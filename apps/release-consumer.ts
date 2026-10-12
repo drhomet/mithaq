@@ -76,6 +76,11 @@ try {
     assert.equal(states?.length, files, `${workspace} reads every copy against the package's r/:\n${check.stdout}`)
     assert.deepEqual(states.filter((one) => one.state !== 'up to date'), [])
   }
+  const targets = spawnSync(process.execPath, ['--input-type=module', '-e', "import * as targets from 'mithaq/targets'; console.log(Object.keys(targets).sort().join(' '))"], { cwd: template, encoding: 'utf8' })
+  assert.equal(targets.status, 0, targets.stderr)
+  for (const name of ['betterAuthTenant', 'drizzleAdapter', 'rbacTarget', 'screenTarget', 'serviceTarget', 'storageTarget', 'versionsTarget', 'zodTarget']) {
+    assert.ok(targets.stdout.split(' ').includes(name), `mithaq/targets exports ${name}:\n${targets.stdout}`)
+  }
   // The rukn that add a key to every kayan augment `KayanConfigs` from their own module. A declaration file that cannot resolve
   // that module drops the augmentation and `skipLibCheck` hides it, so the consumer checks the keys arrive; a stray key must be
   // refused too, since a `KayanConfigs` widened to `any` would pass otherwise.

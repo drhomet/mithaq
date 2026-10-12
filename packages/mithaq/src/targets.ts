@@ -1,0 +1,16 @@
+// Every target factory mithaq ships and the named defaults its options take, so a project's
+// `targets` block reads from one place: `import { drizzleAdapter, serviceTarget } from 'mithaq/targets'`.
+export { drizzleAdapter, drizzleTarget, type Adapter, type ColumnBuilder, type ColumnRule } from './drizzle/index.ts'
+export { kinds as drizzleKinds } from './drizzle/kinds.ts'
+export { rules as drizzleRules } from './drizzle/rules.ts'
+export { zodTarget, type ZodRule, type ZodShape } from './zod/index.ts'
+export { kinds as zodKinds } from './zod/kinds.ts'
+export { rules as zodRules } from './zod/rules.ts'
+export { defaultBulkLimit, defaultDepth, defaultJoinLimit, defaultLimit, defaultMaxLimit, serviceTarget, type ServiceTarget } from './service/index.ts'
+export { defaultAuthorize } from './asas/runner/write.ts'
+export { rbacTarget, type AccessOptions, type AccessTarget, type SystemRole, type SystemRoles } from './rbac/index.ts'
+export { betterAuthTarget, type BetterAuthAccessOptions } from './auth/better-auth/access.ts'
+export { betterAuthTenant } from './auth/better-auth/tenant.ts'
+export { screenKinds, screenTarget, type ScreenTarget } from './screen/index.ts'
+export { defaultFileSize, storageTarget, type StorageConfig, type StorageTarget } from './storage/storage.ts'
+export { versionsTarget, type KayanVersions, type VersionsTarget } from './versions/index.ts'
