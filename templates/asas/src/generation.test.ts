@@ -1458,10 +1458,50 @@ export const files = {
 `)
     await assert.rejects(
       generateScreens({ root, screens: { portal: { ...client, components: { gone: '@cr/gone:./src/gone.tsx#Gone' } } }, into, locales: ['ar', 'en'] }),
-      /The portal screen names files of @cr\/gone, which no node_modules the app reaches holds\. Install it in the app\./,
+      /The portal screen names files of @cr\/gone, which no node_modules in the project holds\. Install it in the app\./,
     )
   } finally {
     await rm(root, { recursive: true })
+  }
+})
+
+test('generateScreens reads an installed package through its node_modules link, never its store path, and only what the project holds', async () => {
+  // The project in a folder of its own, so a package installed above it can be put where the walk must not reach.
+  const outer = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-screens-'))}/`)
+  const elsewhere = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-store-'))}/`)
+  const root = new URL('project/', outer)
+  const app = new URL('apps/mobile/', root)
+  const into = new URL('src/routes/(screens)/', app)
+  const files = () => readFile(new URL('portal/files.ts', into), 'utf8')
+  const link = async (name: string, target: URL) => {
+    await mkdir(new URL(`${name}/src/`, target), { recursive: true })
+    await writeFile(new URL(`${name}/src/center.tsx`, target), '')
+    await mkdir(new URL(`node_modules/${name.slice(0, name.indexOf('/'))}/`, app), { recursive: true })
+    await symlink(fileURLToPath(new URL(name, target)), fileURLToPath(new URL(`node_modules/${name}`, app)))
+  }
+  await mkdir(new URL('src/', app), { recursive: true })
+  await mkdir(new URL('src/', root), { recursive: true })
+  await writeFile(new URL('package.json', root), '{ "name": "portal-project" }\n')
+  await writeFile(new URL('package.json', app), '{ "name": "mobile" }\n')
+  for (const file of ['src/page.tsx', 'src/shell.tsx']) await writeFile(new URL(file, root), '')
+  const naming = (name: string) => ({ ...screenClient(), components: { center: `${name}:./src/center.tsx#Center` } })
+  try {
+    // pnpm's store, whose folder names the version and a hash of the peers, and pnpm's global store outside the project.
+    await link('@cr/centers', new URL('node_modules/.pnpm/@cr+centers@1.0.0_abc123/node_modules/', root))
+    await link('@cr/far', elsewhere)
+    await generateScreens({ root, screens: { portal: naming('@cr/centers') }, into, locales: ['ar', 'en'] })
+    assert.match(await files(), /named\('@cr\/centers', import\.meta\.glob\(\['\.\/src\/center\.tsx'\], \{ base: '\.\.\/\.\.\/\.\.\/\.\.\/node_modules\/@cr\/centers\/', exhaustive: true \}\)\)/)
+    await generateScreens({ root, screens: { portal: naming('@cr/far') }, into, locales: ['ar', 'en'] })
+    assert.match(await files(), /\{ base: '\.\.\/\.\.\/\.\.\/\.\.\/node_modules\/@cr\/far\/', exhaustive: true \}/)
+    await mkdir(new URL('node_modules/@cr/above/src/', outer), { recursive: true })
+    await assert.rejects(
+      generateScreens({ root, screens: { portal: naming('@cr/above') }, into, locales: ['ar', 'en'] }),
+      /The portal screen names files of @cr\/above, which no node_modules in the project holds\./,
+      'the walk stops at the project, so a package installed above it is not read',
+    )
+  } finally {
+    await rm(outer, { recursive: true })
+    await rm(elsewhere, { recursive: true })
   }
 })
 

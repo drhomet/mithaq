@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { isIdentifierName } from '@babel/helper-validator-identifier'
@@ -63,21 +63,38 @@ export type ScreenClient = Client<Pages>
 // One literal, lazy `import.meta.glob` per package over exactly the files the
 // references name: Vite resolves a glob at build and takes no variable.
 const globOf = ({ screen, client, root, app, appName, from }: { screen: string; client: ScreenClient; root: URL; app: URL; appName: unknown; from: URL }) => {
-  // A base is the package's real folder, from the screen's own: npm, pnpm, yarn
-  // and Bun each link a package somewhere else under `node_modules`, and where
-  // its files really are is the one place they agree on.
-  const here = join(realpathSync(fileURLToPath(app)), relative(fileURLToPath(app), fileURLToPath(from)))
-  const baseOf = (folder: string) => `${relative(here, realpathSync(folder)).replaceAll('\\', '/')}/`
+  // Each base is written from the screen's own folder into the project, the
+  // folder holding both the language and the app: the workspace root of a
+  // monorepo, the package itself otherwise. `files.ts` is committed, so a base
+  // never names a folder outside it, which differs from machine to machine.
+  const realApp = realpathSync(fileURLToPath(app))
+  const here = join(realApp, relative(fileURLToPath(app), fileURLToPath(from)))
+  const ours = realpathSync(fileURLToPath(root)).split(sep)
+  const theirs = realApp.split(sep)
+  let shared = 0
+  while (shared < ours.length && ours[shared] === theirs[shared]) shared++
+  const project = ours.slice(0, shared).join(sep) || sep
+  const inProject = (folder: string) => !isAbsolute(relative(project, folder)) && relative(project, folder).split(sep)[0] !== '..'
+  const baseOf = (folder: string) => {
+    if (!inProject(folder)) throw new Refusal(`The ${screen} screen's files are read from ${folder}, outside the project at ${project}.`)
+    return `${relative(here, folder).replaceAll('\\', '/')}/`
+  }
+  // A workspace package is read where it is, which npm, pnpm, yarn and Bun
+  // agree on. Any other is read through its `node_modules` link, because the
+  // folder behind it names a version and a hash, or lies outside the project.
   const installed = (name: string) => {
-    for (let folder = app; ; folder = new URL('../', folder)) {
-      const at = fileURLToPath(new URL(`node_modules/${name}/`, folder))
-      if (existsSync(at)) return baseOf(at)
-      if (new URL('../', folder).href === folder.href) {
-        throw new Refusal(`The ${screen} screen names files of ${name}, which no node_modules the app reaches holds. Install it in the app.`)
+    for (let folder = realApp; ; folder = dirname(folder)) {
+      const link = join(folder, 'node_modules', name)
+      if (existsSync(link)) {
+        const real = realpathSync(link)
+        return baseOf(inProject(real) && !relative(project, real).split(sep).includes('node_modules') ? real : link)
+      }
+      if (folder === project || dirname(folder) === folder) {
+        throw new Refusal(`The ${screen} screen names files of ${name}, which no node_modules in the project holds. Install it in the app.`)
       }
     }
   }
-  const linked = app.href === root.href ? '/' : baseOf(fileURLToPath(root))
+  const linked = app.href === root.href ? '/' : baseOf(ours.join(sep))
   const byPackage = new Map<string, string[]>()
   for (const key of new Set(referencesIn(client).map((reference) => reference.slice(0, reference.indexOf('#'))))) {
     const name = key.startsWith('./') ? '' : key.slice(0, key.indexOf(':'))

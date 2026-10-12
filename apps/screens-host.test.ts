@@ -13,6 +13,7 @@ import { asas } from '../templates/asas/src/asas.ts'
 import { generate, locales } from '../templates/asas/src/mithaq.ts'
 
 const template = new URL('../templates/asas/', import.meta.url)
+const project = new URL('../', import.meta.url)
 const apps = new Map<string, string[]>()
 for (const [screen, folder] of Object.entries(generate.screens)) apps.set(folder, [...(apps.get(folder) ?? []), screen])
 const appOf = (folder: string) => new URL(folder.slice(0, folder.indexOf('src/')), template)
@@ -41,6 +42,10 @@ test('each app names no template path but the base a generated glob reads the pr
       if (!/\.(ts|tsx)$/.test(file)) continue
       // A glob's base is the project's real folder, which no package manager moves.
       const text = await readFile(new URL(file, app), 'utf8')
+      // `files.ts` is committed, so no base it names may lead out of the project, where each machine differs.
+      for (const [, base] of text.matchAll(/\{ base: '([^']*)'/g)) {
+        assert.ok(!relative(fileURLToPath(project), fileURLToPath(new URL(base!, base!.startsWith('/') ? new URL(base!.slice(1), app) : new URL(file, app)))).startsWith('..'), `${folder} ${file} reads ${base}, outside the project`)
+      }
       const source = text.startsWith(generated) ? text.replaceAll(/\{ base: '[^']*'/g, '') : text
       // A quoted specifier or glob reaching into `templates/`; a citation in a comment is in backticks and is no import.
       if (/['"][^'"\n]*templates\/[^'"\n]*['"]/.test(source)) offending.push(`${folder} ${file}`)
