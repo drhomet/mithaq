@@ -15,7 +15,7 @@ const here = fileURLToPath(new URL('.', import.meta.url))
 const run = (url: string | undefined, args: string[], seedAs: Record<string, string> = {}) => {
   const env: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: url, ...seedAs }
   if (url === undefined) delete env.DATABASE_URL
-  for (const key of ['SEED_EMAIL', 'SEED_ORGANIZATION']) if (!(key in seedAs)) delete env[key]
+  for (const key of ['SEED_EMAIL', 'SEED_ORGANIZATION', 'SEED_ALLOW_REMOTE', 'NODE_ENV']) if (!(key in seedAs)) delete env[key]
   const done = spawnSync(process.execPath, args, { cwd: here, env, encoding: 'utf8' })
   return { status: done.status, stdout: done.stdout, stderr: done.stderr }
 }
@@ -28,7 +28,8 @@ const admin = { SEED_EMAIL: 'admin@admin.com', SEED_ORGANIZATION: 'Admin org' }
 const seed = (url: string, seedAs: Record<string, string> = admin) => {
   const done = run(url, ['seed.ts'], seedAs)
   assert.equal(done.status, 0, done.stderr)
-  return JSON.parse(done.stdout.trim().split('\n').at(-1)!) as { organization: string; created: Record<string, number>; repaired: Record<string, number>; totals: Record<string, number> }
+  const lines = done.stdout.trim().split('\n')
+  return { said: lines.at(-2), ...(JSON.parse(lines.at(-1)!) as { organization: string; created: Record<string, number>; repaired: Record<string, number>; totals: Record<string, number> }) }
 }
 const refused = (url: string, seedAs: Record<string, string>) => {
   const done = run(url, ['seed.ts'], seedAs)
@@ -40,6 +41,16 @@ test('the seed refuses to run against a database nobody named', () => {
   const done = run(undefined, ['seed.ts'])
   assert.equal(done.status, 1)
   assert.match(done.stderr, /set DATABASE_URL/)
+})
+
+test('the seed refuses production, and a database on another machine unless told whose organization to fill and told it may, before it connects', () => {
+  // Nothing listens at these hosts, so a seed that connected would fail with another message.
+  const remote = 'postgres://postgres:postgres@db.example.invalid:5432/app'
+  assert.match(refused('postgres://postgres:postgres@localhost:5432/app', { NODE_ENV: 'production' }), /Refusing to seed: NODE_ENV is production/)
+  assert.match(refused(remote, {}), /Refusing to seed: DATABASE_URL names db\.example\.invalid:5432\/app, which is not this machine\. Name the owner/)
+  assert.match(refused(remote, { SEED_EMAIL: 'owner@example.com', SEED_ORGANIZATION: 'Acme' }), /DATABASE_URL names db\.example\.invalid:5432\/app, which is not this machine\. Set SEED_ALLOW_REMOTE=1 to fill the organization "Acme" that owner@example\.com owns there\./)
+  // pg connects to the last `?host=`, so that is the host the guard reads.
+  assert.match(refused('postgres://postgres:postgres@localhost:5432/app?host=db.example.invalid', {}), /names db\.example\.invalid:5432\/app/)
 })
 
 test('a test step that writes refuses a database nobody named, the dev database, the study container, and one not named mithaq', () => {
@@ -93,7 +104,11 @@ test('the seed fills the organization SEED_EMAIL and SEED_ORGANIZATION name thro
     assert.match(refused(fresh, { SEED_EMAIL: 'nobody@example.com' }), /Refusing to seed: no user signs in as nobody@example\.com\./)
     assert.match(refused(fresh, { SEED_EMAIL: 'admin@admin.com', SEED_ORGANIZATION: 'Nowhere' }), /Refusing to seed: admin@admin\.com owns no organization named "Nowhere"\./)
 
-    const first = seed(fresh)
+    // `127.1` is this machine to pg and not to the guard, which reads it as another: told whose and told it may, the seed
+    // fills it, and says which organization in which database.
+    const elsewhere = Object.assign(new URL(fresh), { search: '?host=127.1' }).href
+    const first = seed(elsewhere, { ...admin, SEED_ALLOW_REMOTE: '1' })
+    assert.equal(first.said, `Seeding the organization "Admin org" that admin@admin.com owns, in 127.1:${new URL(fresh).port}/${name}.`)
     assert.deepEqual(first.created, { tags: 6, courses: 20, sessions: first.totals.sessions, enrollments: 60, roles: 3, memberRoles: 3, settings: 1 })
     const sessions = first.totals.sessions!
     assert.ok(sessions >= 40 && sessions <= 120, `two to six sessions for each of twenty courses: ${sessions}`)

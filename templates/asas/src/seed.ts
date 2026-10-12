@@ -16,13 +16,31 @@
 import { createHmac } from 'node:crypto'
 import type { RichTextNode, RichTextValue } from 'mithaq'
 
+function refuse(reason: string): never {
+  console.error(`Refusing to seed: ${reason}`)
+  process.exit(1)
+}
+
 // The language falls back to the local development database when no URL is set,
 // which is right for the dev server and wrong here: a seed writes, so it runs
 // only against a database someone named. Checked before the build is imported,
 // since the import is what reads it.
-if (!process.env.DATABASE_URL) {
-  console.error('Refusing to seed: set DATABASE_URL to the database to fill. Nothing is seeded by default.')
-  process.exit(1)
+if (!process.env.DATABASE_URL) refuse('set DATABASE_URL to the database to fill. Nothing is seeded by default.')
+if (process.env.NODE_ENV === 'production') refuse('NODE_ENV is production, and the seed fills a development database only.')
+const { SEED_EMAIL, SEED_ORGANIZATION } = process.env
+// Without a name the seed picks whoever signed up first, which on a shared
+// database is someone's real organization. So it fills only this machine's
+// database by itself, and another only when told whose and told twice. pg
+// takes a `?host=` over the URL's own host, the last one when repeated, and a
+// path there is a socket on this machine.
+const { hostname, port, pathname, searchParams } = new URL(process.env.DATABASE_URL)
+const host = searchParams.getAll('host').at(-1) || hostname
+const database = `${host}:${searchParams.getAll('port').at(-1) || port || '5432'}/${decodeURIComponent(pathname.slice(1))}`
+if (!host.startsWith('/') && !['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)) {
+  if (!SEED_EMAIL) refuse(`DATABASE_URL names ${database}, which is not this machine. Name the owner whose organization to fill there with SEED_EMAIL, and set SEED_ALLOW_REMOTE=1.`)
+  if (process.env.SEED_ALLOW_REMOTE !== '1') {
+    refuse(`DATABASE_URL names ${database}, which is not this machine. Set SEED_ALLOW_REMOTE=1 to fill ${SEED_ORGANIZATION ? `the organization "${SEED_ORGANIZATION}"` : 'the first organization'} that ${SEED_EMAIL} owns there.`)
+  }
 }
 
 const { asas } = await import('./asas.ts')
@@ -123,12 +141,7 @@ type AuthContext = {
 }
 const auth = await server.$context
 
-function refuse(reason: string): never {
-  console.error(`Refusing to seed: ${reason}`)
-  process.exit(1)
-}
 const oldestFirst = { field: 'createdAt', direction: 'asc' } as const
-const { SEED_EMAIL, SEED_ORGANIZATION } = process.env
 const owner = SEED_EMAIL
   ? (await auth.internalAdapter.findUserByEmail(SEED_EMAIL))?.user
   : (await auth.adapter.findMany({ model: 'user', limit: 1, sortBy: oldestFirst }))[0]
@@ -146,6 +159,7 @@ if (organizations.length !== 1) {
     : `${owner.email} owns no organization. Create one in the tenant app first.`)
 }
 const organization = organizations[0]!
+console.log(`Seeding the organization "${organization.name}" that ${owner.email} owns, in ${database}.`)
 const members = await auth.adapter.findMany({ model: 'member', where: [{ field: 'organizationId', value: organization.id }] })
 
 // A session of the owner's own, in that organization, which the provider
