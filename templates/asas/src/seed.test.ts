@@ -12,9 +12,10 @@ import { testDatabase } from './test-database.ts'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 
-const run = (url: string | undefined, args: string[]) => {
-  const env = { ...process.env, DATABASE_URL: url }
+const run = (url: string | undefined, args: string[], seedAs: Record<string, string> = {}) => {
+  const env: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: url, ...seedAs }
   if (url === undefined) delete env.DATABASE_URL
+  for (const key of ['SEED_EMAIL', 'SEED_ORGANIZATION']) if (!(key in seedAs)) delete env[key]
   const done = spawnSync(process.execPath, args, { cwd: here, env, encoding: 'utf8' })
   return { status: done.status, stdout: done.stdout, stderr: done.stderr }
 }
@@ -22,10 +23,17 @@ const script = (url: string, code: string) => {
   const done = run(url, ['--input-type=module', '-e', `const { asas } = await import('./asas.ts')\ntry {\n${code}\n} finally { await asas.destroy() }`])
   assert.equal(done.status, 0, done.stderr)
 }
-const seed = (url: string) => {
-  const done = run(url, ['seed.ts'])
+// The owner and organization the seed fills unless a test names others.
+const admin = { SEED_EMAIL: 'admin@admin.com', SEED_ORGANIZATION: 'Admin org' }
+const seed = (url: string, seedAs: Record<string, string> = admin) => {
+  const done = run(url, ['seed.ts'], seedAs)
   assert.equal(done.status, 0, done.stderr)
-  return JSON.parse(done.stdout.trim().split('\n').at(-1)!) as { created: Record<string, number>; repaired: Record<string, number>; totals: Record<string, number> }
+  return JSON.parse(done.stdout.trim().split('\n').at(-1)!) as { organization: string; created: Record<string, number>; repaired: Record<string, number>; totals: Record<string, number> }
+}
+const refused = (url: string, seedAs: Record<string, string>) => {
+  const done = run(url, ['seed.ts'], seedAs)
+  assert.equal(done.status, 1, done.stdout)
+  return done.stderr
 }
 
 test('the seed refuses to run against a database nobody named', () => {
@@ -55,7 +63,7 @@ test('a test step that writes refuses a database nobody named, the dev database,
   assert.equal(testDatabase({ DATABASE_URL: named }), named)
 })
 
-test('the seed fills "Admin org" through its owner on the first run and adds nothing on the second', () => {
+test('the seed fills the organization SEED_EMAIL and SEED_ORGANIZATION name through its owner on the first run and adds nothing on the second, and with neither the first user\'s first organization', () => {
   const base = testDatabase()
   const name = `mithaq_seed_${process.pid}`
   const fresh = Object.assign(new URL(base), { pathname: `/${name}` }).href
@@ -69,8 +77,9 @@ test('the seed fills "Admin org" through its owner on the first run and adds not
     // owns, so the seed has to pick the organization by its name and its owner
     // together.
     const password = randomBytes(12).toString('hex')
+    script(fresh, 'await asas.connect()')
+    assert.match(refused(fresh, {}), /Refusing to seed: the database holds no user yet\. Sign up in the tenant app and create an organization first\./)
     script(fresh, `
-      await asas.connect()
       const server = asas.auth.strategies.find((one) => one.name === 'user').server
       const make = async (email, organizations) => {
         const signed = await server.api.signUpEmail({ body: { name: email, email, password: '${password}' }, returnHeaders: true })
@@ -80,6 +89,9 @@ test('the seed fills "Admin org" through its owner on the first run and adds not
       await make('someone@example.com', [['Admin org', 'someone-admin-org']])
       await make('admin@admin.com', [['Elsewhere', 'elsewhere'], ['Admin org', 'admin-org']])
     `)
+
+    assert.match(refused(fresh, { SEED_EMAIL: 'nobody@example.com' }), /Refusing to seed: no user signs in as nobody@example\.com\./)
+    assert.match(refused(fresh, { SEED_EMAIL: 'admin@admin.com', SEED_ORGANIZATION: 'Nowhere' }), /Refusing to seed: admin@admin\.com owns no organization named "Nowhere"\./)
 
     const first = seed(fresh)
     assert.deepEqual(first.created, { tags: 6, courses: 20, sessions: first.totals.sessions, enrollments: 60, roles: 3, memberRoles: 3, settings: 1 })
@@ -144,6 +156,13 @@ test('the seed fills "Admin org" through its owner on the first run and adds not
       if (days < 20) throw new Error('the enrollments fall on ' + days + ' days')
       if (Date.now() - first.getTime() > 90 * 86400000 || last.getTime() > Date.now()) throw new Error('outside the last ninety days: ' + first + ' to ' + last)
     `)
+
+    // Named by neither, the seed fills the first user's first organization: someone@example.com's,
+    // which holds no course until this run.
+    const unnamed = seed(fresh, {})
+    assert.equal(unnamed.created.courses, 20)
+    script(fresh, `const { rows: [held] } = await ${client}.query("select count(*)::int as courses from courses join organization on organization.id = courses.organization_id where organization.slug = 'someone-admin-org'")
+      if (held.courses !== 20) throw new Error('someone-admin-org holds ' + held.courses + ' courses')`)
   } finally {
     script(base, `await ${client}.query('drop database if exists ${name} with (force)')`)
   }

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "seed": "bun src/seed.ts"
+    "seed": "node --env-file-if-exists=.env src/seed.ts"
   },
   "exports": {
     ".": "./src/asas.ts",
