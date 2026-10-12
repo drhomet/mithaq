@@ -51,7 +51,7 @@ import { storageConfig } from './storage/index.ts'
 import { testDatabase } from './test-database.ts'
 
 const label = (en: string) => ({ en, ar: en })
-const reads = ['memos.find', 'memos.count', 'memos.findByID', 'memos.nested', 'memos.fields.id', 'memos.fields.title', 'memos.fields.firmId', 'memos.fields.createdAt', 'memos.fields.updatedAt']
+const reads = ['memos.find', 'memos.peek', 'memos.count', 'memos.findByID', 'memos.nested', 'memos.fields.id', 'memos.fields.title', 'memos.fields.firmId', 'memos.fields.createdAt', 'memos.fields.updatedAt']
 const roles = {
   editor: { label: label('Editor'), permissions: '*' },
   // Reads every column but `secret`.
@@ -92,6 +92,7 @@ const victim: { id?: string; data?: Record<string, unknown> } = {}
 /** Each `ctx.tenant` a recording step saw, in order. */
 const seenTenants: unknown[] = []
 const seeTenant = (ctx: { tenant?: unknown }) => (seenTenants.push(ctx.tenant), ctx)
+const rewriteTenant = (ctx: { tenant?: unknown }) => ((ctx.tenant = 'org2'), ctx)
 /** The memo a step writes into a note, set by the test that makes it. */
 const linked: { memo?: string } = {}
 /** What a step writes past the managed write, set by the test that makes it: a new note, or `id`'s. */
@@ -142,19 +143,26 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           stamp: { steps: ({ steps }: { steps: { insert: unknown } }) => [moveTo('org2'), steps.insert] },
           shift: { steps: ({ steps }: { steps: { update: unknown } }) => [moveTo('org2'), steps.update] },
           // Two steps that rewrite `ctx.tenant`, one in place and one by a copy, around steps that record it.
+          // Each list opens with a step that rewrites it in place, so the object a list starts from is rewritten too.
           forge: {
-            beforeTransaction: [seeTenant],
+            beforeTransaction: [rewriteTenant, seeTenant],
             steps: ({ steps }: { steps: { insert: unknown } }) => [
-              seeTenant,
-              (ctx: { tenant?: unknown }) => ((ctx.tenant = 'org2'), ctx),
+              rewriteTenant,
               seeTenant,
               (ctx: object) => ({ ...ctx, tenant: 'org3' }),
               seeTenant,
               steps.insert,
             ],
-            afterCommit: [seeTenant],
+            afterCommit: [rewriteTenant, seeTenant],
           },
           peek: { steps: ({ steps }: { steps: { find: unknown } }) => [seeTenant, steps.find] },
+          // A managed read inside a read's step, which keeps the reach the outer read opened.
+          peekNested: {
+            steps: ({ steps }: { steps: { find: unknown } }) => [
+              async (ctx: unknown, tools: { kayans: { memos: { peek: (input: object) => Promise<unknown> } } }) => (await tools.kayans.memos.peek({}), ctx),
+              steps.find,
+            ],
+          },
           // A replaced list: the managed read is the project's own step around the sealed one.
           mine: { steps: ({ steps }: { steps: { find: unknown } }) => [(ctx: unknown) => ctx, steps.find] },
           nested: {
@@ -333,7 +341,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp()], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -434,14 +442,25 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     seenTenants.length = 0
     const made = await memos().forge({ title: 'forged' }, { actor: one })
     assert.equal(made.firmId, 'org1')
-    assert.deepEqual(seenTenants, ['org1', 'org1', 'org1', 'org1', 'org1'])
+    assert.deepEqual(seenTenants, ['org1', 'org1', 'org1', 'org1'])
     assert.equal((await memos().count({ where: { title: { equals: 'forged' } } }, { actor: two })).totalDocs, 0)
     seenTenants.length = 0
     await memos().peek({}, { actor: one })
     await memos().peek({}, { actor: one, tenant: 'mine' })
     await built.kayan.pins.operations.forge({ label: 'shared', memo: null }, { actor: one })
     await built.kayan.pins.operations.peek({}, { actor: one })
-    assert.deepEqual(seenTenants, ['org1', undefined, undefined, undefined])
+    await memos().peekNested({}, { actor: one })
+    await memos().peekNested({}, { actor: one, tenant: 'mine' })
+    assert.deepEqual(seenTenants, ['org1', undefined, undefined, undefined, 'org1', undefined])
+    const operator = await actorOf({ active: null, platform: true })
+    platformApp = true
+    try {
+      seenTenants.length = 0
+      await memos().peek({}, { actor: operator, tenant: 'all' })
+      assert.deepEqual(seenTenants, [undefined])
+    } finally {
+      platformApp = false
+    }
   })
 
   test('reads, counts and reads by id see the active organization alone, and another organization\'s row answers as a missing one', async () => {
@@ -997,6 +1016,35 @@ suite('postgres', async () => {
     },
   }
 }, true)
+
+test('a language with no tenant target hands every step ctx.tenant undefined', async () => {
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      store: memoryStore(),
+      zod: zodTarget,
+      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }),
+    } as {},
+  })
+  const notes = {
+    name: 'notes',
+    fields: { ...defaultFields, title: { kind: 'text' } },
+    access: { create: () => true, read: () => true },
+    targets: {
+      service: {
+        operations: {
+          create: { steps: ({ steps }: { steps: { insert: unknown } }) => [seeTenant, steps.insert] },
+          find: { steps: ({ steps }: { steps: { find: unknown } }) => [seeTenant, steps.find] },
+        },
+      },
+    },
+  }
+  const built = language.buildAsas({ http: [fetchHttp()], kayan: [notes] } as never) as unknown as { kayan: { notes: { operations: Record<'create' | 'find', (input: object) => Promise<unknown>> } } }
+  seenTenants.length = 0
+  await built.kayan.notes.operations.create({ title: 'shared' })
+  await built.kayan.notes.operations.find({})
+  assert.deepEqual(seenTenants, [undefined, undefined])
+})
 
 test('buildAsas refuses public files for a tenant-owned kayan, whose address would hand one organization\'s file to anyone', () => {
   assert.throws(() => languageOf(memoryStore() as never, { publicFiles: true }), /Kayan "files" writes "targets.storage" with public: true, and its rows belong to an organization/)

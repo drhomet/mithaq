@@ -607,10 +607,12 @@ export const runOutside = async <Actor>({
   around: { context: Context; user: Actor | null }
 }): Promise<Ctx> => {
   const given = Object.freeze({ ...tools, store: outsideStore(kayan, tools.operation, slot) })
+  // Read before the first step, which is handed `start` itself and may rewrite it in place.
+  const { tenant } = start
   return running.run(around as Running, async () => {
     let ctx = start
     try {
-      for (const step of list) ctx = { ...(await step(ctx, given as WriteTools)), tenant: start.tenant }
+      for (const step of list) ctx = { ...(await step(ctx, given as WriteTools)), tenant }
     } catch (cause) {
       if (slot === 'beforeTransaction') throw cause
       throw new Error(
