@@ -1,8 +1,9 @@
 // Run with DATABASE_URL set to a dedicated local PostgreSQL database named mithaq, which this check writes to.
 // It proves what the boot tests do not: the staged packages (`apps/pack.ts`) make a project the way `bun create mithaq` and
 // `npm create mithaq` do, with `mithaq` installed from the packed tarball and no framework source or `mithaq-admin`; each
-// consumer typechecks, migrates, builds both apps, boots each under Node, answers a signed-in request and passes
-// `mithaq generate --check`. RELEASE_MANAGERS names the package managers, `bun,npm` unless set.
+// consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request and passes
+// `mithaq generate --check`: a monorepo with Bun and with npm, and with Bun a single package and a monorepo with no
+// platform console, which boots with no PLATFORM_URL.
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -47,20 +48,23 @@ try {
     const { repository, homepage, bugs } = JSON.parse(readFileSync(join(root, `.pack/${name}/package.json`), 'utf8')) as { repository?: { url: string }; homepage?: string; bugs?: { url: string } }
     assert.deepEqual([repository?.url, homepage, bugs?.url], ['git+https://github.com/drhomet/mithaq.git', 'https://github.com/drhomet/mithaq#readme', 'https://github.com/drhomet/mithaq/issues'], `.pack/${name} names the public repository`)
   }
-  for (const manager of (process.env.RELEASE_MANAGERS ?? 'bun,npm').split(',')) await release(manager, `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`)
+  const tarball = `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`
+  for (const run of [{ manager: 'bun' }, { manager: 'npm' }, { manager: 'bun', layout: 'single' }, { manager: 'bun', platform: false }]) await release({ tarball, ...run })
   console.log('release consumer passed')
 } finally {
   rmSync(scratch, { recursive: true, force: true })
 }
 
-async function release(manager: string, tarball: string) {
-  const consumer = join(scratch, `consumer-${manager}`)
+async function release({ manager, tarball, layout = 'monorepo', platform = layout === 'monorepo' }: { manager: string; tarball: string; layout?: string; platform?: boolean }) {
+  const name = `${manager}-${layout === 'single' ? 'single' : platform ? 'monorepo' : 'tenant'}`
+  const consumer = join(scratch, name)
+  const single = layout === 'single'
   const servers: ReturnType<typeof spawn>[] = []
   let output = ''
   try {
     // The project as `<manager> create mithaq` makes it, with `mithaq` pointed at the tarball through a flag only this check
     // passes, so nothing is fetched from npm or jsDelivr.
-    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), `consumer-${manager}`, '--mithaq', tarball], {
+    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, platform ? '--platform' : '--no-platform', '--mithaq', tarball], {
       cwd: scratch,
       encoding: 'utf8',
       timeout: 600_000,
@@ -69,24 +73,27 @@ async function release(manager: string, tarball: string) {
     assert.equal(created.status, 0, `${created.stdout}\n${created.stderr}`)
     assert.ok(!created.stderr.includes('Not installed'), created.stderr)
     assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev   # the tenant app`))
-    assert.match(created.stdout, new RegExp(`from apps/asas-platform: ${manager} run dev`))
-    for (const workspace of ['templates/asas', 'templates/auth', 'apps/asas-tanstack', 'apps/asas-platform']) {
+    assert.equal(created.stdout.includes(`from apps/asas-platform: ${manager} run dev`), platform)
+    assert.equal(created.stdout.includes('The package is named asas'), single)
+    const workspaces = single ? [''] : ['templates/asas', 'templates/auth', 'apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : [])]
+    assert.deepEqual(['templates', 'apps/asas-platform'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : platform ? ['templates', 'apps/asas-platform'] : ['templates'])
+    for (const workspace of workspaces) {
       const manifest = JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { devDependencies?: Record<string, string> }
       assert.ok(!manifest.devDependencies?.['mithaq-admin'], `${workspace} names no mithaq-admin`)
       assert.ok(!existsSync(join(consumer, workspace, 'src/asas.test.ts')) && !existsSync(join(consumer, workspace, 'src/test-database.ts')), `${workspace} has no tests`)
     }
-    const app = join(consumer, 'apps/asas-tanstack')
+    const app = single ? consumer : join(consumer, 'apps/asas-tanstack')
     const platformApp = join(consumer, 'apps/asas-platform')
     const mithaq = realpathSync(installed(app, 'mithaq'))
     assert.ok(mithaq.startsWith(join(realpathSync(consumer), 'node_modules')), `mithaq resolves to the installed tarball, not ${mithaq}`)
     assert.equal((JSON.parse(readFileSync(join(mithaq, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq')
     assert.ok(!existsSync(join(consumer, 'node_modules/mithaq-admin')), 'the project has no mithaq-admin')
     // A manager that cannot hoist a package installs it again under each workspace, and a second mithaq is a second language.
-    for (const workspace of ['templates/asas', 'templates/auth', 'apps/asas-platform']) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq')), mithaq, `${workspace} loads the one mithaq`)
-    const template = join(consumer, 'templates/asas')
+    for (const workspace of workspaces) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq')), mithaq, `${workspace} loads the one mithaq`)
+    const template = single ? consumer : join(consumer, 'templates/asas')
     // Every copy each workspace holds is read against the `r/` the installed package ships and must be up to date;
     // with no `r/` there the check answers undefined and this fails.
-    for (const [workspace, files] of [[app, 31], [platformApp, 30], [template, 6]] as const) {
+    for (const [workspace, files] of single ? [[consumer, 37]] as const : [[app, 31], ...(platform ? [[platformApp, 30]] as const : []), [template, 6]] as const) {
       installed(workspace, '.bin/mithaq')
       assert.ok(!existsSync(join(workspace, 'node_modules/mithaq-admin')), `${workspace} has no mithaq-admin`)
       const check = spawnSync(process.execPath, ['--input-type=module', '-e', "import { pathToFileURL } from 'node:url'; import { upgradeCheck } from 'mithaq/upgrade'; console.log(JSON.stringify(await upgradeCheck(pathToFileURL(`${process.cwd()}/`))))"], { cwd: workspace, encoding: 'utf8' })
@@ -107,9 +114,7 @@ async function release(manager: string, tarball: string) {
     ].join('\n'))
     // Each workspace names its own `typescript` (`apps/pack.ts`), so the root has no `tsc` where a manager installs isolated.
     const tsc = installed(template, '.bin/tsc')
-    command(tsc, ['-p', 'apps/asas-tanstack'], consumer)
-    command(tsc, ['-p', 'apps/asas-platform'], consumer)
-    command(tsc, ['-p', '.'], consumer)
+    for (const project of single ? ['.'] : ['apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : []), '.']) command(tsc, ['-p', project], consumer)
     // The database as a deploy leaves it: emptied, then migrated with the `drizzle-kit` the installed `mithaq` resolves.
     // Node runs the rest: the project's `.ts` lies outside `node_modules`, where Node strips types.
     command(process.execPath, ['--input-type=module', '-e', "import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute('drop schema if exists public cascade; create schema public; drop schema if exists drizzle cascade;'); await asas.destroy()"], template)
@@ -118,7 +123,7 @@ async function release(manager: string, tarball: string) {
     command(installed(template, '.bin/mithaq'), ['lock', '--check'], template)
     // Without `--bun`, each program the build script runs starts under the `node` its shebang names.
     command(manager, ['run', 'build'], app)
-    command(manager, ['run', 'build'], platformApp)
+    if (platform) command(manager, ['run', 'build'], platformApp)
 
     const freePort = async () => {
       const held = createServer().listen(0, '127.0.0.1')
@@ -130,13 +135,14 @@ async function release(manager: string, tarball: string) {
     const [port, platformPort] = [await freePort(), await freePort()]
     const origin = `http://127.0.0.1:${port}`
     const platformOrigin = `http://127.0.0.1:${platformPort}`
-    const { BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _fallback, ...withoutAuthSecret } = process.env
+    const { BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _fallback, PLATFORM_URL: _platform, ...withoutAuthSecret } = process.env
     const start = (cwd: string, at: number) => {
       const child = spawn(process.execPath, [join(installed(cwd, 'vite'), 'bin/vite.js'), 'preview', '--port', String(at), '--host', '127.0.0.1', '--strictPort'], {
         cwd,
-        // A production boot needs these settings. `BETTER_AUTH_SECRET` is left out on purpose: each app answering proves it read
-        // the `.env` `create-mithaq` wrote, which TanStack Start loads into `process.env`, a variable already set winning.
-        env: { ...withoutAuthSecret, NODE_ENV: 'production', BETTER_AUTH_URL: origin, PLATFORM_URL: platformOrigin, STORAGE_SECRET: 'mithaq-release-consumer-storage-secret-32', STORAGE_PREFIX: 'mithaq/asas', STORAGE_ADAPTER: 'local', STORAGE_DIR: join(consumer, '.storage') },
+        // A production boot needs these settings, PLATFORM_URL only where a platform app is served. `BETTER_AUTH_SECRET` is
+        // left out on purpose: each app answering proves it read the `.env` `create-mithaq` wrote, which TanStack Start
+        // loads into `process.env`, a variable already set winning.
+        env: { ...withoutAuthSecret, NODE_ENV: 'production', BETTER_AUTH_URL: origin, ...(platform && { PLATFORM_URL: platformOrigin }), STORAGE_SECRET: 'mithaq-release-consumer-storage-secret-32', STORAGE_PREFIX: 'mithaq/asas', STORAGE_ADAPTER: 'local', STORAGE_DIR: join(consumer, '.storage') },
         stdio: ['ignore', 'pipe', 'pipe'],
       })
       servers.push(child)
@@ -146,7 +152,7 @@ async function release(manager: string, tarball: string) {
     }
     // `vite preview` because the build writes a fetch handler and no server; spawned as Node on Vite's own entry,
     // not through `bun run`, so `kill()` reaches the process that holds the port.
-    for (const [at, child] of [[origin, start(app, port)], [platformOrigin, start(platformApp, platformPort)]] as const) {
+    for (const [at, child] of [[origin, start(app, port)], ...(platform ? [[platformOrigin, start(platformApp, platformPort)]] as const : [])] as const) {
       for (let attempt = 0; ; attempt++) {
         assert.ok(child.exitCode === null && child.signalCode === null, `the app on ${at} exited:\n${output}`)
         const answered = await fetch(`${at}/api/not-ours`, { signal: AbortSignal.timeout(1_000) }).catch(() => undefined)
@@ -178,7 +184,7 @@ async function release(manager: string, tarball: string) {
     })
     assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
     command(installed(template, '.bin/mithaq'), ['generate', '--check'], template)
-    console.log(`release consumer passed with ${manager}`)
+    console.log(`release consumer passed: ${name}`)
   } finally {
     for (const server of servers) {
       if (server.exitCode !== null || server.signalCode !== null) continue
