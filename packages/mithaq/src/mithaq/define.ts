@@ -226,7 +226,7 @@ export const defineKayan =
      */
     indexes?: Indexes<NoInfer<keyof Fields & string>, NoInfer<TenantKey<Fields>>>
   }) => {
-    // The key order is the column order: nothing is merged in and nothing is moved.
+    // The key order is the column order but for the timestamps, which a new table puts last: nothing is merged in.
     const fields: Record<string, Field> = Object.fromEntries(
       Object.entries(kayan.fields as Record<string, Field>).map(([name, field]) => [name, tenantDefaults(language, field)]),
     )

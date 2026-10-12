@@ -848,12 +848,10 @@ test('2. buildAsas returns, and refuses a kind no target has an entry for', () =
 })
 
 test('3. the tables carry exactly the columns the kayan describe', async () => {
-  // The column order is the spread order each kayan file wrote: the three shipped default
-  // fields first, then the organization the row belongs to, then the kayan's own.
+  // The column order is the spread order each kayan file wrote, the id first, then the
+  // organization the row belongs to, then the kayan's own, and the two timestamps after them all.
   assert.deepEqual(await columnsOf('course_sessions'), [
     'id',
-    'updated_at',
-    'created_at',
     'organization_id',
     'course_id',
     'starts_at',
@@ -863,11 +861,11 @@ test('3. the tables carry exactly the columns the kayan describe', async () => {
     'archived',
     // Rich text, the last column of each.
     'details',
+    'updated_at',
+    'created_at',
   ])
   assert.deepEqual(await columnsOf('courses'), [
     'id',
-    'updated_at',
-    'created_at',
     'organization_id',
     'title',
     'summary',
@@ -888,13 +886,13 @@ test('3. the tables carry exactly the columns the kayan describe', async () => {
     'details',
     // The cover, an upload's foreign key, last.
     'cover_id',
+    'updated_at',
+    'created_at',
   ])
   // The shipped file columns between the organization and the kayan's own alt text, which is one
   // column per locale.
   assert.deepEqual(await columnsOf('media'), [
     'id',
-    'updated_at',
-    'created_at',
     'organization_id',
     'filename',
     'mime_type',
@@ -905,37 +903,39 @@ test('3. the tables carry exactly the columns the kayan describe', async () => {
     'storage',
     'alt_ar',
     'alt_en',
+    'updated_at',
+    'created_at',
   ])
   assert.deepEqual(await columnsOf('roles'), [
     'id',
-    'updated_at',
-    'created_at',
     'organization_id',
     'name',
     'label_ar',
     'label_en',
     'permissions',
+    'updated_at',
+    'created_at',
   ])
   // Who holds which role, per tenant, which keeps Better Auth's own `member.role`
   // governance alone.
   assert.deepEqual(await columnsOf('member_roles'), [
     'id',
-    'updated_at',
-    'created_at',
     'organization_id',
     'user_id',
     'role',
+    'updated_at',
+    'created_at',
   ])
   assert.deepEqual(await columnsOf('enrollments'), [
     'id',
-    'updated_at',
-    'created_at',
     'organization_id',
     'session_id',
     'student_id',
     // The one kayan of this template that takes the language's soft-delete
     // mark, so its delete keeps the row that says a student was there.
     'deleted_at',
+    'updated_at',
+    'created_at',
   ])
 
   for (const table of ['user', 'session', 'account', 'verification', 'organization', 'member', 'invitation']) {

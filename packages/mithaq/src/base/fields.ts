@@ -37,7 +37,8 @@ export const defaultTimestampFields = {
 
 /**
  * The `id`, `updatedAt` and `createdAt` fields a kayan spreads into its own
- * `fields`: `fields: { ...defaultFields, title }`. Spread order is column order.
+ * `fields`: `fields: { ...defaultFields, title }`. Spread order is column order, except that
+ * a new table puts the two timestamps after every other column.
  */
 export const defaultFields = { ...defaultIdField, ...defaultTimestampFields } as const
 
