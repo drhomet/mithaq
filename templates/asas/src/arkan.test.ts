@@ -152,6 +152,26 @@ test('a kind builds through its own targets, and the project\'s own entry on a t
   await shipped.destroy()
 })
 
+test('a kind no registry control draws names itself as its control, which the project\'s components map draws, and no other kind may name it', async () => {
+  const color = kind<string>(isString)({
+    label,
+    message,
+    rules: ['required'],
+    targets: { drizzle: (field: { column: string }) => text(field.column), zod: () => z.string(), screen: { control: 'color', cell: 'text' } },
+  })
+  const colors = defineRukn({ name: 'colors', kinds: { color } })
+  const screen = screenTarget({ ...dashboardScreen, kayan: ['notes'], controls: screenKinds, pages: { home: { path: '/', component: dashboardScreen.pages.dashboard!.component } } })
+  const own = build(defineMithaq({ targets: { ...offline(), dashboard: screen }, arkan: [base, colors] }), { color: { kind: 'color' } })
+  assert.equal(own.targets.dashboard!.client!.controls.color!.control, 'color', 'the kind is drawn by its own name')
+  await own.destroy()
+  const borrowed = screenTarget({ ...screen, controls: { ...screenKinds, text: { control: 'color', cell: 'text' } } })
+  assert.throws(
+    () => build(defineMithaq({ targets: { ...offline(), dashboard: borrowed }, arkan: [base, colors] }), { color: { kind: 'color' } }),
+    /controls "text" control names "color", which is no name in this screen's components and no control the registry ships/,
+    'another kind cannot borrow it, since the map draws it by the kind',
+  )
+})
+
 test('buildAsas refuses a field whose kind neither the target nor the kind itself builds, naming both', () => {
   const slug = kind<string>(isString)({ label, message, rules: ['required'], targets: { zod: () => z.string() } })
   assert.throws(

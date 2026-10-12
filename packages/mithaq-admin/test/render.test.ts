@@ -146,7 +146,7 @@ test('1. every shipped kind has a control and a cell, and both chains prefer the
   }
   assert.equal(controlFor(fieldOf({ name: 'x', kind: 'number' })), controls.number)
   assert.equal(controlFor(fieldOf({ name: 'x', kind: 'number', component: 'money' })), controls.number)
-  assert.equal(controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' })), controls.uuid)
+  assert.throws(() => controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' })), /components\.controls has no control for "nothing-ships-this", the kind of field "x"/)
   const createdAt = courses.fields.find((one) => one.name === 'createdAt')!
   assert.equal(createdAt.kind, 'datetime', 'the field this reads with is a datetime')
   assert.equal(controlFor(createdAt), controls.datetime, 'with nothing decided the kind is what answers')
@@ -325,13 +325,14 @@ test('a text or number control with a prefix or a suffix is drawn inside an inpu
   assert.doesNotMatch(draw(fieldOf({ name: 'fee', kind: 'number' }), 'en'), /input-group/, 'and a field with neither draws the plain input')
 })
 
-test('9. neither map answers for a key of Object.prototype, so a field naming one resolves to the fallback', () => {
-  // A field's `component` is a string off the projection, and a plain object would answer `constructor` and `toString` from its prototype, so the maps have none.
+test('9. neither map answers for a key of Object.prototype, so a field naming one resolves to its kind', () => {
+  // A field's `component` is a string off the projection, and a plain object would answer `constructor` and `toString` from its prototype.
   for (const component of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
-    assert.equal(
-      controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
-      controls.uuid,
-      `a field naming "${component}" as its component falls through to the read-only control`,
+    assert.equal(controlFor(fieldOf({ name: 'x', kind: 'text', component, cell: component })), controls.text, `a field naming "${component}" as its component falls through to its kind's control`)
+    assert.throws(
+      () => controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
+      /no control for "nothing-ships-this"/,
+      'and to the error where the map has none for its kind either',
     )
     assert.equal(
       cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
@@ -340,7 +341,7 @@ test('9. neither map answers for a key of Object.prototype, so a field naming on
     )
     assert.equal(cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' }), component), cells.text, 'and so does a column naming one as its cell')
   }
-  assert.equal(controlFor(fieldOf({ name: 'x', kind: 'constructor' })), controls.uuid, 'a kind named for a key of Object.prototype resolves to the read-only control')
+  assert.throws(() => controlFor(fieldOf({ name: 'x', kind: 'constructor' })), /no control for "constructor"/, 'a kind named for a key of Object.prototype is no kind the map carries')
   assert.equal(cellFor(fieldOf({ name: 'x', kind: 'constructor' })), cells.text, 'and to the plain cell')
   assert.equal(controlIn({ ...defaultComponents.controls }, fieldOf({ name: 'x', kind: 'text', component: 'toString' })), controls.text, 'the control map answers from its own keys alone, a map a project spread too')
   assert.equal(Object.getPrototypeOf(cells), null, 'and neither does the cell map')
@@ -948,23 +949,21 @@ test('22. the create link is gone where the report denies create, the first show
   assert.equal(/<input[^>]*type="search"[^>]*>/.test(markup({})), true, 'while a searchable list keeps its box')
 })
 
-test('23. a kind no map answers for renders read-only, so a project kind nobody wrote a control for shows its value and takes no edit', () => {
-  // A language may ship a kind this registry has never heard of: the field is shown and cannot be written, and the form never throws.
+test('23. a kind no map answers for is an error naming the kind and the field, so a project kind nobody wrote a control for is never drawn as something else', () => {
   const unmapped: ClientKayan = { ...courses, fields: [fieldOf({ name: 'weight', kind: 'nothing-ships-this' })] }
-  const html = renderToStaticMarkup(
-    createElement(Form, {
-      kayan: unmapped,
-      client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
-      value: { id: 'a-row', weight: '4 kg' },
-      t: copy.t,
-      locale: 'en',
-      onDone: () => {},
-    }),
+  assert.throws(
+    () => renderToStaticMarkup(
+      createElement(Form, {
+        kayan: unmapped,
+        client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+        value: { id: 'a-row', weight: '4 kg' },
+        t: copy.t,
+        locale: 'en',
+        onDone: () => {},
+      }),
+    ),
+    /components\.controls has no control for "nothing-ships-this", the kind of field "weight"/,
   )
-  const input = /<input[^>]*id="courses-weight"[^>]*>/.exec(html)?.[0] ?? ''
-  assert.ok(input, `the unmapped kind still renders a control:\n${html.slice(0, 400)}`)
-  assert.ok(input.includes(' disabled=""'), 'and it is disabled, so nothing about it can be reported as a change')
-  assert.ok(input.includes('4 kg'), 'while still showing the value it is read-only about')
 })
 
 test('24. a label, a description and a refusal all resolve through t, and each falls back to what the caller wrote when no key answers', () => {

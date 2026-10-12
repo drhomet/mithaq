@@ -15,29 +15,45 @@ installed registry, one line per file, and never writes; you merge a change by
 hand. Where it lives: `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
 [The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) describes it.
 
-## Replace a control
+## Add or replace a control
 
 Every screen draws a field's control from the components map the app hands
 `ComponentsProvider`. The app mounts it around every route in
-`src/router.tsx`, with the map the registry ships:
+`src/router.tsx`, typed against the project's language:
 
 ```tsx
-Wrap: ({ children }) => <ComponentsProvider components={defaultComponents}>{children}</ComponentsProvider>,
+const components: ComponentsOf<Language> = defaultComponents
+// ...
+Wrap: ({ children }) => <ComponentsProvider components={components}>{children}</ComponentsProvider>,
 ```
 
 To draw a shipped kind or control name with your own control, spread the
-defaults and replace that one name:
+defaults and replace that one name. A kind your own rukn brings, which no
+control the registry ships draws, names itself as its control, and the map
+draws it under that name:
 
-```tsx
-const components = { ...defaultComponents, controls: { ...defaultComponents.controls, text: MyTextControl } }
+```ts
+const color = kind<string>(isColor)({
+  label: { en: 'Color', ar: 'لون' },
+  message: { en: 'This is not a color.', ar: 'هذا ليس لونا.' },
+  rules: ['required'],
+  targets: { drizzle: drizzleKinds.text, zod: zodKinds.text, screen: { control: 'color', cell: 'text' } },
+})
 ```
 
-The map's keys are the control names the registry ships, so a name it does
-not ship, or a control that does not take `ControlProps`, is a type error. A
-new control name belongs in the screen's `components`, as a `ui()` reference.
-A shipped kind the map leaves out is an error when a field of that kind is
-drawn, and a kind of your own that no registry ships is drawn read-only by the
-map's `uuid` control.
+```tsx
+const components: ComponentsOf<Language> = {
+  ...defaultComponents,
+  controls: { ...defaultComponents.controls, color: ColorControl, text: MyTextControl },
+}
+```
+
+`ComponentsOf<Language>` requires one control per name the registry ships and
+one per kind of the language that no shipped control draws, so leaving `color`
+out, naming a key that is neither, or a control that does not take
+`ControlProps` is a type error. At runtime a field whose kind has no control in
+the map is an error naming the kind and the field; nothing is drawn in its
+place.
 
 ## Add a registry item
 

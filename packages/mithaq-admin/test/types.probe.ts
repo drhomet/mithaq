@@ -38,7 +38,8 @@ import {
   useUser,
 } from 'mithaq/admin/react'
 import type { NodeMap, Places } from '../registry/nodes.tsx'
-import type { Components } from '../registry/components.tsx'
+import type { Components, ComponentsOf } from '../registry/components.tsx'
+import type { Control } from '../registry/control-props.ts'
 
 export const probes: { [Place in keyof Places]: Places[Place] } = {
   provider: ({ children }: ProviderProps<ReactNode>) => children,
@@ -94,3 +95,17 @@ export const wrongSignature: Components = {
 const { text: _text, ...textless } = components.controls
 // @ts-expect-error a map that leaves a kind out is refused
 export const missing: Components = { controls: textless }
+
+type ColorLanguage = typeof import('./color-language.ts').language
+declare const ColorControl: Control
+export const colored: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl } }
+// @ts-expect-error a kind the language's own rukn brings needs a control in the map
+export const colorless: ComponentsOf<ColorLanguage> = { controls: components.controls }
+export const misspelled: ComponentsOf<ColorLanguage> = {
+  // @ts-expect-error and only the kinds it declares do
+  controls: { ...components.controls, color: ColorControl, colour: ColorControl },
+}
+export const wrongColor: ComponentsOf<ColorLanguage> = {
+  // @ts-expect-error a color control is handed ControlProps like any other
+  controls: { ...components.controls, color: ({ value }: { value: number }) => value.toFixed() },
+}

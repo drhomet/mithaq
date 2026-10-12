@@ -5,12 +5,14 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement, type ReactElement } from 'react'
 import { asas } from 'asas'
 import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
+import { fetchHttp } from 'mithaq'
 import './tsx.ts'
 
 const { Form } = await import('../registry/form.tsx')
 const { ComponentsProvider } = await import('../registry/components.tsx')
 const { defaultComponents } = await import('../registry/default-components.tsx')
 type Components = import('../registry/components.tsx').Components
+type ControlsOf<L> = import('../registry/components.tsx').ControlsOf<L>
 type ControlProps = import('../registry/control-props.ts').ControlProps
 
 const screen = asas.targets.dashboard.client
@@ -51,4 +53,20 @@ test('a kind the map leaves out is an error that names it, and a form drawn unde
   const { text: _text, ...rest } = defaultComponents.controls
   assert.throws(() => formWith({ controls: rest as Components['controls'] }), /components\.controls has no control for "text"/)
   assert.throws(() => drawn(form()), /ComponentsProvider/)
+})
+
+test('a kind the project\'s rukn brings is drawn by the control its map names for it, and a map without one is an error naming the kind and the field', async () => {
+  const { language, swatches } = await import('./color-language.ts')
+  const built = language.buildAsas({ http: [fetchHttp()], kayan: [swatches] })
+  try {
+    const kayan = built.targets.dashboard.client.kayan.swatches!
+    const swatch = (components: Components) =>
+      drawn(createElement(ComponentsProvider, { components }, createElement(Form, { kayan, client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) }, value: { id: 's1', color: '#c0ffee' }, t, locale: 'en', onDone: () => {} })))
+    const ColorControl = ({ id, value }: ControlProps) => createElement('input', { id, type: 'color', value: String(value), readOnly: true })
+    const controls = { ...defaultComponents.controls, color: ColorControl } satisfies ControlsOf<typeof language>
+    assert.match(swatch({ ...defaultComponents, controls }), /<input id="swatches-color" type="color"[^>]*value="#c0ffee"/, 'the project\'s color control draws the field')
+    assert.throws(() => swatch(defaultComponents), /components\.controls has no control for "color", the kind of field "color"/)
+  } finally {
+    await built.destroy()
+  }
 })
