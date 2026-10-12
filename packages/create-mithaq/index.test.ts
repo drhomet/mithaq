@@ -27,7 +27,7 @@ test('a project takes the published mithaq under the name its imports use, at ex
   create({ name: 'my-app', cwd: scratch, template, version: '1.2.3' })
   for (const workspace of ['templates/asas', 'templates/auth', 'apps/asas-tanstack', 'apps/asas-platform']) {
     const { dependencies, devDependencies = {} } = json('my-app', workspace, 'package.json')
-    assert.equal(dependencies.mithaq, 'npm:@drhomet/mithaqjs@1.2.3', workspace)
+    assert.equal(dependencies.mithaq, 'npm:@drhomet/mithaq@1.2.3', workspace)
     assert.equal(devDependencies['mithaq-admin'], undefined, workspace)
   }
   assert.equal(json('my-app/apps/asas-tanstack/package.json').dependencies.asas, '*')
@@ -68,7 +68,7 @@ test('the template and both apps get the same .env, with fresh secrets only thei
 
 test('each components.json declares the @mithaq registry at the version the project installs', () => {
   for (const workspace of ['templates/asas', 'apps/asas-tanstack', 'apps/asas-platform']) {
-    assert.equal(json('my-app', workspace, 'components.json').registries['@mithaq'], 'https://cdn.jsdelivr.net/npm/@drhomet/mithaqjs@1.2.3/r/{name}.json', workspace)
+    assert.equal(json('my-app', workspace, 'components.json').registries['@mithaq'], 'https://cdn.jsdelivr.net/npm/@drhomet/mithaq@1.2.3/r/{name}.json', workspace)
   }
 })
 
@@ -87,7 +87,7 @@ test('a dependency left pointing into the framework repository is refused, whate
   for (const [key, spec] of [['other', 'workspace:*'], ['tool', 'link:../tool'], ['local', 'file:../local.tgz']] as const) {
     for (const field of ['dependencies', 'devDependencies'] as const) {
       const packageJson = { dependencies: { mithaq: '*' }, [field]: { mithaq: '*', [key]: spec } }
-      assert.throws(() => updatePackageJSONDependencies({ mithaq: 'npm:@drhomet/mithaqjs@1.2.3', packageJson }), new RegExp(`${key}.*${spec}`), `${field} ${spec}`)
+      assert.throws(() => updatePackageJSONDependencies({ mithaq: 'npm:@drhomet/mithaq@1.2.3', packageJson }), new RegExp(`${key}.*${spec}`), `${field} ${spec}`)
     }
   }
   const packageJson = { dependencies: { mithaq: '*', asas: '*' }, devDependencies: { 'mithaq-admin': 'link:mithaq-admin' } }

@@ -13,12 +13,12 @@
   "publishConfig": {
     "repository": {
       "type": "git",
-      "url": "git+https://github.com/drhomet/mithaqjs.git",
+      "url": "git+https://github.com/drhomet/mithaq.git",
       "directory": "packages/create-mithaq"
     },
-    "homepage": "https://github.com/drhomet/mithaqjs#readme",
+    "homepage": "https://github.com/drhomet/mithaq#readme",
     "bugs": {
-      "url": "https://github.com/drhomet/mithaqjs/issues"
+      "url": "https://github.com/drhomet/mithaq/issues"
     }
   }
 }

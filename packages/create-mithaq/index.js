@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // `bun create mithaq my-app`: lays a new project down from the template this
-// package carries, at the version of `@drhomet/mithaqjs` this package was
+// package carries, at the version of `@drhomet/mithaq` this package was
 // published with. Plain JavaScript on Node's standard library, so `bunx` and
 // `npx` run it with nothing to install first.
 import { spawnSync } from 'node:child_process'
@@ -41,12 +41,12 @@ export function updatePackageJSONDependencies({ mithaq, packageJson }) {
 
 /**
  * Writes the project `name` under `cwd` from `template`, and answers its
- * folder. `version` is the `@drhomet/mithaqjs` the project installs and whose
+ * folder. `version` is the `@drhomet/mithaq` the project installs and whose
  * registry it reads, pinned exactly so the two cannot drift apart and an
  * upgrade is a change the project makes; `mithaq` replaces the dependency
  * itself, which only the release check does.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaqjs@${version}` }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}` }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
@@ -71,7 +71,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   // version installed.
   for (const file of files.filter((file) => basename(file) === 'components.json')) {
     const components = readJson(join(project, file))
-    writeJson(join(project, file), { ...components, registries: { ...components.registries, '@mithaq': `https://cdn.jsdelivr.net/npm/@drhomet/mithaqjs@${version}/r/{name}.json` } })
+    writeJson(join(project, file), { ...components, registries: { ...components.registries, '@mithaq': `https://cdn.jsdelivr.net/npm/@drhomet/mithaq@${version}/r/{name}.json` } })
   }
   // One `.env` for the template's commands and one for each app's dev server,
   // the same secrets in each: the tenant app and the platform console sign

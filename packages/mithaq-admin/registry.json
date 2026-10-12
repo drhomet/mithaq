@@ -1,7 +1,7 @@
 {
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "name": "mithaq-admin",
-  "homepage": "https://github.com/drhomet/mithaqjs",
+  "homepage": "https://github.com/drhomet/mithaq",
   "items": [
     {
       "name": "mithaq-controls",

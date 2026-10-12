@@ -36,15 +36,15 @@ try {
   const scratch = mkdtempSync(join(tmpdir(), 'mithaq-release-'))
   consumer = join(scratch, 'consumer')
   command(process.execPath, ['apps/pack.ts'], root)
-  command('npm', ['pack', '.pack/mithaqjs', '--pack-destination', scratch], root)
-  const { version: published } = JSON.parse(readFileSync(join(root, '.pack/mithaqjs/package.json'), 'utf8')) as { version: string }
-  for (const name of ['mithaqjs', 'create-mithaq']) {
+  command('npm', ['pack', '.pack/mithaq', '--pack-destination', scratch], root)
+  const { version: published } = JSON.parse(readFileSync(join(root, '.pack/mithaq/package.json'), 'utf8')) as { version: string }
+  for (const name of ['mithaq', 'create-mithaq']) {
     const { repository, homepage, bugs } = JSON.parse(readFileSync(join(root, `.pack/${name}/package.json`), 'utf8')) as { repository?: { url: string }; homepage?: string; bugs?: { url: string } }
-    assert.deepEqual([repository?.url, homepage, bugs?.url], ['git+https://github.com/drhomet/mithaqjs.git', 'https://github.com/drhomet/mithaqjs#readme', 'https://github.com/drhomet/mithaqjs/issues'], `.pack/${name} names the public repository`)
+    assert.deepEqual([repository?.url, homepage, bugs?.url], ['git+https://github.com/drhomet/mithaq.git', 'https://github.com/drhomet/mithaq#readme', 'https://github.com/drhomet/mithaq/issues'], `.pack/${name} names the public repository`)
   }
   // The project as `bun create mithaq consumer` makes it, with `mithaq` pointed at the tarball through a flag only this check
   // passes, so nothing is fetched from npm or jsDelivr.
-  const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), 'consumer', '--mithaq', `file:${join(scratch, `drhomet-mithaqjs-${published}.tgz`)}`], {
+  const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), 'consumer', '--mithaq', `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`], {
     cwd: scratch,
     encoding: 'utf8',
     timeout: 600_000,
@@ -63,7 +63,7 @@ try {
   const platformApp = join(consumer, 'apps/asas-platform')
   const installed = realpathSync(join(app, 'node_modules/mithaq'))
   assert.ok(installed.startsWith(join(realpathSync(consumer), 'node_modules')), `mithaq resolves to the installed tarball, not ${installed}`)
-  assert.equal((JSON.parse(readFileSync(join(app, 'node_modules/mithaq/package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaqjs')
+  assert.equal((JSON.parse(readFileSync(join(app, 'node_modules/mithaq/package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq')
   const template = join(consumer, 'templates/asas')
   // Every copy each workspace holds is read against the `r/` the installed package ships and must be up to date;
   // with no `r/` there the check answers undefined and this fails.

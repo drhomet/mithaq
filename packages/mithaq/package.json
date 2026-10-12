@@ -22,16 +22,16 @@
     "mithaq": "./src/asas/cli/mithaq.ts"
   },
   "publishConfig": {
-    "name": "@drhomet/mithaqjs",
-    "version": "0.1.0",
+    "name": "@drhomet/mithaq",
+    "version": "0.1.1",
     "repository": {
       "type": "git",
-      "url": "git+https://github.com/drhomet/mithaqjs.git",
+      "url": "git+https://github.com/drhomet/mithaq.git",
       "directory": "packages/mithaq"
     },
-    "homepage": "https://github.com/drhomet/mithaqjs#readme",
+    "homepage": "https://github.com/drhomet/mithaq#readme",
     "bugs": {
-      "url": "https://github.com/drhomet/mithaqjs/issues"
+      "url": "https://github.com/drhomet/mithaq/issues"
     },
     "engines": {
       "node": ">=24"

@@ -1,4 +1,4 @@
-// Stages the published packages in `.pack/mithaqjs/` and `.pack/create-mithaq/`, to publish with `npm publish <dir> --access public`.
+// Stages the published packages in `.pack/mithaq/` and `.pack/create-mithaq/`, to publish with `npm publish <dir> --access public`.
 // Staged rather than published from `packages/mithaq`, because npm and Bun ignore `publishConfig.exports` and only pnpm applies it.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -9,7 +9,7 @@ import { hashOf, mark } from '../packages/mithaq/src/asas/cli/upgrade.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const source = join(root, 'packages/mithaq')
-const staged = join(root, '.pack/mithaqjs')
+const staged = join(root, '.pack/mithaq')
 
 const { publishConfig, private: _private, devDependencies: _dev, scripts: _scripts, ...manifest } = JSON.parse(
   readFileSync(join(source, 'package.json'), 'utf8'),
