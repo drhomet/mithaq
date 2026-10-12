@@ -1,6 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
-import { formatDate, listed, noValue, type Translate } from './controls.tsx'
+import type { Translate } from './copy.ts'
+import { formatDate, listed, noValue } from './format.tsx'
 import { RelationshipCell, type RelationshipTitles } from './relationship-cell.tsx'
 import { UploadCell } from './upload.tsx'
 

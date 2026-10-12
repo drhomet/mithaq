@@ -397,6 +397,8 @@ const language = defineMithaq({
 // `targets` is the language's own, which `mithaq generate auth` reads beside
 // `generate` to title a provider kayan on each screen that lists it.
 export const { defineKayan, defineGlobal, buildAsas, rows, user, generate, locales, targets, targets: { tenant } } = language
+/** The language's type, which the apps check their admin components map against: a kind of this project's own needs a control there. */
+export type Language = typeof language
 
 /**
  * The field every tenant-owned kayan places, as `organization`: the tenant target's own, under the

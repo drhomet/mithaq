@@ -15,6 +15,54 @@ installed registry, one line per file, and never writes; you merge a change by
 hand. Where it lives: `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
 [The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) describes it.
 
+## Add or replace a control
+
+Every screen draws a field's control from the components map the app hands
+`ComponentsProvider`. The app mounts it around every route in
+`src/router.tsx`, typed against the project's language:
+
+```tsx
+const components: ComponentsOf<Language> = defaultComponents
+// ...
+Wrap: ({ children }) => <ComponentsProvider components={components}>{children}</ComponentsProvider>,
+```
+
+To draw a shipped kind or control name with your own control, spread the
+defaults and replace that one name. A kind your own rukn brings, which no
+control the registry ships draws, names itself as its control, and the map
+draws it under that name:
+
+```ts
+const color = kind<string>(isColor)({
+  label: { en: 'Color', ar: 'لون' },
+  message: { en: 'This is not a color.', ar: 'هذا ليس لونا.' },
+  rules: ['required'],
+  targets: { drizzle: drizzleKinds.text, zod: zodKinds.text, screen: { control: 'color', cell: 'text' } },
+})
+```
+
+```tsx
+const components: ComponentsOf<Language> = {
+  ...defaultComponents,
+  controls: { ...defaultComponents.controls, color: ColorControl, text: MyTextControl },
+}
+```
+
+`ComponentsOf<Language>` requires one control per name the registry ships and
+one per kind of the language that no shipped control draws, so leaving `color`
+out, naming a key that is neither, or a control that does not take
+`ControlProps` is a type error. A kind the language declares needs its entry
+even when no kayan uses it, since the type reads the language and not the
+kayan. A kind drawn by a `ui()` reference needs a map entry too, because an
+operation's dialog, the upload dialog and a form drawn with no page draw it
+through the map.
+
+Each app's `src/server.ts` checks every screen it serves against the map as it
+starts, through `checkComponents`, so a field whose kind has no control stops
+the start with the kind and the field named. A route that throws while drawing
+is replaced by `RouteError`, the router's `defaultErrorComponent`, and the shell
+around it stays.
+
 ## Add a registry item
 
 A registry item is shipped by mithaq for every project. The registry is a shadcn registry in `packages/mithaq-admin/`:

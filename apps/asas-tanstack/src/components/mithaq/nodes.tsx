@@ -40,20 +40,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  besideLabel,
-  controlFor,
-  controls,
-  descriptionFor,
-  labelFor,
-  newTitleOf,
-  placeholderFor,
-  titleOf,
-  type ControlProps,
-  type Copy,
-  type FindApi,
-  type FoundPage,
-} from './controls.tsx'
+import { besideLabel, controlFor, namedControl, useComponents } from './components.tsx'
+import type { ControlProps, FindApi, FoundPage } from './control-props.ts'
+import { descriptionFor, labelFor, newTitleOf, placeholderFor, titleOf, type Copy } from './copy.ts'
 import { FieldShell, describedBy } from './field-shell.tsx'
 import { idsOf, nameOfRow } from './relationship-control.tsx'
 import { titleKey, useRelationshipTitles } from './relationship-cell.tsx'
@@ -828,7 +817,8 @@ export function LeafControl({
   const { locale } = copy
   const chosen = leaf?.component ?? field.component
   const Ref = refOf({ screen, place: 'control', path: chosen })
-  const Control = (leaf?.component && controls[leaf.component]) || controlFor(field)
+  const { controls } = useComponents()
+  const Control = namedControl(controls, leaf?.component) ?? controlFor(controls, field)
   const inputId = `${kayan.name}-${field.name}`
   const description = leaf?.description?.[locale] ?? descriptionFor({ kayan, field, copy })
   const readOnly = props.readOnly || leaf?.readOnly === true
@@ -891,7 +881,7 @@ export function LeafControl({
       description={description}
       error={error}
       onBlur={onBlur}
-      beside={!Ref && besideLabel(Control)}
+      beside={!Ref && besideLabel(controls, Control)}
       control={chosen}
       width={leaf?.width ?? field.width}
     >
@@ -1021,4 +1011,4 @@ export function RecordFrame({
     </>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 d6e35be14e1300296cbe3b2d1330322351a5f45e94e6ae3340b8b6f5728cbc0f
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 c872557b38d0f776b23d250fed69baef1679606a709464dcdd2eb621d329ff27

@@ -54,6 +54,7 @@ test('a project is a workspace every package manager reads, named for it, with r
   assert.ok(existsSync(join(scratch, 'my-app/apps/asas-tanstack/.gitignore')))
   assert.ok(!existsSync(join(scratch, 'my-app/apps/asas-tanstack/gitignore')))
   assert.deepEqual(json('my-app/tsconfig.json').include, ['templates/*/src/**/*.ts', 'apps/*/src/**/*.ts'])
+  assert.deepEqual(json('my-app/tsconfig.json').exclude, ['apps/*/src/server.ts'], 'the server entries are checked by each app\'s own config, which reads their .tsx')
 })
 
 test('the template and both apps get the same .env, with fresh secrets only their owner can read', () => {

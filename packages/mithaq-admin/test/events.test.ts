@@ -37,7 +37,10 @@ const { findOf, readQuery, remembered, rulesOf, writeQuery } = await import('../
 const { Pagination } = await import('../registry/list-pagination.tsx')
 /** The zone the process started in, which a test that sets `TZ` assigns back. */
 const homeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-const { controls } = await import('../registry/controls.tsx')
+const { defaultComponents } = await import('../registry/default-components.tsx')
+const { ComponentsProvider } = await import('../registry/components.tsx')
+const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
+const withComponents = (element: ReactElement) => createElement(ComponentsProvider, { components: defaultComponents }, element)
 const { arm, clientOf } = await import('../registry/host/api.ts')
 const { cells } = await import('../registry/cells.tsx')
 const { CalloutNode } = await import('./callout-node.ts')
@@ -49,7 +52,7 @@ const confirmYes = async () => {
   return asked
 }
 const { RelationshipControl, findByIds, titleFieldOf } = await import('../registry/relationship-control.tsx')
-type FindApi = import('../registry/controls.tsx').FindApi
+type FindApi = import('../registry/control-props.ts').FindApi
 type ClientField = import('mithaq/admin').ClientField
 type ClientKayan = import('mithaq/admin').ClientKayan
 type PageClient = import('mithaq/admin').PageClient
@@ -291,7 +294,7 @@ const render = async (element: ReactElement, over: Partial<ScreenState> = {}) =>
   const root = createRoot(host)
   mounted = root
   await act(async () => {
-    root.render(createElement(ScreenContext, { value: { ...state, ...over } }, element))
+    root.render(createElement(ScreenContext, { value: { ...state, ...over } }, createElement(ComponentsProvider, { components: defaultComponents }, element)))
   })
   return host
 }
@@ -972,6 +975,10 @@ test('218b. a session reads as its course and its start in the enrollment picker
 test('218c. an image lists by its thumbnail and its size in kilobytes or megabytes, its page leads with the image, Download and Replace file, and its New page opens the upload dialog', async (t) => {
   const { FileName, FileSize, MediaPreview, NewImage } = await import('../../../templates/asas/src/media/ui/preview.tsx')
   const { sizeOf } = await import('../registry/upload.tsx')
+  // The template's page imports the app's copy of the upload dialog, which reads the app's copy of the map.
+  const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
+  const { defaultComponents: appDefaults } = await import('@/components/mithaq/default-components.tsx')
+  const inApp = (element: ReactElement) => createElement(AppComponents, { components: appDefaults }, element)
   assert.deepEqual([sizeOf(512, 'en'), sizeOf(2048, 'en'), sizeOf(1536 * 1024, 'en')], ['512 bytes', '2 kilobytes', '1.5 megabytes'], 'bytes, kilobytes and megabytes as a person reads them')
   assert.deepEqual([sizeOf(512, 'ar'), sizeOf(1536 * 1024, 'ar')].map((one) => one.replace(/[\d٠-٩٫.]+\s*/, '')), ['بايت', 'ميغابايت'], 'and in Arabic, the megabyte long as the kilobyte is')
   const media = screen.kayan.media!
@@ -983,7 +990,7 @@ test('218c. an image lists by its thumbnail and its size in kilobytes or megabyt
   assert.equal(name.textContent, 'cover.png', 'and the name')
   assert.equal(name.querySelector('[title="cover.png"]')?.className.includes('min-w-28'), true, 'which keeps room enough to be read on a phone')
 
-  const preview = (access: ScreenState['access']) => render(createElement(MediaPreview), { kayan: media, record: image, access })
+  const preview = (access: ScreenState['access']) => render(inApp(createElement(MediaPreview)), { kayan: media, record: image, access })
   let host = await preview({ collections: { media: { create: true } } } as never)
   assert.equal(host.querySelector('[data-media-download]')?.getAttribute('download'), 'cover.png', 'Download saves the file under its name')
   assert.equal(host.querySelector('[data-media-download]')?.getAttribute('href'), '/api/media/file/m1', 'through the file route')
@@ -1002,7 +1009,7 @@ test('218c. an image lists by its thumbnail and its size in kilobytes or megabyt
   const location = window.location as unknown as Record<'assign', (to: string) => void>
   const went: string[] = []
   t.mock.method(location, 'assign', (to: string) => void went.push(to))
-  await render(createElement(NewImage, { page: media.pages.create! }), { kayan: media })
+  await render(inApp(createElement(NewImage, { page: media.pages.create! })), { kayan: media })
   assert.equal(window.document.querySelector('[data-upload-dialog="media"]') !== null, true, 'the New page opens the upload dialog at once')
   const cancel = [...window.document.querySelectorAll('[data-upload-dialog="media"] button')].find((one) => one.textContent === 'Cancel')
   await act(async () => click(cancel as unknown as Element))
@@ -1466,7 +1473,7 @@ test('35. a form handed another row seeds from that row, so a screen that naviga
   const host = mount()
   const root = createRoot(host)
   const formFor = (value: Record<string, unknown>) =>
-    createElement(Form, { kayan: courses, client, value, t, locale: 'en', onDone: () => {} })
+    withComponents(createElement(Form, { kayan: courses, client, value, t, locale: 'en', onDone: () => {} }))
 
   await act(async () => {
     root.render(formFor({ id: 'first', title: 'Tajweed', summary: 'The first' }))
@@ -1572,7 +1579,7 @@ test('38. a reseed is keyed on the kayan and the id together, and clears a stale
   const host = mount()
   const root = createRoot(host)
   await act(async () => {
-    root.render(
+    root.render(withComponents(
       createElement(Form, {
         kayan: courses,
         client: refusing,
@@ -1581,7 +1588,7 @@ test('38. a reseed is keyed on the kayan and the id together, and clears a stale
         locale: 'en',
         onDone: () => {},
       }),
-    )
+    ))
   })
   await act(async () => {
     fire(host.querySelector('form')!, 'submit')
@@ -1589,7 +1596,7 @@ test('38. a reseed is keyed on the kayan and the id together, and clears a stale
   assert.ok(host.querySelector('[role="alert"]'), 'the refused save is shown')
 
   await act(async () => {
-    root.render(
+    root.render(withComponents(
       createElement(Form, {
         kayan: sessions,
         client: recorded,
@@ -1598,7 +1605,7 @@ test('38. a reseed is keyed on the kayan and the id together, and clears a stale
         locale: 'en',
         onDone: () => {},
       }),
-    )
+    ))
   })
   assert.equal(host.querySelector('[role="alert"]'), null, 'the reseed clears the refusal the row before left behind')
   assert.equal(
@@ -5734,7 +5741,7 @@ test('177m. a filter that arrives in the URL after the list mounted opens the pa
   const draw = (query: Record<string, unknown>) => listOn(courses, [draftRow], { query })
   const host = await render(draw({}))
   // Drawn again under the same wrapper `render` put it in, so it is the same list and not a new one.
-  const again = (query: Record<string, unknown>) => mounted!.render(createElement(ScreenContext, { value: state }, draw(query)))
+  const again = (query: Record<string, unknown>) => mounted!.render(createElement(ScreenContext, { value: state }, withComponents(draw(query))))
   const panel = () => !!host.querySelector('[data-mithaq-filters]')
   assert.equal(panel(), false)
   await act(async () => again({ where }))
@@ -5769,7 +5776,7 @@ test('177o. the count\'s live region is there before a row is ticked, and an ope
   const confirm = () => dialog()!.querySelector('button[type="submit"]') as unknown as HTMLButtonElement
   assert.ok(dialog(), 'the dialog is open')
   assert.equal(confirm().disabled, false, 'and confirms over the row that is ticked')
-  await act(async () => mounted!.render(createElement(ScreenContext, { value: state }, draw([{ ...draftRow, id: 'b-row' }]))))
+  await act(async () => mounted!.render(createElement(ScreenContext, { value: state }, withComponents(draw([{ ...draftRow, id: 'b-row' }])))))
   assert.ok(dialog(), 'and stays open')
   assert.equal(confirm().disabled, true, 'but confirms nothing over no row')
   await act(async () => {
@@ -5796,7 +5803,7 @@ test('177o2. a project\'s own bulk button that ignores busy sends nothing once t
   assert.equal(sent.length > 0, true, 'over the row that is ticked, it sends')
   sent.length = 0
   await act(async () => click(host.querySelector('[aria-label="Select this row"]')!))
-  await act(async () => mounted!.render(createElement(ScreenContext, { value: state }, draw([{ ...draftRow, id: 'b-row' }]))))
+  await act(async () => mounted!.render(createElement(ScreenContext, { value: state }, withComponents(draw([{ ...draftRow, id: 'b-row' }])))))
   await act(async () => click(go()))
   assert.deepEqual(sent, [], 'over no ticked row, not one call is sent')
 })
@@ -7049,7 +7056,7 @@ test('233n. the portal home counts a kayan that keeps drafts the way its list re
 
 test('233o. a range of days takes the form its language gives that count, so Arabic says "7 أيام" and "30 يومًا", and the viewing label reads naturally', async () => {
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
-  const { counted } = await import('../registry/controls.tsx')
+  const { counted } = await import('../registry/format.tsx')
   const days = (locale: 'en' | 'ar', key: string, count: number) => counted({ t: translator(locale), locale, key, count, fallback: '' }).replace(/[\u200e\u200f]/g, '')
   assert.equal(days('en', 'dashboard.chartDays', 7), '7 days')
   assert.equal(days('en', 'dashboard.kpiInRange', 30), 'In the last 30 days')

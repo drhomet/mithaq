@@ -92,7 +92,8 @@ import { ButtonGroup } from '@/components/ui/button-group'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Toggle } from '@/components/ui/toggle'
 import { cn } from '@/lib/utils'
-import { ariaRequired, changeOf, type ControlProps, type Translate } from './controls.tsx'
+import { ariaRequired, changeOf, type ControlProps } from './control-props.ts'
+import type { Translate } from './copy.ts'
 import { richTextBounds, safeUrl, typesOf, unknownType } from 'mithaq/rich-text'
 import { defaultNodes } from './rich-text-nodes.ts'
 
@@ -1080,4 +1081,4 @@ export function RichTextValueView({ value, t }: { value: unknown; t: Translate }
   const direction = useDirection() === 'rtl' ? 'rtl' : 'ltr'
   return value ? <RichTextViewer value={value} direction={direction} t={t} /> : null
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 0709e5fd4e8b0eaeda128c63d9bb3d4bd885ef9f053b7374a40c0223e7aee874
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 9a31f208387f6dcddf8eba732c67165a5e95aba4ada364cdda9cc4139da6652f

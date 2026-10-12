@@ -91,3 +91,4 @@ export { PLATFORM, PLATFORM_SCREEN, assignedRoles, platformEntry } from './tenan
 // one of those, and where each app is served: re-exported here so a host reaches
 // the one instance of the store behind it through the same module the build reads.
 export { asPlatform, onPlatform, platformURL, tenantURL } from '@asas/auth'
+export type { Language } from './mithaq.ts'

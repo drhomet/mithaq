@@ -23,27 +23,22 @@ import { cellFor } from './cells.tsx'
 import { RichTextValueView } from './rich-text.tsx'
 import { UploadValue } from './upload.tsx'
 import { useRelationshipTitles } from './relationship-cell.tsx'
+import { besideLabel, controlFor, useComponents } from './components.tsx'
+import type { FindApi } from './control-props.ts'
 import {
-  besideLabel,
-  controlFor,
-  counted,
   descriptionFor,
   descriptionOf,
   labelFor,
-  listed,
-  localesOf,
   operationFieldLabelFor,
   operationLabelFor,
   placeholderFor,
-  readOnlyField,
-  refusalKeyOf,
-  seedOf,
   titleOf,
-  valuesOf,
   type Copy,
-  type FindApi,
   type Translate,
-} from './controls.tsx'
+} from './copy.ts'
+import { readOnlyField, seedOf, valuesOf } from './field-values.ts'
+import { counted, listed } from './format.tsx'
+import { localesOf, refusalKeyOf } from './refusal.ts'
 import { FieldShell, describedBy } from './field-shell.tsx'
 import { BulkChoice, LeafControl, NavLinks, NodeButton, OwnButton, initialFocusIn, rowWarning, drawNodes, drawsKind, frameOf, leavesOf, nodesOf, pageButtonOf, pageOf, refOf, scopeOf, type Draw, type Node, type PageButton, type ScreenPage } from './nodes.tsx'
 
@@ -466,6 +461,7 @@ export function OperationButton({
   run: (input: Record<string, unknown>, refuse: (thrown: unknown) => void) => Promise<boolean>
 }): ReactElement {
   const { t } = copy
+  const { controls } = useComponents()
   const [held, setHeld] = useState(false)
   const open = controlled.open ?? held
   const setOpen = (next: boolean) => (controlled.onOpenChange ?? setHeld)(next)
@@ -535,18 +531,18 @@ export function OperationButton({
         {/* A form and not a div, so Enter in a one-box dialog submits. */}
         <form className="grid gap-4" noValidate onSubmit={(event) => void submit(event)}>
           {fields.map((field) => {
-            const Control = controlFor(field)
+            const Control = controlFor(controls, field)
             const inputId = `${kayan.name}-${operation.name}-${field.name}`
             const issue = issues[field.name]
             const failed = issue === undefined ? undefined : (t(issue, issue) ?? issue)
-            const choice = writesData && besideLabel(Control)
+            const choice = writesData && besideLabel(controls, Control)
             return (
               <FieldShell
                 key={field.name}
                 id={inputId}
                 label={operationFieldLabelFor({ kayan, operation, field, copy })}
                 error={failed}
-                beside={!choice && besideLabel(Control)}
+                beside={!choice && besideLabel(controls, Control)}
                 width={field.width}
               >
                 {choice ? (
@@ -1464,4 +1460,4 @@ function FormScreen({
     </KayanForm.Provider>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 6a3950dbcb0d13b0f3d3943056ec08b120e52ccaf71877c2bf0e29a7823bbbdc
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 97392ed0a4abdbd62bd09a42b07799b51f3c967aa281afda40ccb2d1035a0299

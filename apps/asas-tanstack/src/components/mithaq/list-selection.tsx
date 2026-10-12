@@ -1,7 +1,9 @@
 import type { ReactElement } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { Checkbox } from '@/components/ui/checkbox'
-import { checkboxSize, readOnlyField, type Translate } from './controls.tsx'
+import { checkboxSize } from './control-props.ts'
+import type { Translate } from './copy.ts'
+import { readOnlyField } from './field-values.ts'
 
 /**
  * The list's checkbox size, with the invisible hit layer grown to 44 pixels below `sm`. Only for
@@ -71,4 +73,4 @@ export function SelectRow({
     />
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 576cedc3611379cc2dcbda75ac13cbf42a5f1d6fbdd43ed6e56fd9d621f3e821
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 242266ea6d2ffea64875c36203f02826d5e59effce3df0e79a33f2a841cc5388

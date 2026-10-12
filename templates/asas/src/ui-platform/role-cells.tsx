@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query'
 import type { CellProps, Row } from 'mithaq/admin'
 import { ListContext, useClient, useLocale, useScreen } from 'mithaq/admin/react'
 import type { asas } from '../asas.ts'
-import { listed, refusalKeyOf } from '@/components/mithaq/controls.tsx'
+import { listed } from '@/components/mithaq/format.tsx'
+import { refusalKeyOf } from '@/components/mithaq/refusal.ts'
 import { systemRoles } from '../roles.ts'
 
 /**

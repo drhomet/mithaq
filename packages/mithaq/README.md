@@ -725,7 +725,7 @@ export const slugs = defineRukn({
 export const arkan = [base, richText({ nodes: richTextNodes }), guardedFiles, versions({ max: 100 }), slugs] as const
 ```
 
-A target reads the project's own entry for a kind first, then the kind's own under `targets`, then its shipped table. `buildAsas` refuses a kind, rule or target that two arkan bring, a rukn target under a key the project's `targets` already use, and a rukn whose need no target meets, naming both sides each time.
+A kind's `screen` control names a control the registry ships, a `ui()` reference, or the kind's own name, which the app's admin components map then draws: see [Add or replace a control](../mithaq-admin/README.md#add-or-replace-a-control). A target reads the project's own entry for a kind first, then the kind's own under `targets`, then its shipped table. `buildAsas` refuses a kind, rule or target that two arkan bring, a rukn target under a key the project's `targets` already use, and a rukn whose need no target meets, naming both sides each time.
 
 A rukn's kinds, rules and target names are vocabulary, so adding a rukn, or changing what one brings, follows [Add a kind or a rule](#add-a-kind-or-a-rule). Fields a feature needs, such as `uploadFields` or `draftFields`, are not part of a rukn: they are exported beside it as named values a kayan spreads.
 

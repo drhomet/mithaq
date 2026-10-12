@@ -3,7 +3,9 @@ import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { controls, labelFor, type FindApi, type Translate } from './controls.tsx'
+import { useComponents } from './components.tsx'
+import type { FindApi } from './control-props.ts'
+import { labelFor, type Translate } from './copy.ts'
 import { RelationshipControl } from './relationship-control.tsx'
 import { operatorsByKind, valueShapeOf, type FilterPath } from './filter-operators.ts'
 import { instantOf, type Condition, type FilterWhere } from './list-query.ts'
@@ -145,6 +147,7 @@ const valueFrom = (kind: string, operator: string, text: string): unknown => {
 
 function ValueInput({ id, locale, operator, onCommit, path, t, value }: { id: string; locale: string; operator: string; path: FilterPath; t: Translate; value: unknown; onCommit: (value: unknown) => void }): ReactElement {
   const { kind } = path
+  const { controls } = useComponents()
   const [text, setText] = useState(asText(value))
   // `sent` is the last commit read back as text; it differs from the typed text where the commit converts it.
   const reported = useRef(asText(value))
@@ -186,7 +189,7 @@ function ValueInput({ id, locale, operator, onCommit, path, t, value }: { id: st
   }
   // A moment is sent as its ISO instant, so 09:30 picked at UTC+3 asks for 06:30Z and the picker draws it back on the reader's clock. `in` and `not_in` keep the token list.
   if ((kind === 'date' || kind === 'datetime') && shape !== 'list') {
-    const Picker = controls[kind]!
+    const Picker = controls[kind]
     return (
       <Picker
         field={path.field}

@@ -11,7 +11,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cellFor } from '@/components/mithaq/cells.tsx'
-import { formatDate, labelFor, operationLabelFor, type FindApi, type FoundPage, type Translate } from '@/components/mithaq/controls.tsx'
+import type { FindApi, FoundPage } from '@/components/mithaq/control-props.ts'
+import { labelFor, operationLabelFor, type Translate } from '@/components/mithaq/copy.ts'
+import { formatDate } from '@/components/mithaq/format.tsx'
 import { useRelationshipTitles, type RelationshipTitles } from '@/components/mithaq/relationship-cell.tsx'
 
 /** One entry as the log's `find` answers it. */

@@ -11,8 +11,13 @@ import './tsx.ts'
 
 const { List } = await import('../registry/list.tsx')
 const { Form } = await import('../registry/form.tsx')
-const { controlFor, controls, descriptionOf, labelFor, operationLabelFor, placeholderFor, readOnlyField, seedOf, valuesOf } =
-  await import('../registry/controls.tsx')
+const { descriptionOf, labelFor, operationLabelFor, placeholderFor, titleOf } = await import('../registry/copy.ts')
+const { readOnlyField, seedOf, valuesOf } = await import('../registry/field-values.ts')
+const { controlFor: controlIn } = await import('../registry/components.tsx')
+const { defaultComponents } = await import('../registry/default-components.tsx')
+const { ComponentsProvider } = await import('../registry/components.tsx')
+const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
+const controlFor = (field: ClientField) => controlIn(defaultComponents.controls, field)
 const { cellFor, cells } = await import('../registry/cells.tsx')
 const { Shell, endonym, iconOf, localeEntries, navEntries, navIcons } = await import('../registry/nav.tsx')
 type NavKayan = import('../registry/nav.tsx').NavKayan
@@ -30,7 +35,6 @@ type ClientKayan = import('mithaq/admin').ClientKayan
 type ClientField = import('mithaq/admin').ClientField
 type PageClient = import('mithaq/admin').PageClient
 type ButtonClient = import('mithaq/admin').ButtonClient
-const { titleOf } = await import('../registry/controls.tsx')
 const { pageButtonOf } = await import('../registry/nodes.tsx')
 const { RecordPage } = await import('../../../templates/asas/src/ui/record-page.tsx')
 const { TablePage } = await import('../../../templates/asas/src/ui/table-page.tsx')
@@ -90,7 +94,7 @@ const state: ScreenState = {
   kayan: courses,
   record: null,
 }
-const renderToStaticMarkup = (element: ReactElement) => staticMarkup(createElement(ScreenContext, { value: state }, element))
+const renderToStaticMarkup = (element: ReactElement) => staticMarkup(createElement(ScreenContext, { value: state }, createElement(ComponentsProvider, { components: defaultComponents }, element)))
 const screenOf = (page: PageClient | undefined, kayan: ClientKayan = courses) => ({ refs, kayan, page: page as Extract<PageClient, { page: unknown }> })
 const recordPage = (main: unknown[]): PageClient => ({ path: '/courses/new', page: { shell: screen.layouts.app!, main: [{ layout: screen.layouts.record!, main } as never] } })
 
@@ -142,7 +146,7 @@ test('1. every shipped kind has a control and a cell, and both chains prefer the
   }
   assert.equal(controlFor(fieldOf({ name: 'x', kind: 'number' })), controls.number)
   assert.equal(controlFor(fieldOf({ name: 'x', kind: 'number', component: 'money' })), controls.number)
-  assert.equal(controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' })), controls.uuid)
+  assert.throws(() => controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' })), /components\.controls has no control for "nothing-ships-this", the kind of field "x"/)
   const createdAt = courses.fields.find((one) => one.name === 'createdAt')!
   assert.equal(createdAt.kind, 'datetime', 'the field this reads with is a datetime')
   assert.equal(controlFor(createdAt), controls.datetime, 'with nothing decided the kind is what answers')
@@ -321,13 +325,14 @@ test('a text or number control with a prefix or a suffix is drawn inside an inpu
   assert.doesNotMatch(draw(fieldOf({ name: 'fee', kind: 'number' }), 'en'), /input-group/, 'and a field with neither draws the plain input')
 })
 
-test('9. neither map answers for a key of Object.prototype, so a field naming one resolves to the fallback', () => {
-  // A field's `component` is a string off the projection, and a plain object would answer `constructor` and `toString` from its prototype, so the maps have none.
+test('9. neither map answers for a key of Object.prototype, so a field naming one resolves to its kind', () => {
+  // A field's `component` is a string off the projection, and a plain object would answer `constructor` and `toString` from its prototype.
   for (const component of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
-    assert.equal(
-      controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
-      controls.uuid,
-      `a field naming "${component}" as its component falls through to the read-only control`,
+    assert.equal(controlFor(fieldOf({ name: 'x', kind: 'text', component, cell: component })), controls.text, `a field naming "${component}" as its component falls through to its kind's control`)
+    assert.throws(
+      () => controlFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
+      /no control for "nothing-ships-this"/,
+      'and to the error where the map has none for its kind either',
     )
     assert.equal(
       cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
@@ -336,9 +341,9 @@ test('9. neither map answers for a key of Object.prototype, so a field naming on
     )
     assert.equal(cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' }), component), cells.text, 'and so does a column naming one as its cell')
   }
-  assert.equal(controlFor(fieldOf({ name: 'x', kind: 'constructor' })), controls.uuid, 'a kind named for a key of Object.prototype resolves to the read-only control')
+  assert.throws(() => controlFor(fieldOf({ name: 'x', kind: 'constructor' })), /no control for "constructor"/, 'a kind named for a key of Object.prototype is no kind the map carries')
   assert.equal(cellFor(fieldOf({ name: 'x', kind: 'constructor' })), cells.text, 'and to the plain cell')
-  assert.equal(Object.getPrototypeOf(controls), null, 'the control map has no prototype to answer from')
+  assert.equal(controlIn({ ...defaultComponents.controls }, fieldOf({ name: 'x', kind: 'text', component: 'toString' })), controls.text, 'the control map answers from its own keys alone, a map a project spread too')
   assert.equal(Object.getPrototypeOf(cells), null, 'and neither does the cell map')
 })
 
@@ -413,7 +418,19 @@ test('12. the app holds the current source of every registry item it copied', ()
   assert.deepEqual(
     names,
     [
-      'mithaq-controls',
+      'mithaq-copy',
+      'mithaq-format',
+      'mithaq-refusal',
+      'mithaq-field-values',
+      'mithaq-control-props',
+      'mithaq-components',
+      'mithaq-text-control',
+      'mithaq-number-control',
+      'mithaq-textarea-control',
+      'mithaq-date-control',
+      'mithaq-choice-control',
+      'mithaq-checkbox-control',
+      'mithaq-default-components',
       'mithaq-cells',
       'mithaq-filter-operators',
       'mithaq-list-query',
@@ -435,7 +452,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the twenty-one items this file knows about',
+    'the registry declares the thirty-three items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`
@@ -932,23 +949,21 @@ test('22. the create link is gone where the report denies create, the first show
   assert.equal(/<input[^>]*type="search"[^>]*>/.test(markup({})), true, 'while a searchable list keeps its box')
 })
 
-test('23. a kind no map answers for renders read-only, so a project kind nobody wrote a control for shows its value and takes no edit', () => {
-  // A language may ship a kind this registry has never heard of: the field is shown and cannot be written, and the form never throws.
+test('23. a kind no map answers for is an error naming the kind and the field, so a project kind nobody wrote a control for is never drawn as something else', () => {
   const unmapped: ClientKayan = { ...courses, fields: [fieldOf({ name: 'weight', kind: 'nothing-ships-this' })] }
-  const html = renderToStaticMarkup(
-    createElement(Form, {
-      kayan: unmapped,
-      client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
-      value: { id: 'a-row', weight: '4 kg' },
-      t: copy.t,
-      locale: 'en',
-      onDone: () => {},
-    }),
+  assert.throws(
+    () => renderToStaticMarkup(
+      createElement(Form, {
+        kayan: unmapped,
+        client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+        value: { id: 'a-row', weight: '4 kg' },
+        t: copy.t,
+        locale: 'en',
+        onDone: () => {},
+      }),
+    ),
+    /components\.controls has no control for "nothing-ships-this", the kind of field "weight"/,
   )
-  const input = /<input[^>]*id="courses-weight"[^>]*>/.exec(html)?.[0] ?? ''
-  assert.ok(input, `the unmapped kind still renders a control:\n${html.slice(0, 400)}`)
-  assert.ok(input.includes(' disabled=""'), 'and it is disabled, so nothing about it can be reported as a change')
-  assert.ok(input.includes('4 kg'), 'while still showing the value it is read-only about')
 })
 
 test('24. a label, a description and a refusal all resolve through t, and each falls back to what the caller wrote when no key answers', () => {
@@ -1028,6 +1043,41 @@ test('33. the column popup moves a column past the hidden one between it and its
 
   assert.equal(neighbour({ columns, at: 2, by: 1 }), -1, 'the last shown column has no neighbour below it')
   assert.deepEqual(move({ columns, at: 2, by: 1 }), columns, 'and a move with no neighbour is the same list, which is what the disabled button stands for')
+})
+
+test('40b. every file an item writes imports only files its own registryDependencies write, followed through each sibling', () => {
+  // `shadcn add` installs an item and its dependencies alone, so a sibling file reached by none of them is a broken import in the project.
+  const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {
+    items: { name: string; registryDependencies?: string[]; files: { path: string; target: string }[] }[]
+  }
+  const installedAt = (target: string) => (target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`)
+  const byName = new Map(source.items.map((item) => [item.name, item]))
+  const writtenBy = new Set(source.items.flatMap((item) => item.files.map((file) => installedAt(file.target))))
+  const closure = (name: string, seen = new Set<string>()): Set<string> => {
+    if (seen.has(name)) return seen
+    seen.add(name)
+    for (const one of byName.get(name)!.registryDependencies ?? []) {
+      const sibling = /mithaq-admin\/r\/(.+)\.json$/.exec(one)?.[1]
+      if (sibling) closure(sibling, seen)
+    }
+    return seen
+  }
+  let checked = 0
+  for (const item of source.items) {
+    const reached = new Set([...closure(item.name)].flatMap((name) => byName.get(name)!.files.map((file) => installedAt(file.target))))
+    for (const file of item.files) {
+      const at = installedAt(file.target)
+      const text = readFileSync(new URL(`../${file.path}`, import.meta.url), 'utf8')
+      for (const [, specifier] of text.matchAll(/from '(\.{1,2}\/[^']+|@\/[^']+)'/g)) {
+        const path = specifier!.startsWith('@/') ? `src/${specifier!.slice(2)}` : new URL(specifier!, `file:///${at}`).pathname.slice(1)
+        // A file no item writes is the app's own, which the host's description names.
+        if (!writtenBy.has(path)) continue
+        checked++
+        assert.ok(reached.has(path), `${item.name} writes ${at}, which imports ${path}, and nothing its registryDependencies reach writes it`)
+      }
+    }
+  }
+  assert.ok(checked > 50, `the imports were read: ${checked}`)
 })
 
 test('40. every item names the shadcn primitive it imports in registryDependencies, and names no primitive it does not import', () => {

@@ -14,6 +14,8 @@ const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { Outlet, RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } = await import('@tanstack/react-router')
 const { ScreenList, flatSearch } = await import('./screen-list.tsx')
+const { ComponentsProvider } = await import('./components/mithaq/components.tsx')
+const { defaultComponents } = await import('./components/mithaq/default-components.tsx')
 const { ScreenContext } = await import('mithaq/admin/react')
 const { askedFor } = await import('./screen-list.tsx')
 
@@ -62,6 +64,7 @@ const start = async (at: string) => {
     history: createMemoryHistory({ initialEntries: [at] }),
     routeTree: root.addChildren([list, createRoute({ getParentRoute: () => root, path: '/courses/$id', component: () => createElement('p', null, 'A row') })]),
     ...flatSearch,
+    Wrap: ({ children }) => createElement(ComponentsProvider, { components: defaultComponents }, children),
   })
   const host = mount()
   const mounted = createRoot(host)

@@ -523,6 +523,8 @@ export const screensOf = (
       }
       const map = place === 'layout' ? 'layouts' : 'components'
       if (Object.hasOwn(maps[map], value)) return maps[map][value]!
+      // A kind no registry control draws names itself, and the project's components map draws it under that name.
+      if (place === 'control' && value === kind && !Object.hasOwn(shippedControls, value) && !(registryControls as readonly string[]).includes(value)) return value
       const shipped: readonly string[] = place === 'control' ? Object.keys(shippedControls) : place === 'cell' ? shippedCells : []
       if (!shipped.includes(value)) {
         throw new Error(`${at} names "${value}", which is no name in this screen's ${map} and no ${place} the registry ships.`)

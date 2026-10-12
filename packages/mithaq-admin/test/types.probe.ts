@@ -38,6 +38,8 @@ import {
   useUser,
 } from 'mithaq/admin/react'
 import type { NodeMap, Places } from '../registry/nodes.tsx'
+import type { Components, ComponentsOf } from '../registry/components.tsx'
+import type { Control } from '../registry/control-props.ts'
 
 export const probes: { [Place in keyof Places]: Places[Place] } = {
   provider: ({ children }: ProviderProps<ReactNode>) => children,
@@ -77,3 +79,33 @@ declare const kinds: NodeMap
 const { separator: _separator, ...withoutSeparator } = kinds
 // @ts-expect-error the separator kind has no entry
 export const partial: NodeMap = withoutSeparator
+
+declare const components: Components
+export const replaced: Components = { ...components, controls: { ...components.controls, text: components.controls.textarea } }
+export const unknownName: Components = {
+  ...components,
+  // @ts-expect-error no control the registry ships is named color, so no screen could ask for it
+  controls: { ...components.controls, color: components.controls.text },
+}
+export const wrongSignature: Components = {
+  ...components,
+  // @ts-expect-error a control is handed ControlProps, whose value is unknown, not a number
+  controls: { ...components.controls, number: ({ value }: { value: number }) => value.toFixed() },
+}
+const { text: _text, ...textless } = components.controls
+// @ts-expect-error a map that leaves a kind out is refused
+export const missing: Components = { controls: textless }
+
+type ColorLanguage = typeof import('./color-language.ts').language
+declare const ColorControl: Control
+export const colored: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl } }
+// @ts-expect-error a kind the language's own rukn brings needs a control in the map
+export const colorless: ComponentsOf<ColorLanguage> = { controls: components.controls }
+export const misspelled: ComponentsOf<ColorLanguage> = {
+  // @ts-expect-error and only the kinds it declares do
+  controls: { ...components.controls, color: ColorControl, colour: ColorControl },
+}
+export const wrongColor: ComponentsOf<ColorLanguage> = {
+  // @ts-expect-error a color control is handed ControlProps like any other
+  controls: { ...components.controls, color: ({ value }: { value: number }) => value.toFixed() },
+}

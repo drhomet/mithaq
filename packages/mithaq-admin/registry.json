@@ -4,37 +4,239 @@
   "homepage": "https://github.com/drhomet/mithaq",
   "items": [
     {
-      "name": "mithaq-controls",
+      "name": "mithaq-copy",
+      "type": "registry:lib",
+      "title": "Mithaq copy",
+      "description": "The chain every label, description, placeholder, operation and title is resolved through: the record's own string for the locale, else the project's copy under its key, else the name.",
+      "files": [
+        {
+          "path": "registry/copy.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/copy.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-format",
       "type": "registry:component",
-      "title": "Mithaq controls",
-      "description": "One control per shipped kind, the copy chain a label is resolved through, the contract every control is written to, and the reader that turns a form's held values into an operation's input.",
+      "title": "Mithaq format",
+      "description": "How a value is written for a reader: a moment or a day in the locale's one format, a counting sentence in its plural form, a list joined in its language, the dash for nothing set, and a value as an input's text or a moment on the reader's wall clock.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/format.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/format.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-refusal",
+      "type": "registry:lib",
+      "title": "Mithaq refusal",
+      "description": "What a refusal carries: its copy key, the locales of each localized field its issues name, and whether a read was refused by access rather than failed.",
+      "files": [
+        {
+          "path": "registry/refusal.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/refusal.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-field-values",
+      "type": "registry:lib",
+      "title": "Mithaq field values",
+      "description": "Which fields the server fills, whether an actor may create a row with something to write, what a form starts holding, and the fields it writes.",
+      "files": [
+        {
+          "path": "registry/field-values.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/field-values.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-control-props",
+      "type": "registry:lib",
+      "title": "Mithaq control props",
+      "description": "The contract every control is written to, the part of the typed client a control reads, and the helpers and sizes the shipped controls share.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/control-props.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/control-props.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-components",
+      "type": "registry:component",
+      "title": "Mithaq components",
+      "description": "The components map a project hands the admin, the provider it mounts it with, and the lookup that picks a field's control from it: the screen's decided name, else the kind's, an error for a shipped kind the map leaves out, and the read-only control for a kind no registry ships.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json"
+      ],
+      "files": [
+        {
+          "path": "registry/components.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/components.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-text-control",
+      "type": "registry:component",
+      "title": "Mithaq text control",
+      "description": "The text, email and decimal boxes, with a prefix and a suffix in the viewer's locale, the one-time code, and the read-only box a uuid is drawn in.",
+      "registryDependencies": [
+        "input",
+        "input-group",
+        "input-otp",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json"
+      ],
+      "files": [
+        {
+          "path": "registry/text-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/text-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-number-control",
+      "type": "registry:component",
+      "title": "Mithaq number control",
+      "description": "The number box that reports a number or nothing, and the slider that draws an unset value with no thumb.",
+      "registryDependencies": [
+        "slider",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-text-control.json"
+      ],
+      "files": [
+        {
+          "path": "registry/number-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/number-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-textarea-control",
+      "type": "registry:component",
+      "title": "Mithaq textarea control",
+      "description": "The text area, and the text list written one entry per line.",
+      "registryDependencies": [
+        "textarea",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json"
+      ],
+      "files": [
+        {
+          "path": "registry/textarea-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/textarea-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-date-control",
+      "type": "registry:component",
+      "title": "Mithaq date control",
+      "description": "The day and moment picker, a calendar beside a 24-hour time box that writes a moment only once both are set, and the inline calendar.",
+      "registryDependencies": [
+        "button",
+        "calendar",
+        "direction",
+        "input",
+        "popover",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json"
+      ],
+      "files": [
+        {
+          "path": "registry/date-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/date-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-choice-control",
+      "type": "registry:component",
+      "title": "Mithaq choice control",
+      "description": "Every control that draws a field's options: the select, the combobox, radio buttons, a toggle group, a button group and a group of checkboxes.",
       "registryDependencies": [
         "button",
         "button-group",
-        "calendar",
-        "direction",
-        "popover",
+        "checkbox",
         "combobox",
-        "input-otp",
         "radio-group",
         "select",
-        "slider",
-        "switch",
         "toggle-group",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json"
+      ],
+      "files": [
+        {
+          "path": "registry/choice-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/choice-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-checkbox-control",
+      "type": "registry:component",
+      "title": "Mithaq checkbox control",
+      "description": "The checkbox, the switch and the toggle a yes-or-no field is drawn with.",
+      "registryDependencies": [
         "checkbox",
-        "input",
-        "input-group",
-        "textarea",
+        "switch",
         "toggle",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/checkbox-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/checkbox-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-default-components",
+      "type": "registry:component",
+      "title": "Mithaq default components",
+      "description": "The components map the admin ships, one control per kind and per control a screen may name, which a project hands the provider as it is or spreads to replace a control.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-choice-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-checkbox-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-date-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-number-control.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
         "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
+        "./node_modules/mithaq-admin/r/mithaq-text-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-textarea-control.json",
         "./node_modules/mithaq-admin/r/mithaq-upload.json"
       ],
       "files": [
         {
-          "path": "registry/controls.tsx",
+          "path": "registry/default-components.tsx",
           "type": "registry:component",
-          "target": "@components/mithaq/controls.tsx"
+          "target": "@components/mithaq/default-components.tsx"
         }
       ]
     },
@@ -44,7 +246,8 @@
       "title": "Mithaq cells",
       "description": "One table cell per shipped kind, resolved through the same chain a control is.",
       "registryDependencies": [
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
         "./node_modules/mithaq-admin/r/mithaq-upload.json"
       ],
@@ -94,7 +297,9 @@
         "button",
         "input",
         "select",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-filter-operators.json",
         "./node_modules/mithaq-admin/r/mithaq-list-query.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
@@ -117,7 +322,8 @@
         "checkbox",
         "label",
         "popover",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-list-query.json"
       ],
       "files": [
@@ -138,7 +344,7 @@
         "input",
         "label",
         "select",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-directional-icon.json",
         "./node_modules/mithaq-admin/r/mithaq-list-query.json"
       ],
@@ -157,7 +363,9 @@
       "description": "The selection a list's bulk buttons run over: the head checkbox, one per row, and the fields a bulk update may write, which are the ones a person could edit on a row.",
       "registryDependencies": [
         "checkbox",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-values.json"
       ],
       "files": [
         {
@@ -179,15 +387,18 @@
         "input",
         "table",
         "./node_modules/mithaq-admin/r/mithaq-cells.json",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-filter-operators.json",
         "./node_modules/mithaq-admin/r/mithaq-form.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
         "./node_modules/mithaq-admin/r/mithaq-list-columns.json",
         "./node_modules/mithaq-admin/r/mithaq-list-filters.json",
         "./node_modules/mithaq-admin/r/mithaq-list-pagination.json",
         "./node_modules/mithaq-admin/r/mithaq-list-query.json",
         "./node_modules/mithaq-admin/r/mithaq-list-selection.json",
         "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json"
       ],
       "files": [
@@ -218,8 +429,11 @@
         "separator",
         "sheet",
         "tabs",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
       ],
       "files": [
@@ -246,9 +460,14 @@
         "spinner",
         "toggle-group",
         "./node_modules/mithaq-admin/r/mithaq-cells.json",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-values.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
         "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
         "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
         "./node_modules/mithaq-admin/r/mithaq-upload.json"
@@ -273,7 +492,7 @@
         "separator",
         "sheet",
         "sidebar",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
       ],
       "files": [
         {
@@ -307,7 +526,9 @@
       "registryDependencies": [
         "combobox",
         "spinner",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json"
       ],
       "files": [
         {
@@ -324,7 +545,9 @@
       "description": "Every relationship id on a page named by one read per target, in three states: loading, the related row's title, and the id where the read did not answer.",
       "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-cells.json",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
       ],
       "files": [
@@ -357,7 +580,8 @@
         "dropdown-menu",
         "input",
         "toggle",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
       ],
       "files": [
         {
@@ -385,8 +609,13 @@
       "registryDependencies": [
         "button",
         "dialog",
-        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-values.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
         "./node_modules/mithaq-admin/r/mithaq-rich-text.json"
@@ -414,10 +643,15 @@
         "card",
         "input",
         "input-group",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-default-components.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-values.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
         "./node_modules/mithaq-admin/r/mithaq-list.json",
-        "./node_modules/mithaq-admin/r/mithaq-nav.json"
+        "./node_modules/mithaq-admin/r/mithaq-nav.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
       ],
       "files": [
         {

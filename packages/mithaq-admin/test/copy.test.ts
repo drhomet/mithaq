@@ -5,14 +5,19 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { act, createElement, type ReactElement } from 'react'
-import { renderToStaticMarkup as staticMarkup } from 'react-dom/server'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { asas } from 'asas'
 import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
 import './tsx.ts'
 import { click, fire, mount, window } from './dom.ts'
 
 const { createRoot } = await import('react-dom/client')
-const { counted, formatDate, localesOf, newTitleOf } = await import('../registry/controls.tsx')
+const { counted, formatDate } = await import('../registry/format.tsx')
+const { localesOf } = await import('../registry/refusal.ts')
+const { newTitleOf } = await import('../registry/copy.ts')
+const { defaultComponents } = await import('../registry/default-components.tsx')
+const { ComponentsProvider } = await import('../registry/components.tsx')
+const staticMarkup = (element: ReactElement) => renderToStaticMarkup(createElement(ComponentsProvider, { components: defaultComponents }, element))
 const { Form, refusalOf, refusalWords } = await import('../registry/form.tsx')
 const { LeafControl, NodeButton, RecordFrame, pageButtonOf, rowWarning } = await import('../registry/nodes.tsx')
 const { OperationButton } = await import('../registry/form.tsx')
@@ -56,7 +61,7 @@ const mountIn = async (element: ReactElement, locale: 'en' | 'ar' = 'en') => {
   const host = mount()
   const root = createRoot(host)
   mounted = root
-  await act(async () => root.render(createElement(ScreenContext, { value: stateOf(locale) }, element)))
+  await act(async () => root.render(createElement(ScreenContext, { value: stateOf(locale) }, createElement(ComponentsProvider, { components: defaultComponents }, element))))
   await act(async () => sleep(20))
   return host
 }

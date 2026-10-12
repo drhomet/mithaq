@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { checkboxSize, labelFor, type Translate } from './controls.tsx'
+import { checkboxSize } from './control-props.ts'
+import { labelFor, type Translate } from './copy.ts'
 import type { ColumnChoice } from './list-query.ts'
 
 export type ColumnsProps = {

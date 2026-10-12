@@ -10,7 +10,9 @@ import './tsx.ts'
 import { click, fire, mount, window, type as typeInto } from './dom.ts'
 
 const { createRoot } = await import('react-dom/client')
-const { controls } = await import('../registry/controls.tsx')
+const { defaultComponents } = await import('../registry/default-components.tsx')
+const { ComponentsProvider } = await import('../registry/components.tsx')
+const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
 const { cells } = await import('../registry/cells.tsx')
 const { FieldValue } = await import('../registry/form.tsx')
 const { useRelationshipTitles } = await import('../registry/relationship-cell.tsx')
@@ -49,7 +51,7 @@ const render = async (element: ReactElement, client: FetchClient = clientOf([]),
   const root = createRoot(host)
   mounted = root
   const state: ScreenState = { t, locale: 'en', dir: 'ltr', screen, access, user: { name: 'Admin', email: 'admin@example.com' }, client }
-  await act(async () => root.render(createElement(ScreenContext, { value: state }, element)))
+  await act(async () => root.render(createElement(ScreenContext, { value: state }, createElement(ComponentsProvider, { components: defaultComponents }, element))))
   await act(async () => sleep(20))
   return host
 }
