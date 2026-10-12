@@ -1,4 +1,4 @@
-import { onPlatform, platformRoles, platformURL } from '@asas/auth'
+import { onPlatform, platformApp, platformRoles, platformURL } from '@asas/auth'
 import { secret } from '@asas/auth/platform-roles'
 import { actorPermissions, actorRoles, authActor, userRefs, type Held, type RowTable, type Store } from 'mithaq'
 import { isOwner, OWNER_ROLE } from './roles/grants.ts'
@@ -170,10 +170,11 @@ export const platformRolesOf = (actor: unknown): string[] => {
 /**
  * Where the tenant app's header links the platform app, for an actor whose
  * platform roles hold `screen.platform`; nothing otherwise. It is a link and
- * grants nothing: the platform app's own server decides entry.
+ * grants nothing: the platform app's own server decides entry. A project that
+ * serves no platform app links nowhere.
  */
 export const platformEntry = (actor: unknown): string | undefined => {
-  if (onPlatform()) return undefined
+  if (onPlatform() || !platformApp) return undefined
   const enters = platformRolesOf(actor).some((slug) => {
     const held = platformRoles[slug as keyof typeof platformRoles].permissions
     return held === '*' || (held as readonly string[]).includes(`screen.${PLATFORM_SCREEN}`)

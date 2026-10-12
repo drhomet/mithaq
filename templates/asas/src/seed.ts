@@ -1,26 +1,46 @@
 // Fills a database with a working organization's worth of rows, so the dashboard
 // can be tried with something in it.
 //
-//   DATABASE_URL=postgres://... bun run seed
+//   DATABASE_URL=postgres://... npm run seed
 //
-// Every row is written through the built asas's own operations, as the owner of
-// the organization named "Admin org", so access, validation, option lists and
-// the organization the runner fills apply exactly as they do to a person in the dashboard.
+// It fills the organization named SEED_ORGANIZATION that the user signing in as
+// SEED_EMAIL owns. SEED_EMAIL unset is the first user to sign up, and
+// SEED_ORGANIZATION unset the first organization that user owns. A development
+// tool only: nothing in production reads it.
+//
+// Every row is written through the built asas's own operations, as that
+// organization's owner, so access, validation, option lists and the
+// organization the runner fills apply exactly as they do to a person in the dashboard.
 // Running it twice adds nothing: each row is looked up by a key that does not
 // change between runs and is skipped where it is already there.
 import { createHmac } from 'node:crypto'
 import type { RichTextNode, RichTextValue } from 'mithaq'
 
-const ORGANIZATION = 'Admin org'
-const OWNER = 'admin@admin.com'
+function refuse(reason: string): never {
+  console.error(`Refusing to seed: ${reason}`)
+  process.exit(1)
+}
 
 // The language falls back to the local development database when no URL is set,
 // which is right for the dev server and wrong here: a seed writes, so it runs
 // only against a database someone named. Checked before the build is imported,
 // since the import is what reads it.
-if (!process.env.DATABASE_URL) {
-  console.error('Refusing to seed: set DATABASE_URL to the database to fill. Nothing is seeded by default.')
-  process.exit(1)
+if (!process.env.DATABASE_URL) refuse('set DATABASE_URL to the database to fill. Nothing is seeded by default.')
+if (process.env.NODE_ENV === 'production') refuse('NODE_ENV is production, and the seed fills a development database only.')
+const { SEED_EMAIL, SEED_ORGANIZATION } = process.env
+// Without a name the seed picks whoever signed up first, which on a shared
+// database is someone's real organization. So it fills only this machine's
+// database by itself, and another only when told whose and told twice. pg
+// takes a `?host=` over the URL's own host, the last one when repeated, and a
+// path there is a socket on this machine.
+const { hostname, port, pathname, searchParams } = new URL(process.env.DATABASE_URL)
+const host = searchParams.getAll('host').at(-1) || hostname
+const database = `${host}:${searchParams.getAll('port').at(-1) || port || '5432'}/${decodeURIComponent(pathname.slice(1))}`
+if (!host.startsWith('/') && !['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)) {
+  if (!SEED_EMAIL) refuse(`DATABASE_URL names ${database}, which is not this machine. Name the owner whose organization to fill there with SEED_EMAIL, and set SEED_ALLOW_REMOTE=1.`)
+  if (process.env.SEED_ALLOW_REMOTE !== '1') {
+    refuse(`DATABASE_URL names ${database}, which is not this machine. Set SEED_ALLOW_REMOTE=1 to fill ${SEED_ORGANIZATION ? `the organization "${SEED_ORGANIZATION}"` : 'the first organization'} that ${SEED_EMAIL} owns there.`)
+  }
 }
 
 const { asas } = await import('./asas.ts')
@@ -112,7 +132,7 @@ type Row = Record<string, unknown> & { id: string }
 type AuthContext = {
   secret: string
   authCookies: { sessionToken: { name: string } }
-  adapter: { findMany(query: { model: string; where: { field: string; value: string }[] }): Promise<Row[]> }
+  adapter: { findMany(query: { model: string; where?: { field: string; value: string }[]; limit?: number; sortBy?: { field: string; direction: 'asc' } }): Promise<Row[]> }
   internalAdapter: {
     findUserByEmail(email: string): Promise<{ user: Row } | null>
     createSession(userId: string, dontRememberMe?: boolean, override?: Record<string, unknown>): Promise<{ token: string }>
@@ -121,21 +141,25 @@ type AuthContext = {
 }
 const auth = await server.$context
 
+const oldestFirst = { field: 'createdAt', direction: 'asc' } as const
+const owner = SEED_EMAIL
+  ? (await auth.internalAdapter.findUserByEmail(SEED_EMAIL))?.user
+  : (await auth.adapter.findMany({ model: 'user', limit: 1, sortBy: oldestFirst }))[0]
+if (!owner) refuse(SEED_EMAIL ? `no user signs in as ${SEED_EMAIL}.` : 'the database holds no user yet. Sign up in the tenant app and create an organization first.')
+const owned = (await auth.adapter.findMany({ model: 'member', where: [{ field: 'userId', value: owner.id }], sortBy: oldestFirst }))
+  .filter((member) => String(member.role).split(',').includes('owner'))
+  .map((member) => String(member.organizationId))
 // A name is not unique, so the organization is the one of that name the owner
 // owns, and there has to be exactly one.
-const owner = (await auth.internalAdapter.findUserByEmail(OWNER))?.user
-const owned = owner
-  ? (await auth.adapter.findMany({ model: 'member', where: [{ field: 'userId', value: owner.id }] }))
-      .filter((member) => String(member.role).split(',').includes('owner'))
-      .map((member) => String(member.organizationId))
-  : []
-const organizations = (await auth.adapter.findMany({ model: 'organization', where: [{ field: 'name', value: ORGANIZATION }] }))
+const organizations = (await auth.adapter.findMany({ model: 'organization', where: [SEED_ORGANIZATION ? { field: 'name', value: SEED_ORGANIZATION } : { field: 'id', value: owned[0] ?? '' }] }))
   .filter((one) => owned.includes(one.id))
-if (!owner || organizations.length !== 1) {
-  console.error(`Refusing to seed: expected one organization named "${ORGANIZATION}" owned by ${OWNER}, found ${organizations.length}.`)
-  process.exit(1)
+if (organizations.length !== 1) {
+  refuse(SEED_ORGANIZATION
+    ? `${owner.email} owns ${organizations.length ? 'more than one' : 'no'} organization named "${SEED_ORGANIZATION}".`
+    : `${owner.email} owns no organization. Create one in the tenant app first.`)
 }
 const organization = organizations[0]!
+console.log(`Seeding the organization "${organization.name}" that ${owner.email} owns, in ${database}.`)
 const members = await auth.adapter.findMany({ model: 'member', where: [{ field: 'organizationId', value: organization.id }] })
 
 // A session of the owner's own, in that organization, which the provider
@@ -175,7 +199,7 @@ try {
     repaired.tagColumns = 1
   }
   const actor = await asas.auth.actor(headers)
-  if (!actor) throw new Error(`The session made for ${OWNER} did not authenticate.`)
+  if (!actor) throw new Error(`The session made for ${owner.email} did not authenticate.`)
   const options = { actor }
   const { courses, sessions, enrollments, tags, roles, memberRoles } = asas.kayan
 
@@ -296,7 +320,7 @@ try {
 
   const { settings } = asas.global
   if (!(await settings.operations.findOne({}, options))) {
-    await settings.operations.update({ siteTitle: `${ORGANIZATION} Academy`, contactEmail: OWNER, maintenance: false }, options)
+    await settings.operations.update({ siteTitle: `${organization.name} Academy`, contactEmail: String(owner.email), maintenance: false }, options)
     created.settings++
   }
 
@@ -318,7 +342,7 @@ try {
     memberRoles: (await memberRoles.operations.count({}, options)).totalDocs,
     settings: (await settings.operations.findOne({}, options)) ? 1 : 0,
   }
-  console.log(JSON.stringify({ organization: ORGANIZATION, created, repaired, totals }))
+  console.log(JSON.stringify({ organization: organization.name, created, repaired, totals }))
 } finally {
   await auth.internalAdapter.deleteSession(token)
   await asas.destroy()

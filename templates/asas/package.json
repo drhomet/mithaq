@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "seed": "bun src/seed.ts"
+    "seed": "node --env-file-if-exists=.env src/seed.ts"
   },
   "exports": {
     ".": "./src/asas.ts",
@@ -33,6 +33,7 @@
     "lucide-react": "^1.16.0",
     "mithaq-admin": "*",
     "react": "^19.3.0",
-    "recharts": "3.8.0"
+    "recharts": "3.8.0",
+    "typescript": "^7.0.2"
   }
 }

@@ -1387,7 +1387,7 @@ test('generateScreens writes each screen a lazy glob over exactly the files its 
   }
 })
 
-test('generateScreens keys a screen served by another app off that app when it holds every file the screen names, and off the project as the app links it otherwise', async () => {
+test('generateScreens keys a screen served by another app off that app when it holds every file the screen names, and off the project\'s own folder otherwise', async () => {
   const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-screens-'))}/`)
   const app = new URL('apps/mobile/', root)
   const into = new URL('src/routes/(screens)/', app)
@@ -1399,12 +1399,13 @@ test('generateScreens keys a screen served by another app off that app when it h
   await writeFile(new URL('package.json', app), '{ "name": "mobile" }\n')
   try {
     await generateScreens({ root, screens: { portal: screenClient() }, into, locales: ['ar', 'en'] })
-    assert.match(await glob(), /\{ base: '\/node_modules\/portal-project\/', exhaustive: true \}/, 'the files are the project\'s, which the app links')
+    // The project's real folder from the screen's, which every package manager agrees on wherever it links the project.
+    assert.match(await glob(), /\{ base: '\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/', exhaustive: true \}/, 'the files are the project\'s, read from its own folder')
     await writeFile(new URL('src/page.tsx', app), 'export const Page = () => null\n')
     await generateScreens({ root, screens: { portal: screenClient() }, into, locales: ['ar', 'en'] })
     // Files a screen prints bare are one package's, since a file of any other package prints its
     // package's name; an app holding one at the same path gives no reason to read it as the app's.
-    assert.match(await glob(), /\{ base: '\/node_modules\/portal-project\/', exhaustive: true \}/, 'the app holding some of them is not the app holding them')
+    assert.match(await glob(), /\{ base: '\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/', exhaustive: true \}/, 'the app holding some of them is not the app holding them')
     await writeFile(new URL('src/shell.tsx', app), 'export const Shell = () => null\nexport const Home = () => null\n')
     await generateScreens({ root, screens: { portal: screenClient() }, into, locales: ['ar', 'en'] })
     assert.match(await glob(), /\['\.\/src\/page\.tsx', '\.\/src\/shell\.tsx'\], \{ base: '\/' \}\)/, 'every file is the app\'s own')
@@ -1438,6 +1439,10 @@ test('generateScreens keys each package a screen names off its own base, and mer
   for (const file of ['src/page.tsx', 'src/shell.tsx']) await writeFile(new URL(file, root), '')
   await mkdir(new URL('src/', app), { recursive: true })
   await writeFile(new URL('package.json', app), '{ "name": "mobile" }\n')
+  // Linked where npm, yarn and a hoisted Bun put a workspace package: at the root, not under the app.
+  await mkdir(new URL('packages/centers/', root), { recursive: true })
+  await mkdir(new URL('node_modules/@cr/', root), { recursive: true })
+  await symlink(fileURLToPath(new URL('packages/centers/', root)), fileURLToPath(new URL('node_modules/@cr/centers', root)))
   const client = { ...screenClient(), components: { own: 'mobile:./src/own.tsx#Own', center: '@cr/centers:./src/center.tsx#Center' } }
   try {
     await generateScreens({ root, screens: { portal: client }, into, locales: ['ar', 'en'] })
@@ -1446,13 +1451,57 @@ test('generateScreens keys each package a screen names off its own base, and mer
 // Every file the \`portal\` screen's references name, each loaded when a page draws it, keyed as the reference prints it.
 const named = (name: string, files: Record<string, () => Promise<unknown>>) => Object.fromEntries(Object.entries(files).map(([file, load]) => [\`\${name}:\${file}\`, load]))
 export const files = {
-  ...import.meta.glob(['./src/page.tsx', './src/shell.tsx'], { base: '/node_modules/portal-project/', exhaustive: true }),
-  ...named('@cr/centers', import.meta.glob(['./src/center.tsx'], { base: '/node_modules/@cr/centers/', exhaustive: true })),
+  ...import.meta.glob(['./src/page.tsx', './src/shell.tsx'], { base: '../../../../../../', exhaustive: true }),
+  ...named('@cr/centers', import.meta.glob(['./src/center.tsx'], { base: '../../../../../../packages/centers/', exhaustive: true })),
   ...named('mobile', import.meta.glob(['./src/own.tsx'], { base: '/' })),
 }
 `)
+    await assert.rejects(
+      generateScreens({ root, screens: { portal: { ...client, components: { gone: '@cr/gone:./src/gone.tsx#Gone' } } }, into, locales: ['ar', 'en'] }),
+      /The portal screen names files of @cr\/gone, which no node_modules in the project holds\. Install it in the app\./,
+    )
   } finally {
     await rm(root, { recursive: true })
+  }
+})
+
+test('generateScreens reads an installed package through its node_modules link, never its store path, and only what the project holds', async () => {
+  // The project in a folder of its own, so a package installed above it can be put where the walk must not reach.
+  const outer = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-screens-'))}/`)
+  const elsewhere = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-store-'))}/`)
+  const root = new URL('project/', outer)
+  const app = new URL('apps/mobile/', root)
+  const into = new URL('src/routes/(screens)/', app)
+  const files = () => readFile(new URL('portal/files.ts', into), 'utf8')
+  const link = async (name: string, target: URL) => {
+    await mkdir(new URL(`${name}/src/`, target), { recursive: true })
+    await writeFile(new URL(`${name}/src/center.tsx`, target), '')
+    await mkdir(new URL(`node_modules/${name.slice(0, name.indexOf('/'))}/`, app), { recursive: true })
+    await symlink(fileURLToPath(new URL(name, target)), fileURLToPath(new URL(`node_modules/${name}`, app)))
+  }
+  await mkdir(new URL('src/', app), { recursive: true })
+  await mkdir(new URL('src/', root), { recursive: true })
+  await writeFile(new URL('package.json', root), '{ "name": "portal-project" }\n')
+  await writeFile(new URL('package.json', app), '{ "name": "mobile" }\n')
+  for (const file of ['src/page.tsx', 'src/shell.tsx']) await writeFile(new URL(file, root), '')
+  const naming = (name: string) => ({ ...screenClient(), components: { center: `${name}:./src/center.tsx#Center` } })
+  try {
+    // pnpm's store, whose folder names the version and a hash of the peers, and pnpm's global store outside the project.
+    await link('@cr/centers', new URL('node_modules/.pnpm/@cr+centers@1.0.0_abc123/node_modules/', root))
+    await link('@cr/far', elsewhere)
+    await generateScreens({ root, screens: { portal: naming('@cr/centers') }, into, locales: ['ar', 'en'] })
+    assert.match(await files(), /named\('@cr\/centers', import\.meta\.glob\(\['\.\/src\/center\.tsx'\], \{ base: '\.\.\/\.\.\/\.\.\/\.\.\/node_modules\/@cr\/centers\/', exhaustive: true \}\)\)/)
+    await generateScreens({ root, screens: { portal: naming('@cr/far') }, into, locales: ['ar', 'en'] })
+    assert.match(await files(), /\{ base: '\.\.\/\.\.\/\.\.\/\.\.\/node_modules\/@cr\/far\/', exhaustive: true \}/)
+    await mkdir(new URL('node_modules/@cr/above/src/', outer), { recursive: true })
+    await assert.rejects(
+      generateScreens({ root, screens: { portal: naming('@cr/above') }, into, locales: ['ar', 'en'] }),
+      /The portal screen names files of @cr\/above, which no node_modules in the project holds\./,
+      'the walk stops at the project, so a package installed above it is not read',
+    )
+  } finally {
+    await rm(outer, { recursive: true })
+    await rm(elsewhere, { recursive: true })
   }
 })
 
@@ -1533,6 +1582,13 @@ test('`mithaq generate screens` writes each screen into the folder generate.scre
     const unnamed = await command(root, 'generate', 'screens')
     assert.notEqual(unnamed.code, 0, 'a screen generate.screens names no folder for is refused')
     assert.match(unnamed.stderr, /generate\.screens names no folder for the screen platform/)
+    // A project with no app serving the platform screen says so, and nothing is written for it.
+    await rm(new URL('staff/', root), { recursive: true })
+    await writeFile(new URL('src/mithaq.ts', root), "export const generate = { messages: 'src/messages/', screens: { portal: 'tenant/src/routes/(screens)/', platform: false } }\n")
+    const unserved = await command(root, 'generate', 'screens')
+    assert.equal(unserved.code, 0, unserved.stderr)
+    await assert.rejects(readdir(new URL('staff/', root)), 'no folder is made for a screen no app serves')
+    assert.equal((await command(root, 'generate', 'screens', '--check')).code, 0)
   } finally {
     await rm(root, { recursive: true })
   }

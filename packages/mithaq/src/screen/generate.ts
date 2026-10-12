@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { isIdentifierName } from '@babel/helper-validator-identifier'
@@ -62,7 +62,39 @@ export type ScreenClient = Client<Pages>
 
 // One literal, lazy `import.meta.glob` per package over exactly the files the
 // references name: Vite resolves a glob at build and takes no variable.
-const globOf = ({ screen, client, root, app, appName, linked }: { screen: string; client: ScreenClient; root: URL; app: URL; appName: unknown; linked: string }) => {
+const globOf = ({ screen, client, root, app, appName, from }: { screen: string; client: ScreenClient; root: URL; app: URL; appName: unknown; from: URL }) => {
+  // Each base is written from the screen's own folder into the project, the
+  // folder holding both the language and the app: the workspace root of a
+  // monorepo, the package itself otherwise. `files.ts` is committed, so a base
+  // never names a folder outside it, which differs from machine to machine.
+  const realApp = realpathSync(fileURLToPath(app))
+  const here = join(realApp, relative(fileURLToPath(app), fileURLToPath(from)))
+  const ours = realpathSync(fileURLToPath(root)).split(sep)
+  const theirs = realApp.split(sep)
+  let shared = 0
+  while (shared < ours.length && ours[shared] === theirs[shared]) shared++
+  const project = ours.slice(0, shared).join(sep) || sep
+  const inProject = (folder: string) => !isAbsolute(relative(project, folder)) && relative(project, folder).split(sep)[0] !== '..'
+  const baseOf = (folder: string) => {
+    if (!inProject(folder)) throw new Refusal(`The ${screen} screen's files are read from ${folder}, outside the project at ${project}.`)
+    return `${relative(here, folder).replaceAll('\\', '/')}/`
+  }
+  // A workspace package is read where it is, which npm, pnpm, yarn and Bun
+  // agree on. Any other is read through its `node_modules` link, because the
+  // folder behind it names a version and a hash, or lies outside the project.
+  const installed = (name: string) => {
+    for (let folder = realApp; ; folder = dirname(folder)) {
+      const link = join(folder, 'node_modules', name)
+      if (existsSync(link)) {
+        const real = realpathSync(link)
+        return baseOf(inProject(real) && !relative(project, real).split(sep).includes('node_modules') ? real : link)
+      }
+      if (folder === project || dirname(folder) === folder) {
+        throw new Refusal(`The ${screen} screen names files of ${name}, which no node_modules in the project holds. Install it in the app.`)
+      }
+    }
+  }
+  const linked = app.href === root.href ? '/' : baseOf(ours.join(sep))
   const byPackage = new Map<string, string[]>()
   for (const key of new Set(referencesIn(client).map((reference) => reference.slice(0, reference.indexOf('#'))))) {
     const name = key.startsWith('./') ? '' : key.slice(0, key.indexOf(':'))
@@ -91,7 +123,7 @@ export const files = ${own}
 // Every file the \`${screen}\` screen's references name, each loaded when a page draws it, keyed as the reference prints it.
 const named = (name: string, files: Record<string, () => Promise<unknown>>) => Object.fromEntries(Object.entries(files).map(([file, load]) => [\`\${name}:\${file}\`, load]))
 export const files = {
-${bare.length ? `  ...${own},\n` : ''}${named.map((name) => `  ...named(${sourceString(name)}, ${glob(byPackage.get(name)!, name === appName ? '/' : `/node_modules/${name}/`)}),\n`).join('')}}
+${bare.length ? `  ...${own},\n` : ''}${named.map((name) => `  ...named(${sourceString(name)}, ${glob(byPackage.get(name)!, name === appName ? '/' : installed(name))}),\n`).join('')}}
 `
 }
 
@@ -166,14 +198,13 @@ export const generateScreens = async ({
   const prefix = decodeURIComponent(into.pathname.slice(routesAt + '/routes'.length))
   // The app is the package holding `into`, and Vite's root is its folder.
   const app = packageOf(into) ?? root
-  const linked = app.href === root.href ? '/' : `/node_modules/${JSON.parse(await readFile(new URL('package.json', root), 'utf8')).name}/`
   const appName: unknown = JSON.parse(await readFile(new URL('package.json', app), 'utf8').catch(() => '{}')).name
   const wanted = Object.entries(screens).flatMap(([key, client]) => {
     const from = new URL(`${key}/`, into)
     return [
       [new URL('screen.json', from), `${JSON.stringify(client, null, 2)}\n`],
       [new URL('types.ts', from), typesOf(client, locales)],
-      [new URL('files.ts', from), globOf({ screen: key, client, root, app, appName, linked })],
+      [new URL('files.ts', from), globOf({ screen: key, client, root, app, appName, from })],
       ...routesOf(key, client, prefix).map(([file, source]) => [new URL(file, into), source] as const),
     ] as const
   })
@@ -217,6 +248,8 @@ export const run = async (project: URL, check: boolean): Promise<number> => {
   const byFolder = new Map<string, Record<string, ScreenClient>>()
   for (const at of folder(into) ? [into] : Object.values(into ?? {})) if (folder(at)) byFolder.set(at as string, {})
   for (const [name, client] of Object.entries(screens)) {
+    // `false` is a project saying no app of its own serves this screen, so nothing is written for it.
+    if (!folder(into) && (into as Record<string, unknown>)[name] === false) continue
     const at = folder(into) ?? folder((into as Record<string, unknown>)[name])
     if (!at) throw new Refusal(`generate.screens names no folder for the screen ${name}. Name one: \`screens: { ${name}: 'src/routes/(screens)/' }\`.`)
     byFolder.set(at, { ...byFolder.get(at), [name]: client })

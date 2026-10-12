@@ -80,8 +80,12 @@ const templateFiles = execFileSync('git', ['ls-files', '-z', 'templates/asas', '
 for (const file of templateFiles) {
   cpSync(join(root, file), join(creator, 'template', file.replace(/(^|\/)\.gitignore$/, '$1gitignore')), { dereference: true })
 }
-const { packageManager, engines, devDependencies } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as Record<string, unknown>
-writeFileSync(join(creator, 'template/package.json'), `${JSON.stringify({ private: true, type: 'module', packageManager, engines, workspaces: ['templates/*', 'apps/*'], devDependencies }, null, 2)}\n`)
+// No `packageManager`: a project installs with whichever manager made it, and corepack refuses any other the field does not name.
+// No `typescript` either: each workspace that type-checks names its own, because npm, seeing a root `typescript` 7 that an
+// optional peer of better-auth's would refuse, installs better-auth and mithaq again under every workspace, and two copies of
+// mithaq are two languages.
+const { engines, devDependencies: { typescript: _typescript, ...devDependencies } } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { engines: unknown; devDependencies: Record<string, string> }
+writeFileSync(join(creator, 'template/package.json'), `${JSON.stringify({ private: true, type: 'module', engines, workspaces: ['templates/*', 'apps/*', 'packages/features/*'], devDependencies }, null, 2)}\n`)
 writeFileSync(join(creator, 'package.json'), `${JSON.stringify({ ...creatorManifest, ...creatorPublished, version: publishConfig.version }, null, 2)}\n`)
 cpSync(join(creatorSource, 'index.js'), join(creator, 'index.js'))
 cpSync(join(root, 'LICENSE'), join(creator, 'LICENSE'))

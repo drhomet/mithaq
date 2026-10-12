@@ -11,8 +11,9 @@
 @import '@fontsource/ibm-plex-sans-arabic';
 
 /* The project's own shells, pages and components, which the screens load
-   through the same linked package (`templates/asas/src/ui/app-shell.tsx`). */
-@source '../node_modules/asas/src';
+   (`templates/asas/src/ui/app-shell.tsx`). Named by their folder, which every
+   package manager leaves where it is, since each links the package elsewhere. */
+@source '../../../templates/asas/src';
 
 @custom-variant dark (&:is(.dark *));
 

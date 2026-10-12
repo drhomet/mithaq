@@ -12258,6 +12258,30 @@ test('142j. a production boot is refused without PLATFORM_URL, BETTER_AUTH_URL o
   })
 })
 
+test('142k. a project that serves no platform console boots in production with BETTER_AUTH_URL and the secret alone', async (t) => {
+  // The provider as `create-mithaq --no-platform` writes it, beside the original so it resolves the same packages.
+  const source = new URL('../../auth/src/', import.meta.url)
+  const copy = new URL(`.no-platform-${process.pid}/`, source)
+  await mkdir(copy)
+  t.after(() => rm(copy, { recursive: true, force: true }))
+  const provider = await readFile(new URL('index.ts', source), 'utf8')
+  assert.ok(provider.includes('export const platformApp: boolean = true'), 'the provider says whether a platform app is served')
+  await writeFile(new URL('index.ts', copy), provider.replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false'))
+  await writeFile(new URL('platform-roles.ts', copy), await readFile(new URL('platform-roles.ts', source), 'utf8'))
+  const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
+    const { PLATFORM_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
+    execFile(process.execPath, ['--input-type=module', '-e', `const { platformApp } = await import(${JSON.stringify(new URL('index.ts', copy).href)}); console.log(platformApp)`], {
+      env: { ...rest, ...env } as NodeJS.ProcessEnv,
+    }, (error: unknown, stdout: string, stderr: string) => resolve({ code: error && typeof error === 'object' && 'code' in error ? Number(error.code) : 0, stdout, stderr }))
+  })
+  const booted = await boot({ NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret', BETTER_AUTH_URL: 'https://app.example.com' })
+  assert.equal(booted.code, 0, booted.stderr)
+  assert.equal(booted.stdout.trim(), 'false')
+  const refused = await boot({ NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret' })
+  assert.notEqual(refused.code, 0)
+  assert.match(refused.stderr, /A production boot needs BETTER_AUTH_URL, where the app is served, and BETTER_AUTH_SECRET, which signs its sessions\. Set both\./)
+})
+
 const rbacCommand = (...flags: string[]) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
   execFile('bun', ['run', '../../packages/mithaq/src/asas/cli/mithaq.ts', 'rbac', 'assign', ...flags], {
     cwd: new URL('../', import.meta.url), env: process.env,

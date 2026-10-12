@@ -113,7 +113,8 @@ const walk = ({ app, from: given }: { app: string; from?: readonly string[] }) =
     const targets = [
       ...statics.map((specifier) => resolveFrom({ app, file, specifier })),
       ...globs.flatMap(({ patterns, base }) => {
-        const at = base.startsWith('/') ? realpathSync(join(root, app, base)) : join(root, dirname(file))
+        // Vite reads a base from the app's root when it starts with `/`, and from the importing file's folder otherwise.
+        const at = base.startsWith('/') ? realpathSync(join(root, app, base)) : join(root, dirname(file), base)
         // A wildcard would walk nothing, so it is refused rather than passed.
         for (const pattern of patterns) assert.ok(!pattern.includes('*'), `${file} globs "${pattern}", and this walk reads a glob's patterns as file names`)
         return patterns.map((pattern) => relative(root, join(at, pattern)))
