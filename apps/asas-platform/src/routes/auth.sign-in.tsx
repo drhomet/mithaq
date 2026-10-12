@@ -1,15 +1,20 @@
 import { useState, type ComponentProps } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { AuthBox, AuthFrame, authGate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
 import { documentHead } from '../copy.ts'
+import { firstUser } from '../first-user.ts'
 import { useCopy } from './__root.tsx'
 import { wanted } from '../redirect.ts'
 
 export const Route = createFileRoute('/auth/sign-in')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.signIn')),
   validateSearch: redirectSearch,
+  // Nobody can sign in to a platform no one administers yet.
+  beforeLoad: async () => {
+    if (!(await firstUser()).initialized) throw redirect({ href: '/auth/create-first-user' })
+  },
   component: SignIn,
 })
 

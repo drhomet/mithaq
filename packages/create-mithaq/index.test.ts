@@ -67,6 +67,8 @@ test('the template and both apps get the same .env, with fresh secrets only thei
   assert.match(env, /^LOCAL_AUTH_SECRET=[0-9a-f]{64}$/m)
   assert.match(env, /^BETTER_AUTH_SECRET=[0-9a-f]{64}$/m)
   assert.match(env, /^# STORAGE_SECRET=$/m)
+  // Left for the owner to choose: a code written here would be one anybody with the repository holds.
+  assert.match(env, /^SETUP_CODE=$/m)
   assert.equal(statSync(join(scratch, 'my-app/templates/asas/.env')).mode & 0o777, 0o600)
   create({ name: 'other-app', cwd: scratch, template, version: '1.2.3', mithaq: 'file:/tmp/mithaq.tgz' })
   const secret = /^LOCAL_AUTH_SECRET=(.*)$/m
