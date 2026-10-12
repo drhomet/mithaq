@@ -71,6 +71,7 @@ const actorName = 'Boot'
 let organizationName = ''
 const password = 'a-long-enough-password'
 const title = `Tajweed ${Date.now()}`
+const setupCode = 'asas-tanstack-boot-setup-code-of-32-characters'
 
 const post = async (path: string, body: unknown, headers: Record<string, string> = {}, at = origin) => {
   const response = await fetch(`${at}${path}`, {
@@ -112,6 +113,8 @@ before(async () => {
     // an impersonation started in the platform lands in the tenant app.
     BETTER_AUTH_URL: origin,
     PLATFORM_URL: platformOrigin,
+    // A production platform makes its first administrator only with this code.
+    SETUP_CODE: setupCode,
     STORAGE_SECRET: 'asas-tanstack-boot-storage-secret-of-32-chars',
     STORAGE_PREFIX: 'mithaq/asas',
     STORAGE_ADAPTER: 'local',
@@ -207,6 +210,22 @@ test('2. a session is signed up and an organization created through the auth arm
   const created = await post('/api/courses/create', { title, fee: 300 }, { cookie })
   assert.equal(created.response.status, 200, `the create answers 200: ${JSON.stringify(created.body)}`)
   assert.equal(created.body.title, title, 'the plain HTTP arm answered with the row the runner wrote')
+})
+
+test('2b. while no one holds a platform role, the platform sends sign-in to the first-administrator page, which asks for the setup code, and both close once an administrator exists', async () => {
+  assert.equal(await sentTo('/auth/sign-in', '', platformOrigin), '/auth/create-first-user', 'sign-in sends a visitor to make the first administrator')
+  const page = await fetch(`${platformOrigin}/auth/create-first-user`)
+  assert.equal(page.status, 200)
+  const html = await page.text()
+  assert.ok(html.includes('Create the first administrator') && html.includes('name="code"'), `the page draws the form with a setup code box:\n${html.slice(0, 600)}`)
+  const wrong = await post('/api/auth/user/first-register', { name: 'Boot', email: `first-${Date.now()}@example.com`, password, code: 'not-the-code' }, { origin: platformOrigin }, platformOrigin)
+  assert.deepEqual([wrong.response.status, wrong.body.code], [403, 'SETUP_CODE_WRONG'], 'a wrong code is refused')
+  await staffAs('super_admin', async () => {
+    assert.equal(await sentTo('/auth/create-first-user', '', platformOrigin), '/auth/sign-in', 'the page sends everyone to sign-in once an administrator exists')
+    assert.equal(await sentTo('/auth/sign-in', '', platformOrigin), null, 'where sign-in is served')
+    const closed = await post('/api/auth/user/first-register', { name: 'Boot', email: `first-${Date.now()}@example.com`, password, code: setupCode }, { origin: platformOrigin }, platformOrigin)
+    assert.deepEqual([closed.response.status, closed.body.code], [403, 'FIRST_REGISTER_CLOSED'], 'and first-register refuses even the right code')
+  })
 })
 
 test('3. the list page is server-rendered with the row the create wrote, under the labels the project declared', async () => {

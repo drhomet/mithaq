@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { tmpdir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 import crypto from 'node:crypto'
+import { syncBuiltinESMExports } from 'node:module'
 import { after, before, mock, test } from 'node:test'
 import { setTimeout } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -12280,6 +12281,189 @@ test('142k. a project that serves no platform console boots in production with B
   const refused = await boot({ NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret' })
   assert.notEqual(refused.code, 0)
   assert.match(refused.stderr, /A production boot needs BETTER_AUTH_URL, where the app is served, and BETTER_AUTH_SECRET, which signs its sessions\. Set both\./)
+})
+
+/**
+ * Runs `run` on a platform no one administers yet: every platform role is taken off its holder
+ * first, and given back after, while every account `run` made keeps no platform role.
+ */
+const withoutPlatformStaff = async (run: () => Promise<void>) => {
+  const { rows } = (await db.execute(`select id, role from "user" where role is not null and role <> 'user'`)) as { rows: { id: string; role: string }[] }
+  await db.execute(`update "user" set role = 'user' where role is not null and role <> 'user'`)
+  try {
+    await run()
+  } finally {
+    await db.execute(`update "user" set role = 'user' where role is not null and role <> 'user'`)
+    for (const row of rows) await db.execute(`update "user" set role = '${row.role.replaceAll("'", "''")}' where id = '${row.id.replaceAll("'", "''")}'`)
+  }
+}
+const platformStaff = async () => ((await db.execute(`select email, role from "user" where role is not null and role <> 'user' order by email`)) as { rows: { email: string; role: string }[] }).rows
+const firstRegisterAt = (handler: (request: Request) => Promise<Response>, at: string) => ({
+  init: () => handler(new Request(`${at}/init`)),
+  register: (body: unknown, headers: Record<string, string> = {}) =>
+    handler(new Request(`${at}/first-register`, { method: 'POST', headers: { 'content-type': 'application/json', origin: new URL(at).origin, ...headers }, body: JSON.stringify(body) })),
+})
+const answered = async (response: Response) => ({ status: response.status, body: await response.json().catch(() => null) as Record<string, unknown> | null })
+
+/**
+ * The provider as a deploy imports it under `env`: a fresh instance under its own URL, because
+ * the module reads its environment once, at import.
+ */
+const providerUnder = async (env: Record<string, string>) => {
+  const vars: Record<string, string | undefined> = process.env
+  const was = Object.fromEntries(Object.keys(env).map((key) => [key, vars[key]]))
+  Object.assign(vars, env)
+  try {
+    return (await import(`${new URL('../../auth/src/index.ts', import.meta.url).href}?${new URLSearchParams(env)}`)) as typeof import('@asas/auth')
+  } finally {
+    for (const [key, value] of Object.entries(was)) {
+      if (value === undefined) delete vars[key]
+      else vars[key] = value
+    }
+  }
+}
+/** The platform app's first-register of `provider`, served by an instance built over this file's store. */
+const firstRegisterOf = (provider: typeof import('@asas/auth')) => {
+  const built = provider.providers.user.server({ drizzle: asas.targets.drizzle as unknown as Parameters<typeof providers.user.server>[0]['drizzle'] })
+  return firstRegisterAt((request) => provider.asPlatform(() => built.handler(request)), `${provider.platformURL}/api/auth`)
+}
+/** As `vite dev` runs the platform app, the one place no setup code is asked. */
+const developed = async () => firstRegisterOf(await providerUnder({ NODE_ENV: 'development' }))
+
+test('142l. while no one holds a platform role, first-register in the platform app makes one super_admin who signs in there; then it refuses everyone with one answer, and the tenant app serves neither route', async () => {
+  const platform = await developed()
+  const tenant = firstRegisterAt((request) => asas.handler(request), 'http://localhost:5173/api/auth/user')
+  const password = 'a-long-enough-password'
+  await withoutPlatformStaff(async () => {
+    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: false, code: 'none' } }, 'under vite dev on this machine no setup code is asked')
+    assert.equal((await tenant.init()).status, 404, 'the tenant app has no init')
+    assert.equal((await tenant.register({ name: 'Tenant 142l', email: 'tenant-142l@example.com', password })).status, 404, 'nor a first-register')
+    assert.equal((await platform.register({ name: 'Short 142l', email: 'short-142l@example.com', password: 'short' })).status, 400, 'a password under the provider\'s bound is refused')
+    assert.equal((await platform.register({ name: ' ', email: 'blank-142l@example.com', password })).status, 400, 'and so is a blank name')
+    assert.equal((await platform.register({ name: 'Foreign 142l', email: 'foreign-142l@example.com', password }, { origin: 'https://elsewhere.example' })).status, 403, 'and a post from another origin')
+    assert.deepEqual(await platformStaff(), [], 'and none of them made anyone')
+
+    // A role written with whitespace around it is still read as the role, as the provider reads it.
+    const member = await signedUp('member-142l')
+    await db.execute(`update "user" set role = E'\\tsuper_admin ' where id = '${member.id}'`)
+    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: true } }, 'so a tab before super_admin closes setup')
+    await db.execute(`update "user" set role = 'user' where id = '${member.id}'`)
+
+    const made = await platform.register({ name: 'First 142l', email: 'first-142l@example.com', password })
+    assert.equal(made.status, 200, await made.clone().text())
+    assert.deepEqual(await platformStaff(), [{ email: 'first-142l@example.com', role: 'super_admin' }], 'the account holds super_admin')
+    const signedIn = await asPlatform(() => server.api.signInEmail({ body: { email: 'first-142l@example.com', password }, returnHeaders: true }))
+    const admin = new Headers({ cookie: (signedIn.headers as Headers).getSetCookie().map((line: string) => line.split(';')[0]).join('; ') })
+    const listed = await asPlatform(() => asas.handler(new Request('http://localhost:5174/api/auth/user/admin/list-users', { headers: admin })))
+    assert.equal(listed.status, 200, 'and signs in to the platform app, where it administers')
+
+    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: true } }, 'init says no more than that it is done')
+    const closed = await answered(await platform.register({ name: 'Second 142l', email: 'second-142l@example.com', password }))
+    assert.equal(closed.status, 403)
+    for (const [who, headers] of [['the administrator', admin], ['a tenant user', member.headers]] as const) {
+      const again = await answered(await platform.register({ name: 'Again 142l', email: 'again-142l@example.com', password }, { cookie: headers.get('cookie') ?? '' }))
+      assert.deepEqual(again, closed, `${who} gets the same refusal as anyone`)
+    }
+    assert.ok(!JSON.stringify(closed.body).includes('first-142l'), 'which names nobody')
+    assert.deepEqual(await platformStaff(), [{ email: 'first-142l@example.com', role: 'super_admin' }], 'and no second administrator was made')
+  })
+})
+
+test('142m. twelve first-registers at once, more than the pool\'s ten clients, all answer and make exactly one administrator', async () => {
+  const platform = await developed()
+  await withoutPlatformStaff(async () => {
+    const all = Promise.all(Array.from({ length: 12 }, (_, one) => platform.register({ name: `Race ${one}`, email: `race-${one}-142m@example.com`, password: 'a-long-enough-password' })))
+    const answers = await Promise.race([all, setTimeout(30_000, 'hung' as const)])
+    assert.notEqual(answers, 'hung', 'no request waits on a pool its own transaction holds')
+    assert.deepEqual((answers as Response[]).map((one) => one.status).sort(), [200, ...Array<number>(11).fill(403)])
+    assert.equal((await platformStaff()).length, 1)
+  })
+})
+
+test('142p. a first-register whose account row fails leaves no user behind, and setup stays open', async (t) => {
+  const platform = await developed()
+  await db.execute(`create or replace function refuse_account_142p() returns trigger language plpgsql as $$ begin raise exception 'refused by 142p'; end $$;
+    create trigger refuse_account_142p before insert on account for each row execute function refuse_account_142p()`)
+  t.after(() => db.execute('drop trigger if exists refuse_account_142p on account; drop function if exists refuse_account_142p()'))
+  await withoutPlatformStaff(async () => {
+    const failed = await platform.register({ name: 'Half 142p', email: 'half-142p@example.com', password: 'a-long-enough-password' })
+    assert.equal(failed.status, 500, await failed.clone().text())
+    assert.deepEqual((await db.execute(`select id from "user" where email = 'half-142p@example.com'`)).rows, [], 'the user row went with the account row')
+    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: false, code: 'none' } }, 'so setup is still open')
+  })
+})
+
+const deployed = { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret-of-at-least-32-characters', PLATFORM_URL: 'https://platform.example.com', BETTER_AUTH_URL: 'https://app.example.com' }
+
+test('142n. outside vite dev on this machine first-register asks for a SETUP_CODE of 32 characters at least: refused while it is unset or short, refused for a wrong code compared by timingSafeEqual on two equal-length digests, answered for the right one, and rate limited', async () => {
+  const password = 'a-long-enough-password'
+  // This file's own provider: no NODE_ENV and no PLATFORM_URL, so localhost, and still a code is asked.
+  const plain = firstRegisterAt((request) => asPlatform(() => asas.handler(request)), 'http://localhost:5174/api/auth/user')
+  await withoutPlatformStaff(async () => {
+    assert.deepEqual(await answered(await plain.init()), { status: 200, body: { initialized: false, code: 'unset' } }, 'with NODE_ENV unset the code is asked even on localhost')
+    const plainly = await answered(await plain.register({ name: 'Plain 142n', email: 'plain-142n@example.com', password }))
+    assert.deepEqual([plainly.status, plainly.body?.code], [403, 'SETUP_CODE_UNSET'])
+
+    for (const SETUP_CODE of ['', 'a-code-of-31-characters-exactly']) {
+      const unset = firstRegisterOf(await providerUnder({ ...deployed, SETUP_CODE }))
+      assert.deepEqual(await answered(await unset.init()), { status: 200, body: { initialized: false, code: 'unset' } }, `the page is told no usable code is set: ${JSON.stringify(SETUP_CODE)}`)
+      const refused = await answered(await unset.register({ name: 'Unset 142n', email: 'unset-142n@example.com', password, code: SETUP_CODE }, { 'x-forwarded-for': '203.0.113.1' }))
+      assert.deepEqual([refused.status, refused.body?.code], [403, 'SETUP_CODE_UNSET'], 'and no code is right then, not even that one')
+    }
+
+    const code = 'a-setup-code-the-owner-chose-of-40-chars'
+    const set = firstRegisterOf(await providerUnder({ ...deployed, SETUP_CODE: code, TRUSTED_IP_HEADER: 'x-forwarded-for' }))
+    assert.deepEqual(await answered(await set.init()), { status: 200, body: { initialized: false, code: 'required' } })
+    const compared = mock.method(crypto, 'timingSafeEqual')
+    syncBuiltinESMExports()
+    let wrong: Awaited<ReturnType<typeof answered>>
+    try {
+      // A code of another length too: compared raw, `timingSafeEqual` would throw on it.
+      wrong = await answered(await set.register({ name: 'Wrong 142n', email: 'wrong-142n@example.com', password, code: 'short' }, { 'x-forwarded-for': '203.0.113.2' }))
+    } finally {
+      compared.mock.restore()
+      syncBuiltinESMExports()
+    }
+    assert.deepEqual([wrong.status, wrong.body?.code], [403, 'SETUP_CODE_WRONG'], 'a wrong code is refused')
+    assert.ok(compared.mock.calls.some(({ arguments: [given, expected] }) => (given as Buffer).length === 32 && (expected as Buffer).length === 32), 'by timingSafeEqual over two SHA-256 digests')
+    const missing = await answered(await set.register({ name: 'Missing 142n', email: 'missing-142n@example.com', password }, { 'x-forwarded-for': '203.0.113.3' }))
+    assert.deepEqual([missing.status, missing.body?.code], [403, 'SETUP_CODE_WRONG'], 'and so is none')
+    assert.deepEqual(await platformStaff(), [], 'and none made anyone')
+
+    const made = await set.register({ name: 'Right 142n', email: 'right-142n@example.com', password, code }, { 'x-forwarded-for': '203.0.113.4' })
+    assert.equal(made.status, 200, await made.clone().text())
+    assert.deepEqual(await platformStaff(), [{ email: 'right-142n@example.com', role: 'super_admin' }], 'the right code makes the administrator')
+
+    const tries = []
+    for (let one = 0; one < 4; one++) tries.push((await set.register({ name: 'Flood 142n', email: 'flood-142n@example.com', password, code }, { 'x-forwarded-for': '203.0.113.5' })).status)
+    assert.deepEqual(tries, [403, 403, 403, 429], 'one address gets three tries a minute')
+  })
+})
+
+test('142q. with no TRUSTED_IP_HEADER an x-forwarded-for a caller writes buys no fresh tries: every caller shares ten a minute', async () => {
+  const shared = firstRegisterOf(await providerUnder({ ...deployed, SETUP_CODE: 'a-setup-code-the-owner-chose-of-40-chars' }))
+  await withoutPlatformStaff(async () => {
+    const tries = []
+    for (let one = 0; one < 11; one++) tries.push((await shared.register({ name: 'Spoof 142q', email: 'spoof-142q@example.com', password: 'a-long-enough-password', code: 'wrong' }, { 'x-forwarded-for': `198.51.100.${one}` })).status)
+    assert.deepEqual(tries, [...Array<number>(10).fill(403), 429])
+  })
+})
+
+test('142o. a project with no platform console has no first-register and no init', async (t) => {
+  // The provider as `create-mithaq --no-platform` writes it, beside the original so it resolves the same packages.
+  const source = new URL('../../auth/src/', import.meta.url)
+  const copy = new URL(`.no-platform-first-${process.pid}/`, source)
+  await mkdir(copy)
+  t.after(() => rm(copy, { recursive: true, force: true }))
+  await writeFile(new URL('index.ts', copy), (await readFile(new URL('index.ts', source), 'utf8')).replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false'))
+  await writeFile(new URL('platform-roles.ts', copy), await readFile(new URL('platform-roles.ts', source), 'utf8'))
+  const provider = (await import(new URL('index.ts', copy).href)) as typeof import('@asas/auth')
+  assert.equal(provider.platformApp, false)
+  const routes = firstRegisterOf(provider)
+  await withoutPlatformStaff(async () => {
+    assert.equal((await routes.init()).status, 404)
+    assert.equal((await routes.register({ name: 'None 142o', email: 'none-142o@example.com', password: 'a-long-enough-password' })).status, 404)
+  })
 })
 
 const rbacCommand = (...flags: string[]) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {

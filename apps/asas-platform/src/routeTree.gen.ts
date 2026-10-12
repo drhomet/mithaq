@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as screensPlatformRouteImport } from './routes/(screens)/platform'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
+import { Route as AuthCreateFirstUserRouteImport } from './routes/auth.create-first-user'
 import { Route as AuthSignInRouteImport } from './routes/auth.sign-in'
 import { Route as screensPlatformIndexRouteImport } from './routes/(screens)/platform.index'
 import { Route as screensPlatformSplatRouteImport } from './routes/(screens)/platform.$'
@@ -29,6 +30,11 @@ const screensPlatformRoute = screensPlatformRouteImport.update({
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCreateFirstUserRoute = AuthCreateFirstUserRouteImport.update({
+  id: '/auth/create-first-user',
+  path: '/auth/create-first-user',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignInRoute = AuthSignInRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/unauthorized': typeof UnauthorizedRoute
   '/platform': typeof screensPlatformRouteWithChildren
   '/api/$': typeof ApiSplatRoute
+  '/auth/create-first-user': typeof AuthCreateFirstUserRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/platform/$': typeof screensPlatformSplatRoute
   '/platform/': typeof screensPlatformIndexRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/unauthorized': typeof UnauthorizedRoute
   '/api/$': typeof ApiSplatRoute
+  '/auth/create-first-user': typeof AuthCreateFirstUserRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/platform/$': typeof screensPlatformSplatRoute
   '/platform': typeof screensPlatformIndexRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   '/unauthorized': typeof UnauthorizedRoute
   '/(screens)/platform': typeof screensPlatformRouteWithChildren
   '/api/$': typeof ApiSplatRoute
+  '/auth/create-first-user': typeof AuthCreateFirstUserRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/(screens)/platform/$': typeof screensPlatformSplatRoute
   '/(screens)/platform/': typeof screensPlatformIndexRoute
@@ -77,16 +86,24 @@ export interface FileRouteTypes {
     | '/unauthorized'
     | '/platform'
     | '/api/$'
+    | '/auth/create-first-user'
     | '/auth/sign-in'
     | '/platform/$'
     | '/platform/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/unauthorized' | '/api/$' | '/auth/sign-in' | '/platform/$' | '/platform'
+  to:
+    | '/unauthorized'
+    | '/api/$'
+    | '/auth/create-first-user'
+    | '/auth/sign-in'
+    | '/platform/$'
+    | '/platform'
   id:
     | '__root__'
     | '/unauthorized'
     | '/(screens)/platform'
     | '/api/$'
+    | '/auth/create-first-user'
     | '/auth/sign-in'
     | '/(screens)/platform/$'
     | '/(screens)/platform/'
@@ -96,6 +113,7 @@ export interface RootRouteChildren {
   UnauthorizedRoute: typeof UnauthorizedRoute
   screensPlatformRoute: typeof screensPlatformRouteWithChildren
   ApiSplatRoute: typeof ApiSplatRoute
+  AuthCreateFirstUserRoute: typeof AuthCreateFirstUserRoute
   AuthSignInRoute: typeof AuthSignInRoute
 }
 
@@ -120,6 +138,13 @@ declare module '@tanstack/react-router' {
       path: '/api/$'
       fullPath: '/api/$'
       preLoaderRoute: typeof ApiSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/create-first-user': {
+      id: '/auth/create-first-user'
+      path: '/auth/create-first-user'
+      fullPath: '/auth/create-first-user'
+      preLoaderRoute: typeof AuthCreateFirstUserRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/sign-in': {
@@ -164,6 +189,7 @@ const rootRouteChildren: RootRouteChildren = {
   UnauthorizedRoute: UnauthorizedRoute,
   screensPlatformRoute: screensPlatformRouteWithChildren,
   ApiSplatRoute: ApiSplatRoute,
+  AuthCreateFirstUserRoute: AuthCreateFirstUserRoute,
   AuthSignInRoute: AuthSignInRoute,
 }
 export const routeTree = rootRouteImport

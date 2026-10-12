@@ -260,6 +260,25 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     signInDescription: { en: 'Sign in to reach the dashboard.', ar: 'سجل الدخول للوصول إلى لوحة التحكم.' },
     signInPlatformDescription: { en: 'Sign in to reach the platform.', ar: 'سجل الدخول للوصول إلى المنصة.' },
     signInPending: { en: 'Signing in…', ar: 'جارٍ تسجيل الدخول…' },
+    createFirstUser: { en: 'Create the first administrator', ar: 'إنشاء أول مسؤول' },
+    createFirstUserDescription: {
+      en: 'No one administers this platform yet. The account made here becomes its first administrator.',
+      ar: 'لا أحد يدير هذه المنصة بعد. الحساب الذي يُنشأ هنا يصبح أول مسؤول عنها.',
+    },
+    createFirstUserSubmit: { en: 'Create the administrator', ar: 'إنشاء المسؤول' },
+    createFirstUserPending: { en: 'Creating…', ar: 'جارٍ الإنشاء…' },
+    createFirstUserFailed: { en: 'That administrator could not be created.', ar: 'تعذر إنشاء هذا المسؤول.' },
+    setupCode: { en: 'Setup code', ar: 'رمز الإعداد' },
+    setupCodeDescription: { en: 'The SETUP_CODE this server was started with.', ar: 'قيمة SETUP_CODE التي شُغّل بها هذا الخادم.' },
+    setupCodeWrong: { en: 'That is not the setup code.', ar: 'هذا ليس رمز الإعداد.' },
+    setupCodeUnset: {
+      en: 'The first administrator is made only with a setup code, and this server has none it can use: SETUP_CODE is unset or shorter than 32 characters. Set SETUP_CODE where the platform app runs to a random value of 32 characters or more, restart it, and open this page again.',
+      ar: 'لا يُنشأ أول مسؤول إلا برمز إعداد، وليس لدى هذا الخادم رمز يمكنه استعماله: SETUP_CODE غير مضبوط أو أقصر من 32 حرفا. اضبط SETUP_CODE حيث يعمل تطبيق المنصة على قيمة عشوائية من 32 حرفا أو أكثر، ثم أعد تشغيله وافتح هذه الصفحة مرة أخرى.',
+    },
+    firstRegisterClosed: {
+      en: 'This platform has its administrator, so this page is closed. Sign in instead.',
+      ar: 'لهذه المنصة مسؤولها، لذا أُغلقت هذه الصفحة. سجل الدخول بدلا من ذلك.',
+    },
     failed: { en: 'That sign-in did not work.', ar: 'لم ينجح تسجيل الدخول.' },
     signUp: { en: 'Sign up', ar: 'إنشاء حساب' },
     signUpDescription: { en: 'Make an account and its organization.', ar: 'أنشئ حسابا ومؤسسته.' },
@@ -834,6 +853,9 @@ const refusalKeys = new Map([
   ['YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER', 'dashboard.removeNotAllowed'],
   ['RESET_PASSWORD_DISABLED', 'auth.resetDisabled'],
   ['INVALID_TOKEN', 'auth.tokenInvalid'],
+  ['SETUP_CODE_WRONG', 'auth.setupCodeWrong'],
+  ['SETUP_CODE_UNSET', 'auth.setupCodeUnset'],
+  ['FIRST_REGISTER_CLOSED', 'auth.firstRegisterClosed'],
 ])
 /** The key of this app's own sentence for a provider refusal, or nothing. The provider's `message` is English on every page and is never shown. */
 export const refusalKey = (status: number, code: unknown): string | undefined =>
