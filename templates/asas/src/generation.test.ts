@@ -2690,10 +2690,12 @@ test('generate.providers as a relative path is written into the generated kayan 
   }
 })
 
-test('the provider package depends on better-auth and mithaq alone, and no non-test source of asas outside the generated kayan imports better-auth', async () => {
+test('the provider package depends on Better Auth\'s own two packages and mithaq alone, and no non-test source of asas outside the generated kayan imports better-auth', async () => {
   const manifest = JSON.parse(await readFile(new URL('../../auth/package.json', import.meta.url), 'utf8'))
   assert.equal(manifest.name, '@asas/auth')
-  assert.deepEqual(Object.keys(manifest.dependencies).sort(), ['better-auth', 'mithaq'])
+  assert.deepEqual(Object.keys(manifest.dependencies).sort(), ['@better-auth/core', 'better-auth', 'mithaq'])
+  // The core `better-auth` itself runs on, never a second version beside it.
+  assert.equal(manifest.dependencies['@better-auth/core'], manifest.dependencies['better-auth'])
   assert.equal(manifest.devDependencies, undefined)
   const source = new URL('./', import.meta.url)
   const importers: string[] = []

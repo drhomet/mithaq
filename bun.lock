@@ -238,6 +238,7 @@
       "name": "@asas/auth",
       "version": "0.0.0",
       "dependencies": {
+        "@better-auth/core": "1.7.4",
         "better-auth": "1.7.4",
         "mithaq": "*",
       },

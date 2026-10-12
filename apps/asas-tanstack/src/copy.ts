@@ -272,8 +272,8 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     setupCodeDescription: { en: 'The SETUP_CODE this server was started with.', ar: 'قيمة SETUP_CODE التي شُغّل بها هذا الخادم.' },
     setupCodeWrong: { en: 'That is not the setup code.', ar: 'هذا ليس رمز الإعداد.' },
     setupCodeUnset: {
-      en: 'In production the first administrator is made only with a setup code, and this server has none. Set SETUP_CODE where the platform app runs to a long random value, restart it, and open this page again.',
-      ar: 'في بيئة الإنتاج لا يُنشأ أول مسؤول إلا برمز إعداد، وهذا الخادم بلا رمز. اضبط SETUP_CODE حيث يعمل تطبيق المنصة على قيمة عشوائية طويلة، ثم أعد تشغيله وافتح هذه الصفحة مرة أخرى.',
+      en: 'The first administrator is made only with a setup code, and this server has none it can use: SETUP_CODE is unset or shorter than 32 characters. Set SETUP_CODE where the platform app runs to a random value of 32 characters or more, restart it, and open this page again.',
+      ar: 'لا يُنشأ أول مسؤول إلا برمز إعداد، وليس لدى هذا الخادم رمز يمكنه استعماله: SETUP_CODE غير مضبوط أو أقصر من 32 حرفا. اضبط SETUP_CODE حيث يعمل تطبيق المنصة على قيمة عشوائية من 32 حرفا أو أكثر، ثم أعد تشغيله وافتح هذه الصفحة مرة أخرى.',
     },
     firstRegisterClosed: {
       en: 'This platform has its administrator, so this page is closed. Sign in instead.',

@@ -177,7 +177,7 @@ async function release({ manager, tarball, layout = 'monorepo', platform = layou
     if (platform) {
       // The `.env` `create-mithaq` wrote leaves SETUP_CODE empty, and a production platform says to set it.
       const page = await (await fetch(`${platformOrigin}/auth/create-first-user`, { signal: AbortSignal.timeout(10_000) })).text()
-      assert.ok(page.includes('Set SETUP_CODE where the platform app runs'), `the first-administrator page asks for SETUP_CODE:\n${page.slice(0, 600)}`)
+      assert.ok(page.includes('SETUP_CODE is unset or shorter than 32 characters'), `the first-administrator page asks for SETUP_CODE:\n${page.slice(0, 600)}`)
     }
 
     const stamp = randomUUID()

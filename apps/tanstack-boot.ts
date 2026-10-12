@@ -71,7 +71,7 @@ const actorName = 'Boot'
 let organizationName = ''
 const password = 'a-long-enough-password'
 const title = `Tajweed ${Date.now()}`
-const setupCode = 'asas-tanstack-boot-setup-code'
+const setupCode = 'asas-tanstack-boot-setup-code-of-32-characters'
 
 const post = async (path: string, body: unknown, headers: Record<string, string> = {}, at = origin) => {
   const response = await fetch(`${at}${path}`, {

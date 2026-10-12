@@ -1,8 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { runWithAdapter } from '@better-auth/core/context'
 import { BASE_ERROR_CODES, betterAuth as betterAuthServer, getCurrentAdapter } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { APIError, createAuthEndpoint, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api'
+import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getSessionFromCtx } from 'better-auth/api'
 import { admin, oneTimeToken, organization } from 'better-auth/plugins'
 import { createAccessControl } from 'better-auth/plugins/access'
 import { adminAc, defaultStatements as adminStatements, userAc } from 'better-auth/plugins/admin/access'
@@ -65,11 +66,15 @@ if (remoteWithNoSecret) {
  */
 export const platformURL = process.env.PLATFORM_URL ?? 'http://localhost:5174'
 
-// The platform's first administrator is made by first-register, which in production, or on a host
-// that is not this machine whatever `NODE_ENV` says, asks for the `SETUP_CODE` the deploy set, so
-// nobody who merely reaches a new deploy first becomes its administrator. An empty value is unset.
-const setupCode = process.env.SETUP_CODE || undefined
-const setupCodeState: 'none' | 'required' | 'unset' = !production && isLocalHost(platformURL) ? 'none' : setupCode ? 'required' : 'unset'
+// The platform's first administrator is made by first-register, which asks for the `SETUP_CODE`
+// the deploy set, so nobody who merely reaches a new deploy first becomes its administrator. Only
+// `vite dev` on this machine skips it: a deploy run with plain `node` sets no `NODE_ENV`, and an
+// unset `PLATFORM_URL` falls back to localhost. The code is the one bar, so a value short enough to
+// guess is no code at all.
+const setupCode = (process.env.SETUP_CODE?.length ?? 0) >= 32 ? process.env.SETUP_CODE : undefined
+const setupCodeState: 'none' | 'required' | 'unset' = process.env.NODE_ENV === 'development' && isLocalHost(platformURL) ? 'none' : setupCode ? 'required' : 'unset'
+// Mirrors the tenant's `rateLimit.enabled`, read off the platform's own address.
+const platformLimited = production || !isLocalHost(platformURL)
 // Digests, so both sides are always 32 bytes and `timingSafeEqual` neither throws on nor answers
 // sooner for a code of another length.
 const digest = (text: string) => createHash('sha256').update(text).digest()
@@ -77,6 +82,16 @@ const isSetupCode = (given: unknown) => typeof given === 'string' && setupCode !
 // Set only around the one `create-user` call first-register makes once it found no platform
 // administrator under its lock, which is the only call with no caller that may write a role.
 const firstRegistering = new AsyncLocalStorage<true>()
+// Without TRUSTED_IP_HEADER, Better Auth keys its limit on an `x-forwarded-for` the caller writes,
+// so first-register also keeps one window that every caller shares.
+// ponytail: process-local, and a flood holds setup off for everyone until it stops; set
+// TRUSTED_IP_HEADER for per-address limits alone.
+const sharedTries: number[] = []
+const overSharedLimit = () => {
+  const now = Date.now()
+  while (sharedTries.length && now - sharedTries[0]! >= 60_000) sharedTries.shift()
+  return sharedTries.length >= 10 || (sharedTries.push(now), false)
+}
 
 /**
  * Where the tenant app is served, the tenant instance's `baseURL` and the target of an
@@ -689,11 +704,12 @@ export const providers = {
         }] },
       }
       // Whether anyone holds a platform role, read as `holdsRole` reads `user.role`: comma-separated,
-      // each name trimmed.
+      // each name trimmed of the whitespace `.trim()` takes. Every tenant user's `user` is passed
+      // over before the split, and the scan stops at the first holder.
       type Executes = { execute(query: unknown): Promise<{ rows: unknown[] }> }
       const users = store.tables.user as { role: unknown }
       const administered = async (db: Executes) =>
-        (await db.execute(sql`select 1 from ${users} where exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one) in ${Object.keys(platformRoles)}) limit 1`)).rows.length > 0
+        (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(platformRoles)}) limit 1`)).rows.length > 0
       // One answer however often and by whomever it is asked, naming nobody.
       const closed = () => new APIError('FORBIDDEN', { code: 'FIRST_REGISTER_CLOSED', message: 'This platform has its administrator, so first-register is closed. Sign in instead.' })
       // The platform's first `super_admin`, which nothing else can make: the provider's own
@@ -704,10 +720,13 @@ export const providers = {
         endpoints: {
           init: createAuthEndpoint('/init', { method: 'GET' }, async (ctx) =>
             ctx.json((await administered(store.db as Executes)) ? { initialized: true } : { initialized: false, code: setupCodeState })),
-          firstRegister: createAuthEndpoint('/first-register', { method: 'POST' }, async (ctx) => {
+          // `formCsrfMiddleware`, as sign-up has: no session guards this route, so another site's
+          // form must not post to it.
+          firstRegister: createAuthEndpoint('/first-register', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
+            if (platformLimited && !ipAddressHeaders && overSharedLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
             if (await administered(store.db as Executes)) throw closed()
             const { name, email, password, code } = (ctx.body ?? {}) as Record<string, unknown>
-            if (setupCodeState === 'unset') throw new APIError('FORBIDDEN', { code: 'SETUP_CODE_UNSET', message: 'Set SETUP_CODE where the platform app runs: in production the first administrator is made only with it.' })
+            if (setupCodeState === 'unset') throw new APIError('FORBIDDEN', { code: 'SETUP_CODE_UNSET', message: 'Set SETUP_CODE where the platform app runs, to a random value of 32 characters or more: the first administrator is made only with it.' })
             if (setupCodeState === 'required' && !isSetupCode(code)) throw new APIError('FORBIDDEN', { code: 'SETUP_CODE_WRONG', message: 'That is not the setup code.' })
             // `create-user` checks the address but not the password's length, which sign-up does.
             const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
@@ -715,15 +734,22 @@ export const providers = {
               throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
             }
             return ctx.json(await store.transaction(async (tx) => {
+              // Read committed whatever the database's default, so the read below sees an
+              // administrator another call committed while this one waited on the lock.
+              await (tx as Executes).execute(sql`set transaction isolation level read committed`)
               await (tx as Executes).execute(sql`select pg_advisory_xact_lock(hashtext('mithaq.first-register'))`)
               if (await administered(tx as Executes)) throw closed()
-              // ponytail: an instance per call, the only public way to run `create-user` inside a
-              // transaction this file opened; it runs once in a project's life. `built` carries the
-              // admin plugin and the audit hooks, which is all `create-user` reads.
+              // ponytail: an instance per call, built over this transaction; it runs once in a
+              // project's life. `built` carries the admin plugin and the audit hooks, which is all
+              // `create-user` reads.
               const bound = betterAuthServer({ ...built, secret: platformSecret, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
+              // The provider writes through the adapter its request stored, which is the platform's
+              // pool here, so the user and account rows are pointed at this transaction instead:
+              // both commit with the check or neither does, and no second client is taken.
+              const adapter = (await bound.$context).adapter
               // The plugin types a role from `adminOptions.roles`, whose platform roles are built at
               // runtime, so it names `user` alone.
-              return firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never } }))
+              return runWithAdapter(adapter, () => firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never } })))
             }))
           }),
         },
@@ -742,6 +768,7 @@ export const providers = {
         plugins: [...built.plugins, seated, keepsRoles, ...(platformApp ? [firstRegister] : [])],
         baseURL: platformURL,
         trustedOrigins: platformOrigins,
+        rateLimit: { ...built.rateLimit, enabled: platformLimited },
         secret: platformSecret,
         advanced: { ...built.advanced, cookiePrefix: platformCookiePrefix },
         // Nor a password reset of its own: staff reset through the tenant app's page like anyone,
