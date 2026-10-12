@@ -523,8 +523,9 @@ export const screensOf = (
       }
       const map = place === 'layout' ? 'layouts' : 'components'
       if (Object.hasOwn(maps[map], value)) return maps[map][value]!
-      // A kind no registry control draws names itself, and the project's components map draws it under that name.
+      // A kind no registry control or cell draws names itself, and the project's components map draws it under that name.
       if (place === 'control' && value === kind && !Object.hasOwn(shippedControls, value) && !(registryControls as readonly string[]).includes(value)) return value
+      if (place === 'cell' && value === kind && !shippedCells.includes(value) && !(registryCells as readonly string[]).includes(value)) return value
       const shipped: readonly string[] = place === 'control' ? Object.keys(shippedControls) : place === 'cell' ? shippedCells : []
       if (!shipped.includes(value)) {
         throw new Error(`${at} names "${value}", which is no name in this screen's ${map} and no ${place} the registry ships.`)
@@ -545,7 +546,7 @@ export const screensOf = (
       if (!row) throw new Error(`${screen} controls has no row for kind "${kind}", and every kind of the language needs one.`)
       controls[kind] = {
         control: ref(`${screen} controls "${kind}" control`, 'control', row.control, kind),
-        cell: ref(`${screen} controls "${kind}" cell`, 'cell', row.cell),
+        cell: ref(`${screen} controls "${kind}" cell`, 'cell', row.cell, kind),
       }
     }
     for (const name of target.kayan) {
@@ -569,7 +570,7 @@ export const screensOf = (
         ...(typeof field.suffix === 'object' && { suffix: field.suffix }),
         ...(typeof field.description === 'object' && { description: field.description }),
         component,
-        cell: own.cell ? ref(`${where} targets.${key}.cell`, 'cell', own.cell) : controls[field.kind]!.cell,
+        cell: own.cell ? ref(`${where} targets.${key}.cell`, 'cell', own.cell, field.kind) : controls[field.kind]!.cell,
         ...(typeof own.width === 'string' && { width: own.width }),
         ...(own.filter === true && { filter: true as const }),
         ...(own.searchable === true && { searchable: true as const }),
@@ -700,7 +701,7 @@ export const screensOf = (
           ...(typeof readOnly === 'boolean' && { readOnly }),
           ...(typeof width === 'string' && { width }),
           ...(place === 'control' && { component: control }),
-          ...((place === 'cell' || cell) && { cell: cell ? ref(`${node} "${name}" cell`, 'cell', cell) : field.cell }),
+          ...((place === 'cell' || cell) && { cell: cell ? ref(`${node} "${name}" cell`, 'cell', cell, field.kind) : field.cell }),
           ...(placeholder !== undefined && { placeholder: copy(`${node} "${name}" placeholder`, placeholder) }),
           ...(description !== undefined && { description: copy(`${node} "${name}" description`, description) }),
           decided,

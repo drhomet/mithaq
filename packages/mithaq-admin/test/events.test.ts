@@ -40,9 +40,12 @@ const homeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 const { defaultComponents } = await import('../registry/default-components.tsx')
 const { ComponentsProvider } = await import('../registry/components.tsx')
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
-const withComponents = (element: ReactElement) => createElement(ComponentsProvider, { components: defaultComponents }, element)
+// A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
+const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
+const { defaultComponents: appDefaults } = await import('@/components/mithaq/default-components.tsx')
+const withComponents = (element: ReactElement) => createElement(ComponentsProvider, { components: defaultComponents }, createElement(AppComponents, { components: appDefaults }, element))
 const { arm, clientOf } = await import('../registry/host/api.ts')
-const { cells } = await import('../registry/cells.tsx')
+const cells: Readonly<Record<string, import('../registry/control-props.ts').Cell>> = defaultComponents.cells
 const { CalloutNode } = await import('./callout-node.ts')
 const confirmYes = async () => {
   const yes = window.document.querySelector('[data-button="confirm-operation"]')
@@ -294,7 +297,7 @@ const render = async (element: ReactElement, over: Partial<ScreenState> = {}) =>
   const root = createRoot(host)
   mounted = root
   await act(async () => {
-    root.render(createElement(ScreenContext, { value: { ...state, ...over } }, createElement(ComponentsProvider, { components: defaultComponents }, element)))
+    root.render(createElement(ScreenContext, { value: { ...state, ...over } }, withComponents(element)))
   })
   return host
 }
@@ -5835,7 +5838,7 @@ test('177q. a moment drawn on the client alone reads in the viewer\'s zone on it
 const enrolled = (queries: unknown, client: unknown, docs: Record<string, unknown>[], cell: unknown) => {
   const path = enrollments.fields.find((one) => one.name === 'session')!.cell
   const list = listOn(enrollments, docs, { screen: screenOf(enrollments.pages.list!, enrollments, { [path]: cell as never }) })
-  return createElement(ScreenContext, { value: { ...state, client: client as never, kayan: enrollments } }, createElement(QueryClientProvider, { client: queries }, createElement(ListContext, { value: list.props as never }, list)))
+  return createElement(ScreenContext, { value: { ...state, client: client as never, kayan: enrollments } }, createElement(QueryClientProvider, { client: queries }, createElement(ListContext, { value: list.props as never }, withComponents(list))))
 }
 
 test('177r. a read a refusal answered reads as no rows and is not tried again, and one that failed is', async () => {

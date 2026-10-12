@@ -56,7 +56,7 @@ const build = (language: unknown, fields: Record<string, unknown> = { title: { k
     http: [fetchHttp()],
     kayan: [one.defineKayan({ name: 'notes', fields: { id: defaultFields.id, ...fields }, targets: { service: { operations: defaultOperations } } })],
   }) as {
-    targets: Record<string, { tables?: Record<string, Record<string, { getSQLType(): string }>>; client?: { controls: Record<string, { control: string }> } }>
+    targets: Record<string, { tables?: Record<string, Record<string, { getSQLType(): string }>>; client?: { controls: Record<string, { control: string; cell: string }>; kayan: Record<string, { fields: { name: string; cell: string }[] }> } }>
     kayan: { notes: { targets: { zod: { schemas: { create: z.ZodType } } } } }
     destroy(): Promise<void>
   }
@@ -176,6 +176,34 @@ test('a kind no registry control draws names itself as its control, which the pr
   assert.throws(
     () => build(defineMithaq({ targets: { ...offline(), dashboard: claiming }, arkan: [base, defineRukn({ name: 'lookalikes', kinds: { richText: lookalike } })] }), { body: { kind: 'richText' } }),
     /controls "richText" control names "richText", which is no name in this screen's components and no control the registry ships/,
+  )
+})
+
+test('a kind no registry cell draws names itself as its cell, which the project\'s components map draws, and no other kind may name it', async () => {
+  const swatch = kind<string>(isString)({
+    label,
+    message,
+    rules: ['required'],
+    targets: { drizzle: (field: { column: string }) => text(field.column), zod: () => z.string(), screen: { control: 'text', cell: 'swatch' } },
+  })
+  const swatches = defineRukn({ name: 'swatches', kinds: { swatch } })
+  const screen = screenTarget({ ...dashboardScreen, kayan: ['notes'], controls: screenKinds, pages: { home: { path: '/', component: dashboardScreen.pages.dashboard!.component } } })
+  const own = build(defineMithaq({ targets: { ...offline(), dashboard: screen }, arkan: [base, swatches] }), { swatch: { kind: 'swatch' } })
+  assert.equal(own.targets.dashboard!.client!.controls.swatch!.cell, 'swatch', 'the kind is drawn by its own name')
+  assert.equal(own.targets.dashboard!.client!.kayan.notes!.fields.find((field) => field.name === 'swatch')!.cell, 'swatch', 'and so is a field of it')
+  await own.destroy()
+  const borrowed = screenTarget({ ...screen, controls: { ...screenKinds, text: { control: 'text', cell: 'swatch' } } })
+  assert.throws(
+    () => build(defineMithaq({ targets: { ...offline(), dashboard: borrowed }, arkan: [base, swatches] }), { swatch: { kind: 'swatch' } }),
+    /controls "text" cell names "swatch", which is no name in this screen's components and no cell the registry ships/,
+    'another kind cannot borrow it, since the map draws it by the kind',
+  )
+  // A registry cell only a rukn's kind brings, such as richText, is never claimed by a kind of the same name that the rukn did not bring.
+  const lookalike = kind<string>(isString)({ label, message, rules: ['required'], targets: { drizzle: (field: { column: string }) => text(field.column), zod: () => z.string() } })
+  const claiming = screenTarget({ ...screen, controls: { ...screenKinds, richText: { control: 'text', cell: 'richText' } } })
+  assert.throws(
+    () => build(defineMithaq({ targets: { ...offline(), dashboard: claiming }, arkan: [base, defineRukn({ name: 'lookalikes', kinds: { richText: lookalike } })] }), { body: { kind: 'richText' } }),
+    /controls "richText" cell names "richText", which is no name in this screen's components and no cell the registry ships/,
   )
 })
 

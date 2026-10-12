@@ -1,3 +1,4 @@
+import { cells } from './cells.tsx'
 import { ButtonGroupControl, CheckboxGroupControl, ComboboxControl, RadioControl, SelectControl, ToggleGroupControl } from './choice-control.tsx'
 import { CheckboxControl, SwitchControl, ToggleControl } from './checkbox-control.tsx'
 import type { Components } from './components.tsx'
@@ -41,5 +42,6 @@ export const defaultComponents: Components = {
     checkboxGroup: CheckboxGroupControl,
     calendar: CalendarControl,
   },
+  cells,
 }
-// mithaq-admin fdc32f5733c79e13845896eca9c9f847174551be ed589018937e17fb772a414a426c628316655224268cf45801de342e490fda90
+// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 f60cecc252edb1c85f30da35e1103f4af7a8f5a4d8c03a0a826d65242d2c63fc

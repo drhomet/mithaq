@@ -1,8 +1,8 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
-import type { ClientField, ClientKayan } from 'mithaq/admin'
-import type { Translate } from './copy.ts'
+import type { ClientField } from 'mithaq/admin'
+import type { Cells } from './components.tsx'
 import { formatDate, listed, noValue } from './format.tsx'
-import { RelationshipCell, type RelationshipTitles } from './relationship-cell.tsx'
+import { RelationshipCell } from './relationship-cell.tsx'
 import { UploadCell } from './upload.tsx'
 
 // The server does not know the viewer's zone, so it and the hydrating render draw the day in UTC
@@ -11,20 +11,6 @@ function Moment({ value, locale }: { value: unknown; locale: string }): ReactNod
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false)
   const text = formatDate({ value, locale, day: !mounted })
   return text === undefined ? plain(value) : <time dateTime={new Date(value as string).toISOString()} suppressHydrationWarning>{text}</time>
-}
-
-/** What every cell is handed. The locale is the browser's; `t` is here because a cell that renders a word rather than the value is rendering the project's copy. */
-export type CellProps = {
-  kayan: ClientKayan
-  field: ClientField
-  value: unknown
-  t: Translate
-  locale: string
-  /**
-   * The titles of the rows the relationship columns point at, read once per page. Absent on a
-   * server render, where every relationship cell reads as loading; no cell shows the id it holds.
-   */
-  titles?: RelationshipTitles
 }
 
 const plain = (value: unknown) => (value === null || value === undefined ? '' : String(value))
@@ -62,8 +48,8 @@ export const richTextLine = (value: unknown): string => {
   return characters.length > lineLength ? `${characters.slice(0, lineLength).join('').trimEnd()}…` : characters.join('')
 }
 
-/** One cell per shipped kind, keyed by the kind's own name. */
-export const cells: Record<string, (props: CellProps) => ReactNode> = {
+/** One cell per name the registry ships, keyed by the kind's own name, which `defaultComponents.cells` holds. */
+export const cells: Cells = {
   text: ({ field, value, locale }) => worded(field, value, locale),
   email: ({ value }) =>
     value ? (
@@ -74,7 +60,7 @@ export const cells: Record<string, (props: CellProps) => ReactNode> = {
       ''
     ),
   number: ({ value, locale }) => (typeof value === 'number' ? value.toLocaleString(locale) : plain(value)),
-  integer: (props) => cells.number!(props),
+  integer: (props) => cells.number(props),
   // Exact text: a JS double would lose digits.
   decimal: ({ field, value, locale }) => worded(field, value, locale),
   // The glyph is aria-hidden, so the sr-only word is what a screen reader gets. The words are keyed per field because `true` means different things on `archived` and `published`.
@@ -104,9 +90,3 @@ export const cells: Record<string, (props: CellProps) => ReactNode> = {
     return line ? <span dir="auto" className="line-clamp-2 min-w-48 whitespace-normal">{line}</span> : noValue
   },
 }
-// No prototype, so a kind named `constructor` never resolves to an inherited property.
-Object.setPrototypeOf(cells, null)
-
-/** The cell for a field, first match wins: the list column's named cell, the field's own cell, the kind's cell, then plain text. */
-export const cellFor = (field: ClientField, column?: string): ((props: CellProps) => ReactNode) =>
-  cells[column ?? ''] ?? cells[field.cell] ?? cells[field.kind] ?? cells.text!

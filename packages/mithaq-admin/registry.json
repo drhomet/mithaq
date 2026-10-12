@@ -78,7 +78,7 @@
       "name": "mithaq-components",
       "type": "registry:component",
       "title": "Mithaq components",
-      "description": "The components map a project hands the admin, the provider it mounts it with, and the lookup that picks a field's control from it: the screen's decided name, else the kind's, an error for a shipped kind the map leaves out, and the read-only control for a kind no registry ships.",
+      "description": "The components map a project hands the admin, the provider it mounts it with, the lookups that pick a field's control and cell from it (the screen's decided name, else the kind's, and an error naming the kind where the map has neither), and the check an app runs on every screen as it starts.",
       "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-control-props.json"
       ],
@@ -219,11 +219,12 @@
       "name": "mithaq-default-components",
       "type": "registry:component",
       "title": "Mithaq default components",
-      "description": "The components map the admin ships, one control per kind and per control a screen may name, which a project hands the provider as it is or spreads to replace a control.",
+      "description": "The components map the admin ships, one control and one cell per name a screen may draw with, which a project hands the provider as it is or spreads to replace a control or a cell.",
       "registryDependencies": [
-        "./node_modules/mithaq-admin/r/mithaq-components.json",
-        "./node_modules/mithaq-admin/r/mithaq-choice-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-cells.json",
         "./node_modules/mithaq-admin/r/mithaq-checkbox-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-choice-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-date-control.json",
         "./node_modules/mithaq-admin/r/mithaq-number-control.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
@@ -244,9 +245,9 @@
       "name": "mithaq-cells",
       "type": "registry:component",
       "title": "Mithaq cells",
-      "description": "One table cell per shipped kind, resolved through the same chain a control is.",
+      "description": "The table cells the registry ships, one per kind by the kind's name, which defaultComponents.cells holds.",
       "registryDependencies": [
-        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-format.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
         "./node_modules/mithaq-admin/r/mithaq-upload.json"
@@ -386,7 +387,7 @@
         "dropdown-menu",
         "input",
         "table",
-        "./node_modules/mithaq-admin/r/mithaq-cells.json",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-filter-operators.json",
@@ -459,7 +460,6 @@
         "card",
         "spinner",
         "toggle-group",
-        "./node_modules/mithaq-admin/r/mithaq-cells.json",
         "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
@@ -544,7 +544,6 @@
       "title": "Mithaq relationship cell",
       "description": "Every relationship id on a page named by one read per target, in three states: loading, the related row's title, and the id where the read did not answer.",
       "registryDependencies": [
-        "./node_modules/mithaq-admin/r/mithaq-cells.json",
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-format.json",
         "./node_modules/mithaq-admin/r/mithaq-refusal.json",

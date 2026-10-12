@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { NodeButton, OwnButton, drawsKind, isUntitled, listOf, nodesOf, pageButtonOf, refOf, rowTitle, rowWarning, scopeOf, shown as holds, type ListNode, type PageButton, type ScreenPage } from './nodes.tsx'
-import { cellFor, cells } from './cells.tsx'
+import { cellFor, useComponents } from './components.tsx'
 import type { FindApi } from './control-props.ts'
 import { descriptionOf, labelFor, operationLabelFor, titleOf, type Copy, type Translate } from './copy.ts'
 import { counted } from './format.tsx'
@@ -231,6 +231,7 @@ export function List({
 }: ListProps): ReactElement {
   const copy: Copy = { t, locale }
   const { maxLimit } = useScreen()
+  const { cells } = useComponents()
   const node = props.node ?? listOf(screen)
   /** The row being edited in place, `null` for a row being added, and nothing while no form is open. */
   const [editing, setEditing] = useState<Row | null | undefined>(undefined)
@@ -622,8 +623,8 @@ export function List({
                             const Ref = refOf({ screen, place: 'cell', path: cellOf.get(field.name) ?? field.cell })
                             // An email cell is a mail link, and a link cannot sit in the row's link (`<a>` in `<a>` is a
                             // hydration error), so the linked column draws its text. Upload draws no anchor.
-                            const drawn = cellFor(field, cellOf.get(field.name))
-                            const Cell = drawn === cells.email && field === linked && opens ? cells.text! : drawn
+                            const drawn = cellFor({ cells, field, column: cellOf.get(field.name) })
+                            const Cell = drawn === cells.email && field === linked && opens ? cells.text : drawn
                             const untitled = field.name === kayan.useAsTitle && isUntitled({ kayan, row, locale })
                             const cell = untitled ? (
                               <span className="text-muted-foreground">{t('admin.untitled', 'Untitled') ?? 'Untitled'}</span>
@@ -865,4 +866,4 @@ function ListButton({
     />
   )
 }
-// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 96ef63cae7ce492a88a97a8573fb40f28cca5802b70c0d668a2384d4e5105df2
+// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 467bc6d2c4a0364dc1ae65ec883418178f08c3201cc5f2aee2aead97a46a245e

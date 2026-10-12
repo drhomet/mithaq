@@ -6,10 +6,10 @@ import './tsx.ts'
 import { mount, type as typeInto } from './dom.ts'
 
 const { createRoot } = await import('react-dom/client')
-const { ComponentsProvider, controlFor } = await import('../registry/components.tsx')
+const { ComponentsProvider, cellFor: cellIn, controlFor } = await import('../registry/components.tsx')
 const { labelFor } = await import('../registry/copy.ts')
 const { defaultComponents } = await import('../registry/default-components.tsx')
-const { cellFor } = await import('../registry/cells.tsx')
+const cellFor = (field: ClientField) => cellIn({ cells: defaultComponents.cells, field })
 const { refusalOf } = await import('../registry/form.tsx')
 const { filterPathsOf } = await import('../registry/filter-operators.ts')
 const { readQuery, writeQuery, sortableOf } = await import('../registry/list-query.ts')

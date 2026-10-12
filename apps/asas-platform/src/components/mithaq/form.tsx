@@ -19,11 +19,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { cellFor } from './cells.tsx'
 import { RichTextValueView } from './rich-text.tsx'
 import { UploadValue } from './upload.tsx'
 import { useRelationshipTitles } from './relationship-cell.tsx'
-import { besideLabel, controlFor, useComponents } from './components.tsx'
+import { besideLabel, cellFor, controlFor, useComponents } from './components.tsx'
 import type { FindApi } from './control-props.ts'
 import {
   descriptionFor,
@@ -666,7 +665,7 @@ export function FieldValue({
   const label = useId()
   const value = row?.[field.name]
   const Ref = refOf({ screen, place: 'cell', path: leaf?.cell ?? field.cell })
-  const Cell = cellFor(field, leaf?.cell)
+  const Cell = cellFor({ cells: useComponents().cells, field, column: leaf?.cell })
   const description = leaf?.description?.[copy.locale] ?? descriptionFor({ kayan, field, copy })
   const width = leaf?.width ?? field.width
   return (
@@ -745,6 +744,7 @@ function FormScreen({
   writes,
 }: FormProps & { made?: string; onMade: (id: string) => void }): ReactElement {
   const copy = { t, locale, locales }
+  const { cells } = useComponents()
   const [refused, setRefused] = useState<unknown>(undefined)
   const [busy, setBusy] = useState(false)
   // Bumped to remount every control and panel, so a panel reads what it shows afresh.
@@ -980,7 +980,7 @@ function FormScreen({
   // may not choose shows the raw id, where the cell reads the target's title.
   const sideEntry = (field: ClientField) => {
     if (field.kind !== 'relationship') return control(field.name)
-    const Cell = cellFor(field)
+    const Cell = cellFor({ cells, field })
     return (
       <div key={field.name} className="grid gap-1.5">
         <span className="text-sm font-medium">{labelFor({ kayan, field, copy })}</span>
@@ -1460,4 +1460,4 @@ function FormScreen({
     </KayanForm.Provider>
   )
 }
-// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 97392ed0a4abdbd62bd09a42b07799b51f3c967aa281afda40ccb2d1035a0299
+// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 ed7d94211d69d3590899dd4eda199beecdbda6daf66c45d0c30735ac19574617

@@ -10,14 +10,13 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FieldShell, describedBy } from './field-shell.tsx'
 import { controlFor, useComponents } from './components.tsx'
-import { changeOf, type ControlProps, type FindApi, type FoundPage } from './control-props.ts'
+import { changeOf, type CellProps, type ControlProps, type FindApi, type FoundPage, type RelationshipTitles } from './control-props.ts'
 import { labelFor, type Translate } from './copy.ts'
 import { createsIn, readOnlyField } from './field-values.ts'
 import { listed, noValue } from './format.tsx'
 import { isForbidden, localesOf, refusalKeyOf } from './refusal.ts'
-import type { CellProps } from './cells.tsx'
 import { RelationshipControl, findByIds, idsOf } from './relationship-control.tsx'
-import { rowKey, type RelationshipTitles } from './relationship-cell.tsx'
+import { rowKey } from './relationship-cell.tsx'
 import type { RichTextPick } from './rich-text.tsx'
 
 type Row = Record<string, unknown>
@@ -689,4 +688,4 @@ export function UploadPlugin(props: ControlProps): ReactElement | null {
     </Dialog>
   )
 }
-// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 7a1489a47bd8f0792ad7b09dc9bacdd975b23855c54a775f1f2fe0698ea7fc11
+// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 89a404f71e555c5dc3b801e642f759b4914aca77858f2d3430727dd74d718d1d

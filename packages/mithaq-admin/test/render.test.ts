@@ -16,9 +16,14 @@ const { readOnlyField, seedOf, valuesOf } = await import('../registry/field-valu
 const { controlFor: controlIn } = await import('../registry/components.tsx')
 const { defaultComponents } = await import('../registry/default-components.tsx')
 const { ComponentsProvider } = await import('../registry/components.tsx')
+// A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
+const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
+const { defaultComponents: appDefaults } = await import('@/components/mithaq/default-components.tsx')
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
 const controlFor = (field: ClientField) => controlIn(defaultComponents.controls, field)
-const { cellFor, cells } = await import('../registry/cells.tsx')
+const { cellFor: cellIn } = await import('../registry/components.tsx')
+const cells = defaultComponents.cells
+const cellFor = (field: ClientField, column?: string) => cellIn({ cells, field, column })
 const { Shell, endonym, iconOf, localeEntries, navEntries, navIcons } = await import('../registry/nav.tsx')
 type NavKayan = import('../registry/nav.tsx').NavKayan
 const { Filters, addCondition, committedOf, removeCondition, updateCondition, updateJoin } = await import(
@@ -94,7 +99,7 @@ const state: ScreenState = {
   kayan: courses,
   record: null,
 }
-const renderToStaticMarkup = (element: ReactElement) => staticMarkup(createElement(ScreenContext, { value: state }, createElement(ComponentsProvider, { components: defaultComponents }, element)))
+const renderToStaticMarkup = (element: ReactElement) => staticMarkup(createElement(ScreenContext, { value: state }, createElement(ComponentsProvider, { components: defaultComponents }, createElement(AppComponents, { components: appDefaults }, element))))
 const screenOf = (page: PageClient | undefined, kayan: ClientKayan = courses) => ({ refs, kayan, page: page as Extract<PageClient, { page: unknown }> })
 const recordPage = (main: unknown[]): PageClient => ({ path: '/courses/new', page: { shell: screen.layouts.app!, main: [{ layout: screen.layouts.record!, main } as never] } })
 
@@ -326,6 +331,7 @@ test('a text or number control with a prefix or a suffix is drawn inside an inpu
 })
 
 test('9. neither map answers for a key of Object.prototype, so a field naming one resolves to its kind', () => {
+  // Like a control, a cell the map carries for no name of the field is an error naming the kind, never plain text in its place.
   // A field's `component` is a string off the projection, and a plain object would answer `constructor` and `toString` from its prototype.
   for (const component of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
     assert.equal(controlFor(fieldOf({ name: 'x', kind: 'text', component, cell: component })), controls.text, `a field naming "${component}" as its component falls through to its kind's control`)
@@ -334,17 +340,18 @@ test('9. neither map answers for a key of Object.prototype, so a field naming on
       /no control for "nothing-ships-this"/,
       'and to the error where the map has none for its kind either',
     )
-    assert.equal(
-      cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
-      cells.text,
-      `and to the plain cell`,
+    assert.equal(cellFor(fieldOf({ name: 'x', kind: 'text', component, cell: component })), cells.text, `a field naming "${component}" as its cell falls through to its kind's cell`)
+    assert.throws(
+      () => cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this', component, cell: component })),
+      /components\.cells has no cell for "nothing-ships-this", the kind of field "x"/,
+      'and to the error where the map has none for its kind either',
     )
-    assert.equal(cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' }), component), cells.text, 'and so does a column naming one as its cell')
+    assert.throws(() => cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' }), component), /no cell for "nothing-ships-this"/, 'and so does a column naming one as its cell')
   }
   assert.throws(() => controlFor(fieldOf({ name: 'x', kind: 'constructor' })), /no control for "constructor"/, 'a kind named for a key of Object.prototype is no kind the map carries')
-  assert.equal(cellFor(fieldOf({ name: 'x', kind: 'constructor' })), cells.text, 'and to the plain cell')
+  assert.throws(() => cellFor(fieldOf({ name: 'x', kind: 'constructor' })), /no cell for "constructor"/, 'for a cell either')
   assert.equal(controlIn({ ...defaultComponents.controls }, fieldOf({ name: 'x', kind: 'text', component: 'toString' })), controls.text, 'the control map answers from its own keys alone, a map a project spread too')
-  assert.equal(Object.getPrototypeOf(cells), null, 'and neither does the cell map')
+  assert.equal(cellIn({ cells: { ...cells }, field: fieldOf({ name: 'x', kind: 'text', cell: 'toString' }) }), cells.text, 'and so does the cell map')
 })
 
 test('9b. a field named for a key of Object.prototype has only the issue the server sent it', async () => {
