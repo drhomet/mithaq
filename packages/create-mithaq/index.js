@@ -140,16 +140,22 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
       include: ['templates/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
     })
   }
-  // npm, yarn and Bun read `workspaces`; pnpm reads this file. Told nothing,
-  // pnpm installs a `"*"` workspace from the registry, where another package
-  // is named `asas`, and pnpm 11 fails on esbuild's install script unless it
-  // is allowed, as the other three allow it.
+  // npm, yarn and Bun read `workspaces`; pnpm 10.6 and later read this file.
+  // Told nothing, pnpm installs a `"*"` workspace from the registry, where
+  // another package is named `asas`, and skips esbuild's install script, which
+  // pnpm 11 then fails on; pnpm 10 reads `onlyBuiltDependencies`, pnpm 11
+  // `allowBuilds`.
   const { workspaces = [] } = readJson(join(project, 'package.json'))
   const packages = workspaces.length ? `packages:\n${workspaces.map((folder) => `  - ${folder}\n`).join('')}linkWorkspacePackages: true\npreferWorkspacePackages: true\n` : ''
-  writeFileSync(join(project, 'pnpm-workspace.yaml'), `${packages}allowBuilds:\n  esbuild: true\n`)
+  writeFileSync(join(project, 'pnpm-workspace.yaml'), `${packages}onlyBuiltDependencies:\n  - esbuild\nallowBuilds:\n  esbuild: true\n`)
+  // Yarn 2 and later would otherwise install Plug'n'Play, which neither Vite's
+  // externals nor Node's type stripping read.
+  writeFileSync(join(project, '.yarnrc.yml'), 'nodeLinker: node-modules\n')
   writeFileSync(join(project, '.gitignore'), ['node_modules', '.env', 'dist', '.storage/', '.tanstack', ''].join('\n'))
   return project
 }
+
+const managers = 'A project installs with npm, pnpm 10.6 or later, Yarn 1 or Bun 1.3. Yarn 2 and later install a copy of mithaq for each workspace of a monorepo, which the build refuses, so a monorepo does not take them yet.'
 
 const help = `Usage: create-mithaq [name] [options]
 
@@ -159,7 +165,9 @@ const help = `Usage: create-mithaq [name] [options]
   --no-platform       leave the platform console out
   --help              print this
 
-Asked when not given, unless the input is not a terminal, where the defaults stand.`
+Asked when not given, unless the input is not a terminal, where the defaults stand.
+
+${managers}`
 
 const main = async () => {
   const { values, positionals } = parseArgs({
@@ -184,10 +192,11 @@ const main = async () => {
   const manager = managerOf(process.env.npm_config_user_agent)
   const installed = manager !== undefined && spawnSync(manager, ['install'], { cwd: project, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0
   const run = manager ?? 'npm'
-  if (!installed) console.warn(`\nNot installed. Run ${run} install in ${project}.`)
+  if (!installed) console.warn(`\nNot installed. Run ${run} install in ${project}. ${managers}`)
   const single = layout === 'single'
   const language = single ? '' : 'templates/asas/'
   const push = `node --env-file=.env --input-type=module -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"`
+  if (single) console.log(`\nThe package is named asas, not ${name}: the screens' copied files import the language as asas, and a package reaches itself by its own name.`)
   console.log(`
 Next, with PostgreSQL 15 or later serving the database DATABASE_URL names in ${language}.env:
 

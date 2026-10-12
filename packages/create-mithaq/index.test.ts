@@ -44,7 +44,8 @@ test('a project is a workspace every package manager reads, named for it, with r
   assert.deepEqual(manifest.workspaces, ['templates/*', 'apps/*', 'packages/features/*'])
   assert.equal(manifest.devDependencies['@types/node'], '^24.12.3')
   // pnpm reads its own file, and takes a `"*"` workspace over the registry's `asas` only when told to.
-  assert.equal(read('my-app/pnpm-workspace.yaml'), 'packages:\n  - templates/*\n  - apps/*\n  - packages/features/*\nlinkWorkspacePackages: true\npreferWorkspacePackages: true\nallowBuilds:\n  esbuild: true\n')
+  assert.equal(read('my-app/pnpm-workspace.yaml'), 'packages:\n  - templates/*\n  - apps/*\n  - packages/features/*\nlinkWorkspacePackages: true\npreferWorkspacePackages: true\nonlyBuiltDependencies:\n  - esbuild\nallowBuilds:\n  esbuild: true\n')
+  assert.equal(read('my-app/.yarnrc.yml'), 'nodeLinker: node-modules\n', 'Yarn 2 and later lay out node_modules, not Plug\'n\'Play')
   assert.ok(!existsSync(join(scratch, 'my-app/bunfig.toml')), 'no installer is required')
   assert.ok(existsSync(join(scratch, 'my-app/packages/features/.gitkeep')))
   assert.equal(json('my-app/templates/asas/package.json').scripts.seed, 'node --env-file-if-exists=.env src/seed.ts', 'run by node, whichever manager runs the script')
@@ -111,11 +112,11 @@ test('without the platform console, its app and its .env are left out, and gener
 test('a single package holds the language, the kayan, its auth and the tenant app, reaching itself by the name asas', () => {
   create({ name: 'one', cwd: scratch, template, version: '1.2.3', layout: 'single', platform: false })
   const at = join(scratch, 'one')
-  assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
+  assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', '.yarnrc.yml', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
   const manifest = json('one/package.json')
   assert.equal(manifest.name, 'asas', 'the registry copies import the language as asas')
   assert.equal(manifest.workspaces, undefined)
-  assert.equal(read('one/pnpm-workspace.yaml'), 'allowBuilds:\n  esbuild: true\n', 'pnpm\'s settings, and no workspace')
+  assert.equal(read('one/pnpm-workspace.yaml'), 'onlyBuiltDependencies:\n  - esbuild\nallowBuilds:\n  esbuild: true\n', 'pnpm\'s settings, and no workspace')
   assert.equal(manifest.exports['.'], './src/asas.ts')
   assert.equal(manifest.exports['./auth'], './src/auth/index.ts')
   assert.equal(manifest.exports['./auth/platform-roles'], './src/auth/platform-roles.ts')
@@ -144,6 +145,7 @@ test('--help prints each question\'s flag', () => {
   const done = spawnSync(process.execPath, [fileURLToPath(new URL('./index.js', import.meta.url)), '--help'], { encoding: 'utf8' })
   assert.equal(done.status, 0, done.stderr)
   for (const flag of ['--layout monorepo', '--layout single', '--platform', '--no-platform']) assert.ok(done.stdout.includes(flag), flag)
+  assert.match(done.stdout, /npm, pnpm 10\.6 or later, Yarn 1 or Bun 1\.3\. Yarn 2 and later/, 'and which package managers a project installs with')
 })
 
 test('a dependency left pointing into the framework repository is refused, whatever the key', () => {
