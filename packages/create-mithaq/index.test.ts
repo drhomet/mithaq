@@ -105,6 +105,7 @@ test('without the platform console, its app and its .env are left out, and gener
   assert.ok(existsSync(join(scratch, 'tenant-only/apps/asas-tanstack/.env')))
   assert.match(read('tenant-only/templates/asas/src/mithaq.ts'), /^      platform: false,$/m)
   assert.doesNotMatch(read('tenant-only/templates/asas/src/mithaq.ts'), /apps\/asas-platform\/src/)
+  assert.match(read('tenant-only/templates/auth/src/index.ts'), /^export const platformApp: boolean = false$/m, 'the provider asks for no PLATFORM_URL and links nobody to a platform')
 })
 
 test('a single package holds the language, the kayan, its auth and the tenant app, reaching itself by the name asas', () => {
@@ -129,6 +130,7 @@ test('a single package holds the language, the kayan, its auth and the tenant ap
   for (const file of ['src/asas.ts', 'src/mithaq.ts', 'src/auth/index.ts', 'src/auth/platform-roles.ts', 'src/screens.tsx', 'src/routes/__root.tsx', 'src/ui/app-shell.tsx', 'public/favicon.svg']) assert.ok(existsSync(join(at, file)), file)
   const sources = filesUnder(join(at, 'src')).filter((file) => /\.(tsx?|json|css)$/.test(file))
   assert.deepEqual(sources.filter((file) => /@asas\/auth|templates\/asas|apps\/asas/.test(readFileSync(file, 'utf8').replaceAll(/^\s*(\/\/|\*).*$/gm, ''))).map((file) => file.slice(at.length)), [], 'no path or name of the monorepo is left')
+  assert.match(read('one/src/auth/index.ts'), /^export const platformApp: boolean = false$/m)
   assert.match(read('one/src/mithaq.ts'), /dashboard: 'src\/routes\/\(screens\)\/',\n      portal: 'src\/routes\/\(screens\)\/',\n      platform: false,/)
   assert.match(read('one/src/routes/(screens)/portal/files.ts'), /\], \{ base: '\/' \}\)\n/, 'off Vite\'s root, the project\'s own')
   assert.match(read('one/src/styles.css'), /\(`src\/ui\/app-shell\.tsx`\)\. \*\/\n@source '\.\/';\n/)

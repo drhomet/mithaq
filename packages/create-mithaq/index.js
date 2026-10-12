@@ -121,6 +121,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   if (!platform) {
     rmSync(join(project, 'apps/asas-platform'), { recursive: true })
     edit(join(project, 'templates/asas/src/mithaq.ts'), (text) => text.replace("platform: '../../apps/asas-platform/src/routes/(screens)/',", 'platform: false,'))
+    edit(join(project, 'templates/auth/src/index.ts'), (text) => text.replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false'))
   }
   // One `.env` for the template's commands and one for each app's dev server,
   // the same secrets in each: the tenant app and the platform console sign

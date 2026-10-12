@@ -24,12 +24,22 @@ export const asPlatform = <Result>(run: () => Result): Result => platformRequest
  */
 export const onPlatform = () => platformRequest.getStore() === true
 
+/**
+ * Whether this project serves the platform console, `apps/asas-platform`. `create-mithaq
+ * --no-platform` writes `false` here, as it writes `platform: false` under `generate.screens` in
+ * the template's `src/mithaq.ts`: then no boot asks for PLATFORM_URL, and nobody is linked or
+ * sent to a platform app that does not exist.
+ */
+export const platformApp: boolean = true
+
 // A production boot needs all three: the fallbacks below are for development only, and Better
 // Auth's refusal of its default secret never fires for the platform, whose secret is derived here.
 const production = process.env.NODE_ENV === 'production'
 const secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET
-if (production && (!process.env.PLATFORM_URL || !process.env.BETTER_AUTH_URL || !secret)) {
-  throw new Error('A production boot needs PLATFORM_URL and BETTER_AUTH_URL, where the two apps are served, and BETTER_AUTH_SECRET, which both sign their sessions under. Set all three.')
+if (production && ((platformApp && !process.env.PLATFORM_URL) || !process.env.BETTER_AUTH_URL || !secret)) {
+  throw new Error(platformApp
+    ? 'A production boot needs PLATFORM_URL and BETTER_AUTH_URL, where the two apps are served, and BETTER_AUTH_SECRET, which both sign their sessions under. Set all three.'
+    : 'A production boot needs BETTER_AUTH_URL, where the app is served, and BETTER_AUTH_SECRET, which signs its sessions. Set both.')
 }
 
 // `NODE_ENV` is unset when a deploy runs plain `node` or `bun`, so the check above never runs and
@@ -49,8 +59,8 @@ if (remoteWithNoSecret) {
 }
 
 /**
- * Where the platform app is served, and the platform instance's `baseURL`. Outside production it
- * falls back to the `vite dev` port.
+ * Where the platform app is served, and the platform instance's `baseURL`. Outside production, or
+ * where no platform app is served, it falls back to the `vite dev` port, and nothing links there.
  */
 export const platformURL = process.env.PLATFORM_URL ?? 'http://localhost:5174'
 
@@ -315,7 +325,7 @@ export const platformAudit = {
     // Ending an impersonation sends the staff member back to the platform, whose session is still
     // theirs, not to the tenant's sign-in. The answer keeps the provider's `success` and the
     // cookies it cleared.
-    if (ctx.path === '/sign-out') return ctx.json({ success: true, url: platformURL })
+    if (ctx.path === '/sign-out') return ctx.json({ success: true, url: platformApp ? platformURL : tenantURL })
   }),
 }
 
