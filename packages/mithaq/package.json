@@ -14,6 +14,7 @@
     "./admin/react": "./src/screen/react.ts",
     "./orpc": "./src/asas/http/orpc.ts",
     "./rich-text": "./src/rich-text/rich-text.ts",
+    "./targets": "./src/targets.ts",
     "./drizzle": "./src/drizzle/proxy/index.ts",
     "./drizzle/pg-core": "./src/drizzle/proxy/pg-core.ts",
     "./drizzle/node-postgres": "./src/drizzle/proxy/node-postgres.ts"
@@ -46,6 +47,7 @@
       "./admin/react": "./dist/screen/react.js",
       "./orpc": "./dist/asas/http/orpc.js",
       "./rich-text": "./dist/rich-text/rich-text.js",
+      "./targets": "./dist/targets.js",
       "./drizzle": "./dist/drizzle/proxy/index.js",
       "./drizzle/pg-core": "./dist/drizzle/proxy/pg-core.js",
       "./drizzle/node-postgres": "./dist/drizzle/proxy/node-postgres.js"

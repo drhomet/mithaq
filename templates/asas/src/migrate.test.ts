@@ -327,6 +327,23 @@ await asas.destroy()
   }
 })
 
+test('a new table puts the timestamps after every field the kayan declares, wherever its fields spread them', async () => {
+  await migrateDatabase()
+  const root = await migrationProject("        ...defaultFields,\n        title: { kind: 'text' },")
+  await writeFile(new URL('src/asas.ts', root), kayanSourceOf("        ...defaultFields,\n        title: { kind: 'text' },").replace('import { fetchHttp }', 'import { defaultFields, fetchHttp }'))
+  try {
+    assert.equal(await sqlIn(root, resetSchemas), 0)
+    const migrated = await migrating(root, 'migrate')
+    assert.equal(migrated.code, 0, migrated.stderr)
+    const sql = await latestSql(root)
+    const notes = sql.slice(sql.indexOf('CREATE TABLE "notes"'))
+    assert.match(notes.slice(0, notes.indexOf(');')), /\n\t"id" [^\n]*,\n\t"title" text,\n\t"deleted_at" [^\n]*,\n\t"updated_at" [^\n]*,\n\t"created_at" [^\n]*\n$/)
+  } finally {
+    await sqlIn(root, resetSchemas)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('`mithaq migrate` writes a decimal as numeric(precision, scale), and refuses a narrowing that would round a stored value until none would', async (t) => {
   await migrateDatabase()
   const sized = (scale: number) => `        id: { kind: 'text' },\n        total: { kind: 'decimal', rules: { precision: 20, scale: 2 } },\n        amount: { kind: 'decimal', rules: { precision: 7, scale: ${scale} } },`

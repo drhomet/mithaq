@@ -1,4 +1,4 @@
-import { defaultFields, defaultOperations, folderOf } from 'mithaq'
+import { defaultOperations, folderOf } from 'mithaq'
 import { defineKayan, organization } from '../mithaq.ts'
 import { readsPast, user as actor } from '../tenant-access.ts'
 import { activity, appPage, danger, platformList, platformRecord, topPage } from '../pages.ts'
@@ -31,8 +31,8 @@ const ownSeats = ({ user }: { user: unknown }) => {
 export const enrollments = defineKayan({
   name: 'enrollments',
   access: { read: ownSeats, update: ownSeats, delete: ownSeats },
-  fields: {
-    ...defaultFields,
+  fields: ({ defaults }) => ({
+    ...defaults,
     organization,
     // Read as the session's course and its start on every screen, where a
     // session alone is titled by its start.
@@ -72,7 +72,7 @@ export const enrollments = defineKayan({
       label: { en: 'Deleted at', ar: 'تاريخ الحذف' },
       rules: { providedBy: { create: 'never', update: 'never' } },
     },
-  },
+  }),
   targets: {
     // Every organization's rows on the platform, read-only, and each row's
     // record, which only reads. A record is titled by its student, a person the

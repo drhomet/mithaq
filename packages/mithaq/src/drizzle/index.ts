@@ -789,7 +789,11 @@ const storeOf = <
           throw new Error(`Kayan "${kayan.name}" asks for the schema ${JSON.stringify(kayan.schemaName)}, ${refused} Give the kayan another schemaName.`)
         }
         const built: Record<string, AnyPgColumnBuilder> = Object.create(null)
-        const columns = Object.values(kayan.fields).flatMap(columnsOfField(kayan.store))
+        // A table reads its own columns first, whichever place the kayan spread the timestamps in.
+        // A column never moves in a table that exists: drizzle-kit diffs columns by name.
+        const stamp = (field: ResolvedField) => field.name === 'createdAt' || field.name === 'updatedAt'
+        const declared = Object.values(kayan.fields).flatMap(columnsOfField(kayan.store))
+        const columns = [...declared.filter((field) => !stamp(field)), ...declared.filter(stamp)]
         // `pgTable` keys on the field name, so a localized `title` and a plain `titleAr` would
         // both ask for `title_ar` and one field would end with no column.
         const asked = new Set<string>()

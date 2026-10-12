@@ -49,6 +49,9 @@ import {
   type CommandActor,
   type Step,
   type CreateOf,
+  type RowOf,
+  draftFields,
+  versionOperations,
   type RuleValue,
   type UpdateOf,
   type ZodRule,
@@ -121,6 +124,72 @@ defineKayan({
   fields: { title: { kind: 'text', label: { en: 'Title', ar: 'العنوان' } } },
   targets: { service: { operations: defaultOperations } },
 })
+
+// `fields` and `operations` written over what the language offers. The defaults are exactly the
+// id and timestamps, and the shipped operations, plus versions' own for a kayan that keeps them.
+const title = { kind: 'text', label: { en: 'Title', ar: 'العنوان' } } as const
+const overDefaults = defineKayan({
+  name: 'overDefaults',
+  fields: ({ defaults }) => ({ ...defaults, title }),
+  targets: { service: { operations: ({ defaults }) => ({ ...defaults, archive: { steps: ({ steps }) => [steps.update] } }) } },
+})
+type OverDefaultsFields = Expect<Equal<keyof (typeof overDefaults)['fields'], 'id' | 'updatedAt' | 'createdAt' | 'title'>>
+type OverDefaultsRow = Expect<Equal<RowOf<(typeof overDefaults)['fields'], 'zod'>['title'], string | null>>
+type OverDefaultsCreate = Expect<Equal<'title' extends keyof CreateOf<(typeof overDefaults)['fields'], 'zod'> ? true : false, true>>
+type OverDefaultsOperations = Expect<Equal<keyof (typeof overDefaults)['targets']['service']['operations'], keyof typeof defaultOperations | 'archive'>>
+defineKayan({
+  name: 'plainDefaults',
+  fields: ({ defaults }) => {
+    type Exact = Expect<Equal<typeof defaults, typeof defaultFields>>
+    return defaults
+  },
+  targets: {
+    service: {
+      operations: ({ defaults }) => {
+        type Exact = Expect<Equal<typeof defaults, typeof defaultOperations>>
+        return defaults
+      },
+    },
+  },
+})
+defineKayan({
+  name: 'draftDefaults',
+  fields: ({ defaults }) => {
+    type Drafts = Expect<Equal<typeof defaults, typeof defaultFields & typeof draftFields>>
+    return defaults
+  },
+  targets: {
+    versions: { drafts: true },
+    service: {
+      operations: ({ defaults }) => {
+        type Versions = Expect<Equal<typeof defaults, typeof defaultOperations & typeof versionOperations>>
+        return defaults
+      },
+    },
+  },
+})
+defineKayan({
+  name: 'overDefaultsStrayKey',
+  // @ts-expect-error `lengthy` is no key of any kind, in the function form as in the object
+  fields: ({ defaults }) => ({ ...defaults, title: { ...title, lengthy: 3 } }),
+})
+defineKayan({
+  name: 'overDefaultsStrayTarget',
+  // @ts-expect-error a field's entry under a screen is typed by that screen: a column is unsortable or nothing
+  fields: ({ defaults }) => ({ ...defaults, title: { ...title, targets: { dashboard: { sortable: true } } } }),
+})
+defineKayan({
+  name: 'overDefaultsStrayOperationKey',
+  fields: ({ defaults }) => defaults,
+  targets: {
+    service: {
+      // @ts-expect-error `bogus` is no key of an operation declaration, in a returned object too
+      operations: ({ defaults }) => ({ ...defaults, archive: { steps: ({ steps }) => [steps.update], bogus: 1 } }),
+    },
+  },
+})
+// @ts-expect-error the defaults are the language's, and hold no field the kayan did not ask for
+defineKayan({ name: 'noDrafts', fields: ({ defaults }) => ({ ...defaults, status: defaults._status }) })
 
 defineKayan({
   name: 'indexesProbe',
@@ -1887,6 +1956,28 @@ const globalCreateAccess = defineGlobal({
   access: { create: () => true, read: () => true },
   targets: { service: { operations: defaultGlobalOperations } },
 })
+defineGlobal({
+  name: 'globalStrayOperationKey',
+  fields: { title: { kind: 'text' }, ...defaultGlobalFields },
+  // @ts-expect-error `bogus` is no key of an operation declaration, on a global as on any kayan
+  targets: { service: { operations: { ...defaultGlobalOperations, update: { ...defaultGlobalOperations.update, bogus: 1 } } } },
+})
+const globalOverDefaults = defineGlobal({
+  name: 'globalOverDefaults',
+  fields: ({ defaults }) => ({ ...defaults, title: { kind: 'text', label: { en: 'Title', ar: 'العنوان' } } }),
+  targets: { service: { operations: ({ defaults }) => defaults } },
+})
+type GlobalOverDefaultsOperations = Expect<Equal<keyof (typeof globalOverDefaults)['targets']['service']['operations'], keyof typeof defaultGlobalOperations>>
+defineGlobal({
+  name: 'globalStrayReturnedKey',
+  fields: ({ defaults }) => defaults,
+  targets: {
+    service: {
+      // @ts-expect-error `bogus` is no key of an operation declaration, in a returned object too
+      operations: ({ defaults }) => ({ ...defaults, update: { ...defaults.update, bogus: 1 } }),
+    },
+  },
+})
 
 export type GlobalProbes = [
   GlobalFindOneIsNullable,
@@ -2756,6 +2847,17 @@ const readsAContextKeyNobodyDeclared = (ctx: ProjectCtx): ProjectCtx => {
   return ctx
 }
 void readsAContextKeyNobodyDeclared
+// `ctx.tenant` is the operation's active organization, or nothing, and a step does not assign it.
+const readsTheTenant: WriteStep = (ctx) => {
+  const tenant: string | undefined = ctx.tenant
+  // @ts-expect-error `ctx.tenant` may be absent, on a shared kayan or a read past one organization
+  const always: string = ctx.tenant
+  // @ts-expect-error `ctx.tenant` is read-only
+  ctx.tenant = 'another'
+  void always
+  return { ...ctx, data: { ...ctx.data, tenant } }
+}
+void readsTheTenant
 // A step of another project, to show the runner's own lists grade the context.
 const readsAnotherProjectsContext = (ctx: Ctx<Record<string, unknown>, unknown, unknown, { tenantId: string }>): Ctx => ({
   ...ctx,

@@ -581,6 +581,11 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
         `Kayan "${kayan.name}" writes "targets.service.${key}", which is no key of a kayan's service target. A kayan writes ${kayanServiceKeys.join(', ')} there.`,
       )
     }
+    if (typeof own.operations === 'function') {
+      throw new Error(
+        `Kayan "${kayan.name}" writes its operations as a function, which only defineKayan and defineGlobal run, since they know the defaults it is handed. Declare it with defineKayan, or write its operations as an object: { ...defaultOperations, archive }.`,
+      )
+    }
     return {
       ...kayan,
       // Flattened here, so every reader of a resolved kayan sees the key space a generated file carries.

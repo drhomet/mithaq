@@ -1,4 +1,4 @@
-import { defaultFields, defaultOperations } from 'mithaq'
+import { defaultFields } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '../mithaq.ts'
 import { appPage, danger, platformList, platformRecord } from '../pages.ts'
@@ -48,8 +48,8 @@ export const tags = defineKayan({
       },
     },
     service: {
-      operations: {
-        ...defaultOperations,
+      operations: ({ defaults }) => ({
+        ...defaults,
         /**
          * The shipped update list with the `expectedUpdatedAt` step before it and
          * its input widened by the key the step reads. A caller who sends the
@@ -63,7 +63,7 @@ export const tags = defineKayan({
           input: ({ update }) => update.extend({ expectedUpdatedAt: z.date().optional() }),
           steps: ({ steps }) => [expectedUpdatedAt, steps.update],
         },
-      },
+      }),
     },
   },
   fields: {

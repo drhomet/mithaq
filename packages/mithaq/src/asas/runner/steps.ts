@@ -43,6 +43,13 @@ export type Ctx<
   /** The store's transaction. Every write in the list goes through it. */
   tx: Tx
   context: Context<Extra>
+  /**
+   * The active organization the operation is scoped to, for a step that keeps something per
+   * organization. `undefined` on a shared kayan, under a read's `tenant` option, which reaches
+   * past one organization, and where the language has no tenant target. Only a copy: the runner
+   * puts it back after every step and scopes from the session, so rewriting it moves nothing.
+   */
+  readonly tenant?: string
 }
 
 /** The keys the project put on the service target's `context`, or the open record where it put none. */
@@ -680,7 +687,7 @@ export type LanguageSlots = {
 
 // Every steps function runs once, here, so what `resolve` seals is data.
 export const resolveOperations = (
-  declared: DeclaredOperations | ((defaults: never) => DeclaredOperations) | undefined,
+  declared: DeclaredOperations | undefined,
   slots: LanguageSlots = {},
 ): Record<string, AnyOperation> => {
   const given = {
@@ -690,10 +697,9 @@ export const resolveOperations = (
     afterSteps: slots.afterSteps ?? [],
     afterCommit: slots.afterCommit ?? [],
   } as never
-  const record = typeof declared === 'function' ? declared(given) : declared
-  if (!record) return {}
+  if (!declared) return {}
   const resolved: Record<string, AnyOperation> = Object.create(null)
-  for (const [name, declaration] of Object.entries(record)) {
+  for (const [name, declaration] of Object.entries(declared)) {
     if (declaration === undefined) continue
     const held = declaration as Record<string, unknown>
     const ran = Object.fromEntries(
