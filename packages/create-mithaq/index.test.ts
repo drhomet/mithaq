@@ -112,7 +112,7 @@ test('without the platform console, its app and its .env are left out, and gener
 test('a single package holds the language, the kayan, its auth and the tenant app, reaching itself by the name asas', () => {
   create({ name: 'one', cwd: scratch, template, version: '1.2.3', layout: 'single', platform: false })
   const at = join(scratch, 'one')
-  assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', '.yarnrc.yml', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
+  assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', '.yarnrc.yml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
   const manifest = json('one/package.json')
   assert.equal(manifest.name, 'asas', 'the registry copies import the language as asas')
   assert.equal(manifest.workspaces, undefined)

@@ -1,0 +1,77 @@
+# Working on the mithaq repository
+
+mithaq is a TypeScript language for declaring a backend and its admin once. `defineMithaq` declares the language; each kayan built from it becomes a Postgres table, a zod schema, HTTP operations, access rules and admin screens.
+It ships as `@drhomet/mithaq` (projects import it as `mithaq`) and as the starter `create-mithaq` (`bun create mithaq my-app`).
+This file is for an agent changing mithaq itself. An agent working inside a created project reads `templates/asas/AGENTS.md`.
+
+## Words
+
+- **kayan**: an entity, one data type: its fields, their kinds and rules, its access and its operations. Declared with `defineKayan`, or `defineGlobal` for a single-row kayan.
+- **rukn**, plural **arkan**: a pillar, a pluggable part that brings kinds, rules, fields or targets (`base`, `richText`, `storage`, `versions`).
+- **asas**: the foundation, the runtime `buildAsas` returns from a list of kayan.
+- **target**: what a declaration is built into, named under `defineMithaq`'s `targets` (`drizzle`, `zod`, `service`, `tenant`, a screen).
+- **capability**: the role a target plays: `store`, `schema`, `service`, `screen`, `access`, `storage`, `tenant` or `versions`.
+- **step**: one function `(ctx, tools)` in an operation's list. Each list holds exactly one store or managed read step and whatever surrounds it.
+- **tenant field**: the field `betterAuthTenant` binds. A kayan that places it belongs to one organization; a kayan without it is shared.
+
+## Map
+
+- `packages/mithaq/`: the core package: the language (`src/mithaq/`), the runner (`src/asas/runner/`), the CLI (`src/asas/cli/mithaq.ts`), the drizzle and zod targets, screens, storage, versions.
+- `packages/mithaq-admin/`: the shadcn registry the admin screens are copied from. Read `packages/mithaq-admin/AGENTS.md` before you edit it.
+- `packages/create-mithaq/`: the `bun create mithaq` starter.
+- `templates/asas/`: the template project that ships into every created project, and the worked example. `templates/auth/` is its Better Auth setup (`@asas/auth`).
+- `apps/`: the hosts (`asas-tanstack` for the tenant app, `asas-platform` for the platform console, `asas-next`), plus the repository's own scripts: `lint-args.ts`, `pack.ts`, `release-consumer.ts` and the boot tests.
+- `LICENSES/`: notices for code mithaq adapts.
+- `.claude/skills/ponytail/`: the skill behind `ponytail:` comments.
+
+## Checks
+
+Bun 1.3 with its isolated linker and Node 24 or later. From the root:
+
+```sh
+bun install
+bun run typecheck
+bun run lint:args
+bun run test             # needs DATABASE_URL
+bun run test:tanstack    # builds and boots both TanStack apps
+bun run test:next        # builds and boots the Next host
+bun run pack             # stages the published packages in .pack/
+bun run test:release     # creates a project from .pack/ and runs it
+```
+
+`bun run test`, the boot tests and `test:release` need `DATABASE_URL` pointing at a local throwaway Postgres whose database is named `mithaq`, on any port except 5432 and 55439. `testDatabase` in `templates/asas/src/test-database.ts` refuses anything else, and the tests drop and rebuild that database.
+
+From `templates/asas/`, with `DATABASE_URL` exported (the `mithaq` bin runs under Node and reads no `.env`):
+
+```sh
+bunx mithaq generate --check   # the lock, generated files, migrations, messages, screens
+bunx mithaq upgrade --check    # registry copies against the registry
+```
+
+Run the whole set before you call a change done.
+
+## Rules
+
+- **The vocabulary is frozen.** The vocabulary of `defineMithaq` is its locales, kinds, rules, target names and capabilities, and root keys (`vocabularyOf` in `packages/mithaq/src/mithaq/lock.ts`). It changes only with the owner's signed decision. When a task needs it changed, stop and tell the owner what and why. Never run `mithaq lock` without `--check`, and never edit a `mithaq.lock`. Everything in `defineKayan`, `defineGlobal` and `buildAsas` is free to change.
+- **Defaults are explicit.** Each default is an exported `default<Name>` that the project spreads (`{ ...defaultOperations, archive }`) or names (`authorize: defaultAuthorize`). Core never falls back to a behaviour of its own (`config.x ?? coreX`); `buildAsas` refuses a config that leaves a required default out. A default that holds policy or talks to the outside world is a registry file copied into the project.
+- **One object for three or more parameters.** A function a project calls or implements takes one object once it has three or more parameters, or two of the same type whose order matters: `client({ kayan, operation, input })`. Steps keep `(ctx, tools)`. `bun run lint:args` checks the count; review checks the rest.
+- **Comments say why.** Write the reason a line exists, never a restatement of what it does. A `ponytail:` comment marks a deliberate shortcut and names its ceiling and the upgrade.
+- **Commits are one plain sentence** about what is now true, with no type prefix and no trailer: `The drizzle target names every compound index after its table and columns.`
+- **Tenant enforcement stays in core.** The scope lives in `packages/mithaq/src/asas/runner/tenant.ts` and is ANDed onto every managed operation. Never add an option, flag or path that skips it. Read `packages/mithaq/src/asas/runner/AGENTS.md` before you touch the runner.
+- **Registry copies are regenerated.** The copies under `templates/asas/` and `apps/` end with a `// mithaq-admin <commit> <hash>` marker. Edit the source in `packages/mithaq-admin/registry/` and copy it again; never edit a copy by hand.
+- **Generated files are regenerated.** A file whose first line reads ``// Written by `mithaq <command>` `` comes from that command (`generate auth`, `generate screens`, `migrate`), as does each screen's `screen.json`. Rerun the command. The copy files in `src/messages/` are the exception: `generate messages` only adds missing keys, and the translations are edited by hand.
+- **Tests first.** Write the failing `node:test` test beside the code, watch it fail, then make it pass.
+- **Security and data safety come before brevity**, and brevity before performance. Measure before optimizing.
+
+## Docs
+
+Start at `README.md`. Each guide is the `README.md` of the folder it describes:
+
+- `templates/asas/README.md`: working in a created project, from getting started to production. It ships with the template, so its links to this repository are absolute.
+- `packages/mithaq/README.md`: the language reference, and adding a rukn, a kind, a target or a configurable feature.
+- `packages/mithaq/src/asas/cli/README.md`: the `mithaq` command.
+- `packages/mithaq/src/asas/runner/README.md`: tenancy.
+- `packages/mithaq/src/drizzle/README.md`: migrations in production.
+- `packages/mithaq-admin/README.md`: the admin registry.
+
+`CONTRIBUTING.md` has the repository layout and the pull request steps. Keep each guide beside the code it describes.

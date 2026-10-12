@@ -63,6 +63,7 @@ for (const name of names) {
   }
   writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`)
 }
+cpSync(join(root, 'README.md'), join(staged, 'README.md'))
 cpSync(join(root, 'LICENSE'), join(staged, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(staged, 'LICENSES'), { recursive: true })
 console.log(`staged ${staged}, with ${names.size} files in r/`)

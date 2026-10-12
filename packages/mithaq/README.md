@@ -1,0 +1,800 @@
+# The mithaq language
+
+This page is the mental model of mithaq, in the order you need it. Each section
+gives a short definition, a small example taken from the template, and a pointer
+to the code. Paths are relative to the repository root; a pointer names a file
+and, in backticks, the symbol or a short fragment to search for.
+
+Three Arabic words name the main parts:
+
+- **kayan** (plural the same): an entity or collection, such as `courses`.
+- **rukn** (plural **arkan**): a pillar, a pluggable part that brings kinds,
+  rules or targets.
+- **asas**: the foundation, the runtime that `buildAsas` builds from your kayan.
+
+If you have not made a project yet, start with
+[Getting started](../../templates/asas/README.md#getting-started). Tenancy has its own page,
+[Tenancy](src/asas/runner/README.md).
+
+## The language
+
+The language is the one object a project hands to `defineMithaq` in
+`src/mithaq.ts`. It names the locales, the arkan and the targets. Everything
+else in the project is written in its words.
+
+```ts
+const language = defineMithaq({
+  locales: ['ar', 'en'] as const,
+  arkan: [base, richText({ nodes: richTextNodes }), files, versions({ max: 100 })],
+  targets: {
+    drizzle: drizzleStore,
+    zod: zodTarget,
+    rbac: accessTarget(),
+    tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict' }),
+    service: serviceTarget({ /* ... */ }),
+    dashboard: dashboardScreen,
+  },
+  generate: { auth: 'src/kayan/auth/', messages: 'src/messages/', screens: { /* ... */ } },
+})
+
+export const { defineKayan, defineGlobal, buildAsas, rows, user, targets: { tenant } } = language
+```
+
+Where it lives: `packages/mithaq/src/mithaq/language.ts` `defineMithaq`; the
+template's language is `templates/asas/src/mithaq.ts`.
+
+### Root keys
+
+- `locales`: every locale the project's copy is written in. Each label then
+  needs one string per locale, so a half-translated project fails to compile.
+  mithaq never picks a locale itself.
+- `arkan`: the pillars the kinds, rules and some targets come from. Kinds and
+  rules come from arkan alone: a `kinds` or `rules` key at the root is refused.
+- `targets`: one entry per target, by the name the project gives it. A
+  target's name is how a kayan addresses it (`targets.dashboard`,
+  `targets.versions`).
+- Any other key, such as `generate`, is the project's own. mithaq passes it
+  through typed, and the generators read `generate` to find where to write.
+
+The service target's own keys (`beforeSteps`, `authorize`, `softDelete`,
+`store`, `schema` and the rest) are refused at the root, by name, and so is
+`operations`: each kayan declares its own.
+
+### What it returns
+
+`defineMithaq` returns the language's own keys (`locales`, `kinds`, `rules`,
+`targets` and the rest) and five functions bound to the language:
+
+- `defineKayan`, which declares a kayan in this language's kinds and rules;
+- `defineGlobal`, which declares a kayan of one row;
+- `buildAsas`, which builds the runtime;
+- `rows`, which compiles an access row table, with its role keys checked
+  against the access target's roles;
+- `user`, which writes a reference to a key of the actor, such as `user.id`,
+  checked against the actor the access target reads.
+
+A kayan is checked against the language it was declared in: a kind the arkan
+do not bring, a rule its kind does not accept, or a label missing a locale is a
+type error.
+
+### The frozen vocabulary
+
+The vocabulary of `defineMithaq` is its locales, the kinds (each one's label,
+message and accepted rules), the rules (each one's message and excludes), the
+targets (each one's name and capability) and the list of root keys. It changes
+only with the project owner's signed decision.
+
+`mithaq.lock` records that vocabulary as plain data, with a signature. `mithaq
+lock` writes and signs it; it signs only when a person types back a code shown
+in a popup, never in the command's own output. `mithaq lock --check`, and
+`mithaq generate --check` as its first step, fail when the vocabulary no longer
+matches the lock or the seal does not verify.
+
+The lock is optional. A project without `mithaq.lock` passes `mithaq lock
+--check` with a notice, and `mithaq lock` locks it.
+
+Everything outside that vocabulary is free to change: every `defineKayan`,
+`defineGlobal` and `buildAsas` call, and the rest of `defineMithaq` (screen
+pages, a screen's kayan list, shells, components, roles, steps and `generate`
+paths).
+
+Where it lives: `packages/mithaq/src/mithaq/lock.ts` `vocabularyOf` and
+`checkLock`. The commands are in [The `mithaq` command](src/asas/cli/README.md).
+
+## Arkan
+
+A rukn is one pillar of capability: some kinds, some rules, some targets, and
+the capabilities it needs from other targets. Two arkan may not bring the same
+kind, rule or target, and a rukn's target may not share a name with one the
+project lays down; `buildAsas` names both sides of the clash.
+
+```ts
+export const slugs = defineRukn({
+  name: 'slugs',
+  rules: {
+    slug: rule<boolean>({
+      accepts: (value): value is boolean => typeof value === 'boolean',
+      message: { en: 'This is not a slug.', ar: 'هذا ليس معرفا نصيا.' },
+    }),
+  },
+})
+```
+
+Where it lives: `packages/mithaq/src/mithaq/rukn.ts` `defineRukn` and
+`composeArkan`. A rukn of your own, and the target maps it needs, are covered in
+[Add a rukn](#add-a-rukn).
+
+### The shipped arkan
+
+- **`base`**: the shipped kinds and rules, listed below. Every project lays it
+  down first. `packages/mithaq/src/base/index.ts` `base`.
+- **`richText({ nodes })`**: the `richText` kind, a Lexical tree checked
+  against the project's own node list. It can be searched and is never sorted.
+  `packages/mithaq/src/rich-text/index.ts` `richText`.
+- **`storage(config)`**: the `upload` kind, a relationship drawn as a file
+  picker, and the `storage` target over the project's config. The config holds
+  the signing secret, so the module that builds the language stays on the
+  server. `packages/mithaq/src/storage/index.ts` `storage`.
+- **`versions({ max })`**: the `versions` target. A kayan that writes
+  `targets.versions` keeps up to `max` past copies of each row, or its own
+  window, and may keep drafts. It needs a target of capability `store`.
+  `packages/mithaq/src/versions/index.ts` `versions`.
+
+The fields a kayan spreads to use them ship beside each one: `uploadFields` for
+a kayan that holds files, `draftFields` (the `_status` field) and
+`versionOperations` for a kayan that keeps drafts and versions.
+
+## Kinds and rules
+
+A kind is what a field holds: its value's type, the label and message a person
+reads, and the rules it accepts. A rule is a constraint or a behaviour a field
+switches on in `rules`.
+
+```ts
+title: {
+  kind: 'text',
+  label: { en: 'Title', ar: 'العنوان' },
+  rules: { required: true, trim: true, maxLength: 120, index: true },
+},
+```
+
+### Kinds
+
+From `base` (`packages/mithaq/src/base/kinds.ts` `defaultKinds`):
+
+- `text`: a string.
+- `email`: a string written as an email address.
+- `number`: a JavaScript number.
+- `integer`: a whole number in Postgres `integer` range.
+- `decimal`: a decimal number carried as text, so money never rounds.
+- `checkbox`: `true` or `false`.
+- `datetime`: a moment, as a `Date`.
+- `date`: a calendar day, as an ISO string such as `2026-02-28`.
+- `textArray`: a list of strings.
+- `uuid`: a uuid string; also the kind of the shipped `id`.
+- `relationship`: the id of one row of another kayan, or a set of ids with
+  `hasMany: true`. Without `onDelete`, a required one restricts and an optional
+  one is set null.
+- `join`: the rows of another kayan whose `on` relationship points back at
+  this row. It builds no column; a read populates it through the child kayan's
+  own access.
+
+From the other arkan:
+
+- `richText` (`richText` rukn): a rich text tree.
+- `upload` (`storage` rukn): one row of a kayan that holds files. A file a row
+  still names is never deleted from under it.
+
+### Rules
+
+From `base` (`packages/mithaq/src/base/rules.ts` `defaultRules`):
+
+- `required`: the value must be there.
+- `unique`: no two rows hold the same value. On a per-organization kayan that
+  means within the organization; see [Tenancy](src/asas/runner/README.md).
+- `index`: the column is indexed.
+- `defaultValue`: a literal, or a reference such as `user.id` to the actor's
+  value. Excludes `defaultNow`.
+- `defaultNow`: the moment of the write, on create.
+- `nowOnUpdate`: the moment of the write, on every update.
+- `providedBy`: who supplies the value on `create` and on `update`: `client`,
+  `application` or `never`. A field that declares nothing is the client's.
+- `localized`: one value per locale, stored as one column per locale.
+- `maxLength`, `minLength`: the length of a string.
+- `pattern`: a `RegExp` the string must match.
+- `min`, `max`: bounds on a number, or on an ISO day for `date`.
+- `precision`, `scale`: a decimal's size, declared together.
+- `minRows`, `maxRows`: how few and how many entries a list holds.
+- `uppercase`, `lowercase`, `trim`: rewrite the value before it is checked.
+- `onDelete`: what happens to this row when the row it points at is deleted:
+  `cascade`, `restrict` or `set null`.
+
+Each kind lists the rules it accepts; a rule a kind does not accept is a type
+error on the field.
+
+## Kayan and globals
+
+### `defineKayan`
+
+A kayan is declared once, as data, and every target derives its part from that
+declaration: the table, the validation shapes, the operations and the screens.
+
+```ts
+export const tags = defineKayan({
+  name: 'tags',
+  messages: {
+    singular: { en: 'Tag', ar: 'وسم' },
+    plural: { en: 'Tags', ar: 'الوسوم' },
+  },
+  fields: {
+    ...defaultFields,
+    organization,
+    name: {
+      kind: 'text',
+      label: { en: 'Name', ar: 'الاسم' },
+      rules: { localized: true, required: true, trim: true, maxLength: 60, index: true },
+    },
+  },
+  targets: {
+    service: { operations: { ...defaultOperations } },
+    dashboard: { useAsTitle: 'name', pages: { /* ... */ } },
+  },
+})
+```
+
+Where it lives: `packages/mithaq/src/mithaq/define.ts` `defineKayan`; the
+example is `templates/asas/src/tags/tags.ts`.
+
+**Fields.** The key order of `fields` is the column order. Each field names a
+`kind`, a `label` in every locale, and its `rules`. It may also carry a
+`description`, a `placeholder`, a `prefix` and `suffix`, `options` (the closed
+list a text field's value is one of), `access` for the field, a `dbName`, and
+`targets.<name>` for what one target says about it. A store's or schema
+target's entry under `targets` replaces what that target would derive; a
+screen's entry says how the field is drawn.
+
+**Default fields.** A project spreads its id and timestamps; nothing is merged
+in for it.
+
+- `defaultIdField`: `id`, a uuid Postgres fills when a create leaves it out.
+- `defaultTimestampFields`: `updatedAt`, written by the runner on every write
+  that changes a row, and `createdAt`, written on insert and indexed.
+- `defaultFields`: both of the above, `{ ...defaultIdField,
+  ...defaultTimestampFields }`.
+
+Every kayan needs an `id`. The template's `expectedUpdatedAt` step, which
+refuses a stale update with a 409, refuses to run on a kayan without
+`updatedAt`. The default fields are not vocabulary: `mithaq.lock` does not
+record them, so changing them needs no signature. Where it lives:
+`packages/mithaq/src/base/fields.ts`.
+
+**Labels and messages.** Every label holds one string per declared locale. A
+kayan's `messages` is its own copy, nested by the parts of each key:
+`singular` and `plural` name the kayan on every screen, and a field's own
+refusal messages go under its name (`fee: { min: { en, ar } }`). `mithaq
+generate messages` writes the copy files and refuses a gap.
+
+**Access.** `access` holds `create`, `read`, `update` and `delete`. Each is a
+callback that answers `true`, `false` or a `Where`, or the project compiles them
+from a row table with `rows(...)`. A field's own `access` holds `create`,
+`read` and `update`, each answering `true` or `false`. See
+[Access and roles](#access-and-roles) below.
+
+**Operations.** A kayan answers exactly the operations it lists under
+`targets.service.operations`, and nothing else. Spread `defaultOperations`
+(`create`, `update`, `delete`, `find`, `findByID`, `count`, `updateMany`,
+`deleteMany`) and leave out any you do not want, or add your own:
+
+```ts
+operations: {
+  ...defaultOperations,
+  archive: {
+    input: () => archiveInput,
+    steps: ({ steps }) => [markArchived, steps.update],
+  },
+},
+```
+
+An operation is a list of steps with exactly one store or read step in it
+(`steps.insert`, `steps.update`, `steps.remove`, `steps.find`,
+`steps.findOne`, `steps.count`, and the bulk and version steps). Its name is
+its permission key: `courses.archive`. It may also declare `input` (the shape it
+parses, from the derived shapes), `output`, and three more lists:
+`beforeTransaction`, `afterSteps` and `afterCommit`. Where it lives:
+`packages/mithaq/src/asas/runner/steps.ts` `defaultOperations` and
+`OperationDeclaration`.
+
+**Steps.** A step is a function `(ctx, tools)` that returns the context.
+`ctx` holds the kayan, `data`, the `actor` (also as `user`), `dataBefore` on an
+update or delete, the transaction `tx` and the call's `context`. `tools` holds
+the operation's name, its schema, the bound store writes on a write, and
+`tools.of(kayan)` for a managed call to another kayan in the same transaction.
+
+```ts
+const markArchived = (ctx: Ctx<z.infer<typeof archiveInput>>): Ctx => {
+  const { reason } = ctx.data
+  return { ...ctx, data: { ...ctx.data, archived: true, archiveReason: reason } }
+}
+```
+
+The example is `templates/asas/src/courses/courses.ts` `markArchived`.
+
+**Indexes.** `indexes` lists the indexes over a kayan's own columns. Every
+field with `unique: true` gets a default unique index. A list is built beside
+those defaults, and a function `({ defaults }) => [...]` answers the whole list:
+
+```ts
+indexes: ({ defaults }) => [
+  ...defaults.filter((index) => !index.fields.includes('code')),
+  { fields: ['code'], unique: true },
+],
+```
+
+An entry is `{ fields, unique?, nullsNotDistinct? }`. On a per-organization
+kayan a group `{ within: 'organization', unique: [...], index: [...] }` builds
+indexes led by the organization field. A `unique` field that no unique index
+covers is refused. The group, and what `unique` means per organization, are
+explained in [Tenancy](src/asas/runner/README.md#unique-values-and-indexes). Where it
+lives: `packages/mithaq/src/mithaq/resolve.ts` `uniqueRuleIndexes`.
+
+**Versions and drafts.** A kayan keeps versions by writing `targets.versions`
+and spreading `versionOperations` (`findVersions`, `findVersionByID`,
+`restoreVersion`). With `drafts`, it also spreads `draftFields`: a write with
+`{ draft: true }` saves a version alone, a plain read leaves a never-published
+row out, and `{ draft: true }` on a read answers each row's latest version.
+
+```ts
+targets: {
+  versions: { drafts: { autosave: true } },
+  service: { operations: { ...defaultOperations, ...versionOperations } },
+},
+fields: { ...defaultFields, ...draftFields, /* ... */ },
+```
+
+Where it lives: `packages/mithaq/src/versions/versions.ts` `versionsOf`.
+
+**Storage.** A kayan holds files by writing `targets.storage` (`mimeTypes`,
+optional `fileSize`, optional `public: true`) and spreading `uploadFields`.
+Exactly one of its operations makes rows, and that operation runs the config's
+`uploaded` step in `beforeTransaction`. The browser asks `POST
+/api/<kayan>/uploadInstructions`, uploads the file, and sends the signed
+reference back in the create; `GET /api/<kayan>/file/<id>` serves it through
+the kayan's own `findByID`. A global holds no files, and a kayan that holds
+files keeps no versions. Where it lives:
+`packages/mithaq/src/storage/storage.ts` `resolveStorage`.
+
+**Screens.** A kayan says what each screen draws of it under
+`targets.<screen>`: its title field, its pages, and per-field drawing hints. See
+[Screens](#screens) below.
+
+### `defineGlobal`
+
+A global is a kayan of one row, such as site settings. It spreads
+`defaultGlobalFields` (the `globalType` constant) and runs
+`defaultGlobalOperations`: `findOne` and `update`. The first `update` makes the
+row; a read before it answers `null`. Its access takes `read` and `update`
+alone.
+
+```ts
+export const settings = defineGlobal({
+  name: 'settings',
+  fields: {
+    ...defaultFields,
+    siteTitle: { kind: 'text', label: { en: 'Site title', ar: 'عنوان الموقع' }, rules: { required: true } },
+    ...defaultGlobalFields,
+  },
+  targets: { service: { operations: defaultGlobalOperations } },
+})
+```
+
+A global that places the organization field is one row per organization; the
+template's `templates/asas/src/settings/settings.ts` is one, and
+[Tenancy](src/asas/runner/README.md#globals) shows what changes. Where it lives:
+`packages/mithaq/src/mithaq/define.ts` `defineGlobal`.
+
+## Targets
+
+A target is one consumer of the declarations: a database, a validator, a screen,
+the runner. Each declares one **capability**, and `buildAsas` treats it by that
+capability alone:
+
+| Capability | What it does | How many |
+| --- | --- | --- |
+| `store` | holds the rows and builds a column per field | any |
+| `schema` | builds a validation shape per field and derives a kayan's shapes | any |
+| `access` | names the system roles and answers what an actor holds | at most one |
+| `service` | the runner: its step lists, limits and access evaluator | exactly one, named `service` |
+| `screen` | draws kayan in an admin app | any, none named `screen` |
+| `tenant` | says which kayan a row's organization is | at most one, named `tenant` |
+| `storage` | where a kayan's files are kept | at most one |
+| `versions` | where a kayan's past copies are kept | at most one |
+
+A store or schema target has one entry per kind and per rule; a kind may also
+carry its own implementation for a target's `type`. A target may carry
+commands, run as `mithaq <target> <command>`.
+
+### The shipped targets
+
+- **drizzle** (`store`): Postgres through Drizzle.
+  `drizzleAdapter({ connectionString, ...drizzleTarget, prodMigrations })`. Its
+  `migrate` command is `mithaq migrate`. `packages/mithaq/src/drizzle/index.ts`
+  `drizzleAdapter`.
+- **zod** (`schema`): the create, update, id, byID, row and list shapes, and
+  the draft shapes. `packages/mithaq/src/zod/index.ts` `zodTarget`.
+- **rbac** (`access`): system roles in code, custom roles and assignments in
+  two kayan, and the `assign` command. `packages/mithaq/src/rbac/index.ts`
+  `rbacTarget`. `betterAuthTarget` is the alternative that keeps custom roles
+  in the provider's own rows.
+- **service** (`service`): the runner. `packages/mithaq/src/service/index.ts`
+  `serviceTarget`.
+- **screen** (`screen`): one admin app's pages. `packages/mithaq/src/screen/index.ts`
+  `screenTarget`.
+- **tenant** (`tenant`): per-organization rows over Better Auth's
+  organizations. `packages/mithaq/src/auth/better-auth/tenant.ts`
+  `betterAuthTenant`.
+- **storage** (`storage`): built by the `storage` rukn, with the `sweep`
+  command that finds objects no row names.
+- **versions** (`versions`): built by the `versions` rukn.
+
+## Asas
+
+`buildAsas` takes the kayan, the globals, the HTTP plugs and the auth settings,
+checks everything, and returns the runtime.
+
+```ts
+export const asas = buildAsas({
+  kayan: [...betterAuth.core, ...betterAuth.organization, roles, memberRoles, tags, courses],
+  global: [settings],
+  http: [orpcHttp({ /* ... */ }), fetchHttp({ context: requestContext })],
+  statements: { ...providerStatements },
+  auth: { admin: { kayan: user, access: superAdmin }, onError: (error) => console.error(error) },
+})
+```
+
+Where it lives: `packages/mithaq/src/asas/build.ts` `buildAsas`; the template's
+is `templates/asas/src/asas.ts`.
+
+### Defaults are explicit
+
+Core never falls back to a behaviour of its own. Each default is a named
+`default<Name>` that the project spreads or names, so the project sees and owns
+every behaviour it might change. `buildAsas` refuses a config that leaves a
+required one out:
+
+- `http`: at least one plug, such as `fetchHttp()`.
+- `auth.onError`, once any kayan carries auth.
+- On the service target: `authorize` (`defaultAuthorize`), `depth`
+  (`defaultDepth`, 8), `defaultLimit` (10), `maxLimit` (100), `joinLimit` (10),
+  `bulkLimit` (1000), `store` and `schema`. An `audit` step needs an `audit`
+  sink.
+- On the storage config: `secret`, `adapters`, `adapter`, `fileSize`
+  (`defaultFileSize`), `onError`, and the functions `key`, `verify`,
+  `disposition`, `sweep`, `instructions`, `uploaded`, `removed` and `serve`.
+
+A default that holds policy or talks to the outside world, such as the storage
+functions or the `expectedUpdatedAt` step, is a registry file copied into the
+project, which the project edits there.
+
+### What it returns
+
+- `handler(request)`: answers every HTTP request. It serves
+  `/api/auth/<strategy>/*`, `GET /api/access` (what the actor may do), the file
+  routes, and then asks each plug in order, answering 404 when none matched.
+- `operations`: the flat table of every built operation, one entry per
+  operation of every kayan and global, which the plugs read.
+- `kayan.<name>.operations` and `global.<name>.operations`: each operation as a
+  function, `(input, { actor })`, for code in the app:
+  `asas.kayan.courses.operations.find({ limit: 20 }, { actor })`.
+- `connect({ readOnly? })`: reaches every store and prepares it, and with
+  `readOnly` writes nothing. With the drizzle store's `prodMigrations`, it runs
+  or refuses pending migrations; see [Migrations in production](src/drizzle/README.md).
+- `destroy()`: closes every store.
+- `catalog` and `statements`: every permission key, as a list and in Better
+  Auth's shape.
+- `targets`, `auth` (the strategies and `auth.actor(headers)`), `router` and
+  `messages`.
+
+## Operations and the runner
+
+Every operation runs through the runner in a fixed order. A step list cannot
+skip a check, because the checks belong to the runner, not to the list.
+
+### Create, update and delete
+
+1. The depth cap and the call's context. A write nested past `depth` throws.
+2. On an update or delete, the id is checked against the id shape: a 400, not a
+   store error.
+3. On a per-organization kayan, the organization scope is checked; see
+   [Tenancy](src/asas/runner/README.md).
+4. Access: the kayan's access answer and the permission key
+   `<kayan>.<operation>`. A create needs `true`; an update or delete may get a
+   `Where` that narrows the row it reaches.
+5. `beforeTransaction`, outside the transaction. No row is loaded yet.
+6. The transaction opens. An update or delete loads its row under the access
+   answer, locked for update.
+7. Field access for the fields the write names.
+8. The parse and the defaults. Without an `input`, the defaults fill and the
+   whole row is parsed; with one, the caller's shape is parsed first and the
+   defaults fill after it.
+9. The service target's `beforeSteps`, the operation's `steps`, then
+   `afterSteps` (the operation's own, or else the service target's). At the
+   store step the runner answers 404 for a row that was not found, asks field
+   access again, checks every relationship value, and refuses a step that wrote
+   a `providedBy: 'never'` field.
+10. The commit. The result is parsed against the row shape and cut to the
+    fields the actor may read.
+11. `afterCommit`, after the commit. A throw there leaves the write standing
+    and answers `AfterCommitError`.
+
+A nested managed write, such as `tools.of(sessions).create(...)` inside a step,
+joins the outer transaction, so both commit or roll back together.
+
+### Read
+
+1. The depth cap, and the organization reach (`tenant: 'mine'` or `'all'`),
+   opened by the outermost read alone.
+2. Access: the read answer and the permission key. A `Where` narrows every row
+   the read reaches.
+3. The parse, then the operation's steps and its own `afterSteps`. A read runs
+   no service-target list and has no `beforeTransaction`.
+4. Inside the read step: the caller's `where` and `sort` are checked against
+   field read access (a filter on a field the actor may not read is a 403), a
+   filter across a relationship carries the far kayan's read access, rows a
+   soft delete marked or a draft never published are left out, and `join`
+   fields are populated through the child kayan's own read.
+5. Each row is parsed against the row shape and cut to the fields the actor may
+   read. A row addressed by id that is absent or hidden answers 404.
+
+### Bulk
+
+`updateMany` and `deleteMany` take `{ where, data }`. The bulk's own key is
+asked once; a `where` is required; the match is refused when it holds more than
+`bulkLimit` rows. Each matched row then goes through the single-row write, with
+its own key and field access, all in one transaction: one failing row rolls
+the whole call back. A draft never published is left alone, and an actor who
+may read drafts finds it listed under `errors`. Where it lives: `packages/mithaq/src/asas/runner/bulk.ts` `bulk`.
+
+### How access is answered
+
+- **Rows.** The access callback, or the row table, answers `true`, `false` or a
+  `Where`. A `Where` is ANDed onto the query or the row lookup, so it narrows
+  and never widens. A kayan with no access of its own answers only to the
+  `auth.admin` kayan's actor, through `auth.admin.access`.
+- **Keys.** Where the actor's keys are graded, an operation also needs
+  `<kayan>.<operation>`, and a field needs `<kayan>.fields.<field>`.
+- **Field access.** On read, a field the actor may not read is removed from the
+  row. On write, a field a row table denies is a 403 that names it, and a field
+  a hand-written callback denies is dropped from the write.
+
+Where it lives: `packages/mithaq/src/asas/runner/write.ts` `defaultAuthorize`
+and `projectReadableFields`; `packages/mithaq/src/asas/runner/read.ts`
+`readers`.
+
+### Errors and refusals
+
+A refusal the caller caused is an `AsasError` with a status, a message `key` a
+client translates, and `params`:
+
+- 400 (`invalid`): the input, a `where`, a reference or an option is wrong.
+- 403 (`denied`): the actor may not do this.
+- 404 (`missing`): no such row. An absent row and one the actor may not reach
+  answer alike, so a 404 never says which.
+- 409 (`conflict`): the write collides with a row already there, such as a
+  unique value. It never names the value.
+
+Any other throw is a fault: the HTTP plugs answer it as a 500 with the message
+replaced. `AfterCommitError` means the write committed and an `afterCommit`
+step failed. Where it lives: `packages/mithaq/src/asas/runner/errors.ts`.
+
+## Access and roles
+
+### Keys
+
+Every permission key comes from the declarations, and `asas.catalog` lists
+them all:
+
+- `<kayan>.<operation>`, one per operation: `courses.find`,
+  `courses.archive`;
+- `<kayan>.fields.<field>`, one per field: `courses.fields.title`;
+- `screen.<screen>`, one per screen, which decides who enters it.
+
+A key a role names that is not in the catalog fails the build.
+
+### System roles and custom roles
+
+The access target (`rbacTarget`) holds two kinds of role:
+
+- **System roles** are code: a slug, a label and the keys it holds (`'*'` for
+  every key). The template's are `templates/asas/src/roles.ts` `systemRoles`:
+  the platform's and the organizations' (`administrator`, `registrar`,
+  `instructor`, `student`).
+- **Custom roles** are rows of the `roles` kayan, each organization's own:
+  a `name` and a `permissions` list.
+
+Which roles an actor holds in an organization are rows of the `memberRoles`
+kayan. The target reads them for the active organization, adds each system
+role's keys from code and each custom role's keys from that organization's
+`roles` rows, and puts the result on the trusted actor. `mithaq rbac assign
+--tenant <id> --user <id> --role <slug>` writes one assignment from the
+command line.
+
+```ts
+rbac: rbacTarget({
+  roles: systemRoles,
+  rolesOf: assignedRoles,
+  access: tenantAccess,
+  kayan: { roles: 'roles', memberRoles: 'memberRoles' },
+}),
+```
+
+Where it lives: `packages/mithaq/src/rbac/index.ts` `rbacTarget`.
+
+### Row tables
+
+A row table says, per role, what each operation may do. Its keys are `'*'`
+(the row every actor assigned a role gets beside its own) and system role
+slugs. An actor with no role takes no row and is denied.
+
+```ts
+access: rows({
+  '*': { create: true, read: true, update: { owner: { equals: user.id } }, delete: false },
+}),
+```
+
+Each row answers `create` (only `true` allows), `read`, `update` and `delete`
+with `true`, `false` or a `Where`, and may list `fields` (`'*'`, a name, or
+`!name`). A `false` in any applicable row denies; several `Where` answers admit
+a row any one of them admits. The access target's `access` table is inherited
+by every per-organization kayan; a kayan drops it with `access: { tenant: false
+}`, and a callback written beside the rows is ANDed with them.
+
+Where it lives: `packages/mithaq/src/mithaq/rows.ts` `rows`; the template's
+table is `templates/asas/src/tenant-access.ts` `tenantAccess`.
+
+## Screens
+
+A screen is a target of capability `screen`: one admin app's pages over the
+kayan it lists. It names its path, its kayan, the control and cell that draw
+each kind (`screenKinds` and the project's own), its providers, its own pages,
+and the shells, layouts and components its pages name. A kayan says what the
+screen draws of it under `targets.<screen>`.
+
+```ts
+export const dashboardScreen = screenTarget({
+  path: '/dashboard',
+  kayan: ['courses', 'tags', 'settings'],
+  controls: screenKinds,
+  providers: [ui('rich-text-nodes.tsx#RichTextNodes')],
+  pages: { dashboard: { path: '/', component: dashboardUi('dashboard.tsx#Dashboard'), permission: 'courses.find' } },
+  layouts: { app: ui('app-shell.tsx#AppShell'), record: ui('record-page.tsx#RecordPage'), table: ui('table-page.tsx#TablePage') },
+  components: {},
+})
+```
+
+A file is named `ui('file.tsx#Export')` off a folder URL from `folderOf`, and
+a missing file or export fails the build. Where it lives:
+`packages/mithaq/src/screen/index.ts` `screenTarget`.
+
+**The admin registry.** The controls, cells, forms, lists and shells a screen draws with, and `mithaq upgrade --check`, which compares a project's copies with them, are described in [The admin registry](../mithaq-admin/README.md).
+
+**`mithaq generate screens`** writes each screen's route files into the host
+app, and `mithaq screens` prints each screen's page tree. Where it lives:
+`packages/mithaq/src/screen/generate.ts` `run`.
+[The `mithaq` command](src/asas/cli/README.md) describes both commands.
+
+## Extending the language
+
+This part covers adding to the language itself: a rukn, a kind or a rule, a target, and a configurable feature. Adding a kayan, a feature on a kayan or a step to a project is in [Adding to the project](../../templates/asas/README.md#adding-to-the-project).
+
+### Add a rukn
+
+A rukn is one object made with `defineRukn({ name, kinds, rules, targets, needs })`. It may bring:
+
+- **kinds**, each with its own implementation for each target type under `targets`: `drizzle` its column, `zod` its shape, `screen` its control and cell;
+- **rules**;
+- **targets** it builds, which merge with the project's own (the storage rukn builds the storage target over the config it is handed);
+- **needs**, the capabilities it requires of the build, such as `needs: ['store']`. A need names a capability, never a target type, so any store meets `'store'`.
+
+A project adds a rukn with one line in `arkan` in `templates/asas/src/mithaq.ts`, and one line in `targets` for each capability the rukn needs that the build does not already lay down.
+
+```ts
+import { defineRukn, kind } from 'mithaq'
+import { varchar } from 'mithaq/drizzle/pg-core'
+import { z } from 'zod'
+
+const isSlug = (value: unknown): value is string => typeof value === 'string'
+
+/** A rukn of this project's own: the `slug` kind, with its column, its shape and how a screen draws it. */
+export const slugs = defineRukn({
+  name: 'slugs',
+  kinds: {
+    slug: kind<string>(isSlug)({
+      label: { en: 'Slug', ar: 'معرف نصي' },
+      message: { en: 'This is not a slug.', ar: 'هذا ليس معرفا نصيا.' },
+      rules: ['required', 'unique', 'index'],
+      targets: {
+        drizzle: (field: { column: string }) => varchar(field.column, { length: 40 }),
+        zod: () => z.string().regex(/^[a-z0-9-]+$/),
+        screen: { control: 'text', cell: 'text' },
+      },
+    }),
+  },
+})
+
+// templates/asas/src/mithaq.ts
+export const arkan = [base, richText({ nodes: richTextNodes }), guardedFiles, versions({ max: 100 }), slugs] as const
+```
+
+A target reads the project's own entry for a kind first, then the kind's own under `targets`, then its shipped table. `buildAsas` refuses a kind, rule or target that two arkan bring, a rukn target under a key the project's `targets` already use, and a rukn whose need no target meets, naming both sides each time.
+
+A rukn's kinds, rules and target names are vocabulary, so adding a rukn, or changing what one brings, follows [Add a kind or a rule](#add-a-kind-or-a-rule). Fields a feature needs, such as `uploadFields` or `draftFields`, are not part of a rukn: they are exported beside it as named values a kayan spreads.
+
+When you write a rukn factory whose kinds depend on its argument, type that argument as `<const C>`, or the kinds widen and the type checks pass silently. A factory whose kinds do not depend on its argument, such as `richText({ nodes })` or `storage(config)`, takes no generic.
+
+### Add a kind or a rule
+
+A kind or a rule is vocabulary, so it changes only with the owner's signature.
+
+1. Ask the owner first. Say what the kayan needs to say and why the existing kinds and rules cannot say it.
+2. Bring the kind or rule in a rukn, as above. A rule is made with `rule({ accepts, message, excludes })`. Each store and schema target needs an entry for a new rule in its `rules` table, or the build refuses a field that carries it with "has no entry in the ... target's rules". A new kind carries its own entry per target type under `targets`.
+3. Run `bunx mithaq lock --check`. In a project that keeps a `mithaq.lock`, it turns red and lists each changed path. The red message ends with the sentence that starts with `ميثاق:`.
+4. Stop there and hand over. The owner runs `bunx mithaq lock`, which signs only when a person types back the code its popup shows. Never sign the lock, approve a signature, or edit `mithaq.lock` by hand: an edited lock fails the check too.
+
+A red lock also stops both apps' `dev`, `build` and `preview` scripts. While a project runs without a lock, the vocabulary still changes only with the owner's explicit word. [The `mithaq` command](src/asas/cli/README.md#lock-and-lock---check) describes both commands.
+
+### Add a target
+
+A target is one entry in `defineMithaq`'s `targets`, under a name, with a `capability` core knows: `store`, `schema`, `access`, `service`, `screen`, `tenant`, `storage` or `versions`. A target's name and capability are vocabulary, so the owner signs every new one. A new capability is a change to mithaq itself.
+
+A target of an existing capability can be the project's own and spreads into `targets` beside the shipped ones. A new target shipped by mithaq follows the order below. Paths from here on are in the mithaq repository.
+
+#### What goes where
+
+| What it is | Where it lives | How a project uses it |
+|---|---|---|
+| The target's name and capability, a kind's label, message and rules | A rukn the project lays down in `arkan`, recorded in `mithaq.lock` | Only the owner signs a change. |
+| Plain data a project extends: fields, operations, nodes | Core, exported as `default<Name>` | The project spreads it: `{ ...defaultOperations, archive }`, `richText({ nodes: [...defaultNodes, MyNode] })`. |
+| A behaviour a project may replace: a step, a key format, a verify, a serve, a sweep | A `default<Name>` function | The project names it in its own config: `verify: defaultVerify`. |
+| Code that holds policy or talks to the outside world: a provider SDK, a bucket, a mailer, UI | A registry file copied into the project with its marker line | The project edits its copy in place. |
+| An invariant no project may break: access before a read, the tenant from the session, the shape check at the trust boundary, a guard against data loss | Core | Exposed as small building blocks the defaults call, such as `checkReference` and `readForFile`, never as a hidden fallback. |
+
+#### The rules
+
+1. **Every default has a name, and the project passes it.** Core never writes `config.verify ?? coreVerify`. A default's name starts with `default`.
+2. **`buildAsas` refuses a config that leaves a default out**, naming the key. The storage target refuses a config with no `verify`, saying "storage names no "verify" function", and the build refuses a config with no `http` plug.
+3. **A default that holds policy lives in the project.** What a valid file is, how a key is built and which orphans the sweep deletes are registry files copied to `templates/asas/src/<target>/defaults.ts`, not core code.
+4. **Operations are spread, never injected.** A target ships `<target>Operations` built from exported `default*` steps, and a kayan spreads it beside `defaultOperations`, as `versionOperations` is spread into `courses`.
+5. **Core keeps only what is not a choice,** and the target's documentation says why each piece core keeps is not the project's. If you cannot write the reason, the piece belongs to the project.
+6. **Replacing a default must not need core's internals.** The building blocks a default calls are exported, and the default's tests ship beside it.
+7. **One object argument** for any function a project calls or implements with three or more parameters, or two whose order matters and whose types match. `bun run lint:args` checks the first case.
+8. **A store that writes at `connect()`** (a push, a seed, a marker) skips that under `connect({ readOnly: true })`, because `generate messages --check` reads through that connect and relies on it writing nothing.
+9. **A target that holds a secret makes the language module server-only.** Check that no module a browser loads imports it; `apps/client-imports.test.ts` walks the apps for this.
+
+#### Order
+
+1. **Agree the design with the owner.** Cover the lock change, every `default*` function and value and where it lives (core spread, project config or registry copy), and what core keeps and why.
+2. **Add the vocabulary:** the target, or the kind in the rukn that brings it, under `packages/mithaq/src/<target>/`. The lock goes red and stays red until the owner signs at the end.
+3. **Write the core building blocks and their types,** each project-facing function taking one object. Give the target constructor a `type`. If a kayan writes anything under the target, augment `KayanConfigs` with that type's shape, as `packages/mithaq/src/versions/index.ts` does. Export it from `packages/mithaq/src/index.ts`.
+4. **Write the defaults,** as registry files under `packages/mithaq-admin/registry/<target>/` where they hold policy or talk to the outside world, otherwise as exported `default*` values.
+5. **Name every function in the template's config,** in `templates/asas/src/mithaq.ts` or a file it imports, such as `templates/asas/src/storage/index.ts`.
+6. **Write the tests:** the security cases first, each default's own tests, a test that `buildAsas` refuses the config with each function removed, and a test that a replaced default is called rather than silently ignored. Add a `@ts-expect-error` probe for the rukn to `templates/asas/src/types.probe.ts`.
+7. **Document it:** what is a default, what core keeps and why, and how to replace each default.
+
+Before review, check that:
+
+- a search of core for `??` finds no fallback to a behaviour;
+- every function the template's config names starts with `default` or is the project's own;
+- `buildAsas` refuses the config with any one function removed, and a replaced default is called (both tested);
+- `bunx mithaq upgrade --check` lists every copied file;
+- the lock diff holds only the target or kind.
+
+### Add a configurable feature
+
+Storage adapters, auth strategies, rich-text nodes, the service target's limits and the HTTP plugs are all configured the same way: the project names every piece, and core supplies named defaults for it to name.
+
+- **A list the project extends is spread.** Rich text nodes are `[...defaultNodes, UploadNode]` in `templates/asas/src/rich-text-nodes.ts`, the one list the server and every editor read. A node that draws React keeps its DOM-free class there and its React subclass in the client file.
+- **A value or a function the project may replace is named.** The service target names `authorize: defaultAuthorize`, `depth: defaultDepth`, `defaultLimit`, `maxLimit: defaultMaxLimit`, `joinLimit: defaultJoinLimit` and `bulkLimit: defaultBulkLimit`. Local auth names `tokenExpiration: defaultTokenExpiration`, `maxLoginAttempts: defaultMaxLoginAttempts` and `lockTime: defaultLockTime`. To change one, put your own value or function in its place.
+- **A default that holds policy or talks to the outside world is a registry file.** The storage adapters (`local`, `r2`, `s3`, `uploadthing`) and `defaults.ts` in `templates/asas/src/storage/` are copies of the `mithaq-storage` item. `templates/asas/src/storage/index.ts` names each of `defaultKey`, `defaultVerify`, `defaultDisposition`, `defaultSweep`, `defaultUploadInstructions`, `defaultUploaded`, `defaultRemoveFile` and `defaultServeFile`. To add an adapter, write it beside the others and add it to `adapters`; to change a policy, edit `defaults.ts`.
+- **Core never falls back.** A missing piece is refused when the project builds, never filled in. A storage config without `verify`, a build without `http`, or a service target without `authorize` is a configuration error, not a default.
+
+Tenancy has no default to replace. Scoping a per-organization kayan to the active organization is not a choice, so core enforces it on every managed operation and nothing turns it off. See [Tenancy](src/asas/runner/README.md).
