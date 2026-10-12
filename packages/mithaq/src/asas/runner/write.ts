@@ -610,7 +610,7 @@ export const runOutside = async <Actor>({
   return running.run(around as Running, async () => {
     let ctx = start
     try {
-      for (const step of list) ctx = await step(ctx, given as WriteTools)
+      for (const step of list) ctx = { ...(await step(ctx, given as WriteTools)), tenant: start.tenant }
     } catch (cause) {
       if (slot === 'beforeTransaction') throw cause
       throw new Error(
@@ -748,7 +748,7 @@ export const write = <Actor = unknown>({
         tools,
         slot: 'beforeTransaction',
         list: atEffect<WriteStep>(declaration.beforeTransaction),
-        start: { kayan, data: { ...data }, actor, user: actor, tx: undefined, context },
+        start: { kayan, data: { ...data }, actor, user: actor, tx: undefined, context, tenant: owner },
         around: { context, user: actor },
       })
       values = before.data as Record<string, unknown>
@@ -870,7 +870,7 @@ export const write = <Actor = unknown>({
           store: protectedStore,
           where: writeWhere,
         })
-        let ctx: Ctx = { kayan, data: { ...inputData }, actor, user: actor, tx, context, dataBefore, dataAfter: dataBefore }
+        let ctx: Ctx = { kayan, data: { ...inputData }, actor, user: actor, tx, context, dataBefore, dataAfter: dataBefore, tenant: owner }
         // With no `input` the filled row is parsed, so a default reaches a required column; with one,
         // the caller's strict shape is parsed first. A remove writes no column, so neither runs.
         const fill = (one: Ctx) => (fieldOperation ? (defaults(one, runTools as WriteTools) as Ctx) : one)
@@ -938,7 +938,7 @@ export const write = <Actor = unknown>({
             // runner's value; on insert no create callback would refuse a step's.
             if (kayan.single) ctx = { ...ctx, data: { ...ctx.data, globalType: kayan.name } }
           }
-          ctx = await step(ctx, runTools as WriteTools)
+          ctx = { ...(await step(ctx, runTools as WriteTools)), tenant: owner }
         }
         committed = ctx
         // A draft may be short of `required`, so it leaves through the draft shape, which holds it to its kinds alone.

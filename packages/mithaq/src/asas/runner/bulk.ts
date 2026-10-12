@@ -55,7 +55,7 @@ export const bulk = <Actor = unknown>({
     }
     const { actor, context, entry, open } = beginWrite<Actor>({ kayan, operation: tools.operation, store, cap, options })
     refuseTenantOption({ kayan, operation: tools.operation, options })
-    writeTenant({ kayan, active: tenantOf(actor), effect: tools.effect, data: given?.data })
+    const owner = writeTenant({ kayan, active: tenantOf(actor), effect: tools.effect, data: given?.data })
     // Asked once, before `beforeTransaction`, so a refused actor runs no outside step.
     const accessWhere = await authorize({
       admin,
@@ -75,7 +75,7 @@ export const bulk = <Actor = unknown>({
         tools,
         slot: 'beforeTransaction',
         list: atEffect<WriteStep>(declaration.beforeTransaction),
-        start: { kayan, data: { ...given }, actor, user: actor, tx: undefined, context },
+        start: { kayan, data: { ...given }, actor, user: actor, tx: undefined, context, tenant: owner },
         around: { context, user: actor },
       })
       values = before.data as Record<string, unknown>
@@ -149,14 +149,14 @@ export const bulk = <Actor = unknown>({
       entry.tx = tx
       return running.run({ context, transactions: new Map(open).set(store, entry), user: actor }, async () => {
         const runTools = Object.freeze({ ...tools, many: (data: Record<string, unknown>) => many(data, tx) })
-        let ctx: Ctx = { kayan, data: { ...values }, actor, user: actor, tx, context }
+        let ctx: Ctx = { kayan, data: { ...values }, actor, user: actor, tx, context, tenant: owner }
         // No defaults here: each row's single-row write fills its own.
         ctx = await parse({ schema: runTools.schema, ctx, tools: runTools })
         for (const step of atEffect<WriteStep>([
           ...declaration.beforeSteps,
           ...list,
           ...declaration.afterSteps,
-        ])) ctx = await step(ctx, runTools as WriteTools)
+        ])) ctx = { ...(await step(ctx, runTools as WriteTools)), tenant: owner }
         committed = ctx
         // Each document already passed its single-row output and read mask.
         // The bulk contract validates the envelope after the steps have run.

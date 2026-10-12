@@ -353,6 +353,7 @@ export const readers = <Actor>({
   audit,
   catalog = [],
   openTenant,
+  tenantOf,
 }: {
   kayan: ResolvedKayan
   store: Store
@@ -369,6 +370,8 @@ export const readers = <Actor>({
   catalog?: readonly string[]
   /** Reads a read's `tenant` option into the scope every managed call under it keeps. */
   openTenant: (args: { actor: unknown; reach: unknown; kayan: ResolvedKayan }) => Promise<TenantScope | undefined>
+  /** The organization the actor's session names, which a step reads as `ctx.tenant`. */
+  tenantOf: (actor: unknown) => string | undefined
 }): ReaderMap<Actor> => {
   // Every managed read reaches the store here, so the soft-delete filter is put on once.
   const alive = aliveWhere(kayan)
@@ -605,13 +608,15 @@ export const readers = <Actor>({
       },
     })
     const tx = currentTx()
-    let ctx: Ctx = { kayan, data: { ...data }, actor, user: actor, tx, context }
+    // A reach past one organization names none; a global is its active organization's row under any reach.
+    const owner = kayan.tenant && (!tenant || kayan.single) ? tenantOf(actor) : undefined
+    let ctx: Ctx = { kayan, data: { ...data }, actor, user: actor, tx, context, tenant: owner }
     const run = async () => {
       // A read fills no default: it writes no column.
       ctx = await parse({ schema: input, ctx, tools })
       // `strictFunctionTypes` checks the actor contravariantly, hence the one cast. A read runs
       // no service-target list: it opens no transaction, and `audit` is taken only by naming it.
-      for (const step of atEffect<ReadStep>([...list, ...declaration.afterSteps])) ctx = await step(ctx, tools as ReadTools)
+      for (const step of atEffect<ReadStep>([...list, ...declaration.afterSteps])) ctx = { ...(await step(ctx, tools as ReadTools)), tenant: owner }
     }
     await running.run(around, run)
     // A total carries no column, so nothing to mask.

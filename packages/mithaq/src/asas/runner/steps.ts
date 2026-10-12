@@ -43,6 +43,13 @@ export type Ctx<
   /** The store's transaction. Every write in the list goes through it. */
   tx: Tx
   context: Context<Extra>
+  /**
+   * The active organization the operation is scoped to, for a step that keeps something per
+   * organization. `undefined` on a shared kayan, under a read's `tenant` option, which reaches
+   * past one organization, and where the language has no tenant target. Only a copy: the runner
+   * puts it back after every step and scopes from the session, so rewriting it moves nothing.
+   */
+  readonly tenant?: string
 }
 
 /** The keys the project put on the service target's `context`, or the open record where it put none. */

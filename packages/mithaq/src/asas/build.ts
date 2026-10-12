@@ -836,6 +836,7 @@ export const buildAsas = <
         admin,
         authorize,
         openTenant: tenant.open,
+        tenantOf: tenant.active,
         kayans: () => boundKayans('read'),
         of: boundOf('read'),
         audit: service.audit as AuditHandler<Actor> | undefined,

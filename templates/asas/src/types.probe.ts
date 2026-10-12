@@ -2756,6 +2756,17 @@ const readsAContextKeyNobodyDeclared = (ctx: ProjectCtx): ProjectCtx => {
   return ctx
 }
 void readsAContextKeyNobodyDeclared
+// `ctx.tenant` is the operation's active organization, or nothing, and a step does not assign it.
+const readsTheTenant: WriteStep = (ctx) => {
+  const tenant: string | undefined = ctx.tenant
+  // @ts-expect-error `ctx.tenant` may be absent, on a shared kayan or a read past one organization
+  const always: string = ctx.tenant
+  // @ts-expect-error `ctx.tenant` is read-only
+  ctx.tenant = 'another'
+  void always
+  return { ...ctx, data: { ...ctx.data, tenant } }
+}
+void readsTheTenant
 // A step of another project, to show the runner's own lists grade the context.
 const readsAnotherProjectsContext = (ctx: Ctx<Record<string, unknown>, unknown, unknown, { tenantId: string }>): Ctx => ({
   ...ctx,

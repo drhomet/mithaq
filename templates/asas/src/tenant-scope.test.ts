@@ -89,6 +89,9 @@ let members = 0
 const reported: unknown[] = []
 /** The row a raw write in a step reaches for, set by the test that makes it. */
 const victim: { id?: string; data?: Record<string, unknown> } = {}
+/** Each `ctx.tenant` a recording step saw, in order. */
+const seenTenants: unknown[] = []
+const seeTenant = (ctx: { tenant?: unknown }) => (seenTenants.push(ctx.tenant), ctx)
 /** The memo a step writes into a note, set by the test that makes it. */
 const linked: { memo?: string } = {}
 /** What a step writes past the managed write, set by the test that makes it: a new note, or `id`'s. */
@@ -138,6 +141,20 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           claimed: { input: () => z.object({ title: z.string(), firmId: z.string() }).strict(), steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], beforeTransaction: [(ctx: unknown) => (outside += 1, ctx)] },
           stamp: { steps: ({ steps }: { steps: { insert: unknown } }) => [moveTo('org2'), steps.insert] },
           shift: { steps: ({ steps }: { steps: { update: unknown } }) => [moveTo('org2'), steps.update] },
+          // Two steps that rewrite `ctx.tenant`, one in place and one by a copy, around steps that record it.
+          forge: {
+            beforeTransaction: [seeTenant],
+            steps: ({ steps }: { steps: { insert: unknown } }) => [
+              seeTenant,
+              (ctx: { tenant?: unknown }) => ((ctx.tenant = 'org2'), ctx),
+              seeTenant,
+              (ctx: object) => ({ ...ctx, tenant: 'org3' }),
+              seeTenant,
+              steps.insert,
+            ],
+            afterCommit: [seeTenant],
+          },
+          peek: { steps: ({ steps }: { steps: { find: unknown } }) => [seeTenant, steps.find] },
           // A replaced list: the managed read is the project's own step around the sealed one.
           mine: { steps: ({ steps }: { steps: { find: unknown } }) => [(ctx: unknown) => ctx, steps.find] },
           nested: {
@@ -267,7 +284,15 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     schemaName: 'tenant_scope',
     fields: { ...defaultFields, label: { kind: 'text' }, memo: { kind: 'relationship', relationTo: 'memos' } },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
-    targets: { service: { operations: defaultOperations } },
+    targets: {
+      service: {
+        operations: {
+          ...defaultOperations,
+          forge: { steps: ({ steps }: { steps: { insert: unknown } }) => [seeTenant, steps.insert] },
+          peek: { steps: ({ steps }: { steps: { find: unknown } }) => [seeTenant, steps.find] },
+        },
+      },
+    },
   }
   // A code is unique within an organization: the default, beside a plain list of the kayan's own.
   const badges = {
@@ -308,7 +333,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp()], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'plant' | 'link' | 'scribble' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -403,6 +428,20 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     await assert.rejects(memos().shift({ id: ids.org1, title: 'moved' }, { actor: one }), /declares providedBy "never"|wrote field "firmId"/)
     assert.equal((await memos().count({}, { actor: two })).totalDocs, before)
     assert.equal((await memos().findByID({ id: ids.org1 }, { actor: one })).firmId, 'org1')
+  })
+
+  test('a step reads ctx.tenant as the active organization, a step rewriting it moves nothing, and a shared kayan or a read past one organization reads none', async () => {
+    seenTenants.length = 0
+    const made = await memos().forge({ title: 'forged' }, { actor: one })
+    assert.equal(made.firmId, 'org1')
+    assert.deepEqual(seenTenants, ['org1', 'org1', 'org1', 'org1', 'org1'])
+    assert.equal((await memos().count({ where: { title: { equals: 'forged' } } }, { actor: two })).totalDocs, 0)
+    seenTenants.length = 0
+    await memos().peek({}, { actor: one })
+    await memos().peek({}, { actor: one, tenant: 'mine' })
+    await built.kayan.pins.operations.forge({ label: 'shared', memo: null }, { actor: one })
+    await built.kayan.pins.operations.peek({}, { actor: one })
+    assert.deepEqual(seenTenants, ['org1', undefined, undefined, undefined])
   })
 
   test('reads, counts and reads by id see the active organization alone, and another organization\'s row answers as a missing one', async () => {
