@@ -1,4 +1,4 @@
-import { defaultFields, draftFields, folderOf, invalid, versionOperations, type Ctx, type ReadTools, type WriteTools, defaultOperations } from 'mithaq'
+import { defaultFields, draftFields, folderOf, invalid, type Ctx, type ReadTools, type WriteTools } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '../mithaq.ts'
 import { activity, appPage, danger, platformList, platformRecord, topPage } from '../pages.ts'
@@ -204,10 +204,9 @@ export const courses = defineKayan({
      * through are the service target's own.
      */
     service: {
-      operations: {
-        ...defaultOperations,
-        // A course keeps its versions, so it answers the three that read and restore them.
-        ...versionOperations,
+      // The defaults hold versions' three operations too, since a course keeps its versions.
+      operations: ({ defaults }) => ({
+        ...defaults,
         /**
          * The shipped create list with one step added and one shape widened:
          * `sessions` is part of the create signature without being a column, since
@@ -275,7 +274,7 @@ export const courses = defineKayan({
           steps: ({ steps }) => [steps.findOne, attachSessions],
           output: ({ row }) => row.extend({ sessions: z.array(sessionRow) }),
         },
-      },
+      }),
     },
     dashboard: {
       // What this kayan is for, drawn under the list heading and the form title.
