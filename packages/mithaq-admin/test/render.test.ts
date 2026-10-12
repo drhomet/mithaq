@@ -11,8 +11,13 @@ import './tsx.ts'
 
 const { List } = await import('../registry/list.tsx')
 const { Form } = await import('../registry/form.tsx')
-const { controlFor, controls, descriptionOf, labelFor, operationLabelFor, placeholderFor, readOnlyField, seedOf, valuesOf } =
-  await import('../registry/controls.tsx')
+const { descriptionOf, labelFor, operationLabelFor, placeholderFor, titleOf } = await import('../registry/copy.ts')
+const { readOnlyField, seedOf, valuesOf } = await import('../registry/field-values.ts')
+const { controlFor: controlIn } = await import('../registry/components.tsx')
+const { defaultComponents } = await import('../registry/default-components.tsx')
+const { ComponentsProvider } = await import('../registry/components.tsx')
+const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
+const controlFor = (field: ClientField) => controlIn(defaultComponents.controls, field)
 const { cellFor, cells } = await import('../registry/cells.tsx')
 const { Shell, endonym, iconOf, localeEntries, navEntries, navIcons } = await import('../registry/nav.tsx')
 type NavKayan = import('../registry/nav.tsx').NavKayan
@@ -30,7 +35,6 @@ type ClientKayan = import('mithaq/admin').ClientKayan
 type ClientField = import('mithaq/admin').ClientField
 type PageClient = import('mithaq/admin').PageClient
 type ButtonClient = import('mithaq/admin').ButtonClient
-const { titleOf } = await import('../registry/controls.tsx')
 const { pageButtonOf } = await import('../registry/nodes.tsx')
 const { RecordPage } = await import('../../../templates/asas/src/ui/record-page.tsx')
 const { TablePage } = await import('../../../templates/asas/src/ui/table-page.tsx')
@@ -90,7 +94,7 @@ const state: ScreenState = {
   kayan: courses,
   record: null,
 }
-const renderToStaticMarkup = (element: ReactElement) => staticMarkup(createElement(ScreenContext, { value: state }, element))
+const renderToStaticMarkup = (element: ReactElement) => staticMarkup(createElement(ScreenContext, { value: state }, createElement(ComponentsProvider, { components: defaultComponents }, element)))
 const screenOf = (page: PageClient | undefined, kayan: ClientKayan = courses) => ({ refs, kayan, page: page as Extract<PageClient, { page: unknown }> })
 const recordPage = (main: unknown[]): PageClient => ({ path: '/courses/new', page: { shell: screen.layouts.app!, main: [{ layout: screen.layouts.record!, main } as never] } })
 
@@ -338,7 +342,7 @@ test('9. neither map answers for a key of Object.prototype, so a field naming on
   }
   assert.equal(controlFor(fieldOf({ name: 'x', kind: 'constructor' })), controls.uuid, 'a kind named for a key of Object.prototype resolves to the read-only control')
   assert.equal(cellFor(fieldOf({ name: 'x', kind: 'constructor' })), cells.text, 'and to the plain cell')
-  assert.equal(Object.getPrototypeOf(controls), null, 'the control map has no prototype to answer from')
+  assert.equal(controlIn({ ...defaultComponents.controls }, fieldOf({ name: 'x', kind: 'text', component: 'toString' })), controls.text, 'the control map answers from its own keys alone, a map a project spread too')
   assert.equal(Object.getPrototypeOf(cells), null, 'and neither does the cell map')
 })
 
@@ -413,7 +417,19 @@ test('12. the app holds the current source of every registry item it copied', ()
   assert.deepEqual(
     names,
     [
-      'mithaq-controls',
+      'mithaq-copy',
+      'mithaq-format',
+      'mithaq-refusal',
+      'mithaq-field-values',
+      'mithaq-control-props',
+      'mithaq-components',
+      'mithaq-text-control',
+      'mithaq-number-control',
+      'mithaq-textarea-control',
+      'mithaq-date-control',
+      'mithaq-choice-control',
+      'mithaq-checkbox-control',
+      'mithaq-default-components',
       'mithaq-cells',
       'mithaq-filter-operators',
       'mithaq-list-query',
@@ -435,7 +451,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the twenty-one items this file knows about',
+    'the registry declares the thirty-three items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`

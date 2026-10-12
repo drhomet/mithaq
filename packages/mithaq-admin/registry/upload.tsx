@@ -9,7 +9,12 @@ import { UploadNode } from 'mithaq/rich-text'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FieldShell, describedBy } from './field-shell.tsx'
-import { changeOf, controlFor, createsIn, isForbidden, labelFor, listed, localesOf, noValue, readOnlyField, refusalKeyOf, type ControlProps, type FindApi, type FoundPage, type Translate } from './controls.tsx'
+import { controlFor, useComponents } from './components.tsx'
+import { changeOf, type ControlProps, type FindApi, type FoundPage } from './control-props.ts'
+import { labelFor, type Translate } from './copy.ts'
+import { createsIn, readOnlyField } from './field-values.ts'
+import { listed, noValue } from './format.tsx'
+import { isForbidden, localesOf, refusalKeyOf } from './refusal.ts'
 import type { CellProps } from './cells.tsx'
 import { RelationshipControl, findByIds, idsOf } from './relationship-control.tsx'
 import { rowKey, type RelationshipTitles } from './relationship-cell.tsx'
@@ -233,6 +238,7 @@ export function UploadDialog({ open, onOpenChange, target, client, t, locale, lo
   locales: readonly string[]
   onDone: (row: Row) => void
 }): ReactElement {
+  const { controls } = useComponents()
   const [file, setFile] = useState<File | null>(null)
   const [values, setValues] = useState<Row>({})
   const [progress, setProgress] = useState<number | null>(null)
@@ -339,7 +345,7 @@ export function UploadDialog({ open, onOpenChange, target, client, t, locale, lo
             </div>
           </FieldShell>
           {fields.map((field) => {
-            const Control = controlFor(field)
+            const Control = controlFor(controls, field)
             const id = `upload-${target.name}-${field.name}`
             const localized = field.rules.localized === true
             const held = (values[field.name] && typeof values[field.name] === 'object' ? values[field.name] : {}) as Row

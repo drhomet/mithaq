@@ -1,6 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
-import { formatDate, listed, noValue, type Translate } from './controls.tsx'
+import type { Translate } from './copy.ts'
+import { formatDate, listed, noValue } from './format.tsx'
 import { RelationshipCell, type RelationshipTitles } from './relationship-cell.tsx'
 import { UploadCell } from './upload.tsx'
 
@@ -109,4 +110,4 @@ Object.setPrototypeOf(cells, null)
 /** The cell for a field, first match wins: the list column's named cell, the field's own cell, the kind's cell, then plain text. */
 export const cellFor = (field: ClientField, column?: string): ((props: CellProps) => ReactNode) =>
   cells[column ?? ''] ?? cells[field.cell] ?? cells[field.kind] ?? cells.text!
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 95340e7fd65595abe95ca51f11ac4b6f98a69775637a46591d6aa053f6aa5f27
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 c661b98a4ac1f8c7b59983318f3f929743280a204c9b832cb1476a091fea0664

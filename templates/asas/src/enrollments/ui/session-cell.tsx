@@ -9,7 +9,9 @@ import { use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { CellProps, FetchClient, Row } from 'mithaq/admin'
 import { ListContext, useClient, useLocale, useScreen } from 'mithaq/admin/react'
-import { formatDate, noValue, refusalKeyOf, type FoundPage } from '@/components/mithaq/controls.tsx'
+import type { FoundPage } from '@/components/mithaq/control-props.ts'
+import { formatDate, noValue } from '@/components/mithaq/format.tsx'
+import { refusalKeyOf } from '@/components/mithaq/refusal.ts'
 import { findByIds, nameOfRow, titleFieldOf } from '@/components/mithaq/relationship-control.tsx'
 
 /** A refusal is the viewer's access answering, so it reads as no rows; anything else is a failure, and throws for the query to try again. */

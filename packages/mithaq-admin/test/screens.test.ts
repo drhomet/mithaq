@@ -36,7 +36,9 @@ const { List } = await import('../registry/list.tsx')
 const { RecordFrame, initialFocusIn, listOf } = await import('../registry/nodes.tsx')
 const { searchableFields } = await import('../registry/list-query.ts')
 const { filterPathsOf } = await import('../registry/filter-operators.ts')
-const { controls } = await import('../registry/controls.tsx')
+const { defaultComponents } = await import('../registry/default-components.tsx')
+const { ComponentsProvider } = await import('../registry/components.tsx')
+const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
 
 const screen = asas.targets.dashboard.client
 const courses = screen.kayan.courses!
@@ -61,7 +63,7 @@ const render = async (element: ReactElement, over: Partial<ScreenState> = {}) =>
   }
   const host = mount()
   mounted = createRoot(host)
-  await act(async () => mounted!.render(createElement(ScreenContext, { value: { ...state, ...over } }, element)))
+  await act(async () => mounted!.render(createElement(ScreenContext, { value: { ...state, ...over } }, createElement(ComponentsProvider, { components: defaultComponents }, element))))
   return host
 }
 

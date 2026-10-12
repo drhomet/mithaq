@@ -6,7 +6,9 @@ import './tsx.ts'
 import { mount, type as typeInto } from './dom.ts'
 
 const { createRoot } = await import('react-dom/client')
-const { controlFor, labelFor } = await import('../registry/controls.tsx')
+const { controlFor } = await import('../registry/components.tsx')
+const { labelFor } = await import('../registry/copy.ts')
+const { defaultComponents } = await import('../registry/default-components.tsx')
 const { cellFor } = await import('../registry/cells.tsx')
 const { refusalOf } = await import('../registry/form.tsx')
 const { filterPathsOf } = await import('../registry/filter-operators.ts')
@@ -28,7 +30,7 @@ test('an integer is a number box stepping by one that reports a number, a decima
       const host = mount()
       const root = createRoot(host)
       try {
-        await act(async () => root.render(createElement(controlFor(one), {
+        await act(async () => root.render(createElement(controlFor(defaultComponents.controls, one), {
           id: one.name, kayan, field: one, value: held, values: {}, setValue: () => {}, onChange: (value: unknown) => changes.push(value), readOnly: false, t, locale,
         })))
         const input = host.querySelector('input')!

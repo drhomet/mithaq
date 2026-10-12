@@ -16,6 +16,8 @@ registerHooks({
 const { createRoot } = await import('react-dom/client')
 const { Outlet, RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } = await import('@tanstack/react-router')
 const { ScreenForm } = await import('./screen-form.tsx')
+const { ComponentsProvider } = await import('./components/mithaq/components.tsx')
+const { defaultComponents } = await import('./components/mithaq/default-components.tsx')
 
 const courses = asas.targets.dashboard.client.kayan.courses!
 const t = (_key: string, fallback?: string) => fallback
@@ -31,6 +33,7 @@ const start = async (at: string) => {
     createElement(ScreenForm, { kayan: courses, client, value, t, locale: 'en', edit: (id: string) => `/courses/${id}`, list: '/courses' })
   const router = createRouter({
     history: createMemoryHistory({ initialEntries: [at] }),
+    Wrap: ({ children }) => createElement(ComponentsProvider, { components: defaultComponents }, children),
     routeTree: root.addChildren([
       createRoute({ getParentRoute: () => root, path: '/courses', component: () => createElement('p', null, 'The list') }),
       createRoute({ getParentRoute: () => root, path: '/courses/new', component: form(null) }),

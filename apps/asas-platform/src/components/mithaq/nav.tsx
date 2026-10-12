@@ -62,7 +62,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { titleOf, type Translate } from './controls.tsx'
+import { titleOf, type Translate } from './copy.ts'
 
 /**
  * As much of the access report as this screen reads: one `read` per kayan, keyed by its name.
@@ -868,4 +868,4 @@ export function SiteHeader({ t, title }: { t: Translate; title?: string }) {
     </header>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 b1ad44964867b0d65635652733a4821b190a720b1e283fc2f4aab3f82993effa
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 5d2a553925f15a7bfd4725ba879af3ec9b616c82903c3a68232164c486dfba55

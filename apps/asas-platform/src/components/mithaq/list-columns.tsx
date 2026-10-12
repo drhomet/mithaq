@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { checkboxSize, labelFor, type Translate } from './controls.tsx'
+import { checkboxSize } from './control-props.ts'
+import { labelFor, type Translate } from './copy.ts'
 import type { ColumnChoice } from './list-query.ts'
 
 export type ColumnsProps = {
@@ -105,4 +106,4 @@ export function Columns({ columns, kayan, locale, onChange, t }: ColumnsProps): 
     </Popover>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 94cd106d0ec41f77e03f3e843d130f7cf848c1c56619ab392d98a5d0d95bd0f1
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 d1fded045599c33ba401ce1c5405fd56858c98a454c8bac33f3fd5bd07539ecc

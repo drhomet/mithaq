@@ -62,7 +62,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { titleOf, type Translate } from './controls.tsx'
+import { titleOf, type Translate } from './copy.ts'
 
 /**
  * As much of the access report as this screen reads: one `read` per kayan, keyed by its name.

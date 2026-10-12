@@ -5,7 +5,7 @@ import { DirectionalIcon } from '@/components/ui/directional-icon'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { Translate } from './controls.tsx'
+import type { Translate } from './copy.ts'
 import { useScreen } from 'mithaq/admin/react'
 import { limitsUpTo } from './list-query.ts'
 
@@ -150,4 +150,4 @@ export function Pagination({ locale, onLimit, onPage, page, t }: PaginationProps
     </footer>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 78d68b28893401072ea1b499a0b3c22588ded882bd7964122ccbb0048698d373
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 a43ef8e40d4d784474643c4292e1fb436fd3f83c79ee8955f30be9cd59e601a0

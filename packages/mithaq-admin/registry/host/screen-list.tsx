@@ -4,7 +4,7 @@ import { ListContext, useScreen } from 'mithaq/admin/react'
 import { Button } from '@/components/ui/button'
 import { List, type ListProps, type Page } from './components/mithaq/list.tsx'
 import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from './components/mithaq/list-query.ts'
-import { counted } from './components/mithaq/controls.tsx'
+import { counted } from './components/mithaq/format.tsx'
 import { listOf } from './components/mithaq/nodes.tsx'
 
 /**

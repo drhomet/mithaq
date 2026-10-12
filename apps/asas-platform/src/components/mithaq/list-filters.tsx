@@ -3,7 +3,9 @@ import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { controls, labelFor, type FindApi, type Translate } from './controls.tsx'
+import { useComponents } from './components.tsx'
+import type { FindApi } from './control-props.ts'
+import { labelFor, type Translate } from './copy.ts'
 import { RelationshipControl } from './relationship-control.tsx'
 import { operatorsByKind, valueShapeOf, type FilterPath } from './filter-operators.ts'
 import { instantOf, type Condition, type FilterWhere } from './list-query.ts'
@@ -145,6 +147,7 @@ const valueFrom = (kind: string, operator: string, text: string): unknown => {
 
 function ValueInput({ id, locale, operator, onCommit, path, t, value }: { id: string; locale: string; operator: string; path: FilterPath; t: Translate; value: unknown; onCommit: (value: unknown) => void }): ReactElement {
   const { kind } = path
+  const { controls } = useComponents()
   const [text, setText] = useState(asText(value))
   // `sent` is the last commit read back as text; it differs from the typed text where the commit converts it.
   const reported = useRef(asText(value))
@@ -186,7 +189,7 @@ function ValueInput({ id, locale, operator, onCommit, path, t, value }: { id: st
   }
   // A moment is sent as its ISO instant, so 09:30 picked at UTC+3 asks for 06:30Z and the picker draws it back on the reader's clock. `in` and `not_in` keep the token list.
   if ((kind === 'date' || kind === 'datetime') && shape !== 'list') {
-    const Picker = controls[kind]!
+    const Picker = controls[kind]
     return (
       <Picker
         field={path.field}
@@ -365,4 +368,4 @@ export function Filters({ api, client, locale, onChange, paths, t, value }: Filt
     </div>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 8606b5fd4339471a01d4f8ff1c783d4c79ae3c0f92bd195586d04260a77a9ea0
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 601264b6bf3cadacbeabb12eb3e26ab1e4d7a568984c3f02bc1282acbdbd0886

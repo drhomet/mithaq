@@ -9,7 +9,12 @@ import { UploadNode } from 'mithaq/rich-text'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FieldShell, describedBy } from './field-shell.tsx'
-import { changeOf, controlFor, createsIn, isForbidden, labelFor, listed, localesOf, noValue, readOnlyField, refusalKeyOf, type ControlProps, type FindApi, type FoundPage, type Translate } from './controls.tsx'
+import { controlFor, useComponents } from './components.tsx'
+import { changeOf, type ControlProps, type FindApi, type FoundPage } from './control-props.ts'
+import { labelFor, type Translate } from './copy.ts'
+import { createsIn, readOnlyField } from './field-values.ts'
+import { listed, noValue } from './format.tsx'
+import { isForbidden, localesOf, refusalKeyOf } from './refusal.ts'
 import type { CellProps } from './cells.tsx'
 import { RelationshipControl, findByIds, idsOf } from './relationship-control.tsx'
 import { rowKey, type RelationshipTitles } from './relationship-cell.tsx'
@@ -233,6 +238,7 @@ export function UploadDialog({ open, onOpenChange, target, client, t, locale, lo
   locales: readonly string[]
   onDone: (row: Row) => void
 }): ReactElement {
+  const { controls } = useComponents()
   const [file, setFile] = useState<File | null>(null)
   const [values, setValues] = useState<Row>({})
   const [progress, setProgress] = useState<number | null>(null)
@@ -339,7 +345,7 @@ export function UploadDialog({ open, onOpenChange, target, client, t, locale, lo
             </div>
           </FieldShell>
           {fields.map((field) => {
-            const Control = controlFor(field)
+            const Control = controlFor(controls, field)
             const id = `upload-${target.name}-${field.name}`
             const localized = field.rules.localized === true
             const held = (values[field.name] && typeof values[field.name] === 'object' ? values[field.name] : {}) as Row
@@ -683,4 +689,4 @@ export function UploadPlugin(props: ControlProps): ReactElement | null {
     </Dialog>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 a7c10956534bbee3e398be2e6b514112d36145157e1fb4ad9ea439c5853a3854
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 7a1489a47bd8f0792ad7b09dc9bacdd975b23855c54a775f1f2fe0698ea7fc11

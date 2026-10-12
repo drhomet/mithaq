@@ -140,7 +140,7 @@ test('a project with no components.json copied nothing, and says so', async (t) 
 test("this repository's app holds every registry file it copied up to date and unedited", async () => {
   const app = new URL('../../../../../apps/asas-tanstack/', import.meta.url)
   const states = (await upgradeCheck(app))!
-  assert.equal(states.length, 31, 'every file of every item the app copied')
+  assert.equal(states.length, 43, 'every file of every item the app copied')
   assert.deepEqual(states.filter((one) => one.state !== 'up to date'), [])
 })
 

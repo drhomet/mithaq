@@ -9,7 +9,10 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { NodeButton, OwnButton, drawsKind, isUntitled, listOf, nodesOf, pageButtonOf, refOf, rowTitle, rowWarning, scopeOf, shown as holds, type ListNode, type PageButton, type ScreenPage } from './nodes.tsx'
 import { cellFor, cells } from './cells.tsx'
-import { counted, descriptionOf, labelFor, operationLabelFor, refusalKeyOf, titleOf, type Copy, type FindApi, type Translate } from './controls.tsx'
+import type { FindApi } from './control-props.ts'
+import { descriptionOf, labelFor, operationLabelFor, titleOf, type Copy, type Translate } from './copy.ts'
+import { counted } from './format.tsx'
+import { refusalKeyOf } from './refusal.ts'
 import { DeleteButton, Form, OperationButton, type FormProps } from './form.tsx'
 import { useRelationshipTitles } from './relationship-cell.tsx'
 import { filterPathsOf } from './filter-operators.ts'
@@ -862,4 +865,4 @@ function ListButton({
     />
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 97acf94d409745118e2ec5a6f107c4ef0ff08f4ec9202ba97fb24f8408de7ddf
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 96ef63cae7ce492a88a97a8573fb40f28cca5802b70c0d668a2384d4e5105df2

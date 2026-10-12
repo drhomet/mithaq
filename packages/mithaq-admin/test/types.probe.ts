@@ -38,6 +38,7 @@ import {
   useUser,
 } from 'mithaq/admin/react'
 import type { NodeMap, Places } from '../registry/nodes.tsx'
+import type { Components } from '../registry/components.tsx'
 
 export const probes: { [Place in keyof Places]: Places[Place] } = {
   provider: ({ children }: ProviderProps<ReactNode>) => children,
@@ -77,3 +78,19 @@ declare const kinds: NodeMap
 const { separator: _separator, ...withoutSeparator } = kinds
 // @ts-expect-error the separator kind has no entry
 export const partial: NodeMap = withoutSeparator
+
+declare const components: Components
+export const replaced: Components = { ...components, controls: { ...components.controls, text: components.controls.textarea } }
+export const unknownName: Components = {
+  ...components,
+  // @ts-expect-error no control the registry ships is named color, so no screen could ask for it
+  controls: { ...components.controls, color: components.controls.text },
+}
+export const wrongSignature: Components = {
+  ...components,
+  // @ts-expect-error a control is handed ControlProps, whose value is unknown, not a number
+  controls: { ...components.controls, number: ({ value }: { value: number }) => value.toFixed() },
+}
+const { text: _text, ...textless } = components.controls
+// @ts-expect-error a map that leaves a kind out is refused
+export const missing: Components = { controls: textless }

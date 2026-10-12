@@ -4,7 +4,7 @@ import { ListContext, useScreen } from 'mithaq/admin/react'
 import { Button } from '@/components/ui/button'
 import { List, type ListProps, type Page } from './components/mithaq/list.tsx'
 import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from './components/mithaq/list-query.ts'
-import { counted } from './components/mithaq/controls.tsx'
+import { counted } from './components/mithaq/format.tsx'
 import { listOf } from './components/mithaq/nodes.tsx'
 
 /**
@@ -136,4 +136,4 @@ export function ScreenList({
     </ListContext>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 3c37825f9f645fd3f9c95a3d1ec554e863e85767e8329a1b2e16a40e5f5ea381
+// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 84fc85dcbd6c3ebbb36401de1f396dbebfa62005d43071b9f6d73f53b53b5d80
