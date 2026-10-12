@@ -33,13 +33,15 @@ const hostFiles = async () => {
   return host.files.map((file) => ({ source: new URL(`../packages/mithaq-admin/${file.path}`, import.meta.url), target: file.target.replace(/^~\//, '') }))
 }
 
-test('each app names no template path, generated files included: it reaches the template through the linked `asas` package alone', async () => {
+test('each app names no template path but the base a generated glob reads the project\'s files from: it reaches the template through the linked `asas` package otherwise', async () => {
   const offending: string[] = []
   for (const folder of apps.keys()) {
     const app = appOf(folder)
     for (const file of [...(await filesUnder(new URL('src/', app))).map((one) => `src/${one}`), 'vite.config.ts']) {
       if (!/\.(ts|tsx)$/.test(file)) continue
-      const source = await readFile(new URL(file, app), 'utf8')
+      // A glob's base is the project's real folder, which no package manager moves.
+      const text = await readFile(new URL(file, app), 'utf8')
+      const source = text.startsWith(generated) ? text.replaceAll(/\{ base: '[^']*'/g, '') : text
       // A quoted specifier or glob reaching into `templates/`; a citation in a comment is in backticks and is no import.
       if (/['"][^'"\n]*templates\/[^'"\n]*['"]/.test(source)) offending.push(`${folder} ${file}`)
     }
@@ -107,9 +109,9 @@ test('a screen naming files in three packages loads every component it names thr
   await write(new URL('src/own.tsx', app), 'export const Own = () => null\n')
   await write(new URL('packages/centers/package.json', root), '{ "name": "@cr/centers" }\n')
   await write(new URL('packages/centers/src/center.tsx', root), 'export const Center = () => null\n')
-  await mkdir(new URL('node_modules/@cr/', app), { recursive: true })
-  await symlink(fileURLToPath(root), fileURLToPath(new URL('node_modules/portal-project', app)))
-  await symlink(fileURLToPath(new URL('packages/centers/', root)), fileURLToPath(new URL('node_modules/@cr/centers', app)))
+  // Hoisted, as npm, yarn and a hoisted Bun link a workspace package: at the root, and nothing under the app.
+  await mkdir(new URL('node_modules/@cr/', root), { recursive: true })
+  await symlink(fileURLToPath(new URL('packages/centers/', root)), fileURLToPath(new URL('node_modules/@cr/centers', root)))
   // The project's own package prints bare in a reference; every other prints by its name.
   const screen = {
     path: '/portal',

@@ -87,7 +87,7 @@ export const holds = (report: AccessReport, key: string) => {
   return report.permissions === '*' || report.permissions?.includes(key) === true
 }
 
-// A reference prints the package name into a glob's base, `/node_modules/<name>/`,
+// `mithaq generate screens` looks a reference's package up as `node_modules/<name>/`,
 // so no path up, absolute path or space may cross.
 const npmName = '(?:@[a-z0-9~-][a-z0-9._~-]*/)?[a-z0-9~-][a-z0-9._~-]*'
 export const packageName = new RegExp(`^${npmName}$`, 'i')

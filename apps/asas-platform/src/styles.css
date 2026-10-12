@@ -12,10 +12,10 @@
 @import "@fontsource/ibm-plex-sans-arabic";
 
 /* The project's own shells, pages and components, which the platform screen
-   loads through the linked package, as the tenant app lists them
-   (`apps/asas-tanstack/src/styles.css`). Tailwind finds this app's own files,
-   the copied `src/components/mithaq` among them, without one. */
-@source "../node_modules/asas/src";
+   loads, as the tenant app lists them (`apps/asas-tanstack/src/styles.css`).
+   Tailwind finds this app's own files, the copied `src/components/mithaq`
+   among them, without one. */
+@source "../../../templates/asas/src";
 
 @custom-variant dark (&:is(.dark *));
 
