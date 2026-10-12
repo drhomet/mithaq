@@ -1,0 +1,38 @@
+{
+  "name": "asas",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "bun src/seed.ts"
+  },
+  "exports": {
+    ".": "./src/asas.ts",
+    "./ui-dashboard/*": "./src/ui-dashboard/*",
+    "./audit-log/*": "./src/audit-log/*",
+    "./messages/*": "./src/messages/*",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@asas/auth": "*",
+    "@orpc/openapi": "1.15.1",
+    "@orpc/server": "1.15.1",
+    "aws4fetch": "1.0.20",
+    "better-auth": "1.7.4",
+    "drizzle-orm": "1.0.0-rc.4",
+    "file-type": "22.0.1",
+    "image-dimensions": "2.5.1",
+    "jose": "6.2.12",
+    "mithaq": "*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.104.0",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19.3.0",
+    "lucide-react": "^1.16.0",
+    "mithaq-admin": "*",
+    "react": "^19.3.0",
+    "recharts": "3.8.0"
+  }
+}

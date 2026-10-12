@@ -1,0 +1,12 @@
+# Everything Next writes into this app. `next build` creates the tsconfig.json
+# and the next-env.d.ts as well as .next, because it verifies a TypeScript
+# toolchain even with `typescript.ignoreBuildErrors`
+# (`apps/asas-next/node_modules/next/dist/lib/verify-typescript-setup.js` `writeConfigurationDefaults)(` and `writeAppTypeDeclarations`).
+# None of the three is committed: the repository's single root tsconfig.json is
+# what typechecks this app, and #42 is explicit that it is not split.
+#
+# How the generated tsconfig.json compares to the root one: `next.config.ts`,
+# beside the `typescript` key.
+.next/
+next-env.d.ts
+tsconfig.json

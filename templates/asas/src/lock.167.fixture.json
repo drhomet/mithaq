@@ -1,0 +1,320 @@
+{
+  "_notice": "ميثاق: do not change the vocabulary of defineMithaq (src/mithaq.ts), which is its locales, kinds, rules, targets and root keys, or this file unless the project's developer asked for that change. When the vocabulary must change, tell the developer what and why, then run `mithaq lock` and let them approve it in the popup it shows.",
+  "language": {
+    "keys": [
+      "generate",
+      "kinds",
+      "locales",
+      "rules",
+      "targets"
+    ],
+    "kinds": {
+      "checkbox": {
+        "label": {
+          "ar": "خانة اختيار",
+          "en": "Checkbox"
+        },
+        "message": {
+          "ar": "يجاب على هذا بنعم أو لا.",
+          "en": "This is answered yes or no."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "index",
+          "defaultValue"
+        ]
+      },
+      "date": {
+        "label": {
+          "ar": "التاريخ",
+          "en": "Date"
+        },
+        "message": {
+          "ar": "هذا ليس تاريخا.",
+          "en": "This is not a date."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "index",
+          "defaultValue",
+          "localized",
+          "min",
+          "max"
+        ]
+      },
+      "datetime": {
+        "label": {
+          "ar": "التاريخ والوقت",
+          "en": "Date and time"
+        },
+        "message": {
+          "ar": "هذا ليس تاريخا ووقتا.",
+          "en": "This is not a date and time."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "index",
+          "defaultValue",
+          "defaultNow",
+          "nowOnUpdate",
+          "localized"
+        ]
+      },
+      "email": {
+        "label": {
+          "ar": "بريد إلكتروني",
+          "en": "Email"
+        },
+        "message": {
+          "ar": "هذا ليس بريدا إلكترونيا.",
+          "en": "This is not an email address."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "unique",
+          "index",
+          "defaultValue",
+          "localized",
+          "maxLength",
+          "minLength",
+          "pattern",
+          "uppercase",
+          "lowercase",
+          "trim"
+        ]
+      },
+      "join": {
+        "label": {
+          "ar": "صفوف مرتبطة",
+          "en": "Related rows"
+        },
+        "message": {
+          "ar": "هذه ليست قائمة عناصر مرتبطة.",
+          "en": "This is not a list of related entries."
+        },
+        "rules": [
+          "providedBy",
+          "required"
+        ]
+      },
+      "number": {
+        "label": {
+          "ar": "رقم",
+          "en": "Number"
+        },
+        "message": {
+          "ar": "هذا ليس رقما.",
+          "en": "This is not a number."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "unique",
+          "index",
+          "defaultValue",
+          "localized",
+          "min",
+          "max"
+        ]
+      },
+      "relationship": {
+        "label": {
+          "ar": "علاقة",
+          "en": "Relationship"
+        },
+        "message": {
+          "ar": "اختر عنصرًا من القائمة.",
+          "en": "Pick one of the listed entries."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "unique",
+          "index",
+          "defaultValue",
+          "onDelete"
+        ]
+      },
+      "text": {
+        "label": {
+          "ar": "نص",
+          "en": "Text"
+        },
+        "message": {
+          "ar": "هذا ليس نصا.",
+          "en": "This is not text."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "unique",
+          "index",
+          "defaultValue",
+          "localized",
+          "maxLength",
+          "minLength",
+          "pattern",
+          "uppercase",
+          "lowercase",
+          "trim"
+        ]
+      },
+      "textArray": {
+        "label": {
+          "ar": "قائمة نصوص",
+          "en": "Text list"
+        },
+        "message": {
+          "ar": "هذه ليست قائمة نصوص.",
+          "en": "This is not a list of text."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "defaultValue",
+          "minRows",
+          "maxRows"
+        ]
+      },
+      "uuid": {
+        "label": {
+          "ar": "معرف فريد",
+          "en": "UUID"
+        },
+        "message": {
+          "ar": "هذا ليس معرفا فريدا.",
+          "en": "This is not a unique identifier."
+        },
+        "rules": [
+          "providedBy",
+          "required",
+          "unique",
+          "index",
+          "defaultValue"
+        ]
+      }
+    },
+    "locales": [
+      "ar",
+      "en"
+    ],
+    "rules": {
+      "defaultNow": {
+        "excludes": [
+          "defaultValue",
+          "localized"
+        ]
+      },
+      "defaultValue": {
+        "excludes": [
+          "defaultNow"
+        ]
+      },
+      "index": {},
+      "localized": {},
+      "lowercase": {
+        "excludes": [
+          "uppercase"
+        ]
+      },
+      "max": {
+        "message": {
+          "ar": "القيمة أكبر من المسموح.",
+          "en": "The value is too large."
+        }
+      },
+      "maxLength": {
+        "message": {
+          "ar": "القيمة طويلة جدًا.",
+          "en": "The value is too long."
+        }
+      },
+      "maxRows": {
+        "message": {
+          "ar": "هذه القائمة فيها عناصر أكثر من المسموح.",
+          "en": "This list has too many entries."
+        }
+      },
+      "min": {
+        "message": {
+          "ar": "القيمة أصغر من المسموح.",
+          "en": "The value is too small."
+        }
+      },
+      "minLength": {
+        "message": {
+          "ar": "القيمة أقصر من المسموح.",
+          "en": "The value is too short."
+        }
+      },
+      "minRows": {
+        "message": {
+          "ar": "هذه القائمة فيها عناصر أقل من المسموح.",
+          "en": "This list has too few entries."
+        }
+      },
+      "nowOnUpdate": {
+        "excludes": [
+          "localized"
+        ]
+      },
+      "onDelete": {},
+      "pattern": {
+        "message": {
+          "ar": "القيمة ليست بالشكل الذي يقبله هذا الحقل.",
+          "en": "The value is not in the shape this field takes."
+        }
+      },
+      "providedBy": {},
+      "required": {
+        "message": {
+          "ar": "هذا الحقل مطلوب.",
+          "en": "This field is required."
+        }
+      },
+      "trim": {},
+      "unique": {},
+      "uppercase": {
+        "excludes": [
+          "lowercase"
+        ]
+      }
+    },
+    "targets": {
+      "dashboard": "screen",
+      "drizzle": "store",
+      "platform": "screen",
+      "portal": "screen",
+      "rbac": "access",
+      "service": "service",
+      "zod": "schema"
+    }
+  },
+  "seal": {
+    "previous": "AWJEBlVkkpk9BicYSe43qtb7A/3r3WvSLsD8kIh2+h/jJN9P2lgyAopum8NLyg3rrCuOfeyiFEZ/X90jozWwAw==",
+    "project": "a35cd97d2456a67cbffaaba2b731bdb9",
+    "restart": {
+      "from": "bf719c93b0d95aed54580496ed343836",
+      "publicKey": "Gpr+d0K3c7MohOIsY1kqApBtKfxugqLsXnTHG2gBYVQ=",
+      "signature": "pwB48lOcrMWQu0bYUC0vu/aBHPCFnW0+eFZtqNKO2mUZ9Eq4wCbsvcM2yCJPq2Qhn+PxKEBVQ5oVrDaTFFp8Cg=="
+    },
+    "sealedAt": "2026-09-30T10:22:01.985Z",
+    "signature": "zcoJDgKkR/YtzTaE2U2FJfNysFl41qE6gL99aT+xrKrPoSzSqvGSiXVMy/eeA1tkagxkgQsrul9Y0KPXPGQHBA==",
+    "signers": [
+      {
+        "addedAt": "2026-09-29T02:14:27.909Z",
+        "label": "Hussams-MacBook-Pro.local",
+        "publicKey": "Gpr+d0K3c7MohOIsY1kqApBtKfxugqLsXnTHG2gBYVQ="
+      },
+      {
+        "addedAt": "2026-09-30T10:22:01.985Z",
+        "label": "Hussams-MacBook-Pro.local",
+        "publicKey": "I1dKWfdMh9uA6w8Afq/KxZjV14JubaeNXd+Zhc6FnxE="
+      }
+    ]
+  }
+}

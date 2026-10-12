@@ -1,0 +1,50 @@
+{
+  "createdAt.invalid": {
+    "ar": "هذا ليس تاريخا ووقتا.",
+    "en": "This is not a date and time."
+  },
+  "createdAt.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "expiresAt.invalid": {
+    "ar": "هذا ليس تاريخا ووقتا.",
+    "en": "This is not a date and time."
+  },
+  "expiresAt.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "id.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "identifier.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "identifier.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "updatedAt.invalid": {
+    "ar": "هذا ليس تاريخا ووقتا.",
+    "en": "This is not a date and time."
+  },
+  "updatedAt.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "value.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "value.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  }
+}

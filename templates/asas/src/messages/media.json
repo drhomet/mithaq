@@ -1,0 +1,66 @@
+{
+  "alt": {
+    "ar": "النص البديل",
+    "en": "Alternative text"
+  },
+  "alt.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "alt.maxLength": {
+    "ar": "القيمة طويلة جدًا.",
+    "en": "The value is too long."
+  },
+  "alt.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "filename": {
+    "ar": "اسم الملف",
+    "en": "File name"
+  },
+  "filesize": {
+    "ar": "حجم الملف",
+    "en": "File size"
+  },
+  "height": {
+    "ar": "الارتفاع",
+    "en": "Height"
+  },
+  "id.invalid": {
+    "ar": "هذا ليس معرفا فريدا.",
+    "en": "This is not a unique identifier."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "key": {
+    "ar": "مفتاح الملف",
+    "en": "Object key"
+  },
+  "mimeType": {
+    "ar": "نوع الملف",
+    "en": "File type"
+  },
+  "organization": {
+    "ar": "المؤسسة",
+    "en": "Organization"
+  },
+  "plural": {
+    "ar": "الصور",
+    "en": "Images"
+  },
+  "singular": {
+    "ar": "صورة",
+    "en": "Image"
+  },
+  "storage": {
+    "ar": "التخزين",
+    "en": "Storage"
+  },
+  "width": {
+    "ar": "العرض",
+    "en": "Width"
+  }
+}

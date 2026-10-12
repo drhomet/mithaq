@@ -1,0 +1,3883 @@
+{
+  "path": "/dashboard",
+  "providers": [
+    "./src/ui-dashboard/theme-provider.tsx#ThemeProvider",
+    "./src/ui/rich-text-nodes.tsx#RichTextNodes",
+    "./src/ui/session-labels.tsx#SessionLabels"
+  ],
+  "pages": {
+    "dashboard": {
+      "path": "/",
+      "component": "./src/ui-dashboard/dashboard.tsx#Dashboard",
+      "permission": "courses.find"
+    },
+    "members": {
+      "path": "/members",
+      "component": "./src/ui-dashboard/members.tsx#Members",
+      "nav": {
+        "label": {
+          "en": "Members",
+          "ar": "الأعضاء"
+        }
+      },
+      "permission": "memberRoles.find"
+    }
+  },
+  "nav": [
+    {
+      "path": "/courses",
+      "page": "list",
+      "kayan": "courses",
+      "permission": "courses.find"
+    },
+    {
+      "path": "/sessions",
+      "page": "list",
+      "kayan": "sessions",
+      "permission": "sessions.find"
+    },
+    {
+      "path": "/enrollments",
+      "page": "list",
+      "kayan": "enrollments",
+      "permission": "enrollments.find"
+    },
+    {
+      "path": "/tags",
+      "page": "list",
+      "kayan": "tags",
+      "permission": "tags.find"
+    },
+    {
+      "path": "/media",
+      "page": "list",
+      "kayan": "media",
+      "permission": "media.find"
+    },
+    {
+      "path": "/roles",
+      "page": "list",
+      "kayan": "roles",
+      "permission": "roles.find"
+    },
+    {
+      "path": "/settings",
+      "page": "settings",
+      "kayan": "settings",
+      "permission": "settings.findOne"
+    },
+    {
+      "path": "/members",
+      "page": "members",
+      "label": {
+        "en": "Members",
+        "ar": "الأعضاء"
+      },
+      "permission": "memberRoles.find"
+    }
+  ],
+  "layouts": {
+    "app": "./src/ui/app-shell.tsx#AppShell",
+    "record": "./src/ui/record-page.tsx#RecordPage",
+    "table": "./src/ui/table-page.tsx#TablePage",
+    "top": "./src/ui/top-shell.tsx#TopShell"
+  },
+  "components": {
+    "noCourses": "./src/courses/ui/no-courses.tsx#NoCourses",
+    "roleForm": "./src/roles/ui/role-form.tsx#RoleForm",
+    "rolesTable": "./src/roles/ui/roles.tsx#RolesTable",
+    "deleteRole": "./src/roles/ui/roles.tsx#DeleteRole",
+    "activity": "./src/audit-log/ui/activity.tsx#Activity",
+    "versions": "./src/ui-dashboard/versions.tsx#Versions"
+  },
+  "controls": {
+    "text": {
+      "control": "text",
+      "cell": "text"
+    },
+    "email": {
+      "control": "email",
+      "cell": "email"
+    },
+    "number": {
+      "control": "number",
+      "cell": "number"
+    },
+    "integer": {
+      "control": "integer",
+      "cell": "integer"
+    },
+    "decimal": {
+      "control": "decimal",
+      "cell": "decimal"
+    },
+    "checkbox": {
+      "control": "checkbox",
+      "cell": "checkbox"
+    },
+    "datetime": {
+      "control": "datetime",
+      "cell": "datetime"
+    },
+    "date": {
+      "control": "date",
+      "cell": "date"
+    },
+    "textArray": {
+      "control": "textArray",
+      "cell": "textArray"
+    },
+    "uuid": {
+      "control": "uuid",
+      "cell": "uuid"
+    },
+    "relationship": {
+      "control": "relationship",
+      "cell": "relationship"
+    },
+    "join": {
+      "control": "join",
+      "cell": "join"
+    },
+    "richText": {
+      "control": "richText",
+      "cell": "richText"
+    },
+    "upload": {
+      "control": "upload",
+      "cell": "upload"
+    }
+  },
+  "kayan": {
+    "courses": {
+      "name": "courses",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "title",
+          "kind": "text",
+          "label": {
+            "en": "Title",
+            "ar": "العنوان"
+          },
+          "rules": {
+            "required": true,
+            "trim": true,
+            "maxLength": 120,
+            "index": true
+          },
+          "placeholder": {
+            "en": "Introduction to Arabic calligraphy",
+            "ar": "مقدمة في الخط العربي"
+          },
+          "prefix": {
+            "en": "Course",
+            "ar": "دورة"
+          },
+          "description": {
+            "en": "The name a student sees in the catalogue.",
+            "ar": "الاسم الذي يراه الطالب في الدليل."
+          },
+          "component": "text",
+          "cell": "text",
+          "filter": true,
+          "searchable": true
+        },
+        {
+          "name": "summary",
+          "kind": "text",
+          "label": {
+            "en": "Summary",
+            "ar": "الملخص"
+          },
+          "rules": {
+            "maxLength": 200,
+            "required": false
+          },
+          "component": "text",
+          "cell": "text",
+          "searchable": true,
+          "sortable": false
+        },
+        {
+          "name": "fee",
+          "kind": "number",
+          "label": {
+            "en": "Fee",
+            "ar": "الرسوم"
+          },
+          "rules": {
+            "required": false
+          },
+          "suffix": {
+            "en": "per seat",
+            "ar": "لكل مقعد"
+          },
+          "component": "number",
+          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+          "filter": true
+        },
+        {
+          "name": "currency",
+          "kind": "text",
+          "label": {
+            "en": "Currency",
+            "ar": "العملة"
+          },
+          "rules": {
+            "required": false
+          },
+          "options": [
+            {
+              "value": "SAR",
+              "label": {
+                "en": "Saudi riyal",
+                "ar": "ريال سعودي"
+              }
+            },
+            {
+              "value": "USD",
+              "label": {
+                "en": "US dollar",
+                "ar": "دولار أمريكي"
+              }
+            }
+          ],
+          "component": "select",
+          "cell": "text"
+        },
+        {
+          "name": "level",
+          "kind": "number",
+          "label": {
+            "en": "Level",
+            "ar": "المستوى"
+          },
+          "rules": {
+            "min": 1,
+            "max": 5,
+            "required": false
+          },
+          "component": "slider",
+          "cell": "number"
+        },
+        {
+          "name": "notifications",
+          "kind": "checkbox",
+          "label": {
+            "en": "Notifications",
+            "ar": "الإشعارات"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "switch",
+          "cell": "checkbox"
+        },
+        {
+          "name": "delivery",
+          "kind": "text",
+          "label": {
+            "en": "Delivery",
+            "ar": "طريقة التقديم"
+          },
+          "rules": {
+            "required": false
+          },
+          "options": [
+            {
+              "value": "live",
+              "label": {
+                "en": "Live",
+                "ar": "مباشر"
+              }
+            },
+            {
+              "value": "recorded",
+              "label": {
+                "en": "Recorded",
+                "ar": "مسجل"
+              }
+            }
+          ],
+          "component": "radio",
+          "cell": "text"
+        },
+        {
+          "name": "audience",
+          "kind": "text",
+          "label": {
+            "en": "Audience",
+            "ar": "الجمهور"
+          },
+          "rules": {
+            "required": false
+          },
+          "options": [
+            {
+              "value": "beginner",
+              "label": {
+                "en": "Beginner",
+                "ar": "مبتدئ"
+              }
+            },
+            {
+              "value": "advanced",
+              "label": {
+                "en": "Advanced",
+                "ar": "متقدم"
+              }
+            }
+          ],
+          "component": "toggleGroup",
+          "cell": "text"
+        },
+        {
+          "name": "accessCode",
+          "kind": "text",
+          "label": {
+            "en": "Access code",
+            "ar": "رمز الدخول"
+          },
+          "rules": {
+            "maxLength": 6,
+            "required": false
+          },
+          "component": "otp",
+          "cell": "text"
+        },
+        {
+          "name": "archived",
+          "kind": "checkbox",
+          "label": {
+            "en": "Archived",
+            "ar": "مؤرشف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "checkbox",
+          "cell": "checkbox",
+          "filter": true
+        },
+        {
+          "name": "topics",
+          "kind": "textArray",
+          "label": {
+            "en": "Topics",
+            "ar": "المواضيع"
+          },
+          "rules": {
+            "maxRows": 2,
+            "required": false
+          },
+          "options": [
+            {
+              "value": "script",
+              "label": {
+                "en": "Script",
+                "ar": "الخط"
+              }
+            },
+            {
+              "value": "grammar",
+              "label": {
+                "en": "Grammar",
+                "ar": "النحو"
+              }
+            },
+            {
+              "value": "recitation",
+              "label": {
+                "en": "Recitation",
+                "ar": "التلاوة"
+              }
+            }
+          ],
+          "component": "textArray",
+          "cell": "textArray"
+        },
+        {
+          "name": "opensOn",
+          "kind": "date",
+          "label": {
+            "en": "Opens on",
+            "ar": "يفتح في"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "date",
+          "cell": "date"
+        },
+        {
+          "name": "archiveReason",
+          "kind": "text",
+          "label": {
+            "en": "Archive reason",
+            "ar": "سبب الأرشفة"
+          },
+          "rules": {
+            "maxLength": 200,
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "tags",
+          "kind": "relationship",
+          "label": {
+            "en": "Tags",
+            "ar": "الوسوم"
+          },
+          "rules": {
+            "required": false
+          },
+          "relationTo": "tags",
+          "hasMany": true,
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "scheduledSessions",
+          "kind": "join",
+          "label": {
+            "en": "Scheduled sessions",
+            "ar": "الجلسات المجدولة"
+          },
+          "rules": {
+            "required": false,
+            "providedBy": {
+              "create": "never",
+              "update": "never"
+            }
+          },
+          "relationTo": "sessions",
+          "on": "course",
+          "component": "join",
+          "cell": "join"
+        },
+        {
+          "name": "_status",
+          "kind": "text",
+          "label": {
+            "en": "Status",
+            "ar": "الحالة"
+          },
+          "rules": {
+            "index": true,
+            "required": false
+          },
+          "options": [
+            {
+              "value": "draft",
+              "label": {
+                "en": "Draft",
+                "ar": "مسودة"
+              }
+            },
+            {
+              "value": "published",
+              "label": {
+                "en": "Published",
+                "ar": "منشور"
+              }
+            }
+          ],
+          "component": "text",
+          "cell": "./src/courses/ui/status-cell.tsx#StatusCell"
+        },
+        {
+          "name": "details",
+          "kind": "richText",
+          "label": {
+            "en": "Details",
+            "ar": "التفاصيل"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "richText",
+          "cell": "richText",
+          "sortable": false
+        },
+        {
+          "name": "cover",
+          "kind": "upload",
+          "label": {
+            "en": "Cover image",
+            "ar": "صورة الغلاف"
+          },
+          "rules": {
+            "required": false,
+            "onDelete": "restrict"
+          },
+          "relationTo": "media",
+          "component": "upload",
+          "cell": "upload"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        },
+        {
+          "name": "findVersions",
+          "effect": "read"
+        },
+        {
+          "name": "findVersionByID",
+          "effect": "read"
+        },
+        {
+          "name": "restoreVersion",
+          "effect": "update"
+        },
+        {
+          "name": "archive",
+          "effect": "update",
+          "fields": [
+            {
+              "name": "reason",
+              "kind": "text",
+              "label": {
+                "en": "Reason",
+                "ar": "السبب"
+              },
+              "rules": {
+                "required": true,
+                "maxLength": 200
+              },
+              "component": "text",
+              "cell": "text"
+            }
+          ]
+        },
+        {
+          "name": "findWithSessions",
+          "effect": "read"
+        }
+      ],
+      "useAsTitle": "title",
+      "description": {
+        "en": "Everything on offer in the catalogue, and what a seat on each costs.",
+        "ar": "كل ما هو معروض في الدليل، وما يكلفه مقعد في كل منها."
+      },
+      "drafts": {
+        "autosave": {
+          "interval": 2000
+        }
+      },
+      "pages": {
+        "list": {
+          "path": "/courses",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "list": {
+                      "columns": [
+                        {
+                          "field": "title",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "fee",
+                          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+                          "decided": "field"
+                        },
+                        {
+                          "field": "archived",
+                          "cell": "checkbox",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "opensOn",
+                          "cell": "date",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "_status",
+                          "cell": "./src/courses/ui/status-cell.tsx#StatusCell",
+                          "decided": "field"
+                        },
+                        {
+                          "field": "details",
+                          "cell": "richText",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "cover",
+                          "cell": "upload",
+                          "decided": "table"
+                        }
+                      ],
+                      "filters": [
+                        "title",
+                        "fee",
+                        "archived"
+                      ],
+                      "search": [
+                        "title",
+                        "summary",
+                        "details"
+                      ],
+                      "empty": "./src/courses/ui/no-courses.tsx#NoCourses",
+                      "bulk": [
+                        {
+                          "button": "deleteMany",
+                          "label": {
+                            "en": "Delete",
+                            "ar": "حذف"
+                          },
+                          "confirm": {
+                            "title": {
+                              "en": "Delete the ticked courses?",
+                              "ar": "حذف الدورات المحددة؟"
+                            },
+                            "body": {
+                              "en": "This cannot be undone.",
+                              "ar": "لا يمكن التراجع عن هذا."
+                            }
+                          }
+                        },
+                        {
+                          "button": "updateMany",
+                          "label": {
+                            "en": "Update",
+                            "ar": "تحديث"
+                          },
+                          "fields": [
+                            "fee",
+                            "archived"
+                          ]
+                        }
+                      ],
+                      "row": [
+                        {
+                          "button": "archive",
+                          "label": {
+                            "en": "Archive",
+                            "ar": "أرشفة"
+                          },
+                          "fields": [
+                            "reason"
+                          ],
+                          "when": {
+                            "or": [
+                              {
+                                "record.archived": {
+                                  "exists": false
+                                }
+                              },
+                              {
+                                "record.archived": {
+                                  "equals": false
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "create": {
+          "path": "/courses/new",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "section": "about",
+                        "label": {
+                          "en": "About the course",
+                          "ar": "عن الدورة"
+                        },
+                        "fields": [
+                          {
+                            "field": "title",
+                            "component": "text",
+                            "decided": "table"
+                          },
+                          {
+                            "field": "summary",
+                            "component": "text",
+                            "decided": "table"
+                          },
+                          {
+                            "field": "cover",
+                            "component": "upload",
+                            "decided": "table"
+                          },
+                          {
+                            "field": "details",
+                            "component": "richText",
+                            "decided": "table"
+                          }
+                        ]
+                      },
+                      {
+                        "section": "pricing",
+                        "label": {
+                          "en": "Pricing",
+                          "ar": "التسعير"
+                        },
+                        "fields": [
+                          {
+                            "row": [
+                              {
+                                "field": "fee",
+                                "component": "number",
+                                "decided": "table"
+                              },
+                              {
+                                "field": "currency",
+                                "component": "select",
+                                "decided": "field"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "section": "teaching",
+                        "label": {
+                          "en": "Teaching",
+                          "ar": "التدريس"
+                        },
+                        "fields": [
+                          {
+                            "field": "delivery",
+                            "component": "radio",
+                            "decided": "field"
+                          },
+                          {
+                            "field": "accessCode",
+                            "component": "otp",
+                            "decided": "field",
+                            "when": {
+                              "delivery": {
+                                "equals": "live"
+                              }
+                            }
+                          },
+                          {
+                            "field": "notifications",
+                            "component": "switch",
+                            "decided": "field"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "side": [
+                  {
+                    "section": "catalogue",
+                    "label": {
+                      "en": "Catalogue",
+                      "ar": "الدليل"
+                    },
+                    "fields": [
+                      {
+                        "field": "tags",
+                        "component": "relationship",
+                        "decided": "table"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "edit": {
+          "path": "/courses/:id",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "tabs": [
+                  {
+                    "tab": "details",
+                    "label": {
+                      "en": "Details",
+                      "ar": "التفاصيل"
+                    },
+                    "fields": [
+                      {
+                        "layout": "./src/ui/record-page.tsx#RecordPage",
+                        "main": [
+                          {
+                            "form": [
+                              {
+                                "section": "about",
+                                "label": {
+                                  "en": "About the course",
+                                  "ar": "عن الدورة"
+                                },
+                                "fields": [
+                                  {
+                                    "field": "title",
+                                    "component": "text",
+                                    "decided": "table"
+                                  },
+                                  {
+                                    "field": "summary",
+                                    "component": "text",
+                                    "decided": "table"
+                                  },
+                                  {
+                                    "field": "cover",
+                                    "component": "upload",
+                                    "decided": "table"
+                                  },
+                                  {
+                                    "field": "details",
+                                    "component": "richText",
+                                    "decided": "table"
+                                  }
+                                ]
+                              },
+                              {
+                                "section": "pricing",
+                                "label": {
+                                  "en": "Pricing",
+                                  "ar": "التسعير"
+                                },
+                                "fields": [
+                                  {
+                                    "row": [
+                                      {
+                                        "field": "fee",
+                                        "component": "number",
+                                        "decided": "table"
+                                      },
+                                      {
+                                        "field": "currency",
+                                        "component": "select",
+                                        "decided": "field"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "section": "teaching",
+                                "label": {
+                                  "en": "Teaching",
+                                  "ar": "التدريس"
+                                },
+                                "fields": [
+                                  {
+                                    "field": "delivery",
+                                    "component": "radio",
+                                    "decided": "field"
+                                  },
+                                  {
+                                    "field": "accessCode",
+                                    "component": "otp",
+                                    "decided": "field",
+                                    "when": {
+                                      "delivery": {
+                                        "equals": "live"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "field": "notifications",
+                                    "component": "switch",
+                                    "decided": "field"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ],
+                        "side": [
+                          {
+                            "section": "catalogue",
+                            "label": {
+                              "en": "Catalogue",
+                              "ar": "الدليل"
+                            },
+                            "fields": [
+                              {
+                                "field": "tags",
+                                "component": "relationship",
+                                "decided": "table"
+                              },
+                              {
+                                "field": "archived",
+                                "readOnly": true,
+                                "component": "checkbox",
+                                "decided": "table"
+                              }
+                            ]
+                          },
+                          {
+                            "component": "./src/audit-log/ui/activity.tsx#Activity",
+                            "when": {
+                              "$user.collections.auditLog.operations.find": {
+                                "equals": true
+                              }
+                            }
+                          }
+                        ],
+                        "danger": [
+                          {
+                            "button": "archive",
+                            "label": {
+                              "en": "Archive",
+                              "ar": "أرشفة"
+                            },
+                            "fields": [
+                              "reason"
+                            ],
+                            "reload": true,
+                            "confirm": {
+                              "title": {
+                                "en": "Archive this course?",
+                                "ar": "أرشفة هذه الدورة؟"
+                              },
+                              "body": {
+                                "en": "It leaves the catalogue for every student.",
+                                "ar": "تخرج من الدليل لكل الطلاب."
+                              }
+                            },
+                            "when": {
+                              "or": [
+                                {
+                                  "record.archived": {
+                                    "exists": false
+                                  }
+                                },
+                                {
+                                  "record.archived": {
+                                    "equals": false
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "button": "delete",
+                            "label": {
+                              "en": "Delete",
+                              "ar": "حذف"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tab": "sessions",
+                    "label": {
+                      "en": "Sessions",
+                      "ar": "الجلسات"
+                    },
+                    "fields": [
+                      {
+                        "list": {
+                          "of": "sessions",
+                          "where": "course",
+                          "columns": [
+                            {
+                              "field": "startsAt",
+                              "cell": "datetime",
+                              "decided": "table"
+                            },
+                            {
+                              "field": "capacity",
+                              "cell": "number",
+                              "decided": "table"
+                            },
+                            {
+                              "field": "venue",
+                              "cell": "text",
+                              "decided": "table"
+                            },
+                            {
+                              "field": "format",
+                              "cell": "text",
+                              "decided": "table"
+                            },
+                            {
+                              "field": "archived",
+                              "cell": "checkbox",
+                              "decided": "table"
+                            }
+                          ],
+                          "filters": [
+                            "venue",
+                            "archived"
+                          ],
+                          "search": [
+                            "venue"
+                          ],
+                          "bulk": [
+                            {
+                              "button": "archiveMany",
+                              "label": {
+                                "en": "Archive",
+                                "ar": "أرشفة"
+                              },
+                              "confirm": {
+                                "title": {
+                                  "en": "Archive the ticked sessions?",
+                                  "ar": "أرشفة الجلسات المحددة؟"
+                                },
+                                "body": {
+                                  "en": "They stay on the course, marked archived.",
+                                  "ar": "تبقى في الدورة، معلمة بأنها مؤرشفة."
+                                }
+                              }
+                            }
+                          ],
+                          "sort": "startsAt"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "tab": "versions",
+                    "label": {
+                      "en": "Versions",
+                      "ar": "الإصدارات"
+                    },
+                    "fields": [
+                      {
+                        "component": "./src/ui-dashboard/versions.tsx#Versions",
+                        "when": {
+                          "$user.collections.courses.operations.findVersions": {
+                            "equals": true
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "board": {
+          "path": "/courses/board",
+          "page": {
+            "shell": "./src/ui/top-shell.tsx#TopShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "nav": [
+              {
+                "nav": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "component": "./src/courses/ui/no-courses.tsx#NoCourses"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sessions": {
+      "name": "sessions",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "course",
+          "kind": "relationship",
+          "label": {
+            "en": "Course",
+            "ar": "الدورة"
+          },
+          "rules": {
+            "required": true,
+            "onDelete": "restrict"
+          },
+          "relationTo": "courses",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "startsAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Starts at",
+            "ar": "وقت البداية"
+          },
+          "rules": {
+            "required": true
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "capacity",
+          "kind": "number",
+          "label": {
+            "en": "Capacity",
+            "ar": "السعة"
+          },
+          "rules": {
+            "min": 1,
+            "required": false
+          },
+          "component": "number",
+          "cell": "number"
+        },
+        {
+          "name": "venue",
+          "kind": "text",
+          "label": {
+            "en": "Venue",
+            "ar": "المكان"
+          },
+          "rules": {
+            "required": false
+          },
+          "options": [
+            {
+              "value": "online",
+              "label": {
+                "en": "Online",
+                "ar": "عبر الإنترنت"
+              }
+            },
+            {
+              "value": "campus",
+              "label": {
+                "en": "Campus",
+                "ar": "الحرم"
+              }
+            }
+          ],
+          "component": "nativeSelect",
+          "cell": "text"
+        },
+        {
+          "name": "format",
+          "kind": "text",
+          "label": {
+            "en": "Format",
+            "ar": "الصيغة"
+          },
+          "rules": {
+            "required": false
+          },
+          "options": [
+            {
+              "value": "workshop",
+              "label": {
+                "en": "Workshop",
+                "ar": "ورشة عمل"
+              }
+            },
+            {
+              "value": "lecture",
+              "label": {
+                "en": "Lecture",
+                "ar": "محاضرة"
+              }
+            }
+          ],
+          "component": "combobox",
+          "cell": "text"
+        },
+        {
+          "name": "archived",
+          "kind": "checkbox",
+          "label": {
+            "en": "Archived",
+            "ar": "مؤرشفة"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "checkbox",
+          "cell": "checkbox"
+        },
+        {
+          "name": "details",
+          "kind": "richText",
+          "label": {
+            "en": "Details",
+            "ar": "التفاصيل"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "richText",
+          "cell": "richText",
+          "sortable": false
+        },
+        {
+          "name": "enrollments",
+          "kind": "join",
+          "label": {
+            "en": "Enrollments",
+            "ar": "التسجيلات"
+          },
+          "rules": {
+            "required": false,
+            "providedBy": {
+              "create": "never",
+              "update": "never"
+            }
+          },
+          "relationTo": "enrollments",
+          "on": "session",
+          "component": "join",
+          "cell": "join"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        },
+        {
+          "name": "archiveMany",
+          "effect": "update",
+          "updatesMany": true
+        }
+      ],
+      "useAsTitle": "startsAt",
+      "description": {
+        "en": "The dates each course meets, and how many seats each one holds.",
+        "ar": "مواعيد انعقاد كل دورة، وعدد المقاعد في كل منها."
+      },
+      "pages": {
+        "list": {
+          "path": "/sessions",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "list": {
+                      "columns": [
+                        {
+                          "field": "course",
+                          "cell": "relationship",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "startsAt",
+                          "cell": "datetime",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "capacity",
+                          "cell": "number",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "venue",
+                          "cell": "text",
+                          "decided": "table"
+                        }
+                      ],
+                      "filters": [
+                        "course",
+                        "startsAt",
+                        "venue",
+                        "format",
+                        "archived"
+                      ],
+                      "search": [
+                        "course.title",
+                        "details"
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "create": {
+          "path": "/sessions/new",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "section": "course",
+                        "label": {
+                          "en": "Course",
+                          "ar": "الدورة"
+                        },
+                        "fields": [
+                          {
+                            "field": "course",
+                            "component": "relationship",
+                            "decided": "table"
+                          }
+                        ]
+                      },
+                      {
+                        "section": "schedule",
+                        "label": {
+                          "en": "Schedule",
+                          "ar": "الموعد"
+                        },
+                        "fields": [
+                          {
+                            "row": [
+                              {
+                                "field": "startsAt",
+                                "component": "datetime",
+                                "decided": "table"
+                              },
+                              {
+                                "field": "capacity",
+                                "component": "number",
+                                "decided": "table"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "section": "place",
+                        "label": {
+                          "en": "Venue and format",
+                          "ar": "المكان والصيغة"
+                        },
+                        "fields": [
+                          {
+                            "row": [
+                              {
+                                "field": "venue",
+                                "component": "nativeSelect",
+                                "decided": "field"
+                              },
+                              {
+                                "field": "format",
+                                "component": "combobox",
+                                "decided": "field"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "section": "notes",
+                        "label": {
+                          "en": "Notes",
+                          "ar": "ملاحظات"
+                        },
+                        "fields": [
+                          {
+                            "field": "details",
+                            "component": "richText",
+                            "decided": "table"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "edit": {
+          "path": "/sessions/:id",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "tabs": [
+                      {
+                        "tab": "details",
+                        "label": {
+                          "en": "Details",
+                          "ar": "التفاصيل"
+                        },
+                        "fields": [
+                          {
+                            "form": [
+                              {
+                                "section": "schedule",
+                                "label": {
+                                  "en": "Schedule",
+                                  "ar": "الموعد"
+                                },
+                                "fields": [
+                                  {
+                                    "row": [
+                                      {
+                                        "field": "startsAt",
+                                        "component": "datetime",
+                                        "decided": "table"
+                                      },
+                                      {
+                                        "field": "capacity",
+                                        "component": "number",
+                                        "decided": "table"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "section": "place",
+                                "label": {
+                                  "en": "Venue and format",
+                                  "ar": "المكان والصيغة"
+                                },
+                                "fields": [
+                                  {
+                                    "row": [
+                                      {
+                                        "field": "venue",
+                                        "component": "nativeSelect",
+                                        "decided": "field"
+                                      },
+                                      {
+                                        "field": "format",
+                                        "component": "combobox",
+                                        "decided": "field"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "section": "notes",
+                                "label": {
+                                  "en": "Notes",
+                                  "ar": "ملاحظات"
+                                },
+                                "fields": [
+                                  {
+                                    "field": "details",
+                                    "component": "richText",
+                                    "decided": "table"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "tab": "enrollments",
+                        "label": {
+                          "en": "Enrollments",
+                          "ar": "التسجيلات"
+                        },
+                        "fields": [
+                          {
+                            "list": {
+                              "of": "enrollments",
+                              "where": "session",
+                              "columns": [
+                                {
+                                  "field": "student",
+                                  "cell": "relationship",
+                                  "decided": "table"
+                                },
+                                {
+                                  "field": "createdAt",
+                                  "cell": "datetime",
+                                  "decided": "table"
+                                }
+                              ]
+                            },
+                            "when": {
+                              "$user.collections.enrollments.operations.find": {
+                                "equals": true
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "side": [
+                  {
+                    "section": "course",
+                    "label": {
+                      "en": "Course",
+                      "ar": "الدورة"
+                    },
+                    "fields": [
+                      {
+                        "field": "course",
+                        "component": "relationship",
+                        "decided": "table"
+                      }
+                    ]
+                  },
+                  {
+                    "component": "./src/audit-log/ui/activity.tsx#Activity",
+                    "when": {
+                      "$user.collections.auditLog.operations.find": {
+                        "equals": true
+                      }
+                    }
+                  }
+                ],
+                "danger": [
+                  {
+                    "button": "delete",
+                    "label": {
+                      "en": "Delete",
+                      "ar": "حذف"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "enrollments": {
+      "name": "enrollments",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "session",
+          "kind": "relationship",
+          "label": {
+            "en": "Session",
+            "ar": "الحصة"
+          },
+          "rules": {
+            "required": true,
+            "onDelete": "restrict"
+          },
+          "relationTo": "sessions",
+          "component": "relationship",
+          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell"
+        },
+        {
+          "name": "student",
+          "kind": "relationship",
+          "label": {
+            "en": "Student",
+            "ar": "الطالب"
+          },
+          "rules": {
+            "required": true,
+            "onDelete": "restrict"
+          },
+          "relationTo": "user",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "deletedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Deleted at",
+            "ar": "تاريخ الحذف"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "never",
+              "update": "never"
+            },
+            "required": false
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        }
+      ],
+      "useAsTitle": "student",
+      "description": {
+        "en": "Which student holds a seat in which session.",
+        "ar": "أي طالب يشغل مقعدا في أي حصة."
+      },
+      "pages": {
+        "list": {
+          "path": "/enrollments",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "list": {
+                      "columns": [
+                        {
+                          "field": "session",
+                          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell",
+                          "decided": "field"
+                        },
+                        {
+                          "field": "student",
+                          "cell": "relationship",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "createdAt",
+                          "cell": "datetime",
+                          "decided": "table"
+                        }
+                      ],
+                      "filters": [
+                        "session",
+                        "student",
+                        "createdAt"
+                      ],
+                      "search": [
+                        "student.name"
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "create": {
+          "path": "/enrollments/new",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "section": "enrollment",
+                        "label": {
+                          "en": "Enrollment",
+                          "ar": "التسجيل"
+                        },
+                        "fields": [
+                          {
+                            "field": "session",
+                            "component": "relationship",
+                            "decided": "table"
+                          },
+                          {
+                            "field": "student",
+                            "component": "relationship",
+                            "decided": "table"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "edit": {
+          "path": "/enrollments/:id",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "section": "enrollment",
+                        "label": {
+                          "en": "Enrollment",
+                          "ar": "التسجيل"
+                        },
+                        "fields": [
+                          {
+                            "field": "session",
+                            "component": "relationship",
+                            "decided": "table"
+                          },
+                          {
+                            "field": "student",
+                            "component": "relationship",
+                            "decided": "table"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "side": [
+                  {
+                    "section": "record",
+                    "label": {
+                      "en": "Record",
+                      "ar": "السجل"
+                    },
+                    "fields": [
+                      {
+                        "field": "organization",
+                        "readOnly": true,
+                        "component": "relationship",
+                        "decided": "table"
+                      },
+                      {
+                        "field": "createdAt",
+                        "readOnly": true,
+                        "component": "datetime",
+                        "decided": "table"
+                      }
+                    ]
+                  },
+                  {
+                    "component": "./src/audit-log/ui/activity.tsx#Activity",
+                    "when": {
+                      "$user.collections.auditLog.operations.find": {
+                        "equals": true
+                      }
+                    }
+                  }
+                ],
+                "danger": [
+                  {
+                    "button": "delete",
+                    "label": {
+                      "en": "Delete",
+                      "ar": "حذف"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "tags": {
+      "name": "tags",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "name",
+          "kind": "text",
+          "label": {
+            "en": "Name",
+            "ar": "الاسم"
+          },
+          "rules": {
+            "localized": true,
+            "required": true,
+            "trim": true,
+            "maxLength": 60,
+            "index": true
+          },
+          "component": "text",
+          "cell": "text"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        }
+      ],
+      "useAsTitle": "name",
+      "description": {
+        "en": "Labels that group courses in the catalogue.",
+        "ar": "تسميات تجمع الدورات في الدليل."
+      },
+      "pages": {
+        "list": {
+          "path": "/tags",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "list": {
+                      "columns": [
+                        {
+                          "field": "name",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "createdAt",
+                          "cell": "datetime",
+                          "decided": "table"
+                        }
+                      ],
+                      "search": [
+                        "name"
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "create": {
+          "path": "/tags/new",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "field": "name",
+                        "component": "text",
+                        "decided": "table"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "mode": "sheet"
+        },
+        "edit": {
+          "path": "/tags/:id",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "section": "tag",
+                        "label": {
+                          "en": "Tag",
+                          "ar": "الوسم"
+                        },
+                        "fields": [
+                          {
+                            "field": "name",
+                            "component": "text",
+                            "decided": "table"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "danger": [
+                  {
+                    "button": "delete",
+                    "label": {
+                      "en": "Delete",
+                      "ar": "حذف"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "media": {
+      "name": "media",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "filename",
+          "kind": "text",
+          "label": {
+            "en": "File name",
+            "ar": "اسم الملف"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "required": true,
+            "index": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "mimeType",
+          "kind": "text",
+          "label": {
+            "en": "File type",
+            "ar": "نوع الملف"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "required": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "filesize",
+          "kind": "number",
+          "label": {
+            "en": "File size",
+            "ar": "حجم الملف"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "required": true
+          },
+          "component": "number",
+          "cell": "number"
+        },
+        {
+          "name": "width",
+          "kind": "number",
+          "label": {
+            "en": "Width",
+            "ar": "العرض"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "required": false
+          },
+          "component": "number",
+          "cell": "number"
+        },
+        {
+          "name": "height",
+          "kind": "number",
+          "label": {
+            "en": "Height",
+            "ar": "الارتفاع"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "required": false
+          },
+          "component": "number",
+          "cell": "number"
+        },
+        {
+          "name": "key",
+          "kind": "text",
+          "label": {
+            "en": "Object key",
+            "ar": "مفتاح الملف"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "required": true,
+            "unique": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "storage",
+          "kind": "text",
+          "label": {
+            "en": "Storage",
+            "ar": "التخزين"
+          },
+          "rules": {
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "required": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "alt",
+          "kind": "text",
+          "label": {
+            "en": "Alternative text",
+            "ar": "النص البديل"
+          },
+          "rules": {
+            "localized": true,
+            "required": true,
+            "maxLength": 300
+          },
+          "component": "text",
+          "cell": "text"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        }
+      ],
+      "useAsTitle": "filename",
+      "description": {
+        "en": "The images this organization uses, each with the words a screen reader says for it.",
+        "ar": "الصور التي تستخدمها هذه المؤسسة، ولكل منها الكلمات التي يقرؤها قارئ الشاشة."
+      },
+      "storage": {
+        "mimeTypes": [
+          "image/png",
+          "image/jpeg",
+          "image/webp"
+        ],
+        "fileSize": 10485760
+      },
+      "pages": {
+        "list": {
+          "path": "/media",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "list": {
+                      "columns": [
+                        {
+                          "field": "filename",
+                          "cell": "./src/media/ui/preview.tsx#FileName",
+                          "decided": "leaf"
+                        },
+                        {
+                          "field": "alt",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "mimeType",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "filesize",
+                          "cell": "./src/media/ui/preview.tsx#FileSize",
+                          "decided": "leaf"
+                        },
+                        {
+                          "field": "createdAt",
+                          "cell": "datetime",
+                          "decided": "table"
+                        }
+                      ],
+                      "search": [
+                        "filename"
+                      ],
+                      "sort": "-createdAt"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "create": {
+          "path": "/media/new",
+          "component": "./src/media/ui/preview.tsx#NewImage"
+        },
+        "edit": {
+          "path": "/media/:id",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "section": "description",
+                        "label": {
+                          "en": "Description",
+                          "ar": "الوصف"
+                        },
+                        "fields": [
+                          {
+                            "field": "alt",
+                            "component": "text",
+                            "decided": "table"
+                          }
+                        ]
+                      },
+                      {
+                        "section": "file",
+                        "label": {
+                          "en": "File",
+                          "ar": "الملف"
+                        },
+                        "fields": [
+                          {
+                            "field": "filename",
+                            "component": "text",
+                            "decided": "table"
+                          },
+                          {
+                            "field": "mimeType",
+                            "component": "text",
+                            "decided": "table"
+                          },
+                          {
+                            "row": [
+                              {
+                                "field": "width",
+                                "component": "number",
+                                "decided": "table"
+                              },
+                              {
+                                "field": "height",
+                                "component": "number",
+                                "decided": "table"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "side": [
+                  {
+                    "component": "./src/media/ui/preview.tsx#MediaPreview"
+                  }
+                ],
+                "danger": [
+                  {
+                    "button": "delete",
+                    "label": {
+                      "en": "Delete",
+                      "ar": "حذف"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "roles": {
+      "name": "roles",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "name",
+          "kind": "text",
+          "label": {
+            "en": "Name",
+            "ar": "الاسم"
+          },
+          "rules": {
+            "required": true,
+            "unique": true,
+            "trim": true,
+            "maxLength": 60,
+            "index": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "label",
+          "kind": "text",
+          "label": {
+            "en": "Label",
+            "ar": "التسمية"
+          },
+          "rules": {
+            "required": true,
+            "localized": true,
+            "trim": true,
+            "maxLength": 60
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "permissions",
+          "kind": "textArray",
+          "label": {
+            "en": "Permissions",
+            "ar": "الصلاحيات"
+          },
+          "rules": {
+            "required": true
+          },
+          "component": "textArray",
+          "cell": "textArray"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        }
+      ],
+      "useAsTitle": "label",
+      "description": {
+        "en": "What each role in this organization may see and do.",
+        "ar": "ما يمكن لكل دور في هذه المؤسسة أن يراه ويفعله."
+      },
+      "pages": {
+        "list": {
+          "path": "/roles",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "list": {
+                      "columns": [
+                        {
+                          "field": "label",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "name",
+                          "cell": "text",
+                          "decided": "table"
+                        }
+                      ],
+                      "limit": 100
+                    },
+                    "component": "./src/roles/ui/roles.tsx#RolesTable"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "create": {
+          "path": "/roles/new",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "field": "name",
+                        "component": "text",
+                        "decided": "table"
+                      },
+                      {
+                        "field": "label",
+                        "component": "text",
+                        "decided": "table"
+                      },
+                      {
+                        "field": "permissions",
+                        "component": "textArray",
+                        "decided": "table"
+                      }
+                    ],
+                    "component": "./src/roles/ui/role-form.tsx#RoleForm"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "edit": {
+          "path": "/roles/:id",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "field": "name",
+                        "component": "text",
+                        "decided": "table"
+                      },
+                      {
+                        "field": "label",
+                        "component": "text",
+                        "decided": "table"
+                      },
+                      {
+                        "field": "permissions",
+                        "component": "textArray",
+                        "decided": "table"
+                      }
+                    ],
+                    "component": "./src/roles/ui/role-form.tsx#RoleForm"
+                  }
+                ],
+                "danger": [
+                  {
+                    "button": "delete",
+                    "label": {
+                      "en": "Delete",
+                      "ar": "حذف"
+                    },
+                    "component": "./src/roles/ui/roles.tsx#DeleteRole"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "memberRoles": {
+      "name": "memberRoles",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "user",
+          "kind": "relationship",
+          "label": {
+            "ar": "العضو",
+            "en": "Member"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "onDelete": "cascade"
+          },
+          "relationTo": "user",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "role",
+          "kind": "text",
+          "label": {
+            "ar": "الدور",
+            "en": "Role"
+          },
+          "rules": {
+            "required": true,
+            "maxLength": 60,
+            "index": true
+          },
+          "component": "text",
+          "cell": "text"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        }
+      ],
+      "pages": {}
+    },
+    "settings": {
+      "name": "settings",
+      "single": true,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict",
+            "unique": true
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "siteTitle",
+          "kind": "text",
+          "label": {
+            "en": "Site title",
+            "ar": "عنوان الموقع"
+          },
+          "rules": {
+            "required": true,
+            "trim": true,
+            "maxLength": 120
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "maintenance",
+          "kind": "checkbox",
+          "label": {
+            "en": "Maintenance",
+            "ar": "الصيانة"
+          },
+          "rules": {
+            "required": false
+          },
+          "description": {
+            "en": "While this is on, the site tells visitors it is closed for maintenance.",
+            "ar": "ما دام هذا مفعلا، يخبر الموقع زواره بأنه مغلق للصيانة."
+          },
+          "component": "checkbox",
+          "cell": "checkbox"
+        },
+        {
+          "name": "contactEmail",
+          "kind": "email",
+          "label": {
+            "en": "Contact email",
+            "ar": "بريد التواصل"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "email",
+          "cell": "email"
+        },
+        {
+          "name": "globalType",
+          "kind": "text",
+          "label": {
+            "en": "Global type",
+            "ar": "النوع العام"
+          },
+          "rules": {
+            "required": true
+          },
+          "component": "text",
+          "cell": "text"
+        }
+      ],
+      "operations": [
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "findOne",
+          "effect": "read"
+        }
+      ],
+      "description": {
+        "en": "How the site presents itself, and whether it is open to visitors.",
+        "ar": "كيف يظهر الموقع، وهل هو مفتوح للزوار."
+      },
+      "pages": {
+        "settings": {
+          "path": "/settings",
+          "page": {
+            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "header": [
+              {
+                "title": {}
+              },
+              {
+                "controls": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "main": [
+                  {
+                    "form": [
+                      {
+                        "section": "site",
+                        "label": {
+                          "en": "Site",
+                          "ar": "الموقع"
+                        },
+                        "fields": [
+                          {
+                            "field": "siteTitle",
+                            "component": "text",
+                            "decided": "table"
+                          },
+                          {
+                            "field": "contactEmail",
+                            "component": "email",
+                            "decided": "table"
+                          }
+                        ]
+                      },
+                      {
+                        "section": "availability",
+                        "label": {
+                          "en": "Availability",
+                          "ar": "الإتاحة"
+                        },
+                        "fields": [
+                          {
+                            "field": "maintenance",
+                            "component": "switch",
+                            "decided": "leaf"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "user": {
+      "name": "user",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "rules": {
+            "required": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "rules": {
+            "required": true
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "name",
+          "kind": "text",
+          "rules": {
+            "required": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "email",
+          "kind": "text",
+          "rules": {
+            "required": true,
+            "unique": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "emailVerified",
+          "kind": "checkbox",
+          "rules": {
+            "required": true
+          },
+          "component": "checkbox",
+          "cell": "checkbox"
+        },
+        {
+          "name": "image",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "role",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "banned",
+          "kind": "checkbox",
+          "rules": {
+            "required": false
+          },
+          "component": "checkbox",
+          "cell": "checkbox"
+        },
+        {
+          "name": "banReason",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "banExpires",
+          "kind": "datetime",
+          "rules": {
+            "required": false
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        }
+      ],
+      "useAsTitle": "name",
+      "pages": {}
+    },
+    "organization": {
+      "name": "organization",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "updatedAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Updated at",
+            "ar": "تاريخ التعديل"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "nowOnUpdate": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "rules": {
+            "required": true
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "name",
+          "kind": "text",
+          "rules": {
+            "required": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "slug",
+          "kind": "text",
+          "rules": {
+            "required": true,
+            "unique": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "logo",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "metadata",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        }
+      ],
+      "operations": [
+        {
+          "name": "create",
+          "effect": "create"
+        },
+        {
+          "name": "update",
+          "effect": "update"
+        },
+        {
+          "name": "delete",
+          "effect": "delete"
+        },
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        },
+        {
+          "name": "updateMany",
+          "effect": "update",
+          "updatesMany": true
+        },
+        {
+          "name": "deleteMany",
+          "effect": "delete"
+        }
+      ],
+      "useAsTitle": "name",
+      "pages": {}
+    },
+    "auditLog": {
+      "name": "auditLog",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "organization",
+          "kind": "relationship",
+          "label": {
+            "en": "Organization",
+            "ar": "المؤسسة"
+          },
+          "rules": {
+            "required": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "never"
+            },
+            "onDelete": "restrict"
+          },
+          "relationTo": "organization",
+          "component": "relationship",
+          "cell": "relationship"
+        },
+        {
+          "name": "kayan",
+          "kind": "text",
+          "label": {
+            "en": "Kayan",
+            "ar": "الكيان"
+          },
+          "rules": {
+            "required": true,
+            "maxLength": 60
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "record",
+          "kind": "text",
+          "label": {
+            "en": "Record",
+            "ar": "السجل"
+          },
+          "rules": {
+            "required": true,
+            "index": true
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "operation",
+          "kind": "text",
+          "label": {
+            "en": "Operation",
+            "ar": "العملية"
+          },
+          "rules": {
+            "required": true,
+            "maxLength": 60
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "actor",
+          "kind": "text",
+          "label": {
+            "en": "Actor",
+            "ar": "المنفذ"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "impersonatedBy",
+          "kind": "text",
+          "label": {
+            "en": "Impersonated by",
+            "ar": "انتحل الصفة"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "changes",
+          "kind": "text",
+          "label": {
+            "en": "Changes",
+            "ar": "التغييرات"
+          },
+          "rules": {
+            "required": true
+          },
+          "component": "text",
+          "cell": "text",
+          "sortable": false
+        }
+      ],
+      "operations": [
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        }
+      ],
+      "pages": {}
+    }
+  },
+  "maxLimit": 100
+}

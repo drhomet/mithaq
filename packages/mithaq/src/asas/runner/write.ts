@@ -1,0 +1,1374 @@
+// One list in one place, so drizzle's callback transaction is kept as it is.
+import { rowsOfField, type Rows } from '../../mithaq/rows.ts'
+import { heldPermissions } from '../../rbac/index.ts'
+import { authActor } from '../actor.ts'
+import { AfterCommitError, AsasError, denied, invalid, missing } from './errors.ts'
+import type { AdminAccess, FieldAccess, LocalesOf, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
+import type { BuiltTables } from '../../drizzle/index.ts'
+import { defaultKinds, type Kind } from '../../base/kinds.ts'
+import type { RichTextValue } from '../../rich-text/rich-text.ts'
+import type { Access } from '../../mithaq/types.ts'
+import type { Store } from '../../mithaq/language.ts'
+import type { LanguageOf } from '../../mithaq/define.ts'
+import { providerOf } from '../../base/rules.ts'
+import type { InferInput, InferOutput, StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
+import { atEffect, defaults, issueRefusal, parse, sealOf, storeSeals, validated, withoutPrototype, type BulkResult, type Context, type ContextOf, type Ctx, type DerivedSchemas, type OperationEffect, type ResolvedOperation, type StepsOf, type Tools, type WriteTools, type WriteStep } from './steps.ts'
+import { firstRegisters, running, snapshot, type Open, type Running } from './runtime.ts'
+import type { FindInput } from './read.ts'
+import { changedColumns, latestVersion, restoreInput, revived, saveVersion } from '../../versions/versions.ts'
+import { fileURLs } from '../../storage/storage.ts'
+import { combineWhere, operatorList } from '../../mithaq/where.ts'
+import { refuseTenantOption, writeTenant, type TenantReach } from './tenant.ts'
+import type { FieldWhere, Operator, Scalar, Where } from '../../mithaq/where.ts'
+
+/** The key of `Options` only the bulk runner sets. */
+export const ontoRow = Symbol('ontoRow')
+
+/** The caller's own context, required where the project declared one. */
+type ContextOption<Extra extends Record<string, unknown>> = [Record<string, unknown>] extends [Extra]
+  ? { context?: Extra }
+  : { context: Extra }
+
+/** The second argument of every write function. */
+export type Options<Actor = unknown, Extra extends Record<string, unknown> = Record<string, unknown>> = {
+  /** Whoever is writing. A `user.<key>` default reads off it. */
+  actor?: Actor
+  /** On a kayan that keeps drafts, save a version alone unless the write sends `_status: 'published'`; a read then reads each row's latest version. */
+  draft?: boolean
+  /** With `draft`, overwrite the latest version in place where it is itself an autosave. */
+  autosave?: boolean
+  // A symbol, so no served call can name it.
+  [ontoRow]?: true
+} & ContextOption<Extra>
+
+export type ReadOptions<Actor = unknown, Extra extends Record<string, unknown> = Record<string, unknown>> = Options<Actor, Extra> & {
+  /**
+   * How far the read reaches past the active organization: `'mine'` is every organization the
+   * actor is a verified member of, each under the roles it holds there; `'all'` is every tenant,
+   * for platform staff in the platform app alone. A `where` on the tenant field only narrows it.
+   */
+  tenant?: TenantReach
+}
+
+/**
+ * The keys this build's runner declared, which is what a caller of it has to
+ * send and what every step of it reads.
+ */
+type ContextExtra<L> = ContextOf<ServiceOf<L>>
+/** The options a caller of this build passes every operation. */
+type CallOptions<L, Actor, Read extends boolean = false> = Read extends true ? ReadOptions<Actor, ContextExtra<L>> : Options<Actor, ContextExtra<L>>
+
+// Required where the project declared a context, or every step would read a declared
+// key typed and `undefined`.
+type CallArgs<L, Actor, Input, Read extends boolean = false> = [Record<string, unknown>] extends [ContextExtra<L>]
+  ? {} extends Input
+    ? [input?: Input, options?: CallOptions<L, Actor, Read>]
+    : [input: Input, options?: CallOptions<L, Actor, Read>]
+  : [input: Input, options: CallOptions<L, Actor, Read>]
+/** The admin provider as the runner sees it: the kayan's name, and its gate. */
+export type ManagedAdmin<Actor = unknown> = { access?: AdminAccess<Actor>; kayan?: string }
+
+const isScalar = (value: unknown): value is Scalar =>
+  value === null ||
+  ['string', 'boolean'].includes(typeof value) ||
+  (typeof value === 'number' && Number.isFinite(value)) ||
+  (value instanceof Date && Number.isFinite(value.getTime()))
+
+const known: ReadonlySet<string> = new Set<Operator>(operatorList)
+/** A list of operators as a sentence says it: `"a", "b" and "c"`. */
+const and = new Intl.ListFormat('en-GB', { type: 'conjunction' })
+
+const checkOperatorValue = (said: string, field: string, operator: string, value: unknown) => {
+  if (operator === 'exists') {
+    if (typeof value !== 'boolean') throw new Error(`${said} field "${field}" operator "exists" needs a boolean.`)
+    return
+  }
+  if (operator === 'in' || operator === 'not_in') {
+    if (!Array.isArray(value) || !value.every(isScalar)) {
+      throw new Error(`${said} field "${field}" operator "${operator}" needs scalar array.`)
+    }
+    return
+  }
+  if ((operator === 'contains' || operator === 'like') && typeof value !== 'string') {
+    throw new Error(`${said} field "${field}" operator "${operator}" needs a string.`)
+  }
+  if (['greater_than', 'greater_than_equal', 'less_than', 'less_than_equal'].includes(operator) && value === null) {
+    throw new Error(`${said} field "${field}" operator "${operator}" cannot compare null.`)
+  }
+  if (!isScalar(value)) {
+    throw new Error(`${said} field "${field}" operator "${operator}" needs a scalar.`)
+  }
+}
+
+// A second segment is a locale or a related field, never both: `resolve` refuses
+// `localized` beside `relationTo` on the field itself, whatever the kind is named.
+const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; said: string }) => {
+  const parts = key.split('.')
+  const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments.`
+  if (parts.length > 2 || parts.some((part) => !part)) throw new Error(unsupported)
+  const field = parts[0]!
+  const path = parts[1]
+  const resolved = kayan.fields[field]
+  if (!resolved) throw new Error(`${said} names unknown field "${key}".`)
+  if (!path || resolved.locales?.includes(path)) return { field, key, kind: resolved.kind, operators: resolved.operators }
+  if (!resolved.target) throw new Error(unsupported)
+  const target = resolved.target.fields[path]
+  if (!target) throw new Error(`${said} path "${key}" names unknown related field.`)
+  return { field, key, kind: target.kind, operators: target.operators }
+}
+
+// An access constraint and a screen's `when` share this one grammar.
+export const assertFieldWhere = ({ said, key, kind, operators, value, valued = true }: { said: string; key: string; kind: string; operators?: readonly Operator[]; value: unknown; valued?: boolean }): FieldWhere => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${said} field "${key}" must use operators.`)
+  }
+  const fieldWhere: Record<string, unknown> = Object.create(null)
+  for (const [operator, operand] of Object.entries(value)) {
+    if (!known.has(operator)) {
+      throw new Error(`${said} field "${key}" uses unsupported operator "${operator}".`)
+    }
+    // A kind that names its operators is held to them and nothing else
+    // as rich text is to the three that search the words of its text.
+    if (operators && !operators.includes(operator as Operator)) {
+      throw new Error(
+        `${said} field "${key}" operator "${operator}" is not supported on a field of kind "${kind}"; only ${and.format(operators.map((one) => `"${one}"`))} ${operators.length === 1 ? 'is' : 'are'}.`,
+      )
+    }
+    // Every operator here compares one value, so none means anything against a list
+    // column; drizzle's array mapper would throw a 500 first. `exists` asks about the column.
+    if (kind === 'textArray' && operator !== 'exists') {
+      throw new Error(`${said} field "${key}" operator "${operator}" is not supported on a list field; only "exists" is.`)
+    }
+    if (!operators && (operator === 'contains' || operator === 'like') && !['email', 'text'].includes(kind)) {
+      throw new Error(`${said} field "${key}" operator "${operator}" only supports text-like fields.`)
+    }
+    if (
+      !operators &&
+      ['greater_than', 'greater_than_equal', 'less_than', 'less_than_equal'].includes(operator) &&
+      !['date', 'datetime', 'number', 'integer', 'decimal'].includes(kind)
+    ) {
+      throw new Error(`${said} field "${key}" operator "${operator}" only supports numeric, date and datetime fields.`)
+    }
+    checkOperatorValue(said, key, operator, operand)
+    // A value an integer or decimal column cannot hold would reach Postgres as a 500.
+    // A caller's own query skips this: its row shape refuses values with a path each.
+    if (valued && (kind === 'integer' || kind === 'decimal') && operator !== 'exists') {
+      for (const one of Array.isArray(operand) ? operand : [operand]) {
+        const read = kind === 'integer' && typeof one === 'string' && /^[+-]?\d+$/.test(one) ? Number(one) : one
+        if (read !== null && !defaultKinds[kind].accepts(read)) throw new Error(`${said} field "${key}" operator "${operator}" needs a value of kind "${kind}".`)
+      }
+    }
+    fieldWhere[operator] = operand
+  }
+  if (!Object.keys(fieldWhere).length) throw new Error(`${said} field "${key}" has no operators.`)
+  return fieldWhere as FieldWhere
+}
+
+export const assertWhere = (kayan: ResolvedKayan, where: unknown): Where =>
+  normalizedWhere({ kayan, where, valued: true, said: `Kayan "${kayan.name}" access constraint` })
+
+// Grammar alone: a caller's values are the row shape's to refuse.
+export const assertWhereGrammar = (kayan: ResolvedKayan, where: unknown): Where =>
+  normalizedWhere({ kayan, where, valued: false, said: `Kayan "${kayan.name}" query` })
+
+const normalizedWhere = ({ kayan, where, valued, said }: { kayan: ResolvedKayan; where: unknown; valued: boolean; said: string }): Where => {
+  if (!where || typeof where !== 'object' || Array.isArray(where)) {
+    throw new Error(`${said} is not an object of fields.`)
+  }
+  const entries = Object.entries(where)
+  if (!entries.length) throw new Error(`${said} is empty.`)
+  // No prototype, so `__proto__` is a key like any other.
+  const normalized: Record<string, unknown> = Object.create(null)
+  for (const [key, value] of entries) {
+    if (key === 'and' || key === 'or') {
+      if (!Array.isArray(value) || !value.length) {
+        throw new Error(`${said} "${key}" must be a non-empty array.`)
+      }
+      normalized[key] = value.map((one) => normalizedWhere({ kayan, where: one, valued, said }))
+      continue
+    }
+    const queried = queryField({ kayan, key, said })
+    const fieldWhere = assertFieldWhere({ said, key, kind: queried.kind, operators: queried.operators, value, valued })
+    normalized[queried.key] = { ...(normalized[queried.key] as object | undefined), ...fieldWhere }
+  }
+  return normalized as Where
+}
+
+// `exists` rather than `equals: null`: it asks about the column, which every store
+// answers alike. The access target's reader never asks it, so `buildAsas` refuses the pair.
+export const aliveWhere = (kayan: ResolvedKayan): Where | undefined =>
+  kayan.softDelete ? { [kayan.softDelete]: { exists: false } } : undefined
+
+// A row made as a draft and never published is read by nothing but a draft read.
+export const publishedWhere = (kayan: ResolvedKayan): Where | undefined =>
+  combineWhere(aliveWhere(kayan), kayan.versions?.drafts ? { _status: { equals: 'published' } } : undefined)
+
+const fieldAccess = async <Actor>(
+  operation: 'create' | 'update',
+  kayan: ResolvedKayan,
+  data: Record<string, unknown>,
+  actor: Actor | null,
+  id: unknown,
+  named: string,
+  doc?: Record<string, unknown>,
+  kept: readonly string[] = [],
+) => {
+  const next = { ...data }
+  const refused: string[] = []
+  let table: Rows | undefined
+  for (const field of Object.values(kayan.fields)) {
+    if (operation === 'update' && field.name === 'id') continue
+    if (!(field.name in next)) continue
+    const access = field.access?.[operation]
+    if (!access) continue
+    // Asked again on every pass: a step may have changed the value the callback judges.
+    const allowed = !!(await (access as FieldAccess<Actor, Record<string, unknown>, unknown>)({ data, doc, id, siblingData: next, user: actor }))
+    if (allowed) continue
+    // A row-compiled denial is named, not silently dropped. A column carried from a draft
+    // is refused whatever denied it, or the stored value would publish unasked.
+    const source = rowsOfField(access)
+    if (!source && !kept.includes(field.name)) {
+      delete next[field.name]
+      continue
+    }
+    table ??= source
+    refused.push(field.name)
+  }
+  if (refused.length) {
+    // The roles go as a list, so a client resolves each against the catalog.
+    const roles = table?.roles(actor) ?? []
+    throw denied({
+      message: `Forbidden: kayan "${kayan.name}" operation "${named}" for roles "${roles.join(', ')}" cannot write field${refused.length > 1 ? 's' : ''} "${refused.join('", "')}".`,
+      key: 'error.forbidden.field_write',
+      params: { kayan: kayan.name, operation: named, roles, fields: refused },
+    })
+  }
+  return next
+}
+
+export const projectReadableFields = async <Actor>({
+  kayan,
+  row,
+  actor,
+}: {
+  kayan: ResolvedKayan
+  row: Record<string, unknown>
+  actor: Actor | null
+}) => {
+  const next = { ...row }
+  for (const field of Object.values(kayan.fields)) {
+    const access = field.access?.read
+    if (!access || !(field.name in next)) continue
+    const allowed = await (access as FieldAccess<Actor, Record<string, unknown>, unknown>)({ data: row, doc: row, id: row.id, siblingData: row, user: actor })
+    if (!allowed) delete next[field.name]
+  }
+  return next
+}
+
+
+
+// A stored row the row shape refuses is the data's fault, so a plain `Error` (a masked
+// 500). The message names the fields and id, never a value: a message may quote it.
+const storedRow = async (kayan: ResolvedKayan, schema: StandardSchemaV1, row: Record<string, unknown>) => {
+  const result = await schema['~standard'].validate(withoutPrototype(row))
+  if (!result.issues) return result.value as Record<string, unknown>
+  const fields = [...new Set(result.issues.map((issue) => {
+    const [first] = issue.path ?? []
+    return String(typeof first === 'object' ? first.key : first ?? '')
+  }))]
+  const id = 'id' in row && !fields.includes('id') ? ` ${JSON.stringify(row.id)}` : ''
+  throw new Error(
+    `Kayan "${kayan.name}" row${id} is stored with a value that is not of its kind in field${fields.length > 1 ? 's' : ''} "${fields.join('", "')}", so it cannot be read. Repair the stored row.`,
+  )
+}
+
+// Masking deletes from the value, so no schema is composed and any validator can be the schema target.
+export const publicResult = async <Actor>({
+  kayan,
+  row,
+  actor,
+  internalOutput,
+  publicOutput,
+}: {
+  kayan: ResolvedKayan
+  row: Record<string, unknown>
+  actor: Actor | null
+  internalOutput: StandardSchemaV1
+  publicOutput?: StandardSchemaV1
+}) => {
+  const internal = await storedRow(kayan, internalOutput, row)
+  // A custom output is handed the operation's own words beside the proved columns.
+  const value = publicOutput ? { ...row, ...internal } : internal
+  const visible = await projectReadableFields({ kayan, row: value, actor })
+  // Computed on every read, never stored.
+  if (!publicOutput) return fileURLs({ kayan, stored: internal as Record<string, unknown>, visible })
+  const parsed = await validated(publicOutput, visible)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`Kayan "${kayan.name}" custom output must return a row object.`)
+  }
+  const final = await projectReadableFields({ kayan, row: parsed as Record<string, unknown>, actor })
+  const removed = Object.keys(parsed).filter((key) => !(key in final))
+  if (removed.length) {
+    throw new Error(`Kayan "${kayan.name}" custom output returned protected field "${removed[0]}" after read projection.`)
+  }
+  return fileURLs({ kayan, stored: internal as Record<string, unknown>, visible: final })
+}
+
+// An access callback answering `true` puts no tenancy filter on a per-tenant global, so
+// it would read another tenant's row. Refused by name; a `where` admitting several is not checked.
+export const assertSingleConstrained = (kayan: ResolvedKayan, where: Where | undefined) => {
+  if (kayan.single && kayan.tenant && !where) {
+    throw new Error(
+      `Global "${kayan.name}" keeps the tenant field, and the actor's access constrains no rows, so no one row is the tenant's own. Return a Where from its read and update access that constrains the rows to the actor's tenant.`,
+    )
+  }
+}
+
+const loadExisting = async (
+  kayan: ResolvedKayan,
+  store: Store,
+  id: unknown,
+  where: Where | undefined,
+  tx?: unknown,
+  rows = aliveWhere(kayan),
+) => {
+  assertSingleConstrained(kayan, where)
+  const found = await store.find({ kayan: kayan.name, args: {
+    limit: 1,
+    page: 1,
+    lock: 'update',
+    // A write's own look at the row it changes, over a set an id or a constraint already reduced.
+    sort: { field: 'id', direction: 'asc' },
+    // A marked row is not there to change, so a second delete of it is the 404 an absent id gets.
+    where: combineWhere(
+      kayan.single ? where : combineWhere({ id: { equals: id as Scalar } }, where),
+      rows,
+    ),
+  }, tx })
+  return found.docs[0]
+}
+
+// Each related id must be one the target's own read access admits for this actor, and in the
+// written row's organization.
+const validateTenantRelationships = async <Actor>(
+  kayan: ResolvedKayan,
+  store: Store,
+  data: Record<string, unknown>,
+  actor: Actor | null,
+  existing: Record<string, unknown> | undefined,
+  authorize: Authorize,
+  admin: ManagedAdmin<Actor> | undefined,
+  tx?: unknown,
+) => {
+  const own = kayan.tenant
+  await assertReferences({
+    kayan,
+    store,
+    data,
+    tenant: own ? (data[own] ?? existing?.[own]) : undefined,
+    // Asked with no operation, so no permission key is asked for.
+    access: (target) => authorize({ admin, actor, data: {}, effect: 'read', kayan: target }),
+    tx,
+  })
+}
+
+/**
+ * Refuses a relationship value naming a row the write may not point at: one of another
+ * organization than the written row's, or one `access` leaves out. A step's own raw write
+ * passes no `access`, so it is held to the organization alone.
+ */
+export const assertReferences = async ({ kayan, store, data, tenant, access, tx }: {
+  kayan: ResolvedKayan
+  store: Pick<Store, 'find'>
+  data: Record<string, unknown>
+  /** The organization the written row belongs to, or the active one where the row belongs to none. */
+  tenant: unknown
+  /** What else the target's row must meet: its read access for this actor. */
+  access?: (target: ResolvedKayan) => Promise<Where | undefined>
+  tx?: unknown
+}) => {
+  const own = kayan.tenant
+  // Gathered per target, so two fields at one kayan and a whole `hasMany` set are one read.
+  const targets = new Map<ResolvedKayan, { field: string; value: unknown }[]>()
+  for (const field of Object.values(kayan.fields)) {
+    // The ownership column is the runner's, or was judged above. A join takes no write.
+    if (!field.target || field.name === own || field.kind === 'join') continue
+    const given = data[field.name]
+    if (given === undefined || given === null) continue
+    for (const value of field.hasMany ? (given as readonly unknown[]) : [given]) {
+      if (value === undefined || value === null) continue
+      targets.set(field.target, [...(targets.get(field.target) ?? []), { field: field.name, value }])
+    }
+  }
+  for (const [target, sets] of targets) {
+    const far = target.tenant
+    // A raw write to a shared row names it as it likes; the foreign key holds it.
+    if (!access && !far) continue
+    // Held whatever the target's own access answers, so no access widens it.
+    const tenanted = tenant !== undefined && tenant !== null && far ? { [far]: { equals: tenant as Scalar } } : undefined
+    // A 400: the value is what the caller sent wrong. Absent, hidden and another tenant's
+    // ids are one refusal, so none tells the caller which ids exist.
+    const refuse = (field: string) => {
+      const params = { kayan: kayan.name, field, target: target.name }
+      return tenanted
+        ? invalid({
+            message: `"${kayan.name}" field "${field}" must reference a "${target.name}" row in the same tenant.`,
+            key: 'error.invalid.tenant_reference',
+            params,
+          })
+        : invalid({
+            message: `"${kayan.name}" field "${field}" must reference a "${target.name}" row the actor can read.`,
+            key: 'error.invalid.reference',
+            params,
+          })
+    }
+    // With no organization and no access to ask, nothing scopes the target, so nothing is admitted.
+    if (!access && !tenanted) throw refuse(sets[0]!.field)
+    let admits: Where | undefined
+    try {
+      admits = await access?.(target)
+    } catch (thrown) {
+      if (!(thrown instanceof AsasError) || thrown.status !== 403) throw thrown
+      // Fail closed before the store is asked, so the foreign key cannot tell which ids exist.
+      throw refuse(sets[0]!.field)
+    }
+    // Postgres answers a uuid in lowercase, so ids are compared in that case.
+    const uuid = target.fields.id?.kind === 'uuid'
+    const keyOf = (value: unknown) => (uuid && typeof value === 'string' ? value.toLowerCase() : value)
+    const ids = [...new Set(sets.map(({ value }) => keyOf(value)))]
+    const found = await store.find({ kayan: target.name, args: {
+      limit: ids.length,
+      lock: 'update',
+      page: 1,
+      sort: { field: 'id', direction: 'asc' },
+      where: combineWhere(
+        combineWhere(
+          combineWhere({ id: { in: ids as Scalar[] } }, admits),
+          tenanted,
+        ),
+        // Nothing a plain read shows may point at a row no plain read shows; a step's own write may.
+        access ? publishedWhere(target) : undefined,
+      ),
+    }, tx })
+    const admitted = new Set(found.docs.map((row) => keyOf(row.id)))
+    const refused = sets.find(({ value }) => !admitted.has(keyOf(value)))
+    if (refused) throw refuse(refused.field)
+  }
+}
+
+
+export const defaultAccess = async <Actor>(admin: ManagedAdmin<Actor> | undefined, actor: Actor | null) => {
+  if (!admin?.kayan || !admin.access || !actor || authActor(actor)?.collection !== admin.kayan) return false
+  return admin.access({ user: actor })
+}
+
+export type Authorize = <Actor>(args: {
+  admin?: ManagedAdmin<Actor>
+  actor: Actor | null
+  data: Record<string, unknown>
+  effect: OperationEffect
+  kayan: ResolvedKayan
+  kind?: Tools['kind']
+  // The named operation, not the effect: `courses.archive` is its own key.
+  operation?: string
+}) => Promise<Where | undefined>
+
+// Asked of the one store that grades this actor. The row answers deny first, so this
+// only narrows; a refusal is a 403, never a 5xx an offline client would retry.
+const assertPermission = (kayan: ResolvedKayan, operation: string | undefined, actor: unknown) => {
+  if (operation === undefined) return
+  const keys = heldPermissions({ access: kayan.access, user: actor })
+  if (keys === undefined || keys === true) return
+  const key = `${kayan.name}.${operation}`
+  if (keys.has(key)) return
+  throw denied({
+    message: `Forbidden: "${kayan.name}" operation "${operation}" needs permission "${key}".`,
+    key: 'error.forbidden.permission',
+    params: { kayan: kayan.name, operation },
+  })
+}
+
+export const defaultAuthorize: Authorize = async <Actor>({
+  admin,
+  actor,
+  data,
+  effect,
+  kayan,
+  kind,
+  operation: named,
+}: {
+  admin?: ManagedAdmin<Actor>
+  actor: Actor | null
+  data: Record<string, unknown>
+  effect: OperationEffect
+  kayan: ResolvedKayan
+  kind?: Tools['kind']
+  operation?: string
+}) => {
+  if (effect === 'read') {
+    const access = kayan.access?.read
+    const result = access
+      ? await (access as Access<Actor, Record<string, unknown>, unknown>)({ id: data.id, slug: kayan.name, user: actor })
+      : await defaultAccess(admin, actor)
+    if (!result) throw denied({ message: `Forbidden: "${kayan.name}" read access denied.`, key: 'error.forbidden.read', params: { kayan: kayan.name } })
+    assertPermission(kayan, named, actor)
+    return result === true ? undefined : assertWhere(kayan, result)
+  }
+  const operation = effect
+  const access = kayan.access?.[operation]
+  const { id, ...values } = data
+  const accessData = kind === 'insert' ? data : kind === 'update' ? values : undefined
+  const result = access
+    ? await (access as Access<Actor, Record<string, unknown>, unknown>)({ data: accessData, id, slug: kayan.name, user: actor })
+    : await defaultAccess(admin, actor)
+  if (operation === 'create') {
+    if (result !== true) throw denied({ message: `Forbidden: "${kayan.name}" create access denied.`, key: 'error.forbidden.create', params: { kayan: kayan.name } })
+    assertPermission(kayan, named, actor)
+    return undefined
+  }
+  if (!result) throw denied({ message: `Forbidden: "${kayan.name}" ${operation} access denied.`, key: 'error.forbidden.operation', params: { kayan: kayan.name, operation } })
+  assertPermission(kayan, named, actor)
+  return result === true ? undefined : assertWhere(kayan, result)
+}
+
+// Shared with the bulk runner, so the depth cap, the cross-transaction refusals and the
+// ambient actor rule answer alike for a bulk and the row it is made of.
+export const beginWrite = <Actor = unknown>({
+  kayan,
+  operation,
+  store,
+  cap,
+  options,
+}: {
+  kayan: ResolvedKayan
+  operation: string
+  store: Store
+  cap: number
+  options?: Options<Actor>
+}) => {
+  const outer = running.getStore()
+  const chain = [...(outer?.context.chain ?? []), `${kayan.name}.${operation}`]
+  const depth = (outer?.context.depth ?? 0) + 1
+  if (depth > cap) {
+    throw new Error(`Write depth ${depth} is past the cap of ${cap}: ${chain.join(' -> ')}.`)
+  }
+  // Frozen, so a step cannot reset `depth` and hand every write under it a spent cap.
+  const context: Context = Object.freeze({
+    source: 'local',
+    ...(outer?.context ?? options?.context),
+    depth,
+    chain,
+  })
+  const open = outer?.transactions ?? new Map()
+  // A nested write joins the outer transaction on the same store, so both commit or roll
+  // back together; another store opens its own. Outside slots carry no transactions.
+  const joined = open.get(store)
+  if (outer?.transactions && !joined) {
+    throw new Error(
+      `Kayan "${kayan.name}" operation "${operation}" cannot write to another store while transaction "${outer.context.chain.at(-1)}" is open.`,
+    )
+  }
+  if (joined?.settled) {
+    throw new Error(
+      `Kayan "${kayan.name}" operation "${operation}" joined the transaction "${joined.operation}" opened, which has already settled, so the write that started this one was not awaited. Await every write a step begins.`,
+    )
+  }
+  const entry: Open = joined ?? { tx: undefined, operation: `${kayan.name}.${operation}` }
+  const actor = (outer?.user as Actor | null | undefined) ?? options?.actor ?? null
+  return { actor, context, entry, open }
+}
+
+// A write from outside the transaction would not roll back with it, or would land after
+// the commit; a step there calls a managed operation, which opens its own.
+const outsideStore = (kayan: ResolvedKayan, operation: string, slot: string): WriteTools['store'] => {
+  const refuse = () => {
+    throw new Error(
+      `Kayan "${kayan.name}" operation "${operation}" reached the store from "${slot}", which runs outside the operation's transaction, so the write would not be in it. Write through tools.kayans, which opens its own, or move the step into "steps".`,
+    )
+  }
+  return Object.freeze({ insert: refuse, remove: refuse, update: refuse })
+}
+
+// No transaction is carried, so a managed write here opens its own. An `afterCommit`
+// throw is never an `AsasError`: the write it would refuse has committed.
+export const runOutside = async <Actor>({
+  kayan,
+  tools,
+  slot,
+  list,
+  start,
+  around,
+}: {
+  kayan: ResolvedKayan
+  tools: WriteTools<unknown, Actor>
+  slot: 'afterCommit' | 'beforeTransaction'
+  list: readonly WriteStep[]
+  start: Ctx
+  around: { context: Context; user: Actor | null }
+}): Promise<Ctx> => {
+  const given = Object.freeze({ ...tools, store: outsideStore(kayan, tools.operation, slot) })
+  return running.run(around as Running, async () => {
+    let ctx = start
+    try {
+      for (const step of list) ctx = await step(ctx, given as WriteTools)
+    } catch (cause) {
+      if (slot === 'beforeTransaction') throw cause
+      throw new Error(
+        `Kayan "${kayan.name}" operation "${tools.operation}" threw in afterCommit, which runs after the commit, so the write stands.`,
+        { cause },
+      )
+    }
+    return ctx
+  })
+}
+
+// One that throws does not silence the rest, since each stands for a committed write;
+// the first error is the one reported.
+export const drain = async (queue: readonly (() => Promise<void>)[]) => {
+  // A wrapper, so a thunk that threw a falsy value is still raised.
+  let failure: { cause: unknown } | undefined
+  for (const queued of queue) {
+    try {
+      await queued()
+    } catch (cause) {
+      failure ??= { cause }
+    }
+  }
+  if (failure) throw failure.cause
+}
+
+// A shape that names the key answers a probe value with an issue at it. An asynchronous
+// answer names nothing, so its key is refused.
+const namesKey = (schema: StandardSchemaV1, key: string) => {
+  const answer = schema['~standard'].validate({ [key]: Symbol(key) })
+  if (answer instanceof Promise) {
+    answer.catch(() => {})
+    return false
+  }
+  return !!answer.issues?.some(({ path: [first] = [] }) => String(typeof first === 'object' ? first.key : first) === key)
+}
+
+export const write = <Actor = unknown>({
+  kayan,
+  declaration,
+  tools,
+  store,
+  cap,
+  authorize,
+  admin,
+  tenantOf,
+}: {
+  kayan: ResolvedKayan
+  declaration: ResolvedOperation
+  tools: WriteTools<unknown, Actor>
+  store: Store
+  cap: number
+  authorize: Authorize
+  admin?: ManagedAdmin<Actor>
+  /** The organization the actor's session names, which a tenant-owned row is made in. */
+  tenantOf: (actor: unknown) => string | undefined
+}) =>
+  async (data: Record<string, unknown> = {}, options?: Options<Actor>) => {
+    const list = atEffect<WriteStep>(declaration.steps)
+    const { actor, context, entry, open } = beginWrite<Actor>({ kayan, operation: tools.operation, store, cap, options })
+    // The id reaches the store before the operation's parse, so it is held to the shape at
+    // `id` first: a 400, not the store refusing a value of the wrong type as a 500.
+    if (tools.kind !== 'insert' && !kayan.single) {
+      const { issues = [] } = await tools.schema['~standard'].validate(withoutPrototype(data))
+      const atId = issues.filter(({ path: [first] = [] }) => (typeof first === 'object' ? first.key : first) === 'id')
+      if (atId.length) throw issueRefusal(atId, tools.schema['~standard'].vendor)
+    }
+    refuseTenantOption({ kayan, operation: tools.operation, options })
+    const owner = writeTenant({ kayan, active: tenantOf(actor), effect: tools.effect, data })
+    const versions = kayan.versions
+    // An operation with its own `input` that changes a row, and each bulk row, lands on the
+    // row as it is: it keeps `_status` and its columns also go into the pending draft.
+    const restoring = list.some((step) => sealOf(step) === 'restoreVersion')
+    const onto = !!versions?.drafts && ((!!declaration.input && tools.kind === 'update' && tools.operation !== 'update' && !restoring) || !!options?.[ontoRow])
+    const drafts = !!versions?.drafts && !!options?.draft
+    if (drafts && onto) {
+      throw invalid({
+        message: `Kayan "${kayan.name}" operation "${tools.operation}" writes its row as it is, so it saves no draft. Call it without draft.`,
+        key: 'error.invalid.draft_operation',
+        params: { kayan: kayan.name, operation: tools.operation },
+      })
+    }
+    // A draft save answers the whole latest draft, so it asks the key a draft read asks.
+    const askDrafts = () => authorize({ admin, actor, data: {}, effect: 'read', kayan, operation: 'findVersions' })
+    const draftsAsked = drafts || (!!versions?.drafts && data._status === 'draft')
+    // What `findVersions` admits for this actor, kept per row; `undefined` without the key.
+    const admits: { where: Where | undefined } | undefined = draftsAsked
+      ? { where: await askDrafts() }
+      : versions?.drafts && tools.kind !== 'insert'
+        ? await askDrafts().then((where) => ({ where }), (thrown: unknown) => {
+          if (thrown instanceof AsasError && thrown.status === 403) return undefined
+          throw thrown
+        })
+        : undefined
+    // Past the rows the actor may read drafts of, a never-published row answers the 404 an
+    // absent id does: a 403 would tell the actor which hidden ids exist.
+    const rowsWhere = !versions?.drafts || tools.kind === 'insert'
+      ? aliveWhere(kayan)
+      : !admits
+        ? publishedWhere(kayan)
+        : combineWhere(aliveWhere(kayan), draftsAsked || !admits.where ? admits.where : { or: [{ _status: { equals: 'published' } }, admits.where] })
+    // The restore's own key is asked before anything is looked up.
+    if (restoring) {
+      await authorize({ admin, actor, data: {}, effect: 'update', kayan, kind: 'update', operation: tools.operation })
+      const asked = Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'id' && !Object.hasOwn(kayan.fields, key)))
+      data = { ...asked, ...await restoreInput({
+        kayan: kayan as ResolvedKayan & { versions: NonNullable<typeof versions> },
+        store,
+        data,
+        actor,
+        authorize,
+        admin,
+        alive: rowsWhere,
+        seesDrafts: !!admits,
+        admits: admits?.where,
+      }) }
+    }
+    // First-register's own create runs whatever the kayan's create access says, while its table is empty.
+    const accessWhere = context.depth === 1 && firstRegisters.has(entry)
+      ? undefined
+      : await authorize({ admin, actor, data, effect: tools.effect, kayan, kind: tools.kind, operation: tools.operation })
+    // The constant that keeps a global to one row, so a caller's value for it is refused by name.
+    if (kayan.single && 'globalType' in data) {
+      throw denied({
+        message: `Forbidden: kayan "${kayan.name}" operation "${tools.operation}" cannot write field "globalType", which is the constant that keeps a global to one row.`,
+        key: 'error.forbidden.global_type',
+        params: { kayan: kayan.name, operation: tools.operation },
+      })
+    }
+    // Outside the transaction, before it opens: no row is loaded and no lock is held.
+    let values = data
+    if (declaration.beforeTransaction.length) {
+      const before = await runOutside({
+        kayan,
+        tools,
+        slot: 'beforeTransaction',
+        list: atEffect<WriteStep>(declaration.beforeTransaction),
+        start: { kayan, data: { ...data }, actor, user: actor, tx: undefined, context },
+        around: { context, user: actor },
+      })
+      values = before.data as Record<string, unknown>
+    }
+    /** The last `ctx` the transaction ended with, which is what `afterCommit` is handed. */
+    let committed: Ctx | undefined
+    const run = (tx: unknown) => {
+      entry.tx = tx
+      return running.run({ context, transactions: new Map(open).set(store, entry), user: actor }, async () => {
+        const existing = tools.kind === 'insert' ? undefined : await loadExisting(kayan, store, values.id, accessWhere, tx, rowsWhere)
+        // An actor who may not read this row's drafts writes onto it as it is, so nothing tells
+        // it a draft is pending.
+        const hidesDrafts = !!versions?.drafts && !!existing && (!admits || (!draftsAsked && !!admits.where
+          && !(await store.find({ kayan: kayan.name, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: combineWhere({ id: { equals: existing.id as Scalar } }, admits.where) }, tx })).docs.length))
+        const asIs = onto || hidesDrafts
+        // A row found without the constraint means the caller cannot address it (404); none means
+        // the upsert. A per-tenant global is left out: the unconstrained look would find another tenant's row.
+        if (
+          kayan.single && !kayan.tenant && tools.kind === 'update' && !existing && accessWhere
+          && await loadExisting(kayan, store, values.id, undefined, tx)
+        ) {
+          throw missing({
+            message: `No "${kayan.name}" row the access constraint admits.`,
+            key: 'error.not_found.global',
+            params: { kayan: kayan.name },
+          })
+        }
+        // One word decides the rest of the write: defaults, field callbacks, shape and step.
+        const kind = kayan.single && tools.kind === 'update' && !existing ? 'insert' : tools.kind
+        const fieldOperation = kind === 'insert' ? 'create' : kind === 'update' ? 'update' : undefined
+        // The row always holds the last published copy; a create still makes the row, as a draft.
+        const drafting = drafts && !!fieldOperation && data._status !== 'published'
+        const autosaving = drafting && versions!.autosave && !!options?.autosave
+        // A caller who named `_status` is judged by its field access like any column.
+        const status = drafting ? 'draft' : data._status ?? (asIs ? existing?._status : undefined) ?? 'published'
+        // A change builds on the row's latest version, so a draft keeps the drafts before it and a
+        // publish publishes them. Publishing a never-published row brings every column it holds.
+        const latest = versions?.drafts && existing
+          ? await latestVersion({ kayan: kayan as ResolvedKayan & { versions: NonNullable<typeof versions> }, store, parent: existing.id, tx })
+          : undefined
+        // A snapshot's organization is never the row's: the row keeps its own.
+        const newest = latest && { ...revived(kayan, latest.version), ...(kayan.tenant && { [kayan.tenant]: existing![kayan.tenant] }) }
+        const base = (!restoring && newest) || existing
+        const merged = versions?.drafts && existing && fieldOperation && !restoring && !asIs
+          ? { ...changedColumns({ kayan, snapshot: base!, row: existing, whole: !drafting && existing._status !== 'published' }), ...values }
+          : values
+        // Carried from a draft rather than sent, so field access refuses rather than drops them.
+        const carried = merged === values ? [] : Object.keys(merged).filter((key) => !(key in values))
+        const pending = asIs && newest && !restoring && base?._status === 'draft' ? base : undefined
+        // A key the operation's own shape would refuse is refused here first, in that shape's words.
+        if (drafting) {
+          const stray = Object.keys(data).find((key) =>
+            key !== 'id' && (Object.hasOwn(kayan.fields, key) ? providerOf(kayan.fields[key]!, fieldOperation!) !== 'client' : !declaration.input || !namesKey(tools.schema, key)))
+          if (stray !== undefined) throw issueRefusal([{ message: `Unrecognized key: "${stray}"`, path: [stray] }], 'mithaq')
+        }
+        // What the caller read: the latest version for a writer who reads drafts, so
+        // `expectedUpdatedAt` holds a draft save, a publish, a delete and a restore alike.
+        const dataBefore = snapshot((!asIs && newest) || existing)
+        const owned = kayan.tenant
+        const writeWhere = !owned || existing?.[owned] === undefined
+          ? accessWhere
+          : combineWhere(accessWhere, { [owned]: { equals: existing[owned] as Scalar } })
+        // A global's update lands on the row that was found, never on an id the caller named.
+        const targetId = kayan.single ? existing?.id : values.id
+        // The id is the runner's on both branches, which is why a global's update shape has none.
+        const given = kayan.single ? { ...values, id: existing?.id } : merged
+        if (kayan.single && !existing) delete given.id
+        // The shipped field carries no default: the value is the global's own name.
+        if (kayan.single && !existing) given.globalType = kayan.name
+        const inputData = fieldOperation
+          ? await fieldAccess(fieldOperation, kayan, given, actor, targetId, tools.operation, existing, carried)
+          : given
+        // The audit sink writes through the same three, so only the kayan's own writes save versions.
+        const versioned = versions ? kayan as ResolvedKayan & { versions: NonNullable<typeof versions> } : undefined
+        const own = (name: string) => versioned && name === kayan.name ? versioned : undefined
+        const protectedStore: WriteTools<unknown, Actor>['store'] = Object.freeze({
+          insert: async ({ tx: heldTx, kayan: name, data: values }) => {
+            const row = await tools.store.insert({ tx: heldTx, kayan: name, data: values })
+            const kept = own(name)
+            if (kept) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row, autosave: autosaving })
+            return row
+          },
+          update: async ({ tx: heldTx, kayan: name, id, data: values }) => {
+            const kept = own(name)
+            if (drafting && kept) {
+              const draft = { ...base, ...values, id: targetId }
+              await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row: draft, autosave: autosaving })
+              return draft
+            }
+            const row = await tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: values, where: writeWhere })
+            // A never-published row is its own draft, so the draft appended below is its one version.
+            if (kept && !(pending && status === 'draft')) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row, autosave: false })
+            // Appended after the row's own, so the draft stays the latest.
+            if (kept && pending) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row: { ...pending, ...values, id: targetId, _status: 'draft' }, autosave: false })
+            return row
+          },
+          // A soft delete keeps the `remove` seal, so the effect, the access answer and the 404 stay
+          // the delete's; the mark is refused as a field any caller supplies.
+
+          remove: ({ tx: heldTx, kayan: name, id }) =>
+            kayan.softDelete
+              ? tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
+              : tools.store.remove({ tx: heldTx, kayan: name, id: targetId ?? id, where: writeWhere }),
+        })
+        // Its absence is a build fault: the partial update shape would make a row without its required fields.
+        if (kind !== tools.kind && !tools.insertSchema) {
+          throw new Error(
+            `Kayan "${kayan.name}" operation "${tools.operation}" has no insert shape, so the row it would make cannot be parsed.`,
+          )
+        }
+        const insertSchema = tools.insertSchema as StandardSchemaV1
+        // Copied, so a step writing `ctx.data` in place never changes the caller's object.
+        const runTools: WriteTools<unknown, Actor> = Object.freeze({
+          ...tools,
+          kind,
+          // Read before `defaults` fills, so validation can refuse the caller a key and still let the runner's value through.
+          sent: Object.keys(data),
+          schema: drafting ? tools.draftInput ?? tools.draftWrite ?? tools.draftSchema! : kind === tools.kind ? tools.schema : insertSchema,
+          store: protectedStore,
+          where: writeWhere,
+        })
+        let ctx: Ctx = { kayan, data: { ...inputData }, actor, user: actor, tx, context, dataBefore, dataAfter: dataBefore }
+        // With no `input` the filled row is parsed, so a default reaches a required column; with one,
+        // the caller's strict shape is parsed first. A remove writes no column, so neither runs.
+        const fill = (one: Ctx) => (fieldOperation ? (defaults(one, runTools as WriteTools) as Ctx) : one)
+        ctx = declaration.input
+          ? fill(await parse({ schema: runTools.schema, ctx, tools: runTools }))
+          : await parse({ schema: runTools.schema, ctx: fill(ctx), tools: runTools })
+        // Filled after the parse, from the session alone.
+        if (kind === 'insert' && kayan.tenant) ctx = { ...ctx, data: { ...ctx.data, [kayan.tenant]: owner } }
+        // The guards belong to the store seal, and no slot may hold one.
+        for (const step of atEffect<WriteStep>([
+          ...declaration.beforeSteps,
+          ...list,
+          ...declaration.afterSteps,
+        ])) {
+          const seal = sealOf(step)
+          // A restore's step is the row's own update, so it is guarded as one.
+          if (seal && (storeSeals.includes(seal) || seal === 'restoreVersion')) {
+            // Reads `kind`, so a global's first update still upserts; at the store seal, after the parse
+            // has refused a malformed id.
+            if (!existing && kind !== 'insert') {
+              throw missing({
+                message: `No "${kayan.name}" row with id ${String(values.id)} to ${kind === 'remove' ? 'delete' : 'update'}.`,
+                key: 'error.not_found.row',
+                params: { kayan: kayan.name, id: values.id, operation: kind === 'remove' ? 'delete' : 'update' },
+              })
+            }
+            if (kind !== 'insert' && ctx.data.id !== targetId) {
+              throw new Error(`Kayan "${kayan.name}" operation "${tools.operation}" cannot change the authorized target id.`)
+            }
+            if (fieldOperation) {
+              ctx = { ...ctx, data: await fieldAccess(fieldOperation, kayan, ctx.data, actor, targetId, tools.operation, existing, carried) }
+              if (kind !== 'remove') await validateTenantRelationships(kayan, store, ctx.data, actor, existing, authorize, admin, tx)
+            }
+            // A publish holds the row to every `required`, which the partial update shape cannot.
+            if (versions?.drafts && status === 'published' && kind === 'update') {
+              const unset = Object.values(kayan.fields).filter((field) =>
+                field.rules?.required && field.kind !== 'join' && (field.name in ctx.data ? ctx.data[field.name] : existing?.[field.name]) == null)
+              if (unset.length) throw issueRefusal(unset.map((field) => ({ message: `${kayan.name}.${field.name}.required`, path: [field.name] })), 'mithaq')
+              // A never-published row's create-only columns are asked of the create's field access and
+              // parsed against the create shape.
+              if (existing!._status !== 'published') {
+                const left: Record<string, unknown> = { ...existing, ...ctx.data }
+                const made = Object.values(kayan.fields).filter((field) => field.kind !== 'join' && providerOf(field, 'create') === 'client' && left[field.name] != null)
+                const createOnly = made.filter((field) => providerOf(field, 'update') !== 'client' && !(field.name in ctx.data)).map((field) => field.name)
+                await fieldAccess('create', kayan, Object.fromEntries(createOnly.map((name) => [name, left[name]])), actor, targetId, tools.operation, existing, createOnly)
+                await validated(insertSchema, Object.fromEntries(made.map((field) => [field.name, left[field.name]])))
+              }
+            }
+            // A step that wrote a `never` field is the project contradicting its own declaration,
+            // so a plain `Error`, never an `AsasError` blaming the caller, who cannot reach here.
+            if (fieldOperation) {
+              const written = Object.values(kayan.fields).find(
+                (field) => providerOf(field, fieldOperation) === 'never' && field.name in ctx.data,
+              )
+              if (written) {
+                throw new Error(
+                  `Kayan "${kayan.name}" operation "${tools.operation}" wrote field "${written.name}", which declares providedBy "never" on ${fieldOperation}, so nothing supplies it.`,
+                )
+              }
+            }
+            // Written after the field callbacks: publishing is what a write without `draft` means,
+            // not a column a role must hold a key for.
+            if (versions?.drafts && fieldOperation) ctx = { ...ctx, data: { ...ctx.data, _status: status } }
+            // After the field callbacks, which deny the field's own update and would refuse the
+            // runner's value; on insert no create callback would refuse a step's.
+            if (kayan.single) ctx = { ...ctx, data: { ...ctx.data, globalType: kayan.name } }
+          }
+          ctx = await step(ctx, runTools as WriteTools)
+        }
+        committed = ctx
+        // A draft may be short of `required`, so it leaves through the draft shape, which holds it to its kinds alone.
+        const row = ctx.data as Record<string, unknown>
+        return publicResult({
+          kayan,
+          row,
+          actor,
+          internalOutput: drafting || (tools.draftSchema && row._status === 'draft') ? tools.draftSchema! : tools.output,
+          publicOutput: tools.publicOutput,
+        })
+      })
+    }
+    // A throw here is `AfterCommitError`: the write has happened, and nothing the caller sent was wrong.
+    const afterCommit = async () => {
+      if (!declaration.afterCommit.length || !committed) return
+      await runOutside({
+        kayan,
+        tools,
+        slot: 'afterCommit',
+        list: atEffect<WriteStep>(declaration.afterCommit),
+        start: { ...committed, tx: undefined },
+        around: { context, user: actor },
+      })
+    }
+    const joined = open.get(store)
+    // Drained by the write that opened the transaction; an outer rollback throws before the drain.
+    if (joined) {
+      const result = await run(joined.tx)
+      if (declaration.afterCommit.length) joined.afterCommit = [...(joined.afterCommit ?? []), afterCommit]
+      return result
+    }
+    let result: unknown
+    try {
+      result = await store.transaction(run)
+    } finally {
+      entry.settled = true
+    }
+    try {
+      await drain([...(entry.afterCommit ?? []), afterCommit])
+    } catch (cause) {
+      // Only the outermost operation answers with what it committed; under an outer one the
+      // failure climbs as a plain `Error`.
+      if (running.getStore()) throw cause
+      throw new AfterCommitError(result, cause)
+    }
+    return result as Awaited<ReturnType<typeof publicResult>>
+  }
+
+type Registry = readonly { name: string; fields: Record<string, RuntimeField> }[]
+type LanguageValues = { kinds: Record<string, Kind>; targets?: unknown }
+type Registered<List extends Registry, Name> = Extract<List[number], { name: Name }>
+// A thunk the registry does not hold types by the thunk's own target.
+type Related<F, List extends Registry> = F extends { relationTo: infer Relation }
+  ? Relation extends string
+    ? Registered<List, Relation>
+    : Relation extends () => infer Target
+      ? Target extends { name: infer Name }
+        ? [Registered<List, Name>] extends [never] ? Target : Registered<List, Name>
+        : never
+      : never
+  : never
+// An override under any other name than the schema target's is not this language's schema.
+type OverrideSchema<F, L extends LanguageValues> = ServiceOf<L> extends { schema: infer Name extends string }
+  ? string extends Name
+    ? never
+    : F extends { targets: infer Overrides }
+      ? Name extends keyof Overrides
+        ? Overrides[Name] extends StandardSchemaV1
+          ? Overrides[Name]
+          : never
+        : never
+      : never
+  : never
+// The language's own locales, left open where it declares none.
+type Localize<F, L extends LanguageValues, V> = F extends { rules: { localized: true } }
+  ? Record<LocalesOf<L>, V>
+  : V
+// A relationship carries the id of the kayan it points at, and a `hasMany` one an array of them.
+type KindCarried<F, L extends LanguageValues, List extends Registry> = F extends { kind: infer Name extends keyof L['kinds'] }
+  ? L['kinds'][Name] extends { pointsAtRow: true }
+    ? Related<F, List> extends { fields: { id: infer Id } }
+      ? F extends { hasMany: true }
+        ? Value<Id, L, List>[]
+        : Value<Id, L, List>
+      : never
+    : L['kinds'][Name] extends Kind<infer V, string>
+      ? V
+      : never
+  : never
+type Value<F, L extends LanguageValues, List extends Registry> = [OverrideSchema<F, L>] extends [never]
+  ? Localize<F, L, KindCarried<F, L, List>>
+  : Exclude<InferOutput<OverrideSchema<F, L> & StandardSchemaV1>, undefined>
+type InputValue<F, L extends LanguageValues, List extends Registry> = [OverrideSchema<F, L>] extends [never]
+  ? Value<F, L, List>
+  : InferInput<OverrideSchema<F, L> & StandardSchemaV1>
+
+// The type twin of what a schema target leaves out of the shape, so the type never invites a refused key.
+type Supplied<Fields, On extends 'create' | 'update'> = {
+  [K in keyof Fields as K extends 'id'
+    ? K
+    : Fields[K] extends { rules: { providedBy: Record<On, infer Provider> } }
+      ? [Provider] extends ['client']
+        ? K
+        : never
+      : K]: Fields[K]
+}
+
+/** Required, and nothing fills it for you. */
+type Needed<F> = F extends { rules: { required: true } }
+  ? F extends { rules: { defaultValue: unknown } } | { rules: { defaultNow: true } }
+    ? false
+    : true
+  : false
+
+/** Optional columns accept null; required columns and ids never do. */
+type Settable<F, L extends LanguageValues, List extends Registry> = F extends {
+  rules: { required: true }
+}
+  ? InputValue<F, L, List>
+  : InputValue<F, L, List> | null
+
+type CreateInput<Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> =
+  CreateKeys<Supplied<Fields, 'create'>, L, List>
+type CreateKeys<Fields, L extends LanguageValues, List extends Registry> = {
+  [K in keyof Fields as K extends 'id' ? never : Needed<Fields[K]> extends true ? K : never]: InputValue<Fields[K], L, List>
+} & {
+  [K in keyof Fields as K extends 'id' ? K : Needed<Fields[K]> extends true ? never : K]?: K extends 'id'
+    ? InputValue<Fields[K], L, List>
+    : Settable<Fields[K], L, List>
+}
+
+/** An update carries only what changes; each site that takes one adds the id beside it. */
+type UpdateInput<Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> = {
+  [K in keyof Supplied<Fields, 'update'> as K extends 'id' ? never : K]?: Settable<Supplied<Fields, 'update'>[K], L, List>
+}
+
+/**
+ * The id's type, and `never` for fields that name no id. `never` is reachable
+ * at the type level only: `buildAsas` refuses a kayan with no id field.
+ */
+type Id<Fields, L extends LanguageValues, List extends Registry> = Fields extends { id: infer F }
+  ? InputValue<F, L, List>
+  : never
+
+type StoredRow<Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> = {
+  [K in keyof Fields]: K extends 'id'
+    ? Value<Fields[K], L, List>
+    : Fields[K] extends { rules: { required: true } }
+      ? Value<Fields[K], L, List>
+      : Value<Fields[K], L, List> | null
+}
+
+// Read for a schema target's `derive`, which sees no registry: a relationship's value is
+// `unknown` there. The same tables, so a derived shape and a built write agree.
+type Opaque<F> = F extends { kind: 'join' } ? F : F extends { relationTo: unknown } ? Omit<F, 'kind'> & { kind: 'opaque' } : F
+type DerivedFields<Fields extends Record<string, RuntimeField>> = { [K in keyof Fields]: Opaque<Fields[K]> }
+type Deriving<Schema extends string> = {
+  kinds: typeof defaultKinds & { opaque: Kind<unknown>; richText: Kind<RichTextValue> }
+  targets: { service: { capability: 'service'; schema: Schema } }
+}
+
+/** Every field, with the id optional: what a target's derived create shape takes. */
+export type CreateOf<Fields extends Record<string, RuntimeField>, Schema extends string> =
+  CreateInput<DerivedFields<Fields>, Deriving<Schema>, []>
+/** What an addressed operation takes: the id, inside its input. */
+export type ByID<Fields, L extends LanguageValues, List extends Registry> = { id: Id<Fields, L, List> }
+/** The same shape partial, with the id required. */
+export type UpdateOf<Fields extends Record<string, RuntimeField>, Schema extends string> =
+  UpdateInput<DerivedFields<Fields>, Deriving<Schema>, []> & ByID<DerivedFields<Fields>, Deriving<Schema>, []>
+/** The id alone: what a target's derived id shape takes, and nothing beside it. */
+export type IdOf<Fields extends Record<string, RuntimeField>, Schema extends string> =
+  ByID<DerivedFields<Fields>, Deriving<Schema>, []>
+/** Every column, and a nullable one wherever nothing requires the field. */
+export type RowOf<Fields extends Record<string, RuntimeField>, Schema extends string> =
+  StoredRow<DerivedFields<Fields>, Deriving<Schema>, []>
+
+/** The row that comes back after field read access projection. */
+export type Row<Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> =
+  Omit<StoredRow<Fields, L, List>, { [K in keyof Fields]: Fields[K] extends { access: { read: unknown } } ? K : never }[keyof Fields]> &
+  Partial<Pick<StoredRow<Fields, L, List>, { [K in keyof Fields]: Fields[K] extends { access: { read: unknown } } ? K : never }[keyof Fields]>>
+
+// Read through Standard Schema's input type, the twin of what the runner parses.
+type OperationInput<Operation> = Operation extends { input: (...args: never[]) => infer Schema }
+  ? Schema extends StandardSchemaV1
+    ? InferInput<Schema>
+    : never
+  : never
+
+/** The declared input where the operation has one, and the derived shape where it does not. */
+export type OperationData<Operation, Derived> = [OperationInput<Operation>] extends [never]
+  ? Derived
+  : OperationInput<Operation>
+
+// The parse runs before the first step, so a step sees `.default()` filled and `.transform()` run.
+type OperationOutput<Operation> = Operation extends { input: (...args: never[]) => infer Schema }
+  ? Schema extends StandardSchemaV1
+    ? InferOutput<Schema>
+    : never
+  : never
+
+/** What a step is handed: the parsed shape where the operation declares one, the derived shape where it does not. */
+export type OperationParsed<Operation, Derived> = [OperationOutput<Operation>] extends [never]
+  ? Derived
+  : OperationOutput<Operation>
+
+// A steps function returns an array, not a tuple, so only the seal survives here; `resolve`
+// reads the list in order at build.
+type SealOfStep<Held> = Held extends { __seal: infer Name } ? Name : never
+type ActingSeal<Operation> = StepsOf<Operation> extends readonly (infer Held)[]
+  ? Extract<SealOfStep<Held>, 'count' | 'find' | 'findOne' | 'insert' | 'remove' | 'update' | 'updateMany' | 'deleteMany' | 'findVersions' | 'findVersionByID' | 'restoreVersion'>
+  : never
+
+/** `many`, `one`, `count`, `versions`, `version`, or nothing at all for an operation that writes. */
+type ReadModeOf<Operation> = [ActingSeal<Operation>] extends [never]
+  ? undefined
+  : ActingSeal<Operation> extends 'find'
+    ? 'many'
+    : ActingSeal<Operation> extends 'findOne'
+      ? 'one'
+      : ActingSeal<Operation> extends 'count'
+        ? 'count'
+        : ActingSeal<Operation> extends 'findVersions'
+          ? 'versions'
+          : ActingSeal<Operation> extends 'findVersionByID'
+            ? 'version'
+            : undefined
+
+type IsReadOperation<Operation> = [ReadModeOf<Operation>] extends [undefined] ? false : true
+/**
+ * A kayan's operations, read off its own declaration alone: nothing is merged
+ * in, so the names a kayan answers are the keys it wrote.
+ */
+type OwnOperations<K> = K extends { targets: { service: { operations: infer O } } } ? O : Record<never, never>
+type OwnOperation<K, Name extends PropertyKey> = Name extends keyof OwnOperations<K> ? OwnOperations<K>[Name] : never
+
+// `remove` parses the derived id shape alone, `findOne` the `byID` shape with `depth`.
+export type DerivedInput<Operation, Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> =
+  ActingSeal<Operation> extends 'insert'
+    ? CreateInput<Fields, L, List>
+    : ActingSeal<Operation> extends 'updateMany'
+      ? { where: Where; data: UpdateInput<Fields, L, List> }
+    : ActingSeal<Operation> extends 'deleteMany'
+      ? { where: Where }
+      : ActingSeal<Operation> extends 'findOne'
+        ? ByID<Fields, L, List> & Pick<FindInput, 'depth'>
+      : ActingSeal<Operation> extends 'remove'
+        ? ByID<Fields, L, List>
+      : ActingSeal<Operation> extends 'findVersionByID' | 'restoreVersion'
+        // A version is addressed by its own id, a uuid whatever the row's id is.
+        ? { id: string }
+        : ActingSeal<Operation> extends 'update'
+          ? UpdateInput<Fields, L, List> & ByID<Fields, L, List>
+          : ActingSeal<Operation> extends 'count'
+            ? { where?: Where }
+            : FindInput
+
+/** One version as a version read answers it: its snapshot cut to the reader's field access and held to its kinds, so every column may be absent. */
+export type Version<Doc> = {
+  id: string
+  parent: unknown
+  latest: boolean
+  autosave: boolean
+  createdAt: Date
+  updatedAt: Date
+  version: Partial<Doc>
+}
+
+type PaginatedRows<Doc> = { docs: Doc[]; totalDocs: number; limit: number; page: number; totalPages: number; hasNextPage: boolean; hasPrevPage: boolean; nextPage: number | null; prevPage: number | null; pagingCounter: number }
+
+// What a custom `output` promises, as a schema or a function of the derived shapes.
+type OutputRow<Operation> = Operation extends { output: infer Given }
+  ? Given extends (...args: never[]) => infer Schema
+    ? Schema extends StandardSchemaV1
+      ? InferOutput<Schema>
+      : never
+    : Given extends StandardSchemaV1
+      ? InferOutput<Given>
+      : never
+  : never
+
+/** The custom output's row where the operation declares one, the kayan's row where it does not. */
+type ResultRow<Operation, Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> =
+  [OutputRow<Operation>] extends [never] ? Row<Fields, L, List> : OutputRow<Operation>
+
+type BulkOutput<Operation, Doc> = [OutputRow<Operation>] extends [never] ? BulkResult<Doc> : OutputRow<Operation>
+
+type OperationResult<Operation, Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> =
+  [ActingSeal<Operation>] extends [never]
+    ? Promise<ResultRow<Operation, Fields, L, List>>
+    : ActingSeal<Operation> extends 'updateMany' | 'deleteMany'
+      ? Promise<BulkOutput<Operation, Row<Fields, L, List>>>
+      : ReadModeOf<Operation> extends 'count'
+        ? Promise<{ totalDocs: number }>
+      : ReadModeOf<Operation> extends 'versions'
+        ? Promise<PaginatedRows<Version<Row<Fields, L, List>>>>
+      // A read by id answers the row or a 404, so no `null`; a global's `findOne` may.
+      : ReadModeOf<Operation> extends 'version'
+        ? Promise<Version<Row<Fields, L, List>>>
+      : ReadModeOf<Operation> extends 'many'
+        ? Promise<PaginatedRows<ResultRow<Operation, Fields, L, List>>>
+        : ReadModeOf<Operation> extends 'one'
+          ? Promise<ResultRow<Operation, Fields, L, List>>
+          : Promise<ResultRow<Operation, Fields, L, List>>
+
+/** What one operation takes: its declared input, or the shape its seal implies. */
+type InputOf<K, Name extends PropertyKey, Fields extends Record<string, RuntimeField>, L extends LanguageValues, List extends Registry> =
+  OperationData<OwnOperation<K, Name>, DerivedInput<OwnOperation<K, Name>, Fields, L, List>>
+
+// No options: a bound call inherits the actor and the context, and one passing either is refused.
+type BoundOne<
+  K,
+  Fields extends Record<string, RuntimeField>,
+  L extends LanguageValues,
+  List extends Registry,
+  Mode extends 'read' | 'write',
+> = {
+  [Name in keyof OwnOperations<K> as Mode extends 'write'
+    ? Name
+    : IsReadOperation<OwnOperation<K, Name>> extends true ? Name : never]: (
+    ...input: {} extends InputOf<K, Name, Fields, L, List>
+      ? [input?: InputOf<K, Name, Fields, L, List>]
+      : [input: InputOf<K, Name, Fields, L, List>]
+  ) => OperationResult<OwnOperation<K, Name>, Fields, L, List>
+}
+
+// Read in a step's body, never its annotation, where two kayan importing each other would
+// make the type circular.
+export type BoundOf<Mode extends 'read' | 'write'> = <const K extends Registry[number] & { single?: never }>(
+  kayan: K,
+) => BoundOne<K, K['fields'], LanguageOf<K>, readonly [K], Mode>
+
+export type BoundKayans<
+  KayanList extends Registry,
+  L extends LanguageValues,
+  Mode extends 'read' | 'write' = 'write',
+> = {
+  [K in KayanList[number] as K['name']]: BoundOne<K, K['fields'], L, KayanList, Mode>
+}
+
+type OwnService<K> = K extends { targets: { service: infer Service } } ? Service : unknown
+type DefaultStoreOf<L> = ServiceOf<L> extends { store: infer Name extends string } ? Name : never
+type StoreNameOf<K, L> = OwnService<K> extends { store: infer Name extends string } ? Name : DefaultStoreOf<L>
+type SchemaNameOf<K, L> = OwnService<K> extends { schema: infer Name extends string }
+  ? Name
+  : ServiceOf<L> extends { schema: infer Name extends string } ? Name : never
+type TargetNamed<L, Name> = L extends { targets: infer Targets }
+  ? Name extends keyof Targets ? Targets[Name] : never
+  : never
+type FieldsOfKayan<K> = K extends { fields: infer Fields extends Record<string, RuntimeField> } ? Fields : never
+
+// Each target's own output for this kayan, never the configuration it was given.
+type KayanOutputs<K, List extends Registry, L extends LanguageValues, Operations> =
+  { service: { operations: Operations } }
+  & { [Name in SchemaNameOf<K, L>]: { schemas: DerivedSchemas<TargetNamed<L, Name>, FieldsOfKayan<K>> } }
+  & (TargetNamed<L, StoreNameOf<K, L>> extends { tables: unknown }
+      ? K extends { name: infer Name extends string }
+        ? { [Named in StoreNameOf<K, L>]: { table: BuiltTables<List, StoreNameOf<K, L>, DefaultStoreOf<L>, L['kinds']>[Name] } }
+        : {}
+      : {})
+
+// Nothing of the declaration, so no access callback, thunk or target configuration
+// sits under a name a runtime output could take.
+type Built<K, List extends Registry, L extends LanguageValues, Operations> = {
+  name: K extends { name: infer Name } ? Name : string
+  fields: FieldsOfKayan<K>
+  /** The same object as `targets.service.operations`, which the service capability always publishes. */
+  operations: Operations
+  targets: KayanOutputs<K, List, L, Operations>
+}
+
+// The global is the namespace, so the functions keep the operation names; `findOne`
+// answers null until the first update makes the row.
+type GlobalOperations<K extends Registry[number], List extends Registry, L extends LanguageValues, Actor> = {
+  findOne(...args: CallArgs<L, Actor, { depth?: number }>): Promise<Row<K['fields'], L, List> | null>
+  update(...args: CallArgs<L, Actor, UpdateInput<K['fields'], L, List>>): Promise<Row<K['fields'], L, List>>
+}
+
+/** What `asas.global` holds: one built global per name, of the shape a kayan has. */
+export type Globals<
+  GlobalList extends Registry,
+  List extends Registry,
+  L extends LanguageValues,
+  Actor = unknown,
+> = {
+  [K in GlobalList[number] as K['name']]: Built<K, List, L, GlobalOperations<K, List, L, Actor>>
+}
+
+// Every operation of one kayan, bound and keyed by name, typed off its input and seal.
+type KayanOperations<
+  K extends Registry[number],
+  List extends Registry,
+  L extends LanguageValues,
+  Actor,
+> = {
+  [Name in keyof OwnOperations<K>]: (
+    ...args: CallArgs<L, Actor, InputOf<K, Name, K['fields'], L, List>, IsReadOperation<OwnOperation<K, Name>>>
+  ) => OperationResult<OwnOperation<K, Name>, K['fields'], L, List>
+}
+
+/** What `asas.kayan` holds. A relationship may point at a global, so `List` holds both. */
+export type Writes<
+  KayanList extends Registry,
+  List extends Registry,
+  L extends LanguageValues,
+  Actor = unknown,
+> = {
+  [K in KayanList[number] as K['name']]: Built<K, List, L, KayanOperations<K, List, L, Actor>>
+}
+
+// Input required: nothing arriving is not an empty object. A function-typed property,
+// so `strictFunctionTypes` checks the input contravariantly.
+type Sent<Method> = Method extends (...args: infer Args) => infer Answer
+  ? (input: Exclude<Args[0], undefined>) => Answer
+  : never
+
+/** Every operation of one bound kayan, as procedures. */
+type Procedural<Bound> = { [Name in keyof Bound]: Sent<Bound[Name]> }
+
+/** The static view of the operation table, keyed by kayan then operation: what each published operation takes and answers. */
+export type Procedures<
+  KayanList extends Registry,
+  GlobalList extends Registry,
+  List extends Registry,
+  L extends LanguageValues,
+> = {
+  [K in KayanList[number] as K['name']]: Procedural<BoundOne<K, K['fields'], L, List, 'write'>>
+} & {
+  [K in GlobalList[number] as K['name']]: {
+    findOne: (input: { depth?: number }) => Promise<Row<K['fields'], L, List> | null>
+    update: (input: UpdateInput<K['fields'], L, List>) => Promise<Row<K['fields'], L, List>>
+  }
+}

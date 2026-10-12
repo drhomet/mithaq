@@ -1,0 +1,52 @@
+{
+  "name": "mithaq-admin",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "files": [
+    "r",
+    "registry",
+    "!registry/ui",
+    "!registry/lib",
+    "!registry/hooks"
+  ],
+  "scripts": {
+    "build": "shadcn build --output r && node --input-type=module -e \"import { pathToFileURL } from 'node:url'; import { mark } from 'mithaq/upgrade'; await mark(pathToFileURL('r/'))\"",
+    "prepare": "bun run build"
+  },
+  "devDependencies": {
+    "@base-ui/react": "^1.5.0",
+    "@hugeicons/core-free-icons": "^4.1.4",
+    "@hugeicons/react": "^1.1.6",
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/react": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "@lexical/selection": "0.52.0",
+    "@lexical/utils": "0.52.0",
+    "@tanstack/react-form": "^1.33.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "asas": "*",
+    "aws4fetch": "1.0.20",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "esbuild": "^0.28.2",
+    "file-type": "22.0.1",
+    "happy-dom": "^20.14.5",
+    "image-dimensions": "2.5.1",
+    "input-otp": "^1.5.0",
+    "lexical": "0.52.0",
+    "lucide-react": "^1.16.0",
+    "mithaq": "*",
+    "react": "^19.3.0",
+    "react-day-picker": "^10.0.1",
+    "react-dom": "^19.3.0",
+    "react-resizable-panels": "^4.13.3",
+    "recharts": "3.8.0",
+    "shadcn": "4.18.0",
+    "tailwind-merge": "^3.6.0"
+  }
+}

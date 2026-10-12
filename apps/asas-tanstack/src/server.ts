@@ -1,0 +1,16 @@
+import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
+import { withQuietAbort } from './quiet-abort.ts'
+
+// A production start connects once before handing on any request, and `connect()` refuses to
+// start while a migration is unapplied; a refused start exits 1. NODE_ENV is read off `process`
+// so Vite cannot replace it at build time, and a built server started without
+// `NODE_ENV=production` never connects, which would push into the deploy's database.
+const { env } = process
+if (env.NODE_ENV === 'production') {
+  await (await import('asas')).asas.connect().catch((error: unknown) => {
+    console.error(error)
+    process.exit(1)
+  })
+}
+
+export default createServerEntry({ fetch: (request: Request) => handler.fetch(withQuietAbort(request)) })

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es2024",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  "include": ["packages/*/src/**/*.ts", "templates/*/src/**/*.ts", "apps/*/src/**/*.ts", "apps/*/next.config.ts", "apps/*.ts", "*.ts"],
+  // The tests that draw the app's own `.tsx`, which the app's config checks with
+  // its JSX and its `@/` alias (`apps/asas-tanstack/tsconfig.json`), and the one
+  // that draws the template's, which no config here carries JSX for.
+  "exclude": [
+    "apps/asas-tanstack/src/screen-form.test.ts",
+    "apps/asas-tanstack/src/screen-list.test.ts",
+    "apps/asas-tanstack/src/auth.test.ts",
+    "apps/asas-tanstack/src/activity.test.ts",
+    "templates/asas/src/ui-dashboard/members.test.ts"
+  ]
+}

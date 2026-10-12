@@ -1,0 +1,4 @@
+// Written by `mithaq generate screens`. Do not edit.
+/// <reference types="vite/client" />
+// Every file the `dashboard` screen's references name, each loaded when a page draws it.
+export const files = import.meta.glob(['./src/audit-log/ui/activity.tsx', './src/courses/ui/fee-cell.tsx', './src/courses/ui/no-courses.tsx', './src/courses/ui/status-cell.tsx', './src/enrollments/ui/session-cell.tsx', './src/media/ui/preview.tsx', './src/roles/ui/role-form.tsx', './src/roles/ui/roles.tsx', './src/ui-dashboard/dashboard.tsx', './src/ui-dashboard/members.tsx', './src/ui-dashboard/theme-provider.tsx', './src/ui-dashboard/versions.tsx', './src/ui/app-shell.tsx', './src/ui/record-page.tsx', './src/ui/rich-text-nodes.tsx', './src/ui/session-labels.tsx', './src/ui/table-page.tsx', './src/ui/top-shell.tsx'], { base: '/node_modules/asas/', exhaustive: true })

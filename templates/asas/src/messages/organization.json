@@ -1,0 +1,50 @@
+{
+  "createdAt.invalid": {
+    "ar": "هذا ليس تاريخا ووقتا.",
+    "en": "This is not a date and time."
+  },
+  "createdAt.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "id.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "logo.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "logo.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "metadata.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "metadata.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "name.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "name.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "slug.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "slug.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  }
+}

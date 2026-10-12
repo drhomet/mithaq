@@ -1,0 +1,185 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { betterAuth as betterAuthServer } from 'better-auth'
+import { memoryAdapter } from 'better-auth/adapters/memory'
+import { authOptions, options, trustedIpHeaders } from './index.ts'
+
+test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
+  assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
+  assert.deepEqual(trustedIpHeaders('cf-connecting-ip, x-forwarded-for'), ['cf-connecting-ip', 'x-forwarded-for'])
+  assert.equal(trustedIpHeaders(undefined), undefined)
+  assert.equal(trustedIpHeaders(''), undefined)
+})
+
+// Better Auth's own rate limiter keys every bucket on the address it resolves
+// from `advanced.ipAddress.ipAddressHeaders`. Two callers naming different
+// trusted addresses must land in different buckets, so a login flood from one
+// address never limits another visitor.
+test('with TRUSTED_IP_HEADER set, requests naming different trusted addresses get separate rate-limit buckets', async () => {
+  const server = betterAuthServer({
+    ...authOptions().options,
+    database: memoryAdapter({}),
+    secret: 'test-secret',
+    rateLimit: { enabled: true, window: 60, max: 1 },
+    advanced: { ipAddress: { ipAddressHeaders: trustedIpHeaders('cf-connecting-ip') } },
+  })
+  const ok = (ip: string) => server.handler(new Request('http://localhost/api/auth/ok', { headers: { 'cf-connecting-ip': ip } }))
+
+  assert.equal((await ok('203.0.113.1')).status, 200)
+  assert.equal((await ok('203.0.113.1')).status, 429)
+  assert.equal((await ok('198.51.100.7')).status, 200)
+})
+
+// With the variable unset, `options` sets no `advanced.ipAddress` of its own, so
+// Better Auth reads only its own default header, `x-forwarded-for`. A caller
+// naming `cf-connecting-ip` is not on that list and must be ignored: two
+// different forged values still collapse onto the one shared bucket.
+test('with TRUSTED_IP_HEADER unset, a forged cf-connecting-ip header is ignored and requests share one bucket', async () => {
+  assert.equal(process.env.TRUSTED_IP_HEADER, undefined)
+  const server = betterAuthServer({
+    ...options,
+    database: memoryAdapter({}),
+    secret: 'test-secret',
+    rateLimit: { enabled: true, window: 60, max: 1 },
+  })
+  const ok = (forgedIp: string) => server.handler(new Request('http://localhost/api/auth/ok', { headers: { 'cf-connecting-ip': forgedIp } }))
+
+  assert.equal((await ok('203.0.113.1')).status, 200)
+  assert.equal((await ok('198.51.100.7')).status, 429)
+})
+
+// Forgot and reset password over the tenant's own provider, with the reset link
+// read off the development log, which is the only place it is ever written, and
+// only under `NODE_ENV=development`.
+const tables = () => ({ user: [], session: [], account: [], verification: [], organization: [], member: [], invitation: [] })
+const serverWith = async (emailAndPassword = {}) => {
+  const developed = (await importedUnder({ NODE_ENV: 'development' })).authOptions().options
+  return betterAuthServer({ ...developed, emailAndPassword: { ...developed.emailAndPassword, ...emailAndPassword }, database: memoryAdapter(tables()), secret: 'test-secret' })
+}
+
+const printed = async (run: () => Promise<unknown>) => {
+  const said: string[] = []
+  const [log, warn, error] = [console.log, console.warn, console.error]
+  console.log = console.warn = console.error = (...words: unknown[]) => void said.push(words.join(' '))
+  try {
+    await run()
+  } finally {
+    Object.assign(console, { log, warn, error })
+  }
+  return said.join('\n')
+}
+const tokenIn = (log: string) => /\/auth\/reset-password\?token=([\w-]+)/.exec(log)?.[1]
+
+test('a forgot-password request answers the same for an address with an account and one without, and only the first gets a link', async () => {
+  const server = await serverWith()
+  await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
+  const ask = (email: string) => server.api.requestPasswordReset({ body: { email }, asResponse: true })
+  let held = new Response(), missing = new Response()
+  const heldLog = await printed(async () => (held = await ask('held@example.com')))
+  const missingLog = await printed(async () => (missing = await ask('nobody@example.com')))
+  assert.equal(held.status, 200, 'an address with an account is answered 200')
+  assert.deepEqual([missing.status, await missing.text()], [held.status, await held.text()], 'and one without is answered the same status and the same body')
+  assert.equal(typeof tokenIn(heldLog), 'string', 'the development log carries the reset link for the account')
+  assert.equal(tokenIn(missingLog), undefined, 'and no link for an address with none')
+})
+
+test('a reset link changes the password once and ends every session: the new one signs in, the old one, a second use of the link and a session made before are refused', async () => {
+  const server = await serverWith()
+  const before = new Headers({ cookie: (await server.api.signUpEmail({ body: { name: 'Reset', email: 'reset@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  assert.ok(await server.api.getSession({ headers: before }), 'the session sign-up made resolves before the reset')
+  const token = tokenIn(await printed(() => server.api.requestPasswordReset({ body: { email: 'reset@example.com' } })))!
+  const reset = (newPassword: string) => server.api.resetPassword({ body: { newPassword, token }, asResponse: true })
+  const signIn = (password: string) => server.api.signInEmail({ body: { email: 'reset@example.com', password }, asResponse: true })
+  assert.equal((await reset('the-new-password')).status, 200, 'a valid token resets the password')
+  assert.equal(await server.api.getSession({ headers: before }), null, 'and the session made before it no longer does')
+  assert.equal((await signIn('the-new-password')).status, 200, 'the new password signs in')
+  assert.equal((await signIn('the-old-password')).status, 401, 'the old one no longer does')
+  assert.equal((await reset('a-third-password')).status, 400, 'a spent token is refused')
+  assert.equal((await signIn('a-third-password')).status, 401, 'and changed nothing')
+})
+
+test('an expired reset link is refused and changes nothing', async () => {
+  // A token that expired a second before it was minted (`emailAndPassword.resetPasswordTokenExpiresIn`, in seconds).
+  const server = await serverWith({ resetPasswordTokenExpiresIn: -1 })
+  await server.api.signUpEmail({ body: { name: 'Late', email: 'late@example.com', password: 'the-old-password' } })
+  const token = tokenIn(await printed(() => server.api.requestPasswordReset({ body: { email: 'late@example.com' } })))!
+  assert.equal((await server.api.resetPassword({ body: { newPassword: 'the-new-password', token }, asResponse: true })).status, 400, 'the expired token is refused')
+  assert.equal((await server.api.signInEmail({ body: { email: 'late@example.com', password: 'the-old-password' }, asResponse: true })).status, 200, 'and the old password still signs in')
+})
+
+/**
+ * This module as a deploy imports it under `env`: a fresh instance under its
+ * own URL, because every guard of the module is read once, at import.
+ */
+const importedUnder = async (env: Record<string, string>) => {
+  // `NODE_ENV` is typed read-only, and written here through a plain record.
+  const vars: Record<string, string | undefined> = process.env
+  const was = Object.fromEntries(Object.keys(env).map((key) => [key, vars[key]]))
+  Object.assign(vars, env)
+  try {
+    return (await import(`./index.ts?${new URLSearchParams(env)}`)) as typeof import('./index.ts')
+  } finally {
+    for (const [key, value] of Object.entries(was)) {
+      if (value === undefined) delete vars[key]
+      else vars[key] = value
+    }
+  }
+}
+
+test('on a local host with NODE_ENV unset, password reset is off and prints nothing: only NODE_ENV=development, set explicitly, logs a link', async () => {
+  // A deploy run with plain node and BETTER_AUTH_URL unset falls back to localhost.
+  assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
+  const server = betterAuthServer({ ...authOptions().options, database: memoryAdapter(tables()), secret: 'test-secret' })
+  await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
+  let held = new Response()
+  const log = await printed(async () => (held = await server.api.requestPasswordReset({ body: { email: 'held@example.com' }, asResponse: true })))
+  assert.equal(held.status, 400, 'the request is refused')
+  assert.equal(JSON.parse(await held.text()).code, 'RESET_PASSWORD_DISABLED', 'as disabled')
+  for (const leak of ['held@example.com', 'token=']) assert.equal(log.includes(leak), false, `nothing printed carries ${leak}`)
+  const developed = await serverWith()
+  await developed.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
+  assert.equal(typeof tokenIn(await printed(() => developed.api.requestPasswordReset({ body: { email: 'held@example.com' } }))), 'string', 'while under NODE_ENV=development the link is logged')
+})
+
+test('off a local host, or in production, password reset is off: a forgot request is refused the same for any address, and prints no token and no address', async () => {
+  assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
+  const deploys = {
+    'a real host with no NODE_ENV': { BETTER_AUTH_URL: 'https://app.example', BETTER_AUTH_SECRET: 'a-deploy-secret' },
+    'production on localhost': { NODE_ENV: 'production', BETTER_AUTH_URL: 'http://localhost:5173', PLATFORM_URL: 'http://localhost:5174', BETTER_AUTH_SECRET: 'a-deploy-secret' },
+  }
+  for (const [deploy, env] of Object.entries(deploys)) {
+    const imported = await importedUnder(env)
+    const server = betterAuthServer({ ...imported.authOptions().options, database: memoryAdapter(tables()), secret: 'test-secret' })
+    await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
+    const ask = (email: string) => server.api.requestPasswordReset({ body: { email }, asResponse: true })
+    let held = new Response(), missing = new Response()
+    const log = (await printed(async () => (held = await ask('held@example.com')))) + (await printed(async () => (missing = await ask('nobody@example.com'))))
+    const answer = await held.text()
+    assert.equal(held.status, 400, `${deploy}: the request is refused`)
+    // The provider's own code for a reset with no sender, thrown before it looks the address up.
+    assert.equal(JSON.parse(answer).code, 'RESET_PASSWORD_DISABLED', `${deploy}: as disabled`)
+    assert.deepEqual([missing.status, await missing.text()], [held.status, answer], `${deploy}: and an address with no account is answered the same`)
+    for (const leak of ['held@example.com', 'nobody@example.com', 'token=']) assert.equal(log.includes(leak), false, `${deploy}: nothing printed carries ${leak}`)
+    assert.equal(imported.options.rateLimit.enabled, true, `${deploy}: and the provider rate limits`)
+  }
+})
+
+test('an invitation writes its accept link to the log under NODE_ENV=development on a local host, and anywhere else prints neither the link nor the address', async () => {
+  // As the reset link above.
+  assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
+  const deploys: [string, Record<string, string>, boolean][] = [
+    ['development on localhost', { NODE_ENV: 'development' }, true],
+    ['a local host with no NODE_ENV', {}, false],
+    ['development on a real host', { NODE_ENV: 'development', BETTER_AUTH_URL: 'https://app.example', BETTER_AUTH_SECRET: 'a-deploy-secret' }, false],
+  ]
+  for (const [deploy, env, logs] of deploys) {
+    const imported = await importedUnder(env)
+    const server = betterAuthServer({ ...imported.authOptions().options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+    const headers = new Headers({ cookie: (await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+    await server.api.createOrganization({ body: { name: 'Org', slug: 'org' }, headers })
+    let made: { id: string } | undefined
+    const log = await printed(async () => (made = (await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })) as { id: string }))
+    assert.equal(log.includes(`http://localhost:5173/auth/accept-invitation?id=${made!.id}`), logs, `${deploy}: the link is ${logs ? '' : 'not '}logged`)
+    assert.equal(log.includes('invitee@example.com'), logs, `${deploy}: nor the address unless the link is`)
+  }
+})

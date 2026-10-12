@@ -1,0 +1,75 @@
+import type { RowTable } from '../../mithaq/rows.ts'
+import { allRows, assignedSlugs, heldSlugs, rbacTarget, scoped, systemKeys, type AccessOptions, type AccessTarget, type SystemRoles } from '../../rbac/index.ts'
+
+// An action list that is not a list of strings contributes nothing: a string
+// would flatten character by character.
+const flatten = (statements: Readonly<Record<string, readonly string[]>>, into: Set<string>) => {
+  for (const [resource, actions] of Object.entries(statements)) {
+    if (!Array.isArray(actions)) continue
+    for (const action of actions) if (typeof action === 'string') into.add(`${resource}.${action}`)
+  }
+}
+
+// Better Auth stores `permission` as a JSON string, not the record its zod object describes.
+const readPermission = (value: unknown): Record<string, readonly string[]> | undefined => {
+  if (typeof value !== 'string') return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value)
+  } catch {
+    return undefined
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+  for (const actions of Object.values(parsed)) {
+    if (!Array.isArray(actions) || actions.some((action) => typeof action !== 'string')) return undefined
+  }
+  return parsed as Record<string, readonly string[]>
+}
+
+export type BetterAuthAccessOptions<Roles extends SystemRoles, Table extends RowTable, Actor> =
+  AccessOptions<Roles, Table, Actor> & {
+    /** The provider's own compile-time roles, each an `ac.newRole(...)` result. */
+    statements?: Readonly<Record<string, { statements: Readonly<Record<string, readonly string[]>> }>>
+  }
+
+/**
+ * The access target over Better Auth's store: a custom role is an `organizationRole` row.
+ * Read directly, not through `hasPermission`, whose cache never invalidates a narrowed role.
+ */
+export const betterAuthTarget = <const Roles extends SystemRoles, const Table extends RowTable, Actor>({
+  roles,
+  rolesOf,
+  access,
+  kayan,
+  statements = {},
+}: BetterAuthAccessOptions<Roles, Table, Actor>): AccessTarget<Roles, Table, Actor> & { readonly type: 'betterAuth' } => {
+  const base = rbacTarget<Roles, Table, Actor>({ access, kayan, roles, rolesOf })
+  const { memberRoles, roles: roleKayan } = kayan
+  return {
+    ...base,
+    type: 'betterAuth',
+    reads: [roleKayan, memberRoles],
+    resolve: async ({ store, tenant, member, actor, ownership }) => {
+      const slugs = await assignedSlugs({ store, kayan: memberRoles, field: ownership(memberRoles), tenant, member })
+      const held = heldSlugs({ roles, rolesOf, slugs, actor })
+      const { custom, everything, keys } = systemKeys(roles, held)
+      if (everything) return { permissions: '*', roles: slugs }
+      for (const slug of held) {
+        const role = statements[slug]
+        if (role?.statements) flatten(role.statements, keys)
+      }
+      if (custom.length && scoped(tenant)) {
+        // Caught, so a role table that is down loses the keys and not the assignment.
+        const found = await allRows({ store, kayan: roleKayan, where: {
+          and: [{ organizationId: { equals: tenant } }, { role: { in: custom } }],
+        } }).catch(() => undefined)
+        if (!found) return { permissions: [], roles: slugs }
+        const stored = found.docs.map((row) => readPermission(row.permission))
+        // A malformed column voids the whole answer.
+        if (stored.some((one) => one === undefined)) return { permissions: [], roles: slugs }
+        for (const one of stored) flatten(one!, keys)
+      }
+      return { permissions: [...keys], roles: slugs }
+    },
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+    // `shadcn add` writes the primitives' imports at the app's `ui` alias, which
+    // is `@/components/ui` in every app that copies this registry
+    // (`apps/asas-tanstack/components.json` `"ui": "@/components/ui"`). The
+    // package holds shadcn's own copies under `registry/ui/` so its typecheck
+    // and its tests resolve the same specifier the app does; they are shadcn's
+    // files and are not items of this registry, so `registry.json` never names
+    // them and `package.json` never ships them.
+    // `@/hooks/*` is the same arrangement for the one hook a primitive of
+    // shadcn's own imports: `sidebar.tsx` reads `@/hooks/use-mobile`, which
+    // `shadcn add sidebar` writes into the app's `hooks` alias
+    // (`apps/asas-tanstack/components.json` `"hooks": "@/hooks"`).
+    // `@/lib/*` is the third: every primitive reads `cn` from the app's
+    // `utils` alias (`apps/asas-tanstack/components.json` `"utils": "@/lib/utils"`),
+    // which is the one line each copied file differs from its source in
+    // (`tanstack-business:packages/design-system/src/ui/button.tsx`
+    // `import { cn } from '../lib/utils'`).
+    // Any other `@/` is the app's own, which the template's shells import as
+    // the app they compile in does, and which the tests reach through them
+    // (`../../templates/asas/src/ui/app-shell.tsx` `from '@/copy.ts'`).
+    "paths": {
+      "@/components/ui/*": ["./registry/ui/*"],
+      "@/hooks/*": ["./registry/hooks/*"],
+      "@/lib/*": ["./registry/lib/*"],
+      "@/*": ["../../apps/asas-tanstack/src/*"]
+    }
+  },
+  "include": ["registry/**/*.ts", "registry/**/*.tsx", "test/**/*.ts"],
+  // The screen host is typechecked where it runs: it imports the app's own
+  // copy table and root route beside it, which this package has no copy of,
+  // and `packages/mithaq-admin/test/render.test.ts` holds the app's copy to
+  // this source (`mithaq-screens-host`).
+  "exclude": ["registry/host/**"]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@asas/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./platform-roles": "./src/platform-roles.ts"
+  },
+  "dependencies": {
+    "better-auth": "1.7.4",
+    "mithaq": "*"
+  }
+}

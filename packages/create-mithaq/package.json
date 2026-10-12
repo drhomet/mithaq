@@ -1,0 +1,24 @@
+{
+  "name": "create-mithaq",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "create-mithaq": "index.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/drhomet/mithaqjs.git",
+      "directory": "packages/create-mithaq"
+    },
+    "homepage": "https://github.com/drhomet/mithaqjs#readme",
+    "bugs": {
+      "url": "https://github.com/drhomet/mithaqjs/issues"
+    }
+  }
+}

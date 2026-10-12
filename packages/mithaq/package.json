@@ -1,0 +1,95 @@
+{
+  "name": "mithaq",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./generate-auth": "./src/auth/better-auth/generate.ts",
+    "./generate-messages": "./src/mithaq/generate-messages.ts",
+    "./generate-screens": "./src/screen/generate.ts",
+    "./upgrade": "./src/asas/cli/upgrade.ts",
+    "./admin": "./src/screen/client.ts",
+    "./admin/react": "./src/screen/react.ts",
+    "./orpc": "./src/asas/http/orpc.ts",
+    "./rich-text": "./src/rich-text/rich-text.ts",
+    "./drizzle": "./src/drizzle/proxy/index.ts",
+    "./drizzle/pg-core": "./src/drizzle/proxy/pg-core.ts",
+    "./drizzle/node-postgres": "./src/drizzle/proxy/node-postgres.ts"
+  },
+  "bin": {
+    "mithaq": "./src/asas/cli/mithaq.ts"
+  },
+  "publishConfig": {
+    "name": "@drhomet/mithaqjs",
+    "version": "0.1.0",
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/drhomet/mithaqjs.git",
+      "directory": "packages/mithaq"
+    },
+    "homepage": "https://github.com/drhomet/mithaqjs#readme",
+    "bugs": {
+      "url": "https://github.com/drhomet/mithaqjs/issues"
+    },
+    "engines": {
+      "node": ">=24"
+    },
+    "exports": {
+      ".": "./dist/index.js",
+      "./generate-auth": "./dist/auth/better-auth/generate.js",
+      "./generate-messages": "./dist/mithaq/generate-messages.js",
+      "./generate-screens": "./dist/screen/generate.js",
+      "./upgrade": "./dist/asas/cli/upgrade.js",
+      "./admin": "./dist/screen/client.js",
+      "./admin/react": "./dist/screen/react.js",
+      "./orpc": "./dist/asas/http/orpc.js",
+      "./rich-text": "./dist/rich-text/rich-text.js",
+      "./drizzle": "./dist/drizzle/proxy/index.js",
+      "./drizzle/pg-core": "./dist/drizzle/proxy/pg-core.js",
+      "./drizzle/node-postgres": "./dist/drizzle/proxy/node-postgres.js"
+    },
+    "bin": {
+      "mithaq": "dist/asas/cli/mithaq.js"
+    }
+  },
+  "dependencies": {
+    "@babel/helper-validator-identifier": "^8.0.4",
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "drizzle-kit": "1.0.0-rc.4",
+    "drizzle-orm": "1.0.0-rc.4",
+    "jose": "6.2.12",
+    "lexical": "0.52.0",
+    "pg": "^8.16.3",
+    "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "@orpc/openapi": "^1.15.1",
+    "@orpc/server": "^1.15.1",
+    "better-auth": "1.7.4",
+    "react": "^19.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@orpc/openapi": {
+      "optional": true
+    },
+    "@orpc/server": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@orpc/openapi": "1.15.1",
+    "@orpc/server": "1.15.1",
+    "@types/pg": "^8.15.6",
+    "better-auth": "1.7.4",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.0"
+  }
+}

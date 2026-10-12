@@ -1,0 +1,1 @@
+ALTER TABLE "local_users" ADD COLUMN "reset_password_attempts" numeric DEFAULT '0';

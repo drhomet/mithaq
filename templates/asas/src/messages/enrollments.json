@@ -1,0 +1,42 @@
+{
+  "deletedAt": {
+    "ar": "تاريخ الحذف",
+    "en": "Deleted at"
+  },
+  "id.invalid": {
+    "ar": "هذا ليس معرفا فريدا.",
+    "en": "This is not a unique identifier."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "organization": {
+    "ar": "المؤسسة",
+    "en": "Organization"
+  },
+  "session": {
+    "ar": "الحصة",
+    "en": "Session"
+  },
+  "session.invalid": {
+    "ar": "اختر عنصرًا من القائمة.",
+    "en": "Pick one of the listed entries."
+  },
+  "session.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "student": {
+    "ar": "الطالب",
+    "en": "Student"
+  },
+  "student.invalid": {
+    "ar": "اختر عنصرًا من القائمة.",
+    "en": "Pick one of the listed entries."
+  },
+  "student.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  }
+}

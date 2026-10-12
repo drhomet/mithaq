@@ -1,0 +1,186 @@
+{
+  "action.archive": {
+    "ar": "أُرشف",
+    "en": "Archived"
+  },
+  "action.archiveMany": {
+    "ar": "أُرشف",
+    "en": "Archived"
+  },
+  "action.create": {
+    "ar": "أُنشئ",
+    "en": "Created"
+  },
+  "action.delete": {
+    "ar": "حُذف",
+    "en": "Deleted"
+  },
+  "action.deleteMany": {
+    "ar": "حُذف",
+    "en": "Deleted"
+  },
+  "action.restoreVersion": {
+    "ar": "استُعيد إصدار",
+    "en": "Restored a version"
+  },
+  "action.update": {
+    "ar": "حُدِّث",
+    "en": "Updated"
+  },
+  "action.updateMany": {
+    "ar": "حُدِّث",
+    "en": "Updated"
+  },
+  "activity": {
+    "ar": "النشاط",
+    "en": "Activity"
+  },
+  "actor": {
+    "ar": "المنفذ",
+    "en": "Actor"
+  },
+  "actor.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "actor.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "changes": {
+    "ar": "التغييرات",
+    "en": "Changes"
+  },
+  "changes.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "changes.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "command": {
+    "ar": "الأمر {command} ({user})",
+    "en": "the command {command} ({user})"
+  },
+  "empty": {
+    "ar": "لم يتغير شيء هنا بعد.",
+    "en": "Nothing has changed here yet."
+  },
+  "event": {
+    "ar": "{action} بواسطة {actor}",
+    "en": "{action} by {actor}"
+  },
+  "eventYou": {
+    "ar": "{action} بواسطتك",
+    "en": "{action} by You"
+  },
+  "failed": {
+    "ar": "تعذرت قراءة النشاط.",
+    "en": "The activity could not be read."
+  },
+  "id.invalid": {
+    "ar": "هذا ليس معرفا فريدا.",
+    "en": "This is not a unique identifier."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "impersonated": {
+    "ar": "{staff} بصفة {member}",
+    "en": "{staff} as {member}"
+  },
+  "impersonatedBy": {
+    "ar": "انتحل الصفة",
+    "en": "Impersonated by"
+  },
+  "impersonatedBy.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "impersonatedBy.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "kayan": {
+    "ar": "الكيان",
+    "en": "Kayan"
+  },
+  "kayan.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "kayan.maxLength": {
+    "ar": "القيمة طويلة جدًا.",
+    "en": "The value is too long."
+  },
+  "kayan.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "loading": {
+    "ar": "جارٍ تحميل النشاط…",
+    "en": "Loading activity…"
+  },
+  "more": {
+    "ar": "عرض الأقدم",
+    "en": "Show older"
+  },
+  "none": {
+    "ar": "لم يتغير حقل يمكنك قراءته.",
+    "en": "No field you may read changed."
+  },
+  "operation": {
+    "ar": "العملية",
+    "en": "Operation"
+  },
+  "operation.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "operation.maxLength": {
+    "ar": "القيمة طويلة جدًا.",
+    "en": "The value is too long."
+  },
+  "operation.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "organization": {
+    "ar": "المؤسسة",
+    "en": "Organization"
+  },
+  "plural": {
+    "ar": "سجل التدقيق",
+    "en": "Audit log"
+  },
+  "record": {
+    "ar": "السجل",
+    "en": "Record"
+  },
+  "record.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "record.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "singular": {
+    "ar": "سجل تدقيق",
+    "en": "Audit entry"
+  },
+  "someone": {
+    "ar": "شخص ما",
+    "en": "Someone"
+  },
+  "system": {
+    "ar": "النظام",
+    "en": "The system"
+  },
+  "you": {
+    "ar": "أنت",
+    "en": "You"
+  }
+}

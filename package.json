@@ -1,0 +1,28 @@
+{
+  "name": "mithaq",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "templates/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "node apps/lint-args.ts && LOCAL_AUTH_SECRET=asas-local-auth-test-secret-of-32-characters node --test 'packages/**/*.test.ts' 'templates/**/*.test.ts' 'apps/**/*.test.ts'",
+    "test:next": "node --test apps/next-boot.ts",
+    "test:tanstack": "node --test apps/tanstack-boot.ts",
+    "test:r2": "node --test templates/asas/src/storage/r2.smoke.ts",
+    "test:release": "node apps/release-consumer.ts",
+    "pack": "node apps/pack.ts",
+    "lint:args": "node apps/lint-args.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/mithaq-admin && tsc -p apps/asas-tanstack && tsc -p apps/asas-platform"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "@types/node": "^24.12.3"
+  }
+}

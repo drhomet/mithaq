@@ -1,0 +1,42 @@
+{
+  "_verified": {
+    "ar": "موثق",
+    "en": "Verified"
+  },
+  "_verified.invalid": {
+    "ar": "يجاب على هذا بنعم أو لا.",
+    "en": "This is answered yes or no."
+  },
+  "_verified.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "email": {
+    "ar": "البريد الإلكتروني",
+    "en": "Email"
+  },
+  "email.invalid": {
+    "ar": "هذا ليس بريدا إلكترونيا.",
+    "en": "This is not an email address."
+  },
+  "email.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "id.invalid": {
+    "ar": "هذا ليس معرفا فريدا.",
+    "en": "This is not a unique identifier."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "plural": {
+    "ar": "الحسابات المحلية",
+    "en": "Local accounts"
+  },
+  "singular": {
+    "ar": "حساب محلي",
+    "en": "Local account"
+  }
+}

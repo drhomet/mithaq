@@ -1,0 +1,66 @@
+{
+  "contactEmail": {
+    "ar": "بريد التواصل",
+    "en": "Contact email"
+  },
+  "contactEmail.invalid": {
+    "ar": "هذا ليس بريدا إلكترونيا.",
+    "en": "This is not an email address."
+  },
+  "contactEmail.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "globalType.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "globalType.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "id.invalid": {
+    "ar": "هذا ليس معرفا فريدا.",
+    "en": "This is not a unique identifier."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "maintenance": {
+    "ar": "الصيانة",
+    "en": "Maintenance"
+  },
+  "maintenance.description": {
+    "ar": "ما دام هذا مفعلا، يخبر الموقع زواره بأنه مغلق للصيانة.",
+    "en": "While this is on, the site tells visitors it is closed for maintenance."
+  },
+  "maintenance.invalid": {
+    "ar": "يجاب على هذا بنعم أو لا.",
+    "en": "This is answered yes or no."
+  },
+  "maintenance.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "organization": {
+    "ar": "المؤسسة",
+    "en": "Organization"
+  },
+  "siteTitle": {
+    "ar": "عنوان الموقع",
+    "en": "Site title"
+  },
+  "siteTitle.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "siteTitle.maxLength": {
+    "ar": "القيمة طويلة جدًا.",
+    "en": "The value is too long."
+  },
+  "siteTitle.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  }
+}

@@ -1,0 +1,260 @@
+// The frame both screens may put at the root of a page: a collapsible sidebar holding the organization switcher, the nav and the user menu, and an inset holding the site header over the page.
+// A row that goes nowhere is not drawn, so there are no quick-create or inbox buttons, documents group, or help and search rows: none has a destination in this template.
+import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import {
+  ArrowUpRight,
+  BookOpen,
+  Building2,
+  CalendarDays,
+  ClipboardList,
+  LayoutDashboard,
+  Settings2,
+  ShieldCheck,
+  Table2,
+  Tags,
+  UserCog,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
+import type { ShellProps } from 'mithaq/admin'
+import { useLocale, useNav, useScreen, useUser } from 'mithaq/admin/react'
+import { authArm } from '@/api.ts'
+import { locales, switchLocale } from '@/copy.ts'
+import { DiscardDialog } from '@/components/mithaq/form.tsx'
+import { NavSidebar, NavUserMenu, OrganizationSwitcher, type NavOrganization } from '@/components/mithaq/nav.tsx'
+import { buttonVariants } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import {
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
+import { navLabel } from './screen-nav.tsx'
+
+export const regions = ['header', 'main'] as const
+
+/** One icon per nav entry, keyed by the entry's path under the screen, and `Table2` for any other. */
+const icons: Record<string, LucideIcon> = {
+  '/': LayoutDashboard,
+  '/users': UserRound,
+  '/organizations': Building2,
+  '/members': Users,
+  '/courses': BookOpen,
+  '/sessions': CalendarDays,
+  '/enrollments': ClipboardList,
+  '/tags': Tags,
+  '/roles': ShieldCheck,
+  '/member-roles': UserCog,
+  '/settings': Settings2,
+}
+export const iconOf = (path: string) => (Object.hasOwn(icons, path) ? icons[path]! : Table2)
+
+/**
+ * The path the browser is on. The server has no location, so nothing is
+ * marked current in the first paint and the entry is marked once it hydrates.
+ */
+const usePathname = () => useSyncExternalStore(() => () => {}, () => window.location.pathname, () => undefined)
+
+/**
+ * The locale switch and sign-out, in the user menu. The locale is a cookie and a reload, because the request middleware reads it before any route runs;
+ * the switch is asked first, in the app's discard dialog, where a form holds a change nobody saved.
+ */
+export function UserMenu() {
+  const { locale, t } = useLocale()
+  // The language asked for while a form holds a change nobody saved, which the
+  // app's own discard dialog confirms in the page's words.
+  const [asked, setAsked] = useState<string>()
+  return (
+    <>
+      <NavUserMenu
+        user={useUser()}
+        t={t}
+        locale={locale}
+        locales={locales}
+        onLocale={(next) => (window.onbeforeunload ? setAsked(next) : switchLocale({ to: next }))}
+        // Only once the provider has answered: its sign-out answers 200 with a
+        // session or without one, so a refusal stays where it is. `replace`,
+        // so Back does not return to the page signed out of. The sign-out that
+        // ends an impersonation answers the platform's address, where the staff
+        // member goes next.
+        onSignOut={() => void authArm('sign-out').then((answer) => answer.ok && window.location.replace(String(answer.body?.url ?? '/auth/sign-in')))}
+      />
+      <DiscardDialog open={asked !== undefined} onOpenChange={(open) => !open && setAsked(undefined)} onDiscard={() => switchLocale({ to: asked! })} t={t} />
+    </>
+  )
+}
+
+/**
+ * The organization switcher over the organizations the session came with. The host sends them with the session, so it is drawn with the page and never flashes a skeleton.
+ * Switching reloads the page, because every loader reads its rows under the active organization on the server.
+ */
+function Organizations() {
+  const { t } = useLocale()
+  const { organizations = [], activeOrganizationId } = useUser()
+  return (
+    <OrganizationSwitcher
+      organizations={organizations}
+      activeOrganizationId={activeOrganizationId}
+      t={t}
+      onSwitch={(organizationId) => void authArm('organization/set-active', { organizationId }).then((answer) => answer.ok && window.location.reload())}
+    />
+  )
+}
+
+/**
+ * One entry per destination, the shell's own first and the entities after.
+ * The dashboard is current on its own path alone; every other entry on its path and below it.
+ */
+function NavMain({ home }: { home?: string }) {
+  const { locale, t } = useLocale()
+  const screen = useScreen()
+  const pathname = usePathname()
+  const entries = [
+    { path: '/', label: home ?? t('dashboard.dashboard', 'Dashboard') },
+    ...[...useNav()].sort((one, other) => Number(!!one.kayan) - Number(!!other.kayan)).map((entry) => ({ path: entry.path, label: navLabel({ entry, screen, locale, t }) })),
+  ]
+  return (
+    <SidebarGroup>
+      <SidebarGroupContent className="flex flex-col gap-2">
+        <SidebarMenu>
+          {entries.map((entry) => {
+            const href = entry.path === '/' ? screen.path : `${screen.path}${entry.path}`
+            const Icon = iconOf(entry.path)
+            const isActive = pathname !== undefined && (pathname === href || (entry.path !== '/' && pathname.startsWith(`${href}/`)))
+            return (
+              <SidebarMenuItem key={entry.path}>
+                {/* A 44 pixel row wherever the sidebar is the phone's sheet. */}
+                <SidebarMenuButton
+                  isActive={isActive}
+                  className="max-md:h-11"
+                  render={
+                    <a href={href}>
+                      <Icon />
+                      <span>{entry.label}</span>
+                    </a>
+                  }
+                />
+              </SidebarMenuItem>
+            )
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}
+
+export const frame = { '--sidebar-width': 'calc(var(--spacing) * 72)', '--header-height': 'calc(var(--spacing) * 12)' } as CSSProperties
+
+/**
+ * The site header's bar, with the page's own title. It is sticky: its trigger is the only way back to a hidden sidebar, so it stays on screen however far the page is scrolled.
+ * Below sm the title may take two lines, set tight so both fit the bar, since on a phone it is often the record's only name; from sm up it is one line, cut at its end.
+ * From sm up the row wraps and the bar grows with it, so a form's controls that do not fit take a line of their own rather than run over the title or past the bar's end.
+ * A bar that wrapped is taller than `--header-height`, so it measures itself into `--header-bar-height`, which what sticks under it reads.
+ */
+export const headerBar = 'sticky top-0 z-10 bg-background rounded-t-[inherit] flex min-h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:min-h-(--header-height)'
+export const headerRow = 'flex w-full min-w-0 items-center gap-1 px-4 sm:flex-wrap sm:gap-y-2 sm:py-2 lg:gap-2 lg:px-6 [&_h1]:min-w-0 max-sm:[&_h1]:line-clamp-2 max-sm:[&_h1]:leading-tight max-sm:[&_h1]:wrap-break-word sm:[&_h1]:truncate [&_h1]:text-base [&_h1]:font-medium [&_h1]:tracking-normal'
+
+/**
+ * The header's own height on the document, as `--header-bar-height`, kept while the header is on screen and taken off with it.
+ * A variable of its own and never `--header-height`, which the bar's `min-h-(--header-height)` reads, so the measure would feed itself.
+ * A module function, so React hands the ref the same callback on every render and observes the header once.
+ */
+const measureHeader = (header: HTMLElement | null) => {
+  if (!header) return
+  const root = document.documentElement.style
+  // `borderBoxSize` is missing before Safari 15.4, so the header's own `offsetHeight` stands in there.
+  const observer = new ResizeObserver(([entry]) => {
+    if (entry) root.setProperty('--header-bar-height', `${entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight}px`)
+  })
+  observer.observe(header)
+  return () => {
+    observer.disconnect()
+    root.removeProperty('--header-bar-height')
+  }
+}
+
+/**
+ * The one way from a tenant screen to the platform app, in the header, for an actor whose own `user.role` holds a platform role that enters it.
+ * The link grants nothing here: the platform app's own server decides entry.
+ * Below xl it is its icon alone, a 44 pixel square on a phone, its words kept for a screen reader, so the page's title keeps the header's width.
+ */
+export function PlatformLink() {
+  const { t } = useLocale()
+  const platform = useUser().screens?.find((one) => one.name === 'platform')
+  if (!platform) return null
+  return (
+    <a href={platform.path} data-platform-link="" className={buttonVariants({ variant: 'outline', size: 'sm', className: 'ms-auto max-sm:size-11 max-xl:px-2.5 max-sm:px-0 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
+      <span className="max-xl:sr-only">{t('dashboard.openPlatform', 'Open the platform')}</span>
+      <ArrowUpRight data-icon="inline-end" className="rtl:-scale-x-100" />
+    </a>
+  )
+}
+
+/** The sidebar on the side the document's direction starts from. */
+export function AppShell({ regions, brand, home }: ShellProps<readonly ['header', 'main'], ReactNode> & { brand?: ReactNode; home?: string }) {
+  const { dir, t } = useLocale()
+  return (
+    <SidebarProvider data-shell="app" style={frame}>
+      <NavSidebar variant="inset" side={dir === 'rtl' ? 'right' : 'left'} t={t}>
+        {/* One navigation landmark around the whole sidebar, named in the
+            page's language, so the switcher and the user menu are inside a
+            landmark as the links are. It is a box of its own and not a role on
+            the sidebar, whose props reach no element on a phone, where it is a
+            sheet. */}
+        <nav aria-label={t('admin.navigation', 'Navigation')} className="flex min-h-0 flex-1 flex-col">
+          <SidebarHeader>{brand ?? <Organizations />}</SidebarHeader>
+          <SidebarContent>
+            <NavMain home={home} />
+          </SidebarContent>
+          <SidebarFooter>
+            <UserMenu />
+          </SidebarFooter>
+        </nav>
+      </NavSidebar>
+      {/* `min-w-0` so the inset, a flex item beside the sidebar, never takes
+          the width of the widest thing a page holds: without it a table wider
+          than a phone would widen the document, header and trigger with it. A
+          wide table scrolls in its own frame instead. */}
+      <SidebarInset className="min-w-0">
+        <header data-region="header" ref={measureHeader} className={headerBar}>
+          <div className={headerRow}>
+            <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 max-md:size-11" />
+            <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
+            {regions.header}
+            <PlatformLink />
+          </div>
+        </header>
+        <div className="flex min-w-0 flex-1 flex-col px-4 py-4 lg:px-6 lg:py-6">
+          {/* `min-w-0` so a table wider than the page scrolls rather than
+              pushing the sidebar off it. A div and not a `main`, because the
+              inset around it is already the page's one main landmark. */}
+          <div data-region="main" className="@container/main flex min-w-0 flex-1 flex-col gap-2">{regions.main}</div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
+
+/**
+ * The platform's frame, the dashboard's with two changes: the app's name where the organization switcher sits, since staff work above every organization and switch to none of them,
+ * and the home entry named as its page names itself, so the nav and the page say one word.
+ */
+export function PlatformShell(props: ShellProps<readonly ['header', 'main'], ReactNode>) {
+  const { t } = useLocale()
+  return (
+    <AppShell
+      {...props}
+      brand={<span data-brand="" className="truncate px-2 py-1.5 text-base font-semibold">{t('platform.brand', 'Asas platform')}</span>}
+      home={t('platform.title', 'Platform')}
+    />
+  )
+}

@@ -1,0 +1,550 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "mithaq-admin",
+  "homepage": "https://github.com/drhomet/mithaqjs",
+  "items": [
+    {
+      "name": "mithaq-controls",
+      "type": "registry:component",
+      "title": "Mithaq controls",
+      "description": "One control per shipped kind, the copy chain a label is resolved through, the contract every control is written to, and the reader that turns a form's held values into an operation's input.",
+      "registryDependencies": [
+        "button",
+        "button-group",
+        "calendar",
+        "direction",
+        "popover",
+        "combobox",
+        "input-otp",
+        "radio-group",
+        "select",
+        "slider",
+        "switch",
+        "toggle-group",
+        "checkbox",
+        "input",
+        "input-group",
+        "textarea",
+        "toggle",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+      ],
+      "files": [
+        {
+          "path": "registry/controls.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/controls.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-cells",
+      "type": "registry:component",
+      "title": "Mithaq cells",
+      "description": "One table cell per shipped kind, resolved through the same chain a control is.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+      ],
+      "files": [
+        {
+          "path": "registry/cells.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/cells.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-filter-operators",
+      "type": "registry:lib",
+      "title": "Mithaq filter operators",
+      "description": "Which operators a kind offers, what shape each operator's value takes, and which paths of a kayan the filter panel may offer.",
+      "files": [
+        {
+          "path": "registry/filter-operators.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/filter-operators.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-query",
+      "type": "registry:lib",
+      "title": "Mithaq list query",
+      "description": "The list's URL in Payload's qs form, read against the list with a hostile or unknown filter refused before any request, the find input a page asks with, the per-viewer half remembered in localStorage, and the search term folded into a where.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-filter-operators.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-query.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/list-query.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-filters",
+      "type": "registry:component",
+      "title": "Mithaq list filters",
+      "description": "The where panel: rows of field, operator and value joined by and or or, offered only for a field that declares itself filterable.",
+      "registryDependencies": [
+        "button",
+        "input",
+        "select",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-filter-operators.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-query.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-filters.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-filters.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-columns",
+      "type": "registry:component",
+      "title": "Mithaq list columns",
+      "description": "The column popup: two sections, a switch per column and two buttons for order, with a denied or undeclared column absent rather than disabled.",
+      "registryDependencies": [
+        "button",
+        "checkbox",
+        "label",
+        "popover",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-query.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-columns.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-columns.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-pagination",
+      "type": "registry:component",
+      "title": "Mithaq list pagination",
+      "description": "Two arrows, a page input clamped to the page count, the per-page popup and the range line, all off the paginated shape the read answered.",
+      "registryDependencies": [
+        "button",
+        "input",
+        "label",
+        "select",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-directional-icon.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-query.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-pagination.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-pagination.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-selection",
+      "type": "registry:component",
+      "title": "Mithaq list selection",
+      "description": "The selection a list's bulk buttons run over: the head checkbox, one per row, and the fields a bulk update may write, which are the ones a person could edit on a row.",
+      "registryDependencies": [
+        "checkbox",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-selection.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-selection.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list",
+      "type": "registry:component",
+      "title": "Mithaq list",
+      "description": "The list screen over a kayan's find, with search, filters, columns, sort, page and limit driven by one callback and every destination a prop, each row opening its record and carrying a menu of Edit, Delete and the list node's row buttons, a row button offered where its when holds over that row, and the toolbar and bulk buttons.",
+      "registryDependencies": [
+        "button",
+        "card",
+        "dropdown-menu",
+        "input",
+        "table",
+        "./node_modules/mithaq-admin/r/mithaq-cells.json",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-filter-operators.json",
+        "./node_modules/mithaq-admin/r/mithaq-form.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-columns.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-filters.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-pagination.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-query.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-selection.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-nodes",
+      "type": "registry:component",
+      "title": "Mithaq nodes",
+      "description": "The node tree both forms draw, a screen's page and the admin's layout alike, the frame a record opens in over the list, the adapter from a screen's kayan, and one props type per place a screen names a component.",
+      "registryDependencies": [
+        "accordion",
+        "alert-dialog",
+        "badge",
+        "button",
+        "card",
+        "collapsible",
+        "dialog",
+        "drawer",
+        "resizable",
+        "scroll-area",
+        "select",
+        "separator",
+        "sheet",
+        "tabs",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
+      ],
+      "files": [
+        {
+          "path": "registry/nodes.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/nodes.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-form",
+      "type": "registry:component",
+      "title": "Mithaq form",
+      "description": "The form screen over a kayan's create, update and delete, holding its values in TanStack Form: it walks a screen's page, checks the rules the projection carries before any request, sends only the fields that changed on an update, and renders a refusal by the key the server sent.",
+      "dependencies": [
+        "@tanstack/react-form"
+      ],
+      "registryDependencies": [
+        "alert-dialog",
+        "badge",
+        "button",
+        "card",
+        "spinner",
+        "toggle-group",
+        "./node_modules/mithaq-admin/r/mithaq-cells.json",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+      ],
+      "files": [
+        {
+          "path": "registry/form.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/form.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-nav",
+      "type": "registry:component",
+      "title": "Mithaq nav",
+      "description": "The admin's app shell: the inset sidebar with the organization switcher, the kayan index the access report allows, the user menu, and the header with the sidebar trigger and the theme toggle.",
+      "registryDependencies": [
+        "avatar",
+        "button",
+        "dropdown-menu",
+        "separator",
+        "sheet",
+        "sidebar",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+      ],
+      "files": [
+        {
+          "path": "registry/nav.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/nav.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-field-shell",
+      "type": "registry:component",
+      "title": "Mithaq field shell",
+      "description": "The label, description and refusal around one control, with htmlFor and aria-describedby wired, and the checkbox's label beside its box.",
+      "registryDependencies": [
+        "field"
+      ],
+      "files": [
+        {
+          "path": "registry/field-shell.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/field-shell.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-relationship-control",
+      "type": "registry:component",
+      "title": "Mithaq relationship control",
+      "description": "The picker for a relationship field: a debounced search over the target kayan's own find, paged on scroll, with the selected row hydrated by one read.",
+      "registryDependencies": [
+        "combobox",
+        "spinner",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+      ],
+      "files": [
+        {
+          "path": "registry/relationship-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/relationship-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-relationship-cell",
+      "type": "registry:component",
+      "title": "Mithaq relationship cell",
+      "description": "Every relationship id on a page named by one read per target, in three states: loading, the related row's title, and the id where the read did not answer.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-cells.json",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
+      ],
+      "files": [
+        {
+          "path": "registry/relationship-cell.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/relationship-cell.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text",
+      "type": "registry:component",
+      "title": "Mithaq rich text",
+      "description": "The richText kind's control and read view: a Lexical editor with history, block formats, text formats, links, alignment, a divider and the / menu, written in the page's direction, and its viewer, both over the nodes and picks a screen provides, and both drawing a stored value whose node they cannot mount as its words, read-only, with the reason in the viewer's language; and the node list itself, which the server reads with too.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/extension@0.52.0",
+        "@lexical/link@0.52.0",
+        "@lexical/list@0.52.0",
+        "@lexical/react@0.52.0",
+        "@lexical/rich-text@0.52.0",
+        "@lexical/selection@0.52.0",
+        "@lexical/utils@0.52.0"
+      ],
+      "registryDependencies": [
+        "button",
+        "button-group",
+        "direction",
+        "dropdown-menu",
+        "input",
+        "toggle",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text.tsx"
+        },
+        {
+          "path": "registry/rich-text-nodes.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/rich-text-nodes.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-upload",
+      "type": "registry:component",
+      "title": "Mithaq upload",
+      "description": "The upload kind's control, cell and read view: a file drawn by its thumbnail or its name, chosen through the relationship's picker or uploaded in place with its progress, the server's refusal and a retry, a set as a grid moved and removed by keyboard; and the opt-in rich text upload node's view, its / menu pick and the dialog that inserts it.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/react@0.52.0",
+        "@lexical/utils@0.52.0"
+      ],
+      "registryDependencies": [
+        "button",
+        "dialog",
+        "./node_modules/mithaq-admin/r/mithaq-controls.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text.json"
+      ],
+      "files": [
+        {
+          "path": "registry/upload.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/upload.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-screens-host",
+      "type": "registry:item",
+      "title": "Mithaq screens host",
+      "description": "What a TanStack Start app draws every screen with: the server functions that resolve the actor, the access report and the screen, the frame and the page each generated route file hands its screen's glob to, the list read through TanStack Query off its qs URL, the form's landing after a save and its guard on leaving with a change, the fetch plug's client, the /unauthorized route, the public landing page at /, the language switch its header and the app's auth pages draw, and the frame, boxes and password toggle those auth pages share. Nothing in it names a screen; `mithaq generate screens` writes each screen's glob and route files beside it. What it imports from the app, which no item writes: `localeOf`, `locales`, `refusalKey` and the type `Locale` from `src/copy.ts`; `wanted` from `src/redirect.ts`; `useCopy` from `src/routes/__root.tsx`, whose route context names the app's own copy key as `app`; the project as the package `asas`; `@/components/mithaq/form`, which the form item writes. The app's `createRouter` spreads `flatSearch` from `src/screen-list.tsx`, so the router reads and writes the list's URL pairs as strings.",
+      "dependencies": [
+        "@tanstack/react-query",
+        "@tanstack/react-router",
+        "@tanstack/react-start"
+      ],
+      "registryDependencies": [
+        "button",
+        "card",
+        "input",
+        "input-group",
+        "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-list.json",
+        "./node_modules/mithaq-admin/r/mithaq-nav.json"
+      ],
+      "files": [
+        {
+          "path": "registry/host/screens.tsx",
+          "type": "registry:file",
+          "target": "~/src/screens.tsx"
+        },
+        {
+          "path": "registry/host/screen-form.tsx",
+          "type": "registry:file",
+          "target": "~/src/screen-form.tsx"
+        },
+        {
+          "path": "registry/host/screen-list.tsx",
+          "type": "registry:file",
+          "target": "~/src/screen-list.tsx"
+        },
+        {
+          "path": "registry/host/api.ts",
+          "type": "registry:file",
+          "target": "~/src/api.ts"
+        },
+        {
+          "path": "registry/host/slide.ts",
+          "type": "registry:file",
+          "target": "~/src/slide.ts"
+        },
+        {
+          "path": "registry/host/screen-names.ts",
+          "type": "registry:file",
+          "target": "~/src/screen-names.ts"
+        },
+        {
+          "path": "registry/host/unauthorized.tsx",
+          "type": "registry:file",
+          "target": "~/src/routes/unauthorized.tsx"
+        },
+        {
+          "path": "registry/host/index.tsx",
+          "type": "registry:file",
+          "target": "~/src/routes/index.tsx"
+        },
+        {
+          "path": "registry/host/locale-switch.tsx",
+          "type": "registry:file",
+          "target": "~/src/locale-switch.tsx"
+        },
+        {
+          "path": "registry/host/auth-frame.tsx",
+          "type": "registry:file",
+          "target": "~/src/auth-frame.tsx"
+        },
+        {
+          "path": "registry/host/links.ts",
+          "type": "registry:file",
+          "target": "~/src/links.ts"
+        },
+        {
+          "path": "registry/host/request-headers.ts",
+          "type": "registry:file",
+          "target": "~/src/request-headers.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-storage",
+      "type": "registry:lib",
+      "title": "Mithaq storage",
+      "description": "The storage adapters a project owns, S3 with an R2 preset, UploadThing for reading and deleting files already there, and a local folder, and the eight functions the storage rukn's config names: the object key, the verification of a stored file, its disposition, the sweep of orphans, and the upload flow's instructions, create step, delete step and file route.",
+      "dependencies": [
+        "aws4fetch@1.0.20",
+        "file-type@22.0.1",
+        "image-dimensions@2.5.1"
+      ],
+      "files": [
+        {
+          "path": "registry/storage/s3.ts",
+          "type": "registry:lib",
+          "target": "~/src/storage/s3.ts"
+        },
+        {
+          "path": "registry/storage/r2.ts",
+          "type": "registry:lib",
+          "target": "~/src/storage/r2.ts"
+        },
+        {
+          "path": "registry/storage/uploadthing.ts",
+          "type": "registry:lib",
+          "target": "~/src/storage/uploadthing.ts"
+        },
+        {
+          "path": "registry/storage/local.ts",
+          "type": "registry:lib",
+          "target": "~/src/storage/local.ts"
+        },
+        {
+          "path": "registry/storage/defaults.ts",
+          "type": "registry:lib",
+          "target": "~/src/storage/defaults.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-expected-updated-at",
+      "type": "registry:lib",
+      "title": "Mithaq expectedUpdatedAt step",
+      "description": "A write step that refuses an update with a 409 when the row's updatedAt is not the instant the caller read, compared against the row the runner locked inside the update's transaction. A kayan adds it by widening its update input with an expectedUpdatedAt and listing the step before the store step.",
+      "files": [
+        {
+          "path": "registry/steps/expected-updated-at.ts",
+          "type": "registry:lib",
+          "target": "~/src/steps/expected-updated-at.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-directional-icon",
+      "type": "registry:ui",
+      "title": "Mithaq directional icon",
+      "description": "A wrapper that mirrors the icon inside it in a right-to-left page, so the pager's chevrons point the way the page reads. No shadcn registry serves it under a bare name, so this registry ships it.",
+      "files": [
+        {
+          "path": "registry/ui/directional-icon.tsx",
+          "type": "registry:ui",
+          "target": "@components/ui/directional-icon.tsx"
+        }
+      ]
+    }
+  ]
+}
