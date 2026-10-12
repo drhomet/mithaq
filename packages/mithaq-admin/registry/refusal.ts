@@ -1,7 +1,6 @@
-/**
- * The key a refusal carries, as `data: { key, params }`, which a client resolves against its own copy. Anything that is not a refusal carries no key.
- */
 export const refusalKeyOf = (error: unknown): string | undefined => {
+  // A refusal carries its key as `data: { key, params }`, which a client resolves against its own copy; anything else carries none.
+  // Inside the body, because `shadcn add` drops a file's leading comment block.
   const key = (error as { data?: { key?: unknown } } | null | undefined)?.data?.key
   return typeof key === 'string' ? key : undefined
 }

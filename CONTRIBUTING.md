@@ -116,7 +116,7 @@ The folders follow the parts of the framework. `index.ts` re-exports the public 
 
 ### `packages/mithaq-admin`
 
-The shadcn registry a project copies from. `registry.json` lists the items. `registry/` holds their sources: the screen components (`controls.tsx`, `cells.tsx`, `form.tsx`, `list*.tsx`, `nodes.tsx`, `nav.tsx` and the rest), `host/` (the screen host an app copies), `storage/` (the storage adapters and defaults), `steps/` (registry steps), and `ui/`, `lib/` and `hooks/`, the shadcn primitives and helpers the registry's own type check and tests build against. An app takes its own primitives from shadcn. `bun run build` in this folder writes `r/`, the built items with a marker line on every file; `r/` is not committed. `test/` holds the registry's tests.
+The shadcn registry a project copies from. `registry.json` lists the items. `registry/` holds their sources: the screen components (one file per control family such as `text-control.tsx`, `default-components.tsx` and the `components.tsx` map they are drawn from, `cells.tsx`, `form.tsx`, `list*.tsx`, `nodes.tsx`, `nav.tsx` and the rest), `host/` (the screen host an app copies), `storage/` (the storage adapters and defaults), `steps/` (registry steps), and `ui/`, `lib/` and `hooks/`, the shadcn primitives and helpers the registry's own type check and tests build against. An app takes its own primitives from shadcn. `bun run build` in this folder writes `r/`, the built items with a marker line on every file; `r/` is not committed. `test/` holds the registry's tests.
 
 ### `packages/create-mithaq`
 

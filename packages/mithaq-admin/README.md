@@ -15,6 +15,30 @@ installed registry, one line per file, and never writes; you merge a change by
 hand. Where it lives: `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
 [The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) describes it.
 
+## Replace a control
+
+Every screen draws a field's control from the components map the app hands
+`ComponentsProvider`. The app mounts it around every route in
+`src/router.tsx`, with the map the registry ships:
+
+```tsx
+Wrap: ({ children }) => <ComponentsProvider components={defaultComponents}>{children}</ComponentsProvider>,
+```
+
+To draw a shipped kind or control name with your own control, spread the
+defaults and replace that one name:
+
+```tsx
+const components = { ...defaultComponents, controls: { ...defaultComponents.controls, text: MyTextControl } }
+```
+
+The map's keys are the control names the registry ships, so a name it does
+not ship, or a control that does not take `ControlProps`, is a type error. A
+new control name belongs in the screen's `components`, as a `ui()` reference.
+A shipped kind the map leaves out is an error when a field of that kind is
+drawn, and a kind of your own that no registry ships is drawn read-only by the
+map's `uuid` control.
+
 ## Add a registry item
 
 A registry item is shipped by mithaq for every project. The registry is a shadcn registry in `packages/mithaq-admin/`:
