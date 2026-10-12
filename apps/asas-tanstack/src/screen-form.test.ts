@@ -16,7 +16,7 @@ registerHooks({
 const { createRoot } = await import('react-dom/client')
 const { Outlet, RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } = await import('@tanstack/react-router')
 const { ScreenForm } = await import('./screen-form.tsx')
-const { ComponentsProvider } = await import('./components/mithaq/components.tsx')
+const { ComponentsProvider, RouteError } = await import('./components/mithaq/components.tsx')
 const { defaultComponents } = await import('./components/mithaq/default-components.tsx')
 
 const courses = asas.targets.dashboard.client.kayan.courses!
@@ -82,4 +82,34 @@ test('leaving a form holding a change asks, and leaving a clean one does not', a
   await act(async () => click([...dialog()!.querySelectorAll('button')].find((one) => one.textContent === 'Discard changes') as unknown as Element))
   assert.equal(router.state.location.pathname, '/courses', 'Discard changes leaves')
   await unmount()
+})
+
+test('a page whose kind has no control draws the error in place of the page, and the shell around it stays', async () => {
+  const root = createRootRoute({ component: () => createElement('div', null, createElement('header', null, 'The shell'), createElement(Outlet)) })
+  const weight = { ...courses, fields: [{ name: 'weight', kind: 'nothing-ships-this', component: 'nothing-ships-this', cell: 'text', rules: {} }] } as typeof courses
+  const client = { create: async () => ({}), update: async () => ({}), delete: async () => ({}) }
+  const router = createRouter({
+    history: createMemoryHistory({ initialEntries: ['/courses/new'] }),
+    Wrap: ({ children }) => createElement(ComponentsProvider, { components: defaultComponents }, children),
+    defaultErrorComponent: RouteError,
+    routeTree: root.addChildren([
+      createRoute({ getParentRoute: () => root, path: '/courses/new', component: () => createElement(ScreenForm, { kayan: weight, client, value: null, t, locale: 'en', edit: () => undefined }) }),
+    ]),
+  })
+  const host = mount()
+  const mounted = createRoot(host)
+  // React and the router report the error they caught; what is drawn instead is under test.
+  const quiet = { error: console.error, warn: console.warn }
+  console.error = console.warn = () => {}
+  try {
+    await act(async () => {
+      await router.load()
+      mounted.render(createElement(RouterProvider, { router }))
+    })
+  } finally {
+    Object.assign(console, quiet)
+  }
+  assert.equal(host.querySelector('header')?.textContent, 'The shell', 'the shell stays')
+  assert.match(host.querySelector('[role="alert"][data-route-error]')?.textContent ?? '', /components\.controls has no control for "nothing-ships-this", the kind of field "weight"/, 'and the page says what to fix')
+  await act(async () => mounted.unmount())
 })

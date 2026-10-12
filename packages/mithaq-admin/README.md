@@ -51,9 +51,17 @@ const components: ComponentsOf<Language> = {
 `ComponentsOf<Language>` requires one control per name the registry ships and
 one per kind of the language that no shipped control draws, so leaving `color`
 out, naming a key that is neither, or a control that does not take
-`ControlProps` is a type error. At runtime a field whose kind has no control in
-the map is an error naming the kind and the field; nothing is drawn in its
-place.
+`ControlProps` is a type error. A kind the language declares needs its entry
+even when no kayan uses it, since the type reads the language and not the
+kayan. A kind drawn by a `ui()` reference needs a map entry too, because an
+operation's dialog, the upload dialog and a form drawn with no page draw it
+through the map.
+
+Each app's `src/server.ts` checks every screen it serves against the map as it
+starts, through `checkComponents`, so a field whose kind has no control stops
+the start with the kind and the field named. A route that throws while drawing
+is replaced by `RouteError`, the router's `defaultErrorComponent`, and the shell
+around it stays.
 
 ## Add a registry item
 

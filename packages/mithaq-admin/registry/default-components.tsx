@@ -2,7 +2,7 @@ import { ButtonGroupControl, CheckboxGroupControl, ComboboxControl, RadioControl
 import { CheckboxControl, SwitchControl, ToggleControl } from './checkbox-control.tsx'
 import type { Components } from './components.tsx'
 import { CalendarControl, DatePicker } from './date-control.tsx'
-import { NumberControl, SliderControl } from './number-control.tsx'
+import { IntegerControl, NumberControl, SliderControl } from './number-control.tsx'
 import { RelationshipControl } from './relationship-control.tsx'
 import { RichTextControl } from './rich-text.tsx'
 import { DecimalControl, EmailControl, OtpControl, ReadOnlyControl, TextControl } from './text-control.tsx'
@@ -24,7 +24,7 @@ export const defaultComponents: Components = {
     text: TextControl,
     email: EmailControl,
     number: NumberControl,
-    integer: NumberControl,
+    integer: IntegerControl,
     decimal: DecimalControl,
     datetime: DatePicker,
     // A calendar day reports the `yyyy-mm-dd` the column holds and never goes through a moment, which would move the day.

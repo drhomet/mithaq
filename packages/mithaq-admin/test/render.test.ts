@@ -1045,6 +1045,41 @@ test('33. the column popup moves a column past the hidden one between it and its
   assert.deepEqual(move({ columns, at: 2, by: 1 }), columns, 'and a move with no neighbour is the same list, which is what the disabled button stands for')
 })
 
+test('40b. every file an item writes imports only files its own registryDependencies write, followed through each sibling', () => {
+  // `shadcn add` installs an item and its dependencies alone, so a sibling file reached by none of them is a broken import in the project.
+  const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {
+    items: { name: string; registryDependencies?: string[]; files: { path: string; target: string }[] }[]
+  }
+  const installedAt = (target: string) => (target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`)
+  const byName = new Map(source.items.map((item) => [item.name, item]))
+  const writtenBy = new Set(source.items.flatMap((item) => item.files.map((file) => installedAt(file.target))))
+  const closure = (name: string, seen = new Set<string>()): Set<string> => {
+    if (seen.has(name)) return seen
+    seen.add(name)
+    for (const one of byName.get(name)!.registryDependencies ?? []) {
+      const sibling = /mithaq-admin\/r\/(.+)\.json$/.exec(one)?.[1]
+      if (sibling) closure(sibling, seen)
+    }
+    return seen
+  }
+  let checked = 0
+  for (const item of source.items) {
+    const reached = new Set([...closure(item.name)].flatMap((name) => byName.get(name)!.files.map((file) => installedAt(file.target))))
+    for (const file of item.files) {
+      const at = installedAt(file.target)
+      const text = readFileSync(new URL(`../${file.path}`, import.meta.url), 'utf8')
+      for (const [, specifier] of text.matchAll(/from '(\.{1,2}\/[^']+|@\/[^']+)'/g)) {
+        const path = specifier!.startsWith('@/') ? `src/${specifier!.slice(2)}` : new URL(specifier!, `file:///${at}`).pathname.slice(1)
+        // A file no item writes is the app's own, which the host's description names.
+        if (!writtenBy.has(path)) continue
+        checked++
+        assert.ok(reached.has(path), `${item.name} writes ${at}, which imports ${path}, and nothing its registryDependencies reach writes it`)
+      }
+    }
+  }
+  assert.ok(checked > 50, `the imports were read: ${checked}`)
+})
+
 test('40. every item names the shadcn primitive it imports in registryDependencies, and names no primitive it does not import', () => {
   // A bare name in `registryDependencies` makes `shadcn add` install shadcn's own primitive beside ours; read off the source so a new import is compared.
   const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {

@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { Slider } from '@/components/ui/slider'
+import { useComponents } from './components.tsx'
 import { changeOf, type ControlProps } from './control-props.ts'
 import { labelFor } from './copy.ts'
 import { typed } from './text-control.tsx'
@@ -11,6 +12,12 @@ export const NumberControl = typed('number', (text) => {
   const parsed = Number(text)
   return Number.isNaN(parsed) ? undefined : parsed
 })
+
+/** Whatever the map draws a number with, so a project that replaces `number` replaces `integer` too. */
+export function IntegerControl(props: ControlProps): ReactElement {
+  const { number: Number } = useComponents().controls
+  return <Number {...props} />
+}
 
 const sliderKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'])
 

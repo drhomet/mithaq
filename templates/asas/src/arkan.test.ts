@@ -170,6 +170,13 @@ test('a kind no registry control draws names itself as its control, which the pr
     /controls "text" control names "color", which is no name in this screen's components and no control the registry ships/,
     'another kind cannot borrow it, since the map draws it by the kind',
   )
+  // A registry control only a rukn's kind brings, such as richText, is never claimed by a kind of the same name that the rukn did not bring.
+  const lookalike = kind<string>(isString)({ label, message, rules: ['required'], targets: { drizzle: (field: { column: string }) => text(field.column), zod: () => z.string() } })
+  const claiming = screenTarget({ ...screen, controls: { ...screenKinds, richText: { control: 'richText', cell: 'text' } } })
+  assert.throws(
+    () => build(defineMithaq({ targets: { ...offline(), dashboard: claiming }, arkan: [base, defineRukn({ name: 'lookalikes', kinds: { richText: lookalike } })] }), { body: { kind: 'richText' } }),
+    /controls "richText" control names "richText", which is no name in this screen's components and no control the registry ships/,
+  )
 })
 
 test('buildAsas refuses a field whose kind neither the target nor the kind itself builds, naming both', () => {

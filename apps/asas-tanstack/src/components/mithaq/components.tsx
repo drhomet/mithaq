@@ -1,5 +1,5 @@
 import { createContext, use, type ReactElement, type ReactNode } from 'react'
-import type { builtInScreenKinds, ClientField, registryControls } from 'mithaq/admin'
+import type { builtInScreenKinds, ClientField, ClientKayan, registryControls } from 'mithaq/admin'
 import type { Control } from './control-props.ts'
 
 type Shipped = (typeof registryControls)[number]
@@ -62,7 +62,28 @@ export const controlFor = (controls: Controls, field: ClientField): Control => {
 }
 
 /**
+ * Every field a screen draws, checked against the map once, so an app that calls this as it starts fails there, naming each kind and field, and not on the page that first draws one. A join is drawn by no form, so it needs no control.
+ */
+export const checkComponents = ({ client, components }: { client: { kayan: Readonly<Record<string, Pick<ClientKayan, 'name' | 'fields' | 'operations'>>> }; components: Components }): void => {
+  const missing = Object.values(client.kayan).flatMap((kayan) =>
+    [...kayan.fields, ...kayan.operations.flatMap((operation) => operation.fields ?? [])]
+      .filter((field) => field.kind !== 'join' && !namedControl(components.controls, field.component) && !namedControl(components.controls, field.kind))
+      .map((field) => `components.controls has no control for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.`),
+  )
+  if (missing.length) throw new Error(`${[...new Set(missing)].join('\n')}\nSpread defaultComponents.controls into the map and add one under each kind's name.`)
+}
+
+/** What a route that threw draws in place of its page, inside the shell above it: the error's own words, which name what to fix. */
+export function RouteError({ error }: { error: unknown }): ReactElement {
+  return (
+    <div role="alert" data-route-error="" className="m-4 rounded-md border border-destructive/50 px-3 py-2 text-sm whitespace-pre-line text-destructive">
+      {error instanceof Error ? error.message : String(error)}
+    </div>
+  )
+}
+
+/**
  * Whether a control's label sits beside it rather than above: a checkbox or a switch reads as attached to its words.
  */
 export const besideLabel = (controls: Controls, Control: unknown) => Control === controls.checkbox || Control === controls.switch
-// mithaq-admin fece91d1f4718f8c5f3f526de4c65f879422028c c39c8e8852ba2edd943277a495881dffa25d99312415cd064a6289efd9fcd1bc
+// mithaq-admin fdc32f5733c79e13845896eca9c9f847174551be 5061fd37f520cb1321fcc8943bbfe7f315871f9a606221b795d7e5bd11117a35

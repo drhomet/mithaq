@@ -117,6 +117,7 @@
       "description": "The number box that reports a number or nothing, and the slider that draws an unset value with no thumb.",
       "registryDependencies": [
         "slider",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-format.json",
@@ -432,6 +433,7 @@
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
       ],
       "files": [

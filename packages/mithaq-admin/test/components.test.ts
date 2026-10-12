@@ -9,7 +9,7 @@ import { fetchHttp } from 'mithaq'
 import './tsx.ts'
 
 const { Form } = await import('../registry/form.tsx')
-const { ComponentsProvider } = await import('../registry/components.tsx')
+const { ComponentsProvider, RouteError, checkComponents } = await import('../registry/components.tsx')
 const { defaultComponents } = await import('../registry/default-components.tsx')
 type Components = import('../registry/components.tsx').Components
 type ControlsOf<L> = import('../registry/components.tsx').ControlsOf<L>
@@ -66,7 +66,31 @@ test('a kind the project\'s rukn brings is drawn by the control its map names fo
     const controls = { ...defaultComponents.controls, color: ColorControl } satisfies ControlsOf<typeof language>
     assert.match(swatch({ ...defaultComponents, controls }), /<input id="swatches-color" type="color"[^>]*value="#c0ffee"/, 'the project\'s color control draws the field')
     assert.throws(() => swatch(defaultComponents), /components\.controls has no control for "color", the kind of field "color"/)
+    // The app checks every screen it serves against its map at startup, so the gap fails there and not on the page that draws it.
+    const client = built.targets.dashboard.client
+    assert.throws(() => checkComponents({ client, components: defaultComponents }), /components\.controls has no control for kind "color", which swatches\.color is drawn with/)
+    assert.doesNotThrow(() => checkComponents({ client, components: { ...defaultComponents, controls } }))
+    assert.doesNotThrow(() => checkComponents({ client: screen, components: defaultComponents }), 'the template\'s own screen needs nothing past the defaults')
   } finally {
     await built.destroy()
   }
+})
+
+test('a route that throws draws the error\'s own words in an alert', () => {
+  const html = renderToStaticMarkup(createElement(RouteError, { error: new Error('components.controls has no control for kind "color", which swatches.color is drawn with.') }))
+  assert.match(html, /<div role="alert" data-route-error=""[^>]*>components\.controls has no control for kind &quot;color&quot;, which swatches\.color is drawn with\.<\/div>/)
+})
+
+test('an integer is drawn by whatever the map draws a number with, so replacing number replaces both', () => {
+  const seats = { ...courses, fields: [{ name: 'seats', kind: 'integer', component: 'integer', cell: 'integer', rules: {} }] } as typeof courses
+  const Counter = ({ id, value }: ControlProps) => createElement('output', { id, 'data-counter': '' }, String(value))
+  const html = drawn(createElement(ComponentsProvider, { components: { ...defaultComponents, controls: { ...defaultComponents.controls, number: Counter } } }, createElement(Form, {
+    kayan: seats,
+    client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+    value: { id: 'c1', seats: 12 },
+    t,
+    locale: 'en',
+    onDone: () => {},
+  })))
+  assert.match(html, /<output id="courses-seats" data-counter="">12<\/output>/)
 })
