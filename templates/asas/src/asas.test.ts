@@ -5160,11 +5160,11 @@ test('39. a global on a language with no tenant field refuses a create or delete
 
     assert.deepEqual(await columnsOf('project_settings'), [
       'id',
-      'updated_at',
-      'created_at',
       'site_title',
       'maintenance',
       'global_type',
+      'updated_at',
+      'created_at',
     ])
   } finally {
     await built.destroy()
@@ -7067,7 +7067,7 @@ test('71. a system role holding \'*\' holds every key of the project, on every k
 test('72. a localized field is one column per locale, and the value is an object keyed by locale on create, read and update', async () => {
   assert.deepEqual(
     await columnsOf('localized_notes'),
-    ['id', 'updated_at', 'created_at', 'title_ar', 'title_en', 'blurb_ar', 'blurb_en', 'fee'],
+    ['id', 'title_ar', 'title_en', 'blurb_ar', 'blurb_en', 'fee', 'updated_at', 'created_at'],
     'the localized fields are one column per declared locale and the plain field is one column',
   )
 
