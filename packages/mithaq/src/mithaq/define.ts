@@ -336,14 +336,15 @@ export const defineGlobal = <const L extends Language>(language: L) => {
     const Name extends string,
     const Fields extends Record<string, FieldOf<L>>,
     const Messages extends MessageTree<LocalesOf<L>> = Record<never, never>,
-    const O extends Record<string, OperationOf<L, Fields, never>> = Record<never, never>,
+    const O extends Record<string, OperationOf<L, Fields, never>> | AnyFunction = Record<never, never>,
     const AccessDef extends GlobalAccess = Record<never, never>,
     const StoreName extends StoreKeys<L['targets']> | undefined = undefined,
     const SchemaName extends SchemaKeys<L['targets']> | undefined = undefined,
     const DbName extends string | undefined = undefined,
+    const R = Record<never, never>,
   >(global: {
     name: Name
-    /** The fields, in column order: `{ ...defaultFields, siteTitle, ...defaultGlobalFields }`, or `({ defaults }) => ({ ...defaults, siteTitle })`. */
+    /** The fields, in column order: `{ ...defaultFields, ...defaultGlobalFields, siteTitle }`, or `({ defaults }) => ({ ...defaults, siteTitle })`. */
     fields: OverDefaults<CheckedFields<L, Fields>, typeof defaultFields & typeof defaultGlobalFields>
     /** This global's own copy, nested by the parts of each key, as on any kayan. */
     messages?: Messages & { [Key in keyof Messages]: StrayMessages<Messages[Key], LocalesOf<L>> }
@@ -352,7 +353,7 @@ export const defineGlobal = <const L extends Language>(language: L) => {
     /** What each target says about this global, exactly as on any kayan. */
     targets?: KayanTargetsOf<L, Fields, { service?: {
       /** The two operations a global runs, `defaultGlobalOperations` or a list of the same names, or `({ defaults }) => defaults`. */
-      operations?: OverDefaults<O, typeof defaultGlobalOperations>
+      operations?: DeclaredOperations<L, Fields, O, R, typeof defaultGlobalOperations>
       /** The store this global is written through. One of the language's targets. */
       store?: StoreName
       /** The target a write is validated against. One of the language's targets. */
@@ -383,7 +384,7 @@ export const defineGlobal = <const L extends Language>(language: L) => {
       single: true
       messages?: Messages
       out?: string
-      targets: KayanTargetsOf<L, Fields, { service: { operations: NoInfer<O> } & NamedStore<StoreName> & NamedSchema<SchemaName> }>
+      targets: KayanTargetsOf<L, Fields, { service: { operations: NoInfer<OperationsOf<O, R>> } & NamedStore<StoreName> & NamedSchema<SchemaName> }>
       custom?: Record<string, unknown>
       fields: TenantDefaulted<L, Fields>
     }

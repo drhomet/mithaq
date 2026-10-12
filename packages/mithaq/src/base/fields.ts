@@ -46,7 +46,7 @@ export const globalTypeLabel = { en: 'Global type', ar: 'النوع العام' 
 
 /**
  * The field a global spreads into its own `fields`:
- * `fields: { ...defaultFields, siteTitle, ...defaultGlobalFields }`.
+ * `fields: { ...defaultFields, ...defaultGlobalFields, siteTitle }`.
  */
 export const defaultGlobalFields = {
   globalType: {

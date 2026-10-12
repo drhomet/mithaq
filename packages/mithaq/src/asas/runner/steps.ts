@@ -687,7 +687,7 @@ export type LanguageSlots = {
 
 // Every steps function runs once, here, so what `resolve` seals is data.
 export const resolveOperations = (
-  declared: DeclaredOperations | ((defaults: never) => DeclaredOperations) | undefined,
+  declared: DeclaredOperations | undefined,
   slots: LanguageSlots = {},
 ): Record<string, AnyOperation> => {
   const given = {
@@ -697,10 +697,9 @@ export const resolveOperations = (
     afterSteps: slots.afterSteps ?? [],
     afterCommit: slots.afterCommit ?? [],
   } as never
-  const record = typeof declared === 'function' ? declared(given) : declared
-  if (!record) return {}
+  if (!declared) return {}
   const resolved: Record<string, AnyOperation> = Object.create(null)
-  for (const [name, declaration] of Object.entries(record)) {
+  for (const [name, declaration] of Object.entries(declared)) {
     if (declaration === undefined) continue
     const held = declaration as Record<string, unknown>
     const ran = Object.fromEntries(

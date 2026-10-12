@@ -16,6 +16,7 @@ import {
   draftFields,
   drizzleAdapter,
   drizzleTarget,
+  fetchHttp,
   serviceTarget,
   versionOperations,
   versions,
@@ -55,9 +56,14 @@ test('the defaults of a kayan that keeps versions hold their operations, and wit
   )
 })
 
-test('a global\'s defaults are its own fields and operations', () => {
+test('a global\'s defaults are its own fields and operations, in the order its documentation spreads them', () => {
   same(
     language.defineGlobal({ name: 'site', fields: ({ defaults }) => ({ ...defaults, title }), targets: { service: { operations: ({ defaults }) => defaults } } }),
     language.defineGlobal({ name: 'site', fields: { ...defaultFields, ...defaultGlobalFields, title }, targets: { service: { operations: defaultGlobalOperations } } }),
   )
+})
+
+test('a kayan built without defineKayan that writes its operations as a function is refused, since nothing hands it the defaults', () => {
+  const raw = { name: 'raw', fields: defaultFields, targets: { service: { operations: () => defaultOperations } } }
+  assert.throws(() => language.buildAsas({ http: [fetchHttp()], kayan: [raw] } as never), /Kayan "raw" writes its operations as a function, which only defineKayan and defineGlobal run/)
 })

@@ -1956,6 +1956,28 @@ const globalCreateAccess = defineGlobal({
   access: { create: () => true, read: () => true },
   targets: { service: { operations: defaultGlobalOperations } },
 })
+defineGlobal({
+  name: 'globalStrayOperationKey',
+  fields: { title: { kind: 'text' }, ...defaultGlobalFields },
+  // @ts-expect-error `bogus` is no key of an operation declaration, on a global as on any kayan
+  targets: { service: { operations: { ...defaultGlobalOperations, update: { ...defaultGlobalOperations.update, bogus: 1 } } } },
+})
+const globalOverDefaults = defineGlobal({
+  name: 'globalOverDefaults',
+  fields: ({ defaults }) => ({ ...defaults, title: { kind: 'text', label: { en: 'Title', ar: 'العنوان' } } }),
+  targets: { service: { operations: ({ defaults }) => defaults } },
+})
+type GlobalOverDefaultsOperations = Expect<Equal<keyof (typeof globalOverDefaults)['targets']['service']['operations'], keyof typeof defaultGlobalOperations>>
+defineGlobal({
+  name: 'globalStrayReturnedKey',
+  fields: ({ defaults }) => defaults,
+  targets: {
+    service: {
+      // @ts-expect-error `bogus` is no key of an operation declaration, in a returned object too
+      operations: ({ defaults }) => ({ ...defaults, update: { ...defaults.update, bogus: 1 } }),
+    },
+  },
+})
 
 export type GlobalProbes = [
   GlobalFindOneIsNullable,
