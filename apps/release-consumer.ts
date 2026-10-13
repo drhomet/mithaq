@@ -3,13 +3,14 @@
 // `npm create mithaq` do, with `mithaq` and `mithaq-admin` installed from the packed tarballs and no framework source; each
 // consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request and passes
 // `mithaq generate --check`: a monorepo with Bun and with npm, and with Bun a single package and a monorepo with no
-// platform console, which boots with no PLATFORM_URL.
+// platform console, which boots with no PLATFORM_URL. A project with no rich text, `mithaq` alone with npm, proves no
+// Lexical is installed with it.
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { createRequire } from 'node:module'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -50,10 +51,42 @@ try {
   }
   const tarball = `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`
   const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
+  withoutRichText(tarball)
   for (const run of [{ manager: 'bun' }, { manager: 'npm' }, { manager: 'bun', layout: 'single' }, { manager: 'bun', platform: false }]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
   rmSync(scratch, { recursive: true, force: true })
+}
+
+/** A project with no rich text installs `mithaq` and no Lexical, and still typechecks and builds its language. */
+function withoutRichText(tarball: string) {
+  const project = join(scratch, 'npm-without-rich-text')
+  mkdirSync(project)
+  writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'without-rich-text', private: true, type: 'module', dependencies: { mithaq: tarball } }))
+  writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, module: 'nodenext', target: 'esnext', noEmit: true, skipLibCheck: true, types: [] }, files: ['index.ts'] }))
+  writeFileSync(join(project, 'index.ts'), [
+    "import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, drizzleAdapter, drizzleTarget, fetchHttp, serviceTarget, zodTarget } from 'mithaq'",
+    'const { defineKayan, buildAsas } = defineMithaq({',
+    '  arkan: [base],',
+    "  targets: { drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', ...drizzleTarget }), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }) },",
+    '})',
+    "const notes = defineKayan({ name: 'notes', fields: { ...defaultFields, title: { kind: 'text', label: { en: 'Title' } } }, targets: { service: { operations: defaultOperations } } })",
+    '// @ts-expect-error a language without the richText rukn has no richText kind',
+    "defineKayan({ name: 'pages', fields: { ...defaultFields, body: { kind: 'richText', label: { en: 'Body' } } }, targets: { service: { operations: defaultOperations } } })",
+    'buildAsas({ http: [fetchHttp()], kayan: [notes] })',
+    "console.log('built without rich text')",
+    '',
+  ].join('\n'))
+  // npm installs every peer that is not optional, so a Lexical left required would land here.
+  command('npm', ['install', '--no-audit', '--no-fund'], project)
+  assert.deepEqual(readdirSync(join(project, 'node_modules')).filter((name) => /^@?lexical$/.test(name)), [], 'no Lexical is installed')
+  // `skipLibCheck` would hide a declaration that names Lexical, so the built files are read for it.
+  const dist = join(project, 'node_modules/mithaq/dist')
+  const naming = readdirSync(dist, { recursive: true, encoding: 'utf8' }).filter((file) => /\.(js|d\.ts)$/.test(file) && /'(lexical|@lexical\/[^']+)'/.test(readFileSync(join(dist, file), 'utf8')))
+  assert.ok(naming.length > 0 && naming.every((file) => file.startsWith('rich-text/')), `only mithaq/rich-text names Lexical: ${naming.join(', ')}`)
+  command(join(root, 'node_modules/.bin/tsc'), ['-p', '.'], project)
+  command(process.execPath, ['index.ts'], project)
+  console.log('release consumer passed: npm-without-rich-text')
 }
 
 async function release({ manager, tarball, adminTarball, layout = 'monorepo', platform = layout === 'monorepo' }: { manager: string; tarball: string; adminTarball: string; layout?: string; platform?: boolean }) {
