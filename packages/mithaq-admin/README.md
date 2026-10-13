@@ -15,6 +15,13 @@ installed registry, one line per file, and never writes; you merge a change by
 hand. Where it lives: `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
 [The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) describes it.
 
+When you recopy `mithaq-upload` from a version before rich text and files became
+add-ons, `upload.tsx` no longer exports `UploadPlugin`, `UploadView`, `imagePick`
+or `INSERT_UPLOAD_COMMAND`: copy `mithaq-upload-node` and import them from
+`upload-node.tsx` in your own `ui/rich-text-nodes.tsx`, and spread
+`richTextComponents` and `uploadComponents` into your components map (see
+[Rich text and files](#rich-text-and-files)).
+
 ## Add or replace a control
 
 Every screen draws a field's control, and a list or a read-only value its
@@ -50,8 +57,8 @@ const components: ComponentsOf<Language> = {
 }
 ```
 
-`ComponentsOf<Language>` requires one control and one cell per name the
-registry ships, and one of each per kind of the language that no shipped one
+`ComponentsOf<Language>` requires one control and one cell per name
+`defaultComponents` holds, and one of each per kind of the language that no shipped one
 draws, so leaving `color` out, naming a key that is neither, or a control that
 does not take `ControlProps` or a cell that does not take `CellProps` is a type
 error. A kind the language declares needs its entry
@@ -71,6 +78,34 @@ the page, the node and the cell named. On the page, such a cell is an error and
 never the field's own cell in its place. A route that throws while drawing
 is replaced by `RouteError`, the router's `defaultErrorComponent`, and the shell
 around it stays.
+
+## Rich text and files
+
+The controls and cells of the `richText` kind, which the rich text rukn
+brings, and of the `upload` kind, which the storage rukn brings, are not in
+`defaultComponents`. Each ships as an add-on map of its own,
+`richTextComponents` in `rich-text.tsx` and `uploadComponents` in `upload.tsx`,
+and a project spreads one only where its language holds the kind. A project
+without rich text never installs Lexical's editor, and one without files never
+installs the upload code:
+
+```tsx
+const components: ComponentsOf<Language> = {
+  ...defaultComponents,
+  controls: { ...defaultComponents.controls, ...richTextComponents.controls, ...uploadComponents.controls },
+  cells: { ...defaultComponents.cells, ...richTextComponents.cells, ...uploadComponents.cells },
+}
+```
+
+`ComponentsOf<Language>` asks for an add-on's control and cell whenever the
+language declares the kind and a screen's controls table draws it with the
+add-on's name, even when no kayan on any screen uses it, since the type reads
+the language and not the kayan. Leaving one out is a type error, and
+`checkComponents` stops the start naming the map to spread. A replaced
+`cells.richText` or `cells.upload` is drawn on record pages too, handed
+`whole`, and must draw the full value when `whole` is set. The rich
+text upload node (`UploadView`, `imagePick` and `UploadPlugin`) is the item
+`mithaq-upload-node`, for a project that has both.
 
 ## Replace a node
 

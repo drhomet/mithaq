@@ -7,8 +7,6 @@ import { useKayanField } from './form-context.tsx'
 import { LeafControl } from './leaf-control.tsx'
 import { refOf, type ScreenPage } from './screen-refs.ts'
 import { useRelationshipTitles } from './relationship-cell.tsx'
-import { RichTextValueView } from './rich-text.tsx'
-import { UploadValue } from './upload.tsx'
 
 /** One field of the form, bound to its value, change, blur and refusal. */
 export function BoundField({
@@ -100,11 +98,7 @@ export function FieldValue({
       <span className="text-sm">
         {!Cell
           ? Ref && <Ref field={field} value={value} row={row ?? {}} />
-          : (leaf?.cell ?? field.cell) === 'richText'
-            ? <RichTextValueView value={value} t={copy.t} />
-            : (leaf?.cell ?? field.cell) === 'upload'
-              ? <UploadValue kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} />
-              : <Cell kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} />}
+          : <Cell kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} whole />}
       </span>
       {description ? <span className="text-muted-foreground text-sm">{description}</span> : null}
     </div>

@@ -93,6 +93,11 @@ export type CellProps = {
    * server render, where every relationship cell reads as loading; no cell shows the id it holds.
    */
   titles?: RelationshipTitles
+  /**
+   * Drawn alone on a record page and not in a list's row, so a cell that shortens its value to fit a row (rich text to
+   * a line, files to thumbnails) draws all of it.
+   */
+  whole?: boolean
 }
 
 /** A cell, as the components map holds it. */

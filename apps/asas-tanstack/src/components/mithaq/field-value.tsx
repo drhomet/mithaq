@@ -7,8 +7,6 @@ import { useKayanField } from './form-context.tsx'
 import { LeafControl } from './leaf-control.tsx'
 import { refOf, type ScreenPage } from './screen-refs.ts'
 import { useRelationshipTitles } from './relationship-cell.tsx'
-import { RichTextValueView } from './rich-text.tsx'
-import { UploadValue } from './upload.tsx'
 
 /** One field of the form, bound to its value, change, blur and refusal. */
 export function BoundField({
@@ -100,14 +98,10 @@ export function FieldValue({
       <span className="text-sm">
         {!Cell
           ? Ref && <Ref field={field} value={value} row={row ?? {}} />
-          : (leaf?.cell ?? field.cell) === 'richText'
-            ? <RichTextValueView value={value} t={copy.t} />
-            : (leaf?.cell ?? field.cell) === 'upload'
-              ? <UploadValue kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} />
-              : <Cell kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} />}
+          : <Cell kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} whole />}
       </span>
       {description ? <span className="text-muted-foreground text-sm">{description}</span> : null}
     </div>
   )
 }
-// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 ed73962f8dec3cf74a2b7792fc3bfaa886440608fd2ff6818aa65bdccfb99033
+// mithaq-admin 12a77ad2d870c125421bf16c2e4e87200a870847 7c5726dd2c99fc437380d0648bad60599a1d2b4d21216390e0bd5ad1d8fb1f43

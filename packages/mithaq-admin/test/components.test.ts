@@ -11,7 +11,12 @@ import './tsx.ts'
 const { Form } = await import('../registry/form.tsx')
 const { List } = await import('../registry/list.tsx')
 const { ComponentsProvider, RouteError, cellFor, checkComponents } = await import('../registry/components.tsx')
-const { defaultComponents } = await import('../registry/default-components.tsx')
+const { defaultComponents: shipped } = await import('../registry/default-components.tsx')
+const { richTextComponents } = await import('../registry/rich-text.tsx')
+const { uploadComponents } = await import('../registry/upload.tsx')
+const { withAddOns } = await import('./with-add-ons.ts')
+// The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
+const defaultComponents = withAddOns(shipped, richTextComponents, uploadComponents)
 const { drawNodes } = await import('../registry/nodes.tsx')
 type Components = import('../registry/components.tsx').Components
 type NodeProps<Kind extends import('mithaq/admin').NodeKind> = import('../registry/node-tree.ts').NodeProps<Kind>
@@ -78,7 +83,20 @@ test('a kind the project\'s rukn brings is drawn by the control its map names fo
   // The kind names its own cell too, so the map the start accepts carries both.
   const cells = { ...defaultComponents.cells, color: ({ value }: CellProps) => String(value) }
   assert.doesNotThrow(() => checkComponents({ client, components: { ...defaultComponents, controls, cells } }))
-  assert.doesNotThrow(() => checkComponents({ client: screen, components: defaultComponents }), 'the template\'s own screen needs nothing past the defaults')
+  assert.doesNotThrow(() => checkComponents({ client: screen, components: defaultComponents }), 'the template\'s own screen needs nothing past the defaults and the add-ons it spreads')
+})
+
+test('a language with rich text or files whose map leaves out their add-on stops the start and the page, naming the map to spread', () => {
+  assert.throws(
+    () => checkComponents({ client: screen, components: shipped }),
+    (error: Error) =>
+      /components\.controls has no control for kind "richText", which courses\.details is drawn with\. The kind is not installed: spread richTextComponents into the map\./.test(error.message)
+      && /components\.cells has no cell for kind "richText", which courses\.details is drawn with\. The kind is not installed: spread richTextComponents into the map\./.test(error.message)
+      && /components\.controls has no control for kind "upload", which courses\.cover is drawn with\. The kind is not installed: spread uploadComponents into the map\./.test(error.message),
+  )
+  assert.throws(() => checkComponents({ client: screen, components: withAddOns(shipped, uploadComponents) }), /spread richTextComponents/)
+  assert.throws(() => formWith(shipped), /components\.controls has no control for "richText", the kind of field "details"\. The kind is not installed: spread richTextComponents into the map\./)
+  assert.throws(() => formWith(withAddOns(shipped, richTextComponents)), /components\.controls has no control for "upload", the kind of field "cover"\. The kind is not installed: spread uploadComponents into the map\./)
 })
 
 test('a route that throws draws the error\'s own words in an alert', () => {

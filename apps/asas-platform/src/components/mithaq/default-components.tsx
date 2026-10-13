@@ -6,12 +6,11 @@ import { CalendarControl, DatePicker } from './date-control.tsx'
 import { defaultNodes } from './default-nodes.tsx'
 import { IntegerControl, NumberControl, SliderControl } from './number-control.tsx'
 import { RelationshipControl } from './relationship-control.tsx'
-import { RichTextControl } from './rich-text.tsx'
 import { DecimalControl, EmailControl, OtpControl, ReadOnlyControl, TextControl } from './text-control.tsx'
 import { TextArrayControl, TextareaControl } from './textarea-control.tsx'
-import { UploadControl } from './upload.tsx'
 
-// Apart from the provider, so a control that reads the map imports no other control.
+// Apart from the provider, so a control that reads the map imports no other control. Rich text and files are not
+// here: `richTextComponents` and `uploadComponents` are spread in by a language that holds their kinds.
 export const defaultComponents: Components = {
   controls: {
     combobox: ComboboxControl,
@@ -35,8 +34,6 @@ export const defaultComponents: Components = {
     textArray: TextArrayControl,
     uuid: ReadOnlyControl,
     relationship: RelationshipControl,
-    upload: UploadControl,
-    richText: RichTextControl,
     textarea: TextareaControl,
     toggle: ToggleControl,
     buttonGroup: ButtonGroupControl,
@@ -46,4 +43,4 @@ export const defaultComponents: Components = {
   cells,
   nodes: defaultNodes,
 }
-// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 c0e05102666471b2730738f4c22141b36429e555002c6d93837f4f66a512f78d
+// mithaq-admin 12a77ad2d870c125421bf16c2e4e87200a870847 32b01bbcd33bde252b05626e09f996dbd35251a0e824d4ab7d8cc5bffd63786c

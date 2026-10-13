@@ -10,13 +10,16 @@ import './tsx.ts'
 import { click, fire, mount, window, type as typeInto } from './dom.ts'
 
 const { createRoot } = await import('react-dom/client')
-const { defaultComponents } = await import('../registry/default-components.tsx')
+const { withAddOns } = await import('./with-add-ons.ts')
+// The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
+const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
 const { ComponentsProvider } = await import('../registry/components.tsx')
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
-const { cells } = await import('../registry/cells.tsx')
+const cells: Readonly<Record<string, import('../registry/control-props.ts').Cell>> = defaultComponents.cells
 const { FieldValue } = await import('../registry/field-value.tsx')
 const { useRelationshipTitles } = await import('../registry/relationship-cell.tsx')
 const upload = await import('../registry/upload.tsx')
+const { UploadPlugin, UploadView, imagePick } = await import('../registry/upload-node.tsx')
 const { RichTextContext, RichTextControl, RichTextViewer, defaultPicks, defaultViews, viewsOf } = await import('../registry/rich-text.tsx')
 const { defaultNodes, UploadNode } = await import('mithaq/rich-text')
 type ClientField = import('mithaq/admin').ClientField
@@ -275,7 +278,7 @@ test('186z. the cell is a small thumbnail for an image and the name for any othe
 
 const richOf = (...children: unknown[]) => ({ root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children } })
 const uploadNode = (relationTo: string, value: string) => ({ type: 'upload', version: 3, format: '', id: 'n0', relationTo, value, fields: null })
-const provided = { nodes: viewsOf([...defaultNodes, UploadNode], [...defaultViews, upload.UploadView]), picks: [...defaultPicks, upload.imagePick], Plugin: upload.UploadPlugin }
+const provided = { nodes: viewsOf([...defaultNodes, UploadNode], [...defaultViews, UploadView]), picks: [...defaultPicks, imagePick], Plugin: UploadPlugin }
 
 test('186aa. the viewer draws an upload node from its row through the file route, and a file the viewer may not read, or of a kayan holding no files, as a placeholder', async () => {
   const viewer = (value: unknown) => createElement(RichTextContext, { value: provided }, createElement(RichTextViewer, { value, direction: 'ltr', t }))
@@ -297,7 +300,7 @@ test('186ab. the / menu\'s Image opens the upload control in a dialog, and the f
   })))
   assert.equal(provided.picks.some((one) => one.key === 'upload' && one.label.en === 'Image' && one.label.ar === 'صورة'), true)
   const editor = (host.querySelector('#courses-details') as unknown as { __lexicalEditor: import('lexical').LexicalEditor }).__lexicalEditor
-  await act(async () => upload.imagePick.onSelect({ editor, isActive: false }))
+  await act(async () => imagePick.onSelect({ editor, isActive: false }))
   await act(async () => sleep(20))
   const dialog = window.document.querySelector('[data-upload-insert]') as unknown as Element
   assert.equal(dialog !== null, true, 'the dialog opens')
