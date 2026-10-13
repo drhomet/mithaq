@@ -8,7 +8,8 @@ import type { RelationshipTitles } from './control-props.ts'
 import { labelFor, type Copy } from './copy.ts'
 import { canSort } from './list-query.ts'
 import { SelectAll, SelectRow } from './list-selection.tsx'
-import { isUntitled, refOf, type ScreenPage } from './nodes.tsx'
+import { isUntitled } from './row-title.tsx'
+import { refOf, type ScreenPage } from './screen-refs.ts'
 
 // Pinned cells are opaque (the card's fill with the head's or hovered row's tint mixed in), because a translucent one
 // shows the cells that scroll beneath it.

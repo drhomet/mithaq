@@ -17,7 +17,8 @@ import type { FindApi } from './control-props.ts'
 import { operationFieldLabelFor, operationLabelFor, type Copy } from './copy.ts'
 import { FieldShell, describedBy } from './field-shell.tsx'
 import { issuesOf, refusalWords } from './form-rules.tsx'
-import { BulkChoice, initialFocusIn, type PageButton } from './nodes.tsx'
+import { BulkChoice, type PageButton } from './node-buttons.tsx'
+import { initialFocusIn } from './record-frame.tsx'
 import { refusalKeyOf } from './refusal.ts'
 
 /**

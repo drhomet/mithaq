@@ -1,7 +1,8 @@
 import type { ClientKayan } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import type { Translate } from './copy.ts'
-import type { Draw, Node, ScreenPage } from './nodes.tsx'
+import type { Draw, Node } from './node-tree.ts'
+import type { ScreenPage } from './screen-refs.ts'
 
 /**
  * The three operations this screen drives, typed structurally so a typed oRPC client, an in-process
@@ -93,4 +94,4 @@ export type FormProps = {
    */
   expectedUpdatedAtOn?: readonly string[]
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 144d22e71e46642c5c380557efdb749b5fb097a9e3dd3d82ea3c45ff2662517c
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 58f3ee71dfa0525ea021f9beffe9b2d13ac13e1ac653d338c9d7224fa5ecae98

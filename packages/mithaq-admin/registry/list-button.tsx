@@ -2,7 +2,8 @@ import { useState, type ReactElement } from 'react'
 import type { ClientKayan, Row } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import type { Copy } from './copy.ts'
-import { NodeButton, OwnButton, refOf, type PageButton, type ScreenPage } from './nodes.tsx'
+import { NodeButton, OwnButton, type PageButton } from './node-buttons.tsx'
+import { refOf, type ScreenPage } from './screen-refs.ts'
 import { OperationButton } from './operation-button.tsx'
 
 /** One of the list node's buttons: the project's own component, a plain button, or the dialog that asks its values. */

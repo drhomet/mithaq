@@ -1,7 +1,8 @@
 import type { ClientKayan } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import type { Translate } from './copy.ts'
-import type { Draw, Node, ScreenPage } from './nodes.tsx'
+import type { Draw, Node } from './node-tree.ts'
+import type { ScreenPage } from './screen-refs.ts'
 
 /**
  * The three operations this screen drives, typed structurally so a typed oRPC client, an in-process

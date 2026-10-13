@@ -3,7 +3,8 @@ import type { ClientKayan, Row } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import type { Copy } from './copy.ts'
 import { DeleteButton } from './delete-button.tsx'
-import { rowWarning, type PageButton } from './nodes.tsx'
+import type { PageButton } from './node-buttons.tsx'
+import { rowWarning } from './row-title.tsx'
 import { OperationButton } from './operation-button.tsx'
 
 /**

@@ -2354,7 +2354,7 @@ test('65. a bulk update writes the fields its button names over the same ids, as
 
 test('65b. a bulk button that asks for fields and carries a confirm says both what it asks and how many rows it runs on', async () => {
   // The confirm's body and the ticked count are one dialog's two sentences, neither in place of the other.
-  const { listOf } = await import('../registry/nodes.tsx')
+  const { listOf } = await import('../registry/node-tree.ts')
   const node = listOf(listScreen())!
   const bulk = [{ button: 'updateMany', label: { en: 'Update', ar: 'تحديث' }, fields: ['fee'], confirm: { title: { en: 'Reprice?', ar: 'إعادة التسعير؟' }, body: { en: 'Every ticked course takes the new fee.', ar: 'تأخذ كل دورة محددة الرسوم الجديدة.' } } }]
   const host = await render(
@@ -3452,14 +3452,14 @@ test('276c. the sidebar on a phone is titled and described in the viewer\'s lang
   } finally {
     window.happyDOM.setViewport({ width })
   }
-  const { RecordFrame } = await import('../registry/nodes.tsx')
+  const { RecordFrame } = await import('../registry/record-frame.tsx')
   await render(createElement(RecordFrame, { mode: 'sheet', title: 'Edit', closeLabel: 'Close', onClose: () => {}, children: 'x' }))
   assert.match(window.document.querySelector('[data-slot="sheet-content"]')!.className, /data-\[side=right\]:max-sm:w-full/, 'the record sheet is full width below sm')
 })
 
 test('the theme provider hands its consumers one value from the first render on, stored theme or not, so nothing it holds changes a screen still hydrating', async () => {
   // A context value that changes after the first commit reaches every consumer; one inside a Suspense boundary still waiting on its files makes React drop the server's HTML there and draw the empty fallback.
-  const { ThemeProvider, useTheme } = await import('../registry/nav.tsx')
+  const { ThemeProvider, useTheme } = await import('../registry/theme.tsx')
   // 'stale' is none of the three this toggle offers, like a value left by another version of this key or another app at the same origin: it is checked before use and falls back to the default.
   for (const stored of [null, 'light', 'stale']) {
     if (stored) window.localStorage.setItem('vite-ui-theme', stored)
@@ -3624,7 +3624,7 @@ test('145a. a list of another kayan edits one row in place below its table, adds
     { id: 's1', course: 'c1', startsAt: '2026-10-01T10:00:00.000Z', capacity: 5, venue: 'campus', format: 'lecture', archived: false },
     { id: 's2', course: 'c1', startsAt: '2026-10-02T10:00:00.000Z', capacity: 8, venue: 'online', format: 'workshop', archived: false },
   ]
-  let listed: import('../registry/nodes.tsx').ListNode | undefined
+  let listed: import('../registry/node-tree.ts').ListNode | undefined
   const host = await render(
     createElement(Form, {
       kayan: courses,
@@ -5792,7 +5792,7 @@ test('177o. the count\'s live region is there before a row is ticked, and an ope
 })
 
 test('177o2. a project\'s own bulk button that ignores busy sends nothing once the ticked rows have left', async () => {
-  const { listOf } = await import('../registry/nodes.tsx')
+  const { listOf } = await import('../registry/node-tree.ts')
   const sent: unknown[] = []
   const ticked = listOf(listScreen())!
   // The template's bulk buttons, each drawn by a component of the project's own, with no confirm to ask.
@@ -5898,7 +5898,7 @@ test('182a. the form\'s own row of buttons wraps, so on a page with no header co
 })
 
 test('182b. a create opened as a drawer draws only its page: its title once, the drawer\'s own for a screen reader alone, no nav, inside a padded scroll', async () => {
-  const { RecordFrame } = await import('../registry/nodes.tsx')
+  const { RecordFrame } = await import('../registry/record-frame.tsx')
   const page = { path: '/courses/new', mode: 'drawer', page: { shell: screen.layouts.app!, header: [{ title: {} }], nav: [{ nav: {} }], main: [{ form: ['title'] }] } } as unknown as PageClient
   await render(createElement(RecordFrame, { mode: 'drawer', title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement(Form, { kayan: courses, screen: screenOf(page), client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })))
   const drawer = window.document.querySelector('[data-slot="drawer-content"]') as unknown as Element | null
@@ -5911,7 +5911,7 @@ test('182b. a create opened as a drawer draws only its page: its title once, the
 })
 
 test('182c. the nav marks the page\'s own kayan current, Home only on a page of the screen\'s own, and the portal header keeps its title over a menu that shrinks to its avatar on a phone', async () => {
-  const { NavLinks } = await import('../registry/nodes.tsx')
+  const { NavLinks } = await import('../registry/nav-links.tsx')
   const { PortalTopShell } = await import('../../../templates/asas/src/ui/top-shell.tsx')
   const { Home } = await import('../../../templates/asas/src/ui-portal/home.tsx')
   const current = (host: Element) => [...host.querySelectorAll('a[aria-current]')].map((one) => `${one.getAttribute('href')} ${one.getAttribute('aria-current')}`)
@@ -5965,7 +5965,7 @@ test('182e. a list page whose header holds no title node keeps its own heading, 
 })
 
 test('182f. a page opened as a drawer draws no nav at any depth', async () => {
-  const { RecordFrame } = await import('../registry/nodes.tsx')
+  const { RecordFrame } = await import('../registry/record-frame.tsx')
   const page = { path: '/courses/new', mode: 'drawer', page: { shell: screen.layouts.app!, header: [{ title: {} }], main: [{ row: [{ nav: {} }] }, { form: ['title'] }] } } as unknown as PageClient
   await render(createElement(RecordFrame, { mode: 'drawer', title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement(Form, { kayan: courses, screen: screenOf(page), client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })))
   assert.equal(window.document.querySelector('[data-slot="drawer-content"]')?.querySelectorAll('[data-node="nav"]').length, 0, 'a nav inside a row is left out too')
@@ -5984,7 +5984,7 @@ test('182g. the portal\'s page and main column are one shrinkable track, so no w
 test('184d. a person\'s actions open from the row\'s menu after its View, the role is picked in its own dialog that outlives the menu and sends nothing unchanged, and the rename dialog says what it changes, holds the slug left to right and closes on Cancel', async () => {
   const { UserMenu } = await import('../../../templates/asas/src/ui-platform/user-actions.tsx')
   const { OrganizationActions } = await import('../../../templates/asas/src/ui-platform/organization-actions.tsx')
-  const { listOf } = await import('../registry/nodes.tsx')
+  const { listOf } = await import('../registry/node-tree.ts')
   const platform = asas.targets.platform.client
   const over = { screen: platform, access: { permissions: '*' as const }, user: { name: 'Admin', email: 'admin@example.com' }, locale: 'ar', dir: 'rtl' as const }
   const users = platform.kayan.user!
@@ -6514,7 +6514,7 @@ test('220e. the updated line of a form left open is read again every minute, as 
 })
 
 test('220g. while a dialog, an alert dialog, a sheet or a drawer is open, everything Base UI marked outside it is inert but a live region, as outside a native modal dialog, a menu makes nothing inert, closing it clears only what was set, and stopping while one is open hands the page back', async () => {
-  const { holdFocus } = await import('../registry/nodes.tsx')
+  const { holdFocus } = await import('../registry/record-frame.tsx')
   const body = window.document.createElement('div')
   window.document.body.append(body)
   const app = window.document.createElement('div')
@@ -6597,7 +6597,8 @@ test('220i. the sidebar header draws the organizations the session came with, ne
 })
 
 // The link popover marks its address invalid only after an edit, which happy-dom cannot show: it keeps no selection for the popover to stay open on, so that one is measured in a browser.
-const appNav = '../../../apps/asas-tanstack/src/components/mithaq/nav.tsx'
+const appTheme = '../../../apps/asas-tanstack/src/components/mithaq/theme.tsx'
+const appUserMenu = '../../../apps/asas-tanstack/src/components/mithaq/nav-user.tsx'
 
 test('231a. the rich text editor is named by its field\'s label, and is required when its field is', async () => {
   const page = recordPage([{ form: ['capacity', 'details'] }], '/sessions/:id')
@@ -6737,7 +6738,7 @@ test('229e. two organizations of one name are told apart in the switcher by thei
 })
 
 test('231f. the user menu offers Light, Dark and System as radio items, marks the stored one, and sets the class and the stored key the first paint reads', async () => {
-  const { ThemeProvider } = await import(appNav)
+  const { ThemeProvider } = await import(appTheme)
   window.localStorage.setItem('vite-ui-theme', 'light')
   const host = await render(createElement(ThemeProvider, { defaultTheme: 'system', storageKey: 'vite-ui-theme', children: createElement(AppShell, { regions: { header: null, main: 'x' } }) }))
   await act(async () => click(host.querySelector('[data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"]')!))
@@ -6766,7 +6767,8 @@ test('231g. a person who may enter another screen finds a link to it in the user
 })
 
 test('231h. the theme group is drawn only where a provider keeps the choice and the project has not emptied `themes`, and offers the themes it is given', async () => {
-  const { ThemeProvider, NavUserMenu } = await import(appNav)
+  const { ThemeProvider } = await import(appTheme)
+  const { NavUserMenu } = await import(appUserMenu)
   const { SidebarProvider } = await import('../registry/ui/sidebar.tsx')
   const menu = async (themes?: readonly string[], provide = true) => {
     const inner = createElement(SidebarProvider, null, createElement(NavUserMenu, { user: { name: 'Admin', email: 'admin@example.com' }, t, onSignOut: () => {}, ...(themes && { themes }) }))
@@ -6973,7 +6975,7 @@ test('233k. the upcoming sessions fold the venue and the capacity under the cour
 })
 
 test('233l. a session\'s Enrollments tab is drawn, and its list read, only for an actor the report lets read enrollments', async () => {
-  const { scopeOf, shown } = await import('../registry/nodes.tsx')
+  const { scopeOf, shown } = await import('../registry/node-tree.ts')
   const edit = sessions.pages.edit as Extract<PageClient, { page: unknown }>
   const tabs = ((edit.page.main as unknown as { main: { tabs: { tab: string; fields: { when?: object }[] }[] }[] }[])[0]!.main[0]!).tabs
   const tab = tabs.find((one) => one.tab === 'enrollments')!
@@ -6986,7 +6988,8 @@ test('233l. a session\'s Enrollments tab is drawn, and its list read, only for a
   assert.equal(holds({}), false, 'and one the report leaves them out for, the registrar')
 
   // The tab strip leaves the tab out, and the host reads no list of it.
-  const { pageOf: drawPage, frameOf, nodesOf, relatedIn } = await import('../registry/nodes.tsx')
+  const { pageOf: drawPage, frameOf } = await import('../registry/nodes.tsx')
+  const { nodesOf, relatedIn } = await import('../registry/node-tree.ts')
   const shell = ({ regions }: { regions: Record<string, ReactElement> }) => createElement('div', null, regions.header, regions.main)
   const tabsFor = async (collections: Record<string, unknown>) => {
     const page = { refs: { [screen.layouts.app!]: shell, [screen.layouts.record!]: RecordPage } as never, kayan: sessions, page: edit }

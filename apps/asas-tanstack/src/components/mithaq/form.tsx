@@ -13,8 +13,13 @@ import { KayanForm } from './form-context.tsx'
 import { FormLayout } from './form-layout.tsx'
 import { brokenRule } from './form-rules.tsx'
 import type { FormProps } from './form-types.tsx'
-import { LeafControl, NavLinks, drawNodes, drawsKind, frameOf, nodesOf, pageButtonOf, pageOf, refOf, scopeOf, type Draw, type PageButton } from './nodes.tsx'
+import { LeafControl } from './leaf-control.tsx'
+import { NavLinks } from './nav-links.tsx'
+import { pageButtonOf, type PageButton } from './node-buttons.tsx'
+import { drawsKind, nodesOf, scopeOf, type Draw } from './node-tree.ts'
+import { drawNodes, frameOf, pageOf } from './nodes.tsx'
 import { localesOf } from './refusal.ts'
+import { refOf } from './screen-refs.ts'
 import { useAutosave } from './use-autosave.tsx'
 import { useDraftView } from './use-draft-view.tsx'
 import { useFormRefusal } from './use-form-refusal.tsx'
@@ -210,4 +215,4 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     </KayanForm.Provider>
   )
 }
-// mithaq-admin a5b0579ead0ea90a1c1f8e4f767641c7e178a7af 34dc69b5c5f159e0f386e13ff64a693593eb7f24d20e2a6a033b260b1976234c
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 161669577948bdead7258e74ea2999c390736d4514fd743cba6b0a90deb0c7c3

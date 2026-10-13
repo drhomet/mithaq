@@ -6,7 +6,7 @@ import { List } from './components/mithaq/list.tsx'
 import type { ListProps, Page } from './components/mithaq/list-types.tsx'
 import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from './components/mithaq/list-query.ts'
 import { counted } from './components/mithaq/format.tsx'
-import { listOf } from './components/mithaq/nodes.tsx'
+import { listOf } from './components/mithaq/node-tree.ts'
 
 /**
  * The list's search as the router carries it: the URL's pairs as strings, each
@@ -137,4 +137,4 @@ export function ScreenList({
     </ListContext>
   )
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 a8ab09598ad19f5750b3b618a1c23177f568e5462ff98c3b3fb0b5891bb86a3d
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 141f58b7b599d53e52641994bcd039eacff5f251051922006eb5151ecf4207f8

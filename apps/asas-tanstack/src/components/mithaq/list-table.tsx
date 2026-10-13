@@ -8,7 +8,8 @@ import type { RelationshipTitles } from './control-props.ts'
 import { labelFor, type Copy } from './copy.ts'
 import { canSort } from './list-query.ts'
 import { SelectAll, SelectRow } from './list-selection.tsx'
-import { isUntitled, refOf, type ScreenPage } from './nodes.tsx'
+import { isUntitled } from './row-title.tsx'
+import { refOf, type ScreenPage } from './screen-refs.ts'
 
 // Pinned cells are opaque (the card's fill with the head's or hovered row's tint mixed in), because a translucent one
 // shows the cells that scroll beneath it.
@@ -227,4 +228,4 @@ export function ListTable({
     </div>
   )
 }
-// mithaq-admin a5b0579ead0ea90a1c1f8e4f767641c7e178a7af b804300ef0a076abafb56fdb85c8202597da5f6c4df1767a8721c7626de55f03
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 48f71ea5346afe9125806acf8fbdbbd00ad127db7d82afe9de3c6efec8432735

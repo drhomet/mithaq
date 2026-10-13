@@ -3,6 +3,7 @@ import { ButtonGroupControl, CheckboxGroupControl, ComboboxControl, RadioControl
 import { CheckboxControl, SwitchControl, ToggleControl } from './checkbox-control.tsx'
 import type { Components } from './components.tsx'
 import { CalendarControl, DatePicker } from './date-control.tsx'
+import { defaultNodes } from './default-nodes.tsx'
 import { IntegerControl, NumberControl, SliderControl } from './number-control.tsx'
 import { RelationshipControl } from './relationship-control.tsx'
 import { RichTextControl } from './rich-text.tsx'
@@ -43,4 +44,5 @@ export const defaultComponents: Components = {
     calendar: CalendarControl,
   },
   cells,
+  nodes: defaultNodes,
 }

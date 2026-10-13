@@ -4,7 +4,8 @@ import type { ClientKayan, Row } from 'mithaq/admin'
 import { buttonVariants } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { operationLabelFor, type Copy } from './copy.ts'
-import type { PageButton, Places } from './nodes.tsx'
+import type { PageButton } from './node-buttons.tsx'
+import type { Places } from './screen-refs.ts'
 
 export type RowMenuProps = {
   kayan: ClientKayan
@@ -70,4 +71,4 @@ export function RowMenu({ copy, kayan, label, Menu, menu, onDelete, onOpen, onRu
     </DropdownMenu>
   )
 }
-// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 b9f00854291180fdd85e7ebe77eb17c994b0842ce58a1d9b6b9106c194bde4d2
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 9f65eb505ebec69c386992532134009e03e61709a62a3f59e91b020af76cbcf6

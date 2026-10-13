@@ -3,7 +3,9 @@ import type { ClientKayan } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import { operationLabelFor, type Copy } from './copy.ts'
 import { DeleteButton } from './delete-button.tsx'
-import { NodeButton, OwnButton, refOf, rowWarning, type PageButton, type ScreenPage } from './nodes.tsx'
+import { NodeButton, OwnButton, type PageButton } from './node-buttons.tsx'
+import { rowWarning } from './row-title.tsx'
+import { refOf, type ScreenPage } from './screen-refs.ts'
 import { OperationButton } from './operation-button.tsx'
 
 export type FormButtonProps = {
@@ -65,4 +67,4 @@ export function FormButton({ api, busy, copy, id, kayan, kayans, onDelete, opera
     />
   )
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 5269b16d04296df8fca5d2b0faaff88e5ef384cab80e60e37e0c6ef18002cf5f
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 f0d5634f7f7dc6ed825518dbc29055801e897e8ebed5145adef46d5c1b3492b2

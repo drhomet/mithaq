@@ -1,6 +1,8 @@
-import { createContext, use, type ReactElement, type ReactNode } from 'react'
-import type { builtInScreenKinds, ClientField, ClientKayan, registryCells, registryControls } from 'mithaq/admin'
+import { createContext, use, type ComponentType, type ReactElement, type ReactNode } from 'react'
+import type { builtInScreenKinds, ClientField, ClientKayan, NodeKind, registryCells, registryControls } from 'mithaq/admin'
 import type { Cell, Control } from './control-props.ts'
+import { kindsIn, nodesOf, type NodeProps } from './node-tree.ts'
+import type { TreePage } from './screen-refs.ts'
 
 type Shipped = (typeof registryControls)[number]
 // `join` among them: no form draws a join, so it needs no control.
@@ -33,10 +35,18 @@ export type ControlsOf<L> = Controls & { readonly [Kind in OwnKinds<L>]: Control
 /** One cell per shipped name and per kind of this language that no shipped cell draws. */
 export type CellsOf<L> = Cells & { readonly [Kind in OwnCellKinds<L>]: Cell }
 
+/**
+ * One component per kind of node a page may hold, which `defaultComponents` holds. A project replaces one and adds
+ * none: a screen's build refuses any kind mithaq/admin does not declare, so no page could name it, and a project
+ * draws its own thing with a `component` node.
+ */
+export type Nodes = { readonly [Kind in NodeKind]: ComponentType<NodeProps<Kind>> }
+
 /** Every piece of the admin a project may replace or add to, each a map of named defaults it spreads. */
 export type ComponentsOf<L> = {
   controls: ControlsOf<L>
   cells: CellsOf<L>
+  nodes: Nodes
 }
 
 /** The map of a language that adds no kind of its own, which `defaultComponents` is. */
@@ -62,6 +72,13 @@ const named = <Drawn,>(map: object, name: string | undefined): Drawn | undefined
   name !== undefined && Object.hasOwn(map, name) ? (map as Readonly<Record<string, Drawn>>)[name] : undefined
 export const namedControl = (controls: Controls, name: string | undefined) => named<Control>(controls, name)
 export const namedCell = (cells: Cells, name: string | undefined) => named<Cell>(cells, name)
+
+/** The component a node of this kind is drawn by; a kind the map does not carry is an error, never drawn as nothing. */
+export const nodeFor = (nodes: Nodes, kind: string): ComponentType<NodeProps> => {
+  const found = named<ComponentType<NodeProps>>(nodes, kind)
+  if (!found) throw new Error(`components.nodes has no node "${kind}". Spread defaultComponents.nodes into the map and add one under that name.`)
+  return found
+}
 // A `ui()` reference is drawn by the screen and never by the map, and only a reference holds a `#`.
 const drawnByMap = (name: string) => !name.includes('#')
 
@@ -101,11 +118,14 @@ const namedCells = (node: unknown, at: string): { cell: string; at: string }[] =
 }
 
 /**
- * Every field a screen draws, and every cell its pages name, checked against the map once, so an app that calls this as it starts fails there, naming each kind and field, and not on the page that first draws one. A join is drawn by no form, so it needs no control; an operation's box is drawn by no list, so it needs no cell.
+ * Every field a screen draws, every cell its pages name and every kind of node they hold, checked against the map once, so an app that calls this as it starts fails there, naming each kind and field, and not on the page that first draws one. A join is drawn by no form, so it needs no control; an operation's box is drawn by no list, so it needs no cell.
  */
 export const checkComponents = ({ client, components }: { client: { path?: string; kayan: Readonly<Record<string, Pick<ClientKayan, 'name' | 'fields' | 'operations' | 'pages'>>> }; components: Components }): void => {
-  const { cells, controls } = components
+  const { cells, controls, nodes } = components
   const missing = Object.values(client.kayan).flatMap((kayan) => [
+    ...Object.entries(kayan.pages ?? {}).flatMap(([page, drawn]) => ('page' in drawn && drawn.page ? kindsIn(nodesOf(drawn as TreePage)) : [])
+      .filter((kind) => !Object.hasOwn(nodes, kind))
+      .map((kind) => `components.nodes has no node "${kind}", which screen ${client.path} ${kayan.name} page "${page}" draws.`)),
     ...Object.entries(kayan.pages ?? {}).flatMap(([page, drawn]) => namedCells(drawn, `screen ${client.path} ${kayan.name} page "${page}" leaf`))
       .filter(({ cell }) => !namedCell(cells, cell))
       .map(({ cell, at }) => `components.cells has no cell "${cell}", which ${at} names.`),
@@ -116,7 +136,7 @@ export const checkComponents = ({ client, components }: { client: { path?: strin
       .filter((field) => !namedCell(cells, field.cell) && !namedCell(cells, field.kind))
       .map((field) => `components.cells has no cell for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.`),
   ])
-  if (missing.length) throw new Error(`${[...new Set(missing)].join('\n')}\nSpread defaultComponents.controls and defaultComponents.cells into the map and add one under each kind's name.`)
+  if (missing.length) throw new Error(`${[...new Set(missing)].join('\n')}\nSpread defaultComponents.controls, defaultComponents.cells and defaultComponents.nodes into the map and add one under each name.`)
 }
 
 /** What a route that threw draws in place of its page, inside the shell above it: the error's own words, which name what to fix. */

@@ -2,7 +2,8 @@ import { useState, type ReactElement } from 'react'
 import type { ClientKayan, Row } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import type { Copy } from './copy.ts'
-import { NodeButton, OwnButton, refOf, type PageButton, type ScreenPage } from './nodes.tsx'
+import { NodeButton, OwnButton, type PageButton } from './node-buttons.tsx'
+import { refOf, type ScreenPage } from './screen-refs.ts'
 import { OperationButton } from './operation-button.tsx'
 
 /** One of the list node's buttons: the project's own component, a plain button, or the dialog that asks its values. */
@@ -68,4 +69,4 @@ export function ListButton({
     />
   )
 }
-// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 98476e6ae97ae9fff3a60eb99c854b8a68ca456c8756b85e2cbec961e4373f69
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 bff9693ac1e5e1be72a0246bdf2c1cba5d26b471eea6e1d9cb31d569d7a3c8f1

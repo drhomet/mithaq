@@ -14,7 +14,13 @@ import type { Page } from './components/mithaq/list-types.tsx'
 import { QueryRefused, findOf, listRaw, prefixOf, readQuery, rulesOf, scopedTo, withList, type RawQuery } from './components/mithaq/list-query.ts'
 import { newTitleOf, titleOf } from './components/mithaq/copy.ts'
 import { createsIn } from './components/mithaq/field-values.ts'
-import { NavLinks, NodeButton, OwnButton, RecordFrame, formIn, holdFocus, frameOf, listIn, nodesOf, pageButtonOf, pageOf, readsAsValues, refOf, relatedIn, rowTitle, scopeOf, type Draw, type Refs, type TreePage } from './components/mithaq/nodes.tsx'
+import { NavLinks } from './components/mithaq/nav-links.tsx'
+import { NodeButton, OwnButton, pageButtonOf } from './components/mithaq/node-buttons.tsx'
+import { formIn, listIn, nodesOf, readsAsValues, relatedIn, scopeOf, type Draw } from './components/mithaq/node-tree.ts'
+import { frameOf, pageOf } from './components/mithaq/nodes.tsx'
+import { RecordFrame, holdFocus } from './components/mithaq/record-frame.tsx'
+import { rowTitle } from './components/mithaq/row-title.tsx'
+import { refOf, type Refs, type TreePage } from './components/mithaq/screen-refs.ts'
 import { idsOf } from './components/mithaq/relationship-control.tsx'
 import { ScreenForm } from './screen-form.tsx'
 import { ScreenList, askedFor, readsDrafts, rowReadsDrafts, rowsKey } from './screen-list.tsx'
@@ -867,4 +873,4 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   }
   return form
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 dd1058c0361abd121daea677356d1b8366375a8eec318d4c30007946b57b62da
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 4c2f2f579cec6934529445ffb09f62f6c739696d2362a3144a87763875308a59

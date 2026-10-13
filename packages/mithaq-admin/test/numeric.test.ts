@@ -83,7 +83,7 @@ test('a filter and a sort on either kind survive the URL in the kind\'s own JS t
 })
 
 test('a node whose when compares a decimal is shown by the values the text holds, padded or not, over a form\'s values and over the record', async () => {
-  const { scopeOf, shown } = await import('../registry/nodes.tsx')
+  const { scopeOf, shown } = await import('../registry/node-tree.ts')
   const node = (when: object) => ({ field: 'quantity', when }) as never
   const at = (values: Record<string, unknown>, record: Record<string, unknown> | null = null) => scopeOf({ values, record, access: null, kayan })
   // As text '999.00' is above '1000'.

@@ -1,0 +1,29 @@
+import { use, type ReactElement } from 'react'
+import { ScreenContext, useLocale, useScreen } from 'mithaq/admin/react'
+import { titleOf } from './copy.ts'
+
+/**
+ * Whether a nav entry is the page the viewer is on: its kayan is the page's own, on every page of that
+ * kayan. Known on the server, so the first paint marks it.
+ */
+export const currentOf = (entry: { kayan?: string }, kayan: string | undefined): 'page' | undefined =>
+  entry.kayan !== undefined && entry.kayan === kayan ? 'page' : undefined
+
+/** The screen's nav as the host provides it: one link per entry under the screen's path. */
+export function NavLinks(): ReactElement {
+  const screen = useScreen()
+  const copy = useLocale()
+  const current = use(ScreenContext)?.kayan?.name
+  return (
+    <ul className="flex flex-col gap-1">
+      {screen.nav.map((entry) => (
+        <li key={`${entry.page}${entry.path}`}>
+          <a href={`${screen.path}${entry.path}`} aria-current={currentOf(entry, current)} className="text-sm">
+            {entry.label?.[copy.locale] ?? titleOf({ kayan: { name: entry.kayan ?? entry.page }, copy, many: !screen.kayan[entry.kayan ?? '']?.single })}
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 04d16173c536dbef84d57a67539e62b48044a40baabe2feae96a50bf5d7223ca

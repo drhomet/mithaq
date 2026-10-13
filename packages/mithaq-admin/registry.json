@@ -80,7 +80,9 @@
       "title": "Mithaq components",
       "description": "The components map a project hands the admin, the provider it mounts it with, the lookups that pick a field's control and cell from it (the screen's decided name, else the kind's, and an error naming the kind where the map has neither), and the check an app runs on every screen as it starts.",
       "registryDependencies": [
-        "./node_modules/mithaq-admin/r/mithaq-control-props.json"
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -226,6 +228,7 @@
         "./node_modules/mithaq-admin/r/mithaq-choice-control.json",
         "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-date-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-default-nodes.json",
         "./node_modules/mithaq-admin/r/mithaq-number-control.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
         "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
@@ -386,7 +389,8 @@
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-form-types.json",
         "./node_modules/mithaq-admin/r/mithaq-list-query.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -404,8 +408,9 @@
       "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
-        "./node_modules/mithaq-admin/r/mithaq-operation-button.json"
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-operation-button.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -424,7 +429,8 @@
         "button",
         "dropdown-menu",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -447,7 +453,8 @@
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-list-query.json",
         "./node_modules/mithaq-admin/r/mithaq-list-selection.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
+        "./node_modules/mithaq-admin/r/mithaq-row-title.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -521,8 +528,9 @@
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-delete-button.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
-        "./node_modules/mithaq-admin/r/mithaq-operation-button.json"
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-operation-button.json",
+        "./node_modules/mithaq-admin/r/mithaq-row-title.json"
       ],
       "files": [
         {
@@ -554,8 +562,11 @@
         "./node_modules/mithaq-admin/r/mithaq-list-table.json",
         "./node_modules/mithaq-admin/r/mithaq-list-toolbar.json",
         "./node_modules/mithaq-admin/r/mithaq-list-types.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-row-title.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json",
         "./node_modules/mithaq-admin/r/mithaq-use-list-state.json"
       ],
       "files": [
@@ -567,37 +578,210 @@
       ]
     },
     {
-      "name": "mithaq-nodes",
-      "type": "registry:component",
-      "title": "Mithaq nodes",
-      "description": "The node tree both forms draw, a screen's page and the admin's layout alike, the frame a record opens in over the list, the adapter from a screen's kayan, and one props type per place a screen names a component.",
+      "name": "mithaq-screen-refs",
+      "type": "registry:lib",
+      "title": "Mithaq screen refs",
+      "description": "The components a screen names by path, typed for the place each sits in, and the page a form or a list draws a screen's tree with.",
+      "files": [
+        {
+          "path": "registry/screen-refs.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/screen-refs.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-node-tree",
+      "type": "registry:lib",
+      "title": "Mithaq node tree",
+      "description": "What a page's tree holds and how a walk reads it: what each kind of node holds, which nodes a when shows, the list and form nodes a page holds, and what a tree is drawn with.",
       "registryDependencies": [
-        "accordion",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
+      ],
+      "files": [
+        {
+          "path": "registry/node-tree.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/node-tree.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-row-title",
+      "type": "registry:component",
+      "title": "Mithaq row title",
+      "description": "What a row is called by its kayan's title field, whether that title is empty, and the sentence a button's dialog says it runs on.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
+      ],
+      "files": [
+        {
+          "path": "registry/row-title.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/row-title.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-nav-links",
+      "type": "registry:component",
+      "title": "Mithaq nav links",
+      "description": "The screen's nav as the host provides it, one link per entry, with the page the viewer is on marked.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/nav-links.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/nav-links.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-use-confirm",
+      "type": "registry:component",
+      "title": "Mithaq use confirm",
+      "description": "A button's confirm, asked in the app's own alert dialog in the page's language rather than the browser's.",
+      "registryDependencies": [
         "alert-dialog",
-        "badge",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/use-confirm.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/use-confirm.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-node-buttons",
+      "type": "registry:component",
+      "title": "Mithaq node buttons",
+      "description": "The buttons a page draws where a node sits: the operation the actor may run, the registry's button, a project's own button behind its confirm, and a bulk update's box for a yes-or-no field.",
+      "registryDependencies": [
         "button",
-        "card",
-        "collapsible",
-        "dialog",
-        "drawer",
-        "resizable",
-        "scroll-area",
         "select",
-        "separator",
-        "sheet",
-        "tabs",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json",
+        "./node_modules/mithaq-admin/r/mithaq-use-confirm.json"
+      ],
+      "files": [
+        {
+          "path": "registry/node-buttons.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/node-buttons.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-leaf-control",
+      "type": "registry:component",
+      "title": "Mithaq leaf control",
+      "description": "One field's control in its shell, as a form draws a leaf, with one box per locale for a localized field.",
+      "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
-        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
-        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
+      ],
+      "files": [
+        {
+          "path": "registry/leaf-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/leaf-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-record-frame",
+      "type": "registry:component",
+      "title": "Mithaq record frame",
+      "description": "The dialog, sheet or drawer a record opens in over its list, its close button named in the viewer's language, and the focus held inside it while it is open.",
+      "registryDependencies": [
+        "button",
+        "dialog",
+        "drawer",
+        "sheet"
+      ],
+      "files": [
+        {
+          "path": "registry/record-frame.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/record-frame.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-nodes",
+      "type": "registry:component",
+      "title": "Mithaq nodes",
+      "description": "How a page's tree is drawn: each node by its kind's component in the components map, each run of loose fields on a card, and the shell and the layouts a page names handed their regions.",
+      "registryDependencies": [
+        "card",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
           "path": "registry/nodes.tsx",
           "type": "registry:component",
           "target": "@components/mithaq/nodes.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-node-groups",
+      "type": "registry:component",
+      "title": "Mithaq node groups",
+      "description": "The tabs, accordion and section nodes, which group a page's fields under a label.",
+      "registryDependencies": [
+        "accordion",
+        "badge",
+        "card",
+        "collapsible",
+        "scroll-area",
+        "tabs",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
+      ],
+      "files": [
+        {
+          "path": "registry/node-groups.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/node-groups.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-default-nodes",
+      "type": "registry:component",
+      "title": "Mithaq default nodes",
+      "description": "The node components the admin ships, one per kind of node a page may hold, which defaultComponents.nodes holds.",
+      "registryDependencies": [
+        "resizable",
+        "separator",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-groups.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-row-title.json"
+      ],
+      "files": [
+        {
+          "path": "registry/default-nodes.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/default-nodes.tsx"
         }
       ]
     },
@@ -609,7 +793,8 @@
       "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -662,9 +847,10 @@
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-form-context.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-leaf-control.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
         "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json",
         "./node_modules/mithaq-admin/r/mithaq-upload.json"
       ],
       "files": [
@@ -684,8 +870,8 @@
         "alert-dialog",
         "button",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
-        "./node_modules/mithaq-admin/r/mithaq-refusal.json"
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json",
+        "./node_modules/mithaq-admin/r/mithaq-row-title.json"
       ],
       "files": [
         {
@@ -725,7 +911,8 @@
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
         "./node_modules/mithaq-admin/r/mithaq-form-rules.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-record-frame.json",
         "./node_modules/mithaq-admin/r/mithaq-refusal.json"
       ],
       "files": [
@@ -842,7 +1029,7 @@
         "./node_modules/mithaq-admin/r/mithaq-field-values.json",
         "./node_modules/mithaq-admin/r/mithaq-form-rules.json",
         "./node_modules/mithaq-admin/r/mithaq-form-types.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
         "./node_modules/mithaq-admin/r/mithaq-use-form-seed.json"
       ],
       "dependencies": [
@@ -886,8 +1073,10 @@
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-delete-button.json",
-        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
-        "./node_modules/mithaq-admin/r/mithaq-operation-button.json"
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-operation-button.json",
+        "./node_modules/mithaq-admin/r/mithaq-row-title.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -953,8 +1142,13 @@
         "./node_modules/mithaq-admin/r/mithaq-form-layout.json",
         "./node_modules/mithaq-admin/r/mithaq-form-rules.json",
         "./node_modules/mithaq-admin/r/mithaq-form-types.json",
+        "./node_modules/mithaq-admin/r/mithaq-leaf-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-nav-links.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
         "./node_modules/mithaq-admin/r/mithaq-nodes.json",
         "./node_modules/mithaq-admin/r/mithaq-refusal.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json",
         "./node_modules/mithaq-admin/r/mithaq-use-autosave.json",
         "./node_modules/mithaq-admin/r/mithaq-use-draft-view.json",
         "./node_modules/mithaq-admin/r/mithaq-use-form-refusal.json",
@@ -970,18 +1164,122 @@
       ]
     },
     {
+      "name": "mithaq-theme",
+      "type": "registry:component",
+      "title": "Mithaq theme",
+      "description": "The theme provider that keeps the viewer's choice, the hook that reads it, and the toggle that offers light, dark and system.",
+      "registryDependencies": [
+        "button",
+        "dropdown-menu"
+      ],
+      "files": [
+        {
+          "path": "registry/theme.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/theme.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-locale-menu",
+      "type": "registry:lib",
+      "title": "Mithaq locale menu",
+      "description": "Each locale's own name for itself, and the rows the user menu's locale group lists.",
+      "files": [
+        {
+          "path": "registry/locale-menu.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/locale-menu.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-nav-entries",
+      "type": "registry:component",
+      "title": "Mithaq nav entries",
+      "description": "The kayan index the sidebar lists: the kayans the access report lets the viewer read, each with its icon, and the group that draws them.",
+      "registryDependencies": [
+        "button",
+        "sidebar",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/nav-entries.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/nav-entries.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-nav-secondary",
+      "type": "registry:component",
+      "title": "Mithaq nav secondary",
+      "description": "The sidebar's documents group and the rows at its foot.",
+      "registryDependencies": [
+        "dropdown-menu",
+        "sidebar"
+      ],
+      "files": [
+        {
+          "path": "registry/nav-secondary.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/nav-secondary.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-nav-user",
+      "type": "registry:component",
+      "title": "Mithaq nav user",
+      "description": "The user menu: the viewer, a link to each of their other screens, the locale and theme groups, and sign-out.",
+      "registryDependencies": [
+        "avatar",
+        "dropdown-menu",
+        "sidebar",
+        "./node_modules/mithaq-admin/r/mithaq-locale-menu.json",
+        "./node_modules/mithaq-admin/r/mithaq-theme.json"
+      ],
+      "files": [
+        {
+          "path": "registry/nav-user.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/nav-user.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-organization-switcher",
+      "type": "registry:component",
+      "title": "Mithaq organization switcher",
+      "description": "The organization switcher, listing every organization the viewer belongs to with the active one checked.",
+      "registryDependencies": [
+        "dropdown-menu",
+        "sidebar"
+      ],
+      "files": [
+        {
+          "path": "registry/organization-switcher.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/organization-switcher.tsx"
+        }
+      ]
+    },
+    {
       "name": "mithaq-nav",
       "type": "registry:component",
       "title": "Mithaq nav",
-      "description": "The admin's app shell: the inset sidebar with the organization switcher, the kayan index the access report allows, the user menu, and the header with the sidebar trigger and the theme toggle.",
+      "description": "The admin's app shell: the inset sidebar, titled in the page's language on a phone, holding the organization switcher, the kayan index the access report allows and the user menu, and the header with the sidebar trigger and the theme toggle.",
       "registryDependencies": [
-        "avatar",
-        "button",
-        "dropdown-menu",
         "separator",
         "sheet",
         "sidebar",
-        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-nav-entries.json",
+        "./node_modules/mithaq-admin/r/mithaq-nav-secondary.json",
+        "./node_modules/mithaq-admin/r/mithaq-nav-user.json",
+        "./node_modules/mithaq-admin/r/mithaq-organization-switcher.json",
+        "./node_modules/mithaq-admin/r/mithaq-theme.json"
       ],
       "files": [
         {
