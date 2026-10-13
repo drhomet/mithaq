@@ -10,10 +10,10 @@ The project is three steps, each named after what it holds, and each imports onl
 
 1. **The language**, `packages/mithaq` (`@asas/mithaq`). `src/mithaq.ts` declares it with `defineMithaq`, with its targets and screens, and exports `defineKayan`, `defineGlobal`, `buildAsas` and the tenant field `organization`. Beside it sits everything the language or more than one feature reads:
    - `src/mithaq/auth/`: the Better Auth setup, imported as `@asas/mithaq/auth`.
-   - `src/mithaq/pages.ts`, `rich-text-nodes.ts` and, with the audit-log add-on, `audit-sink.ts`: the page trees every kayan page starts from, the rich-text nodes and the audit sink.
+   - `src/mithaq/pages.ts`, with the rich-text add-on `rich-text-nodes.ts`, and with the audit-log add-on `audit-sink.ts`: the page trees every kayan page starts from, the rich-text nodes and the audit sink.
    - `src/roles/`: `tenant-roles.ts`, the roles every organization gets and the permission keys each holds, and the access rows and grants beside it. Without the roles add-on those roles are Better Auth's own `owner`, `admin` and `member`, listed in `default-member-roles.ts`, and a member holds the ones its `member.role` names.
    - `src/ui/`: the shells, layouts and pieces several screens draw.
-   - `src/steps/` and `src/storage/`: a write step and storage adapters ejected from `mithaq-admin`. They are this project's files.
+   - `src/steps/` and, with the uploads add-on, `src/storage/`: a write step and storage adapters ejected from `mithaq-admin`. They are this project's files.
 2. **The features**, `packages/features/<feature>` (`@asas/<feature>`), each holding one or more kayan. `index.ts` exports the feature's `kayan` list (and `global`, for a single-row kayan). Each kayan has a folder of its own, `<kayan>/<kayan>.ts`, with any page pieces only it draws in `<kayan>/ui/`; a child kayan is a sibling folder in its feature, never nested. `auth/user/` holds the Better Auth kayan, written by `mithaq generate auth`.
 3. **The asas**, `packages/asas` (`asas`). `src/asas.ts` is the build: it spreads each feature's `kayan` into `buildAsas`. Beside it are each screen's own pieces (`src/ui-dashboard/`, `src/ui-portal/`, `src/ui-platform/`), `src/messages/` (one copy file per kayan, which `mithaq generate messages` fills with missing keys; translate in place), `src/migrations/` (written by `mithaq migrate`; commit them) and `src/seed.ts`.
 
@@ -21,7 +21,7 @@ A feature reaches another feature's kayan by its name (`relationTo: 'user'`) or 
 
 `apps/asas-tanstack/` is the tenant app, serving `/dashboard` and `/portal`; `apps/asas-platform/`, with the platform add-on, is the platform console for staff across every organization. Both import the asas alone.
 
-The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `courses`, `platform`); `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
+The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `rich-text`, `uploads`, `courses`, `platform`); `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
 
 ## Adding a kayan
 

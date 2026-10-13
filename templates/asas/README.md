@@ -23,10 +23,12 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | `roles` | Roles a tenant writes itself (`roles`), who holds which (`memberRoles`) and the Members page. Without it, a member holds what Better Auth's own `member.role` names: `owner` and `admin` every key, `member` what `packages/mithaq/src/roles/default-member-roles.ts` lists. |
 | `audit-log` | The `auditLog` kayan, the `audit` step that writes one row per change, and the activity panel on each edit page. |
 | `settings` | The `settings` global, one row per organization. |
-| `courses` | The worked example: courses, sessions, enrollments and the media a cover is picked from, with the business roles that work them. Needs `roles` and `audit-log`. |
+| `rich-text` | The `richText` kind, its Lexical nodes (`packages/mithaq/src/mithaq/rich-text-nodes.ts`) and the editor. Without it, no Lexical is installed. |
+| `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`). Without it, no storage setting is read. |
+| `courses` | The worked example: courses, sessions, enrollments and the media a cover is picked from, with the business roles that work them. Needs `roles`, `audit-log`, `rich-text` and `uploads`. |
 | `platform` | The platform console, `apps/asas-platform`. A single package cannot hold it. |
 
-An add-on brings kayan and pages, never words: every project speaks the same language, so rich text and file uploads are in each one's `src/mithaq.ts` whether or not a kayan uses them. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
+`rich-text` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
 
 What you get is a Bun workspace:
 
@@ -318,7 +320,7 @@ packages/mithaq/
 - `roles/tenant-access.ts` holds the row table every per-organization kayan inherits, the reader that answers an actor's roles, and the platform's checks; `roles/grants.ts` what the role form and the server both read.
 - `roles/statements.ts` holds the keys the project adds beside the kayan's own operations.
 
-**Configurable features.**
+**Configurable features**, each with its add-on.
 
 - `storage/index.ts` is the storage config. It names every function in `storage/defaults.ts`, and the adapters `local.ts`, `r2.ts`, `s3.ts` and `uploadthing.ts`. Those five files are ejected from the `mithaq-storage` item of `mithaq-admin` and end with a marker line.
 - `steps/expected-updated-at.ts` is ejected from the `mithaq-expected-updated-at` item.
