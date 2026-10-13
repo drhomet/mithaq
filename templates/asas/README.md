@@ -25,7 +25,8 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | `settings` | The `settings` global, one row per organization. |
 | `rich-text` | The `richText` kind, its Lexical nodes (`packages/mithaq/src/mithaq/rich-text-nodes.ts`) and the editor. Without it, no Lexical is installed. |
 | `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`). Without it, no storage setting is read. |
-| `courses` | The worked example: courses, sessions, enrollments and the media a cover is picked from, with the business roles that work them. Needs `roles`, `audit-log`, `rich-text` and `uploads`. |
+| `media` | The organization's images (`media`), which an upload field points at. A holder of `media.create` reads every one; anyone else only what the features pointing at images hand it, such as the courses add-on's covers of the courses they read. Needs `uploads`. |
+| `courses` | The worked example: courses, sessions and enrollments, each course with a cover from the media, and the business roles that work them. Needs `media`, `roles`, `audit-log` and `rich-text`. |
 | `platform` | The platform console, `apps/asas-platform`. A single package cannot hold it. |
 
 `rich-text` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
@@ -276,7 +277,8 @@ my-app/
     features/
       auth/           package "@my-app/auth": the Better Auth kayan and the local accounts
       roles/          package "@my-app/roles": custom roles and each member's roles
-      courses/        package "@my-app/courses": courses, their sessions, enrollments and media
+      courses/        package "@my-app/courses": courses, their sessions and enrollments
+      media/          package "@my-app/media": the organization's images
       tags/ audit-log/ settings/
     asas/             package "asas": the build, the migrations, the copy, each screen's own pages
   apps/
@@ -330,18 +332,17 @@ packages/mithaq/
 
 ### `packages/features`
 
-Each feature is a package that exports its `index.ts` alone, which lists the feature's kayan as `kayan` (and `global`, for a single-row kayan); the asas imports each feature as a namespace and spreads `courses.kayan`, so the list never collides with a kayan of the same name. Each kayan has a folder of its own, named after it in kebab case, holding a file of the same name that exports it:
+Each feature is a package that exports its `index.ts` alone, which lists the feature's kayan as `kayan` (and `global`, for a single-row kayan); the asas imports each feature as a namespace and spreads `courses.kayan`, so the list never collides with a kayan of the same name. The media feature's `kayan` is a function of the reads that open an image to someone without `media.create`, which the asas hands it from the features pointing at images, such as `courses.coverReads`, so media imports none of them. Each kayan has a folder of its own, named after it in kebab case, holding a file of the same name that exports it:
 
 ```
 packages/features/courses/
   package.json        "@my-app/courses", exports "." and "./domain/*"
-  index.ts            export const kayan = [media, courses, sessions, enrollments] as const
+  index.ts            export const kayan = [courses, sessions, enrollments] as const, and coverReads
   courses/
     courses.ts        export const courses = defineKayan({ name: 'courses', ... })
     ui/               page pieces only this kayan draws with
   sessions/           a child kayan is a sibling folder, never nested
   enrollments/
-  media/
   domain/             plain data the asas's pages read too, which imports nothing
 ```
 
