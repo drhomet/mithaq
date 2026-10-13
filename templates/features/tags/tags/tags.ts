@@ -36,8 +36,8 @@ export const tags = defineKayan({
     dashboard: {
       useAsTitle: 'name',
       description: {
-        en: 'Labels that group courses in the catalogue.',
-        ar: 'تسميات تجمع الدورات في الدليل.',
+        en: 'Labels the organization groups its records by.',
+        ar: 'تسميات تجمع بها المؤسسة سجلاتها.',
       },
       pages: {
         list: { path: '/tags', page: appPage([{ layout: 'table', main: [{ list: { columns: ['name', 'createdAt'], search: ['name'] } }] }]) },

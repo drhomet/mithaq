@@ -1580,7 +1580,7 @@ test('54. / is a real landing page, not a redirect: 200 with the hero and a sign
   const visitor = await fetch(`${origin}/`)
   assert.equal(visitor.status, 200, 'a visitor is served the page itself, not a 3xx')
   const visitorHtml = await visitor.text()
-  assert.ok(visitorHtml.includes('Run courses and enrollments without the busywork'), `the hero is in the served HTML:\n${visitorHtml.slice(0, 600)}`)
+  assert.ok(visitorHtml.includes('Run your organization without the busywork'), `the hero is in the served HTML:\n${visitorHtml.slice(0, 600)}`)
   assert.ok(visitorHtml.includes('href="/auth/sign-in"'), 'the header offers sign-in to a visitor')
   assert.ok(visitorHtml.includes('href="/auth/sign-up"'), 'and get started')
   assert.ok(!visitorHtml.includes('Open Dashboard'), 'and no dashboard link, because there is no session to open one for')

@@ -360,7 +360,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
           ) : 'failed' in prior && !against ? (
             <p role="alert" className="text-destructive text-sm">{t('version.failed', 'The versions could not be read.')}</p>
           ) : !rows.length ? (
-            <p className="text-muted-foreground text-sm">{t('auditLog.none', 'No field you may read changed.')}</p>
+            <p className="text-muted-foreground text-sm">{t('version.noReadableChange', 'No field you may read changed.')}</p>
           ) : (
             <ul className="grid gap-3 text-sm">
               {/* Which side is which, over the two columns, since on a phone
