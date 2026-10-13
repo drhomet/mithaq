@@ -7,6 +7,9 @@ import { createElement } from 'react'
 import { fetchHttp } from 'mithaq'
 import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
 import './tsx.ts'
+// The template's screens, which plain-language.ts borrows, sit beside a language that lays down rich text for its server,
+// whose node packages bring Lexical's own utils; loaded first, so the hook sees only what the admin's pieces load.
+import 'mithaq/rich-text'
 
 // Registered after the JSX loader, so it runs first and sees every module the registry files below pull in.
 const loaded: string[] = []
@@ -38,8 +41,7 @@ test('a language with no rich text and no files starts, and draws its forms and 
   assert.match(drawn(createElement(Form, { kayan, client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) }, value: row, t, locale: 'en', onDone: () => {} })), /<input[^>]*id="notes-title"/)
   const page = { docs: [row], hasNextPage: false, hasPrevPage: false, limit: 10, nextPage: null, page: 1, pagingCounter: 1, prevPage: null, totalDocs: 1, totalPages: 1 }
   assert.match(drawn(createElement(List, { kayan, page, query: {}, t, locale: 'en', onQuery: () => {}, href: (id: string) => `/notes/${id}`, newHref: '/notes/new' })), />Groceries</)
-  // `lexical` itself and its node packages are mithaq's own, which the server parses every write with; the editor's are the add-on's.
-  const addOn = new Set(loaded.filter((url) => /\/@lexical\/(react|selection|utils)\/|\/registry\/(rich-text(?!-line\.ts)|upload|file-thumb)/.test(url)).map((url) => url.replace(/^.*\/node_modules\/|^.*\/registry\//, '')))
+  const addOn = new Set(loaded.filter((url) => /\/@?lexical\/|\/registry\/(rich-text(?!-line\.ts)|upload|file-thumb)/.test(url)).map((url) => url.replace(/^.*\/node_modules\/|^.*\/registry\//, '')))
   assert.deepEqual([...addOn], [])
   assert.ok(loaded.some((url) => url.endsWith('/registry/default-components.tsx')), 'the hook saw the defaults load')
 })

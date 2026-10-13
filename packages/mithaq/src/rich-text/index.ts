@@ -7,6 +7,8 @@ import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
 import type { ResolvedField } from '../mithaq/types.ts'
 import { isRichText, richTextReader, storedRichText, type RichTextRead, type RichTextValue } from './rich-text.ts'
 
+export * from './rich-text.ts'
+
 // An emptied editor still sends a root and one empty paragraph, so a blank text
 // with no decorator is missing for `required`.
 const refusalOf = ({ field, read, value }: { field: ResolvedField | undefined; read: (value: unknown) => RichTextRead; value: unknown }) => {

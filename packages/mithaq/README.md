@@ -130,7 +130,10 @@ Where it lives: `packages/mithaq/src/mithaq/rukn.ts` `defineRukn` and
   down first. `packages/mithaq/src/base/index.ts` `base`.
 - **`richText({ nodes })`**: the `richText` kind, a Lexical tree checked
   against the project's own node list. It can be searched and is never sorted.
-  `packages/mithaq/src/rich-text/index.ts` `richText`.
+  It is imported from `mithaq/rich-text`, the one entry that loads Lexical, so a
+  project that uses it installs `lexical`, `@lexical/extension`, `@lexical/link`,
+  `@lexical/list` and `@lexical/rich-text` (mithaq's optional peers) and a project
+  without it installs none. `packages/mithaq/src/rich-text/index.ts` `richText`.
 - **`storage(config)`**: the `upload` kind, a relationship drawn as a file
   picker, and the `storage` target over the project's config. The config holds
   the signing secret, so the module that builds the language stays on the

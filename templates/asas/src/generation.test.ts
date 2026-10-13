@@ -26,7 +26,6 @@ import {
   drizzleAdapter,
   drizzleKinds,
   drizzleRules,
-  richText,
   rule,
   screenTarget,
   upload,
@@ -37,6 +36,7 @@ import {
   fetchHttp,
 } from 'mithaq'
 import type { ColumnRule, MessageRegistry, ZodRule } from 'mithaq'
+import { richText } from 'mithaq/rich-text'
 import { asas } from './asas.ts'
 import { options } from '@asas/auth'
 import { betterAuth } from './kayan/auth/user/index.ts'

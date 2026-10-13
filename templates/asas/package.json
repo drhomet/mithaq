@@ -15,6 +15,10 @@
   },
   "dependencies": {
     "@asas/auth": "*",
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
     "@orpc/openapi": "1.15.1",
     "@orpc/server": "1.15.1",
     "aws4fetch": "1.0.20",
@@ -23,6 +27,7 @@
     "file-type": "22.0.1",
     "image-dimensions": "2.5.1",
     "jose": "6.2.12",
+    "lexical": "0.52.0",
     "mithaq": "*",
     "mithaq-admin": "*",
     "zod": "^4.6.5"
