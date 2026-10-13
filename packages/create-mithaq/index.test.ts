@@ -30,7 +30,7 @@ const json = (...path: string[]) => JSON.parse(read(...path))
 test('a project takes the published mithaq and mithaq-admin under the names its imports use, at exactly one version', () => {
   create({ name: 'my-app', cwd: scratch, template, version: '1.2.3', addOns: every })
   const features = readdirSync(join(scratch, 'my-app/packages/features')).map((one) => `packages/features/${one}`)
-  assert.deepEqual(features, ['audit-log', 'auth', 'courses', 'roles', 'settings', 'tags'].map((one) => `packages/features/${one}`))
+  assert.deepEqual(features, ['audit-log', 'auth', 'courses', 'media', 'roles', 'settings', 'tags'].map((one) => `packages/features/${one}`))
   for (const workspace of ['packages/mithaq', 'packages/asas', ...features, 'apps/asas-tanstack', 'apps/asas-platform']) {
     const { dependencies, devDependencies = {} } = json('my-app', workspace, 'package.json')
     assert.equal(dependencies.mithaq, 'npm:@drhomet/mithaq@1.2.3', workspace)
@@ -161,7 +161,7 @@ test('a single package holds the language, its features, the asas and the tenant
 test('--help prints each question\'s flag', () => {
   const done = spawnSync(process.execPath, [fileURLToPath(new URL('./index.js', import.meta.url)), '--help'], { encoding: 'utf8' })
   assert.equal(done.status, 0, done.stderr)
-  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', 'courses (needs roles, audit-log, rich-text, uploads)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
+  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', 'courses (needs media, roles, audit-log, rich-text)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
   assert.match(done.stdout, /npm, pnpm 10\.6 or later, Yarn 1 or Bun 1\.3\. Yarn 2 and later/, 'and which package managers a project installs with')
 })
 
@@ -179,9 +179,10 @@ test('a dependency left pointing into the framework repository is refused, whate
 
 test('an add-on brings every one it needs, said so, and a name the table does not hold is refused with the list', () => {
   assert.deepEqual(resolveAddOns([]), { chosen: [], added: [] })
-  assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'rich-text', 'uploads', 'courses'], added: ['roles', 'audit-log', 'rich-text', 'uploads'] })
+  assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'rich-text', 'uploads', 'media', 'courses'], added: ['roles', 'audit-log', 'rich-text', 'uploads', 'media'] })
+  assert.deepEqual(resolveAddOns(['media']), { chosen: ['uploads', 'media'], added: ['uploads'] }, 'and what an add-on it needs needs')
   assert.deepEqual(resolveAddOns(['platform', 'roles', 'roles']).chosen, ['roles', 'platform'], 'in the table\'s order, once each')
-  assert.throws(() => resolveAddOns(['roles', 'media', 'rich']), /^Error: No add-on is named "media", "rich"\. The add-ons are roles, audit-log, settings, rich-text, uploads, courses, platform\.$/)
+  assert.throws(() => resolveAddOns(['roles', 'images', 'rich']), /^Error: No add-on is named "images", "rich"\. The add-ons are roles, audit-log, settings, rich-text, uploads, media, courses, platform\.$/)
 })
 
 test('a region keeps its lines only where its add-ons are chosen, a without region is uncommented only where they are not, and the markers go either way', () => {

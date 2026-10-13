@@ -87,11 +87,13 @@ export const addOns = {
   },
   // The `upload` kind, the storage target and its adapters.
   uploads: { needs: [], files: ['packages/mithaq/src/storage'], without: [], packages: ['aws4fetch', 'file-type', 'image-dimensions'], copy: ['kinds.upload', 'kinds.upload.invalid'], tables: false },
+  // The organization's images, which an upload field points at.
+  media: { needs: ['uploads'], files: ['packages/features/media', 'packages/asas/src/messages/media.json'], without: [], packages: [], copy: [], tables: true },
   // The worked example: its business roles are the roles add-on's, its edit pages draw the audit log's activity, its
-  // details are rich text and a course's cover is an upload.
+  // details are rich text and a course's cover is one of the media.
   courses: {
-    needs: ['roles', 'audit-log', 'rich-text', 'uploads'],
-    files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', ...['courses', 'sessions', 'enrollments', 'media'].map((one) => `packages/asas/src/messages/${one}.json`)],
+    needs: ['media', 'roles', 'audit-log', 'rich-text'],
+    files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', ...['courses', 'sessions', 'enrollments'].map((one) => `packages/asas/src/messages/${one}.json`)],
     without: ['packages/asas/src/ui-dashboard/home.tsx'],
     packages: [],
     copy: [],

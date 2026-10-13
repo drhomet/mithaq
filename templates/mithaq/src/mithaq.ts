@@ -325,12 +325,15 @@ export const portalScreen = screenTarget({
     // add-on: courses
     // `sessions` is listed for its title alone, which an enrollment's session
     // reads by; it has no page here and so no nav entry.
-    // `media` is listed for a course's cover alone, which a course page draws read-only.
     'courses',
     'enrollments',
     'sessions',
-    'media',
     // end add-on: courses
+    // add-on: media
+    // `media` is listed for an image's title alone, such as a course's cover,
+    // which a course page draws read-only; it has no page here.
+    'media',
+    // end add-on: media
     // `user` is listed for its title alone, which a relationship to a person reads by.
     'user',
   ],
@@ -364,9 +367,9 @@ export const dashboardScreen = screenTarget({
     'enrollments',
     // end add-on: courses
     'tags',
-    // add-on: courses
+    // add-on: media
     'media',
-    // end add-on: courses
+    // end add-on: media
     // add-on: roles
     // `memberRoles` is listed for its access report alone, which the members
     // page's sheet is drawn by; it has no page of its own.

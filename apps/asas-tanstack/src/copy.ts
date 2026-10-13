@@ -8,9 +8,11 @@ import auditLog from 'asas/messages/auditLog.json' with { type: 'json' }
 // add-on: courses
 import courses from 'asas/messages/courses.json' with { type: 'json' }
 import enrollments from 'asas/messages/enrollments.json' with { type: 'json' }
-import media from 'asas/messages/media.json' with { type: 'json' }
 import sessions from 'asas/messages/sessions.json' with { type: 'json' }
 // end add-on: courses
+// add-on: media
+import media from 'asas/messages/media.json' with { type: 'json' }
+// end add-on: media
 // add-on: roles
 import memberRoles from 'asas/messages/memberRoles.json' with { type: 'json' }
 import roles from 'asas/messages/roles.json' with { type: 'json' }
@@ -697,7 +699,7 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     none: { en: 'No tags yet.', ar: 'لا توجد وسوم بعد.' },
     dangerZoneWarning: { en: 'These actions change this tag for everyone.', ar: 'هذه الإجراءات تغير هذا الوسم للجميع.' },
   },
-  // add-on: courses
+  // add-on: media
   media: {
     ...media,
     new: { en: 'New image', ar: 'صورة جديدة' },
@@ -708,7 +710,7 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     replaceAbout: { en: 'Replace file uploads a new image and opens it. This one stays until you delete it.', ar: 'يرفع استبدال الملف صورة جديدة ويفتحها. تبقى هذه الصورة حتى تحذفها.' },
     dangerZoneWarning: { en: 'These actions change this image for everyone.', ar: 'هذه الإجراءات تغير هذه الصورة للجميع.' },
   },
-  // end add-on: courses
+  // end add-on: media
   localUsers: { ...localUsers, none: { en: 'No local accounts yet.', ar: 'لا توجد حسابات محلية بعد.' } },
   // add-on: audit-log
   auditLog,

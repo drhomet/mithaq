@@ -129,7 +129,7 @@ export const tenantRoles = {
       'tags.fields.updatedAt',
       'tags.fields.organization',
       'tags.fields.name',
-      // add-on: courses
+      // add-on: media
       // The images a course's cover is picked from, which it uploads,
       // re-describes and deletes once no course points at one.
       'media.create',
@@ -150,7 +150,7 @@ export const tenantRoles = {
       'media.fields.organization',
       'media.fields.updatedAt',
       'media.fields.width',
-      // end add-on: courses
+      // end add-on: media
       // add-on: audit-log
       // The activity panel on each edit page it opens: the entries of the
       // kayan it lists, each change graded by the column's own key above.

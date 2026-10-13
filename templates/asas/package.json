@@ -16,6 +16,7 @@
     "@asas/audit-log": "*",
     "@asas/auth": "*",
     "@asas/courses": "*",
+    "@asas/media": "*",
     "@asas/mithaq": "*",
     "@asas/roles": "*",
     "@asas/settings": "*",

@@ -979,7 +979,7 @@ test('218b. a session reads as its course and its start in the enrollment picker
 })
 
 test('218c. an image lists by its thumbnail and its size in kilobytes or megabytes, its page leads with the image, Download and Replace file, and its New page opens the upload dialog', async (t) => {
-  const { FileName, FileSize, MediaPreview, NewImage } = await import('../../../templates/features/courses/media/ui/preview.tsx')
+  const { FileName, FileSize, MediaPreview, NewImage } = await import('../../../templates/features/media/media/ui/preview.tsx')
   const { sizeOf } = await import('../registry/upload.tsx')
   // The template's page imports the upload dialog by the package's name, and the dialog reads the map the same way.
   const { ComponentsProvider: AppComponents } = await import('mithaq-admin/components.tsx')

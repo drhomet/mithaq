@@ -103,6 +103,8 @@ import { accessTarget, dashboardScreen, dashboardUi, organization, platformScree
 import { asPlatform, authOptions, options, platformRoles, platformURL, providers } from '@asas/mithaq/auth'
 import { secret, superAdminOnly } from '@asas/mithaq/auth/platform-roles'
 import { localUsers } from '../../features/auth/local-users/local-users.ts'
+import { kayan as mediaKayan } from '../../features/media/index.ts'
+import { coverReads } from '../../features/courses/index.ts'
 import { memoryStore, noRelationship } from './memory-store.ts'
 import { plainTarget } from './standard-schema-target.ts'
 import { assignedRoles, tenantAccess } from '../../mithaq/src/roles/tenant-access.ts'
@@ -16929,6 +16931,20 @@ test('227b. a role whose image reads are a course\'s cover reads only the covers
   const all = await tenant.as('admin', 'media/find', { limit: 100 })
   assert.deepEqual(new Set((all.body.docs as { id: string }[]).map((one) => one.id)), new Set([shown, archived, drafted, loose]), 'the administrator reads every image')
   assert.equal(await tenant.file('admin', loose), 200, 'an image no course names included')
+})
+
+test('227f. the media feature reads an image for an actor without media.create only through the reads the asas hands it: with none, a student reads no image, a cover of a course it reads included, and with the courses add-on\'s, only those covers', async () => {
+  const tenant = await roleTenant('covers-227f')
+  const { headers } = tenant.people.admin
+  const [shown, loose] = [await uploadedImage(headers, tenant.options, 'shown.png'), await uploadedImage(headers, tenant.options, 'loose.png')]
+  await courses.operations.create({ title: 'Shown 227f', cover: shown }, tenant.options)
+  const student = await asas.auth.actor(tenant.people.student.headers)
+  const registrar = await asas.auth.actor(tenant.people.registrar.headers)
+  const readOf = (reads: Parameters<typeof mediaKayan>[0]['reads']) => mediaKayan({ reads })[0].access!.read! as (args: { user: unknown }) => Promise<unknown>
+  assert.equal(await readOf([])({ user: student }), false, 'with no reads handed in, a student reads no image')
+  assert.deepEqual(await readOf([coverReads])({ user: student }), { id: { in: [shown] } }, 'with the courses add-on\'s, the cover of the course it reads and nothing else')
+  assert.ok(!JSON.stringify(await readOf([coverReads])({ user: student })).includes(loose), 'never an image no course names')
+  assert.equal(await readOf([])({ user: registrar }), true, 'a holder of media.create reads every image of its organization either way')
 })
 
 test('227c. a title, a tag\'s name, a role\'s name and label and the site title are trimmed, so one of spaces alone is refused as required on publish, and a draft keeps it', async () => {

@@ -8,6 +8,9 @@ import * as auth from '@asas/auth'
 // add-on: courses
 import * as courses from '@asas/courses'
 // end add-on: courses
+// add-on: media
+import * as media from '@asas/media'
+// end add-on: media
 // add-on: roles
 import * as roles from '@asas/roles'
 // end add-on: roles
@@ -29,6 +32,17 @@ export const asas = buildAsas({
     ...roles.kayan,
     // end add-on: roles
     ...tags.kayan,
+    // add-on: media
+    // An image is read by a holder of `media.create`, and otherwise through
+    // what the features pointing at images say of it.
+    ...media.kayan({
+      reads: [
+        // add-on: courses
+        courses.coverReads,
+        // end add-on: courses
+      ],
+    }),
+    // end add-on: media
     // add-on: courses
     ...courses.kayan,
     // end add-on: courses

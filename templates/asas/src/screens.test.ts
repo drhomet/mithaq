@@ -1046,7 +1046,7 @@ test('every dashboard create and edit page, and Settings, draws the record layou
     // A page drawn whole by one component draws no tree: the images' New page is the upload dialog's.
     Object.entries(kayan.pages).filter(([name, page]) => ['create', 'edit', 'settings'].includes(name) && !('component' in page)).map(([name, page]) => ({ kayan, name, page: treeOf(page), over: 'mode' in page })),
   )
-  assert.equal((dashboard.kayan.media!.pages.create as { component?: string }).component, '@asas/courses:./media/ui/preview.tsx#NewImage')
+  assert.equal((dashboard.kayan.media!.pages.create as { component?: string }).component, '@asas/media:./media/ui/preview.tsx#NewImage')
   assert.deepEqual(pages.map(({ kayan, name }) => `${kayan.name}.${name}`).sort(), ['courses.create', 'courses.edit', 'enrollments.create', 'enrollments.edit', 'media.edit', 'roles.create', 'roles.edit', 'sessions.create', 'sessions.edit', 'settings.settings', 'tags.create', 'tags.edit'])
   for (const { kayan, name, page, over } of pages) {
     const at = `${kayan.name}.${name}`
