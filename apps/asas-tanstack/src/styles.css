@@ -13,7 +13,7 @@
 @import '@fontsource/ibm-plex-sans-arabic';
 
 /* The project's own shells, pages and components, which the screens load
-   (`templates/mithaq/src/ui/app-shell.tsx`), in every package of the project.
+   (the language package's `src/ui/app-shell.tsx`), in every package of the project.
    Named by their folder, which every package manager leaves where it is, since
    each links the package elsewhere. */
 @source '../../../templates';
