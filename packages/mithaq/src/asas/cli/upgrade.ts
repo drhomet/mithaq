@@ -23,7 +23,8 @@ export const hashOf = (text: string) => sha(bodyOf(text).replace(leading, ''))
  * The hash a marker from `from` holds: of the whole text above it for an eject, which writes byte for byte, so an edit
  * to a leading pragma is an edit; without leading comments only for a copy made at a commit, as `shadcn add` wrote it.
  */
-const hashFrom = (from: string) => (text: string) => (/^(?:[0-9a-f]{40}|unknown)$/.test(from) ? hashOf(text) : sha(bodyOf(text)))
+const madeByShadcn = (from: string) => /^(?:[0-9a-f]{40}|unknown)$/.test(from)
+const hashFrom = (from: string) => (text: string) => (madeByShadcn(from) ? hashOf(text) : sha(bodyOf(text)))
 
 /** A held file's state against the package's text of it, read as `upgrade --check` reads it. */
 export const stateOf = (text: string, source: string): 'up to date' | 'up to date, edited' | 'differs' | 'differs, edited' | 'unknown' => {
@@ -245,6 +246,12 @@ export const prune = async (project: URL): Promise<number> => {
     console.error(noPackage)
     return 1
   }
+  // The package's file at each path, whose leading comments a copy `shadcn add` made may hold and no more.
+  const sources = new Map(installed.items.flatMap((item) => item.files.flatMap((file) => {
+    const path = pathOf(file.target)
+    return path ? [[path, new URL(file.path, installed.root)] as const] : []
+  })))
+  const leadOf = (text: string) => leading.exec(bodyOf(text))![0]
   for (const folder of ejectedFolders(installed.items, pathOf)) {
     if (!within(new URL(folder, project), project)) continue
     const entries = await readdir(new URL(folder, project), { withFileTypes: true }).catch(() => [])
@@ -254,6 +261,10 @@ export const prune = async (project: URL): Promise<number> => {
       const text = await readFile(new URL(path, project), 'utf8')
       const [, from, hash] = marker.exec(text) ?? []
       if (!hash || hash !== hashFrom(from!)(text)) continue
+      // A commit's hash leaves leading comments out, so a pragma written above one is an edit the hash cannot see.
+      const source = sources.get(path)
+      const lead = leadOf(text)
+      if (madeByShadcn(from!) && lead && lead !== (source && within(source, installed.root) ? leadOf(await readFile(source, 'utf8').catch(() => '')) : '')) continue
       await rm(new URL(path, project))
       console.log(`${path} was not edited since it was ejected, so it is deleted and mithaq-admin draws its own.`)
     }

@@ -308,3 +308,13 @@ test('a held file with a leading comment, freshly ejected, reads up to date by t
   assert.equal(stateOf(copied(upstream), packaged), 'up to date', 'and a copy shadcn add made reads as it always did')
 })
 
+test('prune keeps a copy shadcn add made whose leading block differs from the package file, and deletes one whose leading block is empty or that of the package file', async (t) => {
+  const root = await project({
+    'src/components/mithaq/current.ts': copied(upstream),
+    'src/components/mithaq/edited.ts': `// @ts-nocheck\n${copied(upstream)}`,
+    'src/components/mithaq/differs.ts': copied(packaged, upstream),
+  })
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await mithaq(root, 'eject', '--prune')
+  assert.deepEqual(['current', 'edited', 'differs'].map((name) => existsSync(new URL(`src/components/mithaq/${name}.ts`, root))), [false, true, false])
+})
