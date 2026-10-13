@@ -6,12 +6,11 @@ import { CalendarControl, DatePicker } from './date-control.tsx'
 import { defaultNodes } from './default-nodes.tsx'
 import { IntegerControl, NumberControl, SliderControl } from './number-control.tsx'
 import { RelationshipControl } from './relationship-control.tsx'
-import { RichTextControl } from './rich-text.tsx'
 import { DecimalControl, EmailControl, OtpControl, ReadOnlyControl, TextControl } from './text-control.tsx'
 import { TextArrayControl, TextareaControl } from './textarea-control.tsx'
-import { UploadControl } from './upload.tsx'
 
-// Apart from the provider, so a control that reads the map imports no other control.
+// Apart from the provider, so a control that reads the map imports no other control. Rich text and files are not
+// here: `richTextComponents` and `uploadComponents` are spread in by a language that holds their kinds.
 export const defaultComponents: Components = {
   controls: {
     combobox: ComboboxControl,
@@ -35,8 +34,6 @@ export const defaultComponents: Components = {
     textArray: TextArrayControl,
     uuid: ReadOnlyControl,
     relationship: RelationshipControl,
-    upload: UploadControl,
-    richText: RichTextControl,
     textarea: TextareaControl,
     toggle: ToggleControl,
     buttonGroup: ButtonGroupControl,

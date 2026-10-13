@@ -221,7 +221,7 @@
       "name": "mithaq-default-components",
       "type": "registry:component",
       "title": "Mithaq default components",
-      "description": "The components map the admin ships, one control and one cell per name a screen may draw with, which a project hands the provider as it is or spreads to replace a control or a cell.",
+      "description": "The components map the admin ships, one control and one cell per name a screen may draw with but rich text and files, which a project hands the provider as it is or spreads to replace a control or a cell, and to which a language with rich text or files spreads richTextComponents or uploadComponents.",
       "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-cells.json",
         "./node_modules/mithaq-admin/r/mithaq-checkbox-control.json",
@@ -231,10 +231,8 @@
         "./node_modules/mithaq-admin/r/mithaq-default-nodes.json",
         "./node_modules/mithaq-admin/r/mithaq-number-control.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
-        "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
         "./node_modules/mithaq-admin/r/mithaq-text-control.json",
-        "./node_modules/mithaq-admin/r/mithaq-textarea-control.json",
-        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+        "./node_modules/mithaq-admin/r/mithaq-textarea-control.json"
       ],
       "files": [
         {
@@ -252,8 +250,7 @@
       "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-format.json",
-        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
-        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json"
       ],
       "files": [
         {
@@ -855,9 +852,7 @@
         "./node_modules/mithaq-admin/r/mithaq-form-context.json",
         "./node_modules/mithaq-admin/r/mithaq-leaf-control.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
-        "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
-        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json",
-        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
       ],
       "files": [
         {
@@ -1352,36 +1347,15 @@
       ]
     },
     {
-      "name": "mithaq-rich-text",
-      "type": "registry:component",
-      "title": "Mithaq rich text",
-      "description": "The richText kind's control and read view: a Lexical editor with history, block formats, text formats, links, alignment, a divider and the / menu, written in the page's direction, and its viewer, both over the nodes and picks a screen provides, and both drawing a stored value whose node they cannot mount as its words, read-only, with the reason in the viewer's language; and the node list itself, which the server reads with too.",
+      "name": "mithaq-rich-text-nodes",
+      "type": "registry:lib",
+      "title": "Mithaq rich text nodes",
+      "description": "The node list every rich text editor, viewer and the server read with, which a project spreads into its own list beside its own nodes.",
       "dependencies": [
         "lexical@0.52.0",
-        "@lexical/extension@0.52.0",
-        "@lexical/link@0.52.0",
-        "@lexical/list@0.52.0",
-        "@lexical/react@0.52.0",
-        "@lexical/rich-text@0.52.0",
-        "@lexical/selection@0.52.0",
-        "@lexical/utils@0.52.0"
-      ],
-      "registryDependencies": [
-        "button",
-        "button-group",
-        "direction",
-        "dropdown-menu",
-        "input",
-        "toggle",
-        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
-        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+        "@lexical/extension@0.52.0"
       ],
       "files": [
-        {
-          "path": "registry/rich-text.tsx",
-          "type": "registry:component",
-          "target": "@components/mithaq/rich-text.tsx"
-        },
         {
           "path": "registry/rich-text-nodes.ts",
           "type": "registry:lib",
@@ -1390,28 +1364,391 @@
       ]
     },
     {
-      "name": "mithaq-upload",
+      "name": "mithaq-rich-text-value",
+      "type": "registry:lib",
+      "title": "Mithaq rich text value",
+      "description": "What a richText field holds, the empty value an editor starts from, the theme its blocks are drawn with, and what stops a list of nodes reading a stored value.",
+      "dependencies": [
+        "lexical@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-value.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/rich-text-value.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-line",
+      "type": "registry:lib",
+      "title": "Mithaq rich text line",
+      "description": "The words of a rich text value without Lexical: its text a block to a line, its blocks, and its first worded block on one line.",
+      "files": [
+        {
+          "path": "registry/rich-text-line.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/rich-text-line.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-picks",
       "type": "registry:component",
-      "title": "Mithaq upload",
-      "description": "The upload kind's control, cell and read view: a file drawn by its thumbnail or its name, chosen through the relationship's picker or uploaded in place with its progress, the server's refusal and a retry, a set as a grid moved and removed by keyboard; and the opt-in rich text upload node's view, its / menu pick and the dialog that inserts it.",
+      "title": "Mithaq rich text picks",
+      "description": "The entries of the / menu and the block menu, the React views of the nodes that draw React, and the context a screen provides its nodes, picks and editor plugin through.",
       "dependencies": [
         "lexical@0.52.0",
+        "@lexical/list@0.52.0",
+        "@lexical/react@0.52.0",
+        "@lexical/rich-text@0.52.0",
+        "@lexical/selection@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-picks.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-picks.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-nodes.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-selection",
+      "type": "registry:lib",
+      "title": "Mithaq rich text selection",
+      "description": "What the toolbar and the link editor read off the selection, and the placeholder a new link is typed over, which no save may hold.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/link@0.52.0",
+        "@lexical/selection@0.52.0",
+        "@lexical/utils@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-selection.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/rich-text-selection.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-format-buttons",
+      "type": "registry:component",
+      "title": "Mithaq rich text format buttons",
+      "description": "The toolbar's undo and redo, its block menu, its text formats and its clear formatting.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/list@0.52.0",
+        "@lexical/react@0.52.0",
+        "@lexical/rich-text@0.52.0",
+        "@lexical/utils@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-format-buttons.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-format-buttons.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "button",
+        "button-group",
+        "dropdown-menu",
+        "toggle",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-picks.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-selection.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-toolbar",
+      "type": "registry:component",
+      "title": "Mithaq rich text toolbar",
+      "description": "The editor's toolbar, one tab stop moved through by the arrow keys in the page's direction, with its link and alignment buttons.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/link@0.52.0",
         "@lexical/react@0.52.0",
         "@lexical/utils@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-toolbar.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-toolbar.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "button",
+        "button-group",
+        "toggle",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-format-buttons.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-picks.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-selection.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-value.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-link-editor",
+      "type": "registry:component",
+      "title": "Mithaq rich text link editor",
+      "description": "The bubble a link is read, typed, edited and removed in, which saves only an address the server takes.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/link@0.52.0",
+        "@lexical/utils@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-link-editor.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-link-editor.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "button",
+        "input",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-selection.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-link-plugin",
+      "type": "registry:component",
+      "title": "Mithaq rich text link plugin",
+      "description": "What draws the link editor over the link the selection sits in, and drops a placeholder link once the editor is no longer open on it.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/link@0.52.0",
+        "@lexical/react@0.52.0",
+        "@lexical/utils@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-link-plugin.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-link-plugin.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-link-editor.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-selection.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-slash-menu",
+      "type": "registry:component",
+      "title": "Mithaq rich text slash menu",
+      "description": "The / menu, filtered by the words typed after the slash.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/react@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-slash-menu.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-slash-menu.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-picks.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-viewer",
+      "type": "registry:component",
+      "title": "Mithaq rich text viewer",
+      "description": "The rich text read view over the screen's nodes, never editable, and a stored value no node list here can mount drawn as its words with the reason in the viewer's language.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/react@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-viewer.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-viewer.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "direction",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-picks.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-value.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-editor",
+      "type": "registry:component",
+      "title": "Mithaq rich text editor",
+      "description": "The Lexical editor with history, block formats, text formats, links, alignment, a divider and the / menu, written in the page's direction over the screen's nodes and picks.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/react@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-editor.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-editor.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-link-plugin.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-picks.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-selection.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-slash-menu.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-toolbar.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-value.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-viewer.json"
+      ]
+    },
+    {
+      "name": "mithaq-rich-text",
+      "type": "registry:component",
+      "title": "Mithaq rich text",
+      "description": "The add-on a language with the richText kind spreads into its components map, richTextComponents: the kind's control, the editor or the viewer where the field is read only, and its cell, a line in a row and the viewer on a record page.",
+      "registryDependencies": [
+        "direction",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-editor.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-line.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-picks.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-value.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-viewer.json"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-upload-api",
+      "type": "registry:lib",
+      "title": "Mithaq upload api",
+      "description": "The three steps of an upload, the bytes sent with their progress, the refusal the server would answer a file with, and a file type and size as a person reads them.",
+      "files": [
+        {
+          "path": "registry/upload-api.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/upload-api.ts"
+        }
+      ],
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json"
+      ]
+    },
+    {
+      "name": "mithaq-file-thumb",
+      "type": "registry:component",
+      "title": "Mithaq file thumb",
+      "description": "One file drawn: its thumbnail where it is an image, else its name and type, and on a record page the image or the link that downloads it.",
+      "files": [
+        {
+          "path": "registry/file-thumb.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/file-thumb.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-api.json"
+      ]
+    },
+    {
+      "name": "mithaq-upload-cell",
+      "type": "registry:component",
+      "title": "Mithaq upload cell",
+      "description": "The upload kind's cell, thumbnails and names in a row and each file whole on a record page, never a file's id.",
+      "files": [
+        {
+          "path": "registry/upload-cell.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/upload-cell.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-file-thumb.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-control.json"
+      ]
+    },
+    {
+      "name": "mithaq-upload-dialog",
+      "type": "registry:component",
+      "title": "Mithaq upload dialog",
+      "description": "The dialog a new file is made in: the file, the fields the create asks, the send with its progress, and the server's refusal with a retry.",
+      "files": [
+        {
+          "path": "registry/upload-dialog.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/upload-dialog.tsx"
+        }
       ],
       "registryDependencies": [
         "button",
         "dialog",
         "./node_modules/mithaq-admin/r/mithaq-components.json",
-        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
         "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
         "./node_modules/mithaq-admin/r/mithaq-field-values.json",
         "./node_modules/mithaq-admin/r/mithaq-format.json",
         "./node_modules/mithaq-admin/r/mithaq-refusal.json",
-        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-api.json"
+      ]
+    },
+    {
+      "name": "mithaq-upload-control",
+      "type": "registry:component",
+      "title": "Mithaq upload control",
+      "description": "The upload kind's control: a file chosen through the relationship's picker or uploaded in place, and a set as a grid moved and removed by keyboard.",
+      "files": [
+        {
+          "path": "registry/upload-control.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/upload-control.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "button",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-values.json",
+        "./node_modules/mithaq-admin/r/mithaq-file-thumb.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-control.json",
-        "./node_modules/mithaq-admin/r/mithaq-rich-text.json"
+        "./node_modules/mithaq-admin/r/mithaq-upload-api.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-dialog.json"
+      ]
+    },
+    {
+      "name": "mithaq-upload",
+      "type": "registry:component",
+      "title": "Mithaq upload",
+      "description": "The add-on a language with the upload kind spreads into its components map, uploadComponents: the kind's control and its cell.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-file-thumb.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-api.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-dialog.json"
       ],
       "files": [
         {
@@ -1419,6 +1756,34 @@
           "type": "registry:component",
           "target": "@components/mithaq/upload.tsx"
         }
+      ]
+    },
+    {
+      "name": "mithaq-upload-node",
+      "type": "registry:component",
+      "title": "Mithaq upload node",
+      "description": "The opt-in rich text upload node's view, its / menu pick and the dialog that inserts it, for a project with both rich text and files.",
+      "dependencies": [
+        "lexical@0.52.0",
+        "@lexical/react@0.52.0",
+        "@lexical/utils@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/upload-node.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/upload-node.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "button",
+        "dialog",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-file-thumb.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-picks.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-api.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload-control.json"
       ]
     },
     {

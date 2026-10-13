@@ -38,12 +38,14 @@ const { findOf, readQuery, remembered, rulesOf, writeQuery } = await import('../
 const { Pagination } = await import('../registry/list-pagination.tsx')
 /** The zone the process started in, which a test that sets `TZ` assigns back. */
 const homeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-const { defaultComponents } = await import('../registry/default-components.tsx')
+const { withAddOns } = await import('./with-add-ons.ts')
+// The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
+const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
 const { ComponentsProvider } = await import('../registry/components.tsx')
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
 // A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
 const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
-const { defaultComponents: appDefaults } = await import('@/components/mithaq/default-components.tsx')
+const appDefaults = withAddOns((await import('@/components/mithaq/default-components.tsx')).defaultComponents, (await import('@/components/mithaq/rich-text.tsx')).richTextComponents, (await import('@/components/mithaq/upload.tsx')).uploadComponents)
 const withComponents = (element: ReactElement) => createElement(ComponentsProvider, { components: defaultComponents }, createElement(AppComponents, { components: appDefaults }, element))
 const { arm, clientOf } = await import('../registry/host/api.ts')
 const cells: Readonly<Record<string, import('../registry/control-props.ts').Cell>> = defaultComponents.cells
@@ -981,7 +983,7 @@ test('218c. an image lists by its thumbnail and its size in kilobytes or megabyt
   const { sizeOf } = await import('../registry/upload.tsx')
   // The template's page imports the app's copy of the upload dialog, which reads the app's copy of the map.
   const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
-  const { defaultComponents: appDefaults } = await import('@/components/mithaq/default-components.tsx')
+  const appDefaults = withAddOns((await import('@/components/mithaq/default-components.tsx')).defaultComponents, (await import('@/components/mithaq/rich-text.tsx')).richTextComponents, (await import('@/components/mithaq/upload.tsx')).uploadComponents)
   const inApp = (element: ReactElement) => createElement(AppComponents, { components: appDefaults }, element)
   assert.deepEqual([sizeOf(512, 'en'), sizeOf(2048, 'en'), sizeOf(1536 * 1024, 'en')], ['512 bytes', '2 kilobytes', '1.5 megabytes'], 'bytes, kilobytes and megabytes as a person reads them')
   assert.deepEqual([sizeOf(512, 'ar'), sizeOf(1536 * 1024, 'ar')].map((one) => one.replace(/[\d٠-٩٫.]+\s*/, '')), ['بايت', 'ميغابايت'], 'and in Arabic, the megabyte long as the kilobyte is')

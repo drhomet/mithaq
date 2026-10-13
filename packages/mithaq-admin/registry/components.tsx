@@ -9,10 +9,14 @@ type Shipped = (typeof registryControls)[number]
 type Drawn = Shipped | keyof typeof builtInScreenKinds
 type ShippedCell = (typeof registryCells)[number]
 
-/** One control per name the registry ships, which `defaultComponents` holds. */
-export type Controls = { readonly [Name in Shipped]: Control }
-/** One cell per name the registry ships, which `defaultComponents` holds. */
-export type Cells = { readonly [Name in ShippedCell]: Cell }
+// Each ships in a map of its own, which a project spreads only where its language draws with it, so a language
+// without rich text or files never loads the editor or the upload code.
+type AddOn = 'richText' | 'upload'
+
+/** One control per name the registry ships but the add-ons, which `defaultComponents` holds. */
+export type Controls = { readonly [Name in Exclude<Shipped, AddOn>]: Control }
+/** One cell per name the registry ships but the add-ons, which `defaultComponents` holds. */
+export type Cells = { readonly [Name in Exclude<ShippedCell, AddOn>]: Cell }
 
 type KindsOf<L> = L extends { kinds: infer Kinds } ? Kinds : {}
 type ScreensOf<L> = L extends { targets: infer Targets } ? Extract<Targets[keyof Targets], { capability: 'screen' }> : never
@@ -29,11 +33,13 @@ type Own<L, Place extends 'control' | 'cell', Ships> = {
 export type OwnKinds<L> = Own<L, 'control', Drawn>
 /** The kinds of a language that some screen draws with no cell the registry ships. */
 export type OwnCellKinds<L> = Own<L, 'cell', ShippedCell>
+/** The add-ons some screen of a language draws a kind with, whose map the project spreads: `richTextComponents`, `uploadComponents`. */
+export type AddOnsOf<L, Place extends 'control' | 'cell' = 'control' | 'cell'> = { [Kind in keyof KindsOf<L>]: DrawnWith<ScreensOf<L>, KindsOf<L>, Kind, Place> }[keyof KindsOf<L>] & AddOn
 
-/** One control per shipped name and per kind of this language that no shipped control draws, so leaving one out is a type error. */
-export type ControlsOf<L> = Controls & { readonly [Kind in OwnKinds<L>]: Control }
-/** One cell per shipped name and per kind of this language that no shipped cell draws. */
-export type CellsOf<L> = Cells & { readonly [Kind in OwnCellKinds<L>]: Cell }
+/** One control per shipped name, per add-on the language draws with and per kind of it that no shipped control draws, so leaving one out is a type error. */
+export type ControlsOf<L> = Controls & { readonly [Name in AddOnsOf<L, 'control'> | OwnKinds<L>]: Control }
+/** One cell per shipped name, per add-on the language draws with and per kind of it that no shipped cell draws. */
+export type CellsOf<L> = Cells & { readonly [Name in AddOnsOf<L, 'cell'> | OwnCellKinds<L>]: Cell }
 
 /**
  * One component per kind of node a page may hold, which `defaultComponents` holds. A project replaces one and adds
@@ -73,6 +79,13 @@ const named = <Drawn,>(map: object, name: string | undefined): Drawn | undefined
 export const namedControl = (controls: Controls, name: string | undefined) => named<Control>(controls, name)
 export const namedCell = (cells: Cells, name: string | undefined) => named<Cell>(cells, name)
 
+const addOnMaps: Readonly<Record<AddOn, string>> = { richText: 'richTextComponents', upload: 'uploadComponents' }
+/** What a missing name of an add-on adds to its error: the map that installs it. */
+const installHint = (...names: (string | undefined)[]) => {
+  const addOn = names.find((name): name is AddOn => name !== undefined && Object.hasOwn(addOnMaps, name))
+  return addOn ? ` The kind is not installed: spread ${addOnMaps[addOn]} into the map.` : ''
+}
+
 /** The component a node of this kind is drawn by; a kind the map does not carry is an error, never drawn as nothing. */
 export const nodeFor = (nodes: Nodes, kind: string): ComponentType<NodeProps> => {
   // A map written before it carried nodes has none, which reads as every kind missing rather than a bare TypeError.
@@ -88,7 +101,7 @@ const drawnByMap = (name: string) => !name.includes('#')
  */
 export const controlFor = (controls: Controls, field: ClientField): Control => {
   const found = namedControl(controls, field.component) ?? namedControl(controls, field.kind)
-  if (!found) throw new Error(`components.controls has no control for "${field.kind}", the kind of field "${field.name}". Spread defaultComponents.controls into the map and add one under that name.`)
+  if (!found) throw new Error(`components.controls has no control for "${field.kind}", the kind of field "${field.name}".${installHint(field.component, field.kind) || ' Spread defaultComponents.controls into the map and add one under that name.'}`)
   return found
 }
 
@@ -101,11 +114,11 @@ export const controlFor = (controls: Controls, field: ClientField): Control => {
 export const cellFor = ({ cells, field, column }: { cells: Cells; field: ClientField; column?: string }): Cell => {
   if (column !== undefined && drawnByMap(column)) {
     const named = namedCell(cells, column)
-    if (!named) throw new Error(`components.cells has no cell "${column}", which field "${field.name}" is drawn with. Spread defaultComponents.cells into the map and add one under that name.`)
+    if (!named) throw new Error(`components.cells has no cell "${column}", which field "${field.name}" is drawn with.${installHint(column) || ' Spread defaultComponents.cells into the map and add one under that name.'}`)
     return named
   }
   const found = namedCell(cells, field.cell) ?? namedCell(cells, field.kind)
-  if (!found) throw new Error(`components.cells has no cell for "${field.kind}", the kind of field "${field.name}". Spread defaultComponents.cells into the map and add one under that name.`)
+  if (!found) throw new Error(`components.cells has no cell for "${field.kind}", the kind of field "${field.name}".${installHint(field.cell, field.kind) || ' Spread defaultComponents.cells into the map and add one under that name.'}`)
   return found
 }
 
@@ -129,13 +142,13 @@ export const checkComponents = ({ client, components }: { client: { path?: strin
       .map((kind) => `components.nodes has no node "${kind}", which screen ${client.path} ${kayan.name} page "${page}" draws.`)),
     ...Object.entries(kayan.pages ?? {}).flatMap(([page, drawn]) => namedCells(drawn, `screen ${client.path} ${kayan.name} page "${page}" leaf`))
       .filter(({ cell }) => !namedCell(cells, cell))
-      .map(({ cell, at }) => `components.cells has no cell "${cell}", which ${at} names.`),
+      .map(({ cell, at }) => `components.cells has no cell "${cell}", which ${at} names.${installHint(cell)}`),
     ...[...kayan.fields, ...kayan.operations.flatMap((operation) => operation.fields ?? [])]
       .filter((field) => field.kind !== 'join' && !namedControl(controls, field.component) && !namedControl(controls, field.kind))
-      .map((field) => `components.controls has no control for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.`),
+      .map((field) => `components.controls has no control for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.${installHint(field.component, field.kind)}`),
     ...kayan.fields
       .filter((field) => !namedCell(cells, field.cell) && !namedCell(cells, field.kind))
-      .map((field) => `components.cells has no cell for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.`),
+      .map((field) => `components.cells has no cell for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.${installHint(field.cell, field.kind)}`),
   ])
   if (missing.length) throw new Error(`${[...new Set(missing)].join('\n')}\nSpread defaultComponents.controls, defaultComponents.cells and defaultComponents.nodes into the map and add one under each name.`)
 }

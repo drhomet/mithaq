@@ -17,7 +17,15 @@ const { createRoot } = await import('react-dom/client')
 const { Outlet, RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } = await import('@tanstack/react-router')
 const { ScreenForm } = await import('./screen-form.tsx')
 const { ComponentsProvider, RouteError } = await import('./components/mithaq/components.tsx')
-const { defaultComponents } = await import('./components/mithaq/default-components.tsx')
+const { defaultComponents: shipped } = await import('./components/mithaq/default-components.tsx')
+const { richTextComponents } = await import('./components/mithaq/rich-text.tsx')
+const { uploadComponents } = await import('./components/mithaq/upload.tsx')
+// The template's language holds rich text and files, so a course's form draws with both add-ons spread in, as the router does.
+const defaultComponents = {
+  ...shipped,
+  controls: { ...shipped.controls, ...richTextComponents.controls, ...uploadComponents.controls },
+  cells: { ...shipped.cells, ...richTextComponents.cells, ...uploadComponents.cells },
+}
 
 const courses = asas.targets.dashboard.client.kayan.courses!
 const t = (_key: string, fallback?: string) => fallback

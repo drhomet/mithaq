@@ -37,7 +37,9 @@ const { RecordFrame, initialFocusIn } = await import('../registry/record-frame.t
 const { listOf } = await import('../registry/node-tree.ts')
 const { searchableFields } = await import('../registry/list-query.ts')
 const { filterPathsOf } = await import('../registry/filter-operators.ts')
-const { defaultComponents } = await import('../registry/default-components.tsx')
+const { withAddOns } = await import('./with-add-ons.ts')
+// The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
+const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
 const { ComponentsProvider } = await import('../registry/components.tsx')
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
 
@@ -773,7 +775,7 @@ test('the five shadcn controls report the value shape of the kind they draw', as
   assert.deepEqual(calendar.reported, ['2026-09-22'], 'and reports the day as the string the column holds')
 })
 
-const { cells } = await import('../registry/cells.tsx')
+const cells = defaultComponents.cells
 const { refusalOf } = await import('../registry/form-rules.tsx')
 
 test('the browser holds a list to its minRows and maxRows before any request, under the key the server writes, an optional list left empty passing its floor, and a course names at most two topics', () => {

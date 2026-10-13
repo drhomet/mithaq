@@ -93,6 +93,11 @@ export type CellProps = {
    * server render, where every relationship cell reads as loading; no cell shows the id it holds.
    */
   titles?: RelationshipTitles
+  /**
+   * Drawn alone on a record page and not in a list's row, so a cell that shortens its value to fit a row (rich text to
+   * a line, files to thumbnails) draws all of it.
+   */
+  whole?: boolean
 }
 
 /** A cell, as the components map holds it. */
@@ -122,4 +127,4 @@ export const comboboxPhone = 'max-sm:h-11 max-sm:[&_[data-slot=input-group-addon
  * The one size every checkbox of a screen is drawn at, so a box in a list, a form and the column picker match.
  */
 export const checkboxSize = 'size-4'
-// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 e1fc57f1c5cdc70a1b371b1ae4acce8637d678d55613089e5505929c502bb8dc
+// mithaq-admin 12a77ad2d870c125421bf16c2e4e87200a870847 56e681934736d93d31b4ed791a81875e5e3b5f211ddfd8936c6831898db57a48

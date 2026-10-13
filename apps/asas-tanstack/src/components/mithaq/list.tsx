@@ -74,7 +74,7 @@ export function List(props: ListProps): ReactElement {
   const rowActionsLabel = (row: Row) => {
     const name = titled && rowTitle({ kayan, row, locale })
     // Bidi-isolated, so a name in the other direction does not reorder the sentence.
-    return name ? (t('admin.rowActionsFor', 'Actions for {name}') ?? 'Actions for {name}').replace('{name}', () => `⁨${name}⁩`) : (t('admin.rowActions', 'Row actions') ?? 'Row actions')
+    return name ? (t('admin.rowActionsFor', 'Actions for {name}') ?? 'Actions for {name}').replace('{name}', () => `\u2068${name}\u2069`) : (t('admin.rowActions', 'Row actions') ?? 'Row actions')
   }
   const openHint = useId()
   /**
@@ -221,4 +221,4 @@ export function List(props: ListProps): ReactElement {
     </section>
   )
 }
-// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 6ec2592cae176433b87fd05b7aa07c9e497dac05be584c4883bada066c8ad012
+// mithaq-admin 12a77ad2d870c125421bf16c2e4e87200a870847 131fea1cd7ffd39966c31e5056d097316ed0d9951b91bb86e760ce1cb2ecb4b9

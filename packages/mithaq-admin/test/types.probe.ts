@@ -150,3 +150,34 @@ export const wrongColor: ComponentsOf<ColorLanguage> = {
   cells: colorCells,
   nodes: components.nodes,
 }
+
+// Rich text and files are add-ons: their controls and cells are asked for only by a language that declares their kinds.
+type PlainLanguage = typeof import('./plain-language.ts').language
+type TemplateLanguage = import('asas').Language
+declare const richTextComponents: typeof import('../registry/rich-text.tsx').richTextComponents
+declare const uploadComponents: typeof import('../registry/upload.tsx').uploadComponents
+export const plain: ComponentsOf<PlainLanguage> = components
+export const needlessRichText: ComponentsOf<PlainLanguage> = {
+  ...components,
+  // @ts-expect-error no kind of this language draws rich text, so the map takes no richText control
+  controls: { ...components.controls, richText: richTextComponents.controls.richText },
+}
+// @ts-expect-error a language with rich text and files needs both add-on maps
+export const bare: ComponentsOf<TemplateLanguage> = components
+export const fileless: ComponentsOf<TemplateLanguage> = {
+  nodes: components.nodes,
+  // @ts-expect-error a language with files needs uploadComponents.controls besides rich text's
+  controls: { ...components.controls, ...richTextComponents.controls },
+  cells: { ...components.cells, ...richTextComponents.cells, ...uploadComponents.cells },
+}
+export const cellless: ComponentsOf<TemplateLanguage> = {
+  nodes: components.nodes,
+  controls: { ...components.controls, ...richTextComponents.controls, ...uploadComponents.controls },
+  // @ts-expect-error and richTextComponents.cells besides the files'
+  cells: { ...components.cells, ...uploadComponents.cells },
+}
+export const installed: ComponentsOf<TemplateLanguage> = {
+  nodes: components.nodes,
+  controls: { ...components.controls, ...richTextComponents.controls, ...uploadComponents.controls },
+  cells: { ...components.cells, ...richTextComponents.cells, ...uploadComponents.cells },
+}

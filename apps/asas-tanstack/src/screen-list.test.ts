@@ -15,7 +15,15 @@ const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query
 const { Outlet, RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } = await import('@tanstack/react-router')
 const { ScreenList, flatSearch } = await import('./screen-list.tsx')
 const { ComponentsProvider } = await import('./components/mithaq/components.tsx')
-const { defaultComponents } = await import('./components/mithaq/default-components.tsx')
+const { defaultComponents: shipped } = await import('./components/mithaq/default-components.tsx')
+const { richTextComponents } = await import('./components/mithaq/rich-text.tsx')
+const { uploadComponents } = await import('./components/mithaq/upload.tsx')
+// The template's language holds rich text and files, so a course's list draws with both add-ons spread in, as the router does.
+const defaultComponents = {
+  ...shipped,
+  controls: { ...shipped.controls, ...richTextComponents.controls, ...uploadComponents.controls },
+  cells: { ...shipped.cells, ...richTextComponents.cells, ...uploadComponents.cells },
+}
 const { ScreenContext } = await import('mithaq/admin/react')
 const { askedFor } = await import('./screen-list.tsx')
 

@@ -14,11 +14,13 @@ const { Form } = await import('../registry/form.tsx')
 const { descriptionOf, labelFor, operationLabelFor, placeholderFor, titleOf } = await import('../registry/copy.ts')
 const { readOnlyField, seedOf, valuesOf } = await import('../registry/field-values.ts')
 const { controlFor: controlIn } = await import('../registry/components.tsx')
-const { defaultComponents } = await import('../registry/default-components.tsx')
+const { withAddOns } = await import('./with-add-ons.ts')
+// The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
+const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
 const { ComponentsProvider } = await import('../registry/components.tsx')
 // A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
 const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
-const { defaultComponents: appDefaults } = await import('@/components/mithaq/default-components.tsx')
+const appDefaults = withAddOns((await import('@/components/mithaq/default-components.tsx')).defaultComponents, (await import('@/components/mithaq/rich-text.tsx')).richTextComponents, (await import('@/components/mithaq/upload.tsx')).uploadComponents)
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
 const controlFor = (field: ClientField) => controlIn(defaultComponents.controls, field)
 const { cellFor: cellIn } = await import('../registry/components.tsx')
@@ -495,14 +497,32 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-field-shell',
       'mithaq-relationship-control',
       'mithaq-relationship-cell',
+      'mithaq-rich-text-nodes',
+      'mithaq-rich-text-value',
+      'mithaq-rich-text-line',
+      'mithaq-rich-text-picks',
+      'mithaq-rich-text-selection',
+      'mithaq-rich-text-format-buttons',
+      'mithaq-rich-text-toolbar',
+      'mithaq-rich-text-link-editor',
+      'mithaq-rich-text-link-plugin',
+      'mithaq-rich-text-slash-menu',
+      'mithaq-rich-text-viewer',
+      'mithaq-rich-text-editor',
       'mithaq-rich-text',
+      'mithaq-upload-api',
+      'mithaq-file-thumb',
+      'mithaq-upload-cell',
+      'mithaq-upload-dialog',
+      'mithaq-upload-control',
       'mithaq-upload',
+      'mithaq-upload-node',
       'mithaq-screens-host',
       'mithaq-storage',
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the seventy-four items this file knows about',
+    'the registry declares the ninety-two items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`
@@ -1105,7 +1125,7 @@ test('33. the column popup moves a column past the hidden one between it and its
 test('40b. every file an item writes imports only files its own registryDependencies write, followed through each sibling', () => {
   // `shadcn add` installs an item and its dependencies alone, so a sibling file reached by none of them is a broken import in the project.
   const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {
-    items: { name: string; registryDependencies?: string[]; files: { path: string; target: string }[] }[]
+    items: { name: string; dependencies?: string[]; registryDependencies?: string[]; files: { path: string; target: string }[] }[]
   }
   const installedAt = (target: string) => (target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`)
   const byName = new Map(source.items.map((item) => [item.name, item]))
@@ -1135,6 +1155,14 @@ test('40b. every file an item writes imports only files its own registryDependen
     }
   }
   assert.ok(checked > 50, `the imports were read: ${checked}`)
+  // A project whose language has no rich text and no files installs the host and the defaults, and neither the editor nor the upload code.
+  const installs = (name: string) => [...closure(name)].flatMap((one) => byName.get(one)!.dependencies ?? [])
+  for (const name of ['mithaq-screens-host', 'mithaq-default-components']) {
+    assert.deepEqual([...closure(name)].filter((one) => /rich-text|upload|file-thumb/.test(one)), [], `${name} reaches no rich text or upload item`)
+    assert.deepEqual(installs(name).filter((one) => one.includes('lexical')), [], `${name} installs no Lexical package`)
+  }
+  assert.ok(installs('mithaq-rich-text').includes('@lexical/react@0.52.0'), 'and the rich text add-on brings the editor')
+  assert.ok(closure('mithaq-upload').has('mithaq-upload-dialog') && !installs('mithaq-upload').some((one) => one.includes('lexical')), 'and the files add-on its dialog, with no Lexical')
 })
 
 test('40. every item names the shadcn primitive it imports in registryDependencies, and names no primitive it does not import', () => {
