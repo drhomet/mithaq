@@ -43,7 +43,7 @@ const { withAddOns } = await import('./with-add-ons.ts')
 const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
 const { ComponentsProvider } = await import('../registry/components.tsx')
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
-// A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
+// A template file imports the map as `mithaq-admin/components.tsx`, which resolves to the same module here; the second provider stands for the app's own map.
 const { ComponentsProvider: AppComponents } = await import('mithaq-admin/components.tsx')
 const appDefaults = withAddOns((await import('mithaq-admin/default-components.tsx')).defaultComponents, (await import('mithaq-admin/rich-text.tsx')).richTextComponents, (await import('mithaq-admin/upload.tsx')).uploadComponents)
 const withComponents = (element: ReactElement) => createElement(ComponentsProvider, { components: defaultComponents }, createElement(AppComponents, { components: appDefaults }, element))
@@ -951,7 +951,7 @@ test('29. a target that declares no useAsTitle is searched and shown by its id, 
 
 test('218b. a session reads as its course and its start in the enrollment picker, held or listed, and by its start alone where the course is not read', async () => {
   const { SessionLabels } = await import('../../../templates/asas/src/ui/session-labels.tsx')
-  // The app's copy of the picker, the one the provider's context comes from.
+  // The picker as the template imports it, by the package's name.
   const { RelationshipControl } = await import('mithaq-admin/relationship-control.tsx')
   const at = ['2026-10-12T09:00:00.000Z', '2026-10-12T13:00:00.000Z']
   const rows = [{ id: 's1', course: 'c1', startsAt: at[0] }, { id: 's2', course: 'c2', startsAt: at[1] }, { id: 's3', course: 'c9', startsAt: at[1] }]
@@ -981,7 +981,7 @@ test('218b. a session reads as its course and its start in the enrollment picker
 test('218c. an image lists by its thumbnail and its size in kilobytes or megabytes, its page leads with the image, Download and Replace file, and its New page opens the upload dialog', async (t) => {
   const { FileName, FileSize, MediaPreview, NewImage } = await import('../../../templates/asas/src/media/ui/preview.tsx')
   const { sizeOf } = await import('../registry/upload.tsx')
-  // The template's page imports the app's copy of the upload dialog, which reads the app's copy of the map.
+  // The template's page imports the upload dialog by the package's name, and the dialog reads the map the same way.
   const { ComponentsProvider: AppComponents } = await import('mithaq-admin/components.tsx')
   const appDefaults = withAddOns((await import('mithaq-admin/default-components.tsx')).defaultComponents, (await import('mithaq-admin/rich-text.tsx')).richTextComponents, (await import('mithaq-admin/upload.tsx')).uploadComponents)
   const inApp = (element: ReactElement) => createElement(AppComponents, { components: appDefaults }, element)
@@ -1213,7 +1213,7 @@ test('229g. Remove is offered only where the viewer may take every role the memb
 })
 
 test('229f. a role\'s form refused on save marks its name and both labels required and refused, each with its sentence under it, and its permissions group refused where the server names it', async () => {
-  // The app's own copy of the form: the role form binds its fields through the app's alias.
+  // The form by the package's name, as the role form binds its fields through it.
   const { Form: AppForm } = await import('mithaq-admin/form.tsx')
   const { RoleForm } = await import('../../../templates/asas/src/roles/ui/role-form.tsx')
   const roles = screen.kayan.roles!

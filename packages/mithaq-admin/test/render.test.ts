@@ -18,7 +18,7 @@ const { withAddOns } = await import('./with-add-ons.ts')
 // The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
 const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
 const { ComponentsProvider } = await import('../registry/components.tsx')
-// A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
+// A template file imports the map as `mithaq-admin/components.tsx`, which resolves to the same module here; the second provider stands for the app's own map.
 const { ComponentsProvider: AppComponents } = await import('mithaq-admin/components.tsx')
 const appDefaults = withAddOns((await import('mithaq-admin/default-components.tsx')).defaultComponents, (await import('mithaq-admin/rich-text.tsx')).richTextComponents, (await import('mithaq-admin/upload.tsx')).uploadComponents)
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls

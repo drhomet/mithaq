@@ -33,7 +33,7 @@ bun run test:tanstack
 bun run test:next
 ```
 
-Before a release, `bun run pack` stages the two published packages in `.pack/`, and `bun run test:release` creates a project from them and runs it end to end.
+Before a release, `bun run pack` stages the three published packages in `.pack/`, and `bun run test:release` creates a project from them and runs it end to end.
 
 From `templates/asas/`, with `DATABASE_URL` exported:
 

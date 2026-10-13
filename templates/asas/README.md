@@ -239,7 +239,7 @@ This runs the lock check, every generator in check mode, and the migration check
 
 ## Project structure
 
-`bun create mithaq my-app` copies the template at the version of `mithaq` it was published with, pins `"mithaq": "npm:@drhomet/mithaq@<version>"`, writes fresh secrets into three `.env` files and runs `bun install`. The project is a Bun workspace.
+`bun create mithaq my-app` copies the template at the version of `mithaq` it was published with, pins `"mithaq": "npm:@drhomet/mithaq@<version>"` and `"mithaq-admin": "npm:@drhomet/mithaq-admin@<version>"` at that one version, writes fresh secrets into three `.env` files and runs `bun install`. The project is a Bun workspace.
 
 ```
 my-app/

@@ -7,7 +7,7 @@ version of `mithaq`. Each piece is a TSX file the project imports as
 `mithaq-admin/<file>`, and compiles against its own shadcn primitives through
 `@/components/ui/*` and `@/lib/utils`, so the admin takes the app's style.
 
-How a project adds its own components is in [Add a screen component](../../templates/asas/README.md#add-a-screen-component).
+How a project adds its own components is in [Add a screen component](https://github.com/drhomet/mithaq/blob/main/templates/asas/README.md#add-a-screen-component).
 
 ## Set up an app
 
@@ -41,11 +41,12 @@ to edit.
 `mithaq eject <item>`, run in the app, writes the item's own files into `src/components/mithaq/` byte for byte,
 each ending with a marker line, `// mithaq-admin <version> <hash>`. From then on that file is drawn in place of
 the package's by every importer, the package's own pieces among them. Edit it in place. Delete it to draw the
-package's again, or run `mithaq eject --prune`, which deletes every ejected file nobody edited.
+package's again, or run `mithaq eject --prune`, which deletes every ejected file nobody edited. Restart the dev
+server after an eject or a prune.
 
 Eject copies no other piece, because the package already serves each one, never overwrites a file, and installs
 nothing: it names the shadcn primitives and npm packages the item needs that the project lacks. [The `mithaq`
-command](../mithaq/src/asas/cli/README.md#eject-and-eject---prune) has the details.
+command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#eject-and-eject---prune) has the details.
 
 Reach for the components map first: a control, a cell or a node is replaced there without ejecting anything. Eject
 when the piece you want to change is not in the map, such as `list-table.tsx` inside the list.
@@ -55,7 +56,7 @@ when the piece you want to change is not in the map, such as `list-table.tsx` in
 `mithaq upgrade --check` compares every file the project holds (what it ejected and the files it always holds)
 with the installed package, one line per file, and never writes; you merge a change by hand. Where it lives:
 `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
-[The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) describes it.
+[The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#upgrade---check) describes it.
 
 When you eject `mithaq-upload` from a version before rich text and files became
 add-ons, `upload.tsx` no longer exports `UploadPlugin`, `UploadView`, `imagePick`
@@ -148,8 +149,8 @@ brings, and of the `upload` kind, which the storage rukn brings, are not in
 `defaultComponents`. Each ships as an add-on map of its own,
 `richTextComponents` in `rich-text.tsx` and `uploadComponents` in `upload.tsx`,
 and a project spreads one only where its language holds the kind. A project
-without rich text never installs Lexical's editor, and one without files never
-installs the upload code:
+without rich text never loads Lexical's editor, and one without files never
+loads the upload code:
 
 ```tsx
 const components: ComponentsOf<Language> = {

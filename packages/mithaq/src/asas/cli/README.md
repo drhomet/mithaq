@@ -177,6 +177,8 @@ The admin's pieces are imported from the installed `mithaq-admin` package as `mi
 
 `mithaq eject --prune` deletes every marked file in the folders pieces are ejected into whose text still hashes to its marker, meaning nobody edited it, and prints each one. It never touches an edited or unmarked file, or a file at the project's root such as the screen host. It returns a project to the package's pieces wherever it never changed one.
 
+Restart the dev server after an eject or a prune.
+
 Both read `components.json` in the current folder for where files go, so run them in the app: `apps/asas-tanstack` or `apps/asas-platform`.
 
 ```sh
