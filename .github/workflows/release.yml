@@ -22,7 +22,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: mithaq
         ports: ['55432:5432']
-        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       # Not 5432 or 55439, which testDatabase refuses as dev databases; the tests drop and rebuild it.
       DATABASE_URL: postgres://postgres:postgres@localhost:55432/mithaq
@@ -42,8 +42,10 @@ jobs:
       - run: bun run test
       - run: bun run test:tanstack
       - run: bun run test:next
-      - run: bunx mithaq generate --check && bunx mithaq upgrade --check
+      - run: bunx mithaq generate --check
         working-directory: templates/asas
+      # Each folder that holds files from mithaq-admin, which its components.json places.
+      - run: for folder in templates/mithaq apps/asas-tanstack apps/asas-platform; do (cd "$folder" && bunx mithaq upgrade --check) || exit 1; done
       # Stages .pack/, which is what gets published.
       - run: bun run test:release
       # Artifacts are immutable within a run, so publish gets exactly what these checks passed.

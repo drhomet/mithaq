@@ -4863,15 +4863,21 @@ test('172h. a create page autosaves a draft after the first change, moves to the
   const host = await render(createElement(CreateHost, { client: draftClient(calls, (call) => answer(call)), drafts: { autosave: 100 } }))
   const title = () => host.querySelector('#courses-title') as HTMLInputElement
   assert.equal(!!buttonNamed(host, 'Save draft'), true, 'Save draft shows on a create that autosaves')
-  await act(async () => sleep(250))
-  assert.equal(calls.length, 0, 'an untouched create page makes no row')
-  await act(async () => {
-    title().focus()
-    typeInto(title(), 'Taj')
-  })
-  await act(async () => sleep(50))
-  assert.equal(calls.length, 0, 'nothing before the interval')
-  await act(async () => sleep(100))
+  // Mocked, so a loaded machine cannot stretch the 99ms before the interval past it.
+  mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    await act(async () => mock.timers.tick(250))
+    assert.equal(calls.length, 0, 'an untouched create page makes no row')
+    await act(async () => {
+      title().focus()
+      typeInto(title(), 'Taj')
+    })
+    await act(async () => mock.timers.tick(99))
+    assert.equal(calls.length, 0, 'nothing before the interval')
+    await act(async () => mock.timers.tick(1))
+  } finally {
+    mock.timers.reset()
+  }
   assert.deepEqual(calls.map((one) => [one.operation, one.input.title, JSON.stringify(one.options)]), [['create', 'Taj', '{"draft":true,"autosave":true}']], 'the first autosave creates the row as a draft')
   await act(async () => {
     typeInto(title(), 'Tajweed')
