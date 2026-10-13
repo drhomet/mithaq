@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ClientKayan } from 'mithaq/admin'
-import { seedOf } from './field-values.ts'
-import type { DraftStatus, FormClient } from './form-types.tsx'
+import { seedOf } from 'mithaq-admin/field-values.ts'
+import type { DraftStatus, FormClient } from 'mithaq-admin/form-types.tsx'
 
 /**
  * Which copy a changed row shows: the draft, or the published copy, read once when first chosen and drawn

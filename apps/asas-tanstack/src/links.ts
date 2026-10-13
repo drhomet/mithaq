@@ -35,4 +35,4 @@ export const clampedHref = ({ href, page, totalPages }: { href: string; page: nu
   else url.searchParams.delete('page')
   return `${url.pathname}${url.search}${url.hash}`
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 4754cbac64eeac528e7e037173ad56ffa8d07df3e526e1191bbe3be400db97a5
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 4754cbac64eeac528e7e037173ad56ffa8d07df3e526e1191bbe3be400db97a5

@@ -6,7 +6,7 @@ import { renderToStaticMarkup as staticMarkup } from 'react-dom/server'
 import { createElement, type ReactElement } from 'react'
 import { asas } from 'asas'
 import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
-import { hashOf } from 'mithaq/upgrade'
+import { stateOf } from 'mithaq/upgrade'
 import './tsx.ts'
 
 const { List } = await import('../registry/list.tsx')
@@ -18,9 +18,9 @@ const { withAddOns } = await import('./with-add-ons.ts')
 // The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
 const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
 const { ComponentsProvider } = await import('../registry/components.tsx')
-// A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
-const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
-const appDefaults = withAddOns((await import('@/components/mithaq/default-components.tsx')).defaultComponents, (await import('@/components/mithaq/rich-text.tsx')).richTextComponents, (await import('@/components/mithaq/upload.tsx')).uploadComponents)
+// A template file imports the map as `mithaq-admin/components.tsx`, which resolves to the same module here; the second provider stands for the app's own map.
+const { ComponentsProvider: AppComponents } = await import('mithaq-admin/components.tsx')
+const appDefaults = withAddOns((await import('mithaq-admin/default-components.tsx')).defaultComponents, (await import('mithaq-admin/rich-text.tsx')).richTextComponents, (await import('mithaq-admin/upload.tsx')).uploadComponents)
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
 const controlFor = (field: ClientField) => controlIn(defaultComponents.controls, field)
 const { cellFor: cellIn } = await import('../registry/components.tsx')
@@ -423,7 +423,7 @@ test('184c. a search runs only over what the viewer reads, across one relationsh
 })
 
 test('12. the app holds the current source of every registry item it copied', () => {
-  // `r/` is not read: it is `shadcn build` output built on install, so no stored copy can drift. The app's copy can.
+  // The package's own file is the source; the copy a project holds can drift.
   const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8'))
   const names: string[] = source.items.map((item: { name: string }) => item.name)
   assert.deepEqual(
@@ -526,20 +526,18 @@ test('12. the app holds the current source of every registry item it copied', ()
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`
-  const declaredFiles = declaredItems.flatMap((item) => item.files.map((file) => ({ item: item.name, ...file })))
+  // Every other piece is drawn from the installed package; only these import app files or hold policy, so a project holds them.
+  const owned = ['mithaq-screens-host', 'mithaq-storage', 'mithaq-expected-updated-at', 'mithaq-directional-icon']
+  const declaredFiles = declaredItems.filter((item) => owned.includes(item.name)).flatMap((item) => item.files.map((file) => ({ item: item.name, ...file })))
+  assert.equal(declaredFiles.length, 19, 'the twelve host files, the five storage adapters, the step and the icon')
   for (const declared of declaredFiles) {
-    // The CLI strips a file's leading comment block and the build appends a hash marker, so copies are compared by that hash.
+    // Read as `mithaq upgrade --check` reads it: a fresh eject hashes its whole text, a copy `shadcn add` made its text less leading comments.
     const target = declared.target
     // The storage adapters and the write step run on the server, so the project holding them is the template's root, not an app.
     const project = ['mithaq-storage', 'mithaq-expected-updated-at'].includes(declared.item) ? 'templates/asas' : 'apps/asas-tanstack'
     const copied = readFileSync(new URL(`../../../${project}/${appPathOf(target)}`, import.meta.url), 'utf8')
-    // `copied.length > 0` first: every string ends with the empty string, so an empty copy would pass `endsWith`.
-    assert.ok(copied.length > 0, `${project} has a non-empty copy of ${target}`)
     const source = readFileSync(new URL(`../${declared.path}`, import.meta.url), 'utf8')
-    assert.ok(
-      hashOf(copied) === hashOf(source) && copied.endsWith(` ${hashOf(source)}\n`),
-      `${project} has the current ${target}, marked; rerun "shadcn add ./node_modules/mithaq-admin/r/${declared.item}.json --overwrite --yes"`,
-    )
+    assert.equal(stateOf(copied, source), 'up to date', `${project} has the current ${target}, marked; delete it and rerun "mithaq eject ${declared.item}" there`)
   }
 })
 
@@ -1122,52 +1120,28 @@ test('33. the column popup moves a column past the hidden one between it and its
   assert.deepEqual(move({ columns, at: 2, by: 1 }), columns, 'and a move with no neighbour is the same list, which is what the disabled button stands for')
 })
 
-test('40b. every file an item writes imports only files its own registryDependencies write, followed through each sibling', () => {
-  // `shadcn add` installs an item and its dependencies alone, so a sibling file reached by none of them is a broken import in the project.
-  const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {
-    items: { name: string; dependencies?: string[]; registryDependencies?: string[]; files: { path: string; target: string }[] }[]
-  }
-  const installedAt = (target: string) => (target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`)
-  const byName = new Map(source.items.map((item) => [item.name, item]))
-  const writtenBy = new Set(source.items.flatMap((item) => item.files.map((file) => installedAt(file.target))))
-  const closure = (name: string, seen = new Set<string>()): Set<string> => {
-    if (seen.has(name)) return seen
-    seen.add(name)
-    for (const one of byName.get(name)!.registryDependencies ?? []) {
-      const sibling = /mithaq-admin\/r\/(.+)\.json$/.exec(one)?.[1]
-      if (sibling) closure(sibling, seen)
-    }
+test('40b. the host and the defaults reach no rich text or upload piece and no Lexical editor, followed through every piece they import', () => {
+  // Pieces import each other by the package's name, so the graph is read off the source; a project without rich text or files never loads the editor or the upload code.
+  const imports = (path: string) => [...readFileSync(new URL(`../registry/${path}`, import.meta.url), 'utf8').matchAll(/from '([^']+)'/g)].map((hit) => hit[1]!)
+  const reach = (path: string, seen = new Set<string>()): Set<string> => {
+    if (seen.has(path)) return seen
+    seen.add(path)
+    for (const one of imports(path)) if (one.startsWith('mithaq-admin/')) reach(one.slice('mithaq-admin/'.length), seen)
     return seen
   }
-  let checked = 0
-  for (const item of source.items) {
-    const reached = new Set([...closure(item.name)].flatMap((name) => byName.get(name)!.files.map((file) => installedAt(file.target))))
-    for (const file of item.files) {
-      const at = installedAt(file.target)
-      const text = readFileSync(new URL(`../${file.path}`, import.meta.url), 'utf8')
-      for (const [, specifier] of text.matchAll(/from '(\.{1,2}\/[^']+|@\/[^']+)'/g)) {
-        const path = specifier!.startsWith('@/') ? `src/${specifier!.slice(2)}` : new URL(specifier!, `file:///${at}`).pathname.slice(1)
-        // A file no item writes is the app's own, which the host's description names.
-        if (!writtenBy.has(path)) continue
-        checked++
-        assert.ok(reached.has(path), `${item.name} writes ${at}, which imports ${path}, and nothing its registryDependencies reach writes it`)
-      }
-    }
-  }
-  assert.ok(checked > 50, `the imports were read: ${checked}`)
-  // A project whose language has no rich text and no files installs the host and the defaults, and neither the editor nor the upload code.
-  const installs = (name: string) => [...closure(name)].flatMap((one) => byName.get(one)!.dependencies ?? [])
-  for (const name of ['mithaq-screens-host', 'mithaq-default-components']) {
+  const host = readdirSync(new URL('../registry/host/', import.meta.url)).map((file) => `host/${file}`)
+  for (const [name, roots] of [['the host', host], ['the defaults', ['default-components.tsx']]] as const) {
+    const reached = new Set(roots.flatMap((root) => [...reach(root)]))
     // rich-text-line reads a stored value's words with no Lexical, so the defaults may re-export it.
-    assert.deepEqual([...closure(name)].filter((one) => /rich-text(?!-line$)|upload|file-thumb/.test(one)), [], `${name} reaches no rich text or upload item`)
-    assert.deepEqual(installs(name).filter((one) => one.includes('lexical')), [], `${name} installs no Lexical package`)
+    assert.deepEqual([...reached].filter((one) => /rich-text(?!-line\.ts$)|upload|file-thumb/.test(one)), [], `${name} reaches no rich text or upload piece`)
+    assert.deepEqual([...reached].flatMap(imports).filter((one) => one.startsWith('@lexical/')), [], `${name} imports no Lexical editor package`)
   }
-  assert.ok(installs('mithaq-rich-text').includes('@lexical/react@0.52.0'), 'and the rich text add-on brings the editor')
-  assert.ok(closure('mithaq-upload').has('mithaq-upload-dialog') && !installs('mithaq-upload').some((one) => one.includes('lexical')), 'and the files add-on its dialog, with no Lexical')
+  assert.ok([...reach('rich-text.tsx')].flatMap(imports).some((one) => one.startsWith('@lexical/react/')), 'and the rich text add-on brings the editor')
+  assert.ok(reach('upload.tsx').has('upload-dialog.tsx') && ![...reach('upload.tsx')].flatMap(imports).some((one) => one.includes('lexical')), 'and the files add-on its dialog, with no Lexical')
 })
 
 test('40. every item names the shadcn primitive it imports in registryDependencies, and names no primitive it does not import', () => {
-  // A bare name in `registryDependencies` makes `shadcn add` install shadcn's own primitive beside ours; read off the source so a new import is compared.
+  // A bare name in `registryDependencies` is the shadcn primitive `mithaq eject` tells a project to add when it lacks it; read off the source so a new import is compared.
   const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {
     items: { name: string; registryDependencies?: string[]; files: { path: string }[] }[]
   }
@@ -1183,17 +1157,12 @@ test('40. every item names the shadcn primitive it imports in registryDependenci
       (match) => match[1]!.split('/')[0]!,
     )
     found += imported.length
-    // A sibling of ours is a path into the installed package and shadcn's own is a bare name, so the leading dot tells them apart.
-    const declared = (item.registryDependencies ?? []).filter((one) => !one.startsWith('.'))
-    const shipped = imported.filter((name) => ownPrimitives.has(name))
+    const declared = item.registryDependencies ?? []
     assert.deepEqual(
       [...declared].sort(),
       [...new Set(imported.filter((name) => !ownPrimitives.has(name)))].sort(),
       `${item.name} declares the shadcn items its files import, and no other`,
     )
-    for (const name of shipped) {
-      assert.ok(item.registryDependencies?.includes(`./node_modules/mithaq-admin/r/${ownPrimitives.get(name)}.json`), `${item.name} declares ${name} as the item that ships it`)
-    }
   }
   assert.ok(found > 0, 'at least one item imports a primitive, so the regex above matched something')
 })

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { Textarea } from '@/components/ui/textarea'
-import { ariaRequired, changeOf, cleared, type ControlProps } from './control-props.ts'
-import { asText } from './format.tsx'
+import { ariaRequired, changeOf, cleared, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { asText } from 'mithaq-admin/format.tsx'
 
 export function TextareaControl(props: ControlProps): ReactElement {
   const { describedBy, error, field, id, placeholder, readOnly, value } = props

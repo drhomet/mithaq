@@ -7,4 +7,4 @@ export const screenNamed = <Known extends object>(known: Known, name: unknown): 
   if (typeof name !== 'string' || !Object.hasOwn(known, name)) throw new Error(`"${String(name)}" is no screen of this app.`)
   return name as keyof Known & string
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 878b7180f2aa169546feb42bcdfcb6002841d08e46788c94ddd6edfc4e3502ca
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 878b7180f2aa169546feb42bcdfcb6002841d08e46788c94ddd6edfc4e3502ca

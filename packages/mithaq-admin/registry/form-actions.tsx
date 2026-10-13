@@ -4,8 +4,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import type { Translate } from './copy.ts'
-import type { DraftStatus } from './form-types.tsx'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import type { DraftStatus } from 'mithaq-admin/form-types.tsx'
 
 /** Which copy of a changed row the form shows, and how to show the other. */
 export type Views = { viewing: boolean; choose: (next: string) => Promise<void> }

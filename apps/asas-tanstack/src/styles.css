@@ -2,11 +2,13 @@
    imports, custom-variant, :root and .dark variables, the @theme inline
    block and the @layer base rules, unchanged. Only the @source line below
    differs, pointing at this project's template instead of TB's monorepo.
-   Tailwind finds this app's own files, the copied `src/components/mithaq`
+   Tailwind finds this app's own files, an ejected `src/components/mithaq`
    among them, without one. */
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+/* The admin's pieces in node_modules, which Tailwind never scans on its own. */
+@import 'mithaq-admin/source.css';
 @import '@fontsource-variable/raleway';
 @import '@fontsource/ibm-plex-sans-arabic';
 

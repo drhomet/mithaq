@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { Checkbox } from '@/components/ui/checkbox'
-import { checkboxSize } from './control-props.ts'
-import type { Translate } from './copy.ts'
-import { readOnlyField } from './field-values.ts'
+import { checkboxSize } from 'mithaq-admin/control-props.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { readOnlyField } from 'mithaq-admin/field-values.ts'
 
 /**
  * The list's checkbox size, with the invisible hit layer grown to 44 pixels below `sm`. Only for

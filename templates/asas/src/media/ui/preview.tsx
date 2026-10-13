@@ -10,7 +10,7 @@ import type { CellProps, ComponentProps, Row } from 'mithaq/admin'
 import { useAccess, useClient, useLocale, useRecord, useScreen } from 'mithaq/admin/react'
 import { locales } from '@/copy.ts'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { FileThumb, FileValue, UploadDialog, sizeOf } from '@/components/mithaq/upload.tsx'
+import { FileThumb, FileValue, UploadDialog, sizeOf } from 'mithaq-admin/upload.tsx'
 import { AppShell } from '../../ui/app-shell.tsx'
 
 /** The `filesize` column: the size as a person reads it, never the raw bytes, in the upload dialog's own units. */

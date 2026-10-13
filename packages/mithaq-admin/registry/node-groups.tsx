@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import type { Copy } from './copy.ts'
-import { leavesOf, shown, type NodeProps } from './node-tree.ts'
-import { carded, drawNodes } from './nodes.tsx'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { leavesOf, shown, type NodeProps } from 'mithaq-admin/node-tree.ts'
+import { carded, drawNodes } from 'mithaq-admin/nodes.tsx'
 
 /** A named group's label and description, resolved the way a field's are. */
 export const groupCopy = ({

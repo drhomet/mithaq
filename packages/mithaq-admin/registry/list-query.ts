@@ -1,5 +1,5 @@
 import { isDecimal, type ClientField, type ClientKayan } from 'mithaq/admin'
-import { filterPathsOf, offers, valueShapeOf, type FilterContext, type FilterPath } from './filter-operators.ts'
+import { filterPathsOf, offers, valueShapeOf, type FilterContext, type FilterPath } from 'mithaq-admin/filter-operators.ts'
 
 // The reader is a trust boundary: any bad key, field, operator or value refuses the whole URL (`QueryRefused`),
 // and a link naming a field the viewer may not read is refused, never read as a smaller filter.

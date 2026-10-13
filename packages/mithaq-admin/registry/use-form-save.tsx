@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
 import type { AnyFormApi } from '@tanstack/react-form'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
-import { valuesOf } from './field-values.ts'
-import { refusalOf } from './form-rules.tsx'
-import { afterDraft, type DraftOptions, type DraftStatus, type FormProps } from './form-types.tsx'
-import { leavesOf, type Node } from './node-tree.ts'
-import type { Seed, Seeding } from './use-form-seed.tsx'
+import { valuesOf } from 'mithaq-admin/field-values.ts'
+import { refusalOf } from 'mithaq-admin/form-rules.tsx'
+import { afterDraft, type DraftOptions, type DraftStatus, type FormProps } from 'mithaq-admin/form-types.tsx'
+import { leavesOf, type Node } from 'mithaq-admin/node-tree.ts'
+import type { Seed, Seeding } from 'mithaq-admin/use-form-seed.tsx'
 
 export type FormSaveInput = Pick<FormProps, 'client' | 'expectedUpdatedAt' | 'expectedUpdatedAtOn' | 'onDone' | 'operations'> & {
   kayan: ClientKayan

@@ -1,10 +1,10 @@
 import type { FormEvent, ReactElement, ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cellFor, useComponents } from './components.tsx'
-import type { FindApi } from './control-props.ts'
-import { labelFor, type Copy } from './copy.ts'
-import { useRelationshipTitles } from './relationship-cell.tsx'
+import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
+import type { FindApi } from 'mithaq-admin/control-props.ts'
+import { labelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { useRelationshipTitles } from 'mithaq-admin/relationship-cell.tsx'
 
 /**
  * A form handed no page: every field in declared order on one card with the actions under them, and the fields

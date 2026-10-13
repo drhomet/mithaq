@@ -144,4 +144,4 @@ export const authArm = async (path: string, body: unknown = {}) => {
   // The status too, because a rate limit's refusal carries no code to read.
   return { ok: response.ok, status: response.status, message: answered?.message, body: answered }
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 94db2fc49ad4391c0d1c2183cb41001dd08d62017c76af86cc5f611488c22c68
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 94db2fc49ad4391c0d1c2183cb41001dd08d62017c76af86cc5f611488c22c68

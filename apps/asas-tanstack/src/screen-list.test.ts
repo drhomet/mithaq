@@ -14,10 +14,10 @@ const { createRoot } = await import('react-dom/client')
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query')
 const { Outlet, RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } = await import('@tanstack/react-router')
 const { ScreenList, flatSearch } = await import('./screen-list.tsx')
-const { ComponentsProvider } = await import('./components/mithaq/components.tsx')
-const { defaultComponents: shipped } = await import('./components/mithaq/default-components.tsx')
-const { richTextComponents } = await import('./components/mithaq/rich-text.tsx')
-const { uploadComponents } = await import('./components/mithaq/upload.tsx')
+const { ComponentsProvider } = await import('mithaq-admin/components.tsx')
+const { defaultComponents: shipped } = await import('mithaq-admin/default-components.tsx')
+const { richTextComponents } = await import('mithaq-admin/rich-text.tsx')
+const { uploadComponents } = await import('mithaq-admin/upload.tsx')
 // The template's language holds rich text and files, so a course's list draws with both add-ons spread in, as the router does.
 const defaultComponents = {
   ...shipped,

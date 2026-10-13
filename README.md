@@ -14,7 +14,7 @@ The name is Arabic for a covenant. The other words in the API are Arabic too, an
 - **The vocabulary is frozen.** The kinds, rules and targets mithaq ships change only by the maintainer's explicit decision. A project can also seal its own language in a signed `mithaq.lock`. `mithaq lock --check`, which the apps run before `dev`, `build` and `preview`, then fails when the vocabulary no longer matches the lock. Signing a change takes a code shown in a popup, never in the command's output, so a script or an agent running `mithaq lock` cannot approve it.
 - **Tenant isolation is enforced in core.** A kayan that places the tenant field belongs to one organization. Core adds the tenant scope to every operation and combines it with the project's own access with AND, so no access rule can widen it. Writes land in the active organization, and `unique` rules and index groups are built per organization.
 - **Defaults are explicit.** The project names every default it uses (`defaultOperations`, `defaultFields`, `defaultAuthorize`, the limits) in its own code. Core does not fall back to a default of its own: a configuration that leaves a required one out is a type error or a refusal from `buildAsas`.
-- **The admin is your code.** The screens are shadcn components copied into the project from a registry, so you edit them like any other file.
+- **The admin is your code when you want it.** The screens are shadcn components the project imports from `mithaq-admin` and draws with its own primitives; `mithaq eject` puts any one of them into the project to edit like any other file.
 
 ## Quick start
 
@@ -130,7 +130,7 @@ organization: tenant.field,
 - **Versions and drafts:** the `versions` rukn keeps a row's past versions, with drafts, autosave and restore.
 - **Files:** the `storage` rukn and the `upload` kind. The template ships adapters for local disk, Cloudflare R2, S3-compatible services and UploadThing as project files.
 - **Rich text:** the `richText` rukn, over Lexical.
-- **Admin screens:** `screenTarget` describes each screen; `mithaq generate screens` writes its routes into the host app, and the React components come from a shadcn registry that the project copies and owns. `mithaq upgrade --check` compares those copies with the installed version.
+- **Admin screens:** `screenTarget` describes each screen; `mithaq generate screens` writes its routes into the host app, and the React components come from the `mithaq-admin` package, drawn with the app's own shadcn primitives, and a project ejects the ones it wants to own. `mithaq upgrade --check` compares the files it holds with the installed version.
 - **Copy:** `mithaq generate messages` writes the project's labels and messages to one file per kayan, and refuses a label missing a locale.
 
 `mithaq --help` lists every command.
@@ -151,7 +151,7 @@ Each guide is the `README.md` of the folder it describes.
 - [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md): per-organization kayan, what core enforces, and per-organization indexes.
 - [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md): every command, flag and exit code.
 - [Migrations in production](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/drizzle/README.md): `pending: 'refuse'` or `'run'`, the advisory lock, and applying migrations by hand.
-- [The admin registry](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md): the copied screen components, `mithaq upgrade --check`, and adding a registry item.
+- [The admin package](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md): the screen components, ejecting one, `mithaq upgrade --check`, migrating a project that holds copies, and adding a registry item.
 - [Contributing](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md): setting up, the checks, the repository layout, and sending a pull request.
 
 ## Status and license

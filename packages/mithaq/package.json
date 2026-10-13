@@ -10,6 +10,7 @@
     "./generate-messages": "./src/mithaq/generate-messages.ts",
     "./generate-screens": "./src/screen/generate.ts",
     "./upgrade": "./src/asas/cli/upgrade.ts",
+    "./vite": "./src/vite.ts",
     "./admin": "./src/screen/client.ts",
     "./admin/react": "./src/screen/react.ts",
     "./orpc": "./src/asas/http/orpc.ts",
@@ -43,6 +44,7 @@
       "./generate-messages": "./dist/mithaq/generate-messages.js",
       "./generate-screens": "./dist/screen/generate.js",
       "./upgrade": "./dist/asas/cli/upgrade.js",
+      "./vite": "./dist/vite.js",
       "./admin": "./dist/screen/client.js",
       "./admin/react": "./dist/screen/react.js",
       "./orpc": "./dist/asas/http/orpc.js",
@@ -73,7 +75,8 @@
     "@orpc/openapi": "^1.15.1",
     "@orpc/server": "^1.15.1",
     "better-auth": "1.7.4",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "vite": ">=8"
   },
   "peerDependenciesMeta": {
     "@orpc/openapi": {
@@ -84,6 +87,9 @@
     },
     "react": {
       "optional": true
+    },
+    "vite": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -92,6 +98,7 @@
     "@types/pg": "^8.15.6",
     "better-auth": "1.7.4",
     "@types/react": "^19.3.0",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "vite": "^8.0.13"
   }
 }

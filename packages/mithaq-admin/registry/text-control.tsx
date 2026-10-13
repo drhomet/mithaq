@@ -3,8 +3,8 @@ import { REGEXP_ONLY_DIGITS } from 'input-otp'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
-import { ariaRequired, changeOf, cleared, type Control, type ControlProps } from './control-props.ts'
-import { asText } from './format.tsx'
+import { ariaRequired, changeOf, cleared, type Control, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { asText } from 'mithaq-admin/format.tsx'
 
 const affix = 'bg-muted border-input self-stretch px-3'
 

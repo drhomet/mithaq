@@ -1,6 +1,6 @@
 import { use, type ReactElement } from 'react'
 import { ScreenContext, useLocale, useScreen } from 'mithaq/admin/react'
-import { titleOf } from './copy.ts'
+import { titleOf } from 'mithaq-admin/copy.ts'
 
 /**
  * Whether a nav entry is the page the viewer is on: its kayan is the page's own, on every page of that

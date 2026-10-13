@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { localeEntries } from './components/mithaq/locale-menu.ts'
+import { localeEntries } from 'mithaq-admin/locale-menu.ts'
 import { locales, switchLocale, type Locale } from './copy.ts'
 
 /** The language switch for pages without a form: `switchLocale` reloads without asking, so a page with a form must use the user menu, which asks first. */

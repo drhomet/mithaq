@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { kindOf, matchesWhere, regionsIn } from 'mithaq/admin'
 import type { ButtonClient, ClientKayan, LeafClient, NodeClient, NodeKind, NodeOf, Row } from 'mithaq/admin'
-import type { Copy } from './copy.ts'
-import type { TreePage } from './screen-refs.ts'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import type { TreePage } from 'mithaq-admin/screen-refs.ts'
 
 /** One node of a screen's page. */
 export type Node = NodeClient

@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { FileIcon, ImageOffIcon } from 'lucide-react'
-import type { Translate } from './copy.ts'
-import type { Row } from './upload-api.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import type { Row } from 'mithaq-admin/upload-api.ts'
 
 /** A file row's words for a screen reader: its alternative text in the viewer's locale, else its name. */
 const altOf = (row: Row, locale: string) => {

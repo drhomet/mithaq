@@ -1,7 +1,7 @@
 import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
 import type { ScreenClient } from 'mithaq/admin'
-import { checkComponents } from './components/mithaq/components.tsx'
-import { components } from './router.tsx'
+import { checkComponents } from 'mithaq-admin/components.tsx'
+import { components } from './components.ts'
 import { withQuietAbort } from '../../asas-tanstack/src/quiet-abort.ts'
 
 // Every screen this app serves, checked against its components map as it starts, so a field whose kind has no

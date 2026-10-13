@@ -12,9 +12,9 @@ import {
   ComboboxList,
 } from '@/components/ui/combobox'
 import { Spinner } from '@/components/ui/spinner'
-import { ariaRequired, changeOf, comboboxPhone, type ControlProps, type FindApi } from './control-props.ts'
-import { formatDate } from './format.tsx'
-import { isForbidden } from './refusal.ts'
+import { ariaRequired, changeOf, comboboxPhone, type ControlProps, type FindApi } from 'mithaq-admin/control-props.ts'
+import { formatDate } from 'mithaq-admin/format.tsx'
+import { isForbidden } from 'mithaq-admin/refusal.ts'
 
 /**
  * A chip's remove button is 24 pixels and a phone's finger needs 44: its hit area is widened by an

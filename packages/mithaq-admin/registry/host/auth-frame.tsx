@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { authArm } from './api.ts'
-import { FieldShell, describedBy } from './components/mithaq/field-shell.tsx'
+import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { refusalKey } from './copy.ts'
 import { LocaleSwitch } from './locale-switch.tsx'
 import { wanted } from './redirect.ts'

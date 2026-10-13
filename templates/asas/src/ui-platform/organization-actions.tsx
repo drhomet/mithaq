@@ -5,7 +5,7 @@
 import { useState, type FormEvent } from 'react'
 import { holds, type CellProps } from 'mithaq/admin'
 import { useAccess, useLocale, useScreen } from 'mithaq/admin/react'
-import { writeQuery } from '@/components/mithaq/list-query.ts'
+import { writeQuery } from 'mithaq-admin/list-query.ts'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'

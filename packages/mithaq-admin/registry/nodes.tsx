@@ -2,20 +2,20 @@ import { Fragment, type Key, type ReactElement, type ReactNode } from 'react'
 import { kindOf, regionsIn } from 'mithaq/admin'
 import type { ButtonClient, RegionsClient, Translate } from 'mithaq/admin'
 import { Card, CardContent } from '@/components/ui/card'
-import { nodeFor, useComponents } from './components.tsx'
-import { blank, inside, listOf, shown, type Draw, type Node, type NodeProps } from './node-tree.ts'
-import { refOf, type ScreenPage } from './screen-refs.ts'
+import { nodeFor, useComponents } from 'mithaq-admin/components.tsx'
+import { blank, inside, listOf, shown, type Draw, type Node, type NodeProps } from 'mithaq-admin/node-tree.ts'
+import { refOf, type ScreenPage } from 'mithaq-admin/screen-refs.ts'
 
 // ponytail: what this file exported before its pieces were split out, kept for one version so a project's own file
 // importing one from here still builds after recopying; drop it the next minor and import each from its piece.
-export { LeafControl } from './leaf-control.tsx'
-export { NavLinks, currentOf } from './nav-links.tsx'
-export { BulkChoice, NodeButton, OwnButton, pageButtonOf, type PageButton } from './node-buttons.tsx'
-export { drawsKind, formIn, leavesOf, listIn, listOf, nodesOf, readsAsValues, relatedIn, scopeOf, shown, type Draw, type ListNode, type Node } from './node-tree.ts'
-export { CloseButton, RecordFrame, holdFocus, initialFocusIn } from './record-frame.tsx'
-export { isUntitled, rowTitle, rowWarning } from './row-title.tsx'
-export { refOf, type Places, type Refs, type ScreenPage, type TreePage } from './screen-refs.ts'
-export { useConfirm } from './use-confirm.tsx'
+export { LeafControl } from 'mithaq-admin/leaf-control.tsx'
+export { NavLinks, currentOf } from 'mithaq-admin/nav-links.tsx'
+export { BulkChoice, NodeButton, OwnButton, pageButtonOf, type PageButton } from 'mithaq-admin/node-buttons.tsx'
+export { drawsKind, formIn, leavesOf, listIn, listOf, nodesOf, readsAsValues, relatedIn, scopeOf, shown, type Draw, type ListNode, type Node } from 'mithaq-admin/node-tree.ts'
+export { CloseButton, RecordFrame, holdFocus, initialFocusIn } from 'mithaq-admin/record-frame.tsx'
+export { isUntitled, rowTitle, rowWarning } from 'mithaq-admin/row-title.tsx'
+export { refOf, type Places, type Refs, type ScreenPage, type TreePage } from 'mithaq-admin/screen-refs.ts'
+export { useConfirm } from 'mithaq-admin/use-confirm.tsx'
 
 /** One node, drawn by its kind's entry in the components map. */
 function DrawNode(props: NodeProps): ReactElement {

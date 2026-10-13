@@ -1,11 +1,10 @@
-// Stages the published packages in `.pack/mithaq/` and `.pack/create-mithaq/`, to publish with `npm publish <dir> --access public`.
+// Stages the published packages in `.pack/mithaq/`, `.pack/mithaq-admin/` and `.pack/create-mithaq/`, to publish with `npm publish <dir> --access public`.
 // Staged rather than published from `packages/mithaq`, because npm and Bun ignore `publishConfig.exports` and only pnpm applies it.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { hashOf, mark } from '../packages/mithaq/src/asas/cli/upgrade.ts'
+import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const source = join(root, 'packages/mithaq')
@@ -25,48 +24,32 @@ for (const [entry, file] of Object.entries(manifest.exports)) {
 }
 writeFileSync(join(staged, 'package.json'), `${JSON.stringify({ ...manifest, ...publishConfig }, null, 2)}\n`)
 
-// Inside this repository an item names a sibling by the consumer's install path, which shadcn reads against the app's
-// working directory; a published project reads the registry over HTTP under `@mithaq`, so each such entry becomes `@mithaq/<item>`.
+// The admin's pieces as TSX source, which each project compiles against its own primitives. registry/ui, lib and hooks are
+// shadcn's own, held for the package's typecheck and tests; only directional-icon.tsx, which an item names, ships.
 const admin = join(root, 'packages/mithaq-admin')
-const registry = join(staged, 'r')
-execFileSync(join(admin, 'node_modules/.bin/shadcn'), ['build', '--output', registry], { cwd: admin, stdio: 'inherit' })
-await mark(pathToFileURL(`${registry}/`))
-type Item = { name: string; registryDependencies?: string[]; files?: { content: string }[] }
-const installed = /^\.\/node_modules\/mithaq-admin\/r\/([^/]+)\.json$/
-// shadcn reads `@scope/item` as the registry `@scope` and the item `item`, and fetches the URL `components.json` gives
-// that registry with `{name}` replaced, so each rewritten entry must name a file here.
-const namespaced = /^(@[a-zA-Z0-9](?:[a-zA-Z0-9-_]*[a-zA-Z0-9])?)\/(.+)$/
-// A bare registry name shadcn does not serve answers 404 and aborts the whole `shadcn add`. This list is kept by hand,
-// so add a name only after `shadcn add @mithaq/mithaq-screens-host --dry-run` resolves it.
-const shadcnServes = new Set(['accordion', 'alert-dialog', 'avatar', 'badge', 'button', 'button-group', 'calendar', 'card', 'checkbox', 'collapsible', 'combobox', 'dialog', 'direction', 'drawer', 'dropdown-menu', 'field', 'input', 'input-group', 'input-otp', 'label', 'popover', 'radio-group', 'resizable', 'scroll-area', 'select', 'separator', 'sheet', 'sidebar', 'slider', 'spinner', 'switch', 'table', 'tabs', 'textarea', 'toggle', 'toggle-group'])
-const names = new Set(readdirSync(registry).filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -'.json'.length)))
-for (const name of names) {
-  const file = join(registry, `${name}.json`)
-  const json = JSON.parse(readFileSync(file, 'utf8')) as Item & { items?: Item[] }
-  if (!json.items) assert.equal(json.name, name, `r/${name}.json is the item @mithaq/${name} names`)
-  for (const item of json.items ?? [json]) {
-    assert.ok(names.has(item.name), `@mithaq/${item.name} resolves to r/${item.name}.json`)
-    if (item.registryDependencies) item.registryDependencies = item.registryDependencies.map((dependency) => {
-      const [, sibling] = installed.exec(dependency) ?? []
-      return sibling ? `@mithaq/${sibling}` : dependency
-    })
-    for (const dependency of item.registryDependencies ?? []) {
-      assert.ok(!dependency.includes('/') || namespaced.test(dependency), `${item.name} names ${dependency}, which only resolves inside this repository`)
-      const [, scope, target] = namespaced.exec(dependency) ?? []
-      if (scope) assert.ok(scope === '@mithaq' && names.has(target!), `${item.name} names ${dependency}, which is no item of r/`)
-      else assert.ok(shadcnServes.has(dependency), `${item.name} names ${dependency}, which shadcn's registry is not known to serve`)
-    }
-    // The marker hashes a file's text alone, so the rewrite above leaves every marker true; the index lists files without text.
-    for (const { content } of json.items ? [] : (item.files ?? [])) {
-      assert.equal(/ ([0-9a-f]{64})\n$/.exec(content)?.[1], hashOf(content), `a file of ${item.name} still hashes to its marker`)
-    }
-  }
-  writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`)
-}
+const stagedAdmin = join(root, '.pack/mithaq-admin')
+rmSync(stagedAdmin, { recursive: true, force: true })
+const { publishConfig: adminPublished, private: _adminPrivate, devDependencies: _adminDev, ...adminManifest } = JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { publishConfig: Record<string, unknown>; [key: string]: unknown }
+// Committed files only, as the template is staged, so nothing left in the working tree ships.
+const adminFiles = execFileSync('git', ['ls-files', '-z', 'registry', 'registry.json', 'source.css', 'README.md'], { cwd: admin, encoding: 'utf8' })
+  .split('\0')
+  .filter((file) => file && (!/^registry\/(ui|lib|hooks)\//.test(file) || file === 'registry/ui/directional-icon.tsx'))
+for (const file of adminFiles) cpSync(join(admin, file), join(stagedAdmin, file))
+const { items } = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; files: { path: string }[] }[] }
+for (const { name, files } of items) for (const { path } of files) assert.ok(existsSync(join(stagedAdmin, path)), `${name} names ${path}, which ships`)
+// One version for the three packages, so a project that pins them together cannot pair two that drifted apart.
+// ponytail: the `mithaq` peer stays "*". A `file:` tarball, as test:release installs mithaq, satisfies only `*` in Bun's
+// isolated linker; whether an `npm:` alias satisfies an exact pin is untested. Pin the release version once a consumer
+// installed from the registry proves it.
+writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version }, null, 2)}\n`)
+cpSync(join(root, 'LICENSE'), join(stagedAdmin, 'LICENSE'))
+cpSync(join(root, 'LICENSES'), join(stagedAdmin, 'LICENSES'), { recursive: true })
+console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
+
 cpSync(join(root, 'README.md'), join(staged, 'README.md'))
 cpSync(join(root, 'LICENSE'), join(staged, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(staged, 'LICENSES'), { recursive: true })
-console.log(`staged ${staged}, with ${names.size} files in r/`)
+console.log(`staged ${staged}`)
 
 // The template as it is at this version, so creating a project reads nothing over the network but the install.
 // npm leaves every `.gitignore` out of a package, so each is staged as `gitignore` and named back on creation.

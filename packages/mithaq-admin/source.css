@@ -1,0 +1,2 @@
+/* Tailwind never scans node_modules, so a project imports this file for the classes the admin's pieces draw with. */
+@source './registry';

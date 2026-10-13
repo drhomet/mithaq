@@ -164,15 +164,36 @@ It takes no flags and exits 0.
 bunx mithaq screens
 ```
 
+## `eject` and `eject --prune`
+
+The admin's pieces are imported from the installed `mithaq-admin` package as `mithaq-admin/<file>`, so a project holds none of them until it ejects one. `mithaq eject <item>` writes the item's own files where the project keeps them, each byte for byte with a last line `// mithaq-admin <version> <hash>`. From then on the project's file is drawn in place of the package's, for every importer, through the `mithaq/vite` plugin and the `mithaq-admin/*` entry of the app's tsconfig `paths`. Edit it in place; delete it to draw the package's again.
+
+`<item>` is an item's name with or without `mithaq-`, or its file: `mithaq-list-table`, `list-table` and `list-table.tsx` are the same item. An unknown name prints every item and exits 1.
+
+- It never overwrites: a file already there is left as it is and reported as already ejected.
+- It copies no other item. Every sibling is already served by the package.
+- It installs nothing. It names each shadcn primitive the item imports that the project lacks (`run: shadcn add <name>`) and each npm package it cannot resolve, and writes neither `package.json` nor the lockfile.
+- A target that resolves outside the project, or a file outside the package, writes nothing and exits 1.
+
+`mithaq eject --prune` deletes every marked file in the folders pieces are ejected into whose text still hashes to its marker, meaning nobody edited it, and prints each one. It never touches an edited or unmarked file, or a file at the project's root such as the screen host. It returns a project to the package's pieces wherever it never changed one.
+
+Restart the dev server after an eject or a prune.
+
+Both read `components.json` in the current folder for where files go, so run them in the app: `apps/asas-tanstack` or `apps/asas-platform`.
+
+```sh
+cd apps/asas-tanstack && bunx mithaq eject list-table
+```
+
 ## `upgrade --check`
 
-Admin components come from a shadcn registry and are copied into the project, so they are your files. Each copied file ends with a marker line that records the commit it came from and a hash of its content. `upgrade --check` compares every copy in the current folder with the registry that ships with the installed mithaq, and prints one line per file:
+A project holds the files it ejected and the ones that are always its own: the screen host, the storage adapters and defaults, the `expectedUpdatedAt` step and the directional icon. Each ends with a marker line that records the version (or, for a copy made before the package, the commit) it came from and a hash of its content. `upgrade --check` compares every such file in the current folder with the installed `mithaq-admin`, and prints one line per file:
 
 - up to date, with or without your own edits;
-- differs: the registry has a different version. Diff the two before you replace it, and merge by hand if you edited it;
+- differs: the package has a different version. Diff the two before you replace it, and merge by hand if you edited it;
 - carries no marker, so its origin is unknown;
-- outside: the path resolves outside the project or the registry, so it was not read;
-- removed: the registry no longer has the item, so delete the file.
+- outside: the path resolves outside the project or the package, so it was not read;
+- removed: the package no longer has the item, so delete the file.
 
 It reads `components.json` in the current folder, so run it in each folder that has one: `templates/asas`, `apps/asas-tanstack` and `apps/asas-platform`. It never writes. `--check` is required.
 

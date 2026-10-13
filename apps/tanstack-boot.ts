@@ -505,10 +505,11 @@ test('12. every copy key the copied registry asks for is answered in both of the
   // A key the copy table does not answer is no error, since callers write an English fallback;
   // it is an Arabic viewer reading English.
   const { locales, translator } = await import('./asas-tanstack/src/copy.ts')
-  const { operatorsByKind } = await import('./asas-tanstack/src/components/mithaq/filter-operators.ts')
+  const { operatorsByKind } = await import('../packages/mithaq-admin/registry/filter-operators.ts')
   // Registry and routes both ask for keys; only files are read, so the `api` directory is walked past.
   const directories = [
-    ...['components/mithaq', 'routes'].map((where) => fileURLToPath(new URL(`./asas-tanstack/src/${where}`, import.meta.url))),
+    fileURLToPath(new URL('../packages/mithaq-admin/registry', import.meta.url)),
+    fileURLToPath(new URL('./asas-tanstack/src/routes', import.meta.url)),
     ...['ui', 'ui-dashboard', 'ui-portal', 'ui-platform', 'roles/ui'].map((where) => fileURLToPath(new URL(`../templates/asas/src/${where}`, import.meta.url))),
   ]
   const source = [
@@ -1635,7 +1636,8 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
   const screen = asas.targets.dashboard.client
   walk(screen)
   const sources = [
-    ...['components/mithaq', 'routes'].map((where) => fileURLToPath(new URL(`./asas-tanstack/src/${where}`, import.meta.url))),
+    fileURLToPath(new URL('../packages/mithaq-admin/registry', import.meta.url)),
+    fileURLToPath(new URL('./asas-tanstack/src/routes', import.meta.url)),
     ...['ui', 'ui-dashboard', 'courses/ui', 'enrollments/ui', 'roles/ui', 'audit-log/ui', 'media/ui'].map((where) => fileURLToPath(new URL(`../templates/asas/src/${where}`, import.meta.url))),
   ].flatMap((directory) => readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name)).map((entry) => readFileSync(`${directory}/${entry.name}`, 'utf8')))
   // The host's own bar, which draws the impersonation's words over every page.

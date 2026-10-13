@@ -1,75 +1,63 @@
-import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { join, relative } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
 
-// The last line of every registry file: the commit it was built at and the hash of the
-// file above. Trailing, because `shadcn add` drops a file's leading comments only.
+// The last line of every ejected file: the version (or, for a copy `shadcn add` made, the commit) it came from and the
+// hash of the file above. Trailing, because `shadcn add` dropped a file's leading comments only.
 const marker = /\n\/\/ mithaq-admin (\S+) ([0-9a-f]{64})\n?$/
-// What `shadcn add` drops, so a hash is the same over the registry's text and the copy's.
+// What `shadcn add` dropped, so a hash is the same over the package's text and a copy it made.
 const leading = /^(?:\s+|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*/
 
-/** The hash of a file as `shadcn add` writes it, without its marker. */
-export const hashOf = (text: string) => createHash('sha256').update(text.replace(marker, '\n').replace(leading, '')).digest('hex')
-
-type Built = { files?: { content: string; target: string }[] }
-
-/** Appends the marker to every file of every item `shadcn build` wrote into `built`, the registry's `r/`. */
-export const mark = async (built: URL) => {
-  let commit = 'unknown'
-  try {
-    commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: fileURLToPath(built), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-  } catch {}
-  for (const name of await readdir(built)) {
-    if (!name.endsWith('.json') || name === 'registry.json') continue
-    const item = JSON.parse(await readFile(new URL(name, built), 'utf8')) as Built
-    for (const file of item.files ?? []) {
-      const body = file.content.replace(marker, '\n')
-      const text = body.endsWith('\n') ? body : `${body}\n`
-      file.content = `${text}// mithaq-admin ${commit} ${hashOf(text)}\n`
-    }
-    await writeFile(new URL(name, built), `${JSON.stringify(item, null, 2)}\n`)
-  }
+/** What an eject writes above the marker: the file's text, ending in a newline. */
+const bodyOf = (text: string) => {
+  const body = text.replace(marker, '\n')
+  return body.endsWith('\n') ? body : `${body}\n`
 }
+const sha = (text: string) => createHash('sha256').update(text).digest('hex')
 
-// Beside `dist/` when published, at the same depth from this file.
-
-// Beside `dist/` when published; in this repository the apps read the workspace's `mithaq-admin`.
-const registry = new URL('../../../r/', import.meta.url)
-
-// The installed `mithaq-admin`'s `r/`, else the one this mithaq ships, else none.
-const registryOf = (project: URL): URL | undefined => {
-  try {
-    return new URL('r/', pathToFileURL(createRequire(new URL('package.json', project)).resolve('mithaq-admin/package.json')))
-  } catch {
-    return existsSync(new URL('registry.json', registry)) ? registry : undefined
-  }
-}
-
-export type Copied = {
-  /** The file, relative to the project, or the target or item name that resolved outside it. */
-  path: string
-  state: 'up to date' | 'up to date, edited' | 'differs' | 'differs, edited' | 'unknown' | 'outside' | 'removed'
-  /** The commit the copy's marker names, when it carries one. */
-  from?: string
-  /** The commit the installed registry was built at. */
-  to?: string
-}
-
+/** The hash of a copy `shadcn add` made, without its marker and the leading comments it dropped. */
+export const hashOf = (text: string) => sha(bodyOf(text).replace(leading, ''))
 /**
- * Every registry file the project holds where `shadcn add` writes it, with its state. Reads only;
- * a path that climbs out of the project or the registry is listed as outside, never followed.
+ * The hash a marker from `from` holds: of the whole text above it for an eject, which writes byte for byte, so an edit
+ * to a leading pragma is an edit; without leading comments only for a copy made at a commit, as `shadcn add` wrote it.
  */
-export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> => {
+const madeByShadcn = (from: string) => /^(?:[0-9a-f]{40}|unknown)$/.test(from)
+const hashFrom = (from: string) => (text: string) => (madeByShadcn(from) ? hashOf(text) : sha(bodyOf(text)))
+
+/** A held file's state against the package's text of it, read as `upgrade --check` reads it. */
+export const stateOf = (text: string, source: string): 'up to date' | 'up to date, edited' | 'differs' | 'differs, edited' | 'unknown' => {
+  const [, from, hash] = marker.exec(text) ?? []
+  if (!hash) return 'unknown'
+  const hashed = hashFrom(from!)
+  return `${hash !== hashed(source) ? 'differs' : 'up to date'}${hash !== hashed(text) ? ', edited' : ''}`
+}
+
+type Item = { name: string; dependencies?: string[]; registryDependencies?: string[]; files: { path: string; target: string }[] }
+
+/** The `mithaq-admin` the project installed: its folder, its version and its items, or none. */
+const installedOf = async (project: URL) => {
+  let manifest: URL
+  try {
+    manifest = pathToFileURL(createRequire(new URL('package.json', project)).resolve('mithaq-admin/package.json'))
+  } catch {
+    return undefined
+  }
+  const root = new URL('./', manifest)
+  const { version } = JSON.parse(await readFile(manifest, 'utf8')) as { version: string }
+  const { items } = JSON.parse(await readFile(new URL('registry.json', root), 'utf8')) as { items: Item[] }
+  return { root, version, items }
+}
+
+// `new URL` resolves every `..`, encoded or not, so a prefix is the whole test.
+const within = (url: URL, folder: URL) => url.href.startsWith(folder.href)
+
+/** Where the project keeps each target: `@<alias>/…` through `components.json`, `~/…` from the project's root. */
+const targetsOf = async (project: URL) => {
   const components = JSON.parse(await readFile(new URL('components.json', project), 'utf8')) as { aliases?: Record<string, string> }
-  const built = registryOf(project)
-  if (!built) return undefined
-  const { items } = JSON.parse(await readFile(new URL('registry.json', built), 'utf8')) as { items: { name: string }[] }
   const src = existsSync(new URL('src/', project)) ? 'src/' : ''
-  const pathOf = (target: string) => {
+  return (target: string) => {
     if (target.startsWith('~/')) return target.slice(2)
     const [, alias = '', rest] = /^@([^/]+)\/(.+)$/.exec(target) ?? []
     // shadcn resolves an alias through the app's tsconfig `paths`; this reads `@/` as `src/`
@@ -77,43 +65,63 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
     const at = components.aliases?.[alias]
     return at?.startsWith('@/') ? `${src}${at.slice(2)}/${rest}` : undefined
   }
+}
+
+const folderOf = (path: string) => path.slice(0, path.lastIndexOf('/') + 1)
+
+/** The folders a piece the package serves (`registry/<file>`) is ejected into: what `eject --prune` sweeps. */
+const ejectedFolders = (items: readonly Item[], pathOf: (target: string) => string | undefined) =>
+  new Set(items.flatMap((item) => item.files.filter((file) => !file.path.slice('registry/'.length).includes('/')).flatMap((file) => { const path = pathOf(file.target); return path ? folderOf(path) : [] })))
+
+export type Copied = {
+  /** The file, relative to the project, or the target or package path that resolved outside it. */
+  path: string
+  state: 'up to date' | 'up to date, edited' | 'differs' | 'differs, edited' | 'unknown' | 'outside' | 'removed'
+  /** The version or commit the file's marker names, when it carries one. */
+  from?: string
+  /** The installed mithaq-admin's version. */
+  to?: string
+  /** The item of a file the project always holds, which it never deletes: it ejects the item again instead. */
+  item?: string
+}
+
+/**
+ * Every package file the project holds at its target, ejected or always the project's, with its state. Reads only;
+ * a path that climbs out of the project or the package is listed as outside, never followed.
+ */
+export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> => {
+  const pathOf = await targetsOf(project)
+  const installed = await installedOf(project)
+  if (!installed) return undefined
   const copied: Copied[] = []
-  /** Every path an item names, copied or not, and the folders they sit in, which a file no item names any more is looked for in. */
+  /** Every path an item names, held or not, and the folders they sit in, which a file no item names any more is looked for in. */
   const named = new Set<string>()
   const folders = new Set<string>()
-  // `new URL` resolves every `..`, encoded or not, so a prefix is the whole test.
-  const within = (url: URL, folder: URL) => url.href.startsWith(folder.href)
-  for (const { name } of items) {
-    const source = new URL(`${name}.json`, built)
-    if (!within(source, built)) {
-      copied.push({ path: name, state: 'outside' })
-      continue
-    }
-    const item = JSON.parse(await readFile(source, 'utf8')) as Built
-    for (const file of item.files ?? []) {
+  const ejected = ejectedFolders(installed.items, pathOf)
+  for (const { name, files } of installed.items) {
+    for (const file of files) {
+      const source = new URL(file.path, installed.root)
       const path = pathOf(file.target)
+      if (!within(source, installed.root)) {
+        copied.push({ path: file.path, state: 'outside' })
+        continue
+      }
       if (path && !within(new URL(path, project), project)) {
         copied.push({ path: file.target, state: 'outside' })
         continue
       }
       if (path) {
         named.add(path)
-        folders.add(path.slice(0, path.lastIndexOf('/') + 1))
+        folders.add(folderOf(path))
       }
       const text = path && (await readFile(new URL(path, project), 'utf8').catch(() => undefined))
       if (!path || text === undefined) continue
-      const [, from, hash] = marker.exec(text) ?? []
-      const to = marker.exec(file.content)?.[1]
-      if (!hash) {
-        copied.push({ path, state: 'unknown', to })
-        continue
-      }
-      const differs = hash !== hashOf(file.content)
-      const edited = hash !== hashOf(text)
-      copied.push({ path, state: `${differs ? 'differs' : 'up to date'}${edited ? ', edited' : ''}`, from, to })
+      const state = stateOf(text, await readFile(source, 'utf8'))
+      const to = installed.version
+      copied.push(state === 'unknown' ? { path, state, to } : { path, state, from: marker.exec(text)![1], to, ...(!ejected.has(folderOf(path)) && { item: name }) })
     }
   }
-  // A marked file no item names any more: an item the registry dropped, which the project deletes.
+  // A marked file no item names any more: an item the package dropped, which the project deletes.
   for (const folder of folders) {
     const entries = await readdir(new URL(folder || './', project), { withFileTypes: true }).catch(() => [])
     for (const entry of entries) {
@@ -126,35 +134,140 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
   return copied
 }
 
-const sentence = ({ path, state, from = '', to = 'unknown' }: Copied, own: boolean) =>
+const sentence = ({ path, state, from = '', to = 'unknown', item }: Copied) =>
   ({
     'up to date': `${path} is up to date.`,
-    'up to date, edited': `${path} is up to date, and edited since it was copied.`,
-    differs: `${path} differs from ${own ? 'the copy in the registry the installed mithaq ships' : "the installed mithaq-admin's copy"} (built at ${to.slice(0, 12)}), and is not edited since it was copied from ${from.slice(0, 12)}. A hash shows a difference, not which side is newer: diff the two${own ? '' : ', or rebuild mithaq-admin,'} before replacing it.`,
-    'differs, edited': `${path} differs from ${own ? 'the copy in the registry the installed mithaq ships' : "the installed mithaq-admin's copy"} (built at ${to.slice(0, 12)}), and is edited since it was copied from ${from.slice(0, 12)}: diff the two and merge by hand.`,
-    unknown: `${path} carries no mithaq-admin marker on its last line, so nothing says what it was copied from.`,
-    outside: `${path} resolves outside this project or the registry, so it was not read.`,
-    removed: `${path} was copied from mithaq-admin at ${from.slice(0, 12)}, and no item of the installed registry names it any more: it was removed from the registry, so delete it.`,
+    'up to date, edited': `${path} is up to date, and edited since it was ejected.`,
+    differs: `${path} differs from the installed mithaq-admin's file (${to}), and is not edited since it was ejected from ${from.slice(0, 12)}. A hash shows a difference, not which side is newer: diff the two before replacing it, or ${item ? `delete it and run \`mithaq eject ${item}\` to take the package's` : 'delete it to draw the package\'s'}.`,
+    'differs, edited': `${path} differs from the installed mithaq-admin's file (${to}), and is edited since it was ejected from ${from.slice(0, 12)}: diff the two and merge by hand.`,
+    unknown: `${path} carries no mithaq-admin marker on its last line, so nothing says what it was ejected from.`,
+    outside: `${path} resolves outside this project or the package, so it was not read.`,
+    removed: `${path} was ejected from mithaq-admin ${from.slice(0, 12)}, and no item of the installed package names it any more: it was removed from the package, so delete it.`,
   })[state]
 
-/** `mithaq upgrade --check`: one line per copied file, and 1 where any differs. It never writes. */
+const noComponents = 'No components.json here, so nothing says where mithaq-admin files go.'
+const noPackage = 'No mithaq-admin is installed here.'
+
+/** `mithaq upgrade --check`: one line per file the project holds, and 1 where any differs. It never writes. */
 export const run = async (project: URL): Promise<number> => {
-    if (!existsSync(new URL('components.json', project))) {
-    console.log('No components.json here, so nothing was copied with `shadcn add`.')
+  if (!existsSync(new URL('components.json', project))) {
+    console.log(noComponents)
     return 0
   }
   const copied = await upgradeCheck(project)
   if (!copied) {
-    console.log(`No mithaq-admin registry to check the copies against: none is installed here, and the installed mithaq ships no r/ at ${fileURLToPath(registry)}.`)
+    console.log(`${noPackage} Nothing to check the files against.`)
     return 0
   }
-  const own = registryOf(project)?.href === registry.href
   if (!copied.length) console.log('Nothing from mithaq-admin here.')
-  for (const one of copied) console.log(sentence(one, own))
+  for (const one of copied) console.log(sentence(one))
   const differing = copied.filter((one) => one.state.startsWith('differs')).length
   if (differing) {
-    console.error(`${differing} ${differing === 1 ? 'file differs' : 'files differ'} from ${own ? 'the registry the installed mithaq ships' : 'the installed mithaq-admin'}.`)
+    console.error(`${differing} ${differing === 1 ? 'file differs' : 'files differ'} from the installed mithaq-admin.`)
     return 1
+  }
+  return 0
+}
+
+/**
+ * `mithaq eject <item>`: writes the item's own files where the project keeps them, each byte for byte with a marker,
+ * and never over a file already there. It copies no other item and installs nothing: the package serves every
+ * sibling, so it only names a primitive or an npm package the project lacks.
+ */
+export const eject = async (project: URL, name: string): Promise<number> => {
+  if (!existsSync(new URL('components.json', project))) {
+    console.error(noComponents)
+    return 1
+  }
+  const pathOf = await targetsOf(project)
+  const installed = await installedOf(project)
+  if (!installed) {
+    console.error(`${noPackage} Install it at the version of mithaq, then eject.`)
+    return 1
+  }
+  const wanted = `mithaq-${name.replace(/\.tsx?$/, '').replace(/^mithaq-/, '')}`
+  const item = installed.items.find((one) => one.name === wanted)
+  if (!item) {
+    console.error(`mithaq-admin has no item "${name}". Its items are: ${installed.items.map((one) => one.name).join(', ')}.`)
+    return 1
+  }
+  const files = item.files.map((file) => ({ source: new URL(file.path, installed.root), path: pathOf(file.target), target: file.target }))
+  const refused = files.filter(({ source, path }) => !within(source, installed.root) || !path || !within(new URL(path, project), project))
+  if (refused.length) {
+    console.error(`${refused.map((one) => one.target).join(', ')} resolves outside this project or the package, so nothing was written.`)
+    return 1
+  }
+  const ejected = ejectedFolders(installed.items, pathOf)
+  for (const { source, path } of files as { source: URL; path: string }[]) {
+    const at = new URL(path, project)
+    const text = await readFile(source, 'utf8')
+    await mkdir(new URL('./', at), { recursive: true })
+    // `wx` fails on a file already there, so an eject never overwrites, whatever raced it.
+    const body = bodyOf(text)
+    const written = await writeFile(at, `${body}// mithaq-admin ${installed.version} ${sha(body)}\n`, { flag: 'wx' }).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'EEXIST') return false
+        throw error
+      },
+    )
+    // A file the project always holds (the host, storage, a step) is never deleted: the app needs it.
+    const drawn = ejected.has(folderOf(path)) ? '; delete it to draw mithaq-admin\'s again' : ''
+    console.log(written ? `${path} is ejected. Edit it in place${drawn}.` : `${path} is already ejected, so it was left as it is.`)
+  }
+  for (const primitive of item.registryDependencies ?? []) {
+    const path = pathOf(`@ui/${primitive}.tsx`)
+    if (path && !existsSync(new URL(path, project))) console.log(`${path} is missing: run shadcn add ${primitive}`)
+  }
+  const require = createRequire(new URL('package.json', project))
+  for (const dependency of item.dependencies ?? []) {
+    const npm = /^(@?[^@]+)/.exec(dependency)![1]!
+    try {
+      require.resolve(npm)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') console.log(`${npm} is not installed: install ${dependency}`)
+    }
+  }
+  return 0
+}
+
+/**
+ * `mithaq eject --prune`: deletes every marked file in the folders pieces are ejected into whose text still hashes
+ * to its marker, so the package draws it again. Never an edited, unmarked or `~/` file.
+ */
+export const prune = async (project: URL): Promise<number> => {
+  if (!existsSync(new URL('components.json', project))) {
+    console.error(noComponents)
+    return 1
+  }
+  const pathOf = await targetsOf(project)
+  const installed = await installedOf(project)
+  if (!installed) {
+    console.error(noPackage)
+    return 1
+  }
+  // The package's file at each path, whose leading comments a copy `shadcn add` made may hold and no more.
+  const sources = new Map(installed.items.flatMap((item) => item.files.flatMap((file) => {
+    const path = pathOf(file.target)
+    return path ? [[path, new URL(file.path, installed.root)] as const] : []
+  })))
+  const leadOf = (text: string) => leading.exec(bodyOf(text))![0]
+  for (const folder of ejectedFolders(installed.items, pathOf)) {
+    if (!within(new URL(folder, project), project)) continue
+    const entries = await readdir(new URL(folder, project), { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (!entry.isFile()) continue
+      const path = `${folder}${entry.name}`
+      const text = await readFile(new URL(path, project), 'utf8')
+      const [, from, hash] = marker.exec(text) ?? []
+      if (!hash || hash !== hashFrom(from!)(text)) continue
+      // A commit's hash leaves leading comments out, so a pragma written above one is an edit the hash cannot see.
+      const source = sources.get(path)
+      const lead = leadOf(text)
+      if (madeByShadcn(from!) && lead && lead !== (source && within(source, installed.root) ? leadOf(await readFile(source, 'utf8').catch(() => '')) : '')) continue
+      await rm(new URL(path, project))
+      console.log(`${path} was not edited since it was ejected, so it is deleted and mithaq-admin draws its own.`)
+    }
   }
   return 0
 }

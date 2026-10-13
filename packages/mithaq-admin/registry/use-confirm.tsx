@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ButtonClient } from 'mithaq/admin'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import type { Copy } from './copy.ts'
+import type { Copy } from 'mithaq-admin/copy.ts'
 
 /**
  * A button's `confirm`, asked in the app's own alert dialog in the page's locale rather than the

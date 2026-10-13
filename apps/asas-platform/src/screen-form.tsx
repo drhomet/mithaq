@@ -1,7 +1,7 @@
 import { useBlocker, useRouter } from '@tanstack/react-router'
 import { useState, type ReactElement } from 'react'
-import { Form } from './components/mithaq/form.tsx'
-import type { FormProps } from './components/mithaq/form-types.tsx'
+import { Form } from 'mithaq-admin/form.tsx'
+import type { FormProps } from 'mithaq-admin/form-types.tsx'
 
 /**
  * A kayan's form on a screen's page. A create moves to the new row's edit page, a delete to the list.
@@ -32,4 +32,4 @@ export function ScreenForm({ edit, list, ...props }: Omit<FormProps, 'onDone' | 
     />
   )
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 3a8bc845a9866b9145549a935dfebd311da1348d5f94984ef0c6a03264940d25
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 217a28ab185eb9fe5891b248ddb4448404b19d640f52b78bc40c55df2e0bd30e

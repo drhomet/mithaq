@@ -3,12 +3,12 @@ import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useComponents } from './components.tsx'
-import type { FindApi } from './control-props.ts'
-import { labelFor, type Translate } from './copy.ts'
-import { RelationshipControl } from './relationship-control.tsx'
-import { operatorsByKind, valueShapeOf, type FilterPath } from './filter-operators.ts'
-import { instantOf, type Condition, type FilterWhere } from './list-query.ts'
+import { useComponents } from 'mithaq-admin/components.tsx'
+import type { FindApi } from 'mithaq-admin/control-props.ts'
+import { labelFor, type Translate } from 'mithaq-admin/copy.ts'
+import { RelationshipControl } from 'mithaq-admin/relationship-control.tsx'
+import { operatorsByKind, valueShapeOf, type FilterPath } from 'mithaq-admin/filter-operators.ts'
+import { instantOf, type Condition, type FilterWhere } from 'mithaq-admin/list-query.ts'
 
 export type FiltersProps = {
   /** Every path this kayan offers, already narrowed by the access report. */

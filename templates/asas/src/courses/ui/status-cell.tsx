@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { CellProps, Row } from 'mithaq/admin'
 import { ListContext, useClient, useLocale, useScreen } from 'mithaq/admin/react'
 import { Badge } from '@/components/ui/badge'
-import { noValue } from '@/components/mithaq/format.tsx'
+import { noValue } from 'mithaq-admin/format.tsx'
 import { coursesOf } from '../../enrollments/ui/session-cell.tsx'
 
 const pills = {

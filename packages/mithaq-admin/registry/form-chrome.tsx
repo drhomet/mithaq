@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactElement } from 'react'
-import type { Translate } from './copy.ts'
-import { DraftBanner } from './draft-banner.tsx'
-import { ViewSwitch, type Views } from './form-actions.tsx'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { DraftBanner } from 'mithaq-admin/draft-banner.tsx'
+import { ViewSwitch, type Views } from 'mithaq-admin/form-actions.tsx'
 
 /**
  * What a form draws above its fields: its title and sentence, a refusal naming no field where no controls node

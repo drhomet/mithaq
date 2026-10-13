@@ -10,11 +10,11 @@ import { empty } from '../sink.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cellFor, useComponents } from '@/components/mithaq/components.tsx'
-import type { FindApi, FoundPage, RelationshipTitles } from '@/components/mithaq/control-props.ts'
-import { labelFor, operationLabelFor, type Translate } from '@/components/mithaq/copy.ts'
-import { formatDate } from '@/components/mithaq/format.tsx'
-import { useRelationshipTitles } from '@/components/mithaq/relationship-cell.tsx'
+import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
+import type { FindApi, FoundPage, RelationshipTitles } from 'mithaq-admin/control-props.ts'
+import { labelFor, operationLabelFor, type Translate } from 'mithaq-admin/copy.ts'
+import { formatDate } from 'mithaq-admin/format.tsx'
+import { useRelationshipTitles } from 'mithaq-admin/relationship-cell.tsx'
 
 /** One entry as the log's `find` answers it. */
 export type Entry = {

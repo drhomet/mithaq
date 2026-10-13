@@ -10,10 +10,12 @@
    for it, listed first in `--font-sans` below so an Arabic page reads in it and
    a Latin one falls through to the preset's. */
 @import "@fontsource/ibm-plex-sans-arabic";
+/* The admin's pieces in node_modules, which Tailwind never scans on its own. */
+@import "mithaq-admin/source.css";
 
 /* The project's own shells, pages and components, which the platform screen
    loads, as the tenant app lists them (`apps/asas-tanstack/src/styles.css`).
-   Tailwind finds this app's own files, the copied `src/components/mithaq`
+   Tailwind finds this app's own files, an ejected `src/components/mithaq`
    among them, without one. */
 @source "../../../templates/asas/src";
 

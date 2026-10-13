@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
-import type { CellProps, RelationshipTitles } from './control-props.ts'
-import type { Translate } from './copy.ts'
-import { FileThumb, FileValue, type sizes } from './file-thumb.tsx'
-import { noValue } from './format.tsx'
-import { idsOf } from './relationship-control.tsx'
-import { rowKey } from './relationship-cell.tsx'
+import type { CellProps, RelationshipTitles } from 'mithaq-admin/control-props.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { FileThumb, FileValue, type sizes } from 'mithaq-admin/file-thumb.tsx'
+import { noValue } from 'mithaq-admin/format.tsx'
+import { idsOf } from 'mithaq-admin/relationship-control.tsx'
+import { rowKey } from 'mithaq-admin/relationship-cell.tsx'
 
 /** One held id as the map read it: its row, loading until the read answers, a dash where the read failed, and a row the viewer cannot see where it was refused or left out. Never the raw id. */
 const heldFile = ({ titles, target, id, t, locale, size }: {

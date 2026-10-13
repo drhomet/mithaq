@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ClientKayan } from 'mithaq/admin'
 import { useScreen } from 'mithaq/admin/react'
-import { refined, remember, remembered, type ListQuery } from './list-query.ts'
-import { refusalKeyOf } from './refusal.ts'
+import { refined, remember, remembered, type ListQuery } from 'mithaq-admin/list-query.ts'
+import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
 /**
  * A list's own state: the query it asks next, its runs and the refusal the last answered with, the ticked rows and

@@ -1,13 +1,13 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import type { ClientField } from 'mithaq/admin'
-import type { Cells } from './components.tsx'
-import { formatDate, listed } from './format.tsx'
-import { RelationshipCell } from './relationship-cell.tsx'
+import type { Cells } from 'mithaq-admin/components.tsx'
+import { formatDate, listed } from 'mithaq-admin/format.tsx'
+import { RelationshipCell } from 'mithaq-admin/relationship-cell.tsx'
 
 // ponytail: what this file exported before rich text became an add-on, kept for one version so a project's own file
 // importing one from here still builds after recopying; drop it the next minor and import each from rich-text-line.ts.
 // It holds no Lexical, so the defaults stay free of the editor.
-export { blocksOf, richTextLine, richTextPlainText } from './rich-text-line.ts'
+export { blocksOf, richTextLine, richTextPlainText } from 'mithaq-admin/rich-text-line.ts'
 
 // The server does not know the viewer's zone, so it and the hydrating render draw the day in UTC
 // and the mounted client swaps in the moment; drawing both in a zone would be a hydration mismatch.

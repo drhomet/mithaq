@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
-import type { Translate } from './copy.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
 
 /** The list's heading, its sentence, and its New button: a link to the create page, or one that adds a row in place. */
 export function ListHeader({ about, create, of, t, title }: {

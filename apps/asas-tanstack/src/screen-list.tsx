@@ -2,11 +2,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactElement } from 'react'
 import { ListContext, useScreen } from 'mithaq/admin/react'
 import { Button } from '@/components/ui/button'
-import { List } from './components/mithaq/list.tsx'
-import type { ListProps, Page } from './components/mithaq/list-types.tsx'
-import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from './components/mithaq/list-query.ts'
-import { counted } from './components/mithaq/format.tsx'
-import { listOf } from './components/mithaq/node-tree.ts'
+import { List } from 'mithaq-admin/list.tsx'
+import type { ListProps, Page } from 'mithaq-admin/list-types.tsx'
+import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from 'mithaq-admin/list-query.ts'
+import { counted } from 'mithaq-admin/format.tsx'
+import { listOf } from 'mithaq-admin/node-tree.ts'
 
 /**
  * The list's search as the router carries it: the URL's pairs as strings, each
@@ -137,4 +137,4 @@ export function ScreenList({
     </ListContext>
   )
 }
-// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 141f58b7b599d53e52641994bcd039eacff5f251051922006eb5151ecf4207f8
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 900f9707948cf18e36aec6776da8f9e77e4ed92438073443319e54e7a33a9ecf

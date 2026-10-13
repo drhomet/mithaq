@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import type { Translate } from './copy.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
 
 /**
  * The question asked before an unsaved edit is thrown away, used by the form's Cancel and by a

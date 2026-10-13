@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { counted, formatDate } from '@/components/mithaq/format.tsx'
+import { counted, formatDate } from 'mithaq-admin/format.tsx'
 import { AppShell } from '../ui/app-shell.tsx'
 import { KpiCard } from '../ui/kpi-card.tsx'
 

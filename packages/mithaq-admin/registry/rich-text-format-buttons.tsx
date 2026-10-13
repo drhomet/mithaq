@@ -24,9 +24,9 @@ import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Toggle } from '@/components/ui/toggle'
-import type { Translate } from './copy.ts'
-import { pickLabel, type RichTextPick } from './rich-text-picks.tsx'
-import { useSelectionChange } from './rich-text-selection.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { pickLabel, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
+import { useSelectionChange } from 'mithaq-admin/rich-text-selection.ts'
 
 export type Toolbar = { activeEditor: LexicalEditor; blockType: string; setBlockType: (blockType: string) => void }
 

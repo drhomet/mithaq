@@ -11,7 +11,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import type { Translate } from './copy.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
 
 /**
  * What a changed row says above its form: that the published copy is read only, or that a draft is being edited,

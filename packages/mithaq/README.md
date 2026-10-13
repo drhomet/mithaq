@@ -675,7 +675,7 @@ A file is named `ui('file.tsx#Export')` off a folder URL from `folderOf`, and
 a missing file or export fails the build. Where it lives:
 `packages/mithaq/src/screen/index.ts` `screenTarget`.
 
-**The admin registry.** The controls, cells, forms, lists and shells a screen draws with, and `mithaq upgrade --check`, which compares a project's copies with them, are described in [The admin registry](../mithaq-admin/README.md).
+**The admin package.** The controls, cells, forms, lists and shells a screen draws with, `mithaq eject`, and `mithaq upgrade --check`, which compares the files a project holds with them, are described in [The admin package](../mithaq-admin/README.md).
 
 **`mithaq generate screens`** writes each screen's route files into the host
 app, and `mithaq screens` prints each screen's page tree. Where it lives:

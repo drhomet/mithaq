@@ -5,8 +5,8 @@ import { $createHeadingNode, $createQuoteNode, type HeadingTagType } from '@lexi
 import { $setBlocksType } from '@lexical/selection'
 import { $createParagraphNode, $getSelection, $isRangeSelection, type Klass, type LexicalEditor, type LexicalNode } from 'lexical'
 import { Heading1Icon, Heading2Icon, Heading3Icon, ListIcon, ListOrderedIcon, ListTodoIcon, MinusIcon, QuoteIcon, TextIcon } from 'lucide-react'
-import type { ControlProps } from './control-props.ts'
-import { defaultNodes } from './rich-text-nodes.ts'
+import type { ControlProps } from 'mithaq-admin/control-props.ts'
+import { defaultNodes } from 'mithaq-admin/rich-text-nodes.ts'
 
 /** What a toolbar or a slash entry runs with: the editor, and whether the entry is the block the selection is in. */
 type Selected = { editor: LexicalEditor; isActive: boolean }

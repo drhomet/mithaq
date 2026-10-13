@@ -1,4 +1,4 @@
-// Proves what an app's screens are made of: the host copied from the registry's `mithaq-screens-host` item, and each
+// Proves what an app's screens are made of: the host ejected from mithaq-admin's `mithaq-screens-host` item, and each
 // screen's glob and route files written by `mithaq generate screens`.
 import assert from 'node:assert/strict'
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
@@ -9,6 +9,7 @@ import { test } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { referencesIn, type ScreenClient } from '../packages/mithaq/src/screen/client.ts'
 import { generateScreens } from '../packages/mithaq/src/screen/generate.ts'
+import { eject } from '../packages/mithaq/src/asas/cli/upgrade.ts'
 import { asas } from '../templates/asas/src/asas.ts'
 import { generate, locales } from '../templates/asas/src/mithaq.ts'
 
@@ -77,8 +78,10 @@ for (const [folder, served] of apps) test(`rebuilds the committed app of ${serve
     assert.doesNotMatch(source, /from '[^']*screens\.tsx'/, `${file} imports no screen code`)
   }
 
-  // `shadcn add` of the host writes each file at its target, less a file the app deleted (the platform app has no landing page).
-  for (const one of host) if (appFiles.includes(one.target.replace(/^src\//, ''))) await cp(one.source, new URL(one.target, fresh))
+  // `mithaq eject` of the host writes each file at its target, less a file the app deleted (the platform app has no landing page).
+  await symlink(fileURLToPath(new URL('node_modules/', app)), fileURLToPath(new URL('node_modules', fresh)))
+  assert.equal(await eject(fresh, 'mithaq-screens-host'), 0)
+  for (const one of host) if (!appFiles.includes(one.target.replace(/^src\//, ''))) await rm(new URL(one.target, fresh))
   const screens = Object.fromEntries(
     Object.entries(asas.targets as unknown as Record<string, { capability?: string; client?: ScreenClient }>)
       .filter(([name, target]) => target.capability === 'screen' && served.includes(name))

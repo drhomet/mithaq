@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react'
 import { Slider } from '@/components/ui/slider'
-import { useComponents } from './components.tsx'
-import { changeOf, type ControlProps } from './control-props.ts'
-import { labelFor } from './copy.ts'
-import { typed } from './text-control.tsx'
+import { useComponents } from 'mithaq-admin/components.tsx'
+import { changeOf, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { labelFor } from 'mithaq-admin/copy.ts'
+import { typed } from 'mithaq-admin/text-control.tsx'
 
 // The write shape is `z.number()` with no coercion, so a reported string is a 400. `NaN` is reported as `undefined`,
 // which `valuesOf` leaves out of the write, rather than as a value that would clear the column.

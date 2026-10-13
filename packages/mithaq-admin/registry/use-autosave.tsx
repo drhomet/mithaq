@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { AnyFormApi } from '@tanstack/react-form'
 import type { ClientField } from 'mithaq/admin'
-import { valuesOf } from './field-values.ts'
-import { afterDraft, type FormClient } from './form-types.tsx'
-import type { Seed, Seeding } from './use-form-seed.tsx'
+import { valuesOf } from 'mithaq-admin/field-values.ts'
+import { afterDraft, type FormClient } from 'mithaq-admin/form-types.tsx'
+import type { Seed, Seeding } from 'mithaq-admin/use-form-seed.tsx'
 
 export type AutosaveInput = {
   /** The stillness in ms after which a draft is saved, or nothing while no autosave may run. */

@@ -8,4 +8,4 @@ export const mergedHeaders = (session: Headers, own?: HeadersInit): Headers => {
   if (own) for (const [key, value] of new Headers(own)) if (key !== 'cookie') headers.set(key, value)
   return headers
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 2969a3dafbf201d6eb6074ecda0e8f17e341cbd1ca176100350844e74ec23623
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 2969a3dafbf201d6eb6074ecda0e8f17e341cbd1ca176100350844e74ec23623

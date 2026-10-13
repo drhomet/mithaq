@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { authArm } from './api.ts'
-import { FieldShell, describedBy } from './components/mithaq/field-shell.tsx'
+import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { refusalKey } from './copy.ts'
 import { LocaleSwitch } from './locale-switch.tsx'
 import { wanted } from './redirect.ts'
@@ -147,4 +147,4 @@ export function AuthBox({
     </FieldShell>
   )
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 ab822afe361dfc5f82c504570fd5d0ea13ec4572e60adb679a3f9532ccf67803
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 eaddd88aabf2350e81f22ad67eb7e9bef990551b04a81a23d717c1deb4102ccf

@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
+import { mithaqAdmin } from 'mithaq/vite'
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
 
@@ -11,6 +12,8 @@ export default defineConfig({
   resolve: { alias: [{ find: /^@\//, replacement: fileURLToPath(new URL('./src/', import.meta.url)) }] },
   plugins: [
     tailwindcss(),
+    // A file under this folder takes the place of mithaq-admin's file of the same name, for every importer.
+    mithaqAdmin(fileURLToPath(new URL('./src/components/mithaq/', import.meta.url))),
     // `mithaq generate screens` writes `types.ts` and `files.ts` beside the route files, and neither is a route.
     tanstackStart({ router: { routeFileIgnorePattern: '^(files|types)\\.ts$' } }),
     viteReact(),

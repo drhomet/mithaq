@@ -13,8 +13,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
-import { localeEntries } from './locale-menu.ts'
-import { defaultThemes, useTheme, type Theme } from './theme.tsx'
+import { localeEntries } from 'mithaq-admin/locale-menu.ts'
+import { defaultThemes, useTheme, type Theme } from 'mithaq-admin/theme.tsx'
 
 /** A radio row: a 44 pixel target on a phone, and the tick on the inline end in right-to-left pages, where the primitive draws it at the right. */
 const radioRow = 'max-sm:min-h-11 rtl:pr-3 rtl:pl-8 rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:right-auto rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:left-2'
