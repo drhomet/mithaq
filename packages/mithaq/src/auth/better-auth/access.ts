@@ -38,6 +38,10 @@ export type BetterAuthAccessOptions<Roles extends SystemRoles, Table extends Row
  * and no assignment table. It suits a project whose roles are the provider's owner, admin and member.
  * The row is read from the store for the organization asked about, never off the session, so a
  * membership elsewhere grants nothing here.
+ *
+ * A `member.role` slug is one a tenant's admin can mint, since the provider's dynamic access control
+ * is on, so `roles` holds only slugs a tenant may hold, or `rolesOf` drops the rest: a platform role
+ * named in it would otherwise grant its keys inside the tenant.
  */
 export const memberRoleTarget = <const Roles extends SystemRoles, const Table extends RowTable, Actor>({
   roles,
@@ -49,15 +53,19 @@ export const memberRoleTarget = <const Roles extends SystemRoles, const Table ex
   roles,
   ...(rolesOf ? { rolesOf } : {}),
   access: (access ?? {}) as Table,
-  // Better Auth's own model and columns, which `mithaq rbac assign` reads under the same names.
+  // Better Auth's own model and columns.
   reads: ['member'],
   resolve: async ({ store, tenant, member, actor }) => {
-    if (!scoped(tenant) || !scoped(member)) return { permissions: [], roles: [] }
-    const found = await allRows({ store, kayan: 'member', where: { and: [{ organizationId: { equals: tenant } }, { userId: { equals: member } }] } })
-    // Split the way the provider's own owner checks split it: exact, untrimmed.
+    // A read without a tenant would be every tenant's; the actor still goes through `rolesOf`, which
+    // answers platform staff, who have no active organization, their platform roles.
+    const found = scoped(tenant) && scoped(member)
+      ? await allRows({ store, kayan: 'member', where: { and: [{ organizationId: { equals: tenant } }, { userId: { equals: member } }] } })
+      : { docs: [] }
+    // Split the way the provider's own owner checks split it: exact, untrimmed, so ` owner` is no owner.
     const slugs = [...new Set(found.docs.flatMap((row) => (typeof row.role === 'string' ? row.role.split(',').filter(Boolean) : [])))]
-    const { everything, keys } = systemKeys(roles, heldSlugs({ roles, rolesOf, slugs, actor }))
-    return { permissions: everything ? '*' : [...keys], roles: slugs }
+    const held = heldSlugs({ roles, rolesOf, slugs, actor })
+    const { everything, keys } = systemKeys(roles, held)
+    return { permissions: everything ? '*' : [...keys], roles: held }
   },
 })
 

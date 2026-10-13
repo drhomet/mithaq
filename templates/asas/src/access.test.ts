@@ -2408,9 +2408,13 @@ test('64. memberRoleTarget answers a member the system roles its Better Auth mem
   const roles = {
     owner: { label: { ar: 'مالك', en: 'Owner' }, permissions: '*' },
     member: { label: { ar: 'عضو', en: 'Member' }, permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'] },
+    super_admin: { label: { ar: 'مدير المنصة', en: 'Platform administrator' }, permissions: '*' },
   } as const satisfies SystemRoles
   const store = memoryStore()
-  const target = memberRoleTarget({ roles, access: rbacTable, rolesOf: (actor: RbacActor) => actorRoles(actor) ?? [] })
+  // As the template's reader answers: the platform role in the platform app alone, and never off a membership.
+  const rolesOf = (actor: RbacActor & { platform?: boolean }) =>
+    actor.platform ? ['super_admin'] : (actorRoles(actor) ?? []).filter((slug) => slug !== 'super_admin')
+  const target = memberRoleTarget({ roles, access: rbacTable, rolesOf })
   const mithaq = defineMithaq({
     arkan: [base],
     targets: { memory: store, zod: zodTarget, rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
@@ -2433,13 +2437,18 @@ test('64. memberRoleTarget answers a member the system roles its Better Auth mem
     { id: 1, organizationId: 'org1', userId: 'u-owner', role: 'owner,stray' },
     { id: 2, organizationId: 'org1', userId: 'u-member', role: 'member' },
     { id: 3, organizationId: 'org2', userId: 'u-elsewhere', role: 'owner' },
+    { id: 4, organizationId: 'org1', userId: 'u-minted', role: 'super_admin' },
+    { id: 5, organizationId: 'org1', userId: 'u-spaced', role: 'member, owner' },
   ])
-  const held = (member: string, tenant = 'org1') => target.resolve({ store: store as never, tenant, member, actor: { activeOrganizationId: tenant }, ownership: () => undefined })
+  const held = (member: string, tenant = 'org1', platform = false) => target.resolve({ store: store as never, tenant, member, actor: { activeOrganizationId: tenant, platform }, ownership: () => undefined })
   assert.deepEqual(await held('u-owner'), { permissions: '*', roles: ['owner', 'stray'] }, 'an owner holds every key')
   assert.deepEqual(await held('u-member'), { permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'], roles: ['member'] }, 'a member holds what its role lists')
   assert.deepEqual(await held('u-elsewhere'), { permissions: [], roles: [] }, 'a membership of another organization holds nothing here')
   assert.deepEqual(await held('u-nobody'), { permissions: [], roles: [] }, 'and no membership holds nothing')
   assert.deepEqual(await held('u-owner', ''), { permissions: [], roles: [] }, 'nor does a read with no organization')
+  assert.deepEqual(await held('u-staff', '', true), { permissions: '*', roles: ['super_admin'] }, 'platform staff, with no organization, hold what their platform role does')
+  assert.deepEqual(await held('u-minted'), { permissions: [], roles: [] }, 'a platform role a tenant minted into member.role holds nothing')
+  assert.deepEqual(await held('u-spaced'), { permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'], roles: ['member', ' owner'] }, '` owner` is no owner, and grants nothing')
   // Through the strategy, so the keys are the ones the actor carries into an operation.
   const resolve = ({ tenant, member, actor }: { tenant: unknown; member: unknown; actor: object }) => target.resolve({ store: store as never, tenant, member, actor, ownership: () => undefined })
   store.rows.set('courses', [{ id: 1, title: 'Mine', fee: 300, tenant: 'org1' }])
