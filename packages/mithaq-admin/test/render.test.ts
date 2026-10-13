@@ -1158,7 +1158,8 @@ test('40b. every file an item writes imports only files its own registryDependen
   // A project whose language has no rich text and no files installs the host and the defaults, and neither the editor nor the upload code.
   const installs = (name: string) => [...closure(name)].flatMap((one) => byName.get(one)!.dependencies ?? [])
   for (const name of ['mithaq-screens-host', 'mithaq-default-components']) {
-    assert.deepEqual([...closure(name)].filter((one) => /rich-text|upload|file-thumb/.test(one)), [], `${name} reaches no rich text or upload item`)
+    // rich-text-line reads a stored value's words with no Lexical, so the defaults may re-export it.
+    assert.deepEqual([...closure(name)].filter((one) => /rich-text(?!-line$)|upload|file-thumb/.test(one)), [], `${name} reaches no rich text or upload item`)
     assert.deepEqual(installs(name).filter((one) => one.includes('lexical')), [], `${name} installs no Lexical package`)
   }
   assert.ok(installs('mithaq-rich-text').includes('@lexical/react@0.52.0'), 'and the rich text add-on brings the editor')

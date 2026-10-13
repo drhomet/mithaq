@@ -15,6 +15,13 @@ installed registry, one line per file, and never writes; you merge a change by
 hand. Where it lives: `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
 [The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) describes it.
 
+When you recopy `mithaq-upload` from a version before rich text and files became
+add-ons, `upload.tsx` no longer exports `UploadPlugin`, `UploadView`, `imagePick`
+or `INSERT_UPLOAD_COMMAND`: copy `mithaq-upload-node` and import them from
+`upload-node.tsx` in your own `ui/rich-text-nodes.tsx`, and spread
+`richTextComponents` and `uploadComponents` into your components map (see
+[Rich text and files](#rich-text-and-files)).
+
 ## Add or replace a control
 
 Every screen draws a field's control, and a list or a read-only value its
@@ -90,9 +97,13 @@ const components: ComponentsOf<Language> = {
 }
 ```
 
-`ComponentsOf<Language>` asks for an add-on's control and cell exactly when
-some screen of the language draws a kind with it, so leaving one out is a type
-error, and `checkComponents` stops the start naming the map to spread. The rich
+`ComponentsOf<Language>` asks for an add-on's control and cell whenever the
+language declares the kind and a screen's controls table draws it with the
+add-on's name, even when no kayan on any screen uses it, since the type reads
+the language and not the kayan. Leaving one out is a type error, and
+`checkComponents` stops the start naming the map to spread. A replaced
+`cells.richText` or `cells.upload` is drawn on record pages too, handed
+`whole`, and must draw the full value when `whole` is set. The rich
 text upload node (`UploadView`, `imagePick` and `UploadPlugin`) is the item
 `mithaq-upload-node`, for a project that has both.
 

@@ -250,7 +250,8 @@
       "registryDependencies": [
         "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-format.json",
-        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json"
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text-line.json"
       ],
       "files": [
         {

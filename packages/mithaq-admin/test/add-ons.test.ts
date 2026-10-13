@@ -39,7 +39,7 @@ test('a language with no rich text and no files starts, and draws its forms and 
   const page = { docs: [row], hasNextPage: false, hasPrevPage: false, limit: 10, nextPage: null, page: 1, pagingCounter: 1, prevPage: null, totalDocs: 1, totalPages: 1 }
   assert.match(drawn(createElement(List, { kayan, page, query: {}, t, locale: 'en', onQuery: () => {}, href: (id: string) => `/notes/${id}`, newHref: '/notes/new' })), />Groceries</)
   // `lexical` itself and its node packages are mithaq's own, which the server parses every write with; the editor's are the add-on's.
-  const addOn = new Set(loaded.filter((url) => /\/@lexical\/(react|selection|utils)\/|\/registry\/(rich-text|upload|file-thumb)/.test(url)).map((url) => url.replace(/^.*\/node_modules\/|^.*\/registry\//, '')))
+  const addOn = new Set(loaded.filter((url) => /\/@lexical\/(react|selection|utils)\/|\/registry\/(rich-text(?!-line\.ts)|upload|file-thumb)/.test(url)).map((url) => url.replace(/^.*\/node_modules\/|^.*\/registry\//, '')))
   assert.deepEqual([...addOn], [])
   assert.ok(loaded.some((url) => url.endsWith('/registry/default-components.tsx')), 'the hook saw the defaults load')
 })

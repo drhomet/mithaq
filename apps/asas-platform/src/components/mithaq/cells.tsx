@@ -4,6 +4,11 @@ import type { Cells } from './components.tsx'
 import { formatDate, listed } from './format.tsx'
 import { RelationshipCell } from './relationship-cell.tsx'
 
+// ponytail: what this file exported before rich text became an add-on, kept for one version so a project's own file
+// importing one from here still builds after recopying; drop it the next minor and import each from rich-text-line.ts.
+// It holds no Lexical, so the defaults stay free of the editor.
+export { blocksOf, richTextLine, richTextPlainText } from './rich-text-line.ts'
+
 // The server does not know the viewer's zone, so it and the hydrating render draw the day in UTC
 // and the mounted client swaps in the moment; drawing both in a zone would be a hydration mismatch.
 function Moment({ value, locale }: { value: unknown; locale: string }): ReactNode {
@@ -55,4 +60,4 @@ export const cells: Cells = {
   // Nothing where the read carried no join: an absent key means the read did not ask, an empty array means no children, and a count of zero would say both.
   join: ({ value, locale }) => (Array.isArray(value) ? value.length.toLocaleString(locale) : ''),
 }
-// mithaq-admin 12a77ad2d870c125421bf16c2e4e87200a870847 8bbcca4ff99b07a6e00532d3020e84f3f51dca594b5ab2848c245f3c682fa585
+// mithaq-admin 5243bd0c907b5af8991fabcba6b217b9b4921f88 beb1313be782103e50d41b2122f2414af2625cf40953e5559e1ca902ec7d50a2
