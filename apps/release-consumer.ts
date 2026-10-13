@@ -4,7 +4,7 @@
 // consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request, seeds and passes
 // `mithaq generate --check`: a monorepo with every add-on with Bun, a minimal one (auth and the tags example) with npm,
 // which writes its own first migration and boots with no PLATFORM_URL, a single package with every add-on it can hold,
-// and a monorepo with settings, rich text and the platform console but no roles, whose staff hold their keys through
+// and a monorepo with settings, rich text, media without courses and the platform console but no roles, whose staff hold their keys through
 // Better Auth's member roles' access target as they do through the roles add-on's. A full project speaks the frozen
 // vocabulary, and every other one that vocabulary less the words its missing add-ons bring. A project with no rich text,
 // `mithaq` alone with npm, proves no Lexical is installed with it.
@@ -92,7 +92,7 @@ try {
     { manager: 'bun', addOns: ['--full'] },
     { manager: 'npm', addOns: [] },
     { manager: 'bun', layout: 'single', addOns: ['--full'] },
-    { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text'] },
+    { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text,media'] },
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
