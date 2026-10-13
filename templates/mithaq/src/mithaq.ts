@@ -409,12 +409,13 @@ export const dashboardScreen = screenTarget({
     // end without add-on: courses
     // add-on: roles
     // A page that belongs to no kayan, listed in the nav under its own label
-    // and served only to an actor holding the key it names.
+    // and served only to an actor holding the key it names: `member.find`, the
+    // key the auth setup asks before the provider lists members.
     members: {
       path: '/members',
       component: dashboardUi('members.tsx#Members'),
       nav: { label: { en: 'Members', ar: 'الأعضاء' } },
-      permission: 'memberRoles.find',
+      permission: 'member.find',
     },
     // end add-on: roles
   },

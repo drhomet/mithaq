@@ -416,7 +416,7 @@ test('the template screens share their controls and layouts through one const, r
   // two, so the test below builds one that does.
   assert.deepEqual([...kinds].sort(), ['button', 'button confirm', 'component', 'controls', 'field', 'form', 'form component', 'layout', 'list', 'list component', 'nav', 'row', 'section', 'shell', 'tabs', 'title'].sort())
   assert.deepEqual(Object.keys(dashboard.pages), ['dashboard', 'members'], 'a dashboard and one page that belongs to no kayan')
-  assert.deepEqual(dashboard.nav.at(-1), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'memberRoles.find' }, 'listed in the nav behind its own key')
+  assert.deepEqual(dashboard.nav.at(-1), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find' }, 'listed in the nav behind its own key')
 })
 
 test('a screen with no page at / is refused, and so are folder, shell and dashboard, which left the screen', () => {

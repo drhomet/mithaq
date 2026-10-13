@@ -1,5 +1,5 @@
 // The dashboard's one page that belongs to no kayan: who works in the viewer's organization and the roles each holds, and the one place a member's roles are changed.
-// The `loader` reads as the viewer: members from the provider's `list-members` (the active organization only), assignments from `memberRoles`, and the roles the sheet offers: the fixed ones from their code and the organization's own from `roles`, never a platform role.
+// The `loader` reads as the viewer: members from the provider's `list-members` (the active organization only, gated by `member.find`), assignments from `memberRoles`, and the roles the sheet offers: the fixed ones from their code and the organization's own from `roles`, never a platform role.
 // Invitations, cancellations and removals go through the provider's own routes, which the auth template gates by `invitation.create`, `invitation.cancel` and `member.delete`.
 import { useEffect, useId, useRef, useState } from 'react'
 import { Lock } from 'lucide-react'
@@ -50,7 +50,11 @@ export const loader = async ({ access, client, request, maxLimit }: LoaderTools)
       if (!response.ok) throw new Error(`list-members answered ${response.status}`)
       return (await response.json()) as { members: { userId: string; role: string; createdAt: string; user: { name: string; email: string } }[] }
     }),
-    client({ kayan: 'memberRoles', operation: 'find', input: { limit: maxLimit, depth: 0 } }) as Promise<{ docs: { id: string; user: string; role: string }[] }>,
+    // The page is served on `member.find`, so a viewer may list the members
+    // and not read who holds which role.
+    holds(access, 'memberRoles.find')
+      ? (client({ kayan: 'memberRoles', operation: 'find', input: { limit: maxLimit, depth: 0 } }) as Promise<{ docs: { id: string; user: string; role: string }[] }>)
+      : { docs: [] },
     // Asked only of a viewer the report lets read roles, so the page still
     // draws for one who may read the assignments and not the roles.
     holds(access, 'roles.find')

@@ -6559,7 +6559,7 @@ test('226a. over asas.handler no organization is deleted: the route answers 404 
   assert.equal(await active(), id, 'and the owner\'s active organization is still it')
 })
 
-test('226b. over asas.handler get-full-organization hands its invitations only to a caller holding invitation.create in that same organization, and no provider role is written in another organization or without its ac key', async () => {
+test('226b. over asas.handler get-full-organization hands its invitations only to a caller holding invitation.create, and its members only to one holding member.find, in that same organization, and no provider role is written in another organization or without its ac key', async () => {
   const orgOf = async (slug: string) => {
     const owner = await signedUp(`owner-${slug}`)
     const made = await server.api.createOrganization({ body: { name: `Tenant ${slug}`, slug }, headers: owner.headers })
@@ -6600,10 +6600,10 @@ test('226b. over asas.handler get-full-organization hands its invitations only t
     return { id: answer.id, members: answer.members.length, invitations: answer.invitations.map((one) => one.email) }
   }
 
-  assert.deepEqual(await full(keyless.headers), { id: a.id, members: 4, invitations: [] }, 'a member who may not invite reads the members and no invitation')
-  assert.deepEqual(await full(inviter.headers), { id: a.id, members: 4, invitations: ['pending-a-226b@example.com'] }, 'one who may invite reads them')
-  assert.deepEqual(await full(inviter.headers, `?organizationId=${b.id}`), { id: b.id, members: 4, invitations: [] }, 'but not another organization\'s, where it holds no key')
-  assert.deepEqual((await full(b.owner.headers)).invitations, ['pending-b-226b@example.com'], 'which that organization\'s own owner reads')
+  assert.deepEqual(await full(keyless.headers), { id: a.id, members: 0, invitations: [] }, 'a member who may not invite reads no invitation, and without member.find no member')
+  assert.deepEqual(await full(inviter.headers), { id: a.id, members: 0, invitations: ['pending-a-226b@example.com'] }, 'one who may invite reads them')
+  assert.deepEqual(await full(inviter.headers, `?organizationId=${b.id}`), { id: b.id, members: 0, invitations: [] }, 'but not another organization\'s, where it holds no key')
+  assert.deepEqual(await full(b.owner.headers), { id: b.id, members: 4, invitations: ['pending-b-226b@example.com'] }, 'which that organization\'s own owner reads, with its members')
 
   const permission = { member: ['delete'] }
   const named = async (organization: string, role: string) =>
@@ -6665,6 +6665,65 @@ test('226d. a sign-up completes on a pool of one client, because every hook of o
   ])
   assert.equal(answer, 'signed up', 'the sign-up finishes rather than waiting on its own pool')
   await one.$client.end()
+})
+
+test('226e. over asas.handler the provider\'s member reads answer people only to a caller holding member.find in that same organization: a student, a plain member and a keyless governance admin read no one, and nobody reads another organization\'s members', async () => {
+  const owner = await signedUp('owner-226e')
+  const made = await server.api.createOrganization({ body: { name: 'Tenant 226e', slug: 'tenant-226e' }, headers: owner.headers })
+  const a = made!.id as string
+  const otherOwner = await signedUp('other-226e')
+  const b = (await server.api.createOrganization({ body: { name: 'Other 226e', slug: 'other-226e' }, headers: otherOwner.headers }))!.id as string
+  const joined = async ({ slug, role, assigned }: { slug: string; role: string; assigned?: string }) => {
+    const one = await signedUp(slug)
+    await server.api.addMember({ body: { userId: one.id, organizationId: a, role } })
+    await server.api.setActiveOrganization({ body: { organizationId: a }, headers: one.headers })
+    if (assigned) await assignRole(a, one.id, assigned)
+    return one
+  }
+  const student = await joined({ slug: 'student-226e', role: 'member', assigned: 'student' })
+  const plain = await joined({ slug: 'plain-226e', role: 'member' })
+  const keyless = await joined({ slug: 'keyless-226e', role: 'admin' })
+  // An administrator of the other organization who is a plain member of this one, active there.
+  const across = await signedUp('across-226e')
+  await server.api.addMember({ body: { userId: across.id, organizationId: a, role: 'member' } })
+  await server.api.addMember({ body: { userId: across.id, organizationId: b, role: 'admin' } })
+  await assignRole(b, across.id, 'administrator')
+  await server.api.setActiveOrganization({ body: { organizationId: b }, headers: across.headers })
+  await server.api.createInvitation({ body: { email: 'pending-226e@example.com', role: 'member', organizationId: a }, headers: owner.headers })
+
+  const read = async (path: string, headers: Headers) => {
+    const response = await asas.handler(new Request(`http://test/api/auth/user/organization/${path}`, { headers: { cookie: headers.get('cookie') ?? '', origin: 'http://localhost:5173' } }))
+    const text = await response.text()
+    return { status: response.status, text, body: (text ? JSON.parse(text) : null) as { members?: { user?: { email?: string } }[]; invitations?: unknown[]; role?: string } | null }
+  }
+  for (const [said, who] of [['a student', student], ['a plain member', plain], ['a governance admin with no key', keyless]] as const) {
+    for (const path of ['list-members', `list-members?organizationId=${a}`, `get-active-member-role?userId=${owner.id}`]) {
+      const answer = await read(path, who.headers)
+      assert.equal(answer.status, 403, `${said} is refused ${path}: ${answer.text}`)
+      assert.doesNotMatch(answer.text, /owner-226e@example\.com/, `and reads no address from ${path}`)
+    }
+    const full = await read('get-full-organization', who.headers)
+    assert.equal(full.status, 200, `${said} still reads its organization: ${full.text}`)
+    assert.deepEqual([full.body?.members, full.body?.invitations], [[], []], `${said} reads it with no member and no invitation`)
+    assert.equal((await read('get-active-member-role', who.headers)).status, 200, `${said} still reads its own role`)
+  }
+
+  const listed = await read('list-members', owner.headers)
+  assert.equal(listed.status, 200, listed.text)
+  assert.equal(listed.body?.members?.length, 5, 'the administrator reads every member')
+  assert.ok(listed.body?.members?.some((one) => one.user?.email === 'student-226e@example.com'), 'with their addresses')
+  assert.equal((await read('get-full-organization', owner.headers)).body?.members?.length, 5, 'and the full organization with its members')
+  assert.equal((await read(`get-active-member-role?userId=${student.id}`, owner.headers)).body?.role, 'member', 'and anyone\'s role')
+
+  for (const path of [`list-members?organizationId=${a}`, 'list-members?organizationSlug=tenant-226e', `get-active-member-role?userId=${owner.id}&organizationId=${a}`, `get-active-member-role?userId=${owner.id}&organizationSlug=tenant-226e`]) {
+    const answer = await read(path, across.headers)
+    assert.equal(answer.status, 403, `keys held in another organization open nothing here: ${path}: ${answer.text}`)
+    assert.doesNotMatch(answer.text, /owner-226e@example\.com/)
+  }
+  const elsewhere = await read(`get-full-organization?organizationId=${a}`, across.headers)
+  assert.deepEqual([elsewhere.body?.members, elsewhere.body?.invitations], [[], []], `nor the full organization read by id: ${elsewhere.text}`)
+  assert.deepEqual((await read('get-full-organization?organizationSlug=tenant-226e', across.headers)).body?.members, [], 'or by slug')
+  assert.equal((await read(`list-members?organizationId=${a}`, otherOwner.headers)).status, 403, 'and a stranger to this organization reads none of it')
 })
 
 test('229a. over asas.handler an invitation is accepted only by the person signed in under its address, verified or not, makes them a member with that organization active, and is refused once accepted, cancelled or expired', async () => {

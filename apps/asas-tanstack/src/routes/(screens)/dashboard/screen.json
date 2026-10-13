@@ -20,7 +20,7 @@
           "ar": "الأعضاء"
         }
       },
-      "permission": "memberRoles.find"
+      "permission": "member.find"
     }
   },
   "nav": [
@@ -73,7 +73,7 @@
         "en": "Members",
         "ar": "الأعضاء"
       },
-      "permission": "memberRoles.find"
+      "permission": "member.find"
     }
   ],
   "layouts": {

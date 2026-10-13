@@ -263,7 +263,24 @@ const roleWrites = new Map([
   ['/organization/delete-role', 'ac.delete'],
 ])
 type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
+// The provider's member reads take the organization by `organizationId` or by `organizationSlug`,
+// the slug winning, so both are compared with the active organization.
+const sameOrganizationNamed = async (ctx: HookContext) => {
+  const { organizationId, organizationSlug } = (ctx.query ?? {}) as { organizationId?: unknown; organizationSlug?: unknown }
+  sameOrganization({ id: organizationId })
+  if (typeof organizationSlug !== 'string') return
+  const named = await ctx.context.adapter.findOne<{ id: string }>({ model: 'organization', where: [{ field: 'slug', value: organizationSlug }] })
+  sameOrganization({ id: named?.id })
+}
 const auditBefore = async (ctx: HookContext) => {
+  // The provider hands any member every member's name, address, image, role and join date, and
+  // anyone's role by `userId`, and these routes have no hook to gate. Only a caller who may read
+  // members does, in the active organization alone. A caller's own role, asked with no `userId`,
+  // stays open: every request's actor is read through it.
+  if (ctx.path === '/organization/list-members' || (ctx.path === '/organization/get-active-member-role' && (ctx.query as { userId?: unknown } | undefined)?.userId !== undefined)) {
+    await sameOrganizationNamed(ctx)
+    await gate('member.find')()
+  }
   // The provider lets any member list invitations, invitee emails among them, and this route has no
   // hook to gate. Only a caller who may invite reads them, in the active organization alone.
   if (ctx.path === '/organization/list-invitations') {
@@ -327,12 +344,14 @@ const auditBefore = async (ctx: HookContext) => {
 export const platformAudit = {
   before: createAuthMiddleware(auditBefore),
   after: createAuthMiddleware(async (ctx) => {
-    // `get-full-organization` also answers invitations, invitee emails among them, to any member,
-    // so they are emptied unless the caller may invite, as the list route asks.
-    const full = ctx.context.returned as { id?: unknown; invitations?: unknown } | null | undefined
-    if (ctx.path === '/organization/get-full-organization' && full && typeof full === 'object' && Array.isArray(full.invitations)) {
-      const mayInvite = await gate('invitation.create')({ organization: full }).then(() => true, () => false)
-      if (!mayInvite) return ctx.json({ ...full, invitations: [] })
+    // `get-full-organization` also answers members and invitations, addresses among them, to any
+    // member, so each is emptied unless the caller holds the key its own list route asks. The
+    // organization itself stays readable to every member.
+    const full = ctx.context.returned as { id?: unknown; members?: unknown; invitations?: unknown } | null | undefined
+    if (ctx.path === '/organization/get-full-organization' && full && typeof full === 'object' && 'id' in full) {
+      const holds = (key: string) => gate(key)({ organization: full }).then(() => true, () => false)
+      const [mayInvite, mayList] = [await holds('invitation.create'), await holds('member.find')]
+      if (!mayInvite || !mayList) return ctx.json({ ...full, ...(mayInvite ? {} : { invitations: [] }), ...(mayList ? {} : { members: [] }) })
     }
     if (!audited(ctx.path) || ctx.context.returned instanceof Error) return
     const caller = callers.get(ctx.context)
