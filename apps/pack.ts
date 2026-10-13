@@ -37,9 +37,10 @@ const adminFiles = execFileSync('git', ['ls-files', '-z', 'registry', 'registry.
 for (const file of adminFiles) cpSync(join(admin, file), join(stagedAdmin, file))
 const { items } = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; files: { path: string }[] }[] }
 for (const { name, files } of items) for (const { path } of files) assert.ok(existsSync(join(stagedAdmin, path)), `${name} names ${path}, which ships`)
-// One version for the three packages, so a project that pins them together cannot pair two that drifted apart. The
-// `mithaq` peer stays "*": Bun links no peer whose range the installed alias does not satisfy by version, and a pin
-// of an exact version left the store folder without `mithaq` when it was installed from a tarball.
+// One version for the three packages, so a project that pins them together cannot pair two that drifted apart.
+// ponytail: the `mithaq` peer stays "*". A `file:` tarball, as test:release installs mithaq, satisfies only `*` in Bun's
+// isolated linker; whether an `npm:` alias satisfies an exact pin is untested. Pin the release version once a consumer
+// installed from the registry proves it.
 writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version }, null, 2)}\n`)
 cpSync(join(root, 'LICENSE'), join(stagedAdmin, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(stagedAdmin, 'LICENSES'), { recursive: true })
