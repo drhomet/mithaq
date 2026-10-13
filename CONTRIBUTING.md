@@ -49,7 +49,7 @@ bunx mithaq upgrade --check
 - **One object for three or more parameters.** A function a project calls or implements takes one object once it has three or more parameters. `bun run lint:args` checks it.
 - **Comments say why**, never what. A `ponytail:` comment marks a deliberate shortcut and names its limit.
 - **Tenant enforcement stays in core.** No change may add a way around the organization scope. See [packages/mithaq/src/asas/runner/README.md](packages/mithaq/src/asas/runner/README.md).
-- **Copies are regenerated.** Edit registry items in `packages/mithaq-admin/registry/` and copy them again; the steps are in `packages/mithaq-admin/AGENTS.md`. Rerun the command that wrote a generated file rather than editing it.
+- **Held files are ejected again.** Edit the admin's pieces in `packages/mithaq-admin/registry/`; a file an app or the template holds from it is ejected again, as `packages/mithaq-admin/AGENTS.md` says. Rerun the command that wrote a generated file rather than editing it.
 - **Tests first.** Write a failing test that shows the bug or the feature, then the code that makes it pass.
 - **Security and data safety come first**, then short code, then speed. Optimize only what you have measured.
 
@@ -64,7 +64,7 @@ mithaq/
   README.md  AGENTS.md  CONTRIBUTING.md  LICENSE  LICENSES/
   packages/
     mithaq/           the framework, published as @drhomet/mithaq
-    mithaq-admin/     the shadcn registry of screen components, storage adapters and steps
+    mithaq-admin/     the admin's pieces, the screen host, storage adapters and steps, published as @drhomet/mithaq-admin
     create-mithaq/    the bun create starter
   templates/
     asas/  auth/      the template a project starts from
@@ -81,7 +81,7 @@ The `AGENTS.md` files hold the rules for a coding agent, each for the tree it si
 - `AGENTS.md`, for changing mithaq itself;
 - `packages/mithaq/src/asas/runner/AGENTS.md`, for the runner and the tenant scope;
 - `packages/mithaq/src/drizzle/AGENTS.md`, for the drizzle store and migrations;
-- `packages/mithaq-admin/AGENTS.md`, for the registry and its copies;
+- `packages/mithaq-admin/AGENTS.md`, for the admin package and the files projects hold from it;
 - `templates/asas/AGENTS.md`, with `templates/asas/CLAUDE.md` beside it, for working in a created project. Both ship with the template.
 
 The guides sit beside the code they describe, each as its folder's `README.md`:
@@ -92,7 +92,7 @@ The guides sit beside the code they describe, each as its folder's `README.md`:
 - [`packages/mithaq/src/asas/cli/README.md`](packages/mithaq/src/asas/cli/README.md), the `mithaq` command;
 - [`packages/mithaq/src/asas/runner/README.md`](packages/mithaq/src/asas/runner/README.md), tenancy;
 - [`packages/mithaq/src/drizzle/README.md`](packages/mithaq/src/drizzle/README.md), migrations in production;
-- [`packages/mithaq-admin/README.md`](packages/mithaq-admin/README.md), the admin registry.
+- [`packages/mithaq-admin/README.md`](packages/mithaq-admin/README.md), the admin package.
 
 ### `packages/mithaq/src`
 
@@ -116,7 +116,7 @@ The folders follow the parts of the framework. `index.ts` re-exports the public 
 
 ### `packages/mithaq-admin`
 
-The shadcn registry a project copies from. `registry.json` lists the items. `registry/` holds their sources: the screen components (one file per control family such as `text-control.tsx`, `default-components.tsx` and the `components.tsx` map they are drawn from, `cells.tsx`, `form.tsx` and the pieces it is composed of (`form-*.tsx`, `use-*.tsx`, `field-value.tsx`, `operation-button.tsx`, `delete-button.tsx`, `discard-dialog.tsx`, `draft-banner.tsx`), `list*.tsx`, `nodes.tsx` and the pieces a page's tree is drawn with (`node-*.tsx`, `node-tree.ts`, `default-nodes.tsx`, `leaf-control.tsx`, `record-frame.tsx`), `nav.tsx` and the pieces of the shell (`nav-*.tsx`, `organization-switcher.tsx`, `theme.tsx`, `locale-menu.ts`), the add-ons a language with rich text or files spreads into its map, `rich-text.tsx` and its pieces (`rich-text-*.ts*`) and `upload.tsx` and its pieces (`upload-*.ts*`, `file-thumb.tsx`), and the rest), `host/` (the screen host an app copies), `storage/` (the storage adapters and defaults), `steps/` (registry steps), and `ui/`, `lib/` and `hooks/`, the shadcn primitives and helpers the registry's own type check and tests build against. An app takes its own primitives from shadcn. `bun run build` in this folder writes `r/`, the built items with a marker line on every file; `r/` is not committed. `test/` holds the registry's tests.
+The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app imports each as `mithaq-admin/<file>`, and `mithaq eject` writes one into a project. `registry.json` lists the items. `registry/` holds their sources: the screen components (one file per control family such as `text-control.tsx`, `default-components.tsx` and the `components.tsx` map they are drawn from, `cells.tsx`, `form.tsx` and the pieces it is composed of (`form-*.tsx`, `use-*.tsx`, `field-value.tsx`, `operation-button.tsx`, `delete-button.tsx`, `discard-dialog.tsx`, `draft-banner.tsx`), `list*.tsx`, `nodes.tsx` and the pieces a page's tree is drawn with (`node-*.tsx`, `node-tree.ts`, `default-nodes.tsx`, `leaf-control.tsx`, `record-frame.tsx`), `nav.tsx` and the pieces of the shell (`nav-*.tsx`, `organization-switcher.tsx`, `theme.tsx`, `locale-menu.ts`), the add-ons a language with rich text or files spreads into its map, `rich-text.tsx` and its pieces (`rich-text-*.ts*`) and `upload.tsx` and its pieces (`upload-*.ts*`, `file-thumb.tsx`), and the rest), `host/` (the screen host an app holds), `storage/` (the storage adapters and defaults), `steps/` (registry steps), and `ui/`, `lib/` and `hooks/`, the shadcn primitives and helpers the registry's own type check and tests build against. An app takes its own primitives from shadcn. `source.css` points Tailwind at `registry/`. `test/` holds the package's tests.
 
 ### `packages/create-mithaq`
 
@@ -127,7 +127,7 @@ The shadcn registry a project copies from. `registry.json` lists the items. `reg
 | File | What it does |
 |---|---|
 | `lint-args.ts` | `bun run lint:args`: fails an exported function, constructor, method or function type with three or more positional parameters, over `packages/mithaq/src`, the registry and `templates/asas/src`. `lint-args.test.ts` and `lint-args.fixture.ts` test it. |
-| `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package, with the registry in `r/`) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
+| `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package), `.pack/mithaq-admin/` (the pieces as source, at the same version) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
 | `release-consumer.ts` | `bun run test:release`: makes a project from the staged packages as `bun create mithaq` does, then typechecks, migrates, builds and boots it and runs `mithaq generate --check`. |
 | `tanstack-boot.ts`, `next-boot.ts` | `bun run test:tanstack` and `bun run test:next`: build and boot the apps and test them over a real socket. |
 | `migrated-database.ts` | Builds the boot tests' database with `drizzle-kit migrate`. |
@@ -140,7 +140,7 @@ The shadcn registry a project copies from. `registry.json` lists the items. `reg
 - Template tests sit in `templates/asas/src` and `templates/auth/src` as `*.test.ts`, with helpers named `test-*.ts`, `*.support.ts`, `*.fixture.*`, `memory-store.ts` and `standard-schema-target.ts`. `types.probe.ts` holds type probes, and `storage/r2.smoke.ts` runs against a real bucket with `bun run test:r2`. `apps/pack.ts` leaves all of these out of a new project.
 - Package tests sit beside their source in `packages/mithaq/src`, in `packages/mithaq-admin/test/`, and in `packages/create-mithaq/index.test.ts`. App tests sit in `apps/asas-tanstack/src`.
 - `bun run test` runs `lint:args` and every `*.test.ts`. `bun run typecheck` runs the root config and the configs of `packages/mithaq-admin` and both apps.
-- Generated files in the template and apps are committed, as they are in a project. Build output is not: `packages/mithaq-admin/r/`, `.pack/` and `node_modules/` are ignored.
+- Generated files in the template and apps are committed, as they are in a project. Build output is not: `.pack/` and `node_modules/` are ignored.
 
 ## Send a pull request
 

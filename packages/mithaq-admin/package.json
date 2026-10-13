@@ -10,10 +10,6 @@
     "./source.css": "./source.css",
     "./*": "./registry/*"
   },
-  "scripts": {
-    "build": "shadcn build --output r && node --input-type=module -e \"import { pathToFileURL } from 'node:url'; import { mark } from 'mithaq/upgrade'; await mark(pathToFileURL('r/'))\"",
-    "prepare": "bun run build"
-  },
   "publishConfig": {
     "name": "@drhomet/mithaq-admin",
     "repository": {
@@ -46,14 +42,30 @@
     "react-dom": "^19.3.0"
   },
   "peerDependenciesMeta": {
-    "@lexical/link": { "optional": true },
-    "@lexical/list": { "optional": true },
-    "@lexical/react": { "optional": true },
-    "@lexical/rich-text": { "optional": true },
-    "@lexical/selection": { "optional": true },
-    "@lexical/utils": { "optional": true },
-    "@types/react": { "optional": true },
-    "lexical": { "optional": true }
+    "@lexical/link": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/react": {
+      "optional": true
+    },
+    "@lexical/rich-text": {
+      "optional": true
+    },
+    "@lexical/selection": {
+      "optional": true
+    },
+    "@lexical/utils": {
+      "optional": true
+    },
+    "@types/react": {
+      "optional": true
+    },
+    "lexical": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@base-ui/react": "^1.5.0",
@@ -86,7 +98,6 @@
     "react-dom": "^19.3.0",
     "react-resizable-panels": "^4.13.3",
     "recharts": "3.8.0",
-    "shadcn": "4.18.0",
     "tailwind-merge": "^3.6.0"
   }
 }

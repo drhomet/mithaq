@@ -1,7 +1,7 @@
 # Working on the mithaq repository
 
 mithaq is a TypeScript language for declaring a backend and its admin once. `defineMithaq` declares the language; each kayan built from it becomes a Postgres table, a zod schema, HTTP operations, access rules and admin screens.
-It ships as `@drhomet/mithaq` (projects import it as `mithaq`) and as the starter `create-mithaq` (`bun create mithaq my-app`).
+It ships as `@drhomet/mithaq` (projects import it as `mithaq`), the admin's pieces as `@drhomet/mithaq-admin` (imported as `mithaq-admin`), and the starter `create-mithaq` (`bun create mithaq my-app`).
 This file is for an agent changing mithaq itself. An agent working inside a created project reads `templates/asas/AGENTS.md`.
 
 ## Words
@@ -17,7 +17,7 @@ This file is for an agent changing mithaq itself. An agent working inside a crea
 ## Map
 
 - `packages/mithaq/`: the core package: the language (`src/mithaq/`), the runner (`src/asas/runner/`), the CLI (`src/asas/cli/mithaq.ts`), the drizzle and zod targets, screens, storage, versions.
-- `packages/mithaq-admin/`: the shadcn registry the admin screens are copied from. Read `packages/mithaq-admin/AGENTS.md` before you edit it.
+- `packages/mithaq-admin/`: the admin's pieces, which the apps import as `mithaq-admin/<file>` and a project ejects one by one. Read `packages/mithaq-admin/AGENTS.md` before you edit it.
 - `packages/create-mithaq/`: the `bun create mithaq` starter.
 - `templates/asas/`: the template project that ships into every created project, and the worked example. `templates/auth/` is its Better Auth setup (`@asas/auth`).
 - `apps/`: the hosts (`asas-tanstack` for the tenant app, `asas-platform` for the platform console, `asas-next`), plus the repository's own scripts: `lint-args.ts`, `pack.ts`, `release-consumer.ts` and the boot tests.
@@ -35,7 +35,7 @@ bun run lint:args
 bun run test             # needs DATABASE_URL
 bun run test:tanstack    # builds and boots both TanStack apps
 bun run test:next        # builds and boots the Next host
-bun run pack             # stages the published packages in .pack/
+bun run pack             # stages the three published packages in .pack/
 bun run test:release     # creates a project from .pack/ and runs it
 ```
 
@@ -45,7 +45,7 @@ From `templates/asas/`, with `DATABASE_URL` exported (the `mithaq` bin runs unde
 
 ```sh
 bunx mithaq generate --check   # the lock, generated files, migrations, messages, screens
-bunx mithaq upgrade --check    # registry copies against the registry
+bunx mithaq upgrade --check    # the files a project holds from mithaq-admin against the package
 ```
 
 Run the whole set before you call a change done.
@@ -58,7 +58,7 @@ Run the whole set before you call a change done.
 - **Comments say why.** Write the reason a line exists, never a restatement of what it does. A `ponytail:` comment marks a deliberate shortcut and names its ceiling and the upgrade.
 - **Commits are one plain sentence** about what is now true, with no type prefix and no trailer: `The drizzle target names every compound index after its table and columns.`
 - **Tenant enforcement stays in core.** The scope lives in `packages/mithaq/src/asas/runner/tenant.ts` and is ANDed onto every managed operation. Never add an option, flag or path that skips it. Read `packages/mithaq/src/asas/runner/AGENTS.md` before you touch the runner.
-- **Registry copies are regenerated.** The copies under `templates/asas/` and `apps/` end with a `// mithaq-admin <commit> <hash>` marker. Edit the source in `packages/mithaq-admin/registry/` and copy it again; never edit a copy by hand.
+- **Held files are ejected again.** The apps import every piece from `mithaq-admin`. The files they and `templates/asas/` hold from it (the screen host, storage, the step, the directional icon) end with a `// mithaq-admin` marker. Edit the source in `packages/mithaq-admin/registry/` and eject it again; never edit a held file by hand.
 - **Generated files are regenerated.** A file whose first line reads ``// Written by `mithaq <command>` `` comes from that command (`generate auth`, `generate screens`, `migrate`), as does each screen's `screen.json`. Rerun the command. The copy files in `src/messages/` are the exception: `generate messages` only adds missing keys, and the translations are edited by hand.
 - **Tests first.** Write the failing `node:test` test beside the code, watch it fail, then make it pass.
 - **Security and data safety come before brevity**, and brevity before performance. Measure before optimizing.
@@ -72,6 +72,6 @@ Start at `README.md`. Each guide is the `README.md` of the folder it describes:
 - `packages/mithaq/src/asas/cli/README.md`: the `mithaq` command.
 - `packages/mithaq/src/asas/runner/README.md`: tenancy.
 - `packages/mithaq/src/drizzle/README.md`: migrations in production.
-- `packages/mithaq-admin/README.md`: the admin registry.
+- `packages/mithaq-admin/README.md`: the admin package, ejecting a piece, and migrating a project that holds copies.
 
 `CONTRIBUTING.md` has the repository layout and the pull request steps. Keep each guide beside the code it describes.

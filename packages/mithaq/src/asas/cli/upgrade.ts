@@ -1,9 +1,8 @@
-import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
 
 // The last line of every ejected file: the version or commit it came from and the hash of the file above.
 // Trailing, because `shadcn add`, which made the older copies, drops a file's leading comments only.
@@ -13,26 +12,6 @@ const leading = /^(?:\s+|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*/
 
 /** The hash of a file as it is ejected, without its marker. */
 export const hashOf = (text: string) => createHash('sha256').update(text.replace(marker, '\n').replace(leading, '')).digest('hex')
-
-type Built = { files?: { content: string; target: string }[] }
-
-/** Appends the marker to every file of every item `shadcn build` wrote into `built`, the registry's `r/`. */
-export const mark = async (built: URL) => {
-  let commit = 'unknown'
-  try {
-    commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: fileURLToPath(built), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-  } catch {}
-  for (const name of await readdir(built)) {
-    if (!name.endsWith('.json') || name === 'registry.json') continue
-    const item = JSON.parse(await readFile(new URL(name, built), 'utf8')) as Built
-    for (const file of item.files ?? []) {
-      const body = file.content.replace(marker, '\n')
-      const text = body.endsWith('\n') ? body : `${body}\n`
-      file.content = `${text}// mithaq-admin ${commit} ${hashOf(text)}\n`
-    }
-    await writeFile(new URL(name, built), `${JSON.stringify(item, null, 2)}\n`)
-  }
-}
 
 type Item = { name: string; dependencies?: string[]; registryDependencies?: string[]; files: { path: string; target: string }[] }
 

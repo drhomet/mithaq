@@ -26,12 +26,13 @@ const filesUnder = (folder: string) => readdirSync(folder, { recursive: true, en
 const read = (...path: string[]) => readFileSync(join(scratch, ...path), 'utf8')
 const json = (...path: string[]) => JSON.parse(read(...path))
 
-test('a project takes the published mithaq under the name its imports use, at exactly the version whose registry it reads, and no mithaq-admin', () => {
+test('a project takes the published mithaq and mithaq-admin under the names its imports use, at exactly one version', () => {
   create({ name: 'my-app', cwd: scratch, template, version: '1.2.3' })
   for (const workspace of ['templates/asas', 'templates/auth', 'apps/asas-tanstack', 'apps/asas-platform']) {
     const { dependencies, devDependencies = {} } = json('my-app', workspace, 'package.json')
     assert.equal(dependencies.mithaq, 'npm:@drhomet/mithaq@1.2.3', workspace)
     assert.equal(devDependencies['mithaq-admin'], undefined, workspace)
+    assert.equal(dependencies['mithaq-admin'], workspace === 'templates/auth' ? undefined : 'npm:@drhomet/mithaq-admin@1.2.3', workspace)
   }
   assert.equal(json('my-app/apps/asas-tanstack/package.json').dependencies.asas, '*')
   assert.equal(json('my-app/apps/asas-platform/package.json').dependencies.asas, '*')
@@ -77,9 +78,9 @@ test('the template and both apps get the same .env, with fresh secrets only thei
   assert.equal(json('other-app/apps/asas-tanstack/package.json').dependencies.mithaq, 'file:/tmp/mithaq.tgz')
 })
 
-test('each components.json declares the @mithaq registry at the version the project installs', () => {
+test('each components.json names no @mithaq registry: the pieces come from the installed mithaq-admin, and shadcn adds only primitives', () => {
   for (const workspace of ['templates/asas', 'apps/asas-tanstack', 'apps/asas-platform']) {
-    assert.equal(json('my-app', workspace, 'components.json').registries['@mithaq'], 'https://cdn.jsdelivr.net/npm/@drhomet/mithaq@1.2.3/r/{name}.json', workspace)
+    assert.equal(json('my-app', workspace, 'components.json').registries?.['@mithaq'], undefined, workspace)
   }
 })
 
@@ -117,7 +118,7 @@ test('a single package holds the language, the kayan, its auth and the tenant ap
   const at = join(scratch, 'one')
   assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', '.yarnrc.yml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
   const manifest = json('one/package.json')
-  assert.equal(manifest.name, 'asas', 'the registry copies import the language as asas')
+  assert.equal(manifest.name, 'asas', 'the screen host imports the language as asas')
   assert.equal(manifest.workspaces, undefined)
   assert.equal(read('one/pnpm-workspace.yaml'), 'onlyBuiltDependencies:\n  - esbuild\nallowBuilds:\n  esbuild: true\n', 'pnpm\'s settings, and no workspace')
   assert.equal(manifest.exports['.'], './src/asas.ts')
@@ -130,6 +131,7 @@ test('a single package holds the language, the kayan, its auth and the tenant ap
   for (const name of ['asas', '@asas/auth']) assert.equal(manifest.dependencies[name], undefined, name)
   assert.equal(manifest.devDependencies.vite, json('template/apps/asas-tanstack/package.json').devDependencies.vite)
   assert.equal(manifest.devDependencies['mithaq-admin'], undefined)
+  assert.equal(manifest.dependencies['mithaq-admin'], 'npm:@drhomet/mithaq-admin@1.2.3')
   for (const name of ['typescript', '@types/node']) assert.ok(manifest.devDependencies[name], name)
   for (const file of ['src/asas.ts', 'src/mithaq.ts', 'src/auth/index.ts', 'src/auth/platform-roles.ts', 'src/screens.tsx', 'src/routes/__root.tsx', 'src/ui/app-shell.tsx', 'public/favicon.svg']) assert.ok(existsSync(join(at, file)), file)
   const sources = filesUnder(join(at, 'src')).filter((file) => /\.(tsx?|json|css)$/.test(file))
@@ -155,10 +157,10 @@ test('a dependency left pointing into the framework repository is refused, whate
   for (const [key, spec] of [['other', 'workspace:*'], ['tool', 'link:../tool'], ['local', 'file:../local.tgz']] as const) {
     for (const field of ['dependencies', 'devDependencies'] as const) {
       const packageJson = { dependencies: { mithaq: '*' }, [field]: { mithaq: '*', [key]: spec } }
-      assert.throws(() => updatePackageJSONDependencies({ mithaq: 'npm:@drhomet/mithaq@1.2.3', packageJson }), new RegExp(`${key}.*${spec}`), `${field} ${spec}`)
+      assert.throws(() => updatePackageJSONDependencies({ mithaq: 'npm:@drhomet/mithaq@1.2.3', mithaqAdmin: 'npm:@drhomet/mithaq-admin@1.2.3', packageJson }), new RegExp(`${key}.*${spec}`), `${field} ${spec}`)
     }
   }
-  const packageJson = { dependencies: { mithaq: '*', asas: '*' }, devDependencies: { 'mithaq-admin': 'link:mithaq-admin' } }
-  updatePackageJSONDependencies({ mithaq: 'file:/tmp/mithaq.tgz', packageJson })
-  assert.deepEqual(packageJson, { dependencies: { mithaq: 'file:/tmp/mithaq.tgz', asas: '*' }, devDependencies: {} })
+  const packageJson = { dependencies: { mithaq: '*', asas: '*', 'mithaq-admin': '*' } }
+  updatePackageJSONDependencies({ mithaq: 'file:/tmp/mithaq.tgz', mithaqAdmin: 'file:/tmp/mithaq-admin.tgz', packageJson })
+  assert.deepEqual(packageJson, { dependencies: { mithaq: 'file:/tmp/mithaq.tgz', asas: '*', 'mithaq-admin': 'file:/tmp/mithaq-admin.tgz' } })
 })

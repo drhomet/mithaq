@@ -21,22 +21,20 @@ const generateSecret = () => randomBytes(32).toString('hex')
 export const managerOf = (agent = '') => ['npm', 'pnpm', 'yarn', 'bun'].find((name) => agent.startsWith(`${name}/`))
 
 /**
- * Pins the template's manifests to what a published project installs. It edits
- * `devDependencies` too, where the template keeps `mithaq-admin`. `mithaq`
- * becomes the published package under the name every import uses, and
- * `mithaq-admin`, which only the framework's own repository has, goes, since a
- * project reads the registry through `@mithaq`; `asas` and `@asas/auth` stay
- * `"*"`, the project's own workspaces. Any other `workspace:`, `link:` or
- * `file:` spec is an error rather than a pin, because nothing published stands
- * behind it.
+ * Pins the template's manifests to what a published project installs, in
+ * `dependencies` and `devDependencies` alike. `mithaq` and `mithaq-admin`
+ * become the published packages under the names every import uses; `asas` and
+ * `@asas/auth` stay `"*"`, the project's own workspaces. Any other
+ * `workspace:`, `link:` or `file:` spec is an error rather than a pin,
+ * because nothing published stands behind it.
  */
-export function updatePackageJSONDependencies({ mithaq, packageJson }) {
+export function updatePackageJSONDependencies({ mithaq, mithaqAdmin, packageJson }) {
   for (const dependencies of [packageJson.dependencies, packageJson.devDependencies]) {
     if (!dependencies) continue
     if ('mithaq' in dependencies) dependencies.mithaq = mithaq
-    delete dependencies['mithaq-admin']
+    if ('mithaq-admin' in dependencies) dependencies['mithaq-admin'] = mithaqAdmin
     for (const [name, spec] of Object.entries(dependencies)) {
-      if (spec !== mithaq && /^(workspace|link|file):/.test(spec)) {
+      if (spec !== mithaq && spec !== mithaqAdmin && /^(workspace|link|file):/.test(spec)) {
         throw new Error(`The template's dependency ${name} is ${spec}, which only resolves inside the mithaq repository.`)
       }
     }
@@ -47,7 +45,7 @@ export function updatePackageJSONDependencies({ mithaq, packageJson }) {
  * Folds the monorepo into one package at `project`: the template's language and
  * kayan, its auth under `src/auth/`, and the tenant app, whose `src/` holds no
  * file of the same name as theirs. The package keeps the name `asas`, because
- * the registry's copies import it by that name and a package reaches itself
+ * the screen host imports it by that name and a package reaches itself
  * through its own `exports`; `@asas/auth` becomes `asas/auth` the same way.
  */
 const foldIntoOnePackage = (project) => {
@@ -82,14 +80,14 @@ const foldIntoOnePackage = (project) => {
 
 /**
  * Writes the project `name` under `cwd` from `template`, and answers its
- * folder. `version` is the `@drhomet/mithaq` the project installs and whose
- * registry it reads, pinned exactly so the two cannot drift apart and an
- * upgrade is a change the project makes; `mithaq` replaces the dependency
- * itself, which only the release check does. `layout` is `monorepo`, a
+ * folder. `version` is the `@drhomet/mithaq` and `@drhomet/mithaq-admin` the
+ * project installs, pinned exactly so the two cannot drift apart and an
+ * upgrade is a change the project makes; `mithaq` and `mithaqAdmin` replace the
+ * dependencies themselves, which only the release check does. `layout` is `monorepo`, a
  * workspace per package, or `single`, one package with the tenant app and no
  * platform console; `platform` keeps the platform console in a monorepo.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, layout = 'monorepo', platform = layout === 'monorepo' }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', platform = layout === 'monorepo' }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
@@ -109,14 +107,8 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   }
   for (const file of files.filter((file) => basename(file) === 'package.json')) {
     const packageJson = readJson(join(project, file))
-    updatePackageJSONDependencies({ mithaq, packageJson })
+    updatePackageJSONDependencies({ mithaq, mithaqAdmin, packageJson })
     writeJson(join(project, file), file === 'package.json' ? { name, ...packageJson } : packageJson)
-  }
-  // shadcn reads `@mithaq/<item>` from this URL with `{name}` replaced, at the
-  // version installed.
-  for (const file of files.filter((file) => basename(file) === 'components.json')) {
-    const components = readJson(join(project, file))
-    writeJson(join(project, file), { ...components, registries: { ...components.registries, '@mithaq': `https://cdn.jsdelivr.net/npm/@drhomet/mithaq@${version}/r/{name}.json` } })
   }
   if (!platform) {
     rmSync(join(project, 'apps/asas-platform'), { recursive: true })
@@ -175,7 +167,7 @@ const main = async () => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     allowNegative: true,
-    options: { mithaq: { type: 'string' }, layout: { type: 'string' }, platform: { type: 'boolean' }, help: { type: 'boolean' } },
+    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, platform: { type: 'boolean' }, help: { type: 'boolean' } },
   })
   if (values.help) return console.log(help)
   let [name] = positionals
@@ -189,7 +181,7 @@ const main = async () => {
     prompt?.close()
   }
   const { version } = readJson(new URL('package.json', import.meta.url))
-  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, layout, platform: platform ?? false })
+  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, platform: platform ?? false })
   console.log(`Created ${project}.`)
   const manager = managerOf(process.env.npm_config_user_agent)
   const installed = manager !== undefined && spawnSync(manager, ['install'], { cwd: project, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0
@@ -198,7 +190,7 @@ const main = async () => {
   const single = layout === 'single'
   const language = single ? '' : 'templates/asas/'
   const push = `node --env-file=.env --input-type=module -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"`
-  if (single) console.log(`\nThe package is named asas, not ${name}: the screens' copied files import the language as asas, and a package reaches itself by its own name.`)
+  if (single) console.log(`\nThe package is named asas, not ${name}: the screen host imports the language as asas, and a package reaches itself by its own name.`)
   console.log(`
 Next, with PostgreSQL 15 or later serving the database DATABASE_URL names in ${language}.env:
 

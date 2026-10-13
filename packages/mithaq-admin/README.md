@@ -1,36 +1,98 @@
-# The admin registry
+# The admin package
 
-The controls, cells, forms, lists and shells a screen
-draws with are a shadcn registry that ships with mithaq, served under
-`@mithaq/<item>`. A project copies the files it uses with `shadcn add`, and
-owns them from then on. Each copied file ends with a marker line naming the
-commit it came from and a hash of its text.
+The controls, cells, forms, lists and shells a screen draws with ship as the
+package `@drhomet/mithaq-admin`, which a project installs under the name its
+imports use, `"mithaq-admin": "npm:@drhomet/mithaq-admin@<version>"`, at the
+version of `mithaq`. Each piece is a TSX file the project imports as
+`mithaq-admin/<file>`, and compiles against its own shadcn primitives through
+`@/components/ui/*` and `@/lib/utils`, so the admin takes the app's style.
 
-How a project uses and edits its copies is in [Add a screen component](../../templates/asas/README.md#add-a-screen-component).
+How a project adds its own components is in [Add a screen component](../../templates/asas/README.md#add-a-screen-component).
+
+## Set up an app
+
+Each app wires the package in three places, all visible to the project:
+
+- `vite.config.ts`: the `mithaq/vite` plugin, named with the folder pieces are ejected into.
+
+  ```ts
+  import { mithaqAdmin } from 'mithaq/vite'
+  // ...
+  plugins: [tailwindcss(), mithaqAdmin(fileURLToPath(new URL('./src/components/mithaq/', import.meta.url))), /* ... */]
+  ```
+
+  It keeps the package out of Vite's pre-bundling, so a piece the app imports and the same piece another piece
+  imports are one module, and it serves an ejected file in place of the package's for every importer.
+- `tsconfig.json` `paths`: `"mithaq-admin/*": ["./src/components/mithaq/*", "./node_modules/mithaq-admin/registry/*"]`.
+  TypeScript tries the ejected folder first, so an ejected file is checked in place of the package's, then the
+  package, which a piece installed in a store's own folder cannot reach by its name.
+- `styles.css`: `@import 'mithaq-admin/source.css';`, because Tailwind never scans `node_modules`.
+
+Every library a piece imports is a peer dependency of the package: `mithaq`, React, TanStack Form, the two icon
+sets, `input-otp` and `react-day-picker`, and, for the rich text add-on, Lexical.
+
+A project holds a few files of the package from creation, because they import the app's own files or hold
+policy: the screen host (`mithaq-screens-host`), the storage adapters and defaults (`mithaq-storage`), the
+`expectedUpdatedAt` step (`mithaq-expected-updated-at`) and `ui/directional-icon.tsx`. They are the project's
+to edit.
+
+## Eject a piece
+
+`mithaq eject <item>`, run in the app, writes the item's own files into `src/components/mithaq/` byte for byte,
+each ending with a marker line, `// mithaq-admin <version> <hash>`. From then on that file is drawn in place of
+the package's by every importer, the package's own pieces among them. Edit it in place. Delete it to draw the
+package's again, or run `mithaq eject --prune`, which deletes every ejected file nobody edited.
+
+Eject copies no other piece, because the package already serves each one, never overwrites a file, and installs
+nothing: it names the shadcn primitives and npm packages the item needs that the project lacks. [The `mithaq`
+command](../mithaq/src/asas/cli/README.md#eject-and-eject---prune) has the details.
+
+Reach for the components map first: a control, a cell or a node is replaced there without ejecting anything. Eject
+when the piece you want to change is not in the map, such as `list-table.tsx` inside the list.
 
 ## `mithaq upgrade --check`
 
-`mithaq upgrade --check` compares every copied registry file with the
-installed registry, one line per file, and never writes; you merge a change by
-hand. Where it lives: `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
+`mithaq upgrade --check` compares every file the project holds (what it ejected and the files it always holds)
+with the installed package, one line per file, and never writes; you merge a change by hand. Where it lives:
+`packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
 [The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) describes it.
 
-When you recopy `mithaq-upload` from a version before rich text and files became
+When you eject `mithaq-upload` from a version before rich text and files became
 add-ons, `upload.tsx` no longer exports `UploadPlugin`, `UploadView`, `imagePick`
-or `INSERT_UPLOAD_COMMAND`: copy `mithaq-upload-node` and import them from
-`upload-node.tsx` in your own `ui/rich-text-nodes.tsx`, and spread
-`richTextComponents` and `uploadComponents` into your components map (see
+or `INSERT_UPLOAD_COMMAND`: import them from `mithaq-admin/upload-node.tsx` in your
+own `ui/rich-text-nodes.tsx`, and spread `richTextComponents` and
+`uploadComponents` into your components map (see
 [Rich text and files](#rich-text-and-files)).
+
+## Migrate a project that holds copies
+
+A project made before the package holds every piece as a copy under `src/components/mithaq/`. In this order:
+
+1. Install `mithaq-admin` at the version of `mithaq`, then add the plugin, the `paths` entry and the
+   `source.css` import shown in [Set up an app](#set-up-an-app).
+2. Run `bunx mithaq eject --prune` in each app. Every copy you never edited goes, stale ones included, and the
+   package draws the current piece in its place.
+3. In what remains under `src/components/mithaq/`, and in every other file, rewrite the imports: `'./<file>'`
+   inside that folder, `'./components/mithaq/<file>'` and `'@/components/mithaq/<file>'` all become
+   `'mithaq-admin/<file>'`. Step 2 comes first, because a rewritten copy no longer hashes to its marker and
+   would look edited.
+4. Run `bunx mithaq upgrade --check`. Each edited copy reports `differs, edited`; merge each by hand once.
+5. Move the components map out of `src/router.tsx` into `src/components.ts`, and import it from `router.tsx` and
+   `server.ts`, so the server entry reads the map without evaluating the router. In a monorepo, add
+   `apps/*/src/components.ts` to the root tsconfig's `exclude` beside `apps/*/src/server.ts`: the map imports
+   the package's `.tsx`, which the app's own config checks.
+6. Delete the `@mithaq` entry from each `components.json` `registries`; `shadcn add` is for primitives now.
 
 ## Add or replace a control
 
 Every screen draws a field's control, and a list or a read-only value its
-cell, from the components map the app hands `ComponentsProvider`. The app mounts it around every route in
-`src/router.tsx`, typed against the project's language:
+cell, from the components map the app hands `ComponentsProvider`. The app keeps the map in `src/components.ts`,
+typed against the project's language, and mounts it around every route in `src/router.tsx`:
 
 ```tsx
-const components: ComponentsOf<Language> = defaultComponents
-// ...
+// src/components.ts
+export const components: ComponentsOf<Language> = defaultComponents
+// src/router.tsx
 Wrap: ({ children }) => <ComponentsProvider components={components}>{children}</ComponentsProvider>,
 ```
 
@@ -131,15 +193,14 @@ the kayan and the page, and drawing one is an error on the page.
 
 ## Add a registry item
 
-A registry item is shipped by mithaq for every project. The registry is a shadcn registry in `packages/mithaq-admin/`:
+A registry item is a piece mithaq ships for every project. Its source lives in `packages/mithaq-admin/registry/`:
 
-1. Write the file under `packages/mithaq-admin/registry/`, and list it as an item in `packages/mithaq-admin/registry.json` with its `target` and its `registryDependencies`. A shadcn primitive is named by its bare name, and a sibling item by `./node_modules/mithaq-admin/r/<item>.json`.
-2. Put every comment below the imports. `shadcn add` drops a file's leading comment block.
+1. Write the file under `packages/mithaq-admin/registry/`, and list it as an item in `packages/mithaq-admin/registry.json` with its `target`, the bare names of the shadcn primitives it imports in `registryDependencies`, and the npm packages it alone needs in `dependencies`.
+2. Import a sibling piece as `mithaq-admin/<file>`, never by a relative path, so a project's ejected copy of the sibling is drawn in its place.
 3. Add the item's name to the list in `packages/mithaq-admin/test/render.test.ts` `the app holds the current source of every registry item it copied`.
-4. Rebuild `r/` with `bun run build` in `packages/mithaq-admin` (a fresh `bun install` runs it too). `r/` is build output and is not committed. The build appends the marker line to every file: `// mithaq-admin <commit> <hash>`.
-5. Copy it into the app that uses it, or into `templates/asas` for a server file, from that folder: `shadcn add ./node_modules/mithaq-admin/r/<item>.json --overwrite --yes`.
-6. Run `bunx mithaq upgrade --check` in that folder. It exits 1 when a copy differs from the registry; [The `mithaq` command](../mithaq/src/asas/cli/README.md#upgrade---check) lists what each line means.
+4. A library the piece imports that no other piece does is a peer dependency in `packages/mithaq-admin/package.json`.
+5. Run `bun run test`. A piece the apps import is drawn from the package at once; only a file a project always holds (the host, storage, a step) is ejected again in `templates/asas` or the apps: delete the old file and run `bunx mithaq eject <item>` there.
 
 ### A registry step
 
-A step every project may want, and may want to change, ships as a registry file rather than as core code. `expectedUpdatedAt` is one: it lives in `packages/mithaq-admin/registry/steps/expected-updated-at.ts` in the mithaq repository, the registry item `mithaq-expected-updated-at` copies it to `src/steps/expected-updated-at.ts`, and a project edits its copy in place. Write a new one the same way, and follow [Add a registry item](#add-a-registry-item). Put the step's tests beside it so a replacement can run them.
+A step every project may want, and may want to change, ships as a registry file rather than as core code. `expectedUpdatedAt` is one: it lives in `packages/mithaq-admin/registry/steps/expected-updated-at.ts` in the mithaq repository, `mithaq eject mithaq-expected-updated-at` writes it to `src/steps/expected-updated-at.ts`, and a project edits its copy in place. Write a new one the same way, and follow [Add a registry item](#add-a-registry-item). Put the step's tests beside it so a replacement can run them.

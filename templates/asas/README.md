@@ -264,7 +264,7 @@ The template's own tests stay in the mithaq repository. A new project has none o
 ```
 templates/asas/
   package.json        exports ".", "./messages/*", "./ui-dashboard/*", "./audit-log/*"; script "seed"
-  components.json     shadcn config for the server-side registry copies, with the @mithaq registry
+  components.json     where mithaq eject writes the storage and step files
   mithaq.hints.json   the project's answers to "is this a rename?" questions mithaq migrate asks
   mithaq.lock         the signed vocabulary, when the project keeps one
   README.md           this guide
@@ -280,7 +280,7 @@ templates/asas/
     migrations/       written by mithaq migrate, committed
     ui/ ui-dashboard/ ui-portal/ ui-platform/   page pieces several kayan or screens share
     storage/          the storage config, its adapters and defaults
-    steps/            steps copied from the registry
+    steps/            steps ejected from mithaq-admin
     roles.ts tenant-roles.ts tenant-access.ts statements.ts
     pages.ts platform-http.ts rich-text-nodes.ts seed.ts
 ```
@@ -319,8 +319,8 @@ The template's kayan are `courses`, `sessions`, `enrollments`, `tags`, `media`, 
 
 **Configurable features.**
 
-- `storage/index.ts` is the storage config. It names every function in `storage/defaults.ts`, and the adapters `local.ts`, `r2.ts`, `s3.ts` and `uploadthing.ts`. Those five files are copies of the `mithaq-storage` registry item and end with a marker line.
-- `steps/expected-updated-at.ts` is a copy of the `mithaq-expected-updated-at` registry item.
+- `storage/index.ts` is the storage config. It names every function in `storage/defaults.ts`, and the adapters `local.ts`, `r2.ts`, `s3.ts` and `uploadthing.ts`. Those five files are ejected from the `mithaq-storage` item of `mithaq-admin` and end with a marker line.
+- `steps/expected-updated-at.ts` is ejected from the `mithaq-expected-updated-at` item.
 - `rich-text-nodes.ts` is the one list of rich-text nodes the server and every editor read.
 
 **The rest.** `pages.ts` holds the page trees every kayan page starts from (`appPage`, `topPage`, `danger`, `platformList`, `platformRecord`). `platform-http.ts` is the one hand-written route, renaming an organization, which writes a Better Auth table no managed operation may write. `seed.ts` fills a database for a first look, run with `bun run seed`.
@@ -343,8 +343,8 @@ Both apps are TanStack Start apps on Vite. Each app's `dev`, `build` and `previe
 
 ```
 apps/asas-tanstack/
-  components.json     shadcn config, with the @mithaq registry
-  vite.config.ts
+  components.json     shadcn config: where shadcn add and mithaq eject write
+  vite.config.ts      with the mithaq/vite plugin
   src/
     copy.ts           every copy scope the app's translator answers: each kayan's
                       messages JSON plus the app's own keys
@@ -358,9 +358,10 @@ apps/asas-tanstack/
         portal/        screen.json  types.ts  files.ts
     screens.tsx  screen-form.tsx  screen-list.tsx  screen-names.ts  api.ts  slide.ts
     links.ts  locale-switch.tsx  auth-frame.tsx  request-headers.ts
-                      the screen host, copied from the mithaq-screens-host registry item
-    components/mithaq/   the screen components, copied from the registry
-    components/ui/       the shadcn primitives they draw with
+                      the screen host, ejected from the mithaq-screens-host item
+    components.ts        the components map every screen draws its controls, cells and nodes from
+    components/mithaq/   the pieces the project ejected from mithaq-admin, none at first
+    components/ui/       the shadcn primitives the pieces draw with
     lib/  hooks/         shadcn's utils and hooks
     router.tsx  start.ts  server.ts  styles.css  theme.ts  redirect.ts  quiet-abort.ts
     routeTree.gen.ts     written by TanStack Router
@@ -385,7 +386,7 @@ The app owns its copy, its routes, its providers and its styling. It says nothin
 | Better Auth kayan | `src/kayan/auth/user/`, written by `mithaq generate auth`; the project's choices in `<kayan>.access.ts` and `<kayan>.screens.ts` |
 | Tests | beside the code they test, as `<name>.test.ts`; shared test helpers as `test-<name>.ts` |
 
-A file a generator writes starts with a line saying which command wrote it, such as `// Written by \`mithaq generate screens\`. Do not edit.`, and changes only by rerunning that command. A file copied from the registry ends with a marker line, `// mithaq-admin <commit> <hash>`, and is the project's own to edit; `mithaq upgrade --check` reports which copies were edited or differ from the installed registry.
+A file a generator writes starts with a line saying which command wrote it, such as `// Written by \`mithaq generate screens\`. Do not edit.`, and changes only by rerunning that command. A file ejected from `mithaq-admin` ends with a marker line, `// mithaq-admin <version> <hash>`, and is the project's own to edit; `mithaq upgrade --check` reports which were edited or differ from the installed package.
 
 ## Adding to the project
 
@@ -615,9 +616,9 @@ A step that refuses throws `invalid`, `denied`, `missing` or `conflict` from `mi
 
 A component of the project's own lives in a `ui` folder of `templates/asas/src` and is named by `ui('file.tsx#Export')`, where `ui` is a `folderOf(new URL('./ui/', import.meta.url))`. A cell takes `CellProps` from `mithaq/admin`, a button takes `ButtonProps`, and hooks such as `useLocale` and `useRecord` come from `mithaq/admin/react`. Name it where it is used: as a field's `cell` or `component`, as a page node `{ component: ... }`, or under a screen's `components` in `src/mithaq.ts` when several pages use it by name. The build checks that the file exists and exports the name; you keep the field names inside it correct.
 
-A registry item is a screen component, adapter or step mithaq ships for every project. [The admin registry](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md) describes the registry and how to add an item to it.
+The screens draw with the pieces of `mithaq-admin`, which each app imports as `mithaq-admin/<file>`. To change a control, a cell or a node, replace it in the components map in `src/components.ts`. To change a piece the map does not hold, run `bunx mithaq eject <item>` in the app: it writes the piece into `src/components/mithaq/`, and that file is drawn in place of the package's from then on. [The admin package](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md) describes the pieces, ejecting one, and migrating a project made before the package.
 
-A copy is the project's own file. A project edits it in place and never patches it from outside. After an edit, `upgrade --check` reports it as edited. When the installed registry changes the same file, diff the two and merge by hand. A published project reads the registry over HTTP as `@mithaq/<item>`, at the version of `mithaq` it installed, through the `registries` entry `bun create mithaq` writes into each `components.json`.
+An ejected file is the project's own. A project edits it in place and never patches it from outside. After an edit, `upgrade --check` reports it as edited. When the installed package changes the same file, diff the two and merge by hand, or delete an unedited one (`bunx mithaq eject --prune`) to draw the package's.
 
 ### Tests
 
@@ -635,7 +636,7 @@ A copy is the project's own file. A project edits it in place and never patches 
 | `bunx mithaq generate --check` | Every check below and every generator in check mode, stopping at the first failure. [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#generate---check) lists the steps. |
 | `bunx mithaq lock --check` | The vocabulary still matches `mithaq.lock` and its seal verifies. Passes with a notice when there is no lock. |
 | `bunx mithaq migrate --check` | No kayan change waits for a migration. Writes nothing. |
-| `bunx mithaq upgrade --check` | Every registry copy against the installed registry. Never writes. |
+| `bunx mithaq upgrade --check` | Every file the project holds from `mithaq-admin` against the installed package. Never writes. |
 
 ## Running in production
 
@@ -710,7 +711,7 @@ Start both built apps with `NODE_ENV=production`. That one setting decides sever
 
 ### Storage adapters
 
-Uploaded files go through the storage rukn, the pluggable part that brings the `upload` kind and the storage target. Its config is `templates/asas/src/storage/index.ts`, and the adapters beside it are project files, copied from the registry, that you own and edit:
+Uploaded files go through the storage rukn, the pluggable part that brings the `upload` kind and the storage target. Its config is `templates/asas/src/storage/index.ts`, and the adapters beside it are project files, ejected from `mithaq-admin`, that you own and edit:
 
 | Adapter | File | Use |
 | --- | --- | --- |

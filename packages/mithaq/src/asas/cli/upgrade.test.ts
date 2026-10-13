@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { createServer } from 'vite'
 import { mithaqAdmin } from '../../vite.ts'
-import { hashOf, mark, upgradeCheck } from './upgrade.ts'
+import { hashOf, upgradeCheck } from './upgrade.ts'
 
 const exec = promisify(execFile)
 const bin = new URL('./mithaq.ts', import.meta.url).pathname
@@ -66,19 +66,6 @@ const signedLock = async (root: URL) => {
   const { generateKeyPairSync } = await import('node:crypto')
   await writeFile(new URL('mithaq.lock', root), formatLock(sealLanguage({ language: vocabularyOf(receivedLanguage(defineKayan)), key: generateKeyPairSync('ed25519').privateKey })))
 }
-
-test('the build marks every file it ships on its last line, with the commit and the hash of what shadcn add writes', async (t) => {
-  const built = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-mark-'))}/`)
-  t.after(() => rm(built, { recursive: true, force: true }))
-  await write(built, 'probe.json', JSON.stringify({ name: 'probe', files: [{ content: packaged, target: '@components/mithaq/current.ts' }] }))
-  await mark(built)
-  const read = async () => (JSON.parse(await readFile(new URL('probe.json', built), 'utf8')) as { files: { content: string }[] }).files[0]!.content
-  assert.match(await read(), /\n\/\/ mithaq-admin (?:[0-9a-f]{40}|unknown) [0-9a-f]{64}\n$/)
-  assert.ok((await read()).endsWith(`${hashOf(upstream)}\n`), 'the hash ignores the leading comment shadcn add strips')
-  // Marking twice leaves one marker, so a rebuild over a marked `r/` holds.
-  await mark(built)
-  assert.equal((await read()).split('// mithaq-admin').length, 2)
-})
 
 test('each file the project holds reads one state against the installed package, and a file it never ejected is not listed', async (t) => {
   const root = await project(everyCase)

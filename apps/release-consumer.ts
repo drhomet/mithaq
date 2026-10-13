@@ -1,6 +1,6 @@
 // Run with DATABASE_URL set to a dedicated local PostgreSQL database named mithaq, which this check writes to.
 // It proves what the boot tests do not: the staged packages (`apps/pack.ts`) make a project the way `bun create mithaq` and
-// `npm create mithaq` do, with `mithaq` installed from the packed tarball and no framework source or `mithaq-admin`; each
+// `npm create mithaq` do, with `mithaq` and `mithaq-admin` installed from the packed tarballs and no framework source; each
 // consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request and passes
 // `mithaq generate --check`: a monorepo with Bun and with npm, and with Bun a single package and a monorepo with no
 // platform console, which boots with no PLATFORM_URL.
@@ -9,7 +9,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { createRequire } from 'node:module'
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -42,29 +42,30 @@ const installed = (folder: string, name: string): string => {
 const scratch = mkdtempSync(join(tmpdir(), 'mithaq-release-'))
 try {
   command(process.execPath, ['apps/pack.ts'], root)
-  command('npm', ['pack', '.pack/mithaq', '--pack-destination', scratch], root)
+  for (const name of ['mithaq', 'mithaq-admin']) command('npm', ['pack', `.pack/${name}`, '--pack-destination', scratch], root)
   const { version: published } = JSON.parse(readFileSync(join(root, '.pack/mithaq/package.json'), 'utf8')) as { version: string }
-  for (const name of ['mithaq', 'create-mithaq']) {
+  for (const name of ['mithaq', 'mithaq-admin', 'create-mithaq']) {
     const { repository, homepage, bugs } = JSON.parse(readFileSync(join(root, `.pack/${name}/package.json`), 'utf8')) as { repository?: { url: string }; homepage?: string; bugs?: { url: string } }
     assert.deepEqual([repository?.url, homepage, bugs?.url], ['git+https://github.com/drhomet/mithaq.git', 'https://github.com/drhomet/mithaq#readme', 'https://github.com/drhomet/mithaq/issues'], `.pack/${name} names the public repository`)
   }
   const tarball = `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`
-  for (const run of [{ manager: 'bun' }, { manager: 'npm' }, { manager: 'bun', layout: 'single' }, { manager: 'bun', platform: false }]) await release({ tarball, ...run })
+  const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
+  for (const run of [{ manager: 'bun' }, { manager: 'npm' }, { manager: 'bun', layout: 'single' }, { manager: 'bun', platform: false }]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
   rmSync(scratch, { recursive: true, force: true })
 }
 
-async function release({ manager, tarball, layout = 'monorepo', platform = layout === 'monorepo' }: { manager: string; tarball: string; layout?: string; platform?: boolean }) {
+async function release({ manager, tarball, adminTarball, layout = 'monorepo', platform = layout === 'monorepo' }: { manager: string; tarball: string; adminTarball: string; layout?: string; platform?: boolean }) {
   const name = `${manager}-${layout === 'single' ? 'single' : platform ? 'monorepo' : 'tenant'}`
   const consumer = join(scratch, name)
   const single = layout === 'single'
   const servers: ReturnType<typeof spawn>[] = []
   let output = ''
   try {
-    // The project as `<manager> create mithaq` makes it, with `mithaq` pointed at the tarball through a flag only this check
-    // passes, so nothing is fetched from npm or jsDelivr.
-    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, platform ? '--platform' : '--no-platform', '--mithaq', tarball], {
+    // The project as `<manager> create mithaq` makes it, with `mithaq` and `mithaq-admin` pointed at the tarballs through flags
+    // only this check passes, so neither is fetched from npm.
+    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, platform ? '--platform' : '--no-platform', '--mithaq', tarball, '--mithaq-admin', adminTarball], {
       cwd: scratch,
       encoding: 'utf8',
       timeout: 600_000,
@@ -78,8 +79,8 @@ async function release({ manager, tarball, layout = 'monorepo', platform = layou
     const workspaces = single ? [''] : ['templates/asas', 'templates/auth', 'apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : [])]
     assert.deepEqual(['templates', 'apps/asas-platform'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : platform ? ['templates', 'apps/asas-platform'] : ['templates'])
     for (const workspace of workspaces) {
-      const manifest = JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { devDependencies?: Record<string, string> }
-      assert.ok(!manifest.devDependencies?.['mithaq-admin'], `${workspace} names no mithaq-admin`)
+      const manifest = JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }
+      if (workspace !== 'templates/auth') assert.equal(manifest.dependencies?.['mithaq-admin'], adminTarball, `${workspace} pins mithaq-admin`)
       assert.ok(!existsSync(join(consumer, workspace, 'src/asas.test.ts')) && !existsSync(join(consumer, workspace, 'src/test-database.ts')), `${workspace} has no tests`)
     }
     const app = single ? consumer : join(consumer, 'apps/asas-tanstack')
@@ -87,19 +88,22 @@ async function release({ manager, tarball, layout = 'monorepo', platform = layou
     const mithaq = realpathSync(installed(app, 'mithaq'))
     assert.ok(mithaq.startsWith(join(realpathSync(consumer), 'node_modules')), `mithaq resolves to the installed tarball, not ${mithaq}`)
     assert.equal((JSON.parse(readFileSync(join(mithaq, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq')
-    assert.ok(!existsSync(join(consumer, 'node_modules/mithaq-admin')), 'the project has no mithaq-admin')
+    const admin = realpathSync(installed(app, 'mithaq-admin'))
+    assert.equal((JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq-admin')
+    assert.ok(!existsSync(join(app, 'src/components/mithaq')), 'the app holds no piece: each is drawn from the package')
     // A manager that cannot hoist a package installs it again under each workspace, and a second mithaq is a second language.
     for (const workspace of workspaces) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq')), mithaq, `${workspace} loads the one mithaq`)
+    // A second mithaq-admin is a second components map, so the template's shells and the app must draw from one.
+    for (const workspace of workspaces.filter((one) => one !== 'templates/auth')) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq-admin')), admin, `${workspace} loads the one mithaq-admin`)
     const template = single ? consumer : join(consumer, 'templates/asas')
-    // Every copy each workspace holds is read against the `r/` the installed package ships and must be up to date;
-    // with no `r/` there the check answers undefined and this fails.
-    for (const [workspace, files] of single ? [[consumer, 107]] as const : [[app, 101], ...(platform ? [[platformApp, 100]] as const : []), [template, 6]] as const) {
+    // The files each workspace always holds (the host, the icon, the storage adapters and the step) are read against the
+    // installed mithaq-admin and must be up to date; with no package there the check answers undefined and this fails.
+    for (const [workspace, files] of single ? [[consumer, 19]] as const : [[app, 13], ...(platform ? [[platformApp, 12]] as const : []), [template, 6]] as const) {
       installed(workspace, '.bin/mithaq')
-      assert.ok(!existsSync(join(workspace, 'node_modules/mithaq-admin')), `${workspace} has no mithaq-admin`)
       const check = spawnSync(process.execPath, ['--input-type=module', '-e', "import { pathToFileURL } from 'node:url'; import { upgradeCheck } from 'mithaq/upgrade'; console.log(JSON.stringify(await upgradeCheck(pathToFileURL(`${process.cwd()}/`))))"], { cwd: workspace, encoding: 'utf8' })
       assert.equal(check.status, 0, check.stderr)
       const states = JSON.parse(check.stdout) as { path: string; state: string }[] | null
-      assert.equal(states?.length, files, `${workspace} reads every copy against the package's r/:\n${check.stdout}`)
+      assert.equal(states?.length, files, `${workspace} reads every file it holds against the installed mithaq-admin:\n${check.stdout}`)
       assert.deepEqual(states.filter((one) => one.state !== 'up to date'), [])
     }
     const targets = spawnSync(process.execPath, ['--input-type=module', '-e', "import * as targets from 'mithaq/targets'; console.log(Object.keys(targets).sort().join(' '))"], { cwd: template, encoding: 'utf8' })
@@ -119,6 +123,11 @@ async function release({ manager, tarball, layout = 'monorepo', platform = layou
     ].join('\n'))
     // Each workspace names its own `typescript` (`apps/pack.ts`), so the root has no `tsc` where a manager installs isolated.
     const tsc = installed(template, '.bin/tsc')
+    // An ejected piece is drawn in place of the package's by every importer, the package's own pieces among them, in
+    // whatever layout the manager installed: the type check reads it through `paths` and the build through `mithaq/vite`.
+    command(installed(app, '.bin/mithaq'), ['eject', 'nav-links'], app)
+    const ejected = join(app, 'src/components/mithaq/nav-links.tsx')
+    writeFileSync(ejected, `${readFileSync(ejected, 'utf8')}(globalThis as { ejectedProbe?: string }).ejectedProbe = 'mithaq-ejected-probe'\n`)
     for (const project of single ? ['.'] : ['apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : []), '.']) command(tsc, ['-p', project], consumer)
     // The database as a deploy leaves it: emptied, then migrated with the `drizzle-kit` the installed `mithaq` resolves.
     // Node runs the rest: the project's `.ts` lies outside `node_modules`, where Node strips types.
@@ -128,6 +137,8 @@ async function release({ manager, tarball, layout = 'monorepo', platform = layou
     command(installed(template, '.bin/mithaq'), ['lock', '--check'], template)
     // Without `--bun`, each program the build script runs starts under the `node` its shebang names.
     command(manager, ['run', 'build'], app)
+    const client = join(app, 'dist/client')
+    assert.ok(readdirSync(client, { recursive: true, encoding: 'utf8' }).some((file) => file.endsWith('.js') && readFileSync(join(client, file), 'utf8').includes('mithaq-ejected-probe')), 'the build draws the ejected nav-links.tsx')
     if (platform) command(manager, ['run', 'build'], platformApp)
 
     const freePort = async () => {
