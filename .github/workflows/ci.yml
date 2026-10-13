@@ -1,0 +1,89 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    # labeled, so adding release-check to a PR runs that job without a new push.
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Not 5432 or 55439, which testDatabase refuses as dev databases; the tests drop and rebuild it.
+  DATABASE_URL: postgres://postgres:postgres@localhost:55432/mithaq
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mithaq
+        ports: ['55432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint:args
+      - run: bun run test
+      - run: bun run test:tanstack
+      - run: bun run test:next
+      - run: bunx mithaq generate --check && bunx mithaq upgrade --check
+        working-directory: templates/asas
+
+  release-check:
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'release-check')
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mithaq
+        ports: ['55432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
+      # test:release stages .pack/ itself before it creates projects from it.
+      - run: bun run test:release
+      # The tarballs a PR would publish, to install by hand.
+      - run: npm pack .pack/mithaq .pack/mithaq-admin .pack/create-mithaq --pack-destination .pack
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packages
+          path: .pack/*.tgz
+          if-no-files-found: error
