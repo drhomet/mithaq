@@ -161,7 +161,7 @@ test('a single package holds the language, its features, the asas and the tenant
 test('--help prints each question\'s flag', () => {
   const done = spawnSync(process.execPath, [fileURLToPath(new URL('./index.js', import.meta.url)), '--help'], { encoding: 'utf8' })
   assert.equal(done.status, 0, done.stderr)
-  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', 'courses (needs roles, audit-log)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
+  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', 'courses (needs roles, audit-log, rich-text, uploads)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
   assert.match(done.stdout, /npm, pnpm 10\.6 or later, Yarn 1 or Bun 1\.3\. Yarn 2 and later/, 'and which package managers a project installs with')
 })
 
@@ -179,9 +179,9 @@ test('a dependency left pointing into the framework repository is refused, whate
 
 test('an add-on brings every one it needs, said so, and a name the table does not hold is refused with the list', () => {
   assert.deepEqual(resolveAddOns([]), { chosen: [], added: [] })
-  assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'courses'], added: ['roles', 'audit-log'] })
+  assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'rich-text', 'uploads', 'courses'], added: ['roles', 'audit-log', 'rich-text', 'uploads'] })
   assert.deepEqual(resolveAddOns(['platform', 'roles', 'roles']).chosen, ['roles', 'platform'], 'in the table\'s order, once each')
-  assert.throws(() => resolveAddOns(['roles', 'media', 'rich']), /^Error: No add-on is named "media", "rich"\. The add-ons are roles, audit-log, settings, courses, platform\.$/)
+  assert.throws(() => resolveAddOns(['roles', 'media', 'rich']), /^Error: No add-on is named "media", "rich"\. The add-ons are roles, audit-log, settings, rich-text, uploads, courses, platform\.$/)
 })
 
 test('a region keeps its lines only where its add-ons are chosen, a without region is uncommented only where they are not, and the markers go either way', () => {
@@ -224,7 +224,13 @@ test('a minimal project holds auth and the tags example alone: no other feature,
   const language = code('minimal/packages/mithaq/src/mithaq.ts')
   assert.match(language, /^import \{ accessTarget \} from '\.\/roles\/member-access\.ts'$/m)
   assert.match(language, /^export \{ accessTarget \}$/m)
-  assert.doesNotMatch(language, /rbacTarget|auditSink|sessionLabels|softDelete|'courses'|'roles'|'auditLog'|'settings'/)
+  assert.doesNotMatch(language, /rbacTarget|auditSink|sessionLabels|softDelete|'courses'|'roles'|'auditLog'|'settings'|richText|storage\(/)
+  assert.deepEqual(Object.keys(json('minimal/packages/asas/src/messages/mithaq.json')).filter((key) => /richText|upload/.test(key)), [], 'nor the copy of a word it left out')
+  // No add-on's npm packages either, Lexical's above all.
+  for (const workspace of ['', 'packages/mithaq', 'packages/asas', 'apps/asas-tanstack']) {
+    const { dependencies = {}, devDependencies = {} } = json('minimal', workspace, 'package.json')
+    assert.deepEqual(Object.keys({ ...dependencies, ...devDependencies }).filter((one) => /^(lexical|@lexical\/|aws4fetch|file-type|image-dimensions)/.test(one)), [], workspace)
+  }
   assert.match(read('minimal/packages/mithaq/src/roles/tenant-roles.ts'), /\.\.\.defaultMemberRoles,/)
   assert.doesNotMatch(code('minimal/packages/mithaq/src/mithaq/auth/index.ts'), /memberRoles|enrollments/)
   assert.doesNotMatch(code('minimal/packages/asas/src/asas.ts'), /courses|roles\.kayan|auditLog|settings/)
@@ -241,6 +247,7 @@ test('a full project holds every add-on and the template\'s migrations, none of 
   for (const file of Object.values(addOns).flatMap((one) => one.without)) assert.ok(!existsSync(join(at, file)), file)
   assert.match(read('my-app/packages/mithaq/src/mithaq.ts'), /rbacTarget\(\{ \.\.\.accessOptions, roles \}\)/)
   assert.doesNotMatch(read('my-app/packages/mithaq/src/mithaq.ts'), /member-access/)
+  for (const name of ['lexical', '@lexical/react', 'aws4fetch']) assert.ok(json('my-app/apps/asas-tanstack/package.json').dependencies[name] ?? json('my-app/packages/mithaq/package.json').dependencies[name], name)
   assert.ok(readdirSync(join(at, 'packages/asas/src/migrations')).length > 2)
   const sources = filesUnder(at).filter((file) => /\.tsx?$/.test(file))
   assert.deepEqual(sources.filter((file) => /add-on: /.test(readFileSync(file, 'utf8'))).map((file) => file.slice(at.length)), [], 'no marker is left')

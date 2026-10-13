@@ -52,31 +52,52 @@ const once = (text, from, to, count = 1) => {
 /**
  * What a project may hold beyond the language, the asas, the `auth` feature and the `tags` example. Each add-on names the
  * add-ons it needs, the files that are its alone (removed when it is left out), the files that stand in for it (removed
- * when it is chosen), and whether it brings tables, without which the template's migrations, written for every table,
- * do not fit the project. Its lines in a shared file sit in `// add-on: <name>` regions, which `keepAddOns` reads.
+ * when it is chosen), the npm packages only it uses (a name ending in `/` is a whole scope), the keys of its words in
+ * the shared copy file, `mithaq.json`, which can hold no region, and whether it brings
+ * tables, without which the template's migrations, written for every table, do not fit the project. Its lines in a
+ * shared file sit in `// add-on: <name>` regions, which `keepAddOns` reads. `rich-text` and `uploads` bring words of the
+ * language, kinds and a target, so a project's vocabulary follows the add-ons it holds.
  */
 export const addOns = {
   roles: {
     needs: [],
     files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
     without: ['packages/mithaq/src/roles/default-member-roles.ts', 'packages/mithaq/src/roles/member-access.ts'],
+    packages: [],
+    copy: [],
     tables: true,
   },
   'audit-log': {
     needs: [],
     files: ['packages/features/audit-log', 'packages/mithaq/src/mithaq/audit-sink.ts', 'packages/mithaq/src/ui/activity.tsx', 'packages/asas/src/messages/auditLog.json'],
     without: [],
+    packages: [],
+    copy: [],
     tables: true,
   },
-  settings: { needs: [], files: ['packages/features/settings', 'packages/asas/src/messages/settings.json'], without: [], tables: true },
-  // The worked example: its business roles are the roles add-on's, and its edit pages draw the audit log's activity.
+  settings: { needs: [], files: ['packages/features/settings', 'packages/asas/src/messages/settings.json'], without: [], packages: [], copy: [], tables: true },
+  // The `richText` kind, its Lexical nodes and editor.
+  'rich-text': {
+    needs: [],
+    files: ['packages/mithaq/src/mithaq/rich-text-nodes.ts', 'packages/mithaq/src/ui/rich-text-nodes.tsx'],
+    without: [],
+    packages: ['lexical', '@lexical/'],
+    copy: ['kinds.richText', 'kinds.richText.invalid'],
+    tables: false,
+  },
+  // The `upload` kind, the storage target and its adapters.
+  uploads: { needs: [], files: ['packages/mithaq/src/storage'], without: [], packages: ['aws4fetch', 'file-type', 'image-dimensions'], copy: ['kinds.upload', 'kinds.upload.invalid'], tables: false },
+  // The worked example: its business roles are the roles add-on's, its edit pages draw the audit log's activity, its
+  // details are rich text and a course's cover is an upload.
   courses: {
-    needs: ['roles', 'audit-log'],
+    needs: ['roles', 'audit-log', 'rich-text', 'uploads'],
     files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', ...['courses', 'sessions', 'enrollments', 'media'].map((one) => `packages/asas/src/messages/${one}.json`)],
     without: ['packages/asas/src/ui-dashboard/home.tsx'],
+    packages: [],
+    copy: [],
     tables: true,
   },
-  platform: { needs: [], files: ['apps/asas-platform'], without: [], tables: false },
+  platform: { needs: [], files: ['apps/asas-platform'], without: [], packages: [], copy: [], tables: false },
 }
 
 /**
@@ -226,9 +247,19 @@ const keepOnly = ({ project, chosen }) => {
   }
   for (const file of textsUnder(project).filter((one) => basename(one) === 'package.json')) {
     const manifest = readJson(file)
-    for (const name of Object.keys(addOns).filter((one) => !chosen.includes(one))) delete manifest.dependencies?.[`@asas/${name}`]
+    for (const [name, { packages }] of Object.entries(addOns).filter(([one]) => !chosen.includes(one))) {
+      for (const dependencies of [manifest.dependencies, manifest.devDependencies]) {
+        for (const dependency of Object.keys(dependencies ?? {})) {
+          if (dependency === `@asas/${name}` || packages.some((one) => (one.endsWith('/') ? dependency.startsWith(one) : dependency === one))) delete dependencies[dependency]
+        }
+      }
+    }
     writeJson(file, manifest)
   }
+  const copy = join(project, 'packages/asas/src/messages/mithaq.json')
+  const shared = readJson(copy)
+  for (const [name, { copy: keys }] of Object.entries(addOns)) if (!chosen.includes(name)) for (const key of keys) delete shared[key]
+  writeJson(copy, shared)
   if (Object.entries(addOns).every(([name, { tables }]) => !tables || chosen.includes(name))) return
   const migrations = join(project, 'packages/asas/src/migrations')
   for (const entry of readdirSync(migrations)) if (entry !== 'drizzle.config.ts') rmSync(join(migrations, entry), { recursive: true })

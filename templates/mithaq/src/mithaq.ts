@@ -21,19 +21,27 @@ import {
   Refusal,
   screenTarget,
   serviceTarget,
+  // add-on: uploads
   storage,
+  // end add-on: uploads
   versions,
   zodTarget,
   type CommandInput,
 } from 'mithaq'
+// add-on: rich-text
 import { richText } from 'mithaq/rich-text'
+// end add-on: rich-text
 import { fileURLToPath } from 'node:url'
 // add-on: audit-log
 import { auditSink } from './mithaq/audit-sink.ts'
 // end add-on: audit-log
+// add-on: rich-text
 import { richTextNodes } from './mithaq/rich-text-nodes.ts'
+// end add-on: rich-text
 import { systemRoles } from './roles/system-roles.ts'
+// add-on: uploads
 import { storageConfig } from './storage/index.ts'
+// end add-on: uploads
 import { onPlatform } from './mithaq/auth/index.ts'
 import { assignedRoles, platformRolesOf, tenantAccess } from './roles/tenant-access.ts'
 // without add-on: roles
@@ -226,6 +234,7 @@ export const serverTargets = {
   }),
 }
 
+// add-on: uploads
 /**
  * Files: the `upload` kind and the storage target, from the storage rukn over
  * this project's config. `mithaq storage sweep` reads every row, so it is
@@ -248,19 +257,25 @@ const guardedFiles = {
     },
   },
 }
+// end add-on: uploads
 
 /**
  * The pillars the language's kinds, rules and built targets come from: `base`
- * brings the shipped kinds and rules, `richText` the rich text kind over this
- * project's node list, the files rukn the `upload` kind and storage target, and
- * `versions` the target a kayan keeps its past and drafts through by writing
- * `targets.versions`. One row keeps its last hundred versions unless its kayan
- * names another window. A rukn of the project's own goes beside them.
+ * brings the shipped kinds and rules, and `versions` the target a kayan keeps
+ * its past and drafts through by writing `targets.versions`. One row keeps its
+ * last hundred versions unless its kayan names another window. A rukn of the
+ * project's own goes beside them.
  */
 export const arkan = [
   base,
+  // add-on: rich-text
+  // The rich text kind over this project's node list.
   richText({ nodes: richTextNodes }),
+  // end add-on: rich-text
+  // add-on: uploads
+  // The `upload` kind and the storage target.
   guardedFiles,
+  // end add-on: uploads
   versions({ max: 100 }),
 ] as const
 
@@ -320,7 +335,9 @@ export const portalScreen = screenTarget({
     'user',
   ],
   providers: [
+    // add-on: rich-text
     ui('rich-text-nodes.tsx#RichTextNodes'),
+    // end add-on: rich-text
     // add-on: courses
     sessionLabels,
     // end add-on: courses
@@ -371,7 +388,9 @@ export const dashboardScreen = screenTarget({
   ],
   providers: [
     dashboardUi('theme-provider.tsx#ThemeProvider'),
+    // add-on: rich-text
     ui('rich-text-nodes.tsx#RichTextNodes'),
+    // end add-on: rich-text
     // add-on: courses
     sessionLabels,
     // end add-on: courses
@@ -444,7 +463,9 @@ export const platformScreen = screenTarget({
   ],
   providers: [
     dashboardUi('theme-provider.tsx#ThemeProvider'),
+    // add-on: rich-text
     ui('rich-text-nodes.tsx#RichTextNodes'),
+    // end add-on: rich-text
     // add-on: courses
     sessionLabels,
     // end add-on: courses
