@@ -305,17 +305,28 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     })
     assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
     if (platform) {
-      // Staff hold their platform role in the platform app with no organization active, whichever access target the
-      // project's add-ons chose.
-      command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = 'release-${stamp}@example.com'"); await asas.destroy()`], template)
+      // A staff member who belongs to no organization, so the platform session has none active: the access target is
+      // asked with no tenant, and only the project's role reader answers the platform role. Whichever target the
+      // project's add-ons chose, staff hold every key there.
+      const email = `staff-${stamp}@example.com`
+      const joined = await fetch(`${origin}/api/auth/user/sign-up/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin },
+        body: JSON.stringify({ name: 'Staff', email, password: 'release-test-password' }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      assert.equal(joined.status, 200, `${await joined.text()}\n${output}`)
+      command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = '${email}'"); await asas.destroy()`], template)
       const staff = await fetch(`${platformOrigin}/api/auth/user/sign-in/email`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', origin: platformOrigin },
-        body: JSON.stringify({ email: `release-${stamp}@example.com`, password: 'release-test-password' }),
+        body: JSON.stringify({ email, password: 'release-test-password' }),
         signal: AbortSignal.timeout(10_000),
       })
       assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
       const staffCookie = staff.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
+      const session = await (await fetch(`${platformOrigin}/api/auth/user/get-session`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { session?: { activeOrganizationId?: string | null } } | null
+      assert.equal(session?.session?.activeOrganizationId ?? null, null, `the staff session has no organization active: ${JSON.stringify(session).slice(0, 400)}`)
       const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
       assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s platform staff hold every key: ${JSON.stringify(report).slice(0, 400)}`)
     }
