@@ -176,7 +176,7 @@ export function List(props: ListProps): ReactElement {
                         onOpen={() => (!views && editsRows ? setEditing(row) : openRow(id))}
                         menu={menu.map((one) => one.operation)}
                         // A button that asks for values or carries a confirm opens its dialog over the row; any other runs.
-                        onRun={(operation) => (operation.fields?.length || operation.confirm ? setAsking({ row, operation }) : void runOnRow(operation.name, { id: row.id }))}
+                        onRun={(operation) => (operation.fields?.length || operation.confirm ? setAsking({ row, operation }) : void runOnRow({ operation: operation.name, input: { id: row.id } }))}
                         open={setOver}
                         onDelete={deletes ? () => setDeleting(row) : undefined}
                       />
@@ -191,7 +191,7 @@ export function List(props: ListProps): ReactElement {
             <span id={openHint} hidden>
               {t('admin.openRow', 'Press Enter to open this row.') ?? 'Press Enter to open this row.'}
             </span>
-            <RowDialogs {...{ api, asking, copy, deleting, deletes, kayan, running }} kayans={client} onAsked={() => setAsking(undefined)} onDeleted={() => setDeleting(undefined)} run={({ operation, input, refuse }) => runOnRow(operation, input, refuse)} />
+            <RowDialogs {...{ api, asking, copy, deleting, deletes, kayan, running }} kayans={client} onAsked={() => setAsking(undefined)} onDeleted={() => setDeleting(undefined)} run={runOnRow} />
             {over}
 
             {unreadable ? null : <Pagination page={page} t={t} locale={locale} onPage={(next) => onQuery({ ...query, page: next })} onLimit={(limit) => refine({ limit })} />}

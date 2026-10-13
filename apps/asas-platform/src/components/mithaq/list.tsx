@@ -176,7 +176,7 @@ export function List(props: ListProps): ReactElement {
                         onOpen={() => (!views && editsRows ? setEditing(row) : openRow(id))}
                         menu={menu.map((one) => one.operation)}
                         // A button that asks for values or carries a confirm opens its dialog over the row; any other runs.
-                        onRun={(operation) => (operation.fields?.length || operation.confirm ? setAsking({ row, operation }) : void runOnRow(operation.name, { id: row.id }))}
+                        onRun={(operation) => (operation.fields?.length || operation.confirm ? setAsking({ row, operation }) : void runOnRow({ operation: operation.name, input: { id: row.id } }))}
                         open={setOver}
                         onDelete={deletes ? () => setDeleting(row) : undefined}
                       />
@@ -191,7 +191,7 @@ export function List(props: ListProps): ReactElement {
             <span id={openHint} hidden>
               {t('admin.openRow', 'Press Enter to open this row.') ?? 'Press Enter to open this row.'}
             </span>
-            <RowDialogs {...{ api, asking, copy, deleting, deletes, kayan, running }} kayans={client} onAsked={() => setAsking(undefined)} onDeleted={() => setDeleting(undefined)} run={({ operation, input, refuse }) => runOnRow(operation, input, refuse)} />
+            <RowDialogs {...{ api, asking, copy, deleting, deletes, kayan, running }} kayans={client} onAsked={() => setAsking(undefined)} onDeleted={() => setDeleting(undefined)} run={runOnRow} />
             {over}
 
             {unreadable ? null : <Pagination page={page} t={t} locale={locale} onPage={(next) => onQuery({ ...query, page: next })} onLimit={(limit) => refine({ limit })} />}
@@ -218,4 +218,4 @@ export function List(props: ListProps): ReactElement {
     </section>
   )
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 51510464772c5243ccfdef1862540aa0eea1bc37ef23d9c261e0f1dcc9b6986e
+// mithaq-admin a5b0579ead0ea90a1c1f8e4f767641c7e178a7af 284745aecc626afaf6f1e4fe2df013db387379ccbb019a4bcb7ddc60c6595a16

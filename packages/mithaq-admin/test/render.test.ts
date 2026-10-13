@@ -346,7 +346,7 @@ test('9. neither map answers for a key of Object.prototype, so a field naming on
       /components\.cells has no cell for "nothing-ships-this", the kind of field "x"/,
       'and to the error where the map has none for its kind either',
     )
-    assert.throws(() => cellFor(fieldOf({ name: 'x', kind: 'nothing-ships-this' }), component), /no cell for "nothing-ships-this"/, 'and so does a column naming one as its cell')
+    assert.throws(() => cellFor(fieldOf({ name: 'x', kind: 'text' }), component), new RegExp(`no cell "${component}", which field "x" is drawn with`), 'and a column naming one is an error, since it names a cell rather than leaving it to the field')
   }
   assert.throws(() => controlFor(fieldOf({ name: 'x', kind: 'constructor' })), /no control for "constructor"/, 'a kind named for a key of Object.prototype is no kind the map carries')
   assert.throws(() => cellFor(fieldOf({ name: 'x', kind: 'constructor' })), /no cell for "constructor"/, 'for a cell either')
@@ -512,6 +512,12 @@ test('12b. one form item ships, its pieces on TanStack Form, and the boot builds
   }
   const forms = source.items.filter((one) => one.files.some((file) => file.target === '@components/mithaq/form.tsx'))
   assert.deepEqual(forms.map((one) => one.name), ['mithaq-form'], 'one item writes the form file')
+  const form = forms[0]!
+  const scoped = [...readFileSync(new URL(`../${form.files[0]!.path}`, import.meta.url), 'utf8').matchAll(/from '(@[a-z@/-]+)'/g)]
+    .map((hit) => hit[1]!)
+    .filter((one) => !one.startsWith('@/'))
+  assert.deepEqual(scoped, [], 'the form file imports no scoped package: it composes the pieces that hold its values')
+  assert.equal(form.dependencies, undefined, 'so it declares none')
   // The form is composed of pieces, so each piece that imports TanStack Form declares it, and no other piece does.
   const onTanStack = source.items.filter((item) => item.files.some((file) => /from '@tanstack\/react-form'/.test(readFileSync(new URL(`../${file.path}`, import.meta.url), 'utf8'))))
   assert.ok(onTanStack.some((item) => item.name === 'mithaq-use-form-seed'), 'the form holds its values in TanStack Form')

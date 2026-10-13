@@ -103,7 +103,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   }
   // A kayan's own operation can change anything the row touches, children included, so the panels are remounted after it.
   const runOperation = (operation: PageButton) => async (input: Record<string, unknown>, refuse: (thrown: unknown) => void) => {
-    const landed = await run(() => client.run!(operation.name, input), operation.effect, refuse)
+    const landed = await run({ write: () => client.run!(operation.name, input), effect: operation.effect, refuse })
     if (landed) setRevision((already) => already + 1)
     return landed
   }
@@ -131,7 +131,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     button: (node) => {
       const button = id && client.run && !viewing ? pageButtonOf({ kayan, node, allowed: operations }) : undefined
       if (!button) return null
-      const onDelete = (refuse: (thrown: unknown) => void) => run(() => client.delete({ id }), 'delete', refuse)
+      const onDelete = (refuse: (thrown: unknown) => void) => run({ write: () => client.delete({ id }), effect: 'delete', refuse })
       return <FormButton key={button.name} {...{ api, busy, copy, id, kayan, kayans, onDelete, screen, value }} operation={button} run={runOperation(button)} refuse={setRefused} />
     },
     // The page's one <form>, so a list of another kayan beside it, with forms of its own, is never inside it;
@@ -176,7 +176,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
       t={t}
       draft={status === 'changed' ? {
         busy: busy || autosaved === 'saving',
-        onRestore: operations?.restoreVersion === true && client.run ? () => void run(() => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), 'update', undefined, 'published') : undefined,
+        onRestore: operations?.restoreVersion === true && client.run ? () => void run({ write: () => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), effect: 'update', next: 'published' }) : undefined,
         onViewPublished: client.findByID ? () => void choose('published') : undefined,
         viewing,
       } : undefined}

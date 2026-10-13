@@ -1,6 +1,7 @@
-// `bun run lint:args [files]`: fails an exported function, constructor or method with three or more positional parameters.
+// `bun run lint:args [files]`: fails an exported function, constructor or method with three or more positional parameters,
+// and a function an exported hook (`use…`) returns from a `return { … }` in its body.
 // It does not see `export default` of an expression, re-exports, functions in an exported object literal or behind a cast,
-// arrow class properties, or a function typed by a name from another module.
+// arrow class properties, a function typed by a name from another module, or what a hook returns as its arrow's expression body.
 import { globSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { SyntaxKind, type Node } from 'typescript/unstable/ast'
@@ -32,9 +33,29 @@ const inType = (file: string, name: string, node: Node): void => {
   if (node.kind === SyntaxKind.PropertySignature) return void node.forEachChild((child) => inType(file, `${name}.${(node as unknown as { name: Node }).name.getText()}`, child))
   node.forEachChild((child) => inType(file, name, child))
 }
+// What a hook hands its caller is called like an exported function, so each function in the object it returns is
+// checked: one written in place, or a local `const` the object names.
+const checkReturned = (file: string, name: string, node: Node) => {
+  const statements = (node as unknown as { body?: { statements?: Node[] } }).body?.statements ?? []
+  const locals = new Map(statements.flatMap((statement) => statement.kind === SyntaxKind.VariableStatement
+    ? (statement as unknown as { declarationList: { declarations: { name: Node; initializer?: Node }[] } }).declarationList.declarations
+      .flatMap((declaration) => (declaration.initializer && functions.has(declaration.initializer.kind) ? [[declaration.name.getText(), declaration.initializer] as const] : []))
+    : []))
+  for (const statement of statements) {
+    const returned = statement.kind === SyntaxKind.ReturnStatement ? (statement as unknown as { expression?: Node }).expression : undefined
+    if (returned?.kind !== SyntaxKind.ObjectLiteralExpression) continue
+    for (const property of (returned as unknown as { properties: { kind: SyntaxKind; name: Node; initializer?: Node }[] }).properties) {
+      const value = property.kind === SyntaxKind.ShorthandPropertyAssignment ? locals.get(property.name.getText())
+        : property.initializer && functions.has(property.initializer.kind) ? property.initializer
+        : property.initializer ? locals.get(property.initializer.getText()) : undefined
+      if (value) check(file, `${name}.${property.name.getText()}`, value)
+    }
+  }
+}
 const checkFunction = (file: string, name: string, node: Node) => {
   check(file, name, node)
   for (const parameter of (node as unknown as { parameters: { type?: Node }[] }).parameters) if (parameter.type) inType(file, name, parameter.type)
+  if (/^use[A-Z]/.test(name)) checkReturned(file, name, node)
 }
 for (const path of files) {
   const source = program.getSourceFile(path)!

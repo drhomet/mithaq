@@ -88,15 +88,17 @@ export function FieldValue({
   const label = useId()
   const value = row?.[field.name]
   const Ref = refOf({ screen, place: 'cell', path: leaf?.cell ?? field.cell })
-  const Cell = cellFor({ cells: useComponents().cells, field, column: leaf?.cell })
+  const { cells } = useComponents()
+  // The screen's own component draws first, so the map is asked only for what it does not.
+  const Cell = Ref && screen ? undefined : cellFor({ cells, field, column: leaf?.cell })
   const description = leaf?.description?.[copy.locale] ?? descriptionFor({ kayan, field, copy })
   const width = leaf?.width ?? field.width
   return (
     <div role="group" aria-labelledby={label} data-field-value={field.name} className="grid gap-1.5" style={width ? { width } : undefined}>
       <span id={label} className="text-sm font-medium">{labelFor({ kayan, field, copy })}</span>
       <span className="text-sm">
-        {Ref && screen
-          ? <Ref field={field} value={value} row={row ?? {}} />
+        {!Cell
+          ? Ref && <Ref field={field} value={value} row={row ?? {}} />
           : (leaf?.cell ?? field.cell) === 'richText'
             ? <RichTextValueView value={value} t={copy.t} />
             : (leaf?.cell ?? field.cell) === 'upload'
@@ -107,4 +109,4 @@ export function FieldValue({
     </div>
   )
 }
-// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 7baee467352d07edb30a271726b68693d9884b43aed9aadb50f745084d636a90
+// mithaq-admin a5b0579ead0ea90a1c1f8e4f767641c7e178a7af 84fe84c4ed69ccef2e76bd0da7926c18f4204d6833dc42dca2abd76055e44238

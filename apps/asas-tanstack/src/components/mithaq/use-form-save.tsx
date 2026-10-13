@@ -75,8 +75,8 @@ export const useFormSave = ({
   /** Whether a write of the person's own has landed here, which makes a row this page's autosave made theirs. */
   const kept = useRef(false)
   // `refuse` is where a refusal lands: the form's own box by default, or an operation dialog's boxes, which
-  // stays open to hold them. Answers whether the write landed.
-  const run = async (write: () => Promise<unknown>, effect?: string, refuse: (thrown: unknown) => void = setRefused, next?: DraftStatus): Promise<boolean> => {
+  // stays open to hold them. `next` is the draft status the write leaves the row at. Answers whether the write landed.
+  const run = async ({ write, effect, refuse = setRefused, next }: { write: () => Promise<unknown>; effect?: string; refuse?: (thrown: unknown) => void; next?: DraftStatus }): Promise<boolean> => {
     setRefused(undefined)
     setBusy(true)
     try {
@@ -120,7 +120,7 @@ export const useFormSave = ({
     if (refusal) return setRefused(refusal)
     const written = valuesOf({ fields, values, owned })
     const next = drafts ? (options?.draft ? afterDraft(seed.status) : 'published') : undefined
-    void run(() => (id ? client.update({ ...written, ...readAt(expectedUpdatedAt), id }, options) : client.create(written, options)), id ? 'update' : 'create', undefined, next)
+    void run({ write: () => (id ? client.update({ ...written, ...readAt(expectedUpdatedAt), id }, options) : client.create(written, options)), effect: id ? 'update' : 'create', next })
   }
 
   // The discard question is open, or a Discard is on its way out, deleting a draft first where it has one to delete.
@@ -152,4 +152,4 @@ export const useFormSave = ({
 
   return { busy, saves, savedAt, noteSave, named, refusedOver, readAt, run, changed, writable, save, asking, setAsking, leaving, keepsDraft, discard }
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 a17a465f3c2d374e546f10b44d1a4478afd8c6dabedf0e0d15f42b82a4cdcb0e
+// mithaq-admin a5b0579ead0ea90a1c1f8e4f767641c7e178a7af b2e358e83f4a25b466ed523bb5e550eb9aae84deddafe235de069fdb696bfa94

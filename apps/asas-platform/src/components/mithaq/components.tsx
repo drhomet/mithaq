@@ -62,6 +62,8 @@ const named = <Drawn,>(map: object, name: string | undefined): Drawn | undefined
   name !== undefined && Object.hasOwn(map, name) ? (map as Readonly<Record<string, Drawn>>)[name] : undefined
 export const namedControl = (controls: Controls, name: string | undefined) => named<Control>(controls, name)
 export const namedCell = (cells: Cells, name: string | undefined) => named<Cell>(cells, name)
+// A `ui()` reference is drawn by the screen and never by the map, and only a reference holds a `#`.
+const drawnByMap = (name: string) => !name.includes('#')
 
 /**
  * The control for a field: the one its screen decided, else the kind's own. A name the map does not carry falls through to the kind, and a kind it does not carry is an error, so a map that leaves a kind out says so instead of drawing something else.
@@ -73,20 +75,40 @@ export const controlFor = (controls: Controls, field: ClientField): Control => {
 }
 
 /**
- * The cell for a field: the list column's, else the field's own, else the kind's. A name the map does not carry falls through, and a kind it does not carry is an error, as for a control.
+ * The cell for a field: the one a list column or a leaf names, else the field's own, else the kind's. A cell a column
+ * or a leaf names is drawn or is an error, never something else in its place; the field's own falls through to the
+ * kind, and a kind the map does not carry is an error, as for a control. A column's `ui()` reference is the screen's
+ * to draw, so where the screen does not, the field's own cell stands.
  */
 export const cellFor = ({ cells, field, column }: { cells: Cells; field: ClientField; column?: string }): Cell => {
-  const found = namedCell(cells, column) ?? namedCell(cells, field.cell) ?? namedCell(cells, field.kind)
+  if (column !== undefined && drawnByMap(column)) {
+    const named = namedCell(cells, column)
+    if (!named) throw new Error(`components.cells has no cell "${column}", which field "${field.name}" is drawn with. Spread defaultComponents.cells into the map and add one under that name.`)
+    return named
+  }
+  const found = namedCell(cells, field.cell) ?? namedCell(cells, field.kind)
   if (!found) throw new Error(`components.cells has no cell for "${field.kind}", the kind of field "${field.name}". Spread defaultComponents.cells into the map and add one under that name.`)
   return found
 }
 
+// Every cell a list column or a leaf of a page names, with where it names it.
+const namedCells = (node: unknown, at: string): { cell: string; at: string }[] => {
+  if (Array.isArray(node)) return node.flatMap((one) => namedCells(one, at))
+  if (!node || typeof node !== 'object') return []
+  const held = node as Record<string, unknown>
+  const own = typeof held.field === 'string' && typeof held.cell === 'string' && drawnByMap(held.cell) ? [{ cell: held.cell, at: `${at} "${held.field}"` }] : []
+  return [...own, ...Object.entries(held).flatMap(([key, value]) => namedCells(value, key === 'columns' ? at.replace(/ leaf$/, ' list column') : at))]
+}
+
 /**
- * Every field a screen draws, checked against the map once, so an app that calls this as it starts fails there, naming each kind and field, and not on the page that first draws one. A join is drawn by no form, so it needs no control; an operation's box is drawn by no list, so it needs no cell.
+ * Every field a screen draws, and every cell its pages name, checked against the map once, so an app that calls this as it starts fails there, naming each kind and field, and not on the page that first draws one. A join is drawn by no form, so it needs no control; an operation's box is drawn by no list, so it needs no cell.
  */
-export const checkComponents = ({ client, components }: { client: { kayan: Readonly<Record<string, Pick<ClientKayan, 'name' | 'fields' | 'operations'>>> }; components: Components }): void => {
+export const checkComponents = ({ client, components }: { client: { path?: string; kayan: Readonly<Record<string, Pick<ClientKayan, 'name' | 'fields' | 'operations' | 'pages'>>> }; components: Components }): void => {
   const { cells, controls } = components
   const missing = Object.values(client.kayan).flatMap((kayan) => [
+    ...Object.entries(kayan.pages ?? {}).flatMap(([page, drawn]) => namedCells(drawn, `screen ${client.path} ${kayan.name} page "${page}" leaf`))
+      .filter(({ cell }) => !namedCell(cells, cell))
+      .map(({ cell, at }) => `components.cells has no cell "${cell}", which ${at} names.`),
     ...[...kayan.fields, ...kayan.operations.flatMap((operation) => operation.fields ?? [])]
       .filter((field) => field.kind !== 'join' && !namedControl(controls, field.component) && !namedControl(controls, field.kind))
       .map((field) => `components.controls has no control for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.`),
@@ -110,4 +132,4 @@ export function RouteError({ error }: { error: unknown }): ReactElement {
  * Whether a control's label sits beside it rather than above: a checkbox or a switch reads as attached to its words.
  */
 export const besideLabel = (controls: Controls, Control: unknown) => Control === controls.checkbox || Control === controls.switch
-// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 07266c53bf86ea1e3fafe4cbbff311d79753f85afca2dcf26c0db4a7671b43fd
+// mithaq-admin a5b0579ead0ea90a1c1f8e4f767641c7e178a7af a9eed57ae531cca2b297c13bd065552c0cfa6e2ca8fbe0e64aabfa575dbe0069

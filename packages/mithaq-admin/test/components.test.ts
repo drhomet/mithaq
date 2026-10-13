@@ -10,7 +10,7 @@ import './tsx.ts'
 
 const { Form } = await import('../registry/form.tsx')
 const { List } = await import('../registry/list.tsx')
-const { ComponentsProvider, RouteError, checkComponents } = await import('../registry/components.tsx')
+const { ComponentsProvider, RouteError, cellFor, checkComponents } = await import('../registry/components.tsx')
 const { defaultComponents } = await import('../registry/default-components.tsx')
 type Components = import('../registry/components.tsx').Components
 type ControlsOf<L> = import('../registry/components.tsx').ControlsOf<L>
@@ -119,4 +119,35 @@ test('a kind whose own cell the map leaves out stops the start and the page, nam
   assert.throws(() => checkComponents({ client, components: { ...defaultComponents, controls } }), /components\.cells has no cell for kind "color", which swatches\.color is drawn with/)
   assert.throws(() => drawn(createElement(ComponentsProvider, { components: { ...defaultComponents, controls } }, listOf(kayan, [{ id: 's1', color: '#c0ffee' }]))), /components\.cells has no cell for "color", the kind of field "color"/)
   assert.match(drawn(createElement(ComponentsProvider, { components: { controls, cells } }, listOf(kayan, [{ id: 's1', color: '#c0ffee' }]))), /<span data-swatch="#c0ffee">/, 'the project\'s color cell draws the field')
+})
+
+test('a cell a list column or a leaf names, which the map does not carry, stops the start and the page, naming the screen, the node and the cell', () => {
+  const title = { name: 'title', kind: 'text', component: 'text', cell: 'text', rules: {} }
+  // A column naming its kind's own cell, which a kind no shipped cell draws may, and a leaf naming one on a record page.
+  const client = (cell: string) => ({
+    path: '/dashboard',
+    kayan: {
+      notes: {
+        name: 'notes',
+        fields: [title],
+        operations: [],
+        pages: {
+          list: { path: '/notes', page: { main: [{ list: { columns: [{ field: 'title', cell }] } }] } },
+          edit: { path: '/notes/:id', page: { main: [{ field: 'title', cell, readOnly: true }] } },
+        },
+      },
+    },
+  }) as unknown as Parameters<typeof checkComponents>[0]['client']
+  assert.throws(
+    () => checkComponents({ client: client('swatch'), components: defaultComponents }),
+    (error: Error) =>
+      /components\.cells has no cell "swatch", which screen \/dashboard notes page "list" list column "title" names/.test(error.message)
+      && /components\.cells has no cell "swatch", which screen \/dashboard notes page "edit" leaf "title" names/.test(error.message),
+  )
+  const cells = { ...defaultComponents.cells, swatch: ({ value }: CellProps) => String(value) }
+  assert.doesNotThrow(() => checkComponents({ client: client('swatch'), components: { ...defaultComponents, cells } }))
+  assert.doesNotThrow(() => checkComponents({ client: client('./src/ui/swatch.tsx#Swatch'), components: defaultComponents }), 'a ui() reference is drawn by the screen, not the map')
+  // Named, so never drawn as the field's own cell in its place.
+  assert.throws(() => cellFor({ cells: defaultComponents.cells, field: title, column: 'swatch' }), /components\.cells has no cell "swatch", which field "title" is drawn with/)
+  assert.equal(cellFor({ cells: defaultComponents.cells, field: title }), defaultComponents.cells.text, 'and the field\'s own cell stands where nothing is named')
 })

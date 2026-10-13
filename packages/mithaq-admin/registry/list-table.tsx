@@ -188,15 +188,16 @@ export function ListTable({
                     const Ref = refOf({ screen, place: 'cell', path: cellOf.get(field.name) ?? field.cell })
                     // An email cell is a mail link, and a link cannot sit in the row's link (`<a>` in `<a>` is a
                     // hydration error), so the linked column draws its text. Upload draws no anchor.
-                    const drawn = cellFor({ cells, field, column: cellOf.get(field.name) })
+                    // The screen's own component draws first, so the map is asked only for what it does not.
+                    const drawn = Ref && screen ? undefined : cellFor({ cells, field, column: cellOf.get(field.name) })
                     const Cell = drawn === cells.email && field === linked && opens ? cells.text : drawn
                     const untitled = field.name === kayan.useAsTitle && isUntitled({ kayan, row, locale })
                     const cell = untitled ? (
                       <span className="text-muted-foreground">{t('admin.untitled', 'Untitled') ?? 'Untitled'}</span>
-                    ) : Ref && screen ? (
-                      <Ref field={field} value={row[field.name]} row={row} />
-                    ) : (
+                    ) : Cell ? (
                       <Cell kayan={kayan} field={field} value={row[field.name]} t={t} locale={locale} titles={titles} />
+                    ) : (
+                      Ref && <Ref field={field} value={row[field.name]} row={row} />
                     )
                     return (
                       <TableCell key={field.name} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : undefined}>

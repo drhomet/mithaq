@@ -22,7 +22,7 @@ export const useListState = ({ docs, kayan, onQuery, query, run }: {
    * The refusal the last run answered with, drawn above the table, so a refused button that closed does not leave the page reading as changed.
    */
   const [refused, setRefused] = useState<unknown>(undefined)
-  const runOnRow = async (operation: string, input: Record<string, unknown>, refuse: (thrown: unknown) => void = setRefused) => {
+  const runOnRow = async ({ operation, input, refuse = setRefused }: { operation: string; input: Record<string, unknown>; refuse?: (thrown: unknown) => void }) => {
     setRunning(true)
     setRefused(undefined)
     try {
@@ -70,4 +70,4 @@ export const useListState = ({ docs, kayan, onQuery, query, run }: {
 
   return { refine, running, refusal: refusalKeyOf(refused), setRefused, runOnRow, selected, setSelected, rowIds, ticked, done, setDone }
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 7ccf45fd72ac2f8249128830e3897b088f183d052ab963b33929bb97b813a1e5
+// mithaq-admin a5b0579ead0ea90a1c1f8e4f767641c7e178a7af 1beefb9d3ce74d38ce6426279cae2d8f2017e1c3d53dcebf8a939df57750aa94

@@ -58,11 +58,17 @@ error. A kind the language declares needs its entry
 even when no kayan uses it, since the type reads the language and not the
 kayan. A kind drawn by a `ui()` reference needs a map entry too, because an
 operation's dialog, the upload dialog and a form drawn with no page draw it
-through the map.
+through the map. For the same reason the type does not see a cell that a list
+column or a leaf names on a kayan's page: a column naming its kind's own name
+(`{ field: 'color', cell: 'color' }` where the kind draws `text`) needs
+`cells.color` in the map without the type asking for it.
 
 Each app's `src/server.ts` checks every screen it serves against the map as it
 starts, through `checkComponents`, so a field whose kind has no control or no
-cell stops the start with the kind and the field named. A route that throws while drawing
+cell stops the start with the kind and the field named, and a cell a list
+column or a leaf names that the map does not carry stops it with the screen,
+the page, the node and the cell named. On the page, such a cell is an error and
+never the field's own cell in its place. A route that throws while drawing
 is replaced by `RouteError`, the router's `defaultErrorComponent`, and the shell
 around it stays.
 
