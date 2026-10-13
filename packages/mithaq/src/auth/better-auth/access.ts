@@ -33,6 +33,35 @@ export type BetterAuthAccessOptions<Roles extends SystemRoles, Table extends Row
   }
 
 /**
+ * The access target over Better Auth's own `member.role` and nothing else: a member holds the system
+ * roles its membership row names in that organization, comma-separated, and there is no custom role
+ * and no assignment table. It suits a project whose roles are the provider's owner, admin and member.
+ * The row is read from the store for the organization asked about, never off the session, so a
+ * membership elsewhere grants nothing here.
+ */
+export const memberRoleTarget = <const Roles extends SystemRoles, const Table extends RowTable, Actor>({
+  roles,
+  rolesOf,
+  access,
+}: Omit<AccessOptions<Roles, Table, Actor>, 'kayan'>): AccessTarget<Roles, Table, Actor> & { readonly type: 'memberRole' } => ({
+  capability: 'access',
+  type: 'memberRole',
+  roles,
+  ...(rolesOf ? { rolesOf } : {}),
+  access: (access ?? {}) as Table,
+  // Better Auth's own model and columns, which `mithaq rbac assign` reads under the same names.
+  reads: ['member'],
+  resolve: async ({ store, tenant, member, actor }) => {
+    if (!scoped(tenant) || !scoped(member)) return { permissions: [], roles: [] }
+    const found = await allRows({ store, kayan: 'member', where: { and: [{ organizationId: { equals: tenant } }, { userId: { equals: member } }] } })
+    // Split the way the provider's own owner checks split it: exact, untrimmed.
+    const slugs = [...new Set(found.docs.flatMap((row) => (typeof row.role === 'string' ? row.role.split(',').filter(Boolean) : [])))]
+    const { everything, keys } = systemKeys(roles, heldSlugs({ roles, rolesOf, slugs, actor }))
+    return { permissions: everything ? '*' : [...keys], roles: slugs }
+  },
+})
+
+/**
  * The access target over Better Auth's store: a custom role is an `organizationRole` row.
  * Read directly, not through `hasPermission`, whose cache never invalidates a narrowed role.
  */

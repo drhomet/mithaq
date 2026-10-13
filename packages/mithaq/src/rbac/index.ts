@@ -31,8 +31,8 @@ export type AccessTarget<
   Actor = unknown,
 > = {
   readonly capability: 'access'
-  /** `'rbac'` from `rbacTarget`, `'betterAuth'` from `betterAuthTarget`. */
-  readonly type?: 'rbac' | 'betterAuth'
+  /** `'rbac'` from `rbacTarget`, `'betterAuth'` from `betterAuthTarget`, `'memberRole'` from `memberRoleTarget`. */
+  readonly type?: 'rbac' | 'betterAuth' | 'memberRole'
   /** The system roles, which are also the names a row table may be keyed on. */
   readonly roles: Roles
   /** The slugs this actor is assigned, read from the trusted snapshot, so an actor naming its own roles is a claim. Absent is `user.roles`. */
