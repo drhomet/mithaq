@@ -194,6 +194,7 @@ export const eject = async (project: URL, name: string): Promise<number> => {
     console.error(`${refused.map((one) => one.target).join(', ')} resolves outside this project or the package, so nothing was written.`)
     return 1
   }
+  const ejected = ejectedFolders(installed.items, pathOf)
   for (const { source, path } of files as { source: URL; path: string }[]) {
     const at = new URL(path, project)
     const text = await readFile(source, 'utf8')
@@ -207,7 +208,9 @@ export const eject = async (project: URL, name: string): Promise<number> => {
         throw error
       },
     )
-    console.log(written ? `${path} is ejected. Edit it in place; delete it to draw mithaq-admin's again.` : `${path} is already ejected, so it was left as it is.`)
+    // A file the project always holds (the host, storage, a step) is never deleted: the app needs it.
+    const drawn = ejected.has(folderOf(path)) ? '; delete it to draw mithaq-admin\'s again' : ''
+    console.log(written ? `${path} is ejected. Edit it in place${drawn}.` : `${path} is already ejected, so it was left as it is.`)
   }
   for (const primitive of item.registryDependencies ?? []) {
     const path = pathOf(`@ui/${primitive}.tsx`)

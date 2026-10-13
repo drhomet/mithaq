@@ -264,7 +264,9 @@ test('eject refuses an unknown item by listing the items, and a word with an ite
 test('eject --prune deletes each unedited ejected piece, stale ones too, and never an edited, unmarked or project-root file', async (t) => {
   const root = await pieces()
   t.after(() => rm(root, { recursive: true, force: true }))
-  for (const name of ['copy', 'widget', 'list', 'probe']) await mithaq(root, 'eject', name)
+  for (const name of ['copy', 'widget', 'list']) await mithaq(root, 'eject', name)
+  // A file the project always holds is never deleted, so its eject says nothing of deleting it.
+  assert.equal((await mithaq(root, 'eject', 'probe')).stdout, 'src/rooted.ts is ejected. Edit it in place.\n')
   const at = (path: string) => new URL(path, root)
   await writeFile(at('src/components/mithaq/widget.ts'), `${await readFile(at('src/components/mithaq/widget.ts'), 'utf8')}// mine\n`)
   await write(root, 'src/components/mithaq/mine.ts', 'export const mine = 1\n')
