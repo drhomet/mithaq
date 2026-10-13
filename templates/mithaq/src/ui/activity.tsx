@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan, ComponentProps, Row } from 'mithaq/admin'
 import { useAccess, useClient, useKayan, useLocale, useRecord, useScreen, useUser } from 'mithaq/admin/react'
-import { empty } from '@asas/mithaq/mithaq/audit-sink.ts'
+import { empty } from '../mithaq/audit-sink.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

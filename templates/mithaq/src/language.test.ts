@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 
-test('the language imports no other package of the project, and no file outside its own package', async () => {
+test('the language imports no package of the project, itself and the asas among them, and no file outside its own package', async () => {
   const source = new URL('./', import.meta.url)
   const offending: string[] = []
   for (const file of await readdir(source, { recursive: true })) {
@@ -13,7 +13,8 @@ test('the language imports no other package of the project, and no file outside 
     const text = await readFile(new URL(file, source), 'utf8')
     for (const [, specifier] of text.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)) {
       const outside = specifier!.startsWith('.') && !new URL(specifier!, new URL(file, source)).href.startsWith(new URL('../', source).href)
-      if ((specifier!.startsWith('@asas/') && !specifier!.startsWith('@asas/mithaq')) || outside) offending.push(`${file}: ${specifier}`)
+      // Its own files by path, so the package never names itself, and the asas by neither its name nor a path.
+      if (specifier!.startsWith('@asas/') || specifier === 'asas' || specifier!.startsWith('asas/') || outside) offending.push(`${file}: ${specifier}`)
     }
   }
   assert.deepEqual(offending, [])
