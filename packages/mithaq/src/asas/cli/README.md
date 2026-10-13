@@ -218,7 +218,7 @@ The same command as `mithaq migrate`, above.
 
 ### `rbac assign`
 
-Gives a member a role inside one organization. The role must be one written in code, such as the tenant roles in `src/tenant-roles.ts`. It writes a `memberRoles` row in a transaction and an audit entry, then prints one JSON line naming the operating-system user who ran it.
+Gives a member a role inside one organization. The role must be one written in code, such as the tenant roles in `packages/mithaq/src/roles/tenant-roles.ts`. It writes a `memberRoles` row in a transaction and an audit entry, then prints one JSON line naming the operating-system user who ran it.
 
 | Flag | Meaning |
 | --- | --- |

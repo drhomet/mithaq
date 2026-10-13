@@ -24,7 +24,7 @@ export const testDatabase = (env: Readonly<Record<string, string | undefined>> =
   const port = searchParams.getAll('port').at(-1) || named || '5432'
   if ([new URL(devDatabaseUrl).port, '55439'].includes(port)) {
     throw new Error(
-      `Refusing to touch a database: DATABASE_URL names port ${port}, a dev database's (templates/asas/src/mithaq.ts devDatabaseUrl, or the study container on 55439). Point it at a throwaway database.`,
+      `Refusing to touch a database: DATABASE_URL names port ${port}, a dev database's (templates/mithaq/src/mithaq.ts devDatabaseUrl, or the study container on 55439). Point it at a throwaway database.`,
     )
   }
   const database = decodeURIComponent(pathname.slice(1))
