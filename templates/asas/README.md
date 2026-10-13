@@ -663,7 +663,7 @@ An ejected file is the project's own. A project edits it in place and never patc
 
 ### Add an add-on
 
-No command adds an add-on yet. Make two throwaway projects at your mithaq version, one with the add-on and one without, with `bun create mithaq` and the same other add-ons as yours; `git diff --no-index` between them shows exactly what the add-on brings: its feature folder, its own files, the dependency in `packages/asas/package.json`, and the lines it adds to the language, the asas and the tenant app's `copy.ts`. Copy those in, then run `bunx mithaq generate screens`, `bunx mithaq generate messages` and `bunx mithaq migrate --name add_<add-on>` from `packages/asas`. Adding `roles` also takes `default-member-roles.ts` out of `tenant-roles.ts`.
+No command adds an add-on yet. Make two throwaway projects at your mithaq version, one with the add-on and one without, with `bun create mithaq` and the same other add-ons as yours; `git diff --no-index` between them shows exactly what the add-on brings: its feature folder, its own files, the dependency in `packages/asas/package.json`, and the lines it adds to the language, the asas and the tenant app's `copy.ts`. Copy those in, then run `bunx mithaq generate screens`, `bunx mithaq generate messages` and `bunx mithaq migrate --name add_<add-on>` from `packages/asas`. Adding `roles` also takes `default-member-roles.ts` out of `tenant-roles.ts`, and leaves each organization's Better Auth admins and members with no keys until someone assigns them a role; owners keep every key through `administrator`.
 
 ### Tests
 
