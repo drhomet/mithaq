@@ -317,7 +317,7 @@ packages/mithaq/
 
 Better Auth's organization routes let any member read every member. The setup gates them by this project's keys, in the active organization alone: `list-members`, and `get-active-member-role` with a `userId`, need `member.find`; `list-invitations` needs `invitation.create`; `get-full-organization` answers the organization to every member, with its `members` empty without `member.find` and its `invitations` empty without `invitation.create`. Only the `administrator` role (and, without the roles add-on, `owner` and `admin`) holds `member.find`, and the Members page is served on it.
 
-`organizationLimits` in the same file sets the provider's limits rather than leaving its defaults: a person founds organizations (sign-up founds each person's own) only while they belong to fewer than five, an organization holds up to 10,000 members and 1,000 pending invitations, and the Members page reads every member a page at a time.
+`organizationLimits` in the same file sets the provider's limits rather than leaving its defaults: a person founds organizations (sign-up founds each person's own) only while they belong to fewer than five, an organization holds up to 10,000 members and 1,000 pending invitations, and the Members page reads every member a page at a time. A new session opens in the person's oldest membership, and leaving the active organization opens the next oldest.
 
 **Access and roles.**
 

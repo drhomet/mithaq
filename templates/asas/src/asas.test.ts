@@ -6751,6 +6751,32 @@ test('226h. an organization takes and lists members past the provider\'s silent 
   assert.deepEqual([listed.members.length, listed.total], [102, 102], 'the hundred-and-second member is taken and listed')
 })
 
+test('226g. a new session opens in the person\'s oldest membership, and leaving the active organization opens the next oldest rather than none', async () => {
+  const owners = await Promise.all(['one', 'two', 'three'].map((n) => signedUp(`owner-226g-${n}`)))
+  const ids = await Promise.all(owners.map(async (owner, at) => (await server.api.createOrganization({ body: { name: `Joined 226g ${at}`, slug: `joined-226g-${at}` }, headers: owner.headers }))!.id as string))
+  const person = await signedUp('person-226g')
+  for (const id of ids) await server.api.addMember({ body: { userId: person.id, organizationId: id, role: 'member' } })
+  // Joined in the order the rows were written, the last of them first in time.
+  for (const [at, when] of [[0, '2021-01-01'], [1, '2022-01-01'], [2, '2020-01-01']] as const) {
+    await db.execute(`update member set created_at = '${when}' where user_id = '${person.id}' and organization_id = '${ids[at]}'`)
+  }
+  const signIn = async () => {
+    const answer = await server.api.signInEmail({ body: { email: 'person-226g@example.com', password: 'a-long-enough-password' }, returnHeaders: true })
+    return new Headers({ cookie: answer.headers.get('set-cookie') ?? '' })
+  }
+  const active = async (headers: Headers) => ((await server.api.getSession({ headers, query: { disableRefresh: true } })) as { session: { activeOrganizationId?: string | null } }).session.activeOrganizationId
+  const headers = await signIn()
+  assert.equal(await active(headers), ids[2], 'the oldest membership is active')
+  assert.equal(await active(await signIn()), ids[2], 'on every sign-in')
+  const left = await asas.handler(new Request('http://test/api/auth/user/organization/leave', {
+    method: 'POST',
+    headers: { cookie: headers.get('cookie') ?? '', 'content-type': 'application/json', origin: 'http://localhost:5173' },
+    body: JSON.stringify({ organizationId: ids[2] }),
+  }))
+  assert.equal(left.status, 200, await left.clone().text())
+  assert.equal(await active(headers), ids[0], 'leaving it opens the next oldest')
+})
+
 test('229a. over asas.handler an invitation is accepted only by the person signed in under its address, verified or not, makes them a member with that organization active, and is refused once accepted, cancelled or expired', async () => {
   const owner = await signedUp('owner-229a')
   const made = await server.api.createOrganization({ body: { name: 'Tenant 229a', slug: 'tenant-229a' }, headers: owner.headers })

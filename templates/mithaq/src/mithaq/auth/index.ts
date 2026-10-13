@@ -284,6 +284,15 @@ const roleWrites = new Map([
   ['/organization/delete-role', 'ac.delete'],
 ])
 type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
+type Members = { findMany<Row>(query: { model: string; where: { field: string; value: string }[]; limit: number; sortBy: { field: string; direction: 'asc' | 'desc' } }): Promise<Row[]> }
+/**
+ * The organization a session opens in when nothing names one: the person's oldest membership,
+ * usually the one they founded, so every sign-in lands in the same place.
+ */
+const oldestMembership = async ({ adapter, user }: { adapter: Members; user: string }) => {
+  const [oldest] = await adapter.findMany<{ organizationId: string }>({ model: 'member', where: [{ field: 'userId', value: user }], limit: 1, sortBy: { field: 'createdAt', direction: 'asc' } })
+  return oldest?.organizationId
+}
 // The provider's member reads take the organization by `organizationId` or by `organizationSlug`,
 // the slug winning, so both are compared with the active organization.
 const sameOrganizationNamed = async (ctx: HookContext) => {
@@ -373,6 +382,13 @@ export const platformAudit = {
       const holds = (key: string) => gate(key)({ organization: full }).then(() => true, () => false)
       const [mayInvite, mayList] = [await holds('invitation.create'), await holds('member.find')]
       if (!mayInvite || !mayList) return ctx.json({ ...full, ...(mayInvite ? {} : { invitations: [] }), ...(mayList ? {} : { members: [] }) })
+    }
+    // Leaving the active organization leaves the session in none, where every read is refused,
+    // so it opens the person's oldest remaining membership, as a new session would.
+    const leaving = ctx.context.session
+    if (ctx.path === '/organization/leave' && leaving && !(ctx.context.returned instanceof Error) && leaving.session.activeOrganizationId === (ctx.body as { organizationId?: unknown } | undefined)?.organizationId) {
+      const next = await oldestMembership({ adapter: ctx.context.adapter as unknown as Members, user: leaving.user.id })
+      if (next) await ctx.context.internalAdapter.updateSession(leaving.session.token, { activeOrganizationId: next })
     }
     if (!audited(ctx.path) || ctx.context.returned instanceof Error) return
     const caller = callers.get(ctx.context)
@@ -520,7 +536,7 @@ export const options = {
   hooks: platformAudit,
   // The active organization, set where the session is made. Every row this project reads is keyed
   // on it and the provider sets it only when an organization is created, so a user who signed in
-  // held none and was refused every read. The user's first membership becomes active on a session
+  // held none and was refused every read. The user's oldest membership becomes active on a session
   // that names none; a session that names one is left alone.
   //
   // The read goes through `getCurrentAdapter`, the transaction's adapter where the provider opened
@@ -534,8 +550,8 @@ export const options = {
           context: { context: { adapter: { findOne: <Row>(query: { model: string; where: { field: string; value: string }[] }) => Promise<Row | null> } } } | null,
         ) => {
           if (session.activeOrganizationId || !context) return
-          const member = await (await getCurrentAdapter(context.context.adapter as never)).findOne<{ organizationId: string }>({ model: 'member', where: [{ field: 'userId', value: session.userId }] })
-          return member ? { data: { ...session, activeOrganizationId: member.organizationId } } : undefined
+          const organization = await oldestMembership({ adapter: await getCurrentAdapter(context.context.adapter as never), user: session.userId })
+          return organization ? { data: { ...session, activeOrganizationId: organization } } : undefined
         },
       },
     },
