@@ -1,38 +1,42 @@
 # Working in a mithaq project
 
-This project is built on mithaq. Each data type is a kayan (an entity), declared once with `defineKayan`; its table, input schema, operations, access and admin pages all follow from that one declaration. The arkan (singular rukn, a pillar) in `src/mithaq.ts` bring the kinds and rules a field can use. `buildAsas` in `src/asas.ts` builds the asas, the runtime that serves every kayan.
+This project is built on mithaq. Each data type is a kayan (an entity), declared once with `defineKayan`; its table, input schema, operations, access and admin pages all follow from that one declaration. The arkan (singular rukn, a pillar) in the language, `packages/mithaq/src/mithaq.ts`, bring the kinds and rules a field can use. `buildAsas` in `packages/asas/src/asas.ts` builds the asas, the runtime that serves every kayan.
 
-Run every command below from `templates/asas/` unless it says otherwise. `README.md` beside this file is the full guide, with the steps and examples behind each section here.
+Run every `mithaq` command from `packages/asas/` unless it says otherwise. `README.md` beside this file is the full guide, with the steps and examples behind each section here. In a project made with `--layout single`, every folder below is one package: `packages/mithaq/src/` and `packages/asas/src/` are both `src/`, and `packages/features/<feature>/` is `src/features/<feature>/`.
 
 ## Where things go
 
-- `src/mithaq.ts`: the language, its targets and screens. It exports `defineKayan`, `defineGlobal`, `buildAsas` and the tenant field `organization`.
-- `src/asas.ts`: the build. Every kayan is listed in `kayan`, every global in `global`.
-- `src/<kayan>/<kayan>.ts`: one folder per kayan, with any page pieces only it draws in `src/<kayan>/ui/`.
-- `src/tenant-roles.ts`: the roles every organization gets and the permission keys each holds.
-- `src/steps/` and `src/storage/`: a write step and storage adapters ejected from `mithaq-admin`. They are this project's files.
-- `src/kayan/auth/`: the Better Auth kayan, written by `mithaq generate auth`.
-- `src/messages/`: one copy file per kayan, which `mithaq generate messages` fills with missing keys. Translate in place.
-- `src/migrations/`: migrations written by `mithaq migrate`. Commit them.
-- `../auth/`: the Better Auth setup, imported as `@asas/auth`.
-- `../../apps/asas-tanstack/`: the tenant app, serving `/dashboard` and `/portal`. `../../apps/asas-platform/`: the platform console for staff across every organization.
+The project is three steps, each named after what it holds, and each imports only the steps before it.
+
+1. **The language**, `packages/mithaq` (`@asas/mithaq`). `src/mithaq.ts` declares it with `defineMithaq`, with its targets and screens, and exports `defineKayan`, `defineGlobal`, `buildAsas` and the tenant field `organization`. Beside it sits everything the language or more than one feature reads:
+   - `src/mithaq/auth/`: the Better Auth setup, imported as `@asas/mithaq/auth`.
+   - `src/mithaq/pages.ts`, `audit-sink.ts` and `rich-text-nodes.ts`: the page trees every kayan page starts from, the audit sink and the rich-text nodes.
+   - `src/roles/`: `tenant-roles.ts`, the roles every organization gets and the permission keys each holds, and the access rows and grants beside it.
+   - `src/ui/`: the shells, layouts and pieces several screens draw.
+   - `src/steps/` and `src/storage/`: a write step and storage adapters ejected from `mithaq-admin`. They are this project's files.
+2. **The features**, `packages/features/<feature>` (`@asas/<feature>`), each holding one or more kayan. `index.ts` exports the feature's `kayan` list (and `global`, for a single-row kayan). Each kayan has a folder of its own, `<kayan>/<kayan>.ts`, with any page pieces only it draws in `<kayan>/ui/`; a child kayan is a sibling folder in its feature, never nested. `auth/user/` holds the Better Auth kayan, written by `mithaq generate auth`.
+3. **The asas**, `packages/asas` (`asas`). `src/asas.ts` is the build: it spreads each feature's `kayan` into `buildAsas`. Beside it are each screen's own pieces (`src/ui-dashboard/`, `src/ui-portal/`, `src/ui-platform/`), `src/messages/` (one copy file per kayan, which `mithaq generate messages` fills with missing keys; translate in place), `src/migrations/` (written by `mithaq migrate`; commit them) and `src/seed.ts`.
+
+A feature reaches another feature's kayan by its name (`relationTo: 'user'`) or through that feature's `index.ts`, never an inner file. The language never imports a feature or the asas.
+
+`apps/asas-tanstack/` is the tenant app, serving `/dashboard` and `/portal`; `apps/asas-platform/` is the platform console for staff across every organization. Both import the asas alone.
 
 ## Adding a kayan
 
-Copy `src/tags/tags.ts`; `src/courses/courses.ts` shows custom operations and steps.
+Copy `packages/features/tags/`; `packages/features/courses/courses/courses.ts` shows custom operations and steps.
 
-1. Write `src/<name>/<name>.ts` with `defineKayan` from `../mithaq.ts`. Spread `defaultFields` (id, createdAt, updatedAt) into `fields`, and `defaultOperations` into `targets.service.operations`, leaving out any operation the kayan should not have. Give every label and message one string per locale (`en` and `ar`).
+1. Write `<name>/<name>.ts` in the feature it belongs to, or in a new feature `packages/features/<feature>/` with a `package.json` like `tags`' and an `index.ts`. Import `defineKayan` from `@asas/mithaq`. Spread `defaultFields` (id, createdAt, updatedAt) into `fields`, and `defaultOperations` into `targets.service.operations`, leaving out any operation the kayan should not have. Give every label and message one string per locale (`en` and `ar`).
 2. Place `organization` in `fields` when each row belongs to one organization. Leave it out for a kayan every organization shares.
-3. Add the kayan to `kayan` in `src/asas.ts`.
-4. Grant its keys (`<name>.find`, `<name>.create`, `<name>.fields.<field>` and so on) to the roles that use it in `src/tenant-roles.ts`.
-5. To draw it, add it to a screen's `kayan` list in `src/mithaq.ts`, describe its pages under `targets.dashboard` in the kayan, and run `bunx mithaq generate screens`.
+3. Add the kayan to its feature's `kayan` list. A new feature is a dependency of `packages/asas/package.json`, and its `kayan` is spread into `buildAsas` in `src/asas.ts`.
+4. Grant its keys (`<name>.find`, `<name>.create`, `<name>.fields.<field>` and so on) to the roles that use it in `packages/mithaq/src/roles/tenant-roles.ts`.
+5. To draw it, add it to a screen's `kayan` list in `packages/mithaq/src/mithaq.ts`, describe its pages under `targets.dashboard` in the kayan, and run `bunx mithaq generate screens`.
 6. Run `bunx mithaq generate messages` and fill any empty translation it adds.
 7. Write the migration: `bunx mithaq migrate --name add_<name>`. Commit the folder it writes.
 8. Run `bunx mithaq generate --check`.
 
 ## The tenant field
 
-A kayan that places `organization` is per-organization, and mithaq core enforces it on every managed read and write; nothing in the project can turn it off. The scope is the signed-in session's verified active organization. A create fills `organization` from the session, so a caller or a step never sets it, and it never changes. Another organization's row answers like a missing one. Raw SQL through `ctx.tx` is not scoped: filter by organization there yourself. Write the field as `organization` from `src/mithaq.ts`; a look-alike field that is not bound is refused.
+A kayan that places `organization` is per-organization, and mithaq core enforces it on every managed read and write; nothing in the project can turn it off. The scope is the signed-in session's verified active organization. A create fills `organization` from the session, so a caller or a step never sets it, and it never changes. Another organization's row answers like a missing one. Raw SQL through `ctx.tx` is not scoped: filter by organization there yourself. Write the field as `organization` from `@asas/mithaq`; a look-alike field that is not bound is refused.
 
 On a per-organization kayan, `rules: { unique: true }` means unique within each organization, and `{ within: 'organization', unique: [...], index: [...] }` in `indexes` builds indexes led by the organization. A plain `{ fields, unique: true }` entry is unique across every organization.
 
@@ -48,11 +52,11 @@ Reads that reach further (`tenant: 'mine' | 'all'`), what is refused, and the in
   node "$DRIZZLE_KIT" migrate --config src/migrations/drizzle.config.ts
   ```
 - When a change would lose data, `mithaq migrate` stops and asks for an answer in `mithaq.hints.json`. A drop deletes rows: ask the developer before you write one.
-- In production `connect()` checks for pending migrations, as `prodMigrations` in `src/mithaq.ts` says: `pending: 'refuse'` refuses to start, `pending: 'run'` applies them under a lock. `drizzle-kit migrate` run by hand takes no lock, so never run it while an app is starting. See `README.md`, "Running in production", and [Migrations in production](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/drizzle/README.md).
+- In production `connect()` checks for pending migrations, as `prodMigrations` in `packages/mithaq/src/mithaq.ts` says: `pending: 'refuse'` refuses to start, `pending: 'run'` applies them under a lock. `drizzle-kit migrate` run by hand takes no lock, so never run it while an app is starting. See `README.md`, "Running in production", and [Migrations in production](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/drizzle/README.md).
 
 ## Rules
 
-- The vocabulary of `defineMithaq` in `src/mithaq.ts` (its locales, kinds, rules, target names and capabilities, and root keys) changes only when the developer asks for that change. When a task needs it, tell the developer what and why first. If the project has a `mithaq.lock`, `mithaq lock` shows a popup the developer approves; never edit the lock by hand. Everything in `defineKayan`, `defineGlobal` and `buildAsas` is yours to change.
+- The vocabulary of `defineMithaq` in `packages/mithaq/src/mithaq.ts` (its locales, kinds, rules, target names and capabilities, and root keys) changes only when the developer asks for that change. When a task needs it, tell the developer what and why first. If the project has a `mithaq.lock`, `mithaq lock` shows a popup the developer approves; never edit the lock by hand. Everything in `defineKayan`, `defineGlobal` and `buildAsas` is yours to change.
 - A file whose first line reads ``// Written by `mithaq <command>` `` is regenerated by that command, never edited.
 - The admin's pieces come from the `mithaq-admin` package. Replace a control, cell or node in the components map (`src/components.ts` in each app); to change another piece, `bunx mithaq eject <item>` in the app writes it into `src/components/mithaq/`, drawn in place of the package's. A file ejected from `mithaq-admin` ends with a `// mithaq-admin` marker line. It is this project's: edit it in place. After you update mithaq and mithaq-admin together, `bunx mithaq upgrade --check` names each file that differs; merge an edited one by hand.
 - A function the project writes takes one object once it has three or more parameters. Steps keep `(ctx, tools)`.

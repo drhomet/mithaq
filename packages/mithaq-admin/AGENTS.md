@@ -13,7 +13,7 @@ This package ships the admin's pieces as TSX source, published as `@drhomet/mith
 
 1. Edit the source in `registry/`. A piece imports a sibling as `mithaq-admin/<file>`, never by a relative path, so a project's ejected copy of the sibling is drawn in its place.
 2. Run `bun run test`. The apps import the pieces from this package, so they draw the change at once.
-3. A file the apps or the template always hold (`registry/host/`, `registry/storage/`, `registry/steps/`, `registry/ui/directional-icon.tsx`) is ejected again where it lives: delete the old file and run `node ../../packages/mithaq/src/asas/cli/mithaq.ts eject <item>` in `apps/asas-tanstack`, `apps/asas-platform` (the host, less the files it deleted) or `templates/asas` (storage and the step). `test/render.test.ts` fails when one differs from its source, and `apps/screens-host.test.ts` rebuilds each app from the host item.
+3. A file the apps or the template always hold (`registry/host/`, `registry/storage/`, `registry/steps/`, `registry/ui/directional-icon.tsx`) is ejected again where it lives: delete the old file and run `node ../../packages/mithaq/src/asas/cli/mithaq.ts eject <item>` in `apps/asas-tanstack`, `apps/asas-platform` (the host, less the files it deleted) or `templates/mithaq` (storage and the step). `test/render.test.ts` fails when one differs from its source, and `apps/screens-host.test.ts` rebuilds each app from the host item.
 
 Never hand-edit a file the apps or the template hold from this package. A user's project may edit its own; here they must equal the source.
 

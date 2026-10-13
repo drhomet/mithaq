@@ -22,13 +22,13 @@ The name is Arabic for a covenant. The other words in the API are Arabic too, an
 bun create mithaq my-app
 ```
 
-This creates a Bun workspace with the template (`templates/asas`), its Better Auth setup (`templates/auth`), and two apps: the tenant app (`apps/asas-tanstack`), which serves the dashboard and the portal, and the platform console (`apps/asas-platform`), for staff who work across every organization. It writes a `.env` with fresh secrets and runs `bun install`.
+This creates a Bun workspace of the template's three steps, the language (`packages/mithaq`), a package per feature (`packages/features/*`) and the asas that builds them (`packages/asas`), and two apps: the tenant app (`apps/asas-tanstack`), which serves the dashboard and the portal, and the platform console (`apps/asas-platform`), for staff who work across every organization. It writes a `.env` with fresh secrets and runs `bun install`.
 
-Then, with PostgreSQL 15 or later serving the database that `DATABASE_URL` names in `templates/asas/.env`:
+Then, with PostgreSQL 15 or later serving the database that `DATABASE_URL` names in `packages/asas/.env`:
 
 ```sh
 cd my-app
-cd templates/asas
+cd packages/asas
 # push the schema once, development only
 bun -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"
 cd ../..
@@ -36,7 +36,7 @@ bun run --cwd apps/asas-tanstack dev   # the tenant app, http://localhost:5173
 bun run --cwd apps/asas-platform dev   # in a second terminal: the platform console, http://localhost:5174
 ```
 
-Sign up `admin@admin.com` with the organization "Admin org", then run `bun run seed` in `templates/asas`.
+Sign up `admin@admin.com` with the organization "Admin org", then run `bun run seed` in `packages/asas`.
 
 In production, `connect()` does not push the schema; it checks the migration files instead. [Running in production](https://github.com/drhomet/mithaq/blob/main/templates/asas/README.md#running-in-production) explains how to apply them.
 

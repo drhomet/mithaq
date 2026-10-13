@@ -54,7 +54,7 @@ words kayan, rukn, asas, target or operation are new.
    `mithaq migrate` to add the column.
 
 Where it lives: `packages/mithaq/src/auth/better-auth/tenant.ts`
-`betterAuthTenant`; the template's setup is `templates/asas/src/mithaq.ts`
+`betterAuthTenant`; the template's setup is `templates/mithaq/src/mithaq.ts`
 `serverTargets`.
 
 ## The field and its binding
@@ -231,8 +231,8 @@ The template does it like this:
 - The rows give every platform role `read: true` and `false` for every write,
   so staff read every organization's rows and write none.
 
-Where it lives: `templates/auth/src/index.ts` `asPlatform` and `onPlatform`;
-`templates/asas/src/tenant-access.ts` `assignedRoles` and `platformReads`;
+Where it lives: `templates/mithaq/src/mithaq/auth/index.ts` `asPlatform` and `onPlatform`;
+`templates/mithaq/src/roles/tenant-access.ts` `assignedRoles` and `platformReads`;
 `apps/asas-platform/src/screens.tsx` `inProcess`.
 
 ## Unique values and indexes
@@ -313,7 +313,7 @@ A shared kayan's files belong to no organization, whichever session uploads
 them.
 
 Where it lives: `packages/mithaq/src/storage/storage.ts` `signReference`,
-`checkReference` and `resolveStorage`; `templates/asas/src/storage/defaults.ts`
+`checkReference` and `resolveStorage`; `templates/mithaq/src/storage/defaults.ts`
 `defaultKey`.
 
 ## Globals
@@ -343,7 +343,7 @@ export const settings = defineGlobal({
 
 `buildAsas` refuses the field without `unique`, a `unique` `globalType`, and a
 global that drops the unique index over the field alone. The template's global
-is `templates/asas/src/settings/settings.ts` `settings`.
+is `templates/features/settings/settings/settings.ts` `settings`.
 
 ## What is refused
 
@@ -402,7 +402,7 @@ whoever writes them scopes them:
 - **Raw SQL through `ctx.tx`.** A step's `ctx.tx` is the store's own
   transaction, and a query through it sees every organization. Name the
   organization in the query yourself. The template's
-  `templates/asas/src/member-roles/member-roles.ts` `managerRemains` does it:
+  `templates/features/roles/member-roles/member-roles.ts` `managerRemains` does it:
 
   ```ts
   const tx = ctx.tx as NodePgDatabase

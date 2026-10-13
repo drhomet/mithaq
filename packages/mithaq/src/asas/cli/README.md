@@ -1,9 +1,9 @@
 # The `mithaq` command
 
-`mithaq` is the command-line tool that ships with the package. It reads the project it is run from, so run every command from the folder that holds `src/mithaq.ts` and `src/asas.ts`. In a project made by `bun create mithaq`, that folder is `templates/asas`.
+`mithaq` is the command-line tool that ships with the package. It reads the project it is run from, so run every command from the folder that holds `src/mithaq.ts` and `src/asas.ts`. In a project made by `bun create mithaq`, that folder is `packages/asas`, whose `src/mithaq.ts` re-exports the language from `packages/mithaq`; in a single package it is the package's root.
 
 ```sh
-cd templates/asas
+cd packages/asas
 bunx mithaq --help
 ```
 
@@ -23,17 +23,17 @@ Every command except `lock` and `generate --check` first checks `mithaq.lock`. I
 
 ## `generate auth`
 
-Writes one kayan file for each table Better Auth uses, plus an `index.ts` barrel that groups them by plugin. A kayan is an entity: one data type with its fields, access and operations. Run it after you change the Better Auth plugins in `templates/auth/src/index.ts`.
+Writes one kayan file for each table Better Auth uses, plus an `index.ts` barrel that groups them by plugin. A kayan is an entity: one data type with its fields, access and operations. Run it after you change the Better Auth plugins in `packages/mithaq/src/mithaq/auth/index.ts`.
 
-It reads three keys from `generate` in `src/mithaq.ts`:
+It reads three keys from `generate` in `src/mithaq.ts`, each written from the folder the command runs in:
 
-- `auth`: the folder to write into. The template sets `'src/kayan/auth/'`.
-- `language`: the module each generated kayan imports `defineKayan` from, written as given: a package name, or a path relative to a generated file. The template sets `'../../../mithaq.ts'`.
-- `providers`: the module that exports `providers`, the Better Auth instances. The template sets `'@asas/auth'`.
+- `auth`: the folder to write into. The template sets `'../features/auth/'`, the auth feature beside the asas.
+- `language`: the module each generated kayan imports `defineKayan` from, written as given: a package name, or a path relative to a generated file. The template sets `'@asas/mithaq'`, and a single package `'../../../mithaq.ts'`.
+- `providers`: the module that exports `providers`, the Better Auth instances. The template sets `'@asas/mithaq/auth'`.
 
 It refuses when `language` or `providers` is missing or cannot be found from a generated file.
 
-It writes a subfolder for each provider, such as `src/kayan/auth/user/`. It never overwrites or deletes a file that lacks its header comment.
+It writes a subfolder for each provider, such as `../features/auth/user/`. It never overwrites or deletes a file that lacks its header comment.
 
 | Flag | Meaning |
 | --- | --- |
@@ -198,7 +198,7 @@ A project holds the files it ejected and the ones that are always its own: the s
 - outside: the path resolves outside the project or the package, so it was not read;
 - removed: the package no longer has the item, so delete the file.
 
-It reads `components.json` in the current folder, so run it in each folder that has one: `templates/asas`, `apps/asas-tanstack` and `apps/asas-platform`. It never writes. `--check` is required.
+It reads `components.json` in the current folder, so run it in each folder that has one: `packages/mithaq`, `apps/asas-tanstack` and `apps/asas-platform`. It never writes. `--check` is required.
 
 Exit codes: 0 when nothing differs or there is nothing to check, and 1 when any file differs.
 
