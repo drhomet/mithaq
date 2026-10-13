@@ -26,7 +26,6 @@ import {
   base,
   defineMithaq,
   readForFile,
-  richText,
   sanitizeFilename,
   signReference,
   storage as storageRukn,
@@ -42,7 +41,7 @@ import {
   type StorageConfig,
   fetchHttp,
 } from 'mithaq'
-import { defaultNodes, UploadNode } from 'mithaq/rich-text'
+import { defaultNodes, richText, UploadNode } from 'mithaq/rich-text'
 import { markAuthActor } from '../../../../packages/mithaq/src/asas/actor.ts'
 import { memoryStore } from '../memory-store.ts'
 import { plainTarget } from '../standard-schema-target.ts'

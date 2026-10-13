@@ -14,7 +14,7 @@
     "./admin": "./src/screen/client.ts",
     "./admin/react": "./src/screen/react.ts",
     "./orpc": "./src/asas/http/orpc.ts",
-    "./rich-text": "./src/rich-text/rich-text.ts",
+    "./rich-text": "./src/rich-text/index.ts",
     "./targets": "./src/targets.ts",
     "./drizzle": "./src/drizzle/proxy/index.ts",
     "./drizzle/pg-core": "./src/drizzle/proxy/pg-core.ts",
@@ -48,7 +48,7 @@
       "./admin": "./dist/screen/client.js",
       "./admin/react": "./dist/screen/react.js",
       "./orpc": "./dist/asas/http/orpc.js",
-      "./rich-text": "./dist/rich-text/rich-text.js",
+      "./rich-text": "./dist/rich-text/index.js",
       "./targets": "./dist/targets.js",
       "./drizzle": "./dist/drizzle/proxy/index.js",
       "./drizzle/pg-core": "./dist/drizzle/proxy/pg-core.js",
@@ -60,29 +60,44 @@
   },
   "dependencies": {
     "@babel/helper-validator-identifier": "^8.0.4",
-    "@lexical/extension": "0.52.0",
-    "@lexical/link": "0.52.0",
-    "@lexical/list": "0.52.0",
-    "@lexical/rich-text": "0.52.0",
     "drizzle-kit": "1.0.0-rc.4",
     "drizzle-orm": "1.0.0-rc.4",
     "jose": "6.2.12",
-    "lexical": "0.52.0",
     "pg": "^8.16.3",
     "zod": "^4.6.5"
   },
   "peerDependencies": {
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
     "@orpc/openapi": "^1.15.1",
     "@orpc/server": "^1.15.1",
     "better-auth": "1.7.4",
+    "lexical": "0.52.0",
     "react": "^19.3.0",
     "vite": ">=8"
   },
   "peerDependenciesMeta": {
+    "@lexical/extension": {
+      "optional": true
+    },
+    "@lexical/link": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/rich-text": {
+      "optional": true
+    },
     "@orpc/openapi": {
       "optional": true
     },
     "@orpc/server": {
+      "optional": true
+    },
+    "lexical": {
       "optional": true
     },
     "react": {
@@ -93,8 +108,13 @@
     }
   },
   "devDependencies": {
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
     "@orpc/openapi": "1.15.1",
     "@orpc/server": "1.15.1",
+    "lexical": "0.52.0",
     "@types/pg": "^8.15.6",
     "better-auth": "1.7.4",
     "@types/react": "^19.3.0",

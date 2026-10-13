@@ -15,7 +15,6 @@ import {
   folderOf,
   rbacTarget,
   Refusal,
-  richText,
   screenTarget,
   serviceTarget,
   storage,
@@ -23,6 +22,7 @@ import {
   zodTarget,
   type CommandInput,
 } from 'mithaq'
+import { richText } from 'mithaq/rich-text'
 import { fileURLToPath } from 'node:url'
 import { auditSink } from './audit-log/sink.ts'
 import { richTextNodes } from './rich-text-nodes.ts'

@@ -6,7 +6,7 @@ import { AfterCommitError, AsasError, denied, invalid, missing } from './errors.
 import type { AdminAccess, FieldAccess, LocalesOf, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
 import { defaultKinds, type Kind } from '../../base/kinds.ts'
-import type { RichTextValue } from '../../rich-text/rich-text.ts'
+import type { RichTextValue } from '../../rich-text/value.ts'
 import type { Access } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
 import type { LanguageOf } from '../../mithaq/define.ts'

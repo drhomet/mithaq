@@ -29,7 +29,6 @@ import {
   drizzleKinds,
   drizzleRules,
   kind,
-  richText,
   storage,
   versions,
   versionsTarget,
@@ -88,6 +87,7 @@ import {
   fetchHttp,
 } from 'mithaq'
 import type { CompoundIndex } from 'mithaq'
+import { richText } from 'mithaq/rich-text'
 import type { RouterClient } from '@orpc/server'
 import type { FetchClient } from 'mithaq/admin'
 import { asas } from './asas.ts'

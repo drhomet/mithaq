@@ -321,7 +321,7 @@ The template's kayan are `courses`, `sessions`, `enrollments`, `tags`, `media`, 
 
 - `storage/index.ts` is the storage config. It names every function in `storage/defaults.ts`, and the adapters `local.ts`, `r2.ts`, `s3.ts` and `uploadthing.ts`. Those five files are ejected from the `mithaq-storage` item of `mithaq-admin` and end with a marker line.
 - `steps/expected-updated-at.ts` is ejected from the `mithaq-expected-updated-at` item.
-- `rich-text-nodes.ts` is the one list of rich-text nodes the server and every editor read.
+- `rich-text-nodes.ts` is the one list of rich-text nodes the server and every editor read. The `richText` rukn comes from `mithaq/rich-text` and the editor from `mithaq-admin/rich-text.tsx`, and only those two load Lexical, so its packages are listed in each `package.json` that uses them; `mithaq` itself installs none.
 
 **The rest.** `pages.ts` holds the page trees every kayan page starts from (`appPage`, `topPage`, `danger`, `platformList`, `platformRecord`). `platform-http.ts` is the one hand-written route, renaming an organization, which writes a Better Auth table no managed operation may write. `seed.ts` fills a database for a first look, run with `bun run seed`.
 

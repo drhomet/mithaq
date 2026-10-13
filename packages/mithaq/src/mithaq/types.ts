@@ -6,7 +6,7 @@ import type { StandardSchemaV1 } from './standard-schema.ts'
 import type { Rules } from '../base/rules.ts'
 import type { Rule, RuleValue } from '../base/rules.ts'
 import type { Kind, defaultKinds } from '../base/kinds.ts'
-import type { RichTextRead } from '../rich-text/rich-text.ts'
+import type { RichTextRead } from '../rich-text/value.ts'
 import type { ResolvedStorage } from '../storage/storage.ts'
 import type { RefOf, ScreenField, ScreenKeys } from '../screen/index.ts'
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { storedRichText } from '../rich-text/rich-text.ts'
+import { storedRichText } from '../rich-text/value.ts'
 import type { ResolvedField, RuntimeField } from '../mithaq/types.ts'
 import type { Derives, FieldsOf } from '../asas/runner/steps.ts'
 import type { SchemaTarget } from '../mithaq/language.ts'

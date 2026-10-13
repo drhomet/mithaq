@@ -23,7 +23,6 @@ import {
   defineRukn,
   fetchHttp,
   insert,
-  richText as richTextRukn,
   find,
   findOne,
   remove,
@@ -59,7 +58,7 @@ import { expectedUpdatedAt } from './steps/expected-updated-at.ts'
 // The comparison a version's merge makes, reached where it lives, since no public operation shows a
 // jsonb key order on its own.
 import { changedColumns } from '../../../packages/mithaq/src/versions/versions.ts'
-import { defaultNodes } from 'mithaq/rich-text'
+import { defaultNodes, richText as richTextRukn } from 'mithaq/rich-text'
 import { AutoLinkNode, CalloutNode } from '../../../packages/mithaq-admin/test/callout-node.ts'
 
 const allowAccess = { create: () => true, read: () => true, update: () => true, delete: () => true } as const

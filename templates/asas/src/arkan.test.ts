@@ -23,7 +23,6 @@ import {
   drizzleKinds,
   drizzleRules,
   kind,
-  richText,
   rule,
   screenKinds,
   screenTarget,
@@ -38,7 +37,7 @@ import {
   fetchHttp,
   type StandardSchemaV1,
 } from 'mithaq'
-import { defaultNodes } from 'mithaq/rich-text'
+import { defaultNodes, richText } from 'mithaq/rich-text'
 import { dashboardScreen } from './mithaq.ts'
 import { plainTarget } from './standard-schema-target.ts'
 import { storageConfig } from './storage/index.ts'
