@@ -38,9 +38,9 @@ import {
   type StandardSchemaV1,
 } from 'mithaq'
 import { defaultNodes, richText } from 'mithaq/rich-text'
-import { dashboardScreen } from './mithaq.ts'
+import { dashboardScreen } from '../../mithaq/src/mithaq.ts'
 import { plainTarget } from './standard-schema-target.ts'
-import { storageConfig } from './storage/index.ts'
+import { storageConfig } from '../../mithaq/src/storage/index.ts'
 
 /** The targets of a build that makes tables and never connects. */
 const offline = (kinds: Record<string, unknown> = drizzleKinds) => ({

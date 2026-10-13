@@ -15,7 +15,7 @@ const allowed: Record<string, string> = {
 }
 
 const files = process.argv.length > 2 ? process.argv.slice(2).map((file) => resolve(file)) : [
-  'packages/mithaq/src/**/*.{ts,tsx}', 'packages/mithaq-admin/registry/**/*.{ts,tsx}', 'templates/asas/src/**/*.{ts,tsx}',
+  'packages/mithaq/src/**/*.{ts,tsx}', 'packages/mithaq-admin/registry/**/*.{ts,tsx}', 'templates/*/src/**/*.{ts,tsx}', 'templates/features/**/*.{ts,tsx}',
 ].flatMap((pattern) => globSync(pattern, { cwd: root, exclude: (file) => /\.(test|probe|smoke|support)\.tsx?$|^packages\/mithaq-admin\/registry\/(ui|hooks|lib)\//.test(file) }))
   .map((file) => resolve(root, file))
 

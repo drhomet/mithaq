@@ -6,7 +6,7 @@
 import { useState, type ReactNode } from 'react'
 import { holds, type CellProps, type MenuProps, type Row } from 'mithaq/admin'
 import { useAccess, useLocale, useRecord, useUser } from 'mithaq/admin/react'
-import { platformRoles } from '@asas/auth/platform-roles'
+import { platformRoles } from '@asas/mithaq/auth/platform-roles'
 import { authArm } from '@/api.ts'
 import {
   AlertDialog,

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   // An alias rather than `resolve.tsconfigPaths`, which applies only to files the nearest
-  // tsconfig claims: the project's shells in `templates/asas/src` import `@/` too.
+  // tsconfig claims: the project's shells in the language package's `src/ui/` import `@/` too.
   // `^@/` and not `@`, so `@tanstack/*` is left alone.
   resolve: { alias: [{ find: /^@\//, replacement: fileURLToPath(new URL('./src/', import.meta.url)) }] },
   plugins: [

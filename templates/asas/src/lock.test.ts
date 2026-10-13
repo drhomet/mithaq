@@ -14,8 +14,8 @@ import { defaultNodes, richText as richTextRukn } from 'mithaq/rich-text'
 import { checkLock, formatLock, notice, run, sealLanguage, verifyLock, vocabularyOf, warnLock, type Lock, type Seal } from '../../../packages/mithaq/src/mithaq/lock.ts'
 import { receivedLanguage } from '../../../packages/mithaq/src/mithaq/language.ts'
 import { Refusal } from '../../../packages/mithaq/src/mithaq/refusal.ts'
-import { defineKayan } from './mithaq.ts'
-import { storageConfig } from './storage/index.ts'
+import { defineKayan } from '../../mithaq/src/mithaq.ts'
+import { storageConfig } from '../../mithaq/src/storage/index.ts'
 
 /** The project root, where the template's `mithaq.lock` sits. */
 const root = new URL('../', import.meta.url)
@@ -36,7 +36,7 @@ const project = async (at = '') => {
   const top = await mkdtemp(join(tmpdir(), 'mithaq-project-'))
   const dir = join(top, at)
   await mkdir(join(dir, 'src'), { recursive: true })
-  await writeFile(join(dir, 'src', 'mithaq.ts'), `export { defineKayan } from ${JSON.stringify(new URL('./mithaq.ts', import.meta.url).href)}\n`)
+  await writeFile(join(dir, 'src', 'mithaq.ts'), `export { defineKayan } from ${JSON.stringify(new URL('../../mithaq/src/mithaq.ts', import.meta.url).href)}\n`)
   const lockFile = join(dir, 'mithaq.lock')
   return {
     top,
@@ -135,7 +135,7 @@ test('the same language writes the same lock under Bun and Node', async () => {
   const script = [
     `const { receivedLanguage } = await import(${JSON.stringify(new URL('../../../packages/mithaq/src/mithaq/language.ts', import.meta.url).href)})`,
     `const { formatLock, vocabularyOf } = await import(${JSON.stringify(new URL('../../../packages/mithaq/src/mithaq/lock.ts', import.meta.url).href)})`,
-    `const { defineKayan } = await import(${JSON.stringify(new URL('./mithaq.ts', import.meta.url).href)})`,
+    `const { defineKayan } = await import(${JSON.stringify(new URL('../../mithaq/src/mithaq.ts', import.meta.url).href)})`,
     `process.stdout.write(formatLock({ language: vocabularyOf(receivedLanguage(defineKayan)), seal: 'pending' }))`,
   ].join('\n')
   const written = (program: string, argv: string[]) =>

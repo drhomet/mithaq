@@ -13,8 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { counted, formatDate } from 'mithaq-admin/format.tsx'
-import { AppShell } from '../ui/app-shell.tsx'
-import { KpiCard } from '../ui/kpi-card.tsx'
+import { AppShell } from '@asas/mithaq/ui/app-shell.tsx'
+import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
 
 const ranges = [7, 30, 90] as const
 type Range = (typeof ranges)[number]

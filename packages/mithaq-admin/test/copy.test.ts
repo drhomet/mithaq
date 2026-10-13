@@ -30,8 +30,8 @@ const { OperationButton } = await import('../registry/operation-button.tsx')
 const { RichTextViewer } = await import('../registry/rich-text.tsx')
 const { UploadDialog, typeName, typeNames } = await import('../registry/upload.tsx')
 const { List } = await import('../registry/list.tsx')
-const { RecordPage } = await import('../../../templates/asas/src/ui/record-page.tsx')
-const { AppShell } = await import('../../../templates/asas/src/ui/app-shell.tsx')
+const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
+const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
 const { scopes } = await import('../../../apps/asas-tanstack/src/copy.ts')
 
 const screen = asas.targets.dashboard.client

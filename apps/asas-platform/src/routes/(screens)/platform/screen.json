@@ -2,8 +2,8 @@
   "path": "/platform",
   "providers": [
     "./src/ui-dashboard/theme-provider.tsx#ThemeProvider",
-    "./src/ui/rich-text-nodes.tsx#RichTextNodes",
-    "./src/ui/session-labels.tsx#SessionLabels"
+    "@asas/mithaq:./src/ui/rich-text-nodes.tsx#RichTextNodes",
+    "@asas/courses:./enrollments/ui/session-labels.tsx#SessionLabels"
   ],
   "pages": {
     "home": {
@@ -74,9 +74,9 @@
     }
   ],
   "layouts": {
-    "app": "./src/ui/app-shell.tsx#PlatformShell",
+    "app": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
     "record": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
-    "table": "./src/ui/table-page.tsx#TablePage"
+    "table": "@asas/mithaq:./src/ui/table-page.tsx#TablePage"
   },
   "components": {},
   "controls": {
@@ -287,7 +287,7 @@
         "list": {
           "path": "/users",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -295,7 +295,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -349,7 +349,7 @@
         "view": {
           "path": "/users/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -568,7 +568,7 @@
         "list": {
           "path": "/organizations",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -576,7 +576,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -617,7 +617,7 @@
         "view": {
           "path": "/organizations/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -797,7 +797,7 @@
         "list": {
           "path": "/members",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -805,7 +805,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -852,7 +852,7 @@
         "view": {
           "path": "/members/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -1047,7 +1047,7 @@
             "ar": "لكل مقعد"
           },
           "component": "number",
-          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell"
+          "cell": "@asas/courses:./courses/ui/fee-cell.tsx#FeeCell"
         },
         {
           "name": "currency",
@@ -1414,7 +1414,7 @@
         "list": {
           "path": "/courses",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -1422,7 +1422,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -1439,7 +1439,7 @@
                         },
                         {
                           "field": "fee",
-                          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+                          "cell": "@asas/courses:./courses/ui/fee-cell.tsx#FeeCell",
                           "decided": "field"
                         },
                         {
@@ -1473,7 +1473,7 @@
         "view": {
           "path": "/courses/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -1970,7 +1970,7 @@
         "list": {
           "path": "/sessions",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -1978,7 +1978,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -2030,7 +2030,7 @@
         "view": {
           "path": "/sessions/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -2280,7 +2280,7 @@
           },
           "relationTo": "sessions",
           "component": "relationship",
-          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell"
+          "cell": "@asas/courses:./enrollments/ui/session-cell.tsx#SessionCell"
         },
         {
           "name": "student",
@@ -2355,7 +2355,7 @@
         "list": {
           "path": "/enrollments",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -2363,14 +2363,14 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
                       "columns": [
                         {
                           "field": "session",
-                          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell",
+                          "cell": "@asas/courses:./enrollments/ui/session-cell.tsx#SessionCell",
                           "decided": "field"
                         },
                         {
@@ -2405,7 +2405,7 @@
         "view": {
           "path": "/enrollments/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -2605,7 +2605,7 @@
         "list": {
           "path": "/tags",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -2613,7 +2613,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -2650,7 +2650,7 @@
         "view": {
           "path": "/tags/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -2869,7 +2869,7 @@
         "list": {
           "path": "/roles",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -2877,7 +2877,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -2909,7 +2909,7 @@
         "view": {
           "path": "/roles/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -2934,7 +2934,7 @@
                       {
                         "field": "permissions",
                         "component": "textArray",
-                        "cell": "./src/roles/ui/roles.tsx#Permissions",
+                        "cell": "@asas/roles:./roles/ui/roles.tsx#Permissions",
                         "decided": "table"
                       }
                     ]
@@ -3119,7 +3119,7 @@
         "list": {
           "path": "/member-roles",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -3127,7 +3127,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -3167,7 +3167,7 @@
         "view": {
           "path": "/member-roles/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -3476,7 +3476,7 @@
         "list": {
           "path": "/local-users",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}
@@ -3484,7 +3484,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -3554,7 +3554,7 @@
         "edit": {
           "path": "/local-users/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
             "header": [
               {
                 "title": {}

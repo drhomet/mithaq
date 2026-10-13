@@ -98,23 +98,23 @@ import { createAccessControl } from 'better-auth/plugins/access'
 import { adminAc, defaultStatements as adminStatements, userAc } from 'better-auth/plugins/admin/access'
 import { asas } from './asas.ts'
 import { pushInput } from '../../../packages/mithaq/src/drizzle/index.ts'
-import { storageConfig as templateStorage } from './storage/index.ts'
-import { accessTarget, dashboardScreen, dashboardUi, organization, platformScreen, portalScreen, portalUi, serverTargets as projectTargets, targets as languageTargets } from './mithaq.ts'
-import { asPlatform, authOptions, options, platformRoles, platformURL, providers } from '@asas/auth'
-import { secret, superAdminOnly } from '@asas/auth/platform-roles'
-import { localUsers } from './local-users/local-users.ts'
+import { storageConfig as templateStorage } from '../../mithaq/src/storage/index.ts'
+import { accessTarget, dashboardScreen, dashboardUi, organization, platformScreen, portalScreen, portalUi, serverTargets as projectTargets, targets as languageTargets } from '../../mithaq/src/mithaq.ts'
+import { asPlatform, authOptions, options, platformRoles, platformURL, providers } from '@asas/mithaq/auth'
+import { secret, superAdminOnly } from '@asas/mithaq/auth/platform-roles'
+import { localUsers } from '../../features/auth/local-users/local-users.ts'
 import { memoryStore, noRelationship } from './memory-store.ts'
 import { plainTarget } from './standard-schema-target.ts'
-import { assignedRoles, tenantAccess } from './tenant-access.ts'
+import { assignedRoles, tenantAccess } from '../../mithaq/src/roles/tenant-access.ts'
 import { testDatabase } from './test-database.ts'
-import { systemRoles, tenantRoles } from './roles.ts'
+import { systemRoles, tenantRoles } from '../../mithaq/src/roles/system-roles.ts'
 import { buildAsas as buildTestAsas, defineGlobal as defineTestGlobal, defineKayan as defineTestKayan, locales as declaredLocales, narrowed } from './test-language.ts'
-import { betterAuth as authKayan } from './kayan/auth/user/index.ts'
-import { courses as coursesDeclaration } from './courses/courses.ts'
-import { memberRoles } from './member-roles/member-roles.ts'
-import { roles } from './roles/roles.ts'
+import { betterAuth as authKayan } from '../../features/auth/user/index.ts'
+import { courses as coursesDeclaration } from '../../features/courses/courses/courses.ts'
+import { memberRoles } from '../../features/roles/member-roles/member-roles.ts'
+import { roles } from '../../features/roles/roles/roles.ts'
 
-const authDirectory = new URL('./kayan/auth/user/', import.meta.url)
+const authDirectory = new URL('../../features/auth/user/', import.meta.url)
 const authScreens = Object.fromEntries(
   Object.entries(languageTargets as Record<string, { capability?: unknown; kayan?: readonly string[] }>).flatMap(([name, target]) => (target.capability === 'screen' ? [[name, target.kayan ?? []]] : [])),
 )
@@ -602,7 +602,7 @@ const screen = (kayan: readonly string[], controls: Record<string, ScreenKind> =
     // `memberRoles.find` and the dashboard `courses.find`, keys only a build
     // holding those kayan can answer.
     pages: { dashboard: { path: '/', component: dashboardScreen.pages.dashboard!.component } },
-    components: { ...dashboardScreen.components, money: dashboardScreen.components.noCourses },
+    components: { ...dashboardScreen.components, money: dashboardScreen.components.activity },
   })
 
 const screened = (...kayan: string[]) => {
@@ -782,13 +782,13 @@ before(async () => {
 after(() => asas.destroy())
 
 test('1. the committed auth kayan are what the generator writes', async () => {
-  assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
+  assert.deepEqual(await generateAuth({ language: '@asas/mithaq', options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/mithaq/auth', screens: authScreens }), [])
 
   // Dropping every plugin drops the organization plugin's four tables and every column a
   // plugin adds to a table Better Auth ships, so the barrel and six files go stale.
   const withoutPlugins = { ...options, plugins: [] }
   assert.deepEqual(
-    await generateAuth({ options: withoutPlugins, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }),
+    await generateAuth({ language: '@asas/mithaq', options: withoutPlugins, directory: authDirectory, check: true, provider: 'user', providers: '@asas/mithaq/auth', screens: authScreens }),
     ['index.ts', 'invitation.ts', 'member.ts', 'organization.ts', 'organizationRole.ts', 'session.ts', 'user.ts'],
   )
 
@@ -797,8 +797,8 @@ test('1. the committed auth kayan are what the generator writes', async () => {
   const sibling = new URL('user-extras.ts', authDirectory)
   await writeFile(sibling, `export const useAsTitle = 'name'\n`)
   try {
-    assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: false, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
-    assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
+    assert.deepEqual(await generateAuth({ language: '@asas/mithaq', options, directory: authDirectory, check: false, provider: 'user', providers: '@asas/mithaq/auth', screens: authScreens }), [])
+    assert.deepEqual(await generateAuth({ language: '@asas/mithaq', options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/mithaq/auth', screens: authScreens }), [])
   } finally {
     await rm(sibling)
   }
@@ -2421,7 +2421,7 @@ test('13. the generator makes its directory, and never overwrites a file it did 
   try {
     // The directory a project points a generator at need not exist yet.
     const fresh = new URL('kayan/auth/', temporary)
-    assert.equal((await generateAuth({ options, directory: fresh })).length, 9)
+    assert.equal((await generateAuth({ language: '../../../mithaq.ts', options, directory: fresh })).length, 9)
 
     // A foreign key's column name is the snake case of the property name, and a
     // name that opens on a capital has nothing to break before it, so it gets no
@@ -2430,7 +2430,7 @@ test('13. the generator makes its directory, and never overwrites a file it did 
       ...options,
       user: { additionalFields: { AvatarId: { type: 'string', references: { model: 'user' } } } },
     }
-    await generateAuth({ options: capitalised as typeof options, directory: fresh })
+    await generateAuth({ language: '../../../mithaq.ts', options: capitalised as typeof options, directory: fresh })
     const written = await readFile(new URL('user.ts', fresh), 'utf8')
     assert.match(written, /AvatarId: \{ kind: 'relationship', relationTo: \(\) => user, dbName: 'avatar_id'/)
 
@@ -2441,14 +2441,14 @@ test('13. the generator makes its directory, and never overwrites a file it did 
     // removal, so a refused run leaves the directory exactly as it was.
     await writeFile(new URL('gone.ts', mine), `${header}\n`)
     await assert.rejects(
-      () => generateAuth({ options, directory: mine }),
+      () => generateAuth({ language: '../../../mithaq.ts', options, directory: mine }),
       /user\.ts was not written by/,
     )
     assert.deepEqual((await readdir(mine)).sort(), ['gone.ts', 'user.ts'])
 
     await writeFile(new URL('session.ts', mine), 'export const session = { mine: true }\n')
     await assert.rejects(
-      () => generateAuth({ options, directory: mine }),
+      () => generateAuth({ language: '../../../mithaq.ts', options, directory: mine }),
       /session\.ts, user\.ts were not written by/,
     )
   } finally {
@@ -11125,8 +11125,8 @@ const impersonate = async (headers: Headers, userId: string) => {
 
 test('126. the admin plugin adds its five columns to the generated kayan and to the committed migrations, and brings no table, so the barrel is unchanged', async () => {
   // The committed files are exactly what the generator writes from the options in
-  // @asas/auth, the admin plugin among them.
-  assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
+  // @asas/mithaq/auth, the admin plugin among them.
+  assert.deepEqual(await generateAuth({ language: '@asas/mithaq', options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/mithaq/auth', screens: authScreens }), [])
 
   const fieldsOf = (kayan: unknown) => Object.keys((kayan as { fields: Record<string, unknown> }).fields)
   for (const column of ['role', 'banned', 'banReason', 'banExpires']) {
@@ -12219,7 +12219,7 @@ test('181c. the platform app answers a person who holds no platform role exactly
 })
 
 test('142j. a production boot is refused without PLATFORM_URL, BETTER_AUTH_URL or BETTER_AUTH_SECRET, and a live host with no secret set is refused whatever NODE_ENV says', async () => {
-  const provider = new URL('../../auth/src/index.ts', import.meta.url).href
+  const provider = new URL('../../mithaq/src/mithaq/auth/index.ts', import.meta.url).href
   const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const { PLATFORM_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
     execFile(process.execPath, ['--input-type=module', '-e', `const { platformOrigins, platformURL, tenantURL, options } = await import(${JSON.stringify(provider)}); console.log(JSON.stringify({ platformOrigins, platformURL, tenantURL, trustedOrigins: options.trustedOrigins }))`], {
@@ -12261,7 +12261,7 @@ test('142j. a production boot is refused without PLATFORM_URL, BETTER_AUTH_URL o
 
 test('142k. a project that serves no platform console boots in production with BETTER_AUTH_URL and the secret alone', async (t) => {
   // The provider as `create-mithaq --no-platform` writes it, beside the original so it resolves the same packages.
-  const source = new URL('../../auth/src/', import.meta.url)
+  const source = new URL('../../mithaq/src/mithaq/auth/', import.meta.url)
   const copy = new URL(`.no-platform-${process.pid}/`, source)
   await mkdir(copy)
   t.after(() => rm(copy, { recursive: true, force: true }))
@@ -12314,7 +12314,7 @@ const providerUnder = async (env: Record<string, string>) => {
   const was = Object.fromEntries(Object.keys(env).map((key) => [key, vars[key]]))
   Object.assign(vars, env)
   try {
-    return (await import(`${new URL('../../auth/src/index.ts', import.meta.url).href}?${new URLSearchParams(env)}`)) as typeof import('@asas/auth')
+    return (await import(`${new URL('../../mithaq/src/mithaq/auth/index.ts', import.meta.url).href}?${new URLSearchParams(env)}`)) as typeof import('@asas/mithaq/auth')
   } finally {
     for (const [key, value] of Object.entries(was)) {
       if (value === undefined) delete vars[key]
@@ -12323,7 +12323,7 @@ const providerUnder = async (env: Record<string, string>) => {
   }
 }
 /** The platform app's first-register of `provider`, served by an instance built over this file's store. */
-const firstRegisterOf = (provider: typeof import('@asas/auth')) => {
+const firstRegisterOf = (provider: typeof import('@asas/mithaq/auth')) => {
   const built = provider.providers.user.server({ drizzle: asas.targets.drizzle as unknown as Parameters<typeof providers.user.server>[0]['drizzle'] })
   return firstRegisterAt((request) => provider.asPlatform(() => built.handler(request)), `${provider.platformURL}/api/auth`)
 }
@@ -12451,13 +12451,13 @@ test('142q. with no TRUSTED_IP_HEADER an x-forwarded-for a caller writes buys no
 
 test('142o. a project with no platform console has no first-register and no init', async (t) => {
   // The provider as `create-mithaq --no-platform` writes it, beside the original so it resolves the same packages.
-  const source = new URL('../../auth/src/', import.meta.url)
+  const source = new URL('../../mithaq/src/mithaq/auth/', import.meta.url)
   const copy = new URL(`.no-platform-first-${process.pid}/`, source)
   await mkdir(copy)
   t.after(() => rm(copy, { recursive: true, force: true }))
   await writeFile(new URL('index.ts', copy), (await readFile(new URL('index.ts', source), 'utf8')).replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false'))
   await writeFile(new URL('platform-roles.ts', copy), await readFile(new URL('platform-roles.ts', source), 'utf8'))
-  const provider = (await import(new URL('index.ts', copy).href)) as typeof import('@asas/auth')
+  const provider = (await import(new URL('index.ts', copy).href)) as typeof import('@asas/mithaq/auth')
   assert.equal(provider.platformApp, false)
   const routes = firstRegisterOf(provider)
   await withoutPlatformStaff(async () => {

@@ -17,7 +17,7 @@
    loads, as the tenant app lists them (`apps/asas-tanstack/src/styles.css`).
    Tailwind finds this app's own files, an ejected `src/components/mithaq`
    among them, without one. */
-@source "../../../templates/asas/src";
+@source "../../../templates";
 
 @custom-variant dark (&:is(.dark *));
 

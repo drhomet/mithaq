@@ -457,7 +457,7 @@ test('7. TB\'s shape: a providers entry with schemaName \'auth\' generates every
   await symlink(fileURLToPath(new URL('../node_modules/', import.meta.url)), fileURLToPath(new URL('node_modules', root)))
   await writeFile(
     new URL('src/mithaq.ts', root),
-    `export { defineKayan } from '${template}'\nexport const generate = { auth: 'src/kayan/auth/', providers: '../../../auth.ts', migrations: 'src/migrations/' }\n`,
+    `export { defineKayan } from '${template}'\nexport const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../auth.ts', migrations: 'src/migrations/' }\n`,
   )
   // The template's instance, plus a second instance of shoppers on tables of their own, which names
   // no schema unless the step gives it one. Neither instance is built here, only generated, so its
@@ -465,7 +465,7 @@ test('7. TB\'s shape: a providers entry with schemaName \'auth\' generates every
   const providersOf = (schemaName: string, customers = '') =>
     writeFile(
       new URL('src/auth.ts', root),
-      `import { providers as template } from '@asas/auth'
+      `import { providers as template } from '@asas/mithaq/auth'
 export const providers = {
   user: { ...template.user, schemaName: ${schemaName} },
   customers: {

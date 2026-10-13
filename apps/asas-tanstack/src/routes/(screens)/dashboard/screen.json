@@ -2,8 +2,8 @@
   "path": "/dashboard",
   "providers": [
     "./src/ui-dashboard/theme-provider.tsx#ThemeProvider",
-    "./src/ui/rich-text-nodes.tsx#RichTextNodes",
-    "./src/ui/session-labels.tsx#SessionLabels"
+    "@asas/mithaq:./src/ui/rich-text-nodes.tsx#RichTextNodes",
+    "@asas/courses:./enrollments/ui/session-labels.tsx#SessionLabels"
   ],
   "pages": {
     "dashboard": {
@@ -77,17 +77,13 @@
     }
   ],
   "layouts": {
-    "app": "./src/ui/app-shell.tsx#AppShell",
-    "record": "./src/ui/record-page.tsx#RecordPage",
-    "table": "./src/ui/table-page.tsx#TablePage",
-    "top": "./src/ui/top-shell.tsx#TopShell"
+    "app": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
+    "record": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
+    "table": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
+    "top": "@asas/mithaq:./src/ui/top-shell.tsx#TopShell"
   },
   "components": {
-    "noCourses": "./src/courses/ui/no-courses.tsx#NoCourses",
-    "roleForm": "./src/roles/ui/role-form.tsx#RoleForm",
-    "rolesTable": "./src/roles/ui/roles.tsx#RolesTable",
-    "deleteRole": "./src/roles/ui/roles.tsx#DeleteRole",
-    "activity": "./src/audit-log/ui/activity.tsx#Activity",
+    "activity": "@asas/mithaq:./src/ui/activity.tsx#Activity",
     "versions": "./src/ui-dashboard/versions.tsx#Versions"
   },
   "controls": {
@@ -285,7 +281,7 @@
             "ar": "لكل مقعد"
           },
           "component": "number",
-          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+          "cell": "@asas/courses:./courses/ui/fee-cell.tsx#FeeCell",
           "filter": true
         },
         {
@@ -557,7 +553,7 @@
             }
           ],
           "component": "text",
-          "cell": "./src/courses/ui/status-cell.tsx#StatusCell"
+          "cell": "@asas/courses:./courses/ui/status-cell.tsx#StatusCell"
         },
         {
           "name": "details",
@@ -674,7 +670,7 @@
         "list": {
           "path": "/courses",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -682,7 +678,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -694,7 +690,7 @@
                         },
                         {
                           "field": "fee",
-                          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+                          "cell": "@asas/courses:./courses/ui/fee-cell.tsx#FeeCell",
                           "decided": "field"
                         },
                         {
@@ -709,7 +705,7 @@
                         },
                         {
                           "field": "_status",
-                          "cell": "./src/courses/ui/status-cell.tsx#StatusCell",
+                          "cell": "@asas/courses:./courses/ui/status-cell.tsx#StatusCell",
                           "decided": "field"
                         },
                         {
@@ -733,7 +729,7 @@
                         "summary",
                         "details"
                       ],
-                      "empty": "./src/courses/ui/no-courses.tsx#NoCourses",
+                      "empty": "@asas/courses:./courses/ui/no-courses.tsx#NoCourses",
                       "bulk": [
                         {
                           "button": "deleteMany",
@@ -800,7 +796,7 @@
         "create": {
           "path": "/courses/new",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -811,7 +807,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -922,7 +918,7 @@
         "edit": {
           "path": "/courses/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -942,7 +938,7 @@
                     },
                     "fields": [
                       {
-                        "layout": "./src/ui/record-page.tsx#RecordPage",
+                        "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                         "main": [
                           {
                             "form": [
@@ -1052,7 +1048,7 @@
                             ]
                           },
                           {
-                            "component": "./src/audit-log/ui/activity.tsx#Activity",
+                            "component": "@asas/mithaq:./src/ui/activity.tsx#Activity",
                             "when": {
                               "$user.collections.auditLog.operations.find": {
                                 "equals": true
@@ -1201,7 +1197,7 @@
         "board": {
           "path": "/courses/board",
           "page": {
-            "shell": "./src/ui/top-shell.tsx#TopShell",
+            "shell": "@asas/mithaq:./src/ui/top-shell.tsx#TopShell",
             "header": [
               {
                 "title": {}
@@ -1214,10 +1210,10 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
-                    "component": "./src/courses/ui/no-courses.tsx#NoCourses"
+                    "component": "@asas/courses:./courses/ui/no-courses.tsx#NoCourses"
                   }
                 ]
               }
@@ -1497,7 +1493,7 @@
         "list": {
           "path": "/sessions",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -1505,7 +1501,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -1552,7 +1548,7 @@
         "create": {
           "path": "/sessions/new",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -1563,7 +1559,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -1651,7 +1647,7 @@
         "edit": {
           "path": "/sessions/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -1662,7 +1658,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "tabs": [
@@ -1790,7 +1786,7 @@
                     ]
                   },
                   {
-                    "component": "./src/audit-log/ui/activity.tsx#Activity",
+                    "component": "@asas/mithaq:./src/ui/activity.tsx#Activity",
                     "when": {
                       "$user.collections.auditLog.operations.find": {
                         "equals": true
@@ -1901,7 +1897,7 @@
           },
           "relationTo": "sessions",
           "component": "relationship",
-          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell"
+          "cell": "@asas/courses:./enrollments/ui/session-cell.tsx#SessionCell"
         },
         {
           "name": "student",
@@ -1980,7 +1976,7 @@
         "list": {
           "path": "/enrollments",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -1988,14 +1984,14 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
                       "columns": [
                         {
                           "field": "session",
-                          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell",
+                          "cell": "@asas/courses:./enrollments/ui/session-cell.tsx#SessionCell",
                           "decided": "field"
                         },
                         {
@@ -2027,7 +2023,7 @@
         "create": {
           "path": "/enrollments/new",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2038,7 +2034,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -2071,7 +2067,7 @@
         "edit": {
           "path": "/enrollments/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2082,7 +2078,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -2131,7 +2127,7 @@
                     ]
                   },
                   {
-                    "component": "./src/audit-log/ui/activity.tsx#Activity",
+                    "component": "@asas/mithaq:./src/ui/activity.tsx#Activity",
                     "when": {
                       "$user.collections.auditLog.operations.find": {
                         "equals": true
@@ -2291,7 +2287,7 @@
         "list": {
           "path": "/tags",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2299,7 +2295,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -2328,7 +2324,7 @@
         "create": {
           "path": "/tags/new",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2339,7 +2335,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -2359,7 +2355,7 @@
         "edit": {
           "path": "/tags/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2370,7 +2366,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -2670,7 +2666,7 @@
         "list": {
           "path": "/media",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2678,14 +2674,14 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
                       "columns": [
                         {
                           "field": "filename",
-                          "cell": "./src/media/ui/preview.tsx#FileName",
+                          "cell": "@asas/courses:./media/ui/preview.tsx#FileName",
                           "decided": "leaf"
                         },
                         {
@@ -2700,7 +2696,7 @@
                         },
                         {
                           "field": "filesize",
-                          "cell": "./src/media/ui/preview.tsx#FileSize",
+                          "cell": "@asas/courses:./media/ui/preview.tsx#FileSize",
                           "decided": "leaf"
                         },
                         {
@@ -2722,12 +2718,12 @@
         },
         "create": {
           "path": "/media/new",
-          "component": "./src/media/ui/preview.tsx#NewImage"
+          "component": "@asas/courses:./media/ui/preview.tsx#NewImage"
         },
         "edit": {
           "path": "/media/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2738,7 +2734,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -2794,7 +2790,7 @@
                 ],
                 "side": [
                   {
-                    "component": "./src/media/ui/preview.tsx#MediaPreview"
+                    "component": "@asas/courses:./media/ui/preview.tsx#MediaPreview"
                   }
                 ],
                 "danger": [
@@ -2978,7 +2974,7 @@
         "list": {
           "path": "/roles",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -2986,7 +2982,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/table-page.tsx#TablePage",
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
                     "list": {
@@ -3004,7 +3000,7 @@
                       ],
                       "limit": 100
                     },
-                    "component": "./src/roles/ui/roles.tsx#RolesTable"
+                    "component": "@asas/roles:./roles/ui/roles.tsx#RolesTable"
                   }
                 ]
               }
@@ -3014,7 +3010,7 @@
         "create": {
           "path": "/roles/new",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -3025,7 +3021,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -3045,7 +3041,7 @@
                         "decided": "table"
                       }
                     ],
-                    "component": "./src/roles/ui/role-form.tsx#RoleForm"
+                    "component": "@asas/roles:./roles/ui/role-form.tsx#RoleForm"
                   }
                 ]
               }
@@ -3055,7 +3051,7 @@
         "edit": {
           "path": "/roles/:id",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -3066,7 +3062,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [
@@ -3086,7 +3082,7 @@
                         "decided": "table"
                       }
                     ],
-                    "component": "./src/roles/ui/role-form.tsx#RoleForm"
+                    "component": "@asas/roles:./roles/ui/role-form.tsx#RoleForm"
                   }
                 ],
                 "danger": [
@@ -3096,7 +3092,7 @@
                       "en": "Delete",
                       "ar": "حذف"
                     },
-                    "component": "./src/roles/ui/roles.tsx#DeleteRole"
+                    "component": "@asas/roles:./roles/ui/roles.tsx#DeleteRole"
                   }
                 ]
               }
@@ -3402,7 +3398,7 @@
         "settings": {
           "path": "/settings",
           "page": {
-            "shell": "./src/ui/app-shell.tsx#AppShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [
               {
                 "title": {}
@@ -3413,7 +3409,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui/record-page.tsx#RecordPage",
+                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
                 "main": [
                   {
                     "form": [

@@ -9,12 +9,17 @@
   "exports": {
     ".": "./src/asas.ts",
     "./ui-dashboard/*": "./src/ui-dashboard/*",
-    "./audit-log/*": "./src/audit-log/*",
     "./messages/*": "./src/messages/*",
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@asas/audit-log": "*",
     "@asas/auth": "*",
+    "@asas/courses": "*",
+    "@asas/mithaq": "*",
+    "@asas/roles": "*",
+    "@asas/settings": "*",
+    "@asas/tags": "*",
     "@lexical/extension": "0.52.0",
     "@lexical/link": "0.52.0",
     "@lexical/list": "0.52.0",

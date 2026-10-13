@@ -109,11 +109,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', pl
     assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev   # the tenant app`))
     assert.equal(created.stdout.includes(`from apps/asas-platform: ${manager} run dev`), platform)
     assert.equal(created.stdout.includes('The package is named asas'), single)
-    const workspaces = single ? [''] : ['templates/asas', 'templates/auth', 'apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : [])]
-    assert.deepEqual(['templates', 'apps/asas-platform'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : platform ? ['templates', 'apps/asas-platform'] : ['templates'])
+    const features = single ? [] : readdirSync(join(consumer, 'packages/features')).map((one) => `packages/features/${one}`)
+    const workspaces = single ? [''] : ['packages/mithaq', ...features, 'packages/asas', 'apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : [])]
+    assert.deepEqual(['templates', 'packages', 'apps/asas-platform'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : platform ? ['packages', 'apps/asas-platform'] : ['packages'])
+    // Each package that draws or ejects a piece names mithaq-admin; one that holds only kayan or the auth setup's server side need not.
+    const drawing = workspaces.filter((workspace) => (JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }).dependencies?.['mithaq-admin'] !== undefined)
+    assert.ok(['packages/mithaq', 'packages/asas', 'apps/asas-tanstack'].every((one) => single || drawing.includes(one)), `${drawing.join(', ')} name mithaq-admin`)
     for (const workspace of workspaces) {
       const manifest = JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }
-      if (workspace !== 'templates/auth') assert.equal(manifest.dependencies?.['mithaq-admin'], adminTarball, `${workspace} pins mithaq-admin`)
+      if (drawing.includes(workspace)) assert.equal(manifest.dependencies?.['mithaq-admin'], adminTarball, `${workspace} pins mithaq-admin`)
       assert.ok(!existsSync(join(consumer, workspace, 'src/asas.test.ts')) && !existsSync(join(consumer, workspace, 'src/test-database.ts')), `${workspace} has no tests`)
     }
     const app = single ? consumer : join(consumer, 'apps/asas-tanstack')
@@ -127,11 +131,13 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', pl
     // A manager that cannot hoist a package installs it again under each workspace, and a second mithaq is a second language.
     for (const workspace of workspaces) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq')), mithaq, `${workspace} loads the one mithaq`)
     // A second mithaq-admin is a second components map, so the template's shells and the app must draw from one.
-    for (const workspace of workspaces.filter((one) => one !== 'templates/auth')) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq-admin')), admin, `${workspace} loads the one mithaq-admin`)
-    const template = single ? consumer : join(consumer, 'templates/asas')
+    for (const workspace of drawing) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq-admin')), admin, `${workspace} loads the one mithaq-admin`)
+    // The asas, where every mithaq command runs, and the language, which holds the files a project keeps from mithaq-admin.
+    const template = single ? consumer : join(consumer, 'packages/asas')
+    const language = single ? consumer : join(consumer, 'packages/mithaq')
     // The files each workspace always holds (the host, the icon, the storage adapters and the step) are read against the
     // installed mithaq-admin and must be up to date; with no package there the check answers undefined and this fails.
-    for (const [workspace, files] of single ? [[consumer, 19]] as const : [[app, 13], ...(platform ? [[platformApp, 12]] as const : []), [template, 6]] as const) {
+    for (const [workspace, files] of single ? [[consumer, 19]] as const : [[app, 13], ...(platform ? [[platformApp, 12]] as const : []), [language, 6]] as const) {
       installed(workspace, '.bin/mithaq')
       const check = spawnSync(process.execPath, ['--input-type=module', '-e', "import { pathToFileURL } from 'node:url'; import { upgradeCheck } from 'mithaq/upgrade'; console.log(JSON.stringify(await upgradeCheck(pathToFileURL(`${process.cwd()}/`))))"], { cwd: workspace, encoding: 'utf8' })
       assert.equal(check.status, 0, check.stderr)

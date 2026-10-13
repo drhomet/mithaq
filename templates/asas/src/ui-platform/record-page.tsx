@@ -6,8 +6,8 @@ import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import type { LayoutProps } from 'mithaq/admin'
 import { useKayan, useLocale, useScreen } from 'mithaq/admin/react'
-import { RecordPage } from '../ui/record-page.tsx'
-import { navLabel } from '../ui/screen-nav.tsx'
+import { RecordPage } from '@asas/mithaq/ui/record-page.tsx'
+import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 
 export const regions = ['main', 'side', 'danger'] as const
 

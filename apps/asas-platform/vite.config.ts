@@ -6,7 +6,7 @@ import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
-  // An alias rather than `resolve.tsconfigPaths`: the shells in `templates/asas/src` fall under a tsconfig
+  // An alias rather than `resolve.tsconfigPaths`: the shells in the language package's `src/ui/` fall under a tsconfig
   // with no `@/` and still import it. `^@/` leaves `@tanstack/*` alone.
   resolve: { alias: [{ find: /^@\//, replacement: fileURLToPath(new URL('./src/', import.meta.url)) }] },
   plugins: [

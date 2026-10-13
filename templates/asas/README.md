@@ -20,14 +20,15 @@ What you get is a Bun workspace:
 
 | Folder | What it is |
 | --- | --- |
-| `templates/asas` | Your backend. `src/mithaq.ts` declares the language: its locales, its arkan (singular rukn, a pillar: a pluggable part that brings kinds, rules or fields), its targets and its screens. Each kayan (an entity, one data type) has its own folder, such as `src/courses/` or `src/tags/`. `src/asas.ts` builds the asas, the runtime, from those kayan. It also holds `src/migrations/`, `src/messages/`, `src/storage/` and `src/seed.ts`. |
-| `templates/auth` | The `@asas/auth` package: the Better Auth setup, with organizations, admin and platform roles. |
+| `packages/mithaq` | The language, `@my-app/mithaq`. `src/mithaq.ts` declares its locales, its arkan (singular rukn, a pillar: a pluggable part that brings kinds, rules or fields), its targets and its screens. Beside it sit the Better Auth setup (`src/mithaq/auth/`), the roles (`src/roles/`), storage, the shared screen pieces and everything else the language or more than one feature reads. |
+| `packages/features/<feature>` | One package per feature, `@my-app/<feature>`, each holding one or more kayan (an entity, one data type), each kayan in a folder of its own, such as `packages/features/courses/courses/` or `packages/features/tags/tags/`. |
+| `packages/asas` | The asas, the runtime: `src/asas.ts` builds it from every feature's kayan. It also holds `src/migrations/`, `src/messages/`, each screen's own pages and `src/seed.ts`, and every `mithaq` command runs here. |
 | `apps/asas-tanstack` | The tenant app, built on TanStack Start. It serves the dashboard at `/dashboard` and the portal at `/portal`, on `http://localhost:5173`. |
 | `apps/asas-platform` | The platform console, for staff who work across every organization, on `http://localhost:5174`. |
 
 At the root it also writes `bunfig.toml`, which turns on the isolated linker, a `.gitignore`, and a `tsconfig.json`.
 
-It writes the same `.env` into `templates/asas`, `apps/asas-tanstack` and `apps/asas-platform`, readable only by you:
+It writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-platform`, readable only by you:
 
 ```sh
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/mithaq
@@ -57,7 +58,7 @@ To use a Postgres you already run, create a database for the project and change 
 In development, `asas.connect()` pushes the schema: it creates or changes the tables to match your kayan, and refuses any change that would lose data. Run it once:
 
 ```sh
-cd my-app/templates/asas
+cd my-app/packages/asas
 # push the schema once, development only
 bun -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"
 ```
@@ -83,7 +84,7 @@ Open `http://localhost:5173/auth/sign-up` and sign up as `admin@admin.com` with 
 Then fill the organization with sample courses, sessions, tags and roles:
 
 ```sh
-cd templates/asas
+cd packages/asas
 bun run seed
 ```
 
@@ -99,16 +100,26 @@ Then sign in at `http://localhost:5174`.
 
 ### 6. Add your first kayan
 
-This section adds `notes`: a title and a done flag, owned by one organization, listed and edited in the dashboard. Every path below is under `templates/asas`.
+This section adds `notes`: a title and a done flag, owned by one organization, listed and edited in the dashboard, as a feature of its own. Run each command from `packages/asas`.
+
+#### The feature
+
+A feature is a package beside the others: `packages/features/notes/package.json`, the same as `packages/features/tags/package.json` with `"name": "@my-app/notes"`, and `packages/features/notes/index.ts`, which lists its kayan:
+
+```ts
+import { notes } from './notes/notes.ts'
+
+export const kayan = [notes] as const
+```
 
 #### The kayan file
 
-Create `src/notes/notes.ts`:
+Create `packages/features/notes/notes/notes.ts`:
 
 ```ts
 import { defaultFields, defaultOperations } from 'mithaq'
-import { defineKayan, organization } from '../mithaq.ts'
-import { appPage, danger } from '../pages.ts'
+import { defineKayan, organization } from '@my-app/mithaq'
+import { appPage, danger } from '@my-app/mithaq/mithaq/pages.ts'
 
 export const notes = defineKayan({
   name: 'notes',
@@ -155,22 +166,18 @@ A few things to notice:
 
 #### Register it
 
-Add it to the build in `src/asas.ts`:
+Add `"@my-app/notes": "*"` to the dependencies in `packages/asas/package.json`, run `bun install`, and spread the feature's kayan into the build in `packages/asas/src/asas.ts`:
 
 ```ts
-import { notes } from './notes/notes.ts'
+import * as notes from '@my-app/notes'
 
 export const asas = buildAsas({
-  kayan: [
-    // ...the template's kayan
-    auditLog,
-    notes,
-  ],
+  kayan: [...auth.kayan, ...roles.kayan, ...tags.kayan, ...courses.kayan, ...auditLog.kayan, ...notes.kayan],
   // ...
 })
 ```
 
-Then add it to the dashboard screen's `kayan` list in `src/mithaq.ts`:
+Then add it to the dashboard screen's `kayan` list in `packages/mithaq/src/mithaq.ts`:
 
 ```ts
 export const dashboardScreen = screenTarget({
@@ -203,7 +210,7 @@ bunx mithaq generate messages
 
 Restart the tenant app's dev server and open `http://localhost:5173/dashboard/notes`. "Notes" is in the nav. You can create, list, edit and delete notes, and each one belongs to "Admin org".
 
-You see it because the `administrator` role holds every key. Any other role needs the note keys added to it in `src/tenant-roles.ts`: `notes.find`, `notes.findByID`, `notes.create` and so on, plus a key per readable field, such as `notes.fields.title`. `mithaq screens` prints the key each nav entry needs.
+You see it because the `administrator` role holds every key. Any other role needs the note keys added to it in `packages/mithaq/src/roles/tenant-roles.ts`: `notes.find`, `notes.findByID`, `notes.create` and so on, plus a key per readable field, such as `notes.fields.title`. `mithaq screens` prints the key each nav entry needs.
 
 #### Write the migration
 
@@ -239,32 +246,100 @@ This runs the lock check, every generator in check mode, and the migration check
 
 ## Project structure
 
-`bun create mithaq my-app` copies the template at the version of `mithaq` it was published with, pins `"mithaq": "npm:@drhomet/mithaq@<version>"` and `"mithaq-admin": "npm:@drhomet/mithaq-admin@<version>"` at that one version, writes fresh secrets into three `.env` files and runs `bun install`. The project is a Bun workspace.
+`bun create mithaq my-app` copies the template at the version of `mithaq` it was published with, pins `"mithaq": "npm:@drhomet/mithaq@<version>"` and `"mithaq-admin": "npm:@drhomet/mithaq-admin@<version>"` at that one version, names the project's packages under its own scope (`@my-app/...`), writes fresh secrets into three `.env` files and runs `bun install`. The project is a workspace of three steps, each named after what it holds, and each imports only the steps before it:
+
+1. **The language** (`packages/mithaq`): `defineMithaq`, its targets and arkan, and what the language or more than one feature reads.
+2. **The features** (`packages/features/*`): one package per feature, each holding one or more kayan.
+3. **The asas** (`packages/asas`): `buildAsas` over every feature's kayan, with the migrations, the copy and the seed.
 
 ```
 my-app/
-  package.json        workspaces templates/* and apps/*; no scripts
-  bunfig.toml         [install] linker = "isolated", which the screens need
-  tsconfig.json       one strict config over templates/*/src and apps/*/src
+  package.json        workspaces packages/mithaq, packages/features/*, packages/asas and apps/*; no scripts
+  tsconfig.json       one strict config over every package's .ts and apps/*/src
   .gitignore          node_modules, .env, dist, .storage/
-  templates/
-    asas/             package "asas": the language, the build and every kayan
-    auth/             package "@asas/auth": the Better Auth instances and the platform roles
+  packages/
+    mithaq/           package "@my-app/mithaq": the language
+    features/
+      auth/           package "@my-app/auth": the Better Auth kayan and the local accounts
+      roles/          package "@my-app/roles": custom roles and each member's roles
+      courses/        package "@my-app/courses": courses, their sessions, enrollments and media
+      tags/ audit-log/ settings/
+    asas/             package "asas": the build, the migrations, the copy, each screen's own pages
   apps/
     asas-tanstack/    the tenant app: the dashboard and portal screens, sign-in pages, /api
     asas-platform/    the platform console: the platform screen, for staff
 ```
 
-The apps import the template only through the `asas` package (`import { asas } from 'asas'`), never by a path into `templates/`. `templates/asas`, `apps/asas-tanstack` and `apps/asas-platform` each hold a `.env` with the same secrets. The platform app derives its own session secret from `BETTER_AUTH_SECRET`, so the two apps share one session table and never a session.
+The language never imports a feature or the asas, and a feature imports another only through its `index.ts`, or names its kayan by name (`relationTo: 'user'`). The apps import the project only through the `asas` package (`import { asas } from 'asas'`), never by a path into `packages/`; it keeps that name because the screen host imports it by it. `packages/asas`, `apps/asas-tanstack` and `apps/asas-platform` each hold a `.env` with the same secrets. The platform app derives its own session secret from `BETTER_AUTH_SECRET`, so the two apps share one session table and never a session.
+
+`bun create mithaq my-app --layout single` makes the same tree one package instead: `packages/mithaq/src/` and `packages/asas/src/` are both `src/`, each feature is `src/features/<feature>/`, and the tenant app's `src/` joins them. Each import of the language or a feature is then a path, and every `generate` path in `src/mithaq.ts` is written from the package's root.
 
 The template's own tests stay in the mithaq repository. A new project has none of its `*.test.ts` files or test helpers, and writes its own.
 
-### `templates/asas`
+### `packages/mithaq`
 
 ```
-templates/asas/
-  package.json        exports ".", "./messages/*", "./ui-dashboard/*", "./audit-log/*"; script "seed"
+packages/mithaq/
+  package.json        exports ".", "./auth", "./auth/platform-roles" and "./*" for every file under src/
   components.json     where mithaq eject writes the storage and step files
+  src/
+    mithaq.ts         defineMithaq: locales, arkan, targets, screens, generate paths
+    mithaq/
+      auth/           the Better Auth options and instances, the platform session and roles
+      pages.ts        the page trees every kayan page starts from
+      audit-sink.ts   where the audit step hands each write
+      rich-text-nodes.ts
+    roles/            tenant-roles.ts, system-roles.ts, tenant-access.ts, grants.ts, statements.ts
+    ui/               the shells, layouts and pieces several screens draw
+    storage/          the storage config, its adapters and defaults
+    steps/            steps ejected from mithaq-admin
+```
+
+**`src/mithaq.ts`** declares the language with one `defineMithaq` call and exports what it returns: `defineKayan`, `defineGlobal`, `buildAsas`, `rows`, `user`, `generate`, `locales`, `targets` and the tenant target. It also exports `organization`, the tenant target's field with a label, which every per-organization kayan places. The arkan (`base`, `richText`, the storage rukn and `versions`), the server targets (`drizzle`, `zod`, `rbac`, `tenant`, `service`) and the three screens (`dashboard`, `portal`, `platform`) are laid down here. `generate` names, from `packages/asas` where every `mithaq` command runs, where each writes and reads: the language the generated kayan import, the features folder, the auth kayan, the providers module, the messages and migrations folders and each screen's routes folder in an app. The language names the asas's folder (its migrations and each screen's own pages) and the courses feature's session labels by path, and imports neither.
+
+**`src/mithaq/auth/`** is the Better Auth setup: `index.ts` holds the options and instances (`providers`), the platform session, `asPlatform` and `onPlatform`, and the two apps' URLs; `platform-roles.ts` the platform roles staff hold on `user.role`, the columns staff read, and `secret`, the columns no platform role reads. It is imported as `@my-app/mithaq/auth`.
+
+**Access and roles.**
+
+- `roles/tenant-roles.ts` holds the roles every organization has, written in code and never stored as rows. A key is `<kayan>.<operation>`, `<kayan>.fields.<field>` or `screen.<screen>`.
+- `roles/system-roles.ts` joins them with the platform roles into `systemRoles`, which the access target takes.
+- `roles/tenant-access.ts` holds the row table every per-organization kayan inherits, the reader that answers an actor's roles, and the platform's checks; `roles/grants.ts` what the role form and the server both read.
+- `roles/statements.ts` holds the keys the project adds beside the kayan's own operations.
+
+**Configurable features.**
+
+- `storage/index.ts` is the storage config. It names every function in `storage/defaults.ts`, and the adapters `local.ts`, `r2.ts`, `s3.ts` and `uploadthing.ts`. Those five files are ejected from the `mithaq-storage` item of `mithaq-admin` and end with a marker line.
+- `steps/expected-updated-at.ts` is ejected from the `mithaq-expected-updated-at` item.
+- `mithaq/rich-text-nodes.ts` is the one list of rich-text nodes the server and every editor read. The `richText` rukn comes from `mithaq/rich-text` and the editor from `mithaq-admin/rich-text.tsx`, and only those two load Lexical, so its packages are listed in each `package.json` that uses them; `mithaq` itself installs none.
+
+**Shared page pieces.** `src/ui/` holds what every screen draws with: the shells (`app-shell.tsx`, `top-shell.tsx`), the layouts (`record-page.tsx`, `table-page.tsx`), the shared providers and the activity panel. A piece is named with `ui('file.tsx#Export')`, where `ui` is a `folderOf` over its folder, and the build refuses a missing file or export.
+
+### `packages/features`
+
+Each feature is a package that exports its `index.ts` alone, which lists the feature's kayan as `kayan` (and `global`, for a single-row kayan); the asas imports each feature as a namespace and spreads `courses.kayan`, so the list never collides with a kayan of the same name. Each kayan has a folder of its own, named after it in kebab case, holding a file of the same name that exports it:
+
+```
+packages/features/courses/
+  package.json        "@my-app/courses", exports "." and "./domain/*"
+  index.ts            export const kayan = [media, courses, sessions, enrollments] as const
+  courses/
+    courses.ts        export const courses = defineKayan({ name: 'courses', ... })
+    ui/               page pieces only this kayan draws with
+  sessions/           a child kayan is a sibling folder, never nested
+  enrollments/
+  media/
+  domain/             plain data the asas's pages read too, which imports nothing
+```
+
+A kayan's `name` is camelCase (`auditLog`, `memberRoles`), and a multi-word table sets `dbName` in snake case (`audit_log`, `member_roles`). `<kayan>.access.ts`, `<kayan>.steps.ts` or `<kayan>.screens.ts` sit beside the kayan file once they outgrow it.
+
+**`auth/user/`** holds the kayan Better Auth's tables become: `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`, `organizationRole` and `index.ts`, which groups them by plugin. `mithaq generate auth` writes them from the options in `packages/mithaq/src/mithaq/auth/index.ts`, and each starts with `Written by` and is never edited. The project's own choices for one of them go in `<kayan>.access.ts` and `<kayan>.screens.ts` beside it, which the generator imports on its next run.
+
+### `packages/asas`
+
+```
+packages/asas/
+  package.json        "asas": exports ".", "./messages/*", "./ui-dashboard/*"; script "seed"
   mithaq.hints.json   the project's answers to "is this a rename?" questions mithaq migrate asks
   mithaq.lock         the signed vocabulary, when the project keeps one
   README.md           this guide
@@ -272,72 +347,25 @@ templates/asas/
   CLAUDE.md           one line, @AGENTS.md, so Claude Code reads the same rules
   .env.example
   src/
-    mithaq.ts         defineMithaq: locales, arkan, targets, screens, generate paths
-    asas.ts           buildAsas: the kayan list, globals, HTTP plugs, statements, auth
-    <kayan>/          one folder per kayan
-    kayan/auth/user/  the Better Auth kayan, written by mithaq generate auth
+    asas.ts           buildAsas: every feature's kayan, globals, HTTP plugs, statements, auth
+    mithaq.ts         where the mithaq command reads the language from
     messages/         one JSON file of copy per kayan, written by mithaq generate messages
     migrations/       written by mithaq migrate, committed
-    ui/ ui-dashboard/ ui-portal/ ui-platform/   page pieces several kayan or screens share
-    storage/          the storage config, its adapters and defaults
-    steps/            steps ejected from mithaq-admin
-    roles.ts tenant-roles.ts tenant-access.ts statements.ts
-    pages.ts platform-http.ts rich-text-nodes.ts seed.ts
+    ui-dashboard/ ui-portal/ ui-platform/   what one screen draws, such as its home page
+    platform-http.ts seed.ts
 ```
 
-**`src/mithaq.ts`** declares the language with one `defineMithaq` call and exports what it returns: `defineKayan`, `defineGlobal`, `buildAsas`, `rows`, `user`, `generate`, `locales`, `targets` and the tenant target. It also exports `organization`, the tenant target's field with a label, which every per-organization kayan places. The arkan (`base`, `richText`, the storage rukn and `versions`), the server targets (`drizzle`, `zod`, `rbac`, `tenant`, `service`) and the three screens (`dashboard`, `portal`, `platform`) are laid down here. `generate` names where `mithaq generate` writes: the auth kayan, the providers module, the messages folder and each screen's routes folder in an app.
-
-**`src/asas.ts`** builds the asas: `export const asas = buildAsas({ kayan, global, http, statements, auth })`. A kayan joins the project when it is added to `kayan` here.
-
-**One folder per kayan.** The folder is the kayan's name in kebab case, and it holds a file of the same name that exports the kayan:
-
-```
-src/courses/
-  courses.ts          export const courses = defineKayan({ name: 'courses', ... })
-  ui/                 page pieces only this kayan draws with
-    archive-button.tsx
-    fee-cell.tsx
-    status-cell.tsx
-```
-
-The template's kayan are `courses`, `sessions`, `enrollments`, `tags`, `media`, `roles`, `member-roles`, `local-users`, `audit-log` and the global `settings`. A kayan's `name` is camelCase (`auditLog`, `memberRoles`), and a multi-word table sets `dbName` in snake case (`audit_log`, `member_roles`). A kayan whose files are more than one keeps them side by side: `audit-log/` holds the kayan and `sink.ts`, the audit sink the service target names, and `roles/` holds `grants.ts`, which the role form and the server both read.
-
-**`src/kayan/auth/user/`** holds the kayan Better Auth's tables become: `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`, `organizationRole` and `index.ts`, which groups them by plugin. `mithaq generate auth` writes them from the options in `templates/auth/src/index.ts`, and each starts with `Written by` and is never edited. The project's own choices for one of them go in `<kayan>.access.ts` and `<kayan>.screens.ts` beside it, which the generator imports on its next run.
+**`src/asas.ts`** builds the asas: `export const asas = buildAsas({ kayan, global, http, statements, auth })`. A feature joins the project when it is a dependency here and its `kayan` is spread into `kayan`.
 
 **`src/messages/`** holds `<kayanName>.json` for each kayan, keyed by the kayan's name (`courses.json`, `auditLog.json`), and `mithaq.json` for the copy every kayan shares, such as the default fields' labels. `mithaq generate messages` writes them from the labels and `messages` in the kayan. The apps import them as `asas/messages/<name>.json`.
 
 **`src/migrations/`** holds one folder per migration, `<timestamp>_<slug>/` with `migration.sql` and `snapshot.json`, and two files `mithaq migrate` writes and the project commits: `schema.ts`, which names every table, and `drizzle.config.ts`, which `drizzle-kit migrate --config src/migrations/drizzle.config.ts` reads. `mithaq migrate --name <slug>` sets the slug.
 
-**Shared page pieces.** `src/ui/` holds what every screen draws with: the shells (`app-shell.tsx`, `top-shell.tsx`), the layouts (`record-page.tsx`, `table-page.tsx`) and the shared providers. `src/ui-dashboard/`, `src/ui-portal/` and `src/ui-platform/` hold what one screen draws, such as its home page. A piece is named with `ui('file.tsx#Export')`, where `ui` is a `folderOf` over one of these folders, and the build refuses a missing file or export.
-
-**Access and roles.**
-
-- `tenant-roles.ts` holds the roles every organization has, written in code and never stored as rows. A key is `<kayan>.<operation>`, `<kayan>.fields.<field>` or `screen.<screen>`.
-- `roles.ts` joins them with the platform roles from `@asas/auth` into `systemRoles`, which the access target takes.
-- `tenant-access.ts` holds the row table every per-organization kayan inherits, the reader that answers an actor's roles, and the platform's checks.
-- `statements.ts` holds the keys the project adds beside the kayan's own operations.
-
-**Configurable features.**
-
-- `storage/index.ts` is the storage config. It names every function in `storage/defaults.ts`, and the adapters `local.ts`, `r2.ts`, `s3.ts` and `uploadthing.ts`. Those five files are ejected from the `mithaq-storage` item of `mithaq-admin` and end with a marker line.
-- `steps/expected-updated-at.ts` is ejected from the `mithaq-expected-updated-at` item.
-- `rich-text-nodes.ts` is the one list of rich-text nodes the server and every editor read. The `richText` rukn comes from `mithaq/rich-text` and the editor from `mithaq-admin/rich-text.tsx`, and only those two load Lexical, so its packages are listed in each `package.json` that uses them; `mithaq` itself installs none.
-
-**The rest.** `pages.ts` holds the page trees every kayan page starts from (`appPage`, `topPage`, `danger`, `platformList`, `platformRecord`). `platform-http.ts` is the one hand-written route, renaming an organization, which writes a Better Auth table no managed operation may write. `seed.ts` fills a database for a first look, run with `bun run seed`.
-
-### `templates/auth`
-
-```
-templates/auth/src/
-  index.ts            the Better Auth options and instances (providers), the platform session,
-                      asPlatform and onPlatform, and the two apps' URLs
-  platform-roles.ts   the platform roles staff hold on user.role, the columns staff read,
-                      and secret, the columns no platform role reads
-```
+**The rest.** `platform-http.ts` is the one hand-written route, renaming an organization, which writes a Better Auth table no managed operation may write. `seed.ts` fills a database for a first look, run with `bun run seed`.
 
 ### The two apps
 
-Both apps are TanStack Start apps on Vite. Each app's `dev`, `build` and `preview` script runs `mithaq lock --check` in `templates/asas` first, so a red lock stops it from starting.
+Both apps are TanStack Start apps on Vite. Each app's `dev`, `build` and `preview` script runs `mithaq lock --check` in `packages/asas` first, so a red lock stops it from starting.
 
 **`apps/asas-tanstack`** is the tenant app, at `http://localhost:5173` in development. It serves the `dashboard` and `portal` screens, the sign-in, sign-up, password and invitation pages, and every API request through one route, `src/routes/api/$.ts`, which hands the request to `asas.handler`.
 
@@ -375,24 +403,25 @@ The app owns its copy, its routes, its providers and its styling. It says nothin
 
 | What | Where and how it is named |
 |---|---|
-| A kayan | `templates/asas/src/<kebab-name>/<kebab-name>.ts`, exporting `const <camelName> = defineKayan({ name: '<camelName>' })` |
+| A feature | `packages/features/<kebab-name>/`, a package `@my-app/<kebab-name>` whose `index.ts` exports its `kayan` |
+| A kayan | `<feature>/<kebab-name>/<kebab-name>.ts`, exporting `const <camelName> = defineKayan({ name: '<camelName>' })`; a child kayan is a sibling folder |
 | A kayan's own page pieces | `<kayan>/ui/<kebab-name>.tsx`, PascalCase exports, named as `ui('<file>.tsx#<Export>')` |
-| Shared page pieces | `src/ui/`, or `src/ui-<screen>/` for one screen |
+| Shared page pieces | `packages/mithaq/src/ui/`, or `packages/asas/src/ui-<screen>/` for one screen |
 | A step used by one kayan | in the kayan's file, beside the operation that lists it |
-| A step several kayan share | `src/steps/<kebab-name>.ts` |
-| Copy | `src/messages/<camelName>.json`, written by `mithaq generate messages` |
-| Migrations | `src/migrations/<timestamp>_<slug>/`, written by `mithaq migrate --name <slug>` |
+| A step several features share | `packages/mithaq/src/steps/<kebab-name>.ts` |
+| Copy | `packages/asas/src/messages/<camelName>.json`, written by `mithaq generate messages` |
+| Migrations | `packages/asas/src/migrations/<timestamp>_<slug>/`, written by `mithaq migrate --name <slug>` |
 | Screens | each app's `src/routes/(screens)/`, written by `mithaq generate screens` |
-| Better Auth kayan | `src/kayan/auth/user/`, written by `mithaq generate auth`; the project's choices in `<kayan>.access.ts` and `<kayan>.screens.ts` |
+| Better Auth kayan | `packages/features/auth/user/`, written by `mithaq generate auth`; the project's choices in `<kayan>.access.ts` and `<kayan>.screens.ts` |
 | Tests | beside the code they test, as `<name>.test.ts`; shared test helpers as `test-<name>.ts` |
 
 A file a generator writes starts with a line saying which command wrote it, such as `// Written by \`mithaq generate screens\`. Do not edit.`, and changes only by rerunning that command. A file ejected from `mithaq-admin` ends with a marker line, `// mithaq-admin <version> <hash>`, and is the project's own to edit; `mithaq upgrade --check` reports which were edited or differ from the installed package.
 
 ## Adding to the project
 
-Paths are written from the root of a project made by `bun create mithaq`, as laid out in [Project structure](#project-structure). `templates/asas` holds the language, the build and every kayan, `templates/auth` holds the Better Auth instances and the platform roles, and `apps/asas-tanstack` and `apps/asas-platform` are the two host apps. The worked examples in the template are `courses` (`templates/asas/src/courses/courses.ts`) and `tags` (`templates/asas/src/tags/tags.ts`). Read them for shape.
+Paths are written from the root of a project made by `bun create mithaq`, as laid out in [Project structure](#project-structure). `packages/mithaq` holds the language, its Better Auth setup and roles, `packages/features/*` every kayan, `packages/asas` the build, and `apps/asas-tanstack` and `apps/asas-platform` are the two host apps. The worked examples in the template are `courses` (`packages/features/courses/courses/courses.ts`) and `tags` (`packages/features/tags/tags/tags.ts`). Read them for shape.
 
-Every `mithaq` command runs from `templates/asas`. The bin runs under Node and does not read `.env`, so set `DATABASE_URL` in the shell for any command that reaches a database, and point it at a throwaway database while you work.
+Every `mithaq` command runs from `packages/asas`. The bin runs under Node and does not read `.env`, so set `DATABASE_URL` in the shell for any command that reaches a database, and point it at a throwaway database while you work.
 
 ### First, decide who may make the change
 
@@ -406,23 +435,23 @@ The vocabulary of `defineMithaq` is frozen. It is the locales, each kind's label
 
 - **A field says what a value is, and a step says what a write does.** A kind, its rules, its label, its options and who may read it go on the field. Deriving a column or writing another kayan goes in a step, as `markArchived` and `createSessions` do in `courses.ts`.
 - **A rule only a form enforces is not enforced.** Every operation is served over HTTP, so a caller can skip the form. Put the rule in the field's `rules` or in a step. A `when` on a page node only decides whether the node is drawn.
-- **A page component draws and calls operations.** It holds no rule and no write of its own. It lives in the kayan's own `ui/` folder when only that kayan draws with it, and in `src/ui/`, `src/ui-dashboard/`, `src/ui-portal/` or `src/ui-platform/` when several share it.
+- **A page component draws and calls operations.** It holds no rule and no write of its own. It lives in the kayan's own `ui/` folder when only that kayan draws with it, in `packages/mithaq/src/ui/` when several share it, and in `packages/asas/src/ui-dashboard/`, `ui-portal/` or `ui-platform/` when it is one screen's own.
 - **The host app wires things together and says nothing about a kayan.** It holds the copy, the generated routes and the providers. A fact about a kayan written in an app drifts away from the kayan.
-- **A new action is a custom operation, not a hand-written endpoint.** An operation gets its permission key, the access check, the transaction and the audit step, and a page can draw it as a button. The template writes one route by hand, `platformHttp` in `src/platform-http.ts`, because it writes a Better Auth table no managed operation may write. Follow it only for a provider's own table.
+- **A new action is a custom operation, not a hand-written endpoint.** An operation gets its permission key, the access check, the transaction and the audit step, and a page can draw it as a button. The template writes one route by hand, `platformHttp` in `packages/asas/src/platform-http.ts`, because it writes a Better Auth table no managed operation may write. Follow it only for a provider's own table.
 - **Rows of another kayan on a record page are a related list.** Write a `list` node with `of` and `where` beside the form, as the Sessions tab of a course does. A `join` field holds the data, and a page that names it as a leaf is refused.
-- **One row per organization is a global.** Write `defineGlobal` with the `organization` field required and unique, as `src/settings/settings.ts` does.
-- **A column some reader may not see is never filterable, sortable or searchable.** A served `find` takes a `where` on any column the actor reads, so a filter on such a column answers yes or no about values the reader cannot see. Refuse it in a step before the store, as `queriedByQueryable` does in `src/audit-log/audit-log.ts`.
+- **One row per organization is a global.** Write `defineGlobal` with the `organization` field required and unique, as `packages/features/settings/settings/settings.ts` does.
+- **A column some reader may not see is never filterable, sortable or searchable.** A served `find` takes a `where` on any column the actor reads, so a filter on such a column answers yes or no about values the reader cannot see. Refuse it in a step before the store, as `queriedByQueryable` does in `packages/features/audit-log/audit-log/audit-log.ts`.
 
 ### Add a kayan
 
 The example adds `rooms`, a per-organization list of rooms with a name and a capacity.
 
-1. **Write the kayan file.** Create `templates/asas/src/rooms/rooms.ts`. Open `fields` with `...defaultFields` and `organization`, and `targets.service.operations` with `...defaultOperations`. Give every label one string per locale the language declares.
+1. **Write the kayan file.** Create `packages/features/rooms/rooms/rooms.ts`, in a feature of its own as [Add your first kayan](#6-add-your-first-kayan) lays out, or in the folder of a feature it belongs to. Open `fields` with `...defaultFields` and `organization`, and `targets.service.operations` with `...defaultOperations`. Give every label one string per locale the language declares.
 
    ```ts
    import { defaultFields, defaultOperations } from 'mithaq'
-   import { defineKayan, organization } from '../mithaq.ts'
-   import { appPage, danger } from '../pages.ts'
+   import { defineKayan, organization } from '@my-app/mithaq'
+   import { appPage, danger } from '@my-app/mithaq/mithaq/pages.ts'
 
    export const rooms = defineKayan({
      name: 'rooms',
@@ -468,16 +497,16 @@ The example adds `rooms`, a per-organization list of rooms with a name and a cap
 
 3. **Decide the indexes.** On a per-organization kayan, `unique: true` means unique within the organization, and a `{ within: 'organization', ... }` group builds indexes led by the organization field. A plain `{ fields, unique }` entry is unique across every organization. [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md#unique-values-and-indexes) has the full rules.
 
-4. **Leave `access` out unless its rows differ from the tenancy rows.** A kayan that places `organization` and writes no `access` inherits the row table the access target was given (`tenantAccess` in `src/tenant-access.ts`). Plain callbacks such as `access: { read: fn }` are ANDed with those rows, so they only narrow, as `courses` does for archived courses. A table built with `rows({ ... })` replaces the inherited rows, as `src/roles/roles.ts` does.
+4. **Leave `access` out unless its rows differ from the tenancy rows.** A kayan that places `organization` and writes no `access` inherits the row table the access target was given (`tenantAccess` in `packages/mithaq/src/roles/tenant-access.ts`). Plain callbacks such as `access: { read: fn }` are ANDed with those rows, so they only narrow, as `courses` does for archived courses. A table built with `rows({ ... })` replaces the inherited rows, as `packages/features/roles/roles/roles.ts` does.
 
-5. **Register it.** Add `rooms` to `kayan: [...]` in `templates/asas/src/asas.ts`. A kayan that writes `targets.dashboard` must also be listed in that screen's `kayan` array in `templates/asas/src/mithaq.ts`, or the build refuses it with "does not list it in kayan". That array is not part of the vocabulary, so listing a kayan needs no signature.
+5. **Register it.** Add `rooms` to its feature's `kayan` list; a new feature is a dependency of `packages/asas/package.json` whose `kayan` is spread into `buildAsas` in `packages/asas/src/asas.ts`. A kayan that writes `targets.dashboard` must also be listed in that screen's `kayan` array in `packages/mithaq/src/mithaq.ts`, or the build refuses it with "does not list it in kayan". That array is not part of the vocabulary, so listing a kayan needs no signature.
 
-6. **Give roles their keys.** A key is `<kayan>.<operation>` or `<kayan>.fields.<field>`. The `administrator` role holds `'*'`. Add to each other role in `templates/asas/src/tenant-roles.ts` the operations and columns it should reach. If the platform screen lists the kayan, add its columns to the staff reads in `templates/auth/src/platform-roles.ts`, or to `secret` for a column no platform role may read.
+6. **Give roles their keys.** A key is `<kayan>.<operation>` or `<kayan>.fields.<field>`. The `administrator` role holds `'*'`. Add to each other role in `packages/mithaq/src/roles/tenant-roles.ts` the operations and columns it should reach. If the platform screen lists the kayan, add its columns to the staff reads in `packages/mithaq/src/mithaq/auth/platform-roles.ts`, or to `secret` for a column no platform role may read.
 
 7. **Generate copy and screens.**
 
    ```sh
-   cd templates/asas
+   cd packages/asas
    bunx mithaq generate messages
    bunx mithaq generate screens
    ```
@@ -502,8 +531,8 @@ The kayan is done when the project's tests, its typecheck and `bunx mithaq gener
 
 Change the kayan first, then everything that follows from it.
 
-1. **Check the language can say it.** Open `templates/asas/src/mithaq.ts` beside the kayan. If the change needs a kind, rule, locale or target the language does not have, it is a vocabulary change: stop and ask the owner.
-2. **Edit the declaration and nothing else**, then read it back. For a kayan Better Auth owns, the declaration is the provider options in `templates/auth/src/index.ts` and the project's `<kayan>.access.ts` and `<kayan>.screens.ts` files under `templates/asas/src/kayan/auth/user/`. Never edit a file that starts with `Written by`.
+1. **Check the language can say it.** Open `packages/mithaq/src/mithaq.ts` beside the kayan. If the change needs a kind, rule, locale or target the language does not have, it is a vocabulary change: stop and ask the owner.
+2. **Edit the declaration and nothing else**, then read it back. For a kayan Better Auth owns, the declaration is the provider options in `packages/mithaq/src/mithaq/auth/index.ts` and the project's `<kayan>.access.ts` and `<kayan>.screens.ts` files under `packages/features/auth/user/`. Never edit a file that starts with `Written by`.
 3. **Run the generators that follow**, in this order:
    1. `bunx mithaq generate auth` when the provider options or an `.access.ts` or `.screens.ts` file changed;
    2. `bunx mithaq generate messages` when copy changed;
@@ -594,7 +623,7 @@ export const createSessions = async (ctx: Ctx<{ id?: string; sessions?: readonly
 }
 ```
 
-A kayan lists it after the store step: `create: { input: ({ create }) => create.extend({ sessions: ... }), steps: ({ steps }) => [steps.insert, createSessions] }`. The full version, which also refuses a draft, is `createSessions` in `src/courses/courses.ts`.
+A kayan lists it after the store step: `create: { input: ({ create }) => create.extend({ sessions: ... }), steps: ({ steps }) => [steps.insert, createSessions] }`. The full version, which also refuses a draft, is `createSessions` in `packages/features/courses/courses/courses.ts`.
 
 `ctx` carries the kayan, `data` (the parsed input, and after the store step the written row), `actor` and `user`, `dataBefore` (the row loaded before an update or delete), `context` (what the HTTP plug put there, such as `requestId`) and `tx`. A write step's `tools` carry `of`, `store`, `operation`, `kind` and `where`; a read step's carry `of` and `read`.
 
@@ -608,13 +637,13 @@ Where a step goes:
 
 - in an operation's `steps`, before or after its one store or read step, through the `steps` function: `steps: ({ steps }) => [myStep, steps.update]`;
 - in an operation's `beforeTransaction`, which runs outside the transaction before it opens, with no lock and no `dataBefore`, or in its `afterSteps` or `afterCommit`;
-- in the service target's `beforeSteps`, `afterSteps` or `afterCommit` in `src/mithaq.ts`, for every write of the project. `audit` sits in `afterSteps`. A webhook or an email belongs in `afterCommit`, where the row is durable.
+- in the service target's `beforeSteps`, `afterSteps` or `afterCommit` in `packages/mithaq/src/mithaq.ts`, for every write of the project. `audit` sits in `afterSteps`. A webhook or an email belongs in `afterCommit`, where the row is durable.
 
 A step that refuses throws `invalid`, `denied`, `missing` or `conflict` from `mithaq`, each taking one object with a `message`, a copy `key` and `params`. Add the key to the copy in every locale.
 
 ### Add a screen component
 
-A component of the project's own lives in a `ui` folder of `templates/asas/src` and is named by `ui('file.tsx#Export')`, where `ui` is a `folderOf(new URL('./ui/', import.meta.url))`. A cell takes `CellProps` from `mithaq/admin`, a button takes `ButtonProps`, and hooks such as `useLocale` and `useRecord` come from `mithaq/admin/react`. Name it where it is used: as a field's `cell` or `component`, as a page node `{ component: ... }`, or under a screen's `components` in `src/mithaq.ts` when several pages use it by name. The build checks that the file exists and exports the name; you keep the field names inside it correct.
+A component of the project's own lives in a `ui` folder beside the kayan that draws it, or in `packages/mithaq/src/ui/` when several draw it, and is named by `ui('file.tsx#Export')`, where `ui` is a `folderOf(new URL('./ui/', import.meta.url))`. A cell takes `CellProps` from `mithaq/admin`, a button takes `ButtonProps`, and hooks such as `useLocale` and `useRecord` come from `mithaq/admin/react`. Name it where it is used: as a field's `cell` or `component`, as a page node `{ component: ... }`, or under a screen's `components` in `src/mithaq.ts` when several pages use it by name. The build checks that the file exists and exports the name; you keep the field names inside it correct.
 
 The screens draw with the pieces of `mithaq-admin`, which each app imports as `mithaq-admin/<file>`. To change a control, a cell or a node, replace it in the components map in `src/components.ts`. To change a piece the map does not hold, run `bunx mithaq eject <item>` in the app: it writes the piece into `src/components/mithaq/`, and that file is drawn in place of the package's from then on. [The admin package](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md) describes the pieces, ejecting one, and migrating a project made before the package.
 
@@ -622,7 +651,7 @@ An ejected file is the project's own. A project edits it in place and never patc
 
 ### Tests
 
-- Give tests a throwaway database, named by `DATABASE_URL`, and never the development database. Under `node --test` the template's `src/mithaq.ts` refuses to load without `DATABASE_URL`. The mithaq repository's own tests need more; see [CONTRIBUTING.md](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md#set-up).
+- Give tests a throwaway database, named by `DATABASE_URL`, and never the development database. Under `node --test` the template's `packages/mithaq/src/mithaq.ts` refuses to load without `DATABASE_URL`. The mithaq repository's own tests need more; see [CONTRIBUTING.md](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md#set-up).
 - Run with Bun and its isolated linker, which `bun create mithaq` sets in `bunfig.toml`.
 - Put a test beside the code it tests as `<name>.test.ts`, and run it with `node --test`.
 - Write security cases first: the read of another organization's row, the write without the key, the refused input.
@@ -631,7 +660,7 @@ An ejected file is the project's own. A project edits it in place and never patc
 
 ### Checks
 
-| Command, from `templates/asas` | What it checks |
+| Command, from `packages/asas` | What it checks |
 |---|---|
 | `bunx mithaq generate --check` | Every check below and every generator in check mode, stopping at the first failure. [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#generate---check) lists the steps. |
 | `bunx mithaq lock --check` | The vocabulary still matches `mithaq.lock` and its seal verifies. Passes with a notice when there is no lock. |
@@ -665,15 +694,17 @@ if (env.NODE_ENV === 'production') {
 }
 ```
 
-In production, `connect()` does not push. It checks the migrations instead, as `prodMigrations` on `drizzleAdapter` says. Without `prodMigrations`, a production `connect()` refuses to start. The template sets it in `templates/asas/src/mithaq.ts`:
+In production, `connect()` does not push. It checks the migrations instead, as `prodMigrations` on `drizzleAdapter` says. Without `prodMigrations`, a production `connect()` refuses to start. The template sets it in `packages/mithaq/src/mithaq.ts`:
 
 ```ts
 const drizzleStore = drizzleAdapter({
   connectionString,
   ...drizzleTarget,
-  prodMigrations: { migrationsFolder: fileURLToPath(new URL('migrations/', import.meta.url)), pending: 'refuse' },
+  prodMigrations: { migrationsFolder: fileURLToPath(new URL('migrations/', asasSource)), pending: 'refuse' },
 })
 ```
+
+`asasSource` is the asas's `src/`, named by path from the language, so the folder is found wherever each app calls `connect()` from.
 
 `migrationsFolder` must hold the `drizzle.config.ts` that `mithaq migrate` wrote, so ship `src/migrations/` with the deploy. `push: true` and `prodMigrations` cannot be used together.
 
@@ -681,19 +712,19 @@ What `pending: 'refuse'` and `'run'` each do, the lock every writer of the migra
 
 ### Environment variables
 
-`bun create mithaq` writes the same `.env` into `templates/asas`, `apps/asas-tanstack` and `apps/asas-platform`, with fresh values for `LOCAL_AUTH_SECRET` and `BETTER_AUTH_SECRET`. Bun (`bun <file>`, `bun run`, `bun -e`) and the apps' dev servers read it. The `mithaq` command runs under Node and does not read it. A variable already set in the environment always wins over `.env`.
+`bun create mithaq` writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-platform`, with fresh values for `LOCAL_AUTH_SECRET` and `BETTER_AUTH_SECRET`. Bun (`bun <file>`, `bun run`, `bun -e`) and the apps' dev servers read it. The `mithaq` command runs under Node and does not read it. A variable already set in the environment always wins over `.env`.
 
 In production, set these in the host's environment rather than in a file.
 
 | Variable | Read by | Production | Development |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | `templates/asas/src/mithaq.ts`, `seed.ts`, the CLI | Required. Start refuses without it. | Falls back to `postgres://postgres:postgres@localhost:5432/mithaq` for the dev server. `seed`, `migrate`, `rbac assign` and `storage sweep` still refuse without it. Under `node --test` it is required. |
-| `BETTER_AUTH_SECRET` | `templates/auth/src/index.ts` | Required. Both apps must share the same value: the platform app derives its own session secret from it, so a cookie one app signed never verifies in the other. `AUTH_SECRET` is read when it is unset, but a URL below that is not `localhost` still requires `BETTER_AUTH_SECRET` itself. | A public development default. Even outside production, start refuses when either URL below is not `localhost` and this is unset. |
-| `BETTER_AUTH_URL` | `templates/auth/src/index.ts` | Required. The tenant app's public URL. | `http://localhost:5173` |
-| `PLATFORM_URL` | `templates/auth/src/index.ts` | Required. The platform console's public URL. | `http://localhost:5174` |
-| `LOCAL_AUTH_SECRET` | `templates/asas/src/local-users/local-users.ts` | 32 characters at least. If it is unset, local accounts are off: every `POST` under `/api/auth/local` answers 503 and the public sign-up answers 403. | Same. |
-| `TRUSTED_IP_HEADER` | `templates/auth/src/index.ts`, `local-users.ts` | The header names your proxy overwrites with the client address, comma-separated, such as `cf-connecting-ip`. Both rate limiters key on it. Trust it only behind exactly one proxy that overwrites it on every request. | Defaults to `x-forwarded-for`. |
-| `STORAGE_SECRET` | `templates/asas/src/storage/index.ts` | Required. Signs every upload reference and local upload token. Every instance must share it. | A fresh random secret per process, with a warning. |
+| `DATABASE_URL` | `packages/mithaq/src/mithaq.ts`, `seed.ts`, the CLI | Required. Start refuses without it. | Falls back to `postgres://postgres:postgres@localhost:5432/mithaq` for the dev server. `seed`, `migrate`, `rbac assign` and `storage sweep` still refuse without it. Under `node --test` it is required. |
+| `BETTER_AUTH_SECRET` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. Both apps must share the same value: the platform app derives its own session secret from it, so a cookie one app signed never verifies in the other. `AUTH_SECRET` is read when it is unset, but a URL below that is not `localhost` still requires `BETTER_AUTH_SECRET` itself. | A public development default. Even outside production, start refuses when either URL below is not `localhost` and this is unset. |
+| `BETTER_AUTH_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The tenant app's public URL. | `http://localhost:5173` |
+| `PLATFORM_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The platform console's public URL. | `http://localhost:5174` |
+| `LOCAL_AUTH_SECRET` | `packages/features/auth/local-users/local-users.ts` | 32 characters at least. If it is unset, local accounts are off: every `POST` under `/api/auth/local` answers 503 and the public sign-up answers 403. | Same. |
+| `TRUSTED_IP_HEADER` | `packages/mithaq/src/mithaq/auth/index.ts`, `local-users.ts` | The header names your proxy overwrites with the client address, comma-separated, such as `cf-connecting-ip`. Both rate limiters key on it. Trust it only behind exactly one proxy that overwrites it on every request. | Defaults to `x-forwarded-for`. |
+| `STORAGE_SECRET` | `packages/mithaq/src/storage/index.ts` | Required. Signs every upload reference and local upload token. Every instance must share it. | A fresh random secret per process, with a warning. |
 | `STORAGE_PREFIX` | `storage/index.ts` | Required. The bucket folder this project owns, such as `mithaq/asas`. Every key starts with it, and the sweep lists only inside it. | `mithaq/asas` |
 | `STORAGE_ADAPTER` | `storage/index.ts` | Required. Where new uploads go: `local`, or `r2` once R2 is set. | `local` |
 | `STORAGE_DIR` | `storage/index.ts` | The folder of the `local` adapter. | `.storage`, relative to the process's working directory. |
@@ -711,7 +742,7 @@ Start both built apps with `NODE_ENV=production`. That one setting decides sever
 
 ### Storage adapters
 
-Uploaded files go through the storage rukn, the pluggable part that brings the `upload` kind and the storage target. Its config is `templates/asas/src/storage/index.ts`, and the adapters beside it are project files, ejected from `mithaq-admin`, that you own and edit:
+Uploaded files go through the storage rukn, the pluggable part that brings the `upload` kind and the storage target. Its config is `packages/mithaq/src/storage/index.ts`, and the adapters beside it are project files, ejected from `mithaq-admin`, that you own and edit:
 
 | Adapter | File | Use |
 | --- | --- | --- |
@@ -726,14 +757,14 @@ Each upload row stores the name of the adapter that holds its file. `STORAGE_ADA
 
 ### Building and starting both apps
 
-Each app's `build` script runs `mithaq lock --check` in `templates/asas`, then `vite build`, which writes `dist/`:
+Each app's `build` script runs `mithaq lock --check` in `packages/asas`, then `vite build`, which writes `dist/`:
 
 ```sh
 bun run --cwd apps/asas-tanstack build
 bun run --cwd apps/asas-platform build
 ```
 
-The build keeps `asas` and `mithaq` external: the server bundle imports them from `node_modules` at run time. So deploy the whole workspace with its installed `node_modules` and the `templates/asas` source, including `src/migrations/`, not only `dist/`.
+The build keeps `asas` and `mithaq` external: the server bundle imports them from `node_modules` at run time. So deploy the whole workspace with its installed `node_modules` and the `packages/asas` source, including `src/migrations/`, not only `dist/`.
 
 The project's own release check serves each build with `vite preview` under Node. Each app's `preview` script runs it after `mithaq lock --check`. The tenant app uses Vite's default port, 4173, and the platform 4174:
 
@@ -749,8 +780,8 @@ A typical deploy runs in this order:
 3. With `pending: 'refuse'`, apply migrations with drizzle-kit, as [Applying migrations by hand](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/drizzle/README.md#applying-migrations-by-hand) shows.
 4. Start both apps with `NODE_ENV=production` and the variables above.
 
-In CI, after `bun install`, run `mithaq generate --check` in `templates/asas` against a database built from the migrations (see [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#generate---check)).
+In CI, after `bun install`, run `mithaq generate --check` in `packages/asas` against a database built from the migrations (see [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#generate---check)).
 
 ### The test database
 
-Never point tests at a database you want to keep. A project made by `bun create mithaq` ships without the template's own tests, but its `src/mithaq.ts` keeps one guard: under `node --test`, the build refuses to load without `DATABASE_URL`, so a test you write never falls back to the dev database. The mithaq repository's own tests need a throwaway Postgres set up as [CONTRIBUTING.md](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md#set-up) describes.
+Never point tests at a database you want to keep. A project made by `bun create mithaq` ships without the template's own tests, but its `packages/mithaq/src/mithaq.ts` keeps one guard: under `node --test`, the build refuses to load without `DATABASE_URL`, so a test you write never falls back to the dev database. The mithaq repository's own tests need a throwaway Postgres set up as [CONTRIBUTING.md](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md#set-up) describes.

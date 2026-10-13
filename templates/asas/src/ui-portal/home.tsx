@@ -8,10 +8,10 @@ import type { ReactNode } from 'react'
 import { BookOpen, ClipboardList } from 'lucide-react'
 import type { LoaderTools, PageProps } from 'mithaq/admin'
 import { useLocale, useScreen, useUser } from 'mithaq/admin/react'
-import { KpiCard } from '../ui/kpi-card.tsx'
-import { ScreenNav, navLabel } from '../ui/screen-nav.tsx'
-import { PortalTopShell } from '../ui/top-shell.tsx'
-import { onOffer } from '../courses/ui/on-offer.ts'
+import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
+import { ScreenNav, navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
+import { PortalTopShell } from '@asas/mithaq/ui/top-shell.tsx'
+import { onOffer } from '@asas/courses/domain/on-offer.ts'
 
 /** The lists the home counts, each with its card's icon and the rows its list is held to. */
 const figures: readonly [kayan: string, icon: ReactNode, where?: object][] = [

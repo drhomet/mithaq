@@ -45,9 +45,9 @@ type ClientField = import('mithaq/admin').ClientField
 type PageClient = import('mithaq/admin').PageClient
 type ButtonClient = import('mithaq/admin').ButtonClient
 const { pageButtonOf } = await import('../registry/node-buttons.tsx')
-const { RecordPage } = await import('../../../templates/asas/src/ui/record-page.tsx')
-const { TablePage } = await import('../../../templates/asas/src/ui/table-page.tsx')
-const { AppShell } = await import('../../../templates/asas/src/ui/app-shell.tsx')
+const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
+const { TablePage } = await import('../../../templates/mithaq/src/ui/table-page.tsx')
+const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
 
 const screen = asas.targets.dashboard.client
 const kayans = Object.values(screen.kayan)
@@ -534,7 +534,7 @@ test('12. the app holds the current source of every registry item it copied', ()
     // Read as `mithaq upgrade --check` reads it: a fresh eject hashes its whole text, a copy `shadcn add` made its text less leading comments.
     const target = declared.target
     // The storage adapters and the write step run on the server, so the project holding them is the template's root, not an app.
-    const project = ['mithaq-storage', 'mithaq-expected-updated-at'].includes(declared.item) ? 'templates/asas' : 'apps/asas-tanstack'
+    const project = ['mithaq-storage', 'mithaq-expected-updated-at'].includes(declared.item) ? 'templates/mithaq' : 'apps/asas-tanstack'
     const copied = readFileSync(new URL(`../../../${project}/${appPathOf(target)}`, import.meta.url), 'utf8')
     const source = readFileSync(new URL(`../${declared.path}`, import.meta.url), 'utf8')
     assert.equal(stateOf(copied, source), 'up to date', `${project} has the current ${target}, marked; delete it and rerun "mithaq eject ${declared.item}" there`)
@@ -1712,8 +1712,8 @@ test('132. a tab whose every node its when hides draws no tab, so an actor never
 })
 
 test('170. a create\'s audit entry holds only the fields it set, so the Activity panel draws a line for each and none for a field empty before and after', async () => {
-  const { changesOf } = await import('../../../templates/asas/src/audit-log/sink.ts')
-  const { ActivityEntries } = await import('../../../templates/asas/src/audit-log/ui/activity.tsx')
+  const { changesOf } = await import('../../../templates/mithaq/src/mithaq/audit-sink.ts')
+  const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const row = { id: 'c1', organization: 't1', title: 'Tajweed', fee: 300, summary: null, accessCode: undefined, tags: [], archiveReason: '' }
   const entry = { id: 'e1', createdAt: new Date(0), operation: 'create', actor: null, changes: JSON.stringify(changesOf({}, row)) }
   const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, t: copy.t, locale: 'en' }))
@@ -1722,7 +1722,7 @@ test('170. a create\'s audit entry holds only the fields it set, so the Activity
 })
 
 test('214. the Activity panel names every operation in the viewer\'s locale and a person it may not read in neutral words, never by the raw id', async () => {
-  const { ActivityEntries } = await import('../../../templates/asas/src/audit-log/ui/activity.tsx')
+  const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
   const entry = { id: 'e1', createdAt: new Date(0), operation: 'restoreVersion', actor: 'u-hidden', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
   for (const [locale, said] of [['en', 'Restored a version by Someone'], ['ar', 'استُعيد إصدار بواسطة شخص ما']] as const) {
@@ -1739,7 +1739,7 @@ test('214. the Activity panel names every operation in the viewer\'s locale and 
 })
 
 test('276a. a command actor reads in the viewer\'s locale for a reader of the people, and as someone for a reader of none', async () => {
-  const { ActivityEntries } = await import('../../../templates/asas/src/audit-log/ui/activity.tsx')
+  const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
   const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: 'mithaq rbac assign (osuser)', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
   const titles = new Map([['user:mithaq rbac assign (osuser)', false as const]])

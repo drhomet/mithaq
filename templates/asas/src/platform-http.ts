@@ -13,9 +13,9 @@
 // owner rules by, and staff do each by impersonating a member, which is
 // audited under the real person's name.
 import { AsasError, actorPermissions, denied, invalid, missing, type HttpPlug } from 'mithaq'
-import { platformRoles } from '@asas/auth'
-import { targets } from './mithaq.ts'
-import { assignedRoles, type OrganizationActor } from './tenant-access.ts'
+import { platformRoles } from '@asas/mithaq/auth'
+import { targets } from '@asas/mithaq'
+import { assignedRoles, type OrganizationActor } from '@asas/mithaq/roles/tenant-access.ts'
 
 const path = '/api/platform/organizations/update'
 /**

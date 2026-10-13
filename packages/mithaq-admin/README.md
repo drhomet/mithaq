@@ -200,7 +200,7 @@ A registry item is a piece mithaq ships for every project. Its source lives in `
 2. Import a sibling piece as `mithaq-admin/<file>`, never by a relative path, so a project's ejected copy of the sibling is drawn in its place.
 3. Add the item's name to the list in `packages/mithaq-admin/test/render.test.ts` `the app holds the current source of every registry item it copied`.
 4. A library the piece imports that no other piece does is a peer dependency in `packages/mithaq-admin/package.json`.
-5. Run `bun run test`. A piece the apps import is drawn from the package at once; only a file a project always holds (the host, storage, a step) is ejected again in `templates/asas` or the apps: delete the old file and run `bunx mithaq eject <item>` there.
+5. Run `bun run test`. A piece the apps import is drawn from the package at once; only a file a project always holds (the host, storage, a step) is ejected again in `templates/mithaq` or the apps: delete the old file and run `bunx mithaq eject <item>` there.
 
 ### A registry step
 

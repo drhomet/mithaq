@@ -91,21 +91,21 @@ import { richText } from 'mithaq/rich-text'
 import type { RouterClient } from '@orpc/server'
 import type { FetchClient } from 'mithaq/admin'
 import { asas } from './asas.ts'
-import { type OrganizationActor } from './tenant-access.ts'
-import { systemRoles } from './roles.ts'
-import { courses } from './courses/courses.ts'
-import { sessions } from './sessions/sessions.ts'
-import { localUsers } from './local-users/local-users.ts'
-import { settings } from './settings/settings.ts'
-import { user } from './kayan/auth/user/user.ts'
-import { buildAsas, defineGlobal, defineKayan, generate, rows, tenant, user as actor } from './mithaq.ts'
+import { type OrganizationActor } from '../../mithaq/src/roles/tenant-access.ts'
+import { systemRoles } from '../../mithaq/src/roles/system-roles.ts'
+import { courses } from '../../features/courses/courses/courses.ts'
+import { sessions } from '../../features/courses/sessions/sessions.ts'
+import { localUsers } from '../../features/auth/local-users/local-users.ts'
+import { settings } from '../../features/settings/settings/settings.ts'
+import { user } from '../../features/auth/user/user.ts'
+import { buildAsas, defineGlobal, defineKayan, generate, rows, tenant, user as actor } from '../../mithaq/src/mithaq.ts'
 import { memoryStore } from './memory-store.ts'
 import { plainTarget } from './standard-schema-target.ts'
-import { richTextNodes } from './rich-text-nodes.ts'
+import { richTextNodes } from '../../mithaq/src/mithaq/rich-text-nodes.ts'
 // @ts-expect-error mithaq exports no storageOperations: a kayan holding files declares its own create and delete
 import { storageOperations } from 'mithaq'
 void storageOperations
-import { storageConfig } from './storage/index.ts'
+import { storageConfig } from '../../mithaq/src/storage/index.ts'
 
 type Expect<T extends true> = T
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
@@ -302,7 +302,7 @@ type TextId = Expect<Equal<(typeof user)['fields']['id']['kind'], 'text'>>
 type UuidId = Expect<Equal<(typeof courses)['fields']['id']['kind'], 'uuid'>>
 type RequiredTitle = Expect<Equal<(typeof courses)['fields']['title']['rules']['required'], true>>
 
-type Generate = Expect<Equal<(typeof generate)['auth'], 'src/kayan/auth/'>>
+type Generate = Expect<Equal<(typeof generate)['auth'], '../features/auth/'>>
 
 type Names = Expect<
   Equal<

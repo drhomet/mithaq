@@ -84,7 +84,7 @@ const refs = {
   [screen.layouts.table!]: TablePage,
   [summaryBox]: RichText,
   [activity]: Activity,
-  [screen.components.noCourses!]: NoCourses,
+  '@asas/courses:./courses/ui/no-courses.tsx#NoCourses': NoCourses,
   './src/ui-dashboard/course-board.tsx#CourseBoard': Board,
 }
 type TreePage = Extract<PageClient, { page: unknown }>

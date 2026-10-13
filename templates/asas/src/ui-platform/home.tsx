@@ -6,9 +6,9 @@
 import { ArrowRight } from 'lucide-react'
 import type { LoaderTools, PageProps } from 'mithaq/admin'
 import { useLocale, useScreen } from 'mithaq/admin/react'
-import { PlatformShell, iconOf } from '../ui/app-shell.tsx'
-import { KpiCard } from '../ui/kpi-card.tsx'
-import { navLabel } from '../ui/screen-nav.tsx'
+import { PlatformShell, iconOf } from '@asas/mithaq/ui/app-shell.tsx'
+import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
+import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 
 /** How many rows of each kayan the viewer may count, read as the viewer, keyed by its kayan. */
 export const loader = async ({ client, access }: LoaderTools): Promise<Record<string, number | undefined>> =>

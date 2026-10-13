@@ -148,7 +148,7 @@ test('the sweep reports the files and never fails on them: no mithaq-admin, or a
   // A real, empty language and its signed lock, so the sweep's first step passes.
   await writeFile(
     new URL('src/mithaq.ts', root),
-    `import { defineMithaq } from ${JSON.stringify(new URL('../../index.ts', import.meta.url).href)}\nexport const { defineKayan } = defineMithaq({ targets: {}, arkan: [] })\nexport const generate = { auth: 'src/kayan/auth/', providers: '../../../auth.ts', messages: 'src/messages/' }\n`,
+    `import { defineMithaq } from ${JSON.stringify(new URL('../../index.ts', import.meta.url).href)}\nexport const { defineKayan } = defineMithaq({ targets: {}, arkan: [] })\nexport const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../auth.ts', messages: 'src/messages/' }\n`,
   )
   await signedLock(root)
   await writeFile(new URL('src/auth.ts', root), 'export const providers = {}\n')

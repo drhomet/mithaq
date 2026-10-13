@@ -35,11 +35,11 @@ bun run test:next
 
 Before a release, `bun run pack` stages the three published packages in `.pack/`, and `bun run test:release` creates a project from them and runs it end to end.
 
-From `templates/asas/`, with `DATABASE_URL` exported:
+From `templates/asas/`, with `DATABASE_URL` exported, and then from `templates/mithaq/`, `apps/asas-tanstack/` and `apps/asas-platform/`, which hold files from mithaq-admin:
 
 ```sh
-bunx mithaq generate --check
-bunx mithaq upgrade --check
+bunx mithaq generate --check   # in templates/asas
+bunx mithaq upgrade --check    # in each of the other three
 ```
 
 ## Rules
@@ -55,7 +55,7 @@ bunx mithaq upgrade --check
 
 ## Repository layout
 
-The repository is a Bun workspace over `packages/*`, `templates/*` and `apps/*`. The template and its two apps live in it as they ship, and `bun create mithaq` copies them out; [templates/asas/README.md](templates/asas/README.md#project-structure) maps a created project.
+The repository is a Bun workspace over `packages/*`, `templates/*`, `templates/features/*` and `apps/*`. The template and its two apps live in it as they ship, and `bun create mithaq` copies them out, the template's `templates/` becoming a project's `packages/`; [templates/asas/README.md](templates/asas/README.md#project-structure) maps a created project.
 
 ```
 mithaq/
@@ -67,8 +67,10 @@ mithaq/
     mithaq/           the framework, published as @drhomet/mithaq
     mithaq-admin/     the admin's pieces, the screen host, storage adapters and steps, published as @drhomet/mithaq-admin
     create-mithaq/    the bun create starter
-  templates/
-    asas/  auth/      the template a project starts from
+  templates/          the template a project starts from, in its three steps
+    mithaq/           the language, @asas/mithaq, with its Better Auth setup, roles, storage and shared pieces
+    features/         a package per feature, @asas/<feature>, each holding its kayan
+    asas/             the asas that builds them, where every mithaq command runs
   apps/
     asas-tanstack/  asas-platform/   the template's two apps
     asas-next/        a Next.js app that mounts the same API, used to test mounting
@@ -127,7 +129,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 
 | File | What it does |
 |---|---|
-| `lint-args.ts` | `bun run lint:args`: fails an exported function, constructor, method or function type with three or more positional parameters, over `packages/mithaq/src`, the registry and `templates/asas/src`. `lint-args.test.ts` and `lint-args.fixture.ts` test it. |
+| `lint-args.ts` | `bun run lint:args`: fails an exported function, constructor, method or function type with three or more positional parameters, over `packages/mithaq/src`, the registry and the template's packages. `lint-args.test.ts` and `lint-args.fixture.ts` test it. |
 | `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package), `.pack/mithaq-admin/` (the pieces as source, at the same version) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
 | `release.ts` | `node apps/release.ts <version>` commits the version and tags it; `--publish` is release.yml's publish step. `release.test.ts` tests it. |
 | `release-consumer.ts` | `bun run test:release`: makes a project from the staged packages as `bun create mithaq` does, then typechecks, migrates, builds and boots it and runs `mithaq generate --check`. |
@@ -139,7 +141,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 
 ### Where tests and generated files go in the repository
 
-- Template tests sit in `templates/asas/src` and `templates/auth/src` as `*.test.ts`, with helpers named `test-*.ts`, `*.support.ts`, `*.fixture.*`, `memory-store.ts` and `standard-schema-target.ts`. `types.probe.ts` holds type probes, and `storage/r2.smoke.ts` runs against a real bucket with `bun run test:r2`. `apps/pack.ts` leaves all of these out of a new project.
+- Template tests sit in `templates/asas/src` as `*.test.ts`, and a test of one file beside it in `templates/mithaq/src` or a feature, with helpers named `test-*.ts`, `*.support.ts`, `*.fixture.*`, `memory-store.ts` and `standard-schema-target.ts`. `types.probe.ts` holds type probes, and `storage/r2.smoke.ts` runs against a real bucket with `bun run test:r2`. `apps/pack.ts` leaves all of these out of a new project.
 - Package tests sit beside their source in `packages/mithaq/src`, in `packages/mithaq-admin/test/`, and in `packages/create-mithaq/index.test.ts`. App tests sit in `apps/asas-tanstack/src`.
 - `bun run test` runs `lint:args` and every `*.test.ts`. `bun run typecheck` runs the root config and the configs of `packages/mithaq-admin` and both apps.
 - Generated files in the template and apps are committed, as they are in a project. Build output is not: `.pack/` and `node_modules/` are ignored.

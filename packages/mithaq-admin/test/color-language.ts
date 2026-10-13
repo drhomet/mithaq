@@ -22,7 +22,7 @@ import {
   zodKinds,
   zodTarget,
 } from 'mithaq'
-import { dashboardScreen } from '../../../templates/asas/src/mithaq.ts'
+import { dashboardScreen } from '../../../templates/mithaq/src/mithaq.ts'
 
 const color = kind<string>((value): value is string => typeof value === 'string')({
   label: { en: 'Color', ar: 'لون' },

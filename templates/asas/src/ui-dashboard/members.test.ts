@@ -5,8 +5,8 @@ import type { AccessReport, LoaderTools } from '../../../../packages/mithaq/src/
 import '../../../../packages/mithaq-admin/test/tsx.ts'
 
 const { loader } = await import('./members.tsx')
-const { grantable, isOwner, managesRoles } = await import('../roles/grants.ts')
-const { tenantRoles } = await import('../tenant-roles.ts')
+const { grantable, isOwner, managesRoles } = await import('../../../mithaq/src/roles/grants.ts')
+const { tenantRoles } = await import('../../../mithaq/src/roles/tenant-roles.ts')
 
 type Listed = { userId: string; role?: string; createdAt: string; user: { name: string; email: string } }
 

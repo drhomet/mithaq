@@ -1,0 +1,22 @@
+{
+  "name": "@asas/courses",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./domain/*": "./domain/*"
+  },
+  "dependencies": {
+    "@asas/mithaq": "*",
+    "mithaq": "*",
+    "mithaq-admin": "*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.3.0",
+    "@tanstack/react-query": "^5.104.0"
+  }
+}

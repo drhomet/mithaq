@@ -34,14 +34,15 @@ const language = defineMithaq({
     service: serviceTarget({ /* ... */ }),
     dashboard: dashboardScreen,
   },
-  generate: { auth: 'src/kayan/auth/', messages: 'src/messages/', screens: { /* ... */ } },
+  // Each path is from the folder every mithaq command runs in, the asas's.
+  generate: { language: '@asas/mithaq', features: '../features/', auth: '../features/auth/', providers: '@asas/mithaq/auth', messages: 'src/messages/', migrations: 'src/migrations/', screens: { /* ... */ } },
 })
 
 export const { defineKayan, defineGlobal, buildAsas, rows, user, targets: { tenant } } = language
 ```
 
 Where it lives: `packages/mithaq/src/mithaq/language.ts` `defineMithaq`; the
-template's language is `templates/asas/src/mithaq.ts`.
+template's language is `templates/mithaq/src/mithaq.ts`.
 
 ### Root keys
 
@@ -246,7 +247,7 @@ export const tags = defineKayan({
 ```
 
 Where it lives: `packages/mithaq/src/mithaq/define.ts` `defineKayan`; the
-example is `templates/asas/src/tags/tags.ts`.
+example is `templates/features/tags/tags/tags.ts`.
 
 **Fields.** The key order of `fields` is the column order. Each field names a
 `kind`, a `label` in every locale, and its `rules`. It may also carry a
@@ -320,7 +321,7 @@ const markArchived = (ctx: Ctx<z.infer<typeof archiveInput>>): Ctx => {
 }
 ```
 
-The example is `templates/asas/src/courses/courses.ts` `markArchived`.
+The example is `templates/features/courses/courses/courses.ts` `markArchived`.
 
 **Indexes.** `indexes` lists the indexes over a kayan's own columns. Every
 field with `unique: true` gets a default unique index. A list is built beside
@@ -391,7 +392,7 @@ export const settings = defineGlobal({
 ```
 
 A global that places the organization field is one row per organization; the
-template's `templates/asas/src/settings/settings.ts` is one, and
+template's `templates/features/settings/settings/settings.ts` is one, and
 [Tenancy](src/asas/runner/README.md#globals) shows what changes. Where it lives:
 `packages/mithaq/src/mithaq/define.ts` `defineGlobal`.
 
@@ -608,7 +609,7 @@ A key a role names that is not in the catalog fails the build.
 The access target (`rbacTarget`) holds two kinds of role:
 
 - **System roles** are code: a slug, a label and the keys it holds (`'*'` for
-  every key). The template's are `templates/asas/src/roles.ts` `systemRoles`:
+  every key). The template's are `templates/mithaq/src/roles/system-roles.ts` `systemRoles`:
   the platform's and the organizations' (`administrator`, `registrar`,
   `instructor`, `student`).
 - **Custom roles** are rows of the `roles` kayan, each organization's own:
@@ -652,7 +653,7 @@ by every per-organization kayan; a kayan drops it with `access: { tenant: false
 }`, and a callback written beside the rows is ANDed with them.
 
 Where it lives: `packages/mithaq/src/mithaq/rows.ts` `rows`; the template's
-table is `templates/asas/src/tenant-access.ts` `tenantAccess`.
+table is `templates/mithaq/src/roles/tenant-access.ts` `tenantAccess`.
 
 ## Screens
 
@@ -698,7 +699,7 @@ A rukn is one object made with `defineRukn({ name, kinds, rules, targets, needs 
 - **targets** it builds, which merge with the project's own (the storage rukn builds the storage target over the config it is handed);
 - **needs**, the capabilities it requires of the build, such as `needs: ['store']`. A need names a capability, never a target type, so any store meets `'store'`.
 
-A project adds a rukn with one line in `arkan` in `templates/asas/src/mithaq.ts`, and one line in `targets` for each capability the rukn needs that the build does not already lay down.
+A project adds a rukn with one line in `arkan` in `templates/mithaq/src/mithaq.ts`, and one line in `targets` for each capability the rukn needs that the build does not already lay down.
 
 ```ts
 import { defineRukn, kind } from 'mithaq'
@@ -724,7 +725,7 @@ export const slugs = defineRukn({
   },
 })
 
-// templates/asas/src/mithaq.ts
+// templates/mithaq/src/mithaq.ts
 export const arkan = [base, richText({ nodes: richTextNodes }), guardedFiles, versions({ max: 100 }), slugs] as const
 ```
 
@@ -765,7 +766,7 @@ A target of an existing capability can be the project's own and spreads into `ta
 
 1. **Every default has a name, and the project passes it.** Core never writes `config.verify ?? coreVerify`. A default's name starts with `default`.
 2. **`buildAsas` refuses a config that leaves a default out**, naming the key. The storage target refuses a config with no `verify`, saying "storage names no "verify" function", and the build refuses a config with no `http` plug.
-3. **A default that holds policy lives in the project.** What a valid file is, how a key is built and which orphans the sweep deletes are registry files copied to `templates/asas/src/<target>/defaults.ts`, not core code.
+3. **A default that holds policy lives in the project.** What a valid file is, how a key is built and which orphans the sweep deletes are registry files copied to `templates/mithaq/src/<target>/defaults.ts`, not core code.
 4. **Operations are spread, never injected.** A target ships `<target>Operations` built from exported `default*` steps, and a kayan spreads it beside `defaultOperations`, as `versionOperations` is spread into `courses`.
 5. **Core keeps only what is not a choice,** and the target's documentation says why each piece core keeps is not the project's. If you cannot write the reason, the piece belongs to the project.
 6. **Replacing a default must not need core's internals.** The building blocks a default calls are exported, and the default's tests ship beside it.
@@ -779,7 +780,7 @@ A target of an existing capability can be the project's own and spreads into `ta
 2. **Add the vocabulary:** the target, or the kind in the rukn that brings it, under `packages/mithaq/src/<target>/`. The lock goes red and stays red until the owner signs at the end.
 3. **Write the core building blocks and their types,** each project-facing function taking one object. Give the target constructor a `type`. If a kayan writes anything under the target, augment `KayanConfigs` with that type's shape, as `packages/mithaq/src/versions/index.ts` does. Export it from `packages/mithaq/src/index.ts`.
 4. **Write the defaults,** as registry files under `packages/mithaq-admin/registry/<target>/` where they hold policy or talk to the outside world, otherwise as exported `default*` values.
-5. **Name every function in the template's config,** in `templates/asas/src/mithaq.ts` or a file it imports, such as `templates/asas/src/storage/index.ts`.
+5. **Name every function in the template's config,** in `templates/mithaq/src/mithaq.ts` or a file it imports, such as `templates/mithaq/src/storage/index.ts`.
 6. **Write the tests:** the security cases first, each default's own tests, a test that `buildAsas` refuses the config with each function removed, and a test that a replaced default is called rather than silently ignored. Add a `@ts-expect-error` probe for the rukn to `templates/asas/src/types.probe.ts`.
 7. **Document it:** what is a default, what core keeps and why, and how to replace each default.
 
@@ -795,9 +796,9 @@ Before review, check that:
 
 Storage adapters, auth strategies, rich-text nodes, the service target's limits and the HTTP plugs are all configured the same way: the project names every piece, and core supplies named defaults for it to name.
 
-- **A list the project extends is spread.** Rich text nodes are `[...defaultNodes, UploadNode]` in `templates/asas/src/rich-text-nodes.ts`, the one list the server and every editor read. A node that draws React keeps its DOM-free class there and its React subclass in the client file.
+- **A list the project extends is spread.** Rich text nodes are `[...defaultNodes, UploadNode]` in `templates/mithaq/src/mithaq/rich-text-nodes.ts`, the one list the server and every editor read. A node that draws React keeps its DOM-free class there and its React subclass in the client file.
 - **A value or a function the project may replace is named.** The service target names `authorize: defaultAuthorize`, `depth: defaultDepth`, `defaultLimit`, `maxLimit: defaultMaxLimit`, `joinLimit: defaultJoinLimit` and `bulkLimit: defaultBulkLimit`. Local auth names `tokenExpiration: defaultTokenExpiration`, `maxLoginAttempts: defaultMaxLoginAttempts` and `lockTime: defaultLockTime`. To change one, put your own value or function in its place.
-- **A default that holds policy or talks to the outside world is a registry file.** The storage adapters (`local`, `r2`, `s3`, `uploadthing`) and `defaults.ts` in `templates/asas/src/storage/` are copies of the `mithaq-storage` item. `templates/asas/src/storage/index.ts` names each of `defaultKey`, `defaultVerify`, `defaultDisposition`, `defaultSweep`, `defaultUploadInstructions`, `defaultUploaded`, `defaultRemoveFile` and `defaultServeFile`. To add an adapter, write it beside the others and add it to `adapters`; to change a policy, edit `defaults.ts`.
+- **A default that holds policy or talks to the outside world is a registry file.** The storage adapters (`local`, `r2`, `s3`, `uploadthing`) and `defaults.ts` in `templates/mithaq/src/storage/` are copies of the `mithaq-storage` item. `templates/mithaq/src/storage/index.ts` names each of `defaultKey`, `defaultVerify`, `defaultDisposition`, `defaultSweep`, `defaultUploadInstructions`, `defaultUploaded`, `defaultRemoveFile` and `defaultServeFile`. To add an adapter, write it beside the others and add it to `adapters`; to change a policy, edit `defaults.ts`.
 - **Core never falls back.** A missing piece is refused when the project builds, never filled in. A storage config without `verify`, a build without `http`, or a service target without `authorize` is a configuration error, not a default.
 
 Tenancy has no default to replace. Scoping a per-organization kayan to the active organization is not a choice, so core enforces it on every managed operation and nothing turns it off. See [Tenancy](src/asas/runner/README.md).
