@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { Plugin } from 'vite'
 
 /**
@@ -23,11 +23,13 @@ export const mithaqAdmin = (ejected: string): Plugin => {
     // No `server.warmup` of the package: measured cold, it served the first page 0.7 s later and loaded the
     // client 1 s sooner, and it set the optimizer discovering dependencies no page asked for yet.
     config: () => ({ optimizeDeps: { exclude: ['mithaq-admin'] } }),
-    async resolveId(source, importer, options) {
-      const file = (await this.resolve(source, importer, { ...options, skipSelf: true }))?.id.split('?')[0]
-      if (!file?.startsWith(registry)) return
-      const own = join(ejected, relative(registry, file))
-      return existsSync(own) ? own : file
+    // By the specifier, not by resolving it: published as `@drhomet/mithaq-admin`, a piece in a store's folder cannot
+    // reach `mithaq-admin/<file>` by walking up, so the plugin answers for every importer.
+    resolveId(source) {
+      const [, file] = /^mithaq-admin\/(.+\.tsx?)$/.exec(source) ?? []
+      if (!file) return
+      const own = join(ejected, file)
+      return existsSync(own) ? own : join(registry, file)
     },
   }
 }
