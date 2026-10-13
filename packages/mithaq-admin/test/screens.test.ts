@@ -997,6 +997,6 @@ test('a field keeps its box when a when hides a node before it, so typing never 
   assert.ok(host.querySelector('#courses-summary') && later, 'the summary is shown while the title matches')
   await act(async () => type(title, 'Tajwee'))
   assert.equal(host.querySelector('#courses-summary'), null, 'and hidden once it does not')
-  assert.equal(host.querySelector('#courses-title'), title, 'the title is the same box, not a new one')
-  assert.equal(host.querySelector('#courses-currency'), later, 'and so is a field in a later run whose own earlier node was hidden')
+  assert.equal(host.querySelector('#courses-title') === title, true, 'the title is the same box, not a new one')
+  assert.equal(host.querySelector('#courses-currency') === later, true, 'and so is a field in a later run whose own earlier node was hidden')
 })
