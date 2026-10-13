@@ -19,10 +19,10 @@ The name is Arabic for a covenant. The other words in the API are Arabic too, an
 ## Quick start
 
 ```sh
-bun create mithaq my-app
+bun create mithaq my-app --full
 ```
 
-This creates a Bun workspace of the template's three steps, the language (`packages/mithaq`), a package per feature (`packages/features/*`) and the asas that builds them (`packages/asas`), and two apps: the tenant app (`apps/asas-tanstack`), which serves the dashboard and the portal, and the platform console (`apps/asas-platform`), for staff who work across every organization. It writes a `.env` with fresh secrets and runs `bun install`.
+This creates a Bun workspace of the template's three steps, the language (`packages/mithaq`), a package per feature (`packages/features/*`) and the asas that builds them (`packages/asas`), and two apps: the tenant app (`apps/asas-tanstack`), which serves the dashboard and the portal, and the platform console (`apps/asas-platform`), for staff who work across every organization. It writes a `.env` with fresh secrets and runs `bun install`. `--full` takes every add-on, the whole worked example; without it the project is minimal, auth and a `tags` example, and `--with roles,courses` picks add-ons.
 
 Then, with PostgreSQL 15 or later serving the database that `DATABASE_URL` names in `packages/asas/.env`:
 
@@ -124,7 +124,7 @@ organization: tenant.field,
 - **Validation:** zod schemas derived from every kayan (`zodTarget`). A field can carry its own zod shape instead.
 - **Runtime:** the operation runner (`serviceTarget`) with the default operations (create, update, delete, find, findByID, count, updateMany, deleteMany), steps around every write, an audit step, soft delete and bulk limits.
 - **HTTP:** plain fetch routes (`fetchHttp`), or a typed client and OpenAPI through oRPC (`mithaq/orpc`).
-- **Access:** role-based access with permission keys per operation and per field (`rbacTarget`, or `betterAuthTarget` to keep roles in Better Auth's own tables).
+- **Access:** role-based access with permission keys per operation and per field (`rbacTarget`, `betterAuthTarget` to keep roles in Better Auth's own tables, or `memberRoleTarget` for Better Auth's own member roles alone).
 - **Tenancy:** `betterAuthTenant`, over Better Auth organizations.
 - **Auth:** Better Auth (`betterAuth`) or local accounts (`local`), with `mithaq generate auth` writing the Better Auth kayan.
 - **Versions and drafts:** the `versions` rukn keeps a row's past versions, with drafts, autosave and restore.

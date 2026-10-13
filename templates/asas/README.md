@@ -16,15 +16,27 @@ bun create mithaq my-app
 
 This copies the template into `my-app`, pins `mithaq` to the published package, and runs `bun install`. If it was not started by Bun, it skips the install and tells you to run `bun install` yourself. Install with Bun only: the admin screens find their files through Bun's isolated installer, and npm, pnpm and yarn lay `node_modules` out differently.
 
+A project starts minimal: the language, the asas, the `auth` feature and the `tags` example. `--full` adds every add-on, the whole worked example this guide walks through, and `--with roles,settings` picks some, each with the add-ons it needs. Asked with neither, it offers minimal, full or pick.
+
+| Add-on | What it brings |
+| --- | --- |
+| `roles` | Roles a tenant writes itself (`roles`), who holds which (`memberRoles`) and the Members page. Without it, a member holds what Better Auth's own `member.role` names: `owner` and `admin` every key, `member` what `packages/mithaq/src/roles/default-member-roles.ts` lists. |
+| `audit-log` | The `auditLog` kayan, the `audit` step that writes one row per change, and the activity panel on each edit page. |
+| `settings` | The `settings` global, one row per organization. |
+| `courses` | The worked example: courses, sessions, enrollments and the media a cover is picked from, with the business roles that work them. Needs `roles` and `audit-log`. |
+| `platform` | The platform console, `apps/asas-platform`. A single package cannot hold it. |
+
+An add-on brings kayan and pages, never words: every project speaks the same language, so rich text and file uploads are in each one's `src/mithaq.ts` whether or not a kayan uses them. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
+
 What you get is a Bun workspace:
 
 | Folder | What it is |
 | --- | --- |
 | `packages/mithaq` | The language, `@my-app/mithaq`. `src/mithaq.ts` declares its locales, its arkan (singular rukn, a pillar: a pluggable part that brings kinds, rules or fields), its targets and its screens. Beside it sit the Better Auth setup (`src/mithaq/auth/`), the roles (`src/roles/`), storage, the shared screen pieces and everything else the language or more than one feature reads. |
-| `packages/features/<feature>` | One package per feature, `@my-app/<feature>`, each holding one or more kayan (an entity, one data type), each kayan in a folder of its own, such as `packages/features/courses/courses/` or `packages/features/tags/tags/`. |
+| `packages/features/<feature>` | One package per feature, `@my-app/<feature>`, each holding one or more kayan (an entity, one data type), each kayan in a folder of its own, such as `packages/features/tags/tags/`. |
 | `packages/asas` | The asas, the runtime: `src/asas.ts` builds it from every feature's kayan. It also holds `src/migrations/`, `src/messages/`, each screen's own pages and `src/seed.ts`, and every `mithaq` command runs here. |
 | `apps/asas-tanstack` | The tenant app, built on TanStack Start. It serves the dashboard at `/dashboard` and the portal at `/portal`, on `http://localhost:5173`. |
-| `apps/asas-platform` | The platform console, for staff who work across every organization, on `http://localhost:5174`. |
+| `apps/asas-platform` | With the platform add-on, the platform console, for staff who work across every organization, on `http://localhost:5174`. |
 
 At the root it also writes `bunfig.toml`, which turns on the isolated linker, a `.gitignore`, and a `tsconfig.json`.
 
@@ -79,9 +91,9 @@ Each `dev` script first runs `mithaq lock --check`. The template has no `mithaq.
 
 ### 5. Sign up and seed
 
-Open `http://localhost:5173/auth/sign-up` and sign up as `admin@admin.com` with the organization "Admin org". Signing up creates the organization, makes you its owner, and gives you the `administrator` role, which holds every permission in that organization.
+Open `http://localhost:5173/auth/sign-up` and sign up as `admin@admin.com` with the organization "Admin org". Signing up creates the organization and makes you its owner, which holds every permission in that organization: through the `administrator` role the roles add-on gives an owner, or through `owner` itself without it.
 
-Then fill the organization with sample courses, sessions, tags and roles:
+Then fill the organization with sample rows of what the project holds: tags, and with the add-ons courses, sessions, enrollments, roles and settings:
 
 ```sh
 cd packages/asas
@@ -295,13 +307,13 @@ packages/mithaq/
     steps/            steps ejected from mithaq-admin
 ```
 
-**`src/mithaq.ts`** declares the language with one `defineMithaq` call and exports what it returns: `defineKayan`, `defineGlobal`, `buildAsas`, `rows`, `user`, `generate`, `locales`, `targets` and the tenant target. It also exports `organization`, the tenant target's field with a label, which every per-organization kayan places. The arkan (`base`, `richText`, the storage rukn and `versions`), the server targets (`drizzle`, `zod`, `rbac`, `tenant`, `service`) and the three screens (`dashboard`, `portal`, `platform`) are laid down here. `generate` names, from `packages/asas` where every `mithaq` command runs, where each writes and reads: the language the generated kayan import, the features folder, the auth kayan, the providers module, the messages and migrations folders and each screen's routes folder in an app. The language names the asas's folder (its migrations and each screen's own pages) and the courses feature's session labels by path, and imports neither.
+**`src/mithaq.ts`** declares the language with one `defineMithaq` call and exports what it returns: `defineKayan`, `defineGlobal`, `buildAsas`, `rows`, `user`, `generate`, `locales`, `targets` and the tenant target. It also exports `organization`, the tenant target's field with a label, which every per-organization kayan places. The arkan (`base`, `richText`, the storage rukn and `versions`), the server targets (`drizzle`, `zod`, `rbac`, `tenant`, `service`) and the three screens (`dashboard`, `portal`, `platform`) are laid down here. `generate` names, from `packages/asas` where every `mithaq` command runs, where each writes and reads: the language the generated kayan import, the features folder, the auth kayan, the providers module, the messages and migrations folders and each screen's routes folder in an app. The language names the asas's folder (its migrations and each screen's own pages) and, with the courses add-on, its session labels by path, and imports neither.
 
 **`src/mithaq/auth/`** is the Better Auth setup: `index.ts` holds the options and instances (`providers`), the platform session, `asPlatform` and `onPlatform`, and the two apps' URLs; `platform-roles.ts` the platform roles staff hold on `user.role`, the columns staff read, and `secret`, the columns no platform role reads. It is imported as `@my-app/mithaq/auth`.
 
 **Access and roles.**
 
-- `roles/tenant-roles.ts` holds the roles every organization has, written in code and never stored as rows. A key is `<kayan>.<operation>`, `<kayan>.fields.<field>` or `screen.<screen>`.
+- `roles/tenant-roles.ts` holds the roles every organization has, written in code and never stored as rows. A key is `<kayan>.<operation>`, `<kayan>.fields.<field>` or `screen.<screen>`. Without the roles add-on they are Better Auth's own `owner`, `admin` and `member`, from `roles/default-member-roles.ts`, and the access target is `memberRoleTarget`, which answers each member what its `member.role` names in that organization.
 - `roles/system-roles.ts` joins them with the platform roles into `systemRoles`, which the access target takes.
 - `roles/tenant-access.ts` holds the row table every per-organization kayan inherits, the reader that answers an actor's roles, and the platform's checks; `roles/grants.ts` what the role form and the server both read.
 - `roles/statements.ts` holds the keys the project adds beside the kayan's own operations.
@@ -648,6 +660,10 @@ A component of the project's own lives in a `ui` folder beside the kayan that dr
 The screens draw with the pieces of `mithaq-admin`, which each app imports as `mithaq-admin/<file>`. To change a control, a cell or a node, replace it in the components map in `src/components.ts`. To change a piece the map does not hold, run `bunx mithaq eject <item>` in the app: it writes the piece into `src/components/mithaq/`, and that file is drawn in place of the package's from then on. [The admin package](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md) describes the pieces, ejecting one, and migrating a project made before the package.
 
 An ejected file is the project's own. A project edits it in place and never patches it from outside. After an edit, `upgrade --check` reports it as edited. When the installed package changes the same file, diff the two and merge by hand, or delete an unedited one (`bunx mithaq eject --prune`) to draw the package's.
+
+### Add an add-on
+
+No command adds an add-on yet. Make two throwaway projects at your mithaq version, one with the add-on and one without, with `bun create mithaq` and the same other add-ons as yours; `git diff --no-index` between them shows exactly what the add-on brings: its feature folder, its own files, the dependency in `packages/asas/package.json`, and the lines it adds to the language, the asas and the tenant app's `copy.ts`. Copy those in, then run `bunx mithaq generate screens`, `bunx mithaq generate messages` and `bunx mithaq migrate --name add_<add-on>` from `packages/asas`. Adding `roles` also takes `default-member-roles.ts` out of `tenant-roles.ts`.
 
 ### Tests
 
