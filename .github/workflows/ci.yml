@@ -49,6 +49,7 @@ jobs:
       - run: bun run test
       - run: bun run test:tanstack
       - run: bun run test:next
+      - run: bun run pack
       - run: bunx mithaq generate --check && bunx mithaq upgrade --check
         working-directory: templates/asas
 

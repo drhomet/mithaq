@@ -150,16 +150,17 @@ The three packages share one version, `publishConfig.version` in `packages/mitha
 
 ```sh
 node apps/release.ts 0.2.0          # on a clean, up-to-date main: commits the version and tags v0.2.0
-git push origin main --follow-tags
+git push --atomic origin main v0.2.0
 ```
 
-Then approve the `release` run in the repository's Actions tab. It runs every check, publishes the three packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release from the commit subjects since the previous tag. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
+The `release` run runs every check and stages the packages, then waits for the maintainer's approval in the repository's Actions tab. Approved, it publishes the three packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release from the commit subjects since the previous tag. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
 
 Set up once:
 
-1. Publish `@drhomet/mithaq-admin` once by hand; trusted publishing cannot create a package.
-2. On npmjs.com, for each of `@drhomet/mithaq`, `@drhomet/mithaq-admin` and `create-mithaq`, add a Trusted Publisher: GitHub Actions, repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`. Then set Publishing access to "Require two-factor authentication and disallow tokens", and revoke the old tokens.
-3. In the repository's settings, create the environment `npm` with the maintainer as required reviewer and deployment tags limited to `v*`, and add a tag ruleset so only the maintainer creates `v*` tags.
+1. Publish `@drhomet/mithaq-admin` once by hand, since trusted publishing cannot create a package: `bun run pack && npm publish .pack/mithaq-admin --access public`.
+2. Tag the current release, so the next release's notes start there rather than at the first commit: `git tag -a v0.1.1 4527ae1 -m v0.1.1 && git push origin v0.1.1`. That commit has no `release.yml`, so the tag starts no run.
+3. On npmjs.com, for each of `@drhomet/mithaq`, `@drhomet/mithaq-admin` and `create-mithaq`, add a Trusted Publisher: GitHub Actions, repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`, allowed action `npm publish`. Then set Publishing access to "Require two-factor authentication and disallow tokens", and revoke the old tokens.
+4. In the repository's settings, create the environment `npm` with the maintainer as required reviewer and deployment tags limited to `v*`, and add a tag ruleset so only the maintainer creates `v*` tags.
 
 ## Send a pull request
 
