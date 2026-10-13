@@ -173,6 +173,26 @@ const sendInvitationEmail = async ({ id, email }: { id: string; email: string })
   console.log(`[asas auth] Invitation link for "${email}": ${new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href}`)
 }
 
+/**
+ * The provider's organization limits, each set here so none is a silent default of the provider's:
+ * left unset, anyone signed in founds organizations without end, and an organization stops taking
+ * members and listing them at 100.
+ *
+ * - `allowUserToCreateOrganization`: sign-up founds each person's own organization.
+ * - `organizationLimit`: a person who belongs to this many organizations, however they joined, founds
+ *   no more, so one account cannot fill the database with organizations. An invitation still adds
+ *   them to more.
+ * - `membershipLimit`: the members one organization holds, and the most `list-members` answers
+ *   unasked; the Members page pages past it.
+ * - `invitationLimit`: the pending invitations one organization holds.
+ */
+export const organizationLimits = {
+  allowUserToCreateOrganization: true,
+  organizationLimit: 5,
+  membershipLimit: 10_000,
+  invitationLimit: 1_000,
+}
+
 // These options do not depend on this project's vocabulary, so `mithaq generate auth` reads the
 // same schema the runtime builds.
 //
@@ -181,6 +201,7 @@ const sendInvitationEmail = async ({ id, email }: { id: string; email: string })
 // gating it would make creating an organization impossible. `member.create` is left to the
 // provider's static roles.
 const organizationOptions = {
+  ...organizationLimits,
   dynamicAccessControl: { enabled: true as const },
   // An organization that was ever used holds rows that cannot all be removed (an audit log,
   // settings, its last administrator), and every tenant key is `restrict`, so deletion is off over

@@ -14,14 +14,30 @@ const tools = (members: Listed[], access: AccessReport = {}, rows: Record<string
   const asked: string[] = []
   return {
     asked,
-    client: async ({ kayan }) => {
+    // Both answer a page at a time, as the provider and the runner do.
+    client: async ({ kayan, input }) => {
       asked.push(kayan)
-      return { docs: rows[kayan] ?? [] }
+      const page = (input as { page?: number } | undefined)?.page ?? 1
+      return { docs: (rows[kayan] ?? []).slice((page - 1) * 100, page * 100), totalDocs: (rows[kayan] ?? []).length }
     },
-    request: async () => Response.json({ members }),
+    request: async (path) => {
+      const offset = Number(new URL(path, 'http://test').searchParams.get('offset') ?? 0)
+      return Response.json({ members: members.slice(offset, offset + 100), total: members.length })
+    },
     access,
+    maxLimit: 100,
   }
 }
+
+test('the loader reads every member and every assignment, page after page, so an organization past one page is drawn whole', async () => {
+  const many = Array.from({ length: 250 }, (_, at) => ({ userId: String(at), role: 'member', createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, at)).toISOString(), user: { name: `Person ${at}`, email: `p${at}@example.com` } }))
+  const assigned = many.map((one) => ({ id: `r${one.userId}`, user: one.userId, role: 'student' }))
+  const given = tools(many, { permissions: ['memberRoles.find'] }, { memberRoles: assigned })
+  const { members } = await loader(given)
+  assert.equal(members.length, 250, 'every member, not the first hundred')
+  assert.ok(members.every((one) => one.roles.length === 1), 'each with the role assigned past the first page too')
+  assert.deepEqual(members.slice(0, 2).map((one) => one.userId), ['0', '1'], 'in the order they joined')
+})
 
 test("a member whose createdAt does not parse draws empty rather than throwing and failing the whole page", async () => {
   const { members } = await loader(

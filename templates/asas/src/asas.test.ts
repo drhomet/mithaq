@@ -6726,6 +6726,31 @@ test('226e. over asas.handler the provider\'s member reads answer people only to
   assert.equal((await read(`list-members?organizationId=${a}`, otherOwner.headers)).status, 403, 'and a stranger to this organization reads none of it')
 })
 
+test('226f. over asas.handler a person founds organizations only while they belong to fewer than five', async () => {
+  const founder = await signedUp('founder-226f')
+  const found = (n: number) => asas.handler(new Request('http://test/api/auth/user/organization/create', {
+    method: 'POST',
+    headers: { cookie: founder.headers.get('cookie') ?? '', 'content-type': 'application/json', origin: 'http://localhost:5173' },
+    body: JSON.stringify({ name: `Founded 226f ${n}`, slug: `founded-226f-${n}` }),
+  }))
+  for (const n of [1, 2, 3, 4, 5]) assert.equal((await found(n)).status, 200, `organization ${n} is founded`)
+  const sixth = await found(6)
+  assert.equal(sixth.status, 403, 'a sixth is refused')
+  assert.equal(((await sixth.json()) as { code?: string }).code, 'YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS')
+})
+
+test('226h. an organization takes and lists members past the provider\'s silent hundred', async () => {
+  const owner = await signedUp('owner-226f')
+  const organization = (await server.api.createOrganization({ body: { name: 'Crowd 226f', slug: 'crowd-226f' }, headers: owner.headers }))!.id as string
+  // Written straight through SQL: a hundred sign-ups would hash a hundred passwords.
+  await db.execute(`insert into "user" (id, name, email, email_verified, created_at, updated_at) select 'crowd-226f-' || n, 'Crowd ' || n, 'crowd-226f-' || n || '@example.com', false, now(), now() from generate_series(1, 100) n`)
+  await db.execute(`insert into member (id, organization_id, user_id, role, created_at) select 'crowd-226f-member-' || n, '${organization}', 'crowd-226f-' || n, 'member', now() from generate_series(1, 100) n`)
+  const late = await signedUp('late-226f')
+  await server.api.addMember({ body: { userId: late.id, organizationId: organization, role: 'member' } })
+  const listed = (await (await asas.handler(new Request('http://test/api/auth/user/organization/list-members', { headers: { cookie: owner.headers.get('cookie') ?? '' } }))).json()) as { members: unknown[]; total: number }
+  assert.deepEqual([listed.members.length, listed.total], [102, 102], 'the hundred-and-second member is taken and listed')
+})
+
 test('229a. over asas.handler an invitation is accepted only by the person signed in under its address, verified or not, makes them a member with that organization active, and is refused once accepted, cancelled or expired', async () => {
   const owner = await signedUp('owner-229a')
   const made = await server.api.createOrganization({ body: { name: 'Tenant 229a', slug: 'tenant-229a' }, headers: owner.headers })
