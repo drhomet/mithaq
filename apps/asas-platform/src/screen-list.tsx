@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactElement } from 'react'
 import { ListContext, useScreen } from 'mithaq/admin/react'
 import { Button } from '@/components/ui/button'
-import { List, type ListProps, type Page } from './components/mithaq/list.tsx'
+import { List } from './components/mithaq/list.tsx'
+import type { ListProps, Page } from './components/mithaq/list-types.tsx'
 import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from './components/mithaq/list-query.ts'
 import { counted } from './components/mithaq/format.tsx'
 import { listOf } from './components/mithaq/nodes.tsx'
@@ -136,4 +137,4 @@ export function ScreenList({
     </ListContext>
   )
 }
-// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 84fc85dcbd6c3ebbb36401de1f396dbebfa62005d43071b9f6d73f53b53b5d80
+// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 a8ab09598ad19f5750b3b618a1c23177f568e5462ff98c3b3fb0b5891bb86a3d

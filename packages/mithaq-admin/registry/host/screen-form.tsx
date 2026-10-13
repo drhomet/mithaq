@@ -1,6 +1,7 @@
 import { useBlocker, useRouter } from '@tanstack/react-router'
 import { useState, type ReactElement } from 'react'
-import { Form, type FormProps } from './components/mithaq/form.tsx'
+import { Form } from './components/mithaq/form.tsx'
+import type { FormProps } from './components/mithaq/form-types.tsx'
 
 /**
  * A kayan's form on a screen's page. A create moves to the new row's edit page, a delete to the list.

@@ -1,8 +1,12 @@
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
-import { Search as SearchIcon, X } from 'lucide-react'
+import { useEffect, useId, useState, type ComponentProps, type ReactElement, type ReactNode } from 'react'
+import { ChevronDown, Search as SearchIcon, X } from 'lucide-react'
+import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { Translate } from './copy.ts'
+import type { FindApi } from './control-props.ts'
+import { labelFor, type Copy, type Translate } from './copy.ts'
+import { Filters } from './list-filters.tsx'
+import type { FilterWhere } from './list-query.ts'
 
 /** The search box, which asks after 300 ms of stillness and names the fields it runs over. */
 export function Search({
@@ -87,4 +91,102 @@ export function BulkBar({ children, done, said, t, ticked }: {
     </div>
   )
 }
-// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 c286b7c5d870e268fc4ac687a7a0e5bf1462b4a40b6d8654bdc5057f2f3c9480
+
+/**
+ * The row above the table: the search box, the refusal the last run answered with, the list's own buttons, the
+ * filter panel's button and the column picker, and the filter panel under it.
+ */
+export function ListToolbar({ api, children, client, columns, copy, kayan, onSearch, onWhere, paths, refusal, search, searched, where }: {
+  kayan: ClientKayan
+  /** Every kayan of the build, so a search across a relationship names its far field. */
+  client?: readonly ClientKayan[]
+  api?: FindApi
+  copy: Copy
+  search?: string
+  /** The paths a search runs over. */
+  searched: readonly string[]
+  onSearch: (search: string | undefined) => void
+  /** The refusal the last run answered with, so a refused button that closed does not leave the page reading as changed. */
+  refusal?: string
+  /** The paths the filter panel offers, and the filter the URL holds. */
+  paths: ComponentProps<typeof Filters>['paths']
+  where?: FilterWhere
+  onWhere: (where: FilterWhere | undefined) => void
+  /** The list's own buttons and the bulk bar. */
+  children?: ReactNode
+  columns?: ReactNode
+}): ReactElement {
+  const { t, locale } = copy
+  /**
+   * Whether the person has opened or closed the filter panel, and nothing until they do. Until then it is open on a list whose URL filters, read on every render so a `where` that arrives after mount opens it.
+   */
+  const [filtering, setFiltering] = useState<boolean | undefined>(undefined)
+  const open = filtering ?? Boolean(where)
+  const filtersId = useId()
+  return (
+    <>
+      <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-center">
+        <div className="flex flex-1 flex-col gap-2 lg:flex-row lg:items-center">
+          <Search
+            value={search}
+            fields={searched.flatMap((path) => {
+              // A path across a relationship is named by both labels ("Course Title"), so the far field is not
+              // mistaken for the list's own, in the locale's order.
+              const [own, far] = path.split('.')
+              const near = kayan.fields.find((one) => one.name === own)
+              const there = far === undefined ? kayan : client?.find((one) => one.name === near?.relationTo)
+              const field = there?.fields.find((one) => one.name === (far ?? own))
+              if (!there || !field) return []
+              const label = labelFor({ kayan: there, field, copy })
+              if (far === undefined || !near) return [label]
+              return [(t('admin.searchThrough', '{relation} {field}') ?? '{relation} {field}').replace('{relation}', () => labelFor({ kayan, field: near, copy })).replace('{field}', () => label)]
+            })}
+            locale={locale}
+            t={t}
+            onSearch={onSearch}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {refusal ? (
+            <p role="alert" className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive">
+              {t(refusal, refusal)}
+            </p>
+          ) : null}
+          {children}
+          {paths.length ? (
+            <Button
+              type="button"
+              variant={open || where ? 'secondary' : 'outline'}
+              className="max-sm:h-11"
+              aria-controls={open ? filtersId : undefined}
+              aria-expanded={open}
+              onClick={() => setFiltering(!open)}
+            >
+              {t('admin.filters', 'Filters') ?? 'Filters'}
+              <ChevronDown className={open ? 'rotate-180' : undefined} aria-hidden="true" />
+            </Button>
+          ) : null}
+          {columns}
+        </div>
+      </div>
+      {open ? (
+        <div id={filtersId}>
+          <Filters
+            paths={paths}
+            value={where}
+            t={t}
+            locale={locale}
+            client={client}
+            api={api}
+            onChange={(next: FilterWhere | undefined) => {
+              // The person is at work in the panel, so it stays, even where the last filter goes.
+              setFiltering(true)
+              onWhere(next)
+            }}
+          />
+        </div>
+      ) : null}
+    </>
+  )
+}
+// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 703ca7297c6822cbc567352d75dcd7e95b155c430aca9c8a37e50ec9ffb67ae4

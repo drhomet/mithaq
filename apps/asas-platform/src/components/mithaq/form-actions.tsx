@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { Translate } from './copy.ts'
-
-/** Where a row of a kayan that keeps drafts stands: never published, published, or published with a newer draft pending. */
-export type DraftStatus = 'draft' | 'published' | 'changed'
+import type { DraftStatus } from './form-types.tsx'
 
 /** Which copy of a changed row the form shows, and how to show the other. */
 export type Views = { viewing: boolean; choose: (next: string) => Promise<void> }
@@ -227,4 +225,4 @@ export function FormActions({
     </div>
   )
 }
-// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 fd9878d2974242604a5afd279efc54441147c9892a29164eb3f54d26b6ba5d9c
+// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 cf24f1afe7e2f348be0d185290f14784f8e478e6a6cd037295766768be208063

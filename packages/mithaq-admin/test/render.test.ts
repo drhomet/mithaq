@@ -35,7 +35,7 @@ const { filterPathsOf, operatorsByKind } = await import('../registry/filter-oper
 const { findWhere, listRaw, prefixOf, readQuery, readRaw, refined, scopedTo, searchWhere, searchableFields, sortableOf, withList, writeQuery } = await import('../registry/list-query.ts')
 const { columnsOf, withColumns } = await import('../registry/list-columns.tsx')
 const { SelectAll, writableFields } = await import('../registry/list-selection.tsx')
-type Query = import('../registry/list.tsx').Query
+type Query = import('../registry/list-types.tsx').Query
 type ClientKayan = import('mithaq/admin').ClientKayan
 type ClientField = import('mithaq/admin').ClientField
 type PageClient = import('mithaq/admin').PageClient
@@ -445,12 +445,17 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-list-columns',
       'mithaq-list-pagination',
       'mithaq-list-selection',
+      'mithaq-list-types',
       'mithaq-list-button',
       'mithaq-list-row-menu',
       'mithaq-list-table',
       'mithaq-list-toolbar',
+      'mithaq-use-list-state',
+      'mithaq-list-header',
+      'mithaq-list-dialogs',
       'mithaq-list',
       'mithaq-nodes',
+      'mithaq-form-types',
       'mithaq-form-rules',
       'mithaq-form-context',
       'mithaq-field-value',
@@ -459,6 +464,14 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-operation-button',
       'mithaq-form-actions',
       'mithaq-draft-banner',
+      'mithaq-use-form-seed',
+      'mithaq-use-form-refusal',
+      'mithaq-use-draft-view',
+      'mithaq-use-form-save',
+      'mithaq-use-autosave',
+      'mithaq-form-button',
+      'mithaq-form-chrome',
+      'mithaq-form-layout',
       'mithaq-form',
       'mithaq-nav',
       'mithaq-field-shell',
@@ -471,7 +484,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the forty-five items this file knows about',
+    'the registry declares the fifty-eight items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`
@@ -492,19 +505,20 @@ test('12. the app holds the current source of every registry item it copied', ()
   }
 })
 
-test('12b. one form item ships, on TanStack Form, and the boot builds and serves the app once', () => {
+test('12b. one form item ships, its pieces on TanStack Form, and the boot builds and serves the app once', () => {
   // Asserted over the manifest and the source together: a dependency nothing imports is installed for no reason, and an import nothing declares fails to resolve.
   const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {
     items: { name: string; dependencies?: string[]; files: { path: string; target: string }[] }[]
   }
   const forms = source.items.filter((one) => one.files.some((file) => file.target === '@components/mithaq/form.tsx'))
   assert.deepEqual(forms.map((one) => one.name), ['mithaq-form'], 'one item writes the form file')
-  const form = forms[0]!
-  assert.deepEqual(form.dependencies, ['@tanstack/react-form'], 'and it declares the one package it needs')
-  const scoped = [...readFileSync(new URL(`../${form.files[0]!.path}`, import.meta.url), 'utf8').matchAll(/from '(@[a-z@/-]+)'/g)]
-    .map((hit) => hit[1]!)
-    .filter((one) => !one.startsWith('@/'))
-  assert.deepEqual(scoped, ['@tanstack/react-form'], 'which is the one scoped package its source imports')
+  // The form is composed of pieces, so each piece that imports TanStack Form declares it, and no other piece does.
+  const onTanStack = source.items.filter((item) => item.files.some((file) => /from '@tanstack\/react-form'/.test(readFileSync(new URL(`../${file.path}`, import.meta.url), 'utf8'))))
+  assert.ok(onTanStack.some((item) => item.name === 'mithaq-use-form-seed'), 'the form holds its values in TanStack Form')
+  for (const item of source.items) {
+    const scoped = [...new Set(item.files.flatMap((file) => [...readFileSync(new URL(`../${file.path}`, import.meta.url), 'utf8').matchAll(/from '(@tanstack\/react-form)'/g)].map((hit) => hit[1]!)))]
+    assert.deepEqual((item.dependencies ?? []).filter((one) => one.startsWith('@tanstack/react-form')), scoped, `${item.name} declares TanStack Form exactly where its source imports it`)
+  }
 
   const script = (JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')) as { scripts: Record<string, string> }).scripts['test:tanstack']!
   assert.equal(script.split('apps/tanstack-boot.ts').length - 1, 1, 'test:tanstack runs the boot once')

@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { Translate } from './copy.ts'
-
-/** Where a row of a kayan that keeps drafts stands: never published, published, or published with a newer draft pending. */
-export type DraftStatus = 'draft' | 'published' | 'changed'
+import type { DraftStatus } from './form-types.tsx'
 
 /** Which copy of a changed row the form shows, and how to show the other. */
 export type Views = { viewing: boolean; choose: (next: string) => Promise<void> }

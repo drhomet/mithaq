@@ -93,7 +93,7 @@ async function release({ manager, tarball, layout = 'monorepo', platform = layou
     const template = single ? consumer : join(consumer, 'templates/asas')
     // Every copy each workspace holds is read against the `r/` the installed package ships and must be up to date;
     // with no `r/` there the check answers undefined and this fails.
-    for (const [workspace, files] of single ? [[consumer, 61]] as const : [[app, 55], ...(platform ? [[platformApp, 54]] as const : []), [template, 6]] as const) {
+    for (const [workspace, files] of single ? [[consumer, 74]] as const : [[app, 68], ...(platform ? [[platformApp, 67]] as const : []), [template, 6]] as const) {
       installed(workspace, '.bin/mithaq')
       assert.ok(!existsSync(join(workspace, 'node_modules/mithaq-admin')), `${workspace} has no mithaq-admin`)
       const check = spawnSync(process.execPath, ['--input-type=module', '-e', "import { pathToFileURL } from 'node:url'; import { upgradeCheck } from 'mithaq/upgrade'; console.log(JSON.stringify(await upgradeCheck(pathToFileURL(`${process.cwd()}/`))))"], { cwd: workspace, encoding: 'utf8' })
