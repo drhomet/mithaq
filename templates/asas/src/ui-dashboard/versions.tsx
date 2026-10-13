@@ -6,7 +6,7 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { same, type ClientField, type ComponentProps, type Row } from 'mithaq/admin'
 import { FormContext, useAccess, useClient, useKayan, useLocale, useRecord, useScreen } from 'mithaq/admin/react'
-import { empty } from '../audit-log/sink.ts'
+import { empty } from '../mithaq/audit-sink.ts'
 import {
   AlertDialog,
   AlertDialogAction,

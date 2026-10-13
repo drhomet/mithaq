@@ -1712,8 +1712,8 @@ test('132. a tab whose every node its when hides draws no tab, so an actor never
 })
 
 test('170. a create\'s audit entry holds only the fields it set, so the Activity panel draws a line for each and none for a field empty before and after', async () => {
-  const { changesOf } = await import('../../../templates/asas/src/audit-log/sink.ts')
-  const { ActivityEntries } = await import('../../../templates/asas/src/audit-log/ui/activity.tsx')
+  const { changesOf } = await import('../../../templates/asas/src/mithaq/audit-sink.ts')
+  const { ActivityEntries } = await import('../../../templates/asas/src/ui/activity.tsx')
   const row = { id: 'c1', organization: 't1', title: 'Tajweed', fee: 300, summary: null, accessCode: undefined, tags: [], archiveReason: '' }
   const entry = { id: 'e1', createdAt: new Date(0), operation: 'create', actor: null, changes: JSON.stringify(changesOf({}, row)) }
   const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, t: copy.t, locale: 'en' }))
@@ -1722,7 +1722,7 @@ test('170. a create\'s audit entry holds only the fields it set, so the Activity
 })
 
 test('214. the Activity panel names every operation in the viewer\'s locale and a person it may not read in neutral words, never by the raw id', async () => {
-  const { ActivityEntries } = await import('../../../templates/asas/src/audit-log/ui/activity.tsx')
+  const { ActivityEntries } = await import('../../../templates/asas/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
   const entry = { id: 'e1', createdAt: new Date(0), operation: 'restoreVersion', actor: 'u-hidden', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
   for (const [locale, said] of [['en', 'Restored a version by Someone'], ['ar', 'استُعيد إصدار بواسطة شخص ما']] as const) {
@@ -1739,7 +1739,7 @@ test('214. the Activity panel names every operation in the viewer\'s locale and 
 })
 
 test('276a. a command actor reads in the viewer\'s locale for a reader of the people, and as someone for a reader of none', async () => {
-  const { ActivityEntries } = await import('../../../templates/asas/src/audit-log/ui/activity.tsx')
+  const { ActivityEntries } = await import('../../../templates/asas/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
   const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: 'mithaq rbac assign (osuser)', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
   const titles = new Map([['user:mithaq rbac assign (osuser)', false as const]])

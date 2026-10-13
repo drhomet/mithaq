@@ -11,7 +11,7 @@ import { useLocale, useScreen, useUser } from 'mithaq/admin/react'
 import { KpiCard } from '../ui/kpi-card.tsx'
 import { ScreenNav, navLabel } from '../ui/screen-nav.tsx'
 import { PortalTopShell } from '../ui/top-shell.tsx'
-import { onOffer } from '../courses/ui/on-offer.ts'
+import { onOffer } from '../features/courses/courses/ui/on-offer.ts'
 
 /** The lists the home counts, each with its card's icon and the rows its list is held to. */
 const figures: readonly [kayan: string, icon: ReactNode, where?: object][] = [

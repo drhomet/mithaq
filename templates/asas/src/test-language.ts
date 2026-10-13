@@ -4,7 +4,7 @@
 // their assignments point at, whose own declarations write `targets.dashboard`.
 import { defineMithaq, type SystemRoles } from 'mithaq'
 import { accessTarget, arkan, dashboardScreen, platformScreen, portalScreen, serverTargets } from './mithaq.ts'
-import { systemRoles } from './roles.ts'
+import { systemRoles } from './roles/system-roles.ts'
 
 const languageOf = (roles: SystemRoles) => defineMithaq({
   locales: ['ar', 'en'] as const,

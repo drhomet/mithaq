@@ -12,7 +12,7 @@ import type { ProviderProps, Row } from 'mithaq/admin'
 import { useClient, useLocale, useScreen } from 'mithaq/admin/react'
 import { formatDate } from 'mithaq-admin/format.tsx'
 import { nameOfRow, RowLabelContext, titleFieldOf, type UseRowLabel } from 'mithaq-admin/relationship-control.tsx'
-import { coursesOf } from '../enrollments/ui/session-cell.tsx'
+import { coursesOf } from '../features/courses/enrollments/ui/session-cell.tsx'
 
 /** The session's course and its start, or nothing for any other kayan and for a session whose course is not read yet. */
 export const useSessionLabel: UseRowLabel = (target, rows) => {

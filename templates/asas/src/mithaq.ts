@@ -24,12 +24,12 @@ import {
 } from 'mithaq'
 import { richText } from 'mithaq/rich-text'
 import { fileURLToPath } from 'node:url'
-import { auditSink } from './audit-log/sink.ts'
-import { richTextNodes } from './rich-text-nodes.ts'
-import { systemRoles } from './roles.ts'
+import { auditSink } from './mithaq/audit-sink.ts'
+import { richTextNodes } from './mithaq/rich-text-nodes.ts'
+import { systemRoles } from './roles/system-roles.ts'
 import { storageConfig } from './storage/index.ts'
 import { onPlatform } from '@asas/auth'
-import { assignedRoles, platformRolesOf, tenantAccess } from './tenant-access.ts'
+import { assignedRoles, platformRolesOf, tenantAccess } from './roles/tenant-access.ts'
 
 /**
  * A local PostgreSQL on its default port, which `vite dev` falls back to when
@@ -256,14 +256,6 @@ export const portalUi = folderOf(new URL('./ui-portal/', import.meta.url))
 export const platformUi = folderOf(new URL('./ui-platform/', import.meta.url))
 
 /**
- * `courses`, `roles` and `auditLog` keep their page pieces beside their kayan
- * file because nothing else draws with them; the screens below register them.
- */
-const coursesUi = folderOf(new URL('./courses/ui/', import.meta.url))
-const rolesUi = folderOf(new URL('./roles/ui/', import.meta.url))
-const auditLogUi = folderOf(new URL('./audit-log/ui/', import.meta.url))
-
-/**
  * Written once and spread into each screen: what draws each kind and the
  * shared layouts. A piece only one screen draws is written on that screen.
  */
@@ -292,7 +284,7 @@ export const portalScreen = screenTarget({
   // layouts: its own single column, or the dashboard's record layout, which a
   // course's edit page draws.
   layouts: { top: ui('top-shell.tsx#PortalTopShell'), page: portalUi('page.tsx#Page'), record: shared.layouts.record },
-  components: { archive: coursesUi('archive-button.tsx#ArchiveButton') },
+  components: {},
 })
 
 /** The dashboard screen, the tenant back office. The test language narrows it to the kayan a test builds. */
@@ -321,15 +313,11 @@ export const dashboardScreen = screenTarget({
       permission: 'memberRoles.find',
     },
   },
+  // A piece only one kayan draws is named by `ui()` in that kayan's file; these
+  // are drawn by name from many.
   components: {
-    noCourses: coursesUi('no-courses.tsx#NoCourses'),
-    roleForm: rolesUi('role-form.tsx#RoleForm'),
-    // The Roles pages' own pieces: the list with each fixed role locked and its
-    // keys, and a custom role's counted delete.
-    rolesTable: rolesUi('roles.tsx#RolesTable'),
-    deleteRole: rolesUi('roles.tsx#DeleteRole'),
     // A record's own audit entries, which each edit page draws in its side column.
-    activity: auditLogUi('activity.tsx#Activity'),
+    activity: ui('activity.tsx#Activity'),
     // A row's versions, with their restore, which the edit page of a kayan that
     // keeps drafts draws in a tab of its own.
     versions: dashboardUi('versions.tsx#Versions'),
@@ -384,7 +372,8 @@ const language = defineMithaq({
   // serves them: the tenant's two by `apps/asas-tanstack`, the platform by
   // `apps/asas-platform`.
   generate: {
-    auth: 'src/kayan/auth/',
+    features: 'src/features/',
+    auth: 'src/features/auth/',
     language: '../../../mithaq.ts',
     providers: '@asas/auth',
     messages: 'src/messages/',

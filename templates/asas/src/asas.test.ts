@@ -102,19 +102,19 @@ import { storageConfig as templateStorage } from './storage/index.ts'
 import { accessTarget, dashboardScreen, dashboardUi, organization, platformScreen, portalScreen, portalUi, serverTargets as projectTargets, targets as languageTargets } from './mithaq.ts'
 import { asPlatform, authOptions, options, platformRoles, platformURL, providers } from '@asas/auth'
 import { secret, superAdminOnly } from '@asas/auth/platform-roles'
-import { localUsers } from './local-users/local-users.ts'
+import { localUsers } from './features/auth/local-users/local-users.ts'
 import { memoryStore, noRelationship } from './memory-store.ts'
 import { plainTarget } from './standard-schema-target.ts'
-import { assignedRoles, tenantAccess } from './tenant-access.ts'
+import { assignedRoles, tenantAccess } from './roles/tenant-access.ts'
 import { testDatabase } from './test-database.ts'
-import { systemRoles, tenantRoles } from './roles.ts'
+import { systemRoles, tenantRoles } from './roles/system-roles.ts'
 import { buildAsas as buildTestAsas, defineGlobal as defineTestGlobal, defineKayan as defineTestKayan, locales as declaredLocales, narrowed } from './test-language.ts'
-import { betterAuth as authKayan } from './kayan/auth/user/index.ts'
-import { courses as coursesDeclaration } from './courses/courses.ts'
-import { memberRoles } from './member-roles/member-roles.ts'
-import { roles } from './roles/roles.ts'
+import { betterAuth as authKayan } from './features/auth/user/index.ts'
+import { courses as coursesDeclaration } from './features/courses/courses/courses.ts'
+import { memberRoles } from './features/roles/member-roles/member-roles.ts'
+import { roles } from './features/roles/roles/roles.ts'
 
-const authDirectory = new URL('./kayan/auth/user/', import.meta.url)
+const authDirectory = new URL('./features/auth/user/', import.meta.url)
 const authScreens = Object.fromEntries(
   Object.entries(languageTargets as Record<string, { capability?: unknown; kayan?: readonly string[] }>).flatMap(([name, target]) => (target.capability === 'screen' ? [[name, target.kayan ?? []]] : [])),
 )
@@ -602,7 +602,7 @@ const screen = (kayan: readonly string[], controls: Record<string, ScreenKind> =
     // `memberRoles.find` and the dashboard `courses.find`, keys only a build
     // holding those kayan can answer.
     pages: { dashboard: { path: '/', component: dashboardScreen.pages.dashboard!.component } },
-    components: { ...dashboardScreen.components, money: dashboardScreen.components.noCourses },
+    components: { ...dashboardScreen.components, money: dashboardScreen.components.activity },
   })
 
 const screened = (...kayan: string[]) => {

@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import type { ProviderProps } from 'mithaq/admin'
 import { RichTextContext, defaultPicks, defaultViews, viewsOf } from 'mithaq-admin/rich-text-picks.tsx'
 import { UploadPlugin, UploadView, imagePick } from 'mithaq-admin/upload-node.tsx'
-import { richTextNodes } from '../rich-text-nodes.ts'
+import { richTextNodes } from '../mithaq/rich-text-nodes.ts'
 
 // The upload node's `/` entry "Image" opens its dialog in every editor.
 const value = { nodes: viewsOf(richTextNodes, [...defaultViews, UploadView]), picks: [...defaultPicks, imagePick], Plugin: UploadPlugin }

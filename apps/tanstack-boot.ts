@@ -16,7 +16,7 @@ import { asas } from '../templates/asas/src/asas.ts'
 import { testDatabase } from '../templates/asas/src/test-database.ts'
 import { migratedDatabase } from './migrated-database.ts'
 import { platformRoles } from '../templates/auth/src/platform-roles.ts'
-import { tenantRoles } from '../templates/asas/src/roles.ts'
+import { tenantRoles } from '../templates/asas/src/roles/system-roles.ts'
 import { defaultRules, providerOf } from '../packages/mithaq/src/index.ts'
 import type { ScreenClient } from '../packages/mithaq/src/screen/client.ts'
 
@@ -510,7 +510,7 @@ test('12. every copy key the copied registry asks for is answered in both of the
   const directories = [
     fileURLToPath(new URL('../packages/mithaq-admin/registry', import.meta.url)),
     fileURLToPath(new URL('./asas-tanstack/src/routes', import.meta.url)),
-    ...['ui', 'ui-dashboard', 'ui-portal', 'ui-platform', 'roles/ui'].map((where) => fileURLToPath(new URL(`../templates/asas/src/${where}`, import.meta.url))),
+    ...['ui', 'ui-dashboard', 'ui-portal', 'ui-platform', 'features/roles/roles/ui'].map((where) => fileURLToPath(new URL(`../templates/asas/src/${where}`, import.meta.url))),
   ]
   const source = [
     ...directories.flatMap((directory) =>
@@ -1638,7 +1638,7 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
   const sources = [
     fileURLToPath(new URL('../packages/mithaq-admin/registry', import.meta.url)),
     fileURLToPath(new URL('./asas-tanstack/src/routes', import.meta.url)),
-    ...['ui', 'ui-dashboard', 'courses/ui', 'enrollments/ui', 'roles/ui', 'audit-log/ui', 'media/ui'].map((where) => fileURLToPath(new URL(`../templates/asas/src/${where}`, import.meta.url))),
+    ...['ui', 'ui-dashboard', 'features/courses/courses/ui', 'features/courses/enrollments/ui', 'features/roles/roles/ui', 'features/courses/media/ui'].map((where) => fileURLToPath(new URL(`../templates/asas/src/${where}`, import.meta.url))),
   ].flatMap((directory) => readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name)).map((entry) => readFileSync(`${directory}/${entry.name}`, 'utf8')))
   // The host's own bar, which draws the impersonation's words over every page.
   sources.push(readFileSync(new URL('./asas-tanstack/src/screens.tsx', import.meta.url), 'utf8'))

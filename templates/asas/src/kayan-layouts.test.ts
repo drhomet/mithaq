@@ -1,8 +1,8 @@
 // mithaq draws no line from a kayan's own file to where its `ui()` files live: a
 // kayan reaches its screen pieces through `folderOf(new URL('./ui/',
-// import.meta.url))` off wherever its own module sits, so a project may keep a
-// kayan flat, in its own feature folder, or mix the two, and `generate screens`
-// builds and writes exactly the same either way.
+// import.meta.url))` off wherever its own module sits, so a kayan may sit flat,
+// in its folder inside a feature of one package, or in a feature package of its
+// own, and `generate screens` builds and writes each the same way.
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -12,8 +12,8 @@ import { run } from 'mithaq/generate-screens'
 /**
  * A project with two kayan wired into one screen: `flatKayan` sits under a
  * shared `src/kayan/` folder and points at a shared `src/ui/` folder; `widget`
- * sits in its own feature folder, `src/widget/`, with its own `src/widget/ui/`
- * folder beside it. The fixture is written beside this file rather than in the
+ * sits in its folder in the `widget` feature, `src/features/widget/widget/`, with
+ * its own `ui/` folder beside it. The fixture is written beside this file rather than in the
  * system's temp directory, so resolving `mithaq` from it walks up to this
  * template's own `node_modules` and needs no install of its own.
  */
@@ -66,9 +66,9 @@ export const flatKayan = defineKayan({
 `,
   )
   await write(
-    'src/widget/widget.ts',
+    'src/features/widget/widget/widget.ts',
     `import { defaultFields, folderOf } from 'mithaq'
-import { defineKayan } from '../mithaq.ts'
+import { defineKayan } from '../../../mithaq.ts'
 const ui = folderOf(new URL('./ui/', import.meta.url))
 export const widget = defineKayan({
   name: 'widget',
@@ -77,14 +77,15 @@ export const widget = defineKayan({
 })
 `,
   )
-  await write('src/widget/ui/thing.tsx', 'export const Thing = () => null\n')
+  await write('src/features/widget/widget/ui/thing.tsx', 'export const Thing = () => null\n')
+  await write('src/features/widget/index.ts', "import { widget } from './widget/widget.ts'\nexport const kayan = [widget] as const\n")
   await write(
     'src/asas.ts',
     `import { fetchHttp } from 'mithaq'
 import { buildAsas } from './mithaq.ts'
 import { flatKayan } from './kayan/flat-kayan.ts'
-import { widget } from './widget/widget.ts'
-export const asas = buildAsas({ http: [fetchHttp()], kayan: [flatKayan, widget] })
+import * as widget from './features/widget/index.ts'
+export const asas = buildAsas({ http: [fetchHttp()], kayan: [flatKayan, ...widget.kayan] })
 `,
   )
   return root
@@ -98,7 +99,7 @@ test('a flat kayan and a feature-folder kayan build and generate screens alike, 
     kayan: Record<string, { pages: Record<string, { component: string }> }>
   }
   assert.equal(screen.kayan.flatKayan!.pages.list!.component, './src/ui/panel.tsx#Panel', "the flat kayan's page names the shared folder")
-  assert.equal(screen.kayan.widget!.pages.list!.component, './src/widget/ui/thing.tsx#Thing', "the feature-folder kayan's page names its own folder")
+  assert.equal(screen.kayan.widget!.pages.list!.component, './src/features/widget/widget/ui/thing.tsx#Thing', "the feature-folder kayan's page names its own folder")
   assert.equal(await run(root, true), 0, 'a check right after generating is clean for both layouts')
 })
 

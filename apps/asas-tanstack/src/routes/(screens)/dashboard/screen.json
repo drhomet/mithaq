@@ -83,11 +83,7 @@
     "top": "./src/ui/top-shell.tsx#TopShell"
   },
   "components": {
-    "noCourses": "./src/courses/ui/no-courses.tsx#NoCourses",
-    "roleForm": "./src/roles/ui/role-form.tsx#RoleForm",
-    "rolesTable": "./src/roles/ui/roles.tsx#RolesTable",
-    "deleteRole": "./src/roles/ui/roles.tsx#DeleteRole",
-    "activity": "./src/audit-log/ui/activity.tsx#Activity",
+    "activity": "./src/ui/activity.tsx#Activity",
     "versions": "./src/ui-dashboard/versions.tsx#Versions"
   },
   "controls": {
@@ -285,7 +281,7 @@
             "ar": "لكل مقعد"
           },
           "component": "number",
-          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+          "cell": "./src/features/courses/courses/ui/fee-cell.tsx#FeeCell",
           "filter": true
         },
         {
@@ -557,7 +553,7 @@
             }
           ],
           "component": "text",
-          "cell": "./src/courses/ui/status-cell.tsx#StatusCell"
+          "cell": "./src/features/courses/courses/ui/status-cell.tsx#StatusCell"
         },
         {
           "name": "details",
@@ -694,7 +690,7 @@
                         },
                         {
                           "field": "fee",
-                          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+                          "cell": "./src/features/courses/courses/ui/fee-cell.tsx#FeeCell",
                           "decided": "field"
                         },
                         {
@@ -709,7 +705,7 @@
                         },
                         {
                           "field": "_status",
-                          "cell": "./src/courses/ui/status-cell.tsx#StatusCell",
+                          "cell": "./src/features/courses/courses/ui/status-cell.tsx#StatusCell",
                           "decided": "field"
                         },
                         {
@@ -733,7 +729,7 @@
                         "summary",
                         "details"
                       ],
-                      "empty": "./src/courses/ui/no-courses.tsx#NoCourses",
+                      "empty": "./src/features/courses/courses/ui/no-courses.tsx#NoCourses",
                       "bulk": [
                         {
                           "button": "deleteMany",
@@ -1052,7 +1048,7 @@
                             ]
                           },
                           {
-                            "component": "./src/audit-log/ui/activity.tsx#Activity",
+                            "component": "./src/ui/activity.tsx#Activity",
                             "when": {
                               "$user.collections.auditLog.operations.find": {
                                 "equals": true
@@ -1217,7 +1213,7 @@
                 "layout": "./src/ui/table-page.tsx#TablePage",
                 "main": [
                   {
-                    "component": "./src/courses/ui/no-courses.tsx#NoCourses"
+                    "component": "./src/features/courses/courses/ui/no-courses.tsx#NoCourses"
                   }
                 ]
               }
@@ -1790,7 +1786,7 @@
                     ]
                   },
                   {
-                    "component": "./src/audit-log/ui/activity.tsx#Activity",
+                    "component": "./src/ui/activity.tsx#Activity",
                     "when": {
                       "$user.collections.auditLog.operations.find": {
                         "equals": true
@@ -1901,7 +1897,7 @@
           },
           "relationTo": "sessions",
           "component": "relationship",
-          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell"
+          "cell": "./src/features/courses/enrollments/ui/session-cell.tsx#SessionCell"
         },
         {
           "name": "student",
@@ -1995,7 +1991,7 @@
                       "columns": [
                         {
                           "field": "session",
-                          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell",
+                          "cell": "./src/features/courses/enrollments/ui/session-cell.tsx#SessionCell",
                           "decided": "field"
                         },
                         {
@@ -2131,7 +2127,7 @@
                     ]
                   },
                   {
-                    "component": "./src/audit-log/ui/activity.tsx#Activity",
+                    "component": "./src/ui/activity.tsx#Activity",
                     "when": {
                       "$user.collections.auditLog.operations.find": {
                         "equals": true
@@ -2685,7 +2681,7 @@
                       "columns": [
                         {
                           "field": "filename",
-                          "cell": "./src/media/ui/preview.tsx#FileName",
+                          "cell": "./src/features/courses/media/ui/preview.tsx#FileName",
                           "decided": "leaf"
                         },
                         {
@@ -2700,7 +2696,7 @@
                         },
                         {
                           "field": "filesize",
-                          "cell": "./src/media/ui/preview.tsx#FileSize",
+                          "cell": "./src/features/courses/media/ui/preview.tsx#FileSize",
                           "decided": "leaf"
                         },
                         {
@@ -2722,7 +2718,7 @@
         },
         "create": {
           "path": "/media/new",
-          "component": "./src/media/ui/preview.tsx#NewImage"
+          "component": "./src/features/courses/media/ui/preview.tsx#NewImage"
         },
         "edit": {
           "path": "/media/:id",
@@ -2794,7 +2790,7 @@
                 ],
                 "side": [
                   {
-                    "component": "./src/media/ui/preview.tsx#MediaPreview"
+                    "component": "./src/features/courses/media/ui/preview.tsx#MediaPreview"
                   }
                 ],
                 "danger": [
@@ -3004,7 +3000,7 @@
                       ],
                       "limit": 100
                     },
-                    "component": "./src/roles/ui/roles.tsx#RolesTable"
+                    "component": "./src/features/roles/roles/ui/roles.tsx#RolesTable"
                   }
                 ]
               }
@@ -3045,7 +3041,7 @@
                         "decided": "table"
                       }
                     ],
-                    "component": "./src/roles/ui/role-form.tsx#RoleForm"
+                    "component": "./src/features/roles/roles/ui/role-form.tsx#RoleForm"
                   }
                 ]
               }
@@ -3086,7 +3082,7 @@
                         "decided": "table"
                       }
                     ],
-                    "component": "./src/roles/ui/role-form.tsx#RoleForm"
+                    "component": "./src/features/roles/roles/ui/role-form.tsx#RoleForm"
                   }
                 ],
                 "danger": [
@@ -3096,7 +3092,7 @@
                       "en": "Delete",
                       "ar": "حذف"
                     },
-                    "component": "./src/roles/ui/roles.tsx#DeleteRole"
+                    "component": "./src/features/roles/roles/ui/roles.tsx#DeleteRole"
                   }
                 ]
               }

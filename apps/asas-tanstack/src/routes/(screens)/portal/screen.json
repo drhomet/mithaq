@@ -29,9 +29,7 @@
     "page": "./src/ui-portal/page.tsx#Page",
     "record": "./src/ui/record-page.tsx#RecordPage"
   },
-  "components": {
-    "archive": "./src/courses/ui/archive-button.tsx#ArchiveButton"
-  },
+  "components": {},
   "controls": {
     "text": {
       "control": "text",
@@ -223,7 +221,7 @@
             "ar": "لكل مقعد"
           },
           "component": "number",
-          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell"
+          "cell": "./src/features/courses/courses/ui/fee-cell.tsx#FeeCell"
         },
         {
           "name": "currency",
@@ -649,7 +647,7 @@
                         },
                         {
                           "field": "fee",
-                          "cell": "./src/courses/ui/fee-cell.tsx#FeeCell",
+                          "cell": "./src/features/courses/courses/ui/fee-cell.tsx#FeeCell",
                           "decided": "field"
                         }
                       ],
@@ -659,7 +657,7 @@
                       "search": [
                         "title"
                       ],
-                      "empty": "./src/courses/ui/no-courses-on-offer.tsx#NoCourses",
+                      "empty": "./src/features/courses/courses/ui/no-courses-on-offer.tsx#NoCourses",
                       "row": [
                         {
                           "button": "archive",
@@ -812,7 +810,7 @@
                       "ar": "أرشفة"
                     },
                     "reload": true,
-                    "component": "./src/courses/ui/archive-button.tsx#ArchiveButton",
+                    "component": "./src/features/courses/courses/ui/archive-button.tsx#ArchiveButton",
                     "confirm": {
                       "title": {
                         "en": "Archive this course?",
@@ -942,7 +940,7 @@
           },
           "relationTo": "sessions",
           "component": "relationship",
-          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell"
+          "cell": "./src/features/courses/enrollments/ui/session-cell.tsx#SessionCell"
         },
         {
           "name": "student",
@@ -1037,7 +1035,7 @@
                       "columns": [
                         {
                           "field": "session",
-                          "cell": "./src/enrollments/ui/session-cell.tsx#SessionCell",
+                          "cell": "./src/features/courses/enrollments/ui/session-cell.tsx#SessionCell",
                           "decided": "field"
                         },
                         {

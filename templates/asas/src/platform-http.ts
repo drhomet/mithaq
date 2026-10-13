@@ -15,7 +15,7 @@
 import { AsasError, actorPermissions, denied, invalid, missing, type HttpPlug } from 'mithaq'
 import { platformRoles } from '@asas/auth'
 import { targets } from './mithaq.ts'
-import { assignedRoles, type OrganizationActor } from './tenant-access.ts'
+import { assignedRoles, type OrganizationActor } from './roles/tenant-access.ts'
 
 const path = '/api/platform/organizations/update'
 /**

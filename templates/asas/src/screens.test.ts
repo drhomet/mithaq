@@ -38,7 +38,7 @@ const ui = folderOf(new URL('./ui/', import.meta.url))
 const dashboardUi = folderOf(new URL('./ui-dashboard/', import.meta.url))
 const portalUi = folderOf(new URL('./ui-portal/', import.meta.url))
 // `courses` keeps its page pieces beside its kayan file, not in `ui-dashboard/`.
-const coursesUi = folderOf(new URL('./courses/ui/', import.meta.url))
+const coursesUi = folderOf(new URL('./features/courses/courses/ui/', import.meta.url))
 const dashboardBase = {
   path: '/dashboard',
   controls: screenKinds,
@@ -146,13 +146,13 @@ test('a build publishes each screen under asas.targets.<screen>.client, the decl
   // Component precedence: a leaf's own, then the field's, then the screen's table.
   // Each leaf says which of the three decided it, and a list column says the same of its cell.
   const createForm = pageOf('create').form
-  assert.deepEqual(createForm[0].fields[1], { field: 'summary', component: './src/courses/ui/fee-cell.tsx#FeeCell', decided: 'leaf' }, 'the leaf')
+  assert.deepEqual(createForm[0].fields[1], { field: 'summary', component: './src/features/courses/courses/ui/fee-cell.tsx#FeeCell', decided: 'leaf' }, 'the leaf')
   assert.deepEqual(pageOf('edit').form[1], { field: 'summary', component: 'otp', decided: 'field' }, 'the field')
   assert.deepEqual(pageOf('edit').form[0], { field: 'title', component: 'text', decided: 'table' }, 'the screen')
   assert.deepEqual(pageOf('list').list.columns[0], { field: 'title', cell: 'text', decided: 'table' }, 'a column')
 
-  assert.equal(pageOf('list').list.empty, './src/courses/ui/no-courses.tsx#NoCourses')
-  assert.deepEqual(pageOf('board'), { component: './src/courses/ui/no-courses.tsx#NoCourses' })
+  assert.equal(pageOf('list').list.empty, './src/features/courses/courses/ui/no-courses.tsx#NoCourses')
+  assert.deepEqual(pageOf('board'), { component: './src/features/courses/courses/ui/no-courses.tsx#NoCourses' })
   assert.equal(layoutOf('list').layout, layoutOf('board').layout)
 
   assert.equal(courses.fields.find((field) => field.name === 'currency')!.component, 'select')
@@ -509,7 +509,7 @@ test('a region the shell or the layout does not export is refused at build', () 
 test('a page is drawn whole by a component, which takes nothing else, and never mixed with a tree', () => {
   const whole = { path: '/courses/:id', component: coursesUi('no-courses.tsx#NoCourses') }
   const asas = build({ pages: { ...pages, edit: whole } })
-  assert.deepEqual(asas.targets.dashboard.client.kayan.courses!.pages.edit, { path: '/courses/:id', component: './src/courses/ui/no-courses.tsx#NoCourses' })
+  assert.deepEqual(asas.targets.dashboard.client.kayan.courses!.pages.edit, { path: '/courses/:id', component: './src/features/courses/courses/ui/no-courses.tsx#NoCourses' })
   assert.throws(
     () => build({ pages: { ...pages, edit: { ...pages.edit, component: coursesUi('no-courses.tsx#NoCourses') } } }),
     /Screen "dashboard" kayan "courses" page "edit" carries both page and component, and a page is either one tree or drawn whole by one component\./,
@@ -537,11 +537,11 @@ test('a button sits in any region with its confirm, the title and nav nodes proj
   assert.deepEqual(treeOf(courses.pages.list).main[0]!.main, [
     { title: {} },
     { nav: {} },
-    { list: { columns: [{ field: 'title', cell: 'text', decided: 'table' }] }, component: './src/courses/ui/no-courses.tsx#NoCourses' },
+    { list: { columns: [{ field: 'title', cell: 'text', decided: 'table' }] }, component: './src/features/courses/courses/ui/no-courses.tsx#NoCourses' },
   ])
   assert.deepEqual(treeOf(courses.pages.create).main[0]!.main[0]!.form[1], { button: 'archive', label: archive }, 'inside a form')
-  assert.deepEqual(treeOf(courses.pages.edit).main[0]!.side, [{ button: 'archive', label: archive, component: './src/courses/ui/no-courses.tsx#NoCourses' }], 'beside it')
-  assert.equal(treeOf(courses.pages.edit).main[0]!.main[0]!.component, './src/courses/ui/no-courses.tsx#NoCourses')
+  assert.deepEqual(treeOf(courses.pages.edit).main[0]!.side, [{ button: 'archive', label: archive, component: './src/features/courses/courses/ui/no-courses.tsx#NoCourses' }], 'beside it')
+  assert.equal(treeOf(courses.pages.edit).main[0]!.main[0]!.component, './src/features/courses/courses/ui/no-courses.tsx#NoCourses')
   assert.throws(
     () => build({ pages: { ...pages, create: create(['title', { button: 'archive', label: archive, confirm: { title: archive, body: label, tone: 'danger' } }]) } }),
     /form button "archive" confirm carries "tone", which a confirm does not take\. A confirm takes title, body\./,
@@ -983,8 +983,8 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   assert.deepEqual(layout.main.map((node: object) => Object.keys(node)), [['form']], 'its main region the form')
   assert.deepEqual(layout.main[0].form.map((node: { section: string }) => node.section), ['about', 'pricing', 'teaching'])
   assert.ok(JSON.stringify(layout.main[0].form[2].fields).includes('"field":"notifications"'), 'Teaching holds notifications')
-  assert.deepEqual(layout.side.map((node: { section?: string; component?: string }) => node.section ?? node.component), ['catalogue', './src/audit-log/ui/activity.tsx#Activity'], 'its side Catalogue and the activity')
-  assert.deepEqual(layout.side.at(-1), { component: './src/audit-log/ui/activity.tsx#Activity', when: { '$user.collections.auditLog.operations.find': { equals: true } } })
+  assert.deepEqual(layout.side.map((node: { section?: string; component?: string }) => node.section ?? node.component), ['catalogue', './src/ui/activity.tsx#Activity'], 'its side Catalogue and the activity')
+  assert.deepEqual(layout.side.at(-1), { component: './src/ui/activity.tsx#Activity', when: { '$user.collections.auditLog.operations.find': { equals: true } } })
   assert.deepEqual(layout.danger.map((node: { button: string }) => node.button), ['archive', 'delete'], 'and its danger zone')
   assert.deepEqual(sessions!.fields.map((node) => Object.keys(node)), [['list']], 'Sessions holds its list alone, at the full width')
   assert.deepEqual(versions!.fields.map((node) => node.component), [dashboard.components.versions], 'and Versions its panel alone')
@@ -1046,7 +1046,7 @@ test('every dashboard create and edit page, and Settings, draws the record layou
     // A page drawn whole by one component draws no tree: the images' New page is the upload dialog's.
     Object.entries(kayan.pages).filter(([name, page]) => ['create', 'edit', 'settings'].includes(name) && !('component' in page)).map(([name, page]) => ({ kayan, name, page: treeOf(page), over: 'mode' in page })),
   )
-  assert.equal((dashboard.kayan.media!.pages.create as { component?: string }).component, './src/media/ui/preview.tsx#NewImage')
+  assert.equal((dashboard.kayan.media!.pages.create as { component?: string }).component, './src/features/courses/media/ui/preview.tsx#NewImage')
   assert.deepEqual(pages.map(({ kayan, name }) => `${kayan.name}.${name}`).sort(), ['courses.create', 'courses.edit', 'enrollments.create', 'enrollments.edit', 'media.edit', 'roles.create', 'roles.edit', 'sessions.create', 'sessions.edit', 'settings.settings', 'tags.create', 'tags.edit'])
   for (const { kayan, name, page, over } of pages) {
     const at = `${kayan.name}.${name}`

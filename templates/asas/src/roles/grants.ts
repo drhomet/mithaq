@@ -3,7 +3,7 @@
 // page's chunk takes no server module with it, and the server's own guards
 // import the same functions.
 import type { AccessReport } from 'mithaq/admin'
-import type { tenantRoles } from '../roles.ts'
+import type { tenantRoles } from './system-roles.ts'
 
 /**
  * Whether the viewer may hand over these keys, as a role or one at a time,

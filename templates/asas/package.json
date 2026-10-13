@@ -9,7 +9,7 @@
   "exports": {
     ".": "./src/asas.ts",
     "./ui-dashboard/*": "./src/ui-dashboard/*",
-    "./audit-log/*": "./src/audit-log/*",
+    "./ui/*": "./src/ui/*",
     "./messages/*": "./src/messages/*",
     "./package.json": "./package.json"
   },

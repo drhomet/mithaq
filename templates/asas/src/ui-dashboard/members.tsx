@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatDate } from 'mithaq-admin/format.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { grantable, isOwner, managesRoles, OWNER_ROLE } from '../roles/grants.ts'
-import { tenantRoles } from '../tenant-roles.ts'
+import { tenantRoles } from '../roles/tenant-roles.ts'
 import { AppShell } from '../ui/app-shell.tsx'
 
 /**

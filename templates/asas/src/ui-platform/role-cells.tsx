@@ -8,7 +8,7 @@ import { ListContext, useClient, useLocale, useScreen } from 'mithaq/admin/react
 import type { asas } from '../asas.ts'
 import { listed } from 'mithaq-admin/format.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
-import { systemRoles } from '../roles.ts'
+import { systemRoles } from '../roles/system-roles.ts'
 
 /**
  * A membership's role, which is the provider's own governance role, `owner`,

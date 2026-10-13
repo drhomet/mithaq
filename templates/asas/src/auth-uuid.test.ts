@@ -44,7 +44,7 @@ const { generateDrizzleJson, generateMigration } = (await import(
 
 /**
  * The generated files import the language three levels up, so the folder sits
- * under `src/`, as `kayan/auth/user/` does.
+ * under `src/`, as `features/auth/user/` does.
  */
 const root = new URL(`./auth-uuid-${randomUUID()}/`, import.meta.url)
 const uuidDirectory = new URL('auth/user/', root)

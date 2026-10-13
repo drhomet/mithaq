@@ -39,13 +39,13 @@ import type { ColumnRule, MessageRegistry, ZodRule } from 'mithaq'
 import { richText } from 'mithaq/rich-text'
 import { asas } from './asas.ts'
 import { options } from '@asas/auth'
-import { betterAuth } from './kayan/auth/user/index.ts'
+import { betterAuth } from './features/auth/user/index.ts'
 import { buildAsas, defineKayan } from './test-language.ts'
 import { dashboardScreen as templateDashboard } from './mithaq.ts'
-import { memberRoles } from './member-roles/member-roles.ts'
+import { memberRoles } from './features/roles/member-roles/member-roles.ts'
 import { memoryStore } from './memory-store.ts'
-import { richTextNodes } from './rich-text-nodes.ts'
-import { roles } from './roles/roles.ts'
+import { richTextNodes } from './mithaq/rich-text-nodes.ts'
+import { roles } from './features/roles/roles/roles.ts'
 import { Refusal } from '../../../packages/mithaq/src/mithaq/refusal.ts'
 import { formatLock, sealLanguage, vocabularyOf } from '../../../packages/mithaq/src/mithaq/lock.ts'
 import { receivedLanguage } from '../../../packages/mithaq/src/mithaq/language.ts'
@@ -2645,7 +2645,7 @@ test('mithaq generate auth refuses an instance whose tables hold no kayan of its
 test('generate auth on the template imports providers from the package generate.providers names, and --check is green', async () => {
   // The provider is a workspace package of its own, so the generated kayan imports it by its bare
   // name and needs no relative depth.
-  const kayan = await readFile(new URL('kayan/auth/user/user.ts', import.meta.url), 'utf8')
+  const kayan = await readFile(new URL('features/auth/user/user.ts', import.meta.url), 'utf8')
   assert.match(kayan, /\nimport \{ providers \} from '@asas\/auth'\n/)
   assert.equal(await quietly(() => runAuth(new URL('../', import.meta.url), true)), 0)
 })

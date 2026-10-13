@@ -6,7 +6,7 @@ import '../../../../packages/mithaq-admin/test/tsx.ts'
 
 const { loader } = await import('./members.tsx')
 const { grantable, isOwner, managesRoles } = await import('../roles/grants.ts')
-const { tenantRoles } = await import('../tenant-roles.ts')
+const { tenantRoles } = await import('../roles/tenant-roles.ts')
 
 type Listed = { userId: string; role?: string; createdAt: string; user: { name: string; email: string } }
 
