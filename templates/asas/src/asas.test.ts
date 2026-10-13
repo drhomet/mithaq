@@ -12260,7 +12260,7 @@ test('142j. a production boot is refused without PLATFORM_URL, BETTER_AUTH_URL o
 })
 
 test('142k. a project that serves no platform console boots in production with BETTER_AUTH_URL and the secret alone', async (t) => {
-  // The provider as `create-mithaq --no-platform` writes it, beside the original so it resolves the same packages.
+  // The provider as `create-mithaq` writes it without the platform add-on, beside the original so it resolves the same packages.
   const source = new URL('../../mithaq/src/mithaq/auth/', import.meta.url)
   const copy = new URL(`.no-platform-${process.pid}/`, source)
   await mkdir(copy)
@@ -12450,7 +12450,7 @@ test('142q. with no TRUSTED_IP_HEADER an x-forwarded-for a caller writes buys no
 })
 
 test('142o. a project with no platform console has no first-register and no init', async (t) => {
-  // The provider as `create-mithaq --no-platform` writes it, beside the original so it resolves the same packages.
+  // The provider as `create-mithaq` writes it without the platform add-on, beside the original so it resolves the same packages.
   const source = new URL('../../mithaq/src/mithaq/auth/', import.meta.url)
   const copy = new URL(`.no-platform-first-${process.pid}/`, source)
   await mkdir(copy)

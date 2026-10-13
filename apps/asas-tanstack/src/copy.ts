@@ -1,15 +1,23 @@
 // Imports no router, stylesheet or React, so a test can load this under plain `node`.
+import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
+import organization from 'asas/messages/organization.json' with { type: 'json' }
+import tags from 'asas/messages/tags.json' with { type: 'json' }
+// add-on: audit-log
 import auditLog from 'asas/messages/auditLog.json' with { type: 'json' }
+// end add-on: audit-log
+// add-on: courses
 import courses from 'asas/messages/courses.json' with { type: 'json' }
 import enrollments from 'asas/messages/enrollments.json' with { type: 'json' }
-import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
 import media from 'asas/messages/media.json' with { type: 'json' }
-import organization from 'asas/messages/organization.json' with { type: 'json' }
+import sessions from 'asas/messages/sessions.json' with { type: 'json' }
+// end add-on: courses
+// add-on: roles
 import memberRoles from 'asas/messages/memberRoles.json' with { type: 'json' }
 import roles from 'asas/messages/roles.json' with { type: 'json' }
-import sessions from 'asas/messages/sessions.json' with { type: 'json' }
+// end add-on: roles
+// add-on: settings
 import settings from 'asas/messages/settings.json' with { type: 'json' }
-import tags from 'asas/messages/tags.json' with { type: 'json' }
+// end add-on: settings
 
 // Restated, not imported: the original lives in a `.tsx` file and the test runner has no JSX compiler.
 type Translate = (key: string, fallback?: string) => string | undefined
@@ -47,6 +55,7 @@ export const dirOf = (locale: Locale): 'rtl' | 'ltr' => (locale === 'ar' ? 'rtl'
  * locale: a key left unanswered here shows an Arabic viewer the English fallback.
  */
 export const scopes: Record<string, Record<string, Record<string, string>>> = {
+  // add-on: courses
   courses: {
     ...courses,
     'delete.confirm': { en: 'Delete this course', ar: 'احذف هذه الدورة' },
@@ -69,6 +78,7 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'سبب الأرشفة 200 حرف على الأكثر.',
     },
   },
+  // end add-on: courses
   admin: {
     nav: { en: 'Admin', ar: 'الإدارة' },
     yes: { en: 'Yes', ar: 'نعم' },
@@ -644,11 +654,14 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     createdAt: { en: 'Created at', ar: 'تاريخ الإنشاء' },
     updatedAt: { en: 'Updated at', ar: 'تاريخ التعديل' },
   },
+  // add-on: settings
   settings: {
     ...settings,
     singular: { en: 'Settings', ar: 'الإعدادات' },
     plural: { en: 'Settings', ar: 'الإعدادات' },
   },
+  // end add-on: settings
+  // add-on: roles
   roles: {
     ...roles,
     singular: { en: 'Role', ar: 'دور' },
@@ -665,6 +678,8 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'المعرف النصي للدور، الذي يسميه كل إسناد له، مثل course-editor. يقرأ الناس الدور بتسميته أدناه.',
     },
   },
+  // end add-on: roles
+  // add-on: courses
   sessions: {
     ...sessions,
     singular: { en: 'Session', ar: 'جلسة' },
@@ -674,6 +689,8 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     none: { en: 'No sessions yet.', ar: 'لا توجد جلسات بعد.' },
     dangerZoneWarning: { en: 'These actions change this session for everyone.', ar: 'هذه الإجراءات تغير هذه الجلسة للجميع.' },
   },
+  // end add-on: courses
+  // add-on: courses
   enrollments: {
     ...enrollments,
     singular: { en: 'Enrollment', ar: 'تسجيل' },
@@ -683,12 +700,14 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     none: { en: 'No enrollments yet.', ar: 'لا توجد تسجيلات بعد.' },
     dangerZoneWarning: { en: 'These actions change this enrollment for everyone.', ar: 'هذه الإجراءات تغير هذا التسجيل للجميع.' },
   },
+  // end add-on: courses
   tags: {
     ...tags,
     new: { en: 'New tag', ar: 'وسم جديد' },
     none: { en: 'No tags yet.', ar: 'لا توجد وسوم بعد.' },
     dangerZoneWarning: { en: 'These actions change this tag for everyone.', ar: 'هذه الإجراءات تغير هذا الوسم للجميع.' },
   },
+  // add-on: courses
   media: {
     ...media,
     new: { en: 'New image', ar: 'صورة جديدة' },
@@ -699,14 +718,19 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     replaceAbout: { en: 'Replace file uploads a new image and opens it. This one stays until you delete it.', ar: 'يرفع استبدال الملف صورة جديدة ويفتحها. تبقى هذه الصورة حتى تحذفها.' },
     dangerZoneWarning: { en: 'These actions change this image for everyone.', ar: 'هذه الإجراءات تغير هذه الصورة للجميع.' },
   },
+  // end add-on: courses
   localUsers: { ...localUsers, none: { en: 'No local accounts yet.', ar: 'لا توجد حسابات محلية بعد.' } },
+  // add-on: audit-log
   auditLog,
+  // end add-on: audit-log
+  // add-on: roles
   memberRoles: {
     ...memberRoles,
     singular: { en: 'Member role', ar: 'دور عضو' },
     plural: { en: 'Member roles', ar: 'أدوار الأعضاء' },
     none: { en: 'No member roles yet.', ar: 'لا توجد أدوار أعضاء بعد.' },
   },
+  // end add-on: roles
   version: {
     saveDraft: { en: 'Save draft', ar: 'حفظ المسودة' },
     publishChanges: { en: 'Publish changes', ar: 'نشر التغييرات' },

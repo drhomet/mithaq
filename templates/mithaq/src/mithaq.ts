@@ -1,5 +1,7 @@
 import {
+  // add-on: audit-log
   audit,
+  // end add-on: audit-log
   base,
   betterAuthTenant,
   defaultAuthorize,
@@ -13,7 +15,12 @@ import {
   drizzleAdapter,
   drizzleTarget,
   folderOf,
+  // add-on: roles
   rbacTarget,
+  // end add-on: roles
+  // without add-on: roles
+  // memberRoleTarget,
+  // end without add-on: roles
   Refusal,
   screenTarget,
   serviceTarget,
@@ -24,7 +31,9 @@ import {
 } from 'mithaq'
 import { richText } from 'mithaq/rich-text'
 import { fileURLToPath } from 'node:url'
+// add-on: audit-log
 import { auditSink } from './mithaq/audit-sink.ts'
+// end add-on: audit-log
 import { richTextNodes } from './mithaq/rich-text-nodes.ts'
 import { systemRoles } from './roles/system-roles.ts'
 import { storageConfig } from './storage/index.ts'
@@ -106,6 +115,7 @@ const guarded = (store: typeof drizzleStore): typeof drizzleStore => ({
     },
   },
 })
+// add-on: roles
 // A build has one `access` target. Swapping this line for `betterAuthTarget` moves
 // custom roles into the provider's own rows, but the assignment guard
 // `assignableRole` stays bound to this shape: it reads the `roles` kayan by a
@@ -143,6 +153,16 @@ export const accessTarget = (roles: typeof systemRoles = systemRoles) => {
     },
   }
 }
+// end add-on: roles
+// without add-on: roles
+// /**
+//  * The access target over these roles: a member holds what Better Auth's own
+//  * `member.role` names in the organization, owner, admin or member, and no
+//  * custom role or assignment table exists. The roles add-on swaps this for
+//  * `rbacTarget` over its `roles` and `memberRoles` kayan.
+//  */
+// export const accessTarget = (roles: typeof systemRoles = systemRoles) => memberRoleTarget({ roles, rolesOf: assignedRoles, access: tenantAccess })
+// end without add-on: roles
 
 /**
  * Every target but the screens. A screen names the kayan it draws, so a build
@@ -169,13 +189,19 @@ export const serverTargets = {
   // `defaultOperations` into its own `targets.service.operations` and leaves
   // out any it does not want, such as `count`.
   service: serviceTarget({
-    // One of the three lists every write runs around its own. `audit` runs last
-    // inside the write's transaction and writes one `auditLog` row in it. A
-    // precondition goes in `beforeSteps`, and a webhook or email after a durable
-    // write in `afterCommit`.
-    afterSteps: [audit],
+    // One of the three lists every write runs around its own: a step here runs
+    // last inside the write's transaction, as the audit log's `audit` does,
+    // writing one `auditLog` row in it. A precondition goes in `beforeSteps`, and
+    // a webhook or email after a durable write in `afterCommit`.
+    afterSteps: [
+      // add-on: audit-log
+      audit,
+      // end add-on: audit-log
+    ],
+    // add-on: audit-log
     /** Where the `audit` step hands each write: the template's audit log. */
     audit: auditSink,
+    // end add-on: audit-log
     /** The access evaluator every operation runs before its first step. */
     authorize: defaultAuthorize,
     /** The deepest a read or a write may nest another before it is refused, eight. */
@@ -190,6 +216,7 @@ export const serverTargets = {
     joinLimit: defaultJoinLimit,
     /** The most rows one bulk write may match, a thousand. */
     bulkLimit: defaultBulkLimit,
+    // add-on: courses
     // The field that marks a row deleted. A kayan takes soft delete by declaring
     // a field of this name, as `enrollments` does. A build where no kayan
     // declares it is refused, because every delete in it would remove rows for
@@ -197,6 +224,7 @@ export const serverTargets = {
     // store reads the kayan, since a role row the delete marked would still grant
     // its keys.
     softDelete: 'deletedAt',
+    // end add-on: courses
     /** The database a kayan writes through when it names no other. */
     store: 'drizzle',
     /** The target a write is validated against when a kayan names no other. */
@@ -262,8 +290,10 @@ export const ui = folderOf(new URL('./ui/', import.meta.url))
 export const dashboardUi = folderOf(new URL('ui-dashboard/', asasSource))
 export const portalUi = folderOf(new URL('ui-portal/', asasSource))
 export const platformUi = folderOf(new URL('ui-platform/', asasSource))
+// add-on: courses
 /** Every screen's provider of course titles for a session's label, which the courses feature draws. */
 const sessionLabels = folderOf(new URL('courses/enrollments/ui/', featuresFolder))('session-labels.tsx#SessionLabels')
+// end add-on: courses
 
 /**
  * Written once and spread into each screen: what draws each kind and the
@@ -282,12 +312,25 @@ const shared = {
 export const portalScreen = screenTarget({
   ...shared,
   path: '/portal',
-  // `sessions` is listed for its title alone, which an enrollment's session
-  // reads by; it has no page here and so no nav entry.
-  // `media` is listed for a course's cover alone, which a course page draws read-only.
-  // `user` is listed for its title alone, which the enrollment drawer's student picker reads by.
-  kayan: ['courses', 'enrollments', 'sessions', 'media', 'user'],
-  providers: [ui('rich-text-nodes.tsx#RichTextNodes'), sessionLabels],
+  kayan: [
+    // add-on: courses
+    // `sessions` is listed for its title alone, which an enrollment's session
+    // reads by; it has no page here and so no nav entry.
+    // `media` is listed for a course's cover alone, which a course page draws read-only.
+    'courses',
+    'enrollments',
+    'sessions',
+    'media',
+    // end add-on: courses
+    // `user` is listed for its title alone, which a relationship to a person reads by.
+    'user',
+  ],
+  providers: [
+    ui('rich-text-nodes.tsx#RichTextNodes'),
+    // add-on: courses
+    sessionLabels,
+    // end add-on: courses
+  ],
   pages: { home: { path: '/', component: portalUi('home.tsx#Home') } },
   // Its own top shell, which draws no link to the platform app: staff reach it
   // from the dashboard alone. Every portal page is that shell over one of its
@@ -303,17 +346,52 @@ export const dashboardScreen = screenTarget({
   // The top-bar shell too, which the courses board page is rooted at.
   layouts: { ...shared.layouts, top: ui('top-shell.tsx#TopShell') },
   path: '/dashboard',
-  // `user` and `organization` are listed for their titles alone: they have no
-  // page and so no nav entry, and a relationship to either shows the row's name.
-  // `auditLog` is listed for its access report alone, which the edit pages'
-  // activity panel is drawn by. `memberRoles` is listed for its access report
-  // alone too, which the members page's sheet is drawn by; it has no page of
-  // its own.
-  kayan: ['courses', 'sessions', 'enrollments', 'tags', 'media', 'roles', 'memberRoles', 'settings', 'user', 'organization', 'auditLog'],
-  providers: [dashboardUi('theme-provider.tsx#ThemeProvider'), ui('rich-text-nodes.tsx#RichTextNodes'), sessionLabels],
+  kayan: [
+    // add-on: courses
+    'courses',
+    'sessions',
+    'enrollments',
+    // end add-on: courses
+    'tags',
+    // add-on: courses
+    'media',
+    // end add-on: courses
+    // add-on: roles
+    // `memberRoles` is listed for its access report alone, which the members
+    // page's sheet is drawn by; it has no page of its own.
+    'roles',
+    'memberRoles',
+    // end add-on: roles
+    // add-on: settings
+    'settings',
+    // end add-on: settings
+    // `user` and `organization` are listed for their titles alone: they have no
+    // page and so no nav entry, and a relationship to either shows the row's name.
+    'user',
+    'organization',
+    // add-on: audit-log
+    // `auditLog` is listed for its access report alone, which the edit pages'
+    // activity panel is drawn by.
+    'auditLog',
+    // end add-on: audit-log
+  ],
+  providers: [
+    dashboardUi('theme-provider.tsx#ThemeProvider'),
+    ui('rich-text-nodes.tsx#RichTextNodes'),
+    // add-on: courses
+    sessionLabels,
+    // end add-on: courses
+  ],
   pages: {
+    // add-on: courses
     // The page at `/`, served only to an actor who reads the courses it counts.
     dashboard: { path: '/', component: dashboardUi('dashboard.tsx#Dashboard'), permission: 'courses.find' },
+    // end add-on: courses
+    // without add-on: courses
+    // // The page at `/`: a figure for each list the nav offers the viewer.
+    // dashboard: { path: '/', component: dashboardUi('home.tsx#Home') },
+    // end without add-on: courses
+    // add-on: roles
     // A page that belongs to no kayan, listed in the nav under its own label
     // and served only to an actor holding the key it names.
     members: {
@@ -322,12 +400,15 @@ export const dashboardScreen = screenTarget({
       nav: { label: { en: 'Members', ar: 'الأعضاء' } },
       permission: 'memberRoles.find',
     },
+    // end add-on: roles
   },
   // A piece only one kayan draws is named by `ui()` in that kayan's file; these
   // are drawn by name from many.
   components: {
+    // add-on: audit-log
     // A record's own audit entries, which each edit page draws in its side column.
     activity: ui('activity.tsx#Activity'),
+    // end add-on: audit-log
     // A row's versions, with their restore, which the edit page of a kayan that
     // keeps drafts draws in a tab of its own.
     versions: dashboardUi('versions.tsx#Versions'),
@@ -351,8 +432,29 @@ export const platformScreen = screenTarget({
   // use for, and a record page with a link back to its list.
   layouts: { ...shared.layouts, app: ui('app-shell.tsx#PlatformShell'), record: platformUi('record-page.tsx#PlatformRecordPage') },
   path: '/platform',
-  kayan: ['user', 'organization', 'member', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'memberRoles', 'localUsers'],
-  providers: [dashboardUi('theme-provider.tsx#ThemeProvider'), ui('rich-text-nodes.tsx#RichTextNodes'), sessionLabels],
+  kayan: [
+    'user',
+    'organization',
+    'member',
+    // add-on: courses
+    'courses',
+    'sessions',
+    'enrollments',
+    // end add-on: courses
+    'tags',
+    // add-on: roles
+    'roles',
+    'memberRoles',
+    // end add-on: roles
+    'localUsers',
+  ],
+  providers: [
+    dashboardUi('theme-provider.tsx#ThemeProvider'),
+    ui('rich-text-nodes.tsx#RichTextNodes'),
+    // add-on: courses
+    sessionLabels,
+    // end add-on: courses
+  ],
   pages: { home: { path: '/', component: platformUi('home.tsx#Home') } },
   components: {},
 })
@@ -392,7 +494,12 @@ const language = defineMithaq({
     screens: {
       dashboard: '../../apps/asas-tanstack/src/routes/(screens)/',
       portal: '../../apps/asas-tanstack/src/routes/(screens)/',
+      // add-on: platform
       platform: '../../apps/asas-platform/src/routes/(screens)/',
+      // end add-on: platform
+      // without add-on: platform
+      // platform: false,
+      // end without add-on: platform
     },
   },
 })

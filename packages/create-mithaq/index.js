@@ -49,6 +49,84 @@ const once = (text, from, to, count = 1) => {
   if (text.split(from).length !== count + 1) throw new Error(`The template no longer holds ${from} ${count === 1 ? 'exactly once' : `${count} times`}.`)
   return typeof from === 'string' ? text.replaceAll(from, to) : text.replace(from, to)
 }
+/**
+ * What a project may hold beyond the language, the asas, the `auth` feature and the `tags` example. Each add-on names the
+ * add-ons it needs, the files that are its alone (removed when it is left out), the files that stand in for it (removed
+ * when it is chosen), and whether it brings tables, without which the template's migrations, written for every table,
+ * do not fit the project. Its lines in a shared file sit in `// add-on: <name>` regions, which `keepAddOns` reads.
+ */
+export const addOns = {
+  roles: {
+    needs: [],
+    files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
+    without: ['packages/mithaq/src/roles/default-member-roles.ts'],
+    tables: true,
+  },
+  'audit-log': {
+    needs: [],
+    files: ['packages/features/audit-log', 'packages/mithaq/src/mithaq/audit-sink.ts', 'packages/mithaq/src/ui/activity.tsx', 'packages/asas/src/messages/auditLog.json'],
+    without: [],
+    tables: true,
+  },
+  settings: { needs: [], files: ['packages/features/settings', 'packages/asas/src/messages/settings.json'], without: [], tables: true },
+  // The worked example: its business roles are the roles add-on's, and its edit pages draw the audit log's activity.
+  courses: {
+    needs: ['roles', 'audit-log'],
+    files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', ...['courses', 'sessions', 'enrollments', 'media'].map((one) => `packages/asas/src/messages/${one}.json`)],
+    without: ['packages/asas/src/ui-dashboard/home.tsx'],
+    tables: true,
+  },
+  platform: { needs: [], files: ['apps/asas-platform'], without: [], tables: false },
+}
+
+/**
+ * The add-ons `asked` names with every one they need, in the table's order, and the ones added for that. A name the
+ * table does not hold is refused with the list, so a typo never makes a smaller project than asked for.
+ */
+export function resolveAddOns(asked) {
+  const unknown = asked.filter((name) => !Object.hasOwn(addOns, name))
+  if (unknown.length) throw new Error(`No add-on is named ${unknown.map((name) => `"${name}"`).join(', ')}. The add-ons are ${Object.keys(addOns).join(', ')}.`)
+  const chosen = new Set()
+  const take = (name) => {
+    if (chosen.has(name)) return
+    chosen.add(name)
+    for (const one of addOns[name].needs) take(one)
+  }
+  for (const name of asked) take(name)
+  const ordered = Object.keys(addOns).filter((name) => chosen.has(name))
+  return { chosen: ordered, added: ordered.filter((name) => !asked.includes(name)) }
+}
+
+/**
+ * Keeps the lines of `text` the chosen add-ons hold. A region from `// add-on: <names>` to `// end add-on: <names>` keeps
+ * its lines when every add-on it names is chosen; one from `// without add-on: <names>` to its end holds commented lines,
+ * uncommented when they are not. The marker lines go either way, so a project reads as if written for its add-ons. A
+ * marker that is unbalanced or names no add-on fails creation, as a template line that moved does.
+ */
+export function keepAddOns(text, chosen) {
+  const open = []
+  const kept = []
+  for (const line of text.split('\n')) {
+    const marker = /^\s*\/\/ (end )?(without )?add-on: (.+)$/.exec(line)
+    if (!marker) {
+      if (open.every((one) => one.keep)) kept.push(open.some((one) => one.without) ? line.replace(/^(\s*)\/\/ ?/, '$1') : line)
+      continue
+    }
+    const [, end, without, names] = marker
+    const label = `${without ?? ''}add-on: ${names}`
+    if (end) {
+      if (open.pop()?.label !== label) throw new Error(`The template closes "${label}" where no such region is open.`)
+      continue
+    }
+    const named = names.split(', ')
+    for (const name of named) if (!Object.hasOwn(addOns, name)) throw new Error(`The template marks a region of the add-on "${name}", which the table does not hold.`)
+    const all = named.every((name) => chosen.includes(name))
+    open.push({ label, without: Boolean(without), keep: without ? !all : all })
+  }
+  if (open.length) throw new Error(`The template leaves "${open.at(-1).label}" open.`)
+  return kept.join('\n')
+}
+
 /** Every text file a project's own commands or imports read, outside what an install writes. */
 const textsUnder = (folder) =>
   readdirSync(folder, { recursive: true, encoding: 'utf8' })
@@ -132,20 +210,48 @@ const foldIntoOnePackage = (project) => {
 }
 
 /**
+ * Leaves `project` holding the chosen add-ons alone: each other add-on's files, regions and package go, and so do the
+ * files that stand in for a chosen one. The template's migrations build every table, so a project short of any add-on
+ * with tables starts with none, and its first `mithaq migrate` writes them for the tables it has.
+ */
+const keepOnly = ({ project, chosen }) => {
+  for (const [name, { files, without }] of Object.entries(addOns)) {
+    for (const file of chosen.includes(name) ? without : files) rmSync(join(project, file), { recursive: true })
+  }
+  for (const file of textsUnder(project).filter((one) => /\.tsx?$/.test(one))) {
+    const text = readFileSync(file, 'utf8')
+    if (text.includes('add-on: ')) writeFileSync(file, keepAddOns(text, chosen))
+  }
+  for (const file of textsUnder(project).filter((one) => basename(one) === 'package.json')) {
+    const manifest = readJson(file)
+    for (const name of Object.keys(addOns).filter((one) => !chosen.includes(one))) delete manifest.dependencies?.[`@asas/${name}`]
+    writeJson(file, manifest)
+  }
+  if (Object.entries(addOns).every(([name, { tables }]) => !tables || chosen.includes(name))) return
+  const migrations = join(project, 'packages/asas/src/migrations')
+  for (const entry of readdirSync(migrations)) if (entry !== 'drizzle.config.ts') rmSync(join(migrations, entry), { recursive: true })
+  // Each answer names a change between two of the migrations just removed.
+  writeFileSync(join(project, 'packages/asas/mithaq.hints.json'), '[]\n')
+}
+
+/**
  * Writes the project `name` under `cwd` from `template`, and answers its
  * folder. `version` is the `@drhomet/mithaq` and `@drhomet/mithaq-admin` the
  * project installs, pinned exactly so the two cannot drift apart and an
  * upgrade is a change the project makes; `mithaq` and `mithaqAdmin` replace the
  * dependencies themselves, which only the release check does. `layout` is `monorepo`, the
  * language, each feature and the asas as packages, or `single`, one package with the tenant app and no
- * platform console; `platform` keeps the platform console in a monorepo.
+ * platform console. `addOns` names the add-ons the project holds beside auth and the tags example, with
+ * every one they need; none is the minimal project.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', platform = layout === 'monorepo' }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [] }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`, and a scope.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
   }
   if (!['monorepo', 'single'].includes(layout)) throw new Error(`The layout is monorepo or single, not "${layout}".`)
+  const { chosen } = resolveAddOns(asked)
+  const platform = chosen.includes('platform')
   if (layout === 'single' && platform) throw new Error('A single package serves the tenant app alone. Choose the monorepo layout to include the platform console.')
   const project = join(cwd, name)
   if (existsSync(project) && readdirSync(project).length > 0) {
@@ -167,11 +273,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
     updatePackageJSONDependencies({ mithaq, mithaqAdmin, packageJson })
     writeJson(join(project, file), file === 'package.json' ? { name, ...packageJson } : packageJson)
   }
-  if (!platform) {
-    rmSync(join(project, 'apps/asas-platform'), { recursive: true })
-    edit(join(project, 'packages/mithaq/src/mithaq.ts'), (text) => once(text, "platform: '../../apps/asas-platform/src/routes/(screens)/',", 'platform: false,'))
-    edit(join(project, 'packages/mithaq/src/mithaq/auth/index.ts'), (text) => once(text, 'export const platformApp: boolean = true', 'export const platformApp: boolean = false'))
-  }
+  keepOnly({ project, chosen })
   // One `.env` for the asas's commands and one for each app's dev server,
   // the same secrets in each: the tenant app and the platform console sign
   // and read each other's sessions under one `BETTER_AUTH_SECRET`.
@@ -211,39 +313,68 @@ const help = `Usage: create-mithaq [name] [options]
 
   --layout monorepo   the language, each feature, the asas and each app as workspace packages (the default)
   --layout single     one package holding the language, the features, the asas and the tenant app
-  --platform          include the platform console, apps/asas-platform (the default in a monorepo)
-  --no-platform       leave the platform console out
+  --with <a,b>        the add-ons to hold beside auth and the tags example, with every one they need
+  --full              every add-on: the whole worked example (a single package leaves out platform)
   --help              print this
+
+With neither --with nor --full the project is minimal: auth and the tags example. The add-ons:
+
+${Object.entries(addOns).map(([name, { needs }]) => `  ${name}${needs.length ? ` (needs ${needs.join(', ')})` : ''}`).join('\n')}
 
 Asked when not given, unless the input is not a terminal, where the defaults stand.
 
 ${managers}`
 
+/** The `mithaq` bin an install laid down for `folder`, in the nearest `node_modules/.bin` above it. */
+const binAbove = (folder) => {
+  const at = join(folder, 'node_modules/.bin/mithaq')
+  if (existsSync(at)) return at
+  return dirname(folder) === folder ? undefined : binAbove(dirname(folder))
+}
+
 const main = async () => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    allowNegative: true,
-    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, platform: { type: 'boolean' }, help: { type: 'boolean' } },
+    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, help: { type: 'boolean' } },
   })
   if (values.help) return console.log(help)
+  if (values.full && values.with !== undefined) throw new Error('Pass --full or --with, not both: --full is every add-on.')
   let [name] = positionals
-  let { layout, platform } = values
+  let { layout } = values
+  let picked = values.with?.split(',').map((one) => one.trim()).filter(Boolean)
   const prompt = process.stdin.isTTY ? createInterface({ input: process.stdin, output: process.stdout }) : undefined
   try {
     if (!name) name = (await prompt?.question('Project name: '))?.trim() ?? ''
     layout ??= (await prompt?.question('Monorepo, or a single package? (monorepo/single) [monorepo]: '))?.trim().toLowerCase() || 'monorepo'
-    if (layout === 'monorepo') platform ??= !/^n/i.test((await prompt?.question('Include the platform console, apps/asas-platform? (Y/n): '))?.trim() ?? '')
+    if (!values.full && !picked && prompt) {
+      const answer = (await prompt.question('minimal: auth + tags / full: every add-on / pick: choose add-ons (minimal/full/pick) [minimal]: ')).trim().toLowerCase() || 'minimal'
+      if (answer === 'full') values.full = true
+      else if (answer === 'pick') picked = (await prompt.question(`Add-ons, comma-separated (${Object.keys(addOns).join(', ')}): `)).split(',').map((one) => one.trim()).filter(Boolean)
+      else if (answer !== 'minimal') throw new Error(`The answer is minimal, full or pick, not "${answer}".`)
+    }
   } finally {
     prompt?.close()
   }
+  // A single package cannot hold the platform console, so its whole example is every other add-on.
+  const asked = values.full ? Object.keys(addOns).filter((one) => layout !== 'single' || one !== 'platform') : (picked ?? [])
+  const { chosen, added } = resolveAddOns(asked)
+  if (added.length) console.log(`Added ${added.join(', ')}, which ${asked.filter((one) => addOns[one].needs.length).join(', ')} need${added.length === 1 ? 's' : ''}.`)
   const { version } = readJson(new URL('package.json', import.meta.url))
-  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, platform: platform ?? false })
-  console.log(`Created ${project}.`)
+  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen })
+  console.log(`Created ${project}${chosen.length ? `, with ${chosen.join(', ')}` : ', minimal'}.`)
   const manager = managerOf(process.env.npm_config_user_agent)
   const installed = manager !== undefined && spawnSync(manager, ['install'], { cwd: project, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0
   const run = manager ?? 'npm'
   if (!installed) console.warn(`\nNot installed. Run ${run} install in ${project}. ${managers}`)
   const single = layout === 'single'
+  const asas = single ? project : join(project, 'packages/asas')
+  const platform = chosen.includes('platform')
+  // Each screen's files were generated for every kayan of the template, so a project short of an add-on with tables
+  // writes its own once the install has laid the bin down.
+  const regenerate = Object.entries(addOns).some(([one, { tables }]) => tables && !chosen.includes(one))
+  const bin = installed && regenerate ? binAbove(asas) : undefined
+  const generated = bin !== undefined && spawnSync(bin, ['generate', 'screens'], { cwd: asas, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0
+  if (regenerate && !generated) console.warn(`\nThe screens are not written for these add-ons yet. Run mithaq generate screens in ${asas}, after the install.`)
   const language = single ? '' : 'packages/asas/'
   const push = `node --env-file=.env --input-type=module -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"`
   if (single) console.log(`\nThe package is named asas, not ${name}: the screen host imports the language as asas, and a package reaches itself by its own name.`)
@@ -255,7 +386,9 @@ Next, with PostgreSQL 15 or later serving the database DATABASE_URL names in ${l
   ${push}${single ? '' : '\n  cd ../../apps/asas-tanstack'}
   ${run} run dev   # the tenant app, http://localhost:5173${platform ? `\n  # in a second terminal, from apps/asas-platform: ${run} run dev   # the platform console, http://localhost:5174` : ''}
 
-Sign up in the tenant app and create an organization. Then ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills it with sample rows: it takes the first user and that user's first organization, or the ones SEED_EMAIL and SEED_ORGANIZATION name.`)
+Sign up in the tenant app and create an organization. Then ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills it with sample rows: it takes the first user and that user's first organization, or the ones SEED_EMAIL and SEED_ORGANIZATION name.${regenerate ? `
+
+The project holds no migration yet. Before it runs in production, write its first against an empty database with mithaq migrate --name init in ${single ? 'the project' : 'packages/asas'} (README.md, "Running in production").` : ''}`)
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {

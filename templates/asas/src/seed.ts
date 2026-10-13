@@ -14,7 +14,9 @@
 // Running it twice adds nothing: each row is looked up by a key that does not
 // change between runs and is skipped where it is already there.
 import { createHmac } from 'node:crypto'
+// add-on: courses
 import type { RichTextNode, RichTextValue } from 'mithaq'
+// end add-on: courses
 
 function refuse(reason: string): never {
   console.error(`Refusing to seed: ${reason}`)
@@ -58,6 +60,7 @@ const pick = <T>(list: readonly T[]) => list[Math.floor(random() * list.length)]
 const DAY = 86_400_000
 const now = Date.now()
 
+// add-on: courses
 /** One entry per course: the title it is found by on a later run, and a summary in the other locale. */
 const catalogue = [
   ['Introduction to Arabic calligraphy', 'مدخل إلى الخط العربي بأدواته وأساسياته', ['script']],
@@ -96,6 +99,7 @@ const courseDetails = (title: string, summary: string, topics: readonly string[]
 const topicNames: Record<string, string> = { script: 'الخط', grammar: 'النحو', recitation: 'التلاوة' }
 const sessionDetails = (format: 'workshop' | 'lecture') =>
   richText(block('paragraph', [words(format === 'workshop' ? 'A hands-on workshop.' : 'A lecture with questions at the end.')], { textFormat: 0, textStyle: '' }), block('paragraph', [words(format === 'workshop' ? 'ورشة عمل تطبيقية.' : 'محاضرة تتبعها أسئلة.')], { textFormat: 0, textStyle: '' }))
+// end add-on: courses
 
 /** A tag's name is copy a screen shows, so it is one string per locale, and a later run finds it by its English. */
 const tagNames = [
@@ -107,6 +111,7 @@ const tagNames = [
   { en: 'Children', ar: 'أطفال' },
 ]
 
+// add-on: roles
 /** Three custom roles, each labelled in every locale and holding keys the build's own catalog lists. */
 const customRoles = {
   teacher: {
@@ -123,6 +128,7 @@ const customRoles = {
     holds: (key: string) => /^enrollments\./.test(key) || /^(courses|sessions)\.(find|findByID|count|fields\.)/.test(key) || key === 'screen.dashboard',
   },
 }
+// end add-on: roles
 
 // The owner and the organization, read through the provider's own adapter:
 // the generated auth kayan answer no operation to anyone, so this is how a
@@ -170,9 +176,32 @@ const { token } = await auth.internalAdapter.createSession(owner.id, true, { act
 const signature = createHmac('sha256', auth.secret).update(token).digest('base64')
 const headers = new Headers({ cookie: `${auth.authCookies.sessionToken.name}=${encodeURIComponent(`${token}.${signature}`)}` })
 
-const created = { tags: 0, courses: 0, sessions: 0, enrollments: 0, roles: 0, memberRoles: 0, settings: 0 }
+const created = {
+  tags: 0,
+  // add-on: courses
+  courses: 0,
+  sessions: 0,
+  enrollments: 0,
+  // end add-on: courses
+  // add-on: roles
+  roles: 0,
+  memberRoles: 0,
+  // end add-on: roles
+  // add-on: settings
+  settings: 0,
+  // end add-on: settings
+}
 /** The rows this run brought up to date rather than made. */
-const repaired = { roles: 0, tags: 0, tagColumns: 0, details: 0 }
+const repaired = {
+  tags: 0,
+  tagColumns: 0,
+  // add-on: courses
+  details: 0,
+  // end add-on: courses
+  // add-on: roles
+  roles: 0,
+  // end add-on: roles
+}
 const client = (asas.targets.drizzle as unknown as { db: { $client: { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> } } }).db.$client
 
 try {
@@ -201,7 +230,13 @@ try {
   const actor = await asas.auth.actor(headers)
   if (!actor) throw new Error(`The session made for ${owner.email} did not authenticate.`)
   const options = { actor }
-  const { courses, sessions, enrollments, tags, roles, memberRoles } = asas.kayan
+  const { tags } = asas.kayan
+  // add-on: courses
+  const { courses, sessions, enrollments } = asas.kayan
+  // end add-on: courses
+  // add-on: roles
+  const { roles, memberRoles } = asas.kayan
+  // end add-on: roles
 
   const tagIds: string[] = []
   for (const name of tagNames) {
@@ -220,6 +255,7 @@ try {
     tagIds.push(found.id)
   }
 
+  // add-on: courses
   // What this run made and when each is said to have been made, for the one
   // write below that goes around the operations.
   const backdate: { table: 'courses' | 'enrollments'; id: string; at: Date }[] = []
@@ -293,6 +329,17 @@ try {
     backdate.push({ table: 'enrollments', id: made.id, at })
   }
 
+  // `createdAt` is the application's, filled in by the create and refused from
+  // a caller, so no operation can say a row was made in the past. The
+  // dashboard's chart needs a past, so the rows this run just made, and only
+  // those, get one here with a plain update through the drizzle target's own
+  // connection, keyed on each row's id and this tenant.
+  for (const { table, id, at } of backdate) {
+    await client.query(`update "${table}" set "created_at" = $1 where "id" = $2 and "organization_id" = $3`, [at, id, organization.id])
+  }
+  // end add-on: courses
+
+  // add-on: roles
   // A role already there is brought to the keys it would be made with, so a
   // database seeded earlier is repaired by running the seed again. A row that
   // already holds exactly these keys is left alone, so a second run still
@@ -317,30 +364,30 @@ try {
     await memberRoles.operations.create({ user, role }, options)
     created.memberRoles++
   }
+  // end add-on: roles
 
+  // add-on: settings
   const { settings } = asas.global
   if (!(await settings.operations.findOne({}, options))) {
     await settings.operations.update({ siteTitle: `${organization.name} Academy`, contactEmail: String(owner.email), maintenance: false }, options)
     created.settings++
   }
-
-  // `createdAt` is the application's, filled in by the create and refused from
-  // a caller, so no operation can say a row was made in the past. The
-  // dashboard's chart needs a past, so the rows this run just made, and only
-  // those, get one here with a plain update through the drizzle target's own
-  // connection, keyed on each row's id and this tenant.
-  for (const { table, id, at } of backdate) {
-    await client.query(`update "${table}" set "created_at" = $1 where "id" = $2 and "organization_id" = $3`, [at, id, organization.id])
-  }
+  // end add-on: settings
 
   const totals = {
     tags: (await tags.operations.count({}, options)).totalDocs,
+    // add-on: courses
     courses: (await courses.operations.count({}, options)).totalDocs,
     sessions: (await sessions.operations.count({}, options)).totalDocs,
     enrollments: (await enrollments.operations.count({}, options)).totalDocs,
+    // end add-on: courses
+    // add-on: roles
     roles: (await roles.operations.count({}, options)).totalDocs,
     memberRoles: (await memberRoles.operations.count({}, options)).totalDocs,
+    // end add-on: roles
+    // add-on: settings
     settings: (await settings.operations.findOne({}, options)) ? 1 : 0,
+    // end add-on: settings
   }
   console.log(JSON.stringify({ organization: organization.name, created, repaired, totals }))
 } finally {

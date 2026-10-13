@@ -65,6 +65,7 @@ const record = {
 export const platformRecord = <const Main extends readonly unknown[], const Side extends readonly unknown[] = readonly []>({ path, main, side }: { path: string; main: Main; side?: Side }) =>
   ({ view: { path, page: appPage([{ layout: 'record', main, side: [...(side ?? []), record] }]) } }) as const
 
+// add-on: audit-log
 /**
  * The record's activity, which each dashboard edit page draws in its side
  * column, drawn only for an actor the access report lets read the log: one
@@ -72,3 +73,4 @@ export const platformRecord = <const Main extends readonly unknown[], const Side
  * server still refuses the read whatever the page drew.
  */
 export const activity = { component: 'activity', when: { '$user.collections.auditLog.operations.find': { equals: true } } } as const
+// end add-on: audit-log

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { create, managerOf, updatePackageJSONDependencies } from './index.js'
+import { addOns, create, keepAddOns, managerOf, resolveAddOns, updatePackageJSONDependencies } from './index.js'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const scratch = mkdtempSync(join(tmpdir(), 'create-mithaq-'))
@@ -23,11 +23,12 @@ for (const folder of ['apps/asas-tanstack', 'apps/asas-platform']) renameSync(jo
 writeFileSync(join(template, 'package.json'), JSON.stringify({ private: true, type: 'module', engines: { node: '>=24' }, workspaces: ['packages/mithaq', 'packages/features/*', 'packages/asas', 'apps/*'], devDependencies: { '@types/node': '^24.12.3' } }))
 const filesUnder = (folder: string) => readdirSync(folder, { recursive: true, encoding: 'utf8' }).map((file) => join(folder, file))
 
+const every = Object.keys(addOns)
 const read = (...path: string[]) => readFileSync(join(scratch, ...path), 'utf8')
 const json = (...path: string[]) => JSON.parse(read(...path))
 
 test('a project takes the published mithaq and mithaq-admin under the names its imports use, at exactly one version', () => {
-  create({ name: 'my-app', cwd: scratch, template, version: '1.2.3' })
+  create({ name: 'my-app', cwd: scratch, template, version: '1.2.3', addOns: every })
   const features = readdirSync(join(scratch, 'my-app/packages/features')).map((one) => `packages/features/${one}`)
   assert.deepEqual(features, ['audit-log', 'auth', 'courses', 'roles', 'settings', 'tags'].map((one) => `packages/features/${one}`))
   for (const workspace of ['packages/mithaq', 'packages/asas', ...features, 'apps/asas-tanstack', 'apps/asas-platform']) {
@@ -80,7 +81,7 @@ test('the template and both apps get the same .env, with fresh secrets only thei
   // Left for the owner to choose: a code written here would be one anybody with the repository holds.
   assert.match(env, /^SETUP_CODE=$/m)
   assert.equal(statSync(join(scratch, 'my-app/packages/asas/.env')).mode & 0o777, 0o600)
-  create({ name: 'other-app', cwd: scratch, template, version: '1.2.3', mithaq: 'file:/tmp/mithaq.tgz' })
+  create({ name: 'other-app', cwd: scratch, template, version: '1.2.3', mithaq: 'file:/tmp/mithaq.tgz', addOns: every })
   const secret = /^LOCAL_AUTH_SECRET=(.*)$/m
   assert.notEqual(secret.exec(read('other-app/packages/asas/.env'))![1], secret.exec(env)![1])
   assert.equal(json('other-app/apps/asas-tanstack/package.json').dependencies.mithaq, 'file:/tmp/mithaq.tgz')
@@ -113,7 +114,7 @@ test('the package manager is read from the user agent each of the four sets, and
 })
 
 test('without the platform console, its app and its .env are left out, and generate.screens says no app serves its screen', () => {
-  create({ name: 'tenant-only', cwd: scratch, template, version: '1.2.3', platform: false })
+  create({ name: 'tenant-only', cwd: scratch, template, version: '1.2.3', addOns: every.filter((one) => one !== 'platform') })
   assert.ok(!existsSync(join(scratch, 'tenant-only/apps/asas-platform')))
   assert.ok(existsSync(join(scratch, 'tenant-only/apps/asas-tanstack/.env')))
   assert.match(read('tenant-only/packages/mithaq/src/mithaq.ts'), /^      platform: false,$/m)
@@ -122,7 +123,7 @@ test('without the platform console, its app and its .env are left out, and gener
 })
 
 test('a single package holds the language, its features, the asas and the tenant app, reaching itself by the name asas and every other part by path', () => {
-  create({ name: 'one', cwd: scratch, template, version: '1.2.3', layout: 'single', platform: false })
+  create({ name: 'one', cwd: scratch, template, version: '1.2.3', layout: 'single', addOns: every.filter((one) => one !== 'platform') })
   const at = join(scratch, 'one')
   assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', '.yarnrc.yml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
   const manifest = json('one/package.json')
@@ -153,14 +154,14 @@ test('a single package holds the language, its features, the asas and the tenant
   assert.match(read('one/src/styles.css'), /\(`src\/ui\/app-shell\.tsx`\)\. \*\/\n@source '\.\/';\n/)
   assert.doesNotMatch(read('one/tsconfig.json'), /\.\.\//)
   assert.equal(statSync(join(at, '.env')).mode & 0o777, 0o600)
-  assert.throws(() => create({ name: 'two', cwd: scratch, template, version: '1.2.3', layout: 'single', platform: true }), /single package serves the tenant app alone/)
+  assert.throws(() => create({ name: 'two', cwd: scratch, template, version: '1.2.3', layout: 'single', addOns: ['platform'] }), /single package serves the tenant app alone/)
   assert.throws(() => create({ name: 'three', cwd: scratch, template, version: '1.2.3', layout: 'mono' }), /monorepo or single, not "mono"/)
 })
 
 test('--help prints each question\'s flag', () => {
   const done = spawnSync(process.execPath, [fileURLToPath(new URL('./index.js', import.meta.url)), '--help'], { encoding: 'utf8' })
   assert.equal(done.status, 0, done.stderr)
-  for (const flag of ['--layout monorepo', '--layout single', '--platform', '--no-platform']) assert.ok(done.stdout.includes(flag), flag)
+  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', 'courses (needs roles, audit-log)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
   assert.match(done.stdout, /npm, pnpm 10\.6 or later, Yarn 1 or Bun 1\.3\. Yarn 2 and later/, 'and which package managers a project installs with')
 })
 
@@ -174,4 +175,69 @@ test('a dependency left pointing into the framework repository is refused, whate
   const packageJson = { dependencies: { mithaq: '*', asas: '*', 'mithaq-admin': '*' } }
   updatePackageJSONDependencies({ mithaq: 'file:/tmp/mithaq.tgz', mithaqAdmin: 'file:/tmp/mithaq-admin.tgz', packageJson })
   assert.deepEqual(packageJson, { dependencies: { mithaq: 'file:/tmp/mithaq.tgz', asas: '*', 'mithaq-admin': 'file:/tmp/mithaq-admin.tgz' } })
+})
+
+test('an add-on brings every one it needs, said so, and a name the table does not hold is refused with the list', () => {
+  assert.deepEqual(resolveAddOns([]), { chosen: [], added: [] })
+  assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'courses'], added: ['roles', 'audit-log'] })
+  assert.deepEqual(resolveAddOns(['platform', 'roles', 'roles']).chosen, ['roles', 'platform'], 'in the table\'s order, once each')
+  assert.throws(() => resolveAddOns(['roles', 'media', 'rich']), /^Error: No add-on is named "media", "rich"\. The add-ons are roles, audit-log, settings, courses, platform\.$/)
+})
+
+test('a region keeps its lines only where its add-ons are chosen, a without region is uncommented only where they are not, and the markers go either way', () => {
+  const text = [
+    'a',
+    '// add-on: roles',
+    'b',
+    '  // add-on: courses',
+    '  c',
+    '  // end add-on: courses',
+    '// end add-on: roles',
+    '// without add-on: roles',
+    '// d',
+    '//',
+    '//   e',
+    '// end without add-on: roles',
+    'f',
+  ].join('\n')
+  assert.equal(keepAddOns(text, []), ['a', 'd', '', '  e', 'f'].join('\n'))
+  assert.equal(keepAddOns(text, ['roles']), ['a', 'b', 'f'].join('\n'))
+  assert.equal(keepAddOns(text, ['roles', 'courses']), ['a', 'b', '  c', 'f'].join('\n'))
+  assert.throws(() => keepAddOns('// add-on: roles\nb', []), /leaves "add-on: roles" open/)
+  assert.throws(() => keepAddOns('// add-on: roles\n// end add-on: courses', []), /closes "add-on: courses" where no such region is open/)
+  assert.throws(() => keepAddOns('// add-on: rolls\n// end add-on: rolls', []), /the add-on "rolls", which the table does not hold/)
+})
+
+test('a minimal project holds auth and the tags example alone: no other feature, no file only an add-on reads, and access over Better Auth\'s own member roles', () => {
+  create({ name: 'minimal', cwd: scratch, template, version: '1.2.3' })
+  const at = join(scratch, 'minimal')
+  assert.deepEqual(readdirSync(join(at, 'packages/features')).sort(), ['auth', 'tags'])
+  assert.ok(!existsSync(join(at, 'apps/asas-platform')))
+  for (const file of Object.values(addOns).flatMap((one) => one.files)) assert.ok(!existsSync(join(at, file)), file)
+  for (const file of Object.values(addOns).flatMap((one) => one.without)) assert.ok(existsSync(join(at, file)), file)
+  assert.deepEqual(Object.keys(json('minimal/packages/asas/package.json').dependencies).filter((one) => one.startsWith('@minimal/')).sort(), ['@minimal/auth', '@minimal/mithaq', '@minimal/tags'])
+  // Its code, the comments aside, which may name what an add-on would bring.
+  const code = (file: string) => read(file).replaceAll(/^\s*(\/\/|\/?\*).*$/gm, '')
+  const language = code('minimal/packages/mithaq/src/mithaq.ts')
+  assert.match(language, /^export const accessTarget = \(roles: typeof systemRoles = systemRoles\) => memberRoleTarget\(/m)
+  assert.doesNotMatch(language, /rbacTarget|auditSink|sessionLabels|softDelete|'courses'|'roles'|'auditLog'|'settings'/)
+  assert.match(read('minimal/packages/mithaq/src/roles/tenant-roles.ts'), /\.\.\.defaultMemberRoles,/)
+  assert.doesNotMatch(code('minimal/packages/mithaq/src/mithaq/auth/index.ts'), /memberRoles|enrollments/)
+  assert.doesNotMatch(code('minimal/packages/asas/src/asas.ts'), /courses|roles\.kayan|auditLog|settings/)
+  // The template's migrations build every table, so none ships, and no answer to them either.
+  assert.deepEqual(readdirSync(join(at, 'packages/asas/src/migrations')), ['drizzle.config.ts'])
+  assert.equal(read('minimal/packages/asas/mithaq.hints.json'), '[]\n')
+  const sources = filesUnder(at).filter((file) => /\.tsx?$/.test(file))
+  assert.deepEqual(sources.filter((file) => /add-on: /.test(readFileSync(file, 'utf8'))).map((file) => file.slice(at.length)), [], 'no marker is left')
+})
+
+test('a full project holds every add-on and the template\'s migrations, none of the files that stand in for an add-on, and no marker', () => {
+  const at = join(scratch, 'my-app')
+  for (const file of Object.values(addOns).flatMap((one) => one.files)) assert.ok(existsSync(join(at, file)), file)
+  for (const file of Object.values(addOns).flatMap((one) => one.without)) assert.ok(!existsSync(join(at, file)), file)
+  assert.match(read('my-app/packages/mithaq/src/mithaq.ts'), /rbacTarget\(\{ \.\.\.accessOptions, roles \}\)/)
+  assert.doesNotMatch(read('my-app/packages/mithaq/src/mithaq.ts'), /memberRoleTarget/)
+  assert.ok(readdirSync(join(at, 'packages/asas/src/migrations')).length > 2)
+  const sources = filesUnder(at).filter((file) => /\.tsx?$/.test(file))
+  assert.deepEqual(sources.filter((file) => /add-on: /.test(readFileSync(file, 'utf8'))).map((file) => file.slice(at.length)), [], 'no marker is left')
 })

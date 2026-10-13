@@ -27,12 +27,16 @@ export const asPlatform = <Result>(run: () => Result): Result => platformRequest
 export const onPlatform = () => platformRequest.getStore() === true
 
 /**
- * Whether this project serves the platform console, `apps/asas-platform`. `create-mithaq
- * --no-platform` writes `false` here, as it writes `platform: false` under `generate.screens` in
- * the template's `src/mithaq.ts`: then no boot asks for PLATFORM_URL, and nobody is linked or
+ * Whether this project serves the platform console, `apps/asas-platform`, as `generate.screens`
+ * in `src/mithaq.ts` says too. Without it no boot asks for PLATFORM_URL, and nobody is linked or
  * sent to a platform app that does not exist.
  */
+// add-on: platform
 export const platformApp: boolean = true
+// end add-on: platform
+// without add-on: platform
+// export const platformApp: boolean = false
+// end without add-on: platform
 
 // A production boot needs all three: the fallbacks below are for development only, and Better
 // Auth's refusal of its default secret never fires for the platform, whose secret is derived here.
@@ -504,11 +508,8 @@ export const options = {
  * first.
  *
  * The three built-in roles are the provider's defaults over the provider's own resources and grade
- * nothing of this project: what a member may do is the access target's answer, kept apart so a
- * governance name never widens a business grant. One reading is deliberate and narrow: a member
- * whose `member.role` names the owner always holds the fixed `administrator` role in that tenant,
- * so the owner is never left without the role that manages roles. A project narrows these where its
- * own governance differs.
+ * nothing of this project: what a member may do is the access target's answer, which reads the
+ * project's own keys. A project narrows these where its own governance differs.
  */
 export const authOptions = (hooks: StoreHooks = {}) => {
   // Only the provider's own vocabulary. Merging this project's catalog in would make the provider's
@@ -544,11 +545,7 @@ export const authOptions = (hooks: StoreHooks = {}) => {
           ...organizationOptions,
           organizationHooks: {
             ...organizationOptions.organizationHooks,
-            // The tenant's first assignment, which nothing inside the project can make: a role
-            // holding `memberRoles.create` has to be assigned before it can assign anything, and
-            // the caller of `createOrganization` is in no organization until that route puts it in
-            // one. So the row is written straight through the store, and the organization has a
-            // root granter from its first moment.
+            // The project's own, written where the store is in hand: `providers.user.server`.
             ...hooks,
             beforeRemoveMember: async (data: Parameters<NonNullable<StoreHooks['beforeRemoveMember']>>[0]) => {
               await organizationOptions.organizationHooks.beforeRemoveMember(data)
@@ -594,12 +591,8 @@ export const providers = {
         count?(args: { kayan: string; args: { where?: Where } }): Promise<number>
       }
     }) => {
-      // The tenant's first assignment, written where the store is in hand. It goes straight through
-      // the store rather than through `asas.kayan.memberRoles.operations.create`, because a managed
-      // create is graded against the actor making it and the caller of `createOrganization` holds
-      // nothing yet. The row is `administrator`, which holds `'*'`, so every later assignment is
-      // the gated one.
       const store = targets.drizzle
+      // add-on: roles
       // The drizzle store always counts; `Store` types it optional for stores that cannot.
       const heldRoles = (organization: string, user: string) => store.count!({ kayan: 'memberRoles', args: { where: { organization: { equals: organization }, user: { equals: user } } } })
       const holdsRoles = () => new APIError('CONFLICT', { code: 'error.conflict.member_holds_roles', message: 'This member still holds a role in this organization. Take each role from them first.' })
@@ -619,7 +612,16 @@ export const providers = {
           for (const row of left.docs) await store.remove({ tx, kayan: 'memberRoles', id: row.id })
         })
       }
+      // end add-on: roles
       const built = authOptions({
+        // add-on: roles
+        // The tenant's first assignment, which nothing inside the project can make: a role holding
+        // `memberRoles.create` has to be assigned before it can assign anything, and the caller of
+        // `createOrganization` is in no organization until that route puts it in one. So it goes
+        // straight through the store rather than through `asas.kayan.memberRoles.operations.create`,
+        // which is graded against the actor making it. The row is `administrator`, which holds
+        // `'*'`, so the organization has a root granter from its first moment and every later
+        // assignment is the gated one.
         afterCreateOrganization: async ({ organization, user: creator }) => {
           const written = new Date()
           await store.transaction((tx) =>
@@ -651,6 +653,7 @@ export const providers = {
         },
         beforeAcceptInvitation: ({ user, organization }) => clearsLeftRoles({ organization: organization.id, user: user.id }),
         beforeAddMember: ({ member, organization }) => clearsLeftRoles({ organization: organization.id, user: member.userId }),
+        // end add-on: roles
       }).options
       // `transaction: true` makes the provider's own transaction helper open a real transaction
       // wherever it asks for one: a sign-up writes its user, account and session in one, and an
@@ -663,6 +666,7 @@ export const providers = {
       // The plugin stays in it because it refuses a banned user a session and carries
       // `impersonatedBy` onto the session it reads.
       const tenantOnly = Object.values(admin(adminOptions).endpoints).map((endpoint) => endpoint.path)
+      // add-on: roles
       // Leaving is refused while a role is held, as a removal is above. The provider's leave route
       // runs no hook, so it is matched by path, on both instances. A member who holds a
       // role-managing role takes it from nobody else, so leaves only once another member has taken
@@ -681,7 +685,19 @@ export const providers = {
           }),
         }] },
       }
-      const tenant = betterAuthServer({ ...built, plugins: [...built.plugins, keepsRoles], disabledPaths: tenantOnly, database })
+      // end add-on: roles
+      const tenant = betterAuthServer({
+        ...built,
+        plugins: [
+          ...built.plugins,
+          // add-on: roles
+          keepsRoles,
+          // end add-on: roles
+        ],
+        disabledPaths: tenantOnly,
+        database,
+      })
+      // add-on: courses
       // A person who holds a seat, a withdrawn one included, is not removed: the enrollment records
       // that they attended, and its `student` key restricts. The provider's `deleteUser` runs in no
       // transaction, so the key alone would fail after the person's sessions and accounts were
@@ -703,6 +719,7 @@ export const providers = {
           }),
         }] },
       }
+      // end add-on: courses
       // Whether anyone holds a platform role, read as `holdsRole` reads `user.role`: comma-separated,
       // each name trimmed of the whitespace `.trim()` takes. Every tenant user's `user` is passed
       // over before the split, and the scan stops at the first holder.
@@ -765,7 +782,16 @@ export const providers = {
       // platform already has. A project with no platform console has no first-register either.
       const platform = betterAuthServer({
         ...built,
-        plugins: [...built.plugins, seated, keepsRoles, ...(platformApp ? [firstRegister] : [])],
+        plugins: [
+          ...built.plugins,
+          // add-on: courses
+          seated,
+          // end add-on: courses
+          // add-on: roles
+          keepsRoles,
+          // end add-on: roles
+          ...(platformApp ? [firstRegister] : []),
+        ],
         baseURL: platformURL,
         trustedOrigins: platformOrigins,
         rateLimit: { ...built.rateLimit, enabled: platformLimited },
