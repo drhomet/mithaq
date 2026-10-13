@@ -236,7 +236,8 @@ export const membersOf = (store: Pick<Store, 'find'>) => async ({ user: actor }:
   if (held === true || held?.has('member.find')) return ids.length ? { id: { in: ids } } : false
   const seen = new Set([authActor(actor)?.id])
   // add-on: roles
-  const audience = [...new Set(assignedRoles(actor as OrganizationActor).flatMap((slug) => peopleAudience[slug] ?? []))]
+  // A custom role's name is a tenant's to write, so one named `constructor` reads no inherited key.
+  const audience =[...new Set(assignedRoles(actor as OrganizationActor).flatMap((slug) => (Object.hasOwn(peopleAudience, slug) ? peopleAudience[slug]! : [])))]
   if (audience.length) {
     const assigned = await store.find({ kayan: 'memberRoles', args: { ...all, where: { organization: { equals: active }, role: { in: audience } } } })
     for (const row of assigned.docs) seen.add(row.user)

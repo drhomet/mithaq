@@ -39,6 +39,19 @@ test('the loader reads every member and every assignment, page after page, so an
   assert.deepEqual(members.slice(0, 2).map((one) => one.userId), ['0', '1'], 'in the order they joined')
 })
 
+test('a member a shifted page hands over twice is drawn once', async () => {
+  const many = Array.from({ length: 150 }, (_, at) => ({ userId: String(at), role: 'member', createdAt: '2026-01-01T00:00:00.000Z', user: { name: `Person ${at}`, email: `p${at}@example.com` } }))
+  const given = tools(many)
+  // A member removed between the two reads shifts the second page back by one.
+  given.request = async (path) => {
+    const offset = Number(new URL(path, 'http://test').searchParams.get('offset') ?? 0)
+    const start = offset ? offset - 1 : 0
+    return Response.json({ members: many.slice(start, start + 100), total: many.length })
+  }
+  const { members } = await loader(given)
+  assert.equal(new Set(members.map((one) => one.userId)).size, members.length, 'no member twice')
+})
+
 test("a member whose createdAt does not parse draws empty rather than throwing and failing the whole page", async () => {
   const { members } = await loader(
     tools([

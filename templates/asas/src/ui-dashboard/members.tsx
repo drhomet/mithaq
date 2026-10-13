@@ -47,32 +47,42 @@ const isoOf = (value: string): string => {
 /**
  * Every row of a read that answers a page at a time, read until the total is reached: an organization outgrows any one
  * page, and a page that drew the first hundred would leave the rest out without a word.
+ *
+ * The pages are offsets, so a row added or removed between two reads shifts the next page: a row then comes back twice,
+ * and is kept once by `key`, or is missed until the page loads again.
  */
-// ponytail: every member is read and drawn at once; page the table itself once an organization's size makes the page slow.
-export const everyPage = async <Row,>(read: (offset: number) => Promise<{ rows: Row[]; total: number }>): Promise<Row[]> => {
-  const rows: Row[] = []
-  for (;;) {
-    const page = await read(rows.length)
-    rows.push(...page.rows)
-    if (!page.rows.length || rows.length >= page.total) return rows
+// ponytail: every member is read and drawn at once, by offset; page the table itself, by a cursor, once an organization's size makes the page slow.
+export const everyPage = async <Row,>({ read, key }: { read: (offset: number) => Promise<{ rows: Row[]; total: number }>; key: (row: Row) => string }): Promise<Row[]> => {
+  const rows = new Map<string, Row>()
+  for (let offset = 0; ; ) {
+    const page = await read(offset)
+    for (const row of page.rows) if (!rows.has(key(row))) rows.set(key(row), row)
+    offset += page.rows.length
+    if (!page.rows.length || offset >= page.total) return [...rows.values()]
   }
 }
 
 export const loader = async ({ access, client, request, maxLimit }: LoaderTools): Promise<MembersData> => {
   const [members, assignments, roles, invited] = await Promise.all([
-    everyPage(async (offset) => {
-      // Paged by the id, the one column no two members share, so no member falls between two pages.
-      const response = await request(`/api/auth/user/organization/list-members?limit=${maxLimit}&offset=${offset}&sortBy=id`)
-      if (!response.ok) throw new Error(`list-members answered ${response.status}`)
-      const page = (await response.json()) as { members: { userId: string; role: string; createdAt: string; user: { name: string; email: string } }[]; total: number }
-      return { rows: page.members, total: page.total }
+    everyPage({
+      key: (member) => member.userId,
+      read: async (offset: number) => {
+        // In id order, which no change to a member's other columns reorders.
+        const response = await request(`/api/auth/user/organization/list-members?limit=${maxLimit}&offset=${offset}&sortBy=id`)
+        if (!response.ok) throw new Error(`list-members answered ${response.status}`)
+        const page = (await response.json()) as { members: { userId: string; role: string; createdAt: string; user: { name: string; email: string } }[]; total: number }
+        return { rows: page.members, total: page.total }
+      },
     }),
     // The page is served on `member.find`, so a viewer may list the members
     // and not read who holds which role.
     holds(access, 'memberRoles.find')
-      ? everyPage(async (offset) => {
-          const page = (await client({ kayan: 'memberRoles', operation: 'find', input: { limit: maxLimit, page: Math.ceil(offset / maxLimit) + 1, depth: 0 } })) as { docs: { id: string; user: string; role: string }[]; totalDocs: number }
-          return { rows: page.docs, total: page.totalDocs }
+      ? everyPage({
+          key: (row) => row.id,
+          read: async (offset: number) => {
+            const page = (await client({ kayan: 'memberRoles', operation: 'find', input: { limit: maxLimit, page: Math.ceil(offset / maxLimit) + 1, depth: 0 } })) as { docs: { id: string; user: string; role: string }[]; totalDocs: number }
+            return { rows: page.docs, total: page.totalDocs }
+          },
         })
       : [],
     // Asked only of a viewer the report lets read roles, so the page still

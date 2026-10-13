@@ -284,14 +284,18 @@ const roleWrites = new Map([
   ['/organization/delete-role', 'ac.delete'],
 ])
 type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
-type Members = { findMany<Row>(query: { model: string; where: { field: string; value: string }[]; limit: number; sortBy: { field: string; direction: 'asc' | 'desc' } }): Promise<Row[]> }
+type Members = { findMany<Row>(query: { model: string; where: { field: string; value: string | Date }[]; limit: number; sortBy: { field: string; direction: 'asc' | 'desc' } }): Promise<Row[]> }
 /**
  * The organization a session opens in when nothing names one: the person's oldest membership,
- * usually the one they founded, so every sign-in lands in the same place.
+ * usually the one they founded, so every sign-in lands in the same place. The adapter sorts by one
+ * column, so memberships made in the same instant are read again and the first by id is taken.
  */
 const oldestMembership = async ({ adapter, user }: { adapter: Members; user: string }) => {
-  const [oldest] = await adapter.findMany<{ organizationId: string }>({ model: 'member', where: [{ field: 'userId', value: user }], limit: 1, sortBy: { field: 'createdAt', direction: 'asc' } })
-  return oldest?.organizationId
+  const [oldest] = await adapter.findMany<{ createdAt: Date; organizationId: string }>({ model: 'member', where: [{ field: 'userId', value: user }], limit: 1, sortBy: { field: 'createdAt', direction: 'asc' } })
+  if (!oldest) return undefined
+  const [first] = await adapter.findMany<{ organizationId: string }>({ model: 'member', where: [{ field: 'userId', value: user }, { field: 'createdAt', value: oldest.createdAt }], limit: 1, sortBy: { field: 'id', direction: 'asc' } })
+  // A database timestamp finer than the adapter's date matches no row; the oldest stands then.
+  return first?.organizationId ?? oldest.organizationId
 }
 // The provider's member reads take the organization by `organizationId` or by `organizationSlug`,
 // the slug winning, so both are compared with the active organization.
@@ -307,9 +311,18 @@ const auditBefore = async (ctx: HookContext) => {
   // anyone's role by `userId`, and these routes have no hook to gate. Only a caller who may read
   // members does, in the active organization alone. A caller's own role, asked with no `userId`,
   // stays open: every request's actor is read through it.
+  //
+  // The key is asked first, so a caller without it learns nothing of whether a slug names an
+  // organization.
   if (ctx.path === '/organization/list-members' || (ctx.path === '/organization/get-active-member-role' && (ctx.query as { userId?: unknown } | undefined)?.userId !== undefined)) {
-    await sameOrganizationNamed(ctx)
     await gate('member.find')()
+    await sameOrganizationNamed(ctx)
+  }
+  // The full read's members are emptied afterwards for a caller who may not list them, so the
+  // provider loads one rather than up to `membershipLimit`.
+  if (ctx.path === '/organization/get-full-organization') {
+    const mayList = await gate('member.find')().then(() => sameOrganizationNamed(ctx)).then(() => true, () => false)
+    if (!mayList) return { context: { query: { ...(ctx.query as object | undefined), membersLimit: 1 } } }
   }
   // The provider lets any member list invitations, invitee emails among them, and this route has no
   // hook to gate. Only a caller who may invite reads them, in the active organization alone.
@@ -383,6 +396,10 @@ export const platformAudit = {
       const [mayInvite, mayList] = [await holds('invitation.create'), await holds('member.find')]
       if (!mayInvite || !mayList) return ctx.json({ ...full, ...(mayInvite ? {} : { invitations: [] }), ...(mayList ? {} : { members: [] }) })
     }
+    // The provider hands the invitee the inviter's address, which the accept page never shows, and
+    // an invitation is no reason to learn a member's address.
+    const invitation = ctx.context.returned as { inviterEmail?: unknown } | null | undefined
+    if (ctx.path === '/organization/get-invitation' && invitation && typeof invitation === 'object' && 'inviterEmail' in invitation) return ctx.json({ ...invitation, inviterEmail: '' })
     // Leaving the active organization leaves the session in none, where every read is refused,
     // so it opens the person's oldest remaining membership, as a new session would.
     const leaving = ctx.context.session
