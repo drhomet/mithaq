@@ -2,7 +2,7 @@
 // Staged rather than published from `packages/mithaq`, because npm and Bun ignore `publishConfig.exports` and only pnpm applies it.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -29,18 +29,19 @@ writeFileSync(join(staged, 'package.json'), `${JSON.stringify({ ...manifest, ...
 const admin = join(root, 'packages/mithaq-admin')
 const stagedAdmin = join(root, '.pack/mithaq-admin')
 rmSync(stagedAdmin, { recursive: true, force: true })
-const { publishConfig: adminPublished, private: _adminPrivate, devDependencies: _adminDev, ...adminManifest } = JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { publishConfig: Record<string, unknown>; [key: string]: unknown }
-cpSync(join(admin, 'registry'), join(stagedAdmin, 'registry'), { recursive: true })
-for (const folder of ['ui', 'lib', 'hooks']) rmSync(join(stagedAdmin, 'registry', folder), { recursive: true })
-cpSync(join(admin, 'registry/ui/directional-icon.tsx'), join(stagedAdmin, 'registry/ui/directional-icon.tsx'))
-for (const file of ['registry.json', 'source.css', 'README.md']) cpSync(join(admin, file), join(stagedAdmin, file))
+const { publishConfig: adminPublished, private: _adminPrivate, devDependencies: _adminDev, peerDependencies: adminPeers, ...adminManifest } = JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { publishConfig: Record<string, unknown>; peerDependencies: Record<string, string>; [key: string]: unknown }
+// Committed files only, as the template is staged, so nothing left in the working tree ships.
+const adminFiles = execFileSync('git', ['ls-files', '-z', 'registry', 'registry.json', 'source.css', 'README.md'], { cwd: admin, encoding: 'utf8' })
+  .split('\0')
+  .filter((file) => file && (!/^registry\/(ui|lib|hooks)\//.test(file) || file === 'registry/ui/directional-icon.tsx'))
+for (const file of adminFiles) cpSync(join(admin, file), join(stagedAdmin, file))
 const { items } = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; files: { path: string }[] }[] }
 for (const { name, files } of items) for (const { path } of files) assert.ok(existsSync(join(stagedAdmin, path)), `${name} names ${path}, which ships`)
 // One version for the three packages, so a project that pins them together cannot pair two that drifted apart.
-writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version }, null, 2)}\n`)
+writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version, peerDependencies: { ...adminPeers, mithaq: publishConfig.version } }, null, 2)}\n`)
 cpSync(join(root, 'LICENSE'), join(stagedAdmin, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(stagedAdmin, 'LICENSES'), { recursive: true })
-console.log(`staged ${stagedAdmin}, with ${readdirSync(join(stagedAdmin, 'registry'), { recursive: true }).length} entries in registry/`)
+console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
 
 cpSync(join(root, 'README.md'), join(staged, 'README.md'))
 cpSync(join(root, 'LICENSE'), join(staged, 'LICENSE'))
