@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -17,6 +18,8 @@ const upstream = 'import { a } from "a"\nexport const now = a\n'
 const older = 'import { a } from "a"\nexport const then = a\n'
 // A copy `shadcn add` made before the package: its marker names the commit it was built at.
 const copied = (body: string, from = body) => `${body}// mithaq-admin 0123456789abcdef0123456789abcdef01234567 ${hashOf(from)}\n`
+// What an eject writes: the hash of exactly the text above the marker.
+const sha = (text: string) => createHash('sha256').update(text).digest('hex')
 // The package's own text, with the leading comment an older copy lost to `shadcn add`.
 const packaged = `/** The package's note. */\n${upstream}`
 
@@ -102,7 +105,8 @@ test('a marked file no item names any more is reported removed, and a file of th
 })
 
 test('upgrade --check exits 1 when a file differs from the installed package, says which side is newer is not known, writes nothing, and exits 0 when none differs', async (t) => {
-  const differing = await project(everyCase)
+  // A held file at the project's root, which the app needs: deleting it would break the app.
+  const differing = await project({ ...everyCase, 'src/rooted.ts': copied(older) })
   const current = await project({ 'src/components/mithaq/current.ts': copied(upstream), 'src/components/mithaq/unmarked.ts': upstream })
   t.after(() => Promise.all([differing, current].map((root) => rm(root, { recursive: true, force: true }))))
   const failure = await failed(differing, 'upgrade', '--check')
@@ -112,7 +116,9 @@ test('upgrade --check exits 1 when a file differs from the installed package, sa
   assert.match(failure.stdout, /src\/components\/mithaq\/differs-edited\.ts differs from the installed mithaq-admin's file \(1\.2\.3\), and is edited since it was ejected from 0123456789ab: diff the two and merge by hand\./)
   assert.doesNotMatch(failure.stdout, /behind|losing nothing/)
   assert.match(failure.stdout, /src\/components\/mithaq\/unmarked\.ts carries no mithaq-admin marker/)
-  assert.match(failure.stderr, /2 files differ from the installed mithaq-admin/)
+  assert.match(failure.stdout, /src\/rooted\.ts differs from the installed mithaq-admin's file \(1\.2\.3\), and is not edited since it was ejected from 0123456789ab\. A hash shows a difference, not which side is newer: diff the two before replacing it, or delete it and run `mithaq eject mithaq-probe` to take the package's\./)
+  assert.doesNotMatch(failure.stdout, /rooted\.ts.*delete it to draw/)
+  assert.match(failure.stderr, /3 files differ from the installed mithaq-admin/)
   assert.equal(await readFile(new URL('src/components/mithaq/differs.ts', differing), 'utf8'), everyCase['src/components/mithaq/differs.ts'], 'and it wrote nothing')
   const passed = await mithaq(current, 'upgrade', '--check')
   assert.match(passed.stdout, /src\/components\/mithaq\/current\.ts is up to date/)
@@ -194,7 +200,8 @@ const pieces = async () => {
   const piece = (name: string, text: string) => write(root, `node_modules/mithaq-admin/registry/${name}`, text)
   await piece('copy.ts', "export const who = 'package'\n")
   await piece('widget.ts', "import { who } from 'mithaq-admin/copy.ts'\nexport const widget = `widget sees ${who}`\n")
-  await piece('list.ts', "import { widget } from 'mithaq-admin/widget.ts'\nexport const list = `list holds ${widget}`\n")
+  // With no newline at its end, which an eject adds before the marker.
+  await piece('list.ts', "import { widget } from 'mithaq-admin/widget.ts'\nexport const list = `list holds ${widget}`")
   const files = (name: string) => [{ path: `registry/${name}.ts`, target: `@components/mithaq/${name}.ts` }]
   await write(root, 'node_modules/mithaq-admin/registry.json', JSON.stringify({
     items: [
@@ -229,7 +236,7 @@ test('eject writes the piece byte for byte with a marker, every importer draws i
   }
   const text = "export const who = 'package'\n"
   const at = new URL('src/components/mithaq/copy.ts', root)
-  assert.equal(await readFile(at, 'utf8'), `${text}// mithaq-admin 1.2.3 ${hashOf(text)}\n`)
+  assert.equal(await readFile(at, 'utf8'), `${text}// mithaq-admin 1.2.3 ${sha(text)}\n`)
   assert.deepEqual((await upgradeCheck(root))!.map(({ path, state }) => [path, state]), [['src/components/mithaq/copy.ts', 'up to date']], 'and upgrade --check reads it up to date')
   await writeFile(at, (await readFile(at, 'utf8')).replace("'package'", "'ejected'"))
   assert.deepEqual(await served(root), { who: 'ejected', list: 'list holds widget sees ejected' }, 'the app, and the package\'s widget through its list, draw the edit')
@@ -270,4 +277,20 @@ test('eject --prune deletes each unedited ejected piece, stale ones too, and nev
     'the unedited and the stale go; the edited and the project\'s own stay',
   )
   assert.ok(existsSync(at('src/rooted.ts')), 'a file at the project\'s root is the project\'s, ejected or not')
+})
+
+test('an edit only in the leading comments of an ejected file is an edit, so prune keeps it, and a file ejected with a newline added hashes what was written', async (t) => {
+  const root = await pieces()
+  t.after(() => rm(root, { recursive: true, force: true }))
+  for (const name of ['copy', 'list']) await mithaq(root, 'eject', name)
+  const at = (path: string) => new URL(path, root)
+  const list = "import { widget } from 'mithaq-admin/widget.ts'\nexport const list = `list holds ${widget}`\n"
+  assert.equal(await readFile(at('src/components/mithaq/list.ts'), 'utf8'), `${list}// mithaq-admin 1.2.3 ${sha(list)}\n`)
+  await writeFile(at('src/components/mithaq/copy.ts'), `// @ts-nocheck\n${await readFile(at('src/components/mithaq/copy.ts'), 'utf8')}`)
+  assert.deepEqual(
+    (await upgradeCheck(root))!.map(({ path, state }) => [path, state]),
+    [['src/components/mithaq/copy.ts', 'up to date, edited'], ['src/components/mithaq/list.ts', 'up to date']],
+  )
+  await mithaq(root, 'eject', '--prune')
+  assert.deepEqual(['copy', 'list'].map((name) => existsSync(at(`src/components/mithaq/${name}.ts`))), [true, false], 'the pragma stands, and the unedited list goes')
 })

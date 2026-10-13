@@ -4,14 +4,26 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 
-// The last line of every ejected file: the version or commit it came from and the hash of the file above.
-// Trailing, because `shadcn add`, which made the older copies, drops a file's leading comments only.
+// The last line of every ejected file: the version (or, for a copy `shadcn add` made, the commit) it came from and the
+// hash of the file above. Trailing, because `shadcn add` dropped a file's leading comments only.
 const marker = /\n\/\/ mithaq-admin (\S+) ([0-9a-f]{64})\n?$/
-// What `shadcn add` drops, so a hash is the same over the package's text and an older copy's.
+// What `shadcn add` dropped, so a hash is the same over the package's text and a copy it made.
 const leading = /^(?:\s+|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*/
 
-/** The hash of a file as it is ejected, without its marker. */
-export const hashOf = (text: string) => createHash('sha256').update(text.replace(marker, '\n').replace(leading, '')).digest('hex')
+/** What an eject writes above the marker: the file's text, ending in a newline. */
+const bodyOf = (text: string) => {
+  const body = text.replace(marker, '\n')
+  return body.endsWith('\n') ? body : `${body}\n`
+}
+const sha = (text: string) => createHash('sha256').update(text).digest('hex')
+
+/** The hash of a copy `shadcn add` made, without its marker and the leading comments it dropped. */
+export const hashOf = (text: string) => sha(bodyOf(text).replace(leading, ''))
+/**
+ * The hash a marker from `from` holds: of the whole text above it for an eject, which writes byte for byte, so an edit
+ * to a leading pragma is an edit; without leading comments only for a copy made at a commit, as `shadcn add` wrote it.
+ */
+const hashFrom = (from: string) => (text: string) => (/^(?:[0-9a-f]{40}|unknown)$/.test(from) ? hashOf(text) : sha(bodyOf(text)))
 
 type Item = { name: string; dependencies?: string[]; registryDependencies?: string[]; files: { path: string; target: string }[] }
 
@@ -46,9 +58,11 @@ const targetsOf = async (project: URL) => {
   }
 }
 
+const folderOf = (path: string) => path.slice(0, path.lastIndexOf('/') + 1)
+
 /** The folders a piece the package serves (`registry/<file>`) is ejected into: what `eject --prune` sweeps. */
 const ejectedFolders = (items: readonly Item[], pathOf: (target: string) => string | undefined) =>
-  new Set(items.flatMap((item) => item.files.filter((file) => !file.path.slice('registry/'.length).includes('/')).flatMap((file) => pathOf(file.target)?.replace(/[^/]*$/, '') ?? [])))
+  new Set(items.flatMap((item) => item.files.filter((file) => !file.path.slice('registry/'.length).includes('/')).flatMap((file) => { const path = pathOf(file.target); return path ? folderOf(path) : [] })))
 
 export type Copied = {
   /** The file, relative to the project, or the target or package path that resolved outside it. */
@@ -58,6 +72,8 @@ export type Copied = {
   from?: string
   /** The installed mithaq-admin's version. */
   to?: string
+  /** The item of a file the project always holds, which it never deletes: it ejects the item again instead. */
+  item?: string
 }
 
 /**
@@ -72,7 +88,8 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
   /** Every path an item names, held or not, and the folders they sit in, which a file no item names any more is looked for in. */
   const named = new Set<string>()
   const folders = new Set<string>()
-  for (const { files } of installed.items) {
+  const ejected = ejectedFolders(installed.items, pathOf)
+  for (const { name, files } of installed.items) {
     for (const file of files) {
       const source = new URL(file.path, installed.root)
       const path = pathOf(file.target)
@@ -86,7 +103,7 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
       }
       if (path) {
         named.add(path)
-        folders.add(path.slice(0, path.lastIndexOf('/') + 1))
+        folders.add(folderOf(path))
       }
       const text = path && (await readFile(new URL(path, project), 'utf8').catch(() => undefined))
       if (!path || text === undefined) continue
@@ -96,9 +113,9 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
         copied.push({ path, state: 'unknown', to })
         continue
       }
-      const differs = hash !== hashOf(await readFile(source, 'utf8'))
-      const edited = hash !== hashOf(text)
-      copied.push({ path, state: `${differs ? 'differs' : 'up to date'}${edited ? ', edited' : ''}`, from, to })
+      const differs = hash !== hashFrom(from!)(await readFile(source, 'utf8'))
+      const edited = hash !== hashFrom(from!)(text)
+      copied.push({ path, state: `${differs ? 'differs' : 'up to date'}${edited ? ', edited' : ''}`, from, to, ...(!ejected.has(folderOf(path)) && { item: name }) })
     }
   }
   // A marked file no item names any more: an item the package dropped, which the project deletes.
@@ -114,11 +131,11 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
   return copied
 }
 
-const sentence = ({ path, state, from = '', to = 'unknown' }: Copied) =>
+const sentence = ({ path, state, from = '', to = 'unknown', item }: Copied) =>
   ({
     'up to date': `${path} is up to date.`,
     'up to date, edited': `${path} is up to date, and edited since it was ejected.`,
-    differs: `${path} differs from the installed mithaq-admin's file (${to}), and is not edited since it was ejected from ${from.slice(0, 12)}. A hash shows a difference, not which side is newer: diff the two before replacing it, or delete it to draw the package's.`,
+    differs: `${path} differs from the installed mithaq-admin's file (${to}), and is not edited since it was ejected from ${from.slice(0, 12)}. A hash shows a difference, not which side is newer: diff the two before replacing it, or ${item ? `delete it and run \`mithaq eject ${item}\` to take the package's` : 'delete it to draw the package\'s'}.`,
     'differs, edited': `${path} differs from the installed mithaq-admin's file (${to}), and is edited since it was ejected from ${from.slice(0, 12)}: diff the two and merge by hand.`,
     unknown: `${path} carries no mithaq-admin marker on its last line, so nothing says what it was ejected from.`,
     outside: `${path} resolves outside this project or the package, so it was not read.`,
@@ -182,7 +199,8 @@ export const eject = async (project: URL, name: string): Promise<number> => {
     const text = await readFile(source, 'utf8')
     await mkdir(new URL('./', at), { recursive: true })
     // `wx` fails on a file already there, so an eject never overwrites, whatever raced it.
-    const written = await writeFile(at, `${text}${text.endsWith('\n') ? '' : '\n'}// mithaq-admin ${installed.version} ${hashOf(text)}\n`, { flag: 'wx' }).then(
+    const body = bodyOf(text)
+    const written = await writeFile(at, `${body}// mithaq-admin ${installed.version} ${sha(body)}\n`, { flag: 'wx' }).then(
       () => true,
       (error: NodeJS.ErrnoException) => {
         if (error.code === 'EEXIST') return false
@@ -229,8 +247,8 @@ export const prune = async (project: URL): Promise<number> => {
       if (!entry.isFile()) continue
       const path = `${folder}${entry.name}`
       const text = await readFile(new URL(path, project), 'utf8')
-      const hash = marker.exec(text)?.[2]
-      if (!hash || hash !== hashOf(text)) continue
+      const [, from, hash] = marker.exec(text) ?? []
+      if (!hash || hash !== hashFrom(from!)(text)) continue
       await rm(new URL(path, project))
       console.log(`${path} was not edited since it was ejected, so it is deleted and mithaq-admin draws its own.`)
     }
