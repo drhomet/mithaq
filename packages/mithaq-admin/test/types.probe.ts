@@ -37,8 +37,9 @@ import {
   useScreen,
   useUser,
 } from 'mithaq/admin/react'
-import type { NodeMap, Places } from '../registry/nodes.tsx'
-import type { Components, ComponentsOf } from '../registry/components.tsx'
+import type { Places } from '../registry/screen-refs.ts'
+import type { Components, ComponentsOf, Nodes } from '../registry/components.tsx'
+import type { NodeProps } from '../registry/node-tree.ts'
 import type { Cell, Control } from '../registry/control-props.ts'
 
 export const probes: { [Place in keyof Places]: Places[Place] } = {
@@ -75,12 +76,22 @@ export const emptyLocale: Places['empty'] = ({ locale }: EmptyProps & { locale: 
 // @ts-expect-error a button reads the row through `useRecord()`
 export const buttonRecord: Places['button'] = ({ record }: ButtonProps & { record: { id: string } }) => record.id
 
-declare const kinds: NodeMap
-const { separator: _separator, ...withoutSeparator } = kinds
-// @ts-expect-error the separator kind has no entry
-export const partial: NodeMap = withoutSeparator
-
 declare const components: Components
+const { separator: _separator, ...withoutSeparator } = components.nodes
+// @ts-expect-error the separator kind has no entry
+export const partial: Nodes = withoutSeparator
+export const replacedNode: Components = { ...components, nodes: { ...components.nodes, tabs: ({ node }: NodeProps<'tabs'>) => node.tabs.length } }
+export const unknownNode: Components = {
+  ...components,
+  // @ts-expect-error no page can hold a kind of node mithaq/admin does not declare, so the map adds none
+  nodes: { ...components.nodes, callout: components.nodes.section },
+}
+export const wrongNode: Components = {
+  ...components,
+  // @ts-expect-error a tabs node is handed its tabs, not a section's fields
+  nodes: { ...components.nodes, tabs: ({ node }: NodeProps<'section'>) => node.fields.length },
+}
+
 export const replaced: Components = { ...components, controls: { ...components.controls, text: components.controls.textarea } }
 export const unknownName: Components = {
   ...components,
@@ -114,23 +125,28 @@ type ColorLanguage = typeof import('./color-language.ts').language
 declare const ColorControl: Control
 declare const ColorCell: Cell
 const colorCells = { ...components.cells, color: ColorCell }
-export const colored: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl }, cells: colorCells }
+export const colored: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl }, cells: colorCells, nodes: components.nodes }
+// @ts-expect-error the map carries a node per kind as well
+export const nodeless: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl }, cells: colorCells }
 // @ts-expect-error a kind the language's own rukn brings needs a control in the map
-export const colorless: ComponentsOf<ColorLanguage> = { controls: components.controls, cells: colorCells }
+export const colorless: ComponentsOf<ColorLanguage> = { controls: components.controls, cells: colorCells, nodes: components.nodes }
 // @ts-expect-error and a cell, where it names its own
-export const uncelled: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl }, cells: components.cells }
+export const uncelled: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl }, cells: components.cells, nodes: components.nodes }
 export const misspelled: ComponentsOf<ColorLanguage> = {
   // @ts-expect-error and only the kinds it declares do
   controls: { ...components.controls, color: ColorControl, colour: ColorControl },
   cells: colorCells,
+  nodes: components.nodes,
 }
 export const misspelledCell: ComponentsOf<ColorLanguage> = {
   controls: { ...components.controls, color: ColorControl },
   // @ts-expect-error a cell under a name no kind of the language draws with
   cells: { ...colorCells, colour: ColorCell },
+  nodes: components.nodes,
 }
 export const wrongColor: ComponentsOf<ColorLanguage> = {
   // @ts-expect-error a color control is handed ControlProps like any other
   controls: { ...components.controls, color: ({ value }: { value: number }) => value.toFixed() },
   cells: colorCells,
+  nodes: components.nodes,
 }

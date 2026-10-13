@@ -3,7 +3,8 @@ import type { FindApi } from './control-props.ts'
 import type { Translate } from './copy.ts'
 import type { FormProps } from './form-types.tsx'
 import type { ListQuery } from './list-query.ts'
-import type { ListNode, ScreenPage } from './nodes.tsx'
+import type { ListNode } from './node-tree.ts'
+import type { ScreenPage } from './screen-refs.ts'
 
 /** One page, as the managed reader answers it. */
 export type Page = {
@@ -79,4 +80,4 @@ export type ListProps = {
     prefill?: Readonly<Record<string, unknown>>
   }
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 b93ac6bfcd7b4ae42f0b1affe178e17a40e561e546fce14286c136436619bd5c
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 2e53f4e7300ffe090d9d93c002dccea22f73141627c2c1d3e3b910952bd0d07a

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { Copy, Translate } from './copy.ts'
-import { rowWarning } from './nodes.tsx'
+import { rowWarning } from './row-title.tsx'
 import { refusalKeyOf } from './refusal.ts'
 
 /**
@@ -99,4 +99,4 @@ const deleteRefusal = ({ refused, t }: { refused: unknown; t: Translate }): stri
   }
   return t(key, key) ?? key
 }
-// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 d478903ddc08875a8ba015ec61a9f824c03b3faffbf3a4f56412ee24a090cdaa
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 120d06b7bebe9b52459e68a6f2134767db9caa444965e7ab390d2f788e7ab33a

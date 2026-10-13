@@ -3,7 +3,8 @@ import type { FindApi } from './control-props.ts'
 import type { Translate } from './copy.ts'
 import type { FormProps } from './form-types.tsx'
 import type { ListQuery } from './list-query.ts'
-import type { ListNode, ScreenPage } from './nodes.tsx'
+import type { ListNode } from './node-tree.ts'
+import type { ScreenPage } from './screen-refs.ts'
 
 /** One page, as the managed reader answers it. */
 export type Page = {

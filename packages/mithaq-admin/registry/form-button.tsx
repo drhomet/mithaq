@@ -3,7 +3,9 @@ import type { ClientKayan } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import { operationLabelFor, type Copy } from './copy.ts'
 import { DeleteButton } from './delete-button.tsx'
-import { NodeButton, OwnButton, refOf, rowWarning, type PageButton, type ScreenPage } from './nodes.tsx'
+import { NodeButton, OwnButton, type PageButton } from './node-buttons.tsx'
+import { rowWarning } from './row-title.tsx'
+import { refOf, type ScreenPage } from './screen-refs.ts'
 import { OperationButton } from './operation-button.tsx'
 
 export type FormButtonProps = {

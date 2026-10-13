@@ -24,8 +24,10 @@ const controlFor = (field: ClientField) => controlIn(defaultComponents.controls,
 const { cellFor: cellIn } = await import('../registry/components.tsx')
 const cells = defaultComponents.cells
 const cellFor = (field: ClientField, column?: string) => cellIn({ cells, field, column })
-const { Shell, endonym, iconOf, localeEntries, navEntries, navIcons } = await import('../registry/nav.tsx')
-type NavKayan = import('../registry/nav.tsx').NavKayan
+const { Shell } = await import('../registry/nav.tsx')
+const { iconOf, navEntries, navIcons } = await import('../registry/nav-entries.tsx')
+const { endonym, localeEntries } = await import('../registry/locale-menu.ts')
+type NavKayan = import('../registry/nav-entries.tsx').NavKayan
 const { Filters, addCondition, committedOf, removeCondition, updateCondition, updateJoin } = await import(
   '../registry/list-filters.tsx'
 )
@@ -40,7 +42,7 @@ type ClientKayan = import('mithaq/admin').ClientKayan
 type ClientField = import('mithaq/admin').ClientField
 type PageClient = import('mithaq/admin').PageClient
 type ButtonClient = import('mithaq/admin').ButtonClient
-const { pageButtonOf } = await import('../registry/nodes.tsx')
+const { pageButtonOf } = await import('../registry/node-buttons.tsx')
 const { RecordPage } = await import('../../../templates/asas/src/ui/record-page.tsx')
 const { TablePage } = await import('../../../templates/asas/src/ui/table-page.tsx')
 const { AppShell } = await import('../../../templates/asas/src/ui/app-shell.tsx')
@@ -454,7 +456,17 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-list-header',
       'mithaq-list-dialogs',
       'mithaq-list',
+      'mithaq-screen-refs',
+      'mithaq-node-tree',
+      'mithaq-row-title',
+      'mithaq-nav-links',
+      'mithaq-use-confirm',
+      'mithaq-node-buttons',
+      'mithaq-leaf-control',
+      'mithaq-record-frame',
       'mithaq-nodes',
+      'mithaq-node-groups',
+      'mithaq-default-nodes',
       'mithaq-form-types',
       'mithaq-form-rules',
       'mithaq-form-context',
@@ -473,6 +485,12 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-form-chrome',
       'mithaq-form-layout',
       'mithaq-form',
+      'mithaq-theme',
+      'mithaq-locale-menu',
+      'mithaq-nav-entries',
+      'mithaq-nav-secondary',
+      'mithaq-nav-user',
+      'mithaq-organization-switcher',
       'mithaq-nav',
       'mithaq-field-shell',
       'mithaq-relationship-control',
@@ -484,7 +502,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the fifty-eight items this file knows about',
+    'the registry declares the seventy-four items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`

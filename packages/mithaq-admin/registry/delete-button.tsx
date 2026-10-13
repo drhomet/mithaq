@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { Copy, Translate } from './copy.ts'
-import { rowWarning } from './nodes.tsx'
+import { rowWarning } from './row-title.tsx'
 import { refusalKeyOf } from './refusal.ts'
 
 /**

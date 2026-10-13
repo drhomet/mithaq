@@ -33,7 +33,8 @@ const { ScreenList, rowReadsDrafts } = (await import(new URL('../registry/host/s
 }
 const { Form } = await import('../registry/form.tsx')
 const { List } = await import('../registry/list.tsx')
-const { RecordFrame, initialFocusIn, listOf } = await import('../registry/nodes.tsx')
+const { RecordFrame, initialFocusIn } = await import('../registry/record-frame.tsx')
+const { listOf } = await import('../registry/node-tree.ts')
 const { searchableFields } = await import('../registry/list-query.ts')
 const { filterPathsOf } = await import('../registry/filter-operators.ts')
 const { defaultComponents } = await import('../registry/default-components.tsx')
@@ -197,7 +198,7 @@ test('a list node draws its columns, filters and search, and its empty component
 })
 
 test('a page is read as values where it holds no form, or where the viewer may update no row it draws and no component of the project draws its form', async () => {
-  const { readsAsValues } = await import('../registry/nodes.tsx')
+  const { readsAsValues } = await import('../registry/node-tree.ts')
   const edit = courses.pages.edit! as TreePage
   const row = { id: 'c1' }
   assert.equal(readsAsValues({ page: edit, value: row, operations: { update: false } }), true, 'a row the viewer may not update is read')
@@ -342,7 +343,8 @@ test('215m. a bulk that left ticked rows never published says how many above the
 
 test('a component node by its reference is handed its page, inside the layout its page nests in the shell', async () => {
   const page = courses.pages.board! as TreePage
-  const { drawNodes, nodesOf } = await import('../registry/nodes.tsx')
+  const { drawNodes } = await import('../registry/nodes.tsx')
+  const { nodesOf } = await import('../registry/node-tree.ts')
   const host = await render(createElement('div', null, drawNodes({
     nodes: nodesOf(page),
     draw: {
@@ -381,7 +383,8 @@ test(`a page button that names a component draws it with ButtonProps, and its ru
 })
 
 test('a nav node draws the screen\'s nav as handed, each entry linked under the screen\'s path and named by its label or its kayan', async () => {
-  const { drawNodes, NavLinks } = await import('../registry/nodes.tsx')
+  const { drawNodes } = await import('../registry/nodes.tsx')
+  const { NavLinks } = await import('../registry/nav-links.tsx')
   // The nav a host hands is already cut to the actor, so this list is exactly what the node draws.
   const cut = { ...screen, nav: [screen.nav[0]!, { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' } }] }
   const host = await render(createElement('div', null, drawNodes({
@@ -627,8 +630,9 @@ test('useForm() outside a form throws a message that says where it can be read, 
 })
 
 test('every node kind is drawn through the one map and walked through it, in the order mithaq/admin asks for them', async () => {
-  const { drawNodes, leavesOf, nodeMap } = await import('../registry/nodes.tsx')
-  assert.deepEqual(Object.keys(nodeMap), [...nodeKinds], 'one entry per kind, and no other')
+  const { drawNodes } = await import('../registry/nodes.tsx')
+  const { leavesOf } = await import('../registry/node-tree.ts')
+  assert.deepEqual(Object.keys(defaultComponents.nodes), [...nodeKinds], 'one entry per kind, and no other')
   const group = (fields: unknown[]) => ({ label: { en: 'G', ar: 'م' }, fields })
   // One node of every kind, each container holding a leaf, so a walk that
   // missed a kind's children would miss that leaf.
@@ -668,7 +672,7 @@ test('every node kind is drawn through the one map and walked through it, in the
 })
 
 test('a button\'s run asks its confirm first on every path, so a project\'s own button component cannot skip the question', async () => {
-  const { OwnButton } = await import('../registry/nodes.tsx')
+  const { OwnButton } = await import('../registry/node-buttons.tsx')
   const ran: unknown[] = []
   const Own = ({ run }: ButtonProps) => createElement('button', { type: 'button', 'data-own-button': 'archive', onClick: () => void run({ reason: 'Moved' }) }, 'Mine')
   await render(createElement(OwnButton, {
@@ -969,4 +973,30 @@ test('266b. an edit page edits a row\'s drafts only where findVersions finds a v
   assert.equal(await rowReadsDrafts({ kayan, operations: {}, id: 'a-row', findVersions: answering([{ id: 'v1' }]) }), false, 'an actor without the key edits the row')
   assert.equal(await rowReadsDrafts({ kayan: {}, operations: holds, id: 'a-row', findVersions: answering([{ id: 'v1' }]) }), false, 'and so does every actor on a kayan keeping no drafts')
   assert.deepEqual(asked, [], 'asking nothing where the key decides')
+})
+
+test('a field keeps its box when a when hides a node before it, so typing never remounts the box being typed in', async () => {
+  const shownWhileTajweed = { title: { equals: 'Tajweed' } }
+  const host = await render(createElement(Form, {
+    kayan: courses,
+    nodes: [
+      { field: 'summary', when: shownWhileTajweed },
+      { field: 'title' },
+      { section: 'more', label: { en: 'More' }, fields: [{ field: 'level' }] },
+      { field: 'fee', when: shownWhileTajweed },
+      { field: 'currency' },
+    ],
+    client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+    value: { id: 'c1', title: 'Tajweed' },
+    t,
+    locale: 'en',
+    onDone: () => {},
+  }))
+  const title = host.querySelector('#courses-title')!
+  const later = host.querySelector('#courses-currency')
+  assert.ok(host.querySelector('#courses-summary') && later, 'the summary is shown while the title matches')
+  await act(async () => type(title, 'Tajwee'))
+  assert.equal(host.querySelector('#courses-summary'), null, 'and hidden once it does not')
+  assert.equal(host.querySelector('#courses-title'), title, 'the title is the same box, not a new one')
+  assert.equal(host.querySelector('#courses-currency'), later, 'and so is a field in a later run whose own earlier node was hidden')
 })

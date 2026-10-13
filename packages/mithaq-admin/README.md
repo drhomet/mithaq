@@ -72,6 +72,28 @@ never the field's own cell in its place. A route that throws while drawing
 is replaced by `RouteError`, the router's `defaultErrorComponent`, and the shell
 around it stays.
 
+## Replace a node
+
+A page's tree is drawn from the same map, one component per kind of node under
+`nodes`. To draw tabs, a section or any other shipped node your own way, spread
+`defaultComponents.nodes` and replace that kind; the component is handed `NodeProps` of
+its kind, and draws the nodes it holds with `drawNodes`:
+
+```tsx
+const MySection = ({ node, draw }: NodeProps<'section'>) => <fieldset>{drawNodes({ nodes: node.fields, draw })}</fieldset>
+
+const components: ComponentsOf<Language> = {
+  ...defaultComponents,
+  nodes: { ...defaultComponents.nodes, section: MySection },
+}
+```
+
+The map takes one entry per kind `mithaq/admin` declares and no other: a
+screen's build refuses a node of any other kind, so no page could hold one.
+Draw your own thing with a `component` node instead. `checkComponents` stops
+the start when a page holds a kind the map does not carry, naming the screen,
+the kayan and the page, and drawing one is an error on the page.
+
 ## Add a registry item
 
 A registry item is shipped by mithaq for every project. The registry is a shadcn registry in `packages/mithaq-admin/`:

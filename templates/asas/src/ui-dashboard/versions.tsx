@@ -30,8 +30,8 @@ import type { FindApi, FoundPage } from '@/components/mithaq/control-props.ts'
 import { labelFor, titleOf } from '@/components/mithaq/copy.ts'
 import { formatDate } from '@/components/mithaq/format.tsx'
 import { refusalKeyOf } from '@/components/mithaq/refusal.ts'
-import { endonym } from '@/components/mithaq/nav.tsx'
-import { CloseButton } from '@/components/mithaq/nodes.tsx'
+import { endonym } from '@/components/mithaq/locale-menu.ts'
+import { CloseButton } from '@/components/mithaq/record-frame.tsx'
 import { useRelationshipTitles } from '@/components/mithaq/relationship-cell.tsx'
 
 /** One version as `findVersions` answers it. */

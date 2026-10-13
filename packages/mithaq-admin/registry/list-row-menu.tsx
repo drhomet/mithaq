@@ -4,7 +4,8 @@ import type { ClientKayan, Row } from 'mithaq/admin'
 import { buttonVariants } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { operationLabelFor, type Copy } from './copy.ts'
-import type { PageButton, Places } from './nodes.tsx'
+import type { PageButton } from './node-buttons.tsx'
+import type { Places } from './screen-refs.ts'
 
 export type RowMenuProps = {
   kayan: ClientKayan

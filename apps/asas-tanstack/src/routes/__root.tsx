@@ -2,7 +2,7 @@ import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-r
 import { DirectionProvider } from '@/components/ui/direction'
 export { locales } from '../copy.ts'
 import { dirOf, documentHead, localeOf, translator } from '../copy.ts'
-import { ThemeProvider } from '../components/mithaq/nav.tsx'
+import { ThemeProvider } from '../components/mithaq/theme.tsx'
 import { themeStorageKey } from '../theme.ts'
 import appCss from '../styles.css?url'
 

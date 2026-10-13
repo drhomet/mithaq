@@ -3,7 +3,8 @@ import type { ClientKayan, Row } from 'mithaq/admin'
 import type { FindApi } from './control-props.ts'
 import type { Copy } from './copy.ts'
 import { DeleteButton } from './delete-button.tsx'
-import { rowWarning, type PageButton } from './nodes.tsx'
+import type { PageButton } from './node-buttons.tsx'
+import { rowWarning } from './row-title.tsx'
 import { OperationButton } from './operation-button.tsx'
 
 /**
@@ -60,4 +61,4 @@ export function RowDialogs({ api, asking, copy, deleting, deletes, kayan, kayans
     </>
   )
 }
-// mithaq-admin f355602d9b433b5ced670b49042fa08f689458b7 c522ad11577c311885c4bd11e4af5def60bdf12ad5c39f4fb85fa50efbba6078
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 0a16bd2415cfa64d7df8db7ef3f215623f988fe896fc07696ff654e8e14b2d45

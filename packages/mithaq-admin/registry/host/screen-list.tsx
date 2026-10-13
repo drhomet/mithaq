@@ -6,7 +6,7 @@ import { List } from './components/mithaq/list.tsx'
 import type { ListProps, Page } from './components/mithaq/list-types.tsx'
 import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from './components/mithaq/list-query.ts'
 import { counted } from './components/mithaq/format.tsx'
-import { listOf } from './components/mithaq/nodes.tsx'
+import { listOf } from './components/mithaq/node-tree.ts'
 
 /**
  * The list's search as the router carries it: the URL's pairs as strings, each

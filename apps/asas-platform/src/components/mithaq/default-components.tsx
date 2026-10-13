@@ -3,6 +3,7 @@ import { ButtonGroupControl, CheckboxGroupControl, ComboboxControl, RadioControl
 import { CheckboxControl, SwitchControl, ToggleControl } from './checkbox-control.tsx'
 import type { Components } from './components.tsx'
 import { CalendarControl, DatePicker } from './date-control.tsx'
+import { defaultNodes } from './default-nodes.tsx'
 import { IntegerControl, NumberControl, SliderControl } from './number-control.tsx'
 import { RelationshipControl } from './relationship-control.tsx'
 import { RichTextControl } from './rich-text.tsx'
@@ -43,5 +44,6 @@ export const defaultComponents: Components = {
     calendar: CalendarControl,
   },
   cells,
+  nodes: defaultNodes,
 }
-// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 f60cecc252edb1c85f30da35e1103f4af7a8f5a4d8c03a0a826d65242d2c63fc
+// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 c0e05102666471b2730738f4c22141b36429e555002c6d93837f4f66a512f78d

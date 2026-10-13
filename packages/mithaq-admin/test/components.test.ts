@@ -12,7 +12,9 @@ const { Form } = await import('../registry/form.tsx')
 const { List } = await import('../registry/list.tsx')
 const { ComponentsProvider, RouteError, cellFor, checkComponents } = await import('../registry/components.tsx')
 const { defaultComponents } = await import('../registry/default-components.tsx')
+const { drawNodes } = await import('../registry/nodes.tsx')
 type Components = import('../registry/components.tsx').Components
+type NodeProps<Kind extends import('mithaq/admin').NodeKind> = import('../registry/node-tree.ts').NodeProps<Kind>
 type ControlsOf<L> = import('../registry/components.tsx').ControlsOf<L>
 type CellsOf<L> = import('../registry/components.tsx').CellsOf<L>
 type CellProps = import('../registry/control-props.ts').CellProps
@@ -75,7 +77,7 @@ test('a kind the project\'s rukn brings is drawn by the control its map names fo
   assert.throws(() => checkComponents({ client, components: defaultComponents }), /components\.controls has no control for kind "color", which swatches\.color is drawn with/)
   // The kind names its own cell too, so the map the start accepts carries both.
   const cells = { ...defaultComponents.cells, color: ({ value }: CellProps) => String(value) }
-  assert.doesNotThrow(() => checkComponents({ client, components: { controls, cells } }))
+  assert.doesNotThrow(() => checkComponents({ client, components: { ...defaultComponents, controls, cells } }))
   assert.doesNotThrow(() => checkComponents({ client: screen, components: defaultComponents }), 'the template\'s own screen needs nothing past the defaults')
 })
 
@@ -118,7 +120,7 @@ test('a kind whose own cell the map leaves out stops the start and the page, nam
   const cells = { ...defaultComponents.cells, color: ColorCell } satisfies CellsOf<typeof language>
   assert.throws(() => checkComponents({ client, components: { ...defaultComponents, controls } }), /components\.cells has no cell for kind "color", which swatches\.color is drawn with/)
   assert.throws(() => drawn(createElement(ComponentsProvider, { components: { ...defaultComponents, controls } }, listOf(kayan, [{ id: 's1', color: '#c0ffee' }]))), /components\.cells has no cell for "color", the kind of field "color"/)
-  assert.match(drawn(createElement(ComponentsProvider, { components: { controls, cells } }, listOf(kayan, [{ id: 's1', color: '#c0ffee' }]))), /<span data-swatch="#c0ffee">/, 'the project\'s color cell draws the field')
+  assert.match(drawn(createElement(ComponentsProvider, { components: { ...defaultComponents, controls, cells } }, listOf(kayan, [{ id: 's1', color: '#c0ffee' }]))), /<span data-swatch="#c0ffee">/, 'the project\'s color cell draws the field')
 })
 
 test('a cell a list column or a leaf names, which the map does not carry, stops the start and the page, naming the screen, the node and the cell', () => {
@@ -150,4 +152,62 @@ test('a cell a list column or a leaf names, which the map does not carry, stops 
   // Named, so never drawn as the field's own cell in its place.
   assert.throws(() => cellFor({ cells: defaultComponents.cells, field: title, column: 'swatch' }), /components\.cells has no cell "swatch", which field "title" is drawn with/)
   assert.equal(cellFor({ cells: defaultComponents.cells, field: title }), defaultComponents.cells.text, 'and the field\'s own cell stands where nothing is named')
+})
+
+const sectioned = (components: Components) => drawn(createElement(ComponentsProvider, { components }, createElement(Form, {
+  kayan: courses,
+  nodes: [{ section: 'details', label: { en: 'Details' }, fields: [{ field: 'title' }] }],
+  client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+  value: { id: 'c1', title: 'Tajweed' },
+  t,
+  locale: 'en',
+  onDone: () => {},
+})))
+
+test('a node kind is drawn through the components map, and a replacement draws in place of the shipped one', () => {
+  assert.match(sectioned(defaultComponents), /data-node="section"/, 'the shipped section draws the group')
+  const Mine = ({ node, draw }: NodeProps<'section'>) => createElement('aside', { 'data-mine': node.section }, drawNodes({ nodes: node.fields, draw }))
+  const html = sectioned({ ...defaultComponents, nodes: { ...defaultComponents.nodes, section: Mine } })
+  assert.match(html, /<aside data-mine="details">[\s\S]*id="courses-title"[\s\S]*<\/aside>/, 'the project\'s section draws the group, with the fields it holds inside it')
+  assert.doesNotMatch(html, /data-node="section"/, 'and the shipped one does not')
+})
+
+test('a node kind the map leaves out stops the start and the page, naming the kind and the page that draws it', () => {
+  const { section: _section, ...rest } = defaultComponents.nodes
+  const sectionless = { ...defaultComponents, nodes: rest as Components['nodes'] }
+  assert.throws(() => sectioned(sectionless), /components\.nodes has no node "section"\. Spread defaultComponents\.nodes into the map and add one under that name\./)
+  const { title: _title, ...untitled } = defaultComponents.nodes
+  assert.throws(
+    () => checkComponents({ client: screen, components: { ...defaultComponents, nodes: untitled as Components['nodes'] } }),
+    /components\.nodes has no node "title", which screen \/dashboard courses page "list" draws\./,
+  )
+  assert.doesNotThrow(() => checkComponents({ client: screen, components: { ...defaultComponents, nodes: { ...defaultComponents.nodes, section: () => null } } }), 'a replaced node is a node the map carries')
+})
+
+test('the start reads every kind of node a page holds, nested in a group or on a page that opens over its list, and a map with no nodes at all says so', () => {
+  const group = (fields: unknown[]) => ({ label: { en: 'G' }, fields })
+  const client = {
+    path: '/dashboard',
+    kayan: {
+      notes: {
+        name: 'notes',
+        fields: [],
+        operations: [],
+        pages: {
+          edit: { path: '/notes/:id', page: { main: [{ tabs: [{ tab: 't', ...group([{ section: 's', ...group([{ field: 'title' }]) }]) }] }] } },
+          create: { path: '/notes/new', mode: 'dialog', page: { main: [{ separator: true }] } },
+        },
+      },
+    },
+  } as unknown as Parameters<typeof checkComponents>[0]['client']
+  const { section: _section, separator: _separator, ...rest } = defaultComponents.nodes
+  assert.throws(
+    () => checkComponents({ client, components: { ...defaultComponents, nodes: rest as Components['nodes'] } }),
+    (error: Error) =>
+      /components\.nodes has no node "section", which screen \/dashboard notes page "edit" draws\./.test(error.message)
+      && /components\.nodes has no node "separator", which screen \/dashboard notes page "create" draws\./.test(error.message),
+  )
+  const { nodes: _nodes, ...nodeless } = defaultComponents
+  assert.throws(() => checkComponents({ client, components: nodeless as Components }), /components\.nodes has no node "tabs"/)
+  assert.throws(() => sectioned(nodeless as Components), /components\.nodes has no node "form"\. Spread defaultComponents\.nodes into the map/)
 })
