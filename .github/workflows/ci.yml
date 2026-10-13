@@ -89,4 +89,6 @@ jobs:
         with:
           name: packages
           path: .pack/*.tgz
+          # upload-artifact skips every path under a dot folder, .pack included, without this.
+          include-hidden-files: true
           if-no-files-found: error
