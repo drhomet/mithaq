@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ariaRequired } from '@/components/mithaq/control-props.ts'
 import { FieldShell, describedBy } from '@/components/mithaq/field-shell.tsx'
-import { useKayanField } from '@/components/mithaq/form.tsx'
+import { useKayanField } from '@/components/mithaq/form-context.tsx'
 import { grantable } from '../grants.ts'
 import { projectStatements } from '../../statements.ts'
 

@@ -33,7 +33,7 @@ type Conditions = import('../registry/list-filters.tsx').Conditions
 const { columnCandidates, move, neighbour } = await import('../registry/list-columns.tsx')
 const { filterPathsOf, operatorsByKind } = await import('../registry/filter-operators.ts')
 const { findWhere, listRaw, prefixOf, readQuery, readRaw, refined, scopedTo, searchWhere, searchableFields, sortableOf, withList, writeQuery } = await import('../registry/list-query.ts')
-const { columnsOf, withColumns } = await import('../registry/list.tsx')
+const { columnsOf, withColumns } = await import('../registry/list-columns.tsx')
 const { SelectAll, writableFields } = await import('../registry/list-selection.tsx')
 type Query = import('../registry/list.tsx').Query
 type ClientKayan = import('mithaq/admin').ClientKayan
@@ -355,7 +355,7 @@ test('9. neither map answers for a key of Object.prototype, so a field naming on
 })
 
 test('9b. a field named for a key of Object.prototype has only the issue the server sent it', async () => {
-  const { issuesOf } = await import('../registry/form.tsx')
+  const { issuesOf } = await import('../registry/form-rules.tsx')
   assert.equal(issuesOf(null).toString, undefined, 'no refusal gives no field an issue')
   const refused = { data: { params: { issues: [{ path: 'toString', message: 'm' }, { path: 'constructor', message: 'n' }] } } }
   assert.equal(issuesOf(refused).toString, 'm', 'and a refusal naming the field is kept')
@@ -445,8 +445,20 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-list-columns',
       'mithaq-list-pagination',
       'mithaq-list-selection',
+      'mithaq-list-button',
+      'mithaq-list-row-menu',
+      'mithaq-list-table',
+      'mithaq-list-toolbar',
       'mithaq-list',
       'mithaq-nodes',
+      'mithaq-form-rules',
+      'mithaq-form-context',
+      'mithaq-field-value',
+      'mithaq-delete-button',
+      'mithaq-discard-dialog',
+      'mithaq-operation-button',
+      'mithaq-form-actions',
+      'mithaq-draft-banner',
       'mithaq-form',
       'mithaq-nav',
       'mithaq-field-shell',
@@ -459,7 +471,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the thirty-three items this file knows about',
+    'the registry declares the forty-five items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`

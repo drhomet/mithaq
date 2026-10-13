@@ -770,7 +770,7 @@ test('the five shadcn controls report the value shape of the kind they draw', as
 })
 
 const { cells } = await import('../registry/cells.tsx')
-const { refusalOf } = await import('../registry/form.tsx')
+const { refusalOf } = await import('../registry/form-rules.tsx')
 
 test('the browser holds a list to its minRows and maxRows before any request, under the key the server writes, an optional list left empty passing its floor, and a course names at most two topics', () => {
   const topics = Object.values(screen.kayan).find((one) => one.name === 'courses')!.fields.filter((one) => one.name === 'topics')

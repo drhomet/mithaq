@@ -10,7 +10,7 @@ const { ComponentsProvider, cellFor: cellIn, controlFor } = await import('../reg
 const { labelFor } = await import('../registry/copy.ts')
 const { defaultComponents } = await import('../registry/default-components.tsx')
 const cellFor = (field: ClientField) => cellIn({ cells: defaultComponents.cells, field })
-const { refusalOf } = await import('../registry/form.tsx')
+const { refusalOf } = await import('../registry/form-rules.tsx')
 const { filterPathsOf } = await import('../registry/filter-operators.ts')
 const { readQuery, writeQuery, sortableOf } = await import('../registry/list-query.ts')
 type ClientField = import('mithaq/admin').ClientField

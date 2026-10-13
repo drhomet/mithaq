@@ -8,7 +8,8 @@ import { actingAs, arm, authArm, caused, clientOf, readsOf, takesKey } from './a
 import { clampedHref, routedHref } from './links.ts'
 import { mergedHeaders } from './request-headers.ts'
 import { documentHead, localeOf, locales, translator, type Locale } from './copy.ts'
-import { FieldValue, type FormClient, type FormProps } from './components/mithaq/form.tsx'
+import { FieldValue } from './components/mithaq/field-value.tsx'
+import type { FormClient, FormProps } from './components/mithaq/form.tsx'
 import type { Page } from './components/mithaq/list.tsx'
 import { QueryRefused, findOf, listRaw, prefixOf, readQuery, rulesOf, scopedTo, withList, type RawQuery } from './components/mithaq/list-query.ts'
 import { newTitleOf, titleOf } from './components/mithaq/copy.ts'
@@ -866,4 +867,4 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   }
   return form
 }
-// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 57b042f5df4b09a3d414d57e3ee38715273ffb415dc1a949948ccb3cd7bcaf9d
+// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 bbe1dd0327aab8ce4adb809ce49abd31d6860484662d7d78dfcd64e520a080f5

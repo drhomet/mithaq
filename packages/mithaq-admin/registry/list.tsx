@@ -1,37 +1,28 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactElement, type ReactNode } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, MoreHorizontal, Plus, Search as SearchIcon, X } from 'lucide-react'
-import type { ButtonClient, ClientField, ClientKayan, Row } from 'mithaq/admin'
+import { useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { ChevronDown, Plus } from 'lucide-react'
+import type { ButtonClient, ClientKayan, Row } from 'mithaq/admin'
 import { useScreen } from 'mithaq/admin/react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { NodeButton, OwnButton, drawsKind, isUntitled, listOf, nodesOf, pageButtonOf, refOf, rowTitle, rowWarning, scopeOf, shown as holds, type ListNode, type PageButton, type ScreenPage } from './nodes.tsx'
-import { cellFor, useComponents } from './components.tsx'
 import type { FindApi } from './control-props.ts'
-import { descriptionOf, labelFor, operationLabelFor, titleOf, type Copy, type Translate } from './copy.ts'
-import { counted } from './format.tsx'
-import { refusalKeyOf } from './refusal.ts'
-import { DeleteButton, Form, OperationButton, type FormProps } from './form.tsx'
-import { useRelationshipTitles } from './relationship-cell.tsx'
+import { descriptionOf, labelFor, titleOf, type Copy, type Translate } from './copy.ts'
+import { DeleteButton } from './delete-button.tsx'
 import { filterPathsOf } from './filter-operators.ts'
+import { Form, type FormProps } from './form.tsx'
+import { counted } from './format.tsx'
+import { ListButton } from './list-button.tsx'
+import { Columns, columnsOf, withColumns } from './list-columns.tsx'
 import { Filters } from './list-filters.tsx'
-import { Columns, columnCandidates } from './list-columns.tsx'
 import { Pagination } from './list-pagination.tsx'
-import { SelectAll, SelectRow, writableFields } from './list-selection.tsx'
-import {
-  canSort,
-  columnsFrom,
-  columnsTo,
-  refined,
-  remember,
-  remembered,
-  searchableFields,
-  type ColumnChoice,
-  type FilterWhere,
-  type ListQuery,
-} from './list-query.ts'
+import { refined, remember, remembered, searchableFields, type FilterWhere, type ListQuery } from './list-query.ts'
+import { RowMenu } from './list-row-menu.tsx'
+import { writableFields } from './list-selection.tsx'
+import { ListTable } from './list-table.tsx'
+import { BulkBar, Search } from './list-toolbar.tsx'
+import { drawsKind, listOf, nodesOf, pageButtonOf, refOf, rowTitle, rowWarning, scopeOf, shown as holds, type ListNode, type PageButton, type ScreenPage } from './nodes.tsx'
+import { OperationButton } from './operation-button.tsx'
+import { refusalKeyOf } from './refusal.ts'
+import { useRelationshipTitles } from './relationship-cell.tsx'
 
 /** One page, as the managed reader answers it. */
 export type Page = {
@@ -108,105 +99,6 @@ export type ListProps = {
   }
 }
 
-/**
- * Which columns a list shows, in order: the URL's list when it carries one, else the list node's `columns`, else every field. Never a field this actor may not read.
- */
-export const columnsOf = ({
-  kayan,
-  cols,
-  reads,
-  opens,
-}: {
-  kayan: ClientKayan
-  cols?: readonly string[]
-  reads?: (kayan: string, field: string) => boolean
-  /** The columns a page's list node opens with, which is every field where there is no node. */
-  opens?: readonly string[]
-}): readonly ColumnChoice[] => {
-  const isDefault = (_kayan: ClientKayan, field: ClientField) => !opens || opens.includes(field.name)
-  const candidates = columnCandidates(kayan, reads)
-  const offered = new Set(candidates.map((field) => field.name))
-  const fromUrl = columnsFrom(cols).filter((one) => offered.has(one.name))
-  const named = new Set(fromUrl.map((one) => one.name))
-  const rest = candidates.filter((field) => !named.has(field.name))
-  if (fromUrl.length) {
-    // A column the URL did not name keeps the declaration's answer, so a field added to a kayan is not hidden from old links.
-    return [...fromUrl, ...rest.map((field) => ({ name: field.name, active: isDefault(kayan, field) }))]
-  }
-  return candidates.map((field) => ({ name: field.name, active: isDefault(kayan, field) }))
-}
-
-/**
- * The query a column change asks for. It keeps the page it is on, since it changes what a row shows and never which rows match.
- */
-export const withColumns = (query: Query, columns: readonly ColumnChoice[]): Query => ({
-  ...query,
-  cols: columnsTo(columns),
-})
-
-// Pinned cells are opaque (the card's fill with the head's or hovered row's tint mixed in), because a translucent one
-// shows the cells that scroll beneath it.
-const headFill = 'bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]'
-const pinnedHead = `sticky z-10 ${headFill}`
-const pinned = 'sticky z-10 bg-card group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]'
-// A shadow on the row menu column's start edge while the table runs on under it. The head cell keeps its rule underneath
-// (`[&_th]:shadow-[inset_0_-1px_0_var(--border)]` on the head row), so the head's own takes `!` and carries the rule too.
-const edge = 'shadow-[-10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)] rtl:shadow-[10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)]'
-const edgeHead = 'shadow-[inset_0_-1px_0_var(--border),-10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)]! rtl:shadow-[inset_0_-1px_0_var(--border),10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)]!'
-// Exactly a touch target wide, so the first column pins right after it; on a phone as tall, so the box's 44 pixel layer
-// stays inside its own row.
-const selection = 'w-11 min-w-11 p-0 max-sm:h-11 [&>*]:mx-auto [&>[role=checkbox]]:translate-y-0'
-
-const nextSort = (name: string, sort: string | undefined) =>
-  sort === name ? `-${name}` : sort === `-${name}` ? undefined : name
-
-function Search({
-  fields,
-  locale,
-  onSearch,
-  t,
-  value,
-}: {
-  value: string | undefined
-  /** The labels of the fields a search runs over, which is empty for a kayan with none. */
-  fields: readonly string[]
-  locale: string
-  onSearch: (term: string | undefined) => void
-  t: Translate
-}): ReactElement | null {
-  const [text, setText] = useState(value ?? '')
-  useEffect(() => setText(value ?? ''), [value])
-  useEffect(() => {
-    if (text === (value ?? '')) return
-    const timer = setTimeout(() => onSearch(text.trim() === '' ? undefined : text), 300)
-    return () => clearTimeout(timer)
-  }, [onSearch, text, value])
-  // No searchable field, no box. After the hooks, which must run on every render or on none.
-  if (!fields.length) return null
-  const label = t('admin.search', 'Search') ?? 'Search'
-  const placeholder = new Intl.ListFormat(locale, { type: 'disjunction' }).format(fields)
-  return (
-    <span className="flex w-full items-center gap-1 lg:max-w-sm">
-      <span className="relative w-full">
-        <SearchIcon className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" aria-hidden="true" />
-        <Input
-          type="search"
-          className="ps-9 max-sm:h-11"
-          placeholder={placeholder}
-          aria-label={label}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
-      </span>
-      {text ? (
-        <Button type="button" variant="outline" size="icon-sm" className="max-sm:size-11" onClick={() => setText('')} aria-label={t('admin.clearSearch', 'Clear search') ?? 'Clear search'}>
-          <X />
-        </Button>
-      ) : null}
-    </span>
-  )
-}
-
 export function List({
   access,
   api,
@@ -231,7 +123,6 @@ export function List({
 }: ListProps): ReactElement {
   const copy: Copy = { t, locale }
   const { maxLimit } = useScreen()
-  const { cells } = useComponents()
   const node = props.node ?? listOf(screen)
   /** The row being edited in place, `null` for a row being added, and nothing while no form is open. */
   const [editing, setEditing] = useState<Row | null | undefined>(undefined)
@@ -253,8 +144,6 @@ export function List({
   // alone, so a relationship the viewer has switched off costs no read.
   const titles = useRelationshipTitles({ fields: shown, docs: page.docs, context: { api, client, locale } })
   const paths = filterPathsOf(kayan, { client, locales, reads, ...(node?.filters && { filters: node.filters }) })
-  // The first shown cell carries the row's link, so a hidden or unreadable title leaves a row reachable.
-  const linked = shown[0]
   const refine = (next: Partial<Query>) => onQuery(refined(query, next))
   const filtered = Boolean(query.where || query.search)
   /**
@@ -291,24 +180,6 @@ export function List({
   const [asking, setAsking] = useState<{ row: Row; operation: PageButton } | undefined>(undefined)
   const [running, setRunning] = useState(false)
   const table = useRef<HTMLTableElement>(null)
-  // Whether the table runs past its frame's end, so the frame fades there. The value is the width of the row menu's pinned
-  // column, which the fade sits before, and `false` where nothing runs past. `scrollLeft` is negative on a right-to-left page.
-  const [more, setMore] = useState<number | false>(false)
-  useEffect(() => {
-    const grid = table.current
-    const frame = grid?.parentElement
-    if (!grid || !frame) return
-    const check = () => setMore(frame.scrollWidth - frame.clientWidth - Math.abs(frame.scrollLeft) > 1 && (grid.querySelector('thead th:last-child')?.getBoundingClientRect().width ?? 0))
-    check()
-    frame.addEventListener('scroll', check, { passive: true })
-    const resized = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(check)
-    resized?.observe(frame)
-    resized?.observe(grid)
-    return () => {
-      frame.removeEventListener('scroll', check)
-      resized?.disconnect()
-    }
-  }, [])
   /**
    * The name of a row's menu button, naming the row by its title so a reader going down the column hears each row's own; a row with no title, or with the title column hidden, keeps the shared name.
    */
@@ -445,46 +316,36 @@ export function List({
                   </p>
                 ) : null}
                 {toolbar.map((one, at) => button(one.operation, (values) => values, `toolbar-${at}`, { description: t('admin.toolbarWarning', 'This runs on no row of the list.') ?? 'This runs on no row of the list.' }))}
-                {/* Both stay mounted, the buttons hidden until a row is ticked: a live region must exist before its first change
-                    to be announced, and a dialog a button opened must outlive a read that took the ticked rows off the page. */}
                 {picks ? (
-                  // On a phone the count and bulk buttons are a bar fixed to the bottom while a row is ticked, so ticking
-                  // does not push the table down under the finger. It stands on the form's own bar where a record page draws one.
-                  <div
-                    data-mithaq-bulk-bar=""
-                    role="region"
-                    aria-label={t('admin.bulkBar', 'Ticked rows') ?? 'Ticked rows'}
-                    className={ticked.length || done ? 'contents max-sm:bg-background max-sm:fixed max-sm:inset-x-0 max-sm:bottom-[var(--action-bar-height,0px)] max-sm:z-30 max-sm:flex max-sm:flex-nowrap max-sm:items-center max-sm:gap-2 max-sm:overflow-x-auto max-sm:border-t max-sm:p-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:[&_button]:shrink-0 max-sm:[&>span]:shrink-0' : 'contents'}
+                  <BulkBar
+                    ticked={ticked.length}
+                    done={done}
+                    t={t}
+                    said={ticked.length
+                      ? (t('admin.selected', '{count} selected') ?? '{count} selected').replace('{count}', String(ticked.length))
+                      : done ? aboutTicked('admin.bulkDone', done.count, '{plural} done: {count}.') : ''}
                   >
-                    {/* `aria-live`: the count changes as boxes are ticked and nothing else announces it. */}
-                    <span className={ticked.length || done ? 'text-muted-foreground text-sm' : 'sr-only'} aria-live="polite" data-mithaq-selected={ticked.length || undefined} data-mithaq-done={!ticked.length && done ? done.count : undefined}>
-                      {ticked.length
-                        ? (t('admin.selected', '{count} selected') ?? '{count} selected').replace('{count}', String(ticked.length))
-                        : done ? aboutTicked('admin.bulkDone', done.count, '{plural} done: {count}.') : ''}
-                    </span>
-                    <span hidden={ticked.length === 0} className={ticked.length ? 'contents' : undefined}>
-                      {bulkButtons.map((one, at) =>
-                        button(
-                          one.operation,
-                          // Only the ticked rows still on the page, with the boxes' values as the data written over each.
-                          (values) => ({ where: { id: { in: ticked } }, ...(one.operation.fields.length > 0 && { data: values }) }),
-                          `bulk-${at}`,
-                          {
-                            // A where of no id is a call nobody ticked, which a dialog left open over rows that left the
-                            // page would confirm, so it is disabled.
-                            disabled: ticked.length === 0,
-                            description: aboutTicked('admin.bulkWarning', ticked.length, '{plural} you ticked: {count}. This applies to each of them.'),
-                            // The ticked ids name rows the host's re-read is about to drop, so the selection is cleared
-                            // and what the bulk did is said, less the rows it named as left.
-                            onRan: (written) => {
-                              setDone({ count: ticked.length - ((written as { errors?: readonly unknown[] } | null)?.errors?.length ?? 0) })
-                              setSelected(new Set())
-                            },
+                    {bulkButtons.map((one, at) =>
+                      button(
+                        one.operation,
+                        // Only the ticked rows still on the page, with the boxes' values as the data written over each.
+                        (values) => ({ where: { id: { in: ticked } }, ...(one.operation.fields.length > 0 && { data: values }) }),
+                        `bulk-${at}`,
+                        {
+                          // A where of no id is a call nobody ticked, which a dialog left open over rows that left the
+                          // page would confirm, so it is disabled.
+                          disabled: ticked.length === 0,
+                          description: aboutTicked('admin.bulkWarning', ticked.length, '{plural} you ticked: {count}. This applies to each of them.'),
+                          // The ticked ids name rows the host's re-read is about to drop, so the selection is cleared
+                          // and what the bulk did is said, less the rows it named as left.
+                          onRan: (written) => {
+                            setDone({ count: ticked.length - ((written as { errors?: readonly unknown[] } | null)?.errors?.length ?? 0) })
+                            setSelected(new Set())
                           },
-                        ),
-                      )}
-                    </span>
-                  </div>
+                        },
+                      ),
+                    )}
+                  </BulkBar>
                 ) : null}
                 {paths.length ? (
                   <Button
@@ -529,183 +390,62 @@ export function List({
               </div>
             ) : null}
 
-            {/* Held to the screen below the page's header so it scrolls both ways and the head row can stay (a printed page
-                holds every row). It isolates, so pinned cells never paint over the page's sticky header or take its clicks. */}
-            <div className="bg-card relative isolate overflow-hidden rounded-lg border [&>div:first-child]:max-h-[calc(100dvh-var(--header-height,0px))] print:[&>div:first-child]:max-h-none">
-              {unreadable ? null : (
-              <Table ref={table}>
-                  {/* The head rule is each head cell's own inset shadow, since a collapsed border scrolls away from a sticky
-                      head; the row's own `border-b` is dropped so both do not draw. */}
-                  <TableHeader className={`sticky top-0 z-20 ${headFill} [&_tr]:border-b-0 [&_th]:shadow-[inset_0_-1px_0_var(--border)]`}>
-                    <TableRow>
-                      {picks ? (
-                        <TableHead scope="col" className={`${pinnedHead} start-0 ${selection}`}>
-                          <SelectAll ids={rowIds} selected={selected} onSelect={setSelected} t={t} />
-                        </TableHead>
-                      ) : null}
-                      {shown.map((field) => {
-                        // A heading is a button only where the read would take the sort: the server answers 400 for a
-                        // localized field, a set, a join and a screen's `sortable: false`.
-                        const sortable = canSort(field)
-                        // The URL's sort, else the list node's default, which is the order the page was read in.
-                        const sort = query.sort ?? node?.sort
-                        const direction = sort === field.name ? 'ascending' : sort === `-${field.name}` ? 'descending' : 'none'
-                        return (
-                          <TableHead key={field.name} scope="col" aria-sort={sortable ? direction : undefined} className={field === linked ? `${pinnedHead} ${picks ? 'start-11' : 'start-0'}` : undefined}>
-                            {sortable ? (
-                              // One arrow, on the sorted column only. `aria-hidden` on the glyph and `aria-sort` on the
-                              // cell keep the answer readable without it.
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="-ms-2 h-8 px-2 max-sm:h-11 max-sm:min-w-11"
-                                onClick={() => refine({ sort: nextSort(field.name, query.sort) })}
-                              >
-                                {labelFor({ kayan, field, copy })}
-                                {direction === 'ascending' ? (
-                                  <ArrowUp className="size-4" aria-hidden="true" />
-                                ) : direction === 'descending' ? (
-                                  <ArrowDown className="size-4" aria-hidden="true" />
-                                ) : null}
-                              </Button>
-                            ) : (
-                              labelFor({ kayan, field, copy })
-                            )}
-                          </TableHead>
-                        )
-                      })}
-                      <TableHead scope="col" className={`${pinnedHead} end-0 w-0 ${more === false ? '' : edgeHead}`}>
-                        <span className="sr-only">{t('admin.actions', 'Actions')}</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                <TableBody>
-                  {page.docs.map((row, index) => {
-                      const id = String(row.id ?? '')
-                      // The list node's row buttons whose `when` holds over this row. One a project draws with its own
-                      // component stays in the cell, since a menu item cannot be one.
-                      const offered = rowButtons.filter((one) => holds(one.node, scopeOf({ values: row, record: row, access, kayan })))
-                      const own = offered.filter((one) => refOf({ screen, place: 'button', path: one.operation.component }))
-                      const menu = offered.filter((one) => !own.includes(one))
-                      // `#` is the host's word for a kayan with no page that draws a row, so such a row is no link and
-                      // no tab stop, and its menu offers neither Edit nor View.
-                      const to = href(id)
-                      const opens = to !== '#'
-                      const edits = editsRows || opens
-                      return (
-                        // The whole row opens the record, and so does Enter on the row. A click on anything inside that acts
-                        // on its own, or on the menu or a dialog it opened (React hands those up through its portal), opens nothing.
-                        <TableRow
-                          key={String(row.id ?? index)}
-                          tabIndex={opens ? 0 : undefined}
-                          data-row={id}
-                          aria-describedby={opens ? openHint : undefined}
-                          // The ring every focusable control draws, inset so the table's frame does not clip it.
-                          className={opens ? 'group/row cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset' : 'group/row'}
-                          onClick={(event: MouseEvent<HTMLTableRowElement>) => {
-                            const target = event.target as Element
-                            if (!opens || !event.currentTarget.contains(target) || target.closest('a, button, input, select, textarea, label, [role="checkbox"], [role="menuitem"]')) return
-                            openRow(id)
-                          }}
-                          onKeyDown={(event: KeyboardEvent<HTMLTableRowElement>) => {
-                            if (!opens || event.key !== 'Enter' || event.target !== event.currentTarget) return
-                            event.preventDefault()
-                            openRow(id)
-                          }}
-                        >
-                          {picks ? (
-                            <TableCell className={`${pinned} start-0 ${selection}`}>
-                              <SelectRow id={id} selected={selected} onSelect={setSelected} t={t} />
-                            </TableCell>
-                          ) : null}
-                          {shown.map((field) => {
-                            const Ref = refOf({ screen, place: 'cell', path: cellOf.get(field.name) ?? field.cell })
-                            // An email cell is a mail link, and a link cannot sit in the row's link (`<a>` in `<a>` is a
-                            // hydration error), so the linked column draws its text. Upload draws no anchor.
-                            const drawn = cellFor({ cells, field, column: cellOf.get(field.name) })
-                            const Cell = drawn === cells.email && field === linked && opens ? cells.text : drawn
-                            const untitled = field.name === kayan.useAsTitle && isUntitled({ kayan, row, locale })
-                            const cell = untitled ? (
-                              <span className="text-muted-foreground">{t('admin.untitled', 'Untitled') ?? 'Untitled'}</span>
-                            ) : Ref && screen ? (
-                              <Ref field={field} value={row[field.name]} row={row} />
-                            ) : (
-                              <Cell kayan={kayan} field={field} value={row[field.name]} t={t} locale={locale} titles={titles} />
-                            )
-                            return (
-                              <TableCell key={field.name} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : undefined}>
-                                {field === linked && opens ? (
-                                  // A real link, so it opens in a new tab and lists for a reader, but out of the tab
-                                  // order since the row is the stop. An untitled row's name holds the visible text.
-                                  <a href={to} data-row-link={id} tabIndex={-1} aria-label={untitled ? (t('admin.openUntitled', 'Untitled, open') ?? 'Untitled, open') : undefined} className="font-medium hover:underline">
-                                    {cell}
-                                  </a>
-                                ) : (
-                                  cell
-                                )}
-                              </TableCell>
-                            )
-                          })}
-                          <TableCell className={`${pinned} end-0 w-0 ${more === false ? '' : edge}`}>
-                            <div className="flex items-center justify-end gap-2">
-                              {own.map((one, at) => button(one.operation, (values) => ({ ...values, id: row.id }), `row-${at}`, { description: rowWarning({ kayan, row, operation: one.operation.name, copy }) }))}
-                              {edits || menu.length || deletes || Menu ? (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  data-row-menu={id}
-                                  aria-label={rowActionsLabel(row)}
-                                  className={buttonVariants({ variant: 'ghost', size: 'icon-sm', className: 'max-sm:size-11' })}
-                                >
-                                  <MoreHorizontal className="size-4" aria-hidden="true" />
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
-                                  {/* View where the report lets this actor update no row of the kayan, since the row's
-                                      page is then only read. */}
-                                  {edits ? (
-                                    operations && operations.update !== true ? (
-                                      <DropdownMenuItem data-row-action="view" className="max-sm:min-h-11" onClick={() => openRow(id)}>
-                                        {t('admin.view', 'View') ?? 'View'}
-                                      </DropdownMenuItem>
-                                    ) : (
-                                      <DropdownMenuItem data-row-action="edit" className="max-sm:min-h-11" onClick={() => (editsRows ? setEditing(row) : openRow(id))}>
-                                        {t('admin.edit', 'Edit') ?? 'Edit'}
-                                      </DropdownMenuItem>
-                                    )
-                                  ) : null}
-                                  {menu.map((one) => (
-                                    <DropdownMenuItem
-                                      key={one.operation.name}
-                                      data-row-action={one.operation.name}
-                                      className="max-sm:min-h-11"
-                                      disabled={running}
-                                      onClick={() => {
-                                        // A button that asks for values or carries a confirm opens its dialog over the
-                                        // row; any other runs.
-                                        if (one.operation.fields?.length || one.operation.confirm) return setAsking({ row, operation: one.operation })
-                                        void runOnRow(one.operation.name, { id: row.id })
-                                      }}
-                                    >
-                                      {operationLabelFor({ kayan, operation: one.operation, copy })}
-                                    </DropdownMenuItem>
-                                  ))}
-                                  {Menu ? <Menu row={row} open={setOver} /> : null}
-                                  {deletes ? (
-                                    <DropdownMenuItem data-row-action="delete" variant="destructive" className="max-sm:min-h-11" disabled={running} onClick={() => setDeleting(row)}>
-                                      {t('admin.delete', 'Delete') ?? 'Delete'}
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                </TableBody>
-              </Table>
-              )}
+            <ListTable
+              kayan={kayan}
+              copy={copy}
+              screen={screen}
+              shown={shown}
+              docs={page.docs}
+              titles={titles}
+              cellOf={cellOf}
+              sort={query.sort}
+              defaultSort={node?.sort}
+              onSort={(sort) => refine({ sort })}
+              selection={picks ? { ids: rowIds, selected, onSelect: setSelected } : undefined}
+              href={href}
+              openHint={openHint}
+              openRow={openRow}
+              table={table}
+              unreadable={unreadable}
+              actions={(row) => {
+                const id = String(row.id ?? '')
+                // The list node's row buttons whose `when` holds over this row. One a project draws with its own
+                // component stays in the cell, since a menu item cannot be one.
+                const offered = rowButtons.filter((one) => holds(one.node, scopeOf({ values: row, record: row, access, kayan })))
+                const own = offered.filter((one) => refOf({ screen, place: 'button', path: one.operation.component }))
+                const menu = offered.filter((one) => !own.includes(one))
+                // A row with no page that draws it offers neither Edit nor View, and View where the report lets this
+                // actor update no row of the kayan, since the row's page is then only read.
+                const edits = editsRows || href(id) !== '#'
+                const views = operations && operations.update !== true
+                return (
+                  <>
+                    {own.map((one, at) => button(one.operation, (values) => ({ ...values, id: row.id }), `row-${at}`, { description: rowWarning({ kayan, row, operation: one.operation.name, copy }) }))}
+                    {edits || menu.length || deletes || Menu ? (
+                      <RowMenu
+                        kayan={kayan}
+                        copy={copy}
+                        row={row}
+                        label={rowActionsLabel(row)}
+                        opens={edits ? (views ? 'view' : 'edit') : undefined}
+                        onOpen={() => (!views && editsRows ? setEditing(row) : openRow(id))}
+                        menu={menu.map((one) => one.operation)}
+                        running={running}
+                        onRun={(operation) => {
+                          // A button that asks for values or carries a confirm opens its dialog over the
+                          // row; any other runs.
+                          if (operation.fields?.length || operation.confirm) return setAsking({ row, operation })
+                          void runOnRow(operation.name, { id: row.id })
+                        }}
+                        Menu={Menu}
+                        open={setOver}
+                        onDelete={deletes ? () => setDeleting(row) : undefined}
+                      />
+                    ) : null}
+                  </>
+                )
+              }}
+            >
               {/* The table can be wider than a phone, so a sentence in a cell spanning it would be cut off at the frame's
                   edge. */}
               {page.docs.length === 0 ? (
@@ -730,8 +470,7 @@ export function List({
                   {t('admin.noColumns', 'Your role can\'t see any column of this list. Ask an administrator of your organization for access.')}
                 </div>
               ) : null}
-              {more === false ? null : <div data-scroll-cue="" aria-hidden className="from-card pointer-events-none absolute inset-y-0 w-10 bg-linear-to-l to-transparent rtl:bg-linear-to-r" style={{ insetInlineEnd: more }} />}
-            </div>
+            </ListTable>
 
             <span id={openHint} hidden>
               {t('admin.openRow', 'Press Enter to open this row.') ?? 'Press Enter to open this row.'}
@@ -801,68 +540,5 @@ export function List({
         </CardContent>
       </Card>
     </section>
-  )
-}
-
-function ListButton({
-  api,
-  client,
-  copy,
-  description,
-  disabled,
-  inputOf,
-  kayan,
-  onRan,
-  onRefused,
-  operation,
-  run,
-  screen,
-}: {
-  api?: FindApi
-  client?: readonly ClientKayan[]
-  copy: Copy
-  description?: string
-  disabled?: boolean
-  inputOf: (values: Record<string, unknown>) => Record<string, unknown>
-  kayan: ClientKayan
-  onRan?: (written: unknown) => void
-  onRefused: (thrown: unknown) => void
-  operation: PageButton
-  run: (operation: string, input: Record<string, unknown>) => Promise<unknown>
-  screen?: ScreenPage
-}): ReactElement {
-  const [busy, setBusy] = useState(false)
-  const call = async (input: Record<string, unknown>, refuse: (thrown: unknown) => void = onRefused) => {
-    // Every path ends here, so a button that ignores `busy` sends nothing too.
-    if (disabled) return false
-    setBusy(true)
-    onRefused(undefined)
-    try {
-      onRan?.(await run(operation.name, input))
-      return true
-    } catch (thrown) {
-      refuse(thrown)
-      return false
-    } finally {
-      setBusy(false)
-    }
-  }
-  const Own = refOf({ screen, place: 'button', path: operation.component })
-  if (Own && screen) {
-    return <OwnButton Own={Own} operation={operation} busy={busy || disabled === true} copy={copy} call={async (input: Row) => void (await call(inputOf(input)))} />
-  }
-  if (!operation.fields?.length) return <NodeButton node={operation} copy={copy} busy={busy || disabled === true} description={description} run={() => void call(inputOf({}))} />
-  return (
-    <OperationButton
-      api={api}
-      busy={busy || disabled === true}
-      copy={copy}
-      description={description}
-      inputOf={inputOf}
-      kayan={kayan}
-      kayans={client}
-      operation={operation}
-      run={call}
-    />
   )
 }

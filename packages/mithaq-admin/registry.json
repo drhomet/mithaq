@@ -377,6 +377,85 @@
       ]
     },
     {
+      "name": "mithaq-list-button",
+      "type": "registry:component",
+      "title": "Mithaq list button",
+      "description": "One of a list node's buttons, in its toolbar, its bulk bar or a row: the project's own component, a plain button, or the dialog that asks its values.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-operation-button.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-button.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-row-menu",
+      "type": "registry:component",
+      "title": "Mithaq list row menu",
+      "description": "One row's menu: View or Edit, the list node's row buttons, the project's own items, and Delete.",
+      "registryDependencies": [
+        "button",
+        "dropdown-menu",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-row-menu.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-row-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-table",
+      "type": "registry:component",
+      "title": "Mithaq list table",
+      "description": "The list's table: sortable headings, the selection column, each row's cells drawn from the components map with the first linking the row, and the pinned columns and the fade where it runs past its frame.",
+      "registryDependencies": [
+        "button",
+        "table",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-query.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-selection.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-table.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-table.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-list-toolbar",
+      "type": "registry:component",
+      "title": "Mithaq list toolbar",
+      "description": "The list's search box, which names the fields it runs over, and the bar that counts the ticked rows and holds the bulk buttons.",
+      "registryDependencies": [
+        "button",
+        "input",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/list-toolbar.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/list-toolbar.tsx"
+        }
+      ]
+    },
+    {
       "name": "mithaq-list",
       "type": "registry:component",
       "title": "Mithaq list",
@@ -384,21 +463,23 @@
       "registryDependencies": [
         "button",
         "card",
-        "dropdown-menu",
-        "input",
-        "table",
-        "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-delete-button.json",
         "./node_modules/mithaq-admin/r/mithaq-filter-operators.json",
         "./node_modules/mithaq-admin/r/mithaq-form.json",
         "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-button.json",
         "./node_modules/mithaq-admin/r/mithaq-list-columns.json",
         "./node_modules/mithaq-admin/r/mithaq-list-filters.json",
         "./node_modules/mithaq-admin/r/mithaq-list-pagination.json",
         "./node_modules/mithaq-admin/r/mithaq-list-query.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-row-menu.json",
         "./node_modules/mithaq-admin/r/mithaq-list-selection.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-table.json",
+        "./node_modules/mithaq-admin/r/mithaq-list-toolbar.json",
         "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-operation-button.json",
         "./node_modules/mithaq-admin/r/mithaq-refusal.json",
         "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json"
       ],
@@ -446,6 +527,161 @@
       ]
     },
     {
+      "name": "mithaq-form-rules",
+      "type": "registry:component",
+      "title": "Mithaq form rules",
+      "description": "The rules a form checks before it sends, the ones the projection carries in the server's order, the refusal they make in the server's wire shape, the fields a refusal names, and the sentence over a refused save.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-format.json"
+      ],
+      "files": [
+        {
+          "path": "registry/form-rules.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/form-rules.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-form-context",
+      "type": "registry:component",
+      "title": "Mithaq form context",
+      "description": "The form a field is bound to: useKayanField reads one field's value, change, blur, write access and refusal, and useValues reads the form's values, from a component the project draws inside the form.",
+      "dependencies": [
+        "@tanstack/react-form"
+      ],
+      "files": [
+        {
+          "path": "registry/form-context.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/form-context.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-field-value",
+      "type": "registry:component",
+      "title": "Mithaq field value",
+      "description": "A field the form draws bound to its value and refusal, and a field read and never edited, drawn under its label with the cell a list column draws it with.",
+      "registryDependencies": [
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-form-context.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
+        "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
+        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+      ],
+      "files": [
+        {
+          "path": "registry/field-value.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/field-value.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-delete-button",
+      "type": "registry:component",
+      "title": "Mithaq delete button",
+      "description": "The delete in two clicks, whose dialog names the row and stays open over a refusal until the delete lands.",
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json"
+      ],
+      "files": [
+        {
+          "path": "registry/delete-button.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/delete-button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-discard-dialog",
+      "type": "registry:component",
+      "title": "Mithaq discard dialog",
+      "description": "The question asked before an unsaved edit is thrown away, for a form's Cancel and a navigation the router blocked.",
+      "registryDependencies": [
+        "alert-dialog",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/discard-dialog.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/discard-dialog.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-operation-button",
+      "type": "registry:component",
+      "title": "Mithaq operation button",
+      "description": "One of a kayan's own operations as a button and the dialog that asks its values, which a refusal keeps open over the boxes it names.",
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-control-props.json",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-form-rules.json",
+        "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-refusal.json"
+      ],
+      "files": [
+        {
+          "path": "registry/operation-button.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/operation-button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-form-actions",
+      "type": "registry:component",
+      "title": "Mithaq form actions",
+      "description": "The form's action bar: Cancel, Save or Save draft and Publish, the autosave's word, the status pill, the draft or published switch and the time since the last update, fixed to the foot of a phone's screen.",
+      "registryDependencies": [
+        "badge",
+        "button",
+        "spinner",
+        "toggle-group",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/form-actions.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/form-actions.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-draft-banner",
+      "type": "registry:component",
+      "title": "Mithaq draft banner",
+      "description": "What a changed row says above its form: the published copy read only, or the draft being edited, with a link to the published copy and the restore that throws the draft away.",
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "./node_modules/mithaq-admin/r/mithaq-copy.json"
+      ],
+      "files": [
+        {
+          "path": "registry/draft-banner.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/draft-banner.tsx"
+        }
+      ]
+    },
+    {
       "name": "mithaq-form",
       "type": "registry:component",
       "title": "Mithaq form",
@@ -454,23 +690,22 @@
         "@tanstack/react-form"
       ],
       "registryDependencies": [
-        "alert-dialog",
-        "badge",
-        "button",
         "card",
-        "spinner",
-        "toggle-group",
         "./node_modules/mithaq-admin/r/mithaq-components.json",
         "./node_modules/mithaq-admin/r/mithaq-control-props.json",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
-        "./node_modules/mithaq-admin/r/mithaq-field-shell.json",
+        "./node_modules/mithaq-admin/r/mithaq-delete-button.json",
+        "./node_modules/mithaq-admin/r/mithaq-discard-dialog.json",
+        "./node_modules/mithaq-admin/r/mithaq-draft-banner.json",
+        "./node_modules/mithaq-admin/r/mithaq-field-value.json",
         "./node_modules/mithaq-admin/r/mithaq-field-values.json",
-        "./node_modules/mithaq-admin/r/mithaq-format.json",
+        "./node_modules/mithaq-admin/r/mithaq-form-actions.json",
+        "./node_modules/mithaq-admin/r/mithaq-form-context.json",
+        "./node_modules/mithaq-admin/r/mithaq-form-rules.json",
         "./node_modules/mithaq-admin/r/mithaq-nodes.json",
+        "./node_modules/mithaq-admin/r/mithaq-operation-button.json",
         "./node_modules/mithaq-admin/r/mithaq-refusal.json",
-        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json",
-        "./node_modules/mithaq-admin/r/mithaq-rich-text.json",
-        "./node_modules/mithaq-admin/r/mithaq-upload.json"
+        "./node_modules/mithaq-admin/r/mithaq-relationship-cell.json"
       ],
       "files": [
         {
