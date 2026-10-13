@@ -208,9 +208,9 @@ export const tenantRoles = {
       'sessions.count',
       'sessions.findByID',
       ...sessionColumns,
-      // The people of its organization by their id and name alone, which the
+      // The students of its organization by their id and name alone, which the
       // enrollment drawer's student picker lists and an enrollment's student is
-      // titled by.
+      // titled by: `peopleAudience` in `tenant-access.ts` names whom it reads.
       'user.find',
       'user.count',
       'user.findByID',

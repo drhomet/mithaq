@@ -17050,6 +17050,31 @@ test('227d. an enrollment names a session and a student: a create naming no sess
   assert.equal(cleared.status, 400, 'and no update takes the student away')
 })
 
+test('227f. a role reads the people its audience names and itself, unless it holds member.find: the instructor reads the students and not the staff, a student reads no one, a custom role reading people reads itself alone, and the administrator reads everyone', async () => {
+  const tenant = await roleTenant('people-227f')
+  const elsewhere = await roleTenant('people-227f-elsewhere')
+  const names = async (who: keyof typeof tenant.people) => {
+    const answer = await tenant.as(who, 'user/find', { limit: 100, sort: 'name' })
+    return answer.status === 200 ? (answer.body.docs as { name: string }[]).map((one) => one.name) : answer.status
+  }
+  assert.deepEqual(await names('admin'), ['people-227f-instructor', 'people-227f-owner', 'people-227f-registrar', 'people-227f-student'], 'the administrator reads every member')
+  assert.deepEqual(await names('instructor'), ['people-227f-instructor', 'people-227f-student'], 'the instructor reads the students and itself, and no other organization\'s student')
+  assert.equal(await names('student'), 403, 'a student reads no one')
+  assert.equal((await tenant.as('instructor', 'user/count', {})).body.totalDocs, 2, 'and the count agrees')
+  const staff = await tenant.as('instructor', 'user/findByID', { id: tenant.people.registrar.id })
+  assert.equal(staff.status, 404, `the instructor does not open a staff member: ${JSON.stringify(staff.body)}`)
+  const course = await courses.operations.create({ title: 'People 227f' }, tenant.options)
+  const session = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-02-01T09:00:00Z') }, tenant.options)
+  const enrolsStaff = await tenant.as('instructor', 'enrollments/create', { session: session.id, student: tenant.people.registrar.id })
+  assert.notEqual(enrolsStaff.status, 200, `nor enrolls one, whom it cannot name: ${JSON.stringify(enrolsStaff.body)}`)
+  assert.equal((await tenant.as('instructor', 'enrollments/create', { session: session.id, student: elsewhere.people.student.id })).status === 200, false, 'nor another organization\'s student')
+
+  await seedRoleRow(tenant.organization, 'reader-227f', ['screen.dashboard', 'user.find', 'user.fields.id', 'user.fields.name'])
+  await db.execute(`update member_roles set role = 'reader-227f' where user_id = '${tenant.people.registrar.id}'`)
+  assert.deepEqual(await names('registrar'), ['people-227f-registrar'], 'a custom role that reads people and is named in no audience reads itself alone')
+  await db.execute(`update member_roles set role = 'registrar' where user_id = '${tenant.people.registrar.id}'`)
+})
+
 test('227e. a person who holds a seat, a withdrawn one included, is not removed on the platform: the route answers 409 before anything goes, and their account and sessions stay', async () => {
   const tenant = await roleTenant('seated-227e')
   const course = await courses.operations.create({ title: 'Seated 227e' }, tenant.options)

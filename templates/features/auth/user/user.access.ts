@@ -8,7 +8,8 @@
 // differently, and neither row reaches the other's side. In the tenant app a
 // member reads its active organization's members by their id and their name
 // alone, so a relationship to a person shows a name in the dashboard's cell and
-// picker, and no email, role or ban reaches a tenant. In the platform app a
+// picker, and no email, role or ban reaches a tenant. Which members: all of them
+// to a holder of `member.find`, otherwise itself and its roles' `peopleAudience`. In the platform app a
 // platform role reads every person, each column where it holds that column's key.
 //
 // The id and the name are held by `namesInTenant` rather than by a field list

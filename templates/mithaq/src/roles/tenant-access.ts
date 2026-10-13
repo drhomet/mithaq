@@ -205,18 +205,46 @@ export const namesInTenant = (kayan: string) => (actor: unknown): Held => {
 }
 
 /**
+ * Whom a role reads among its organization's people when it holds no
+ * `member.find`: the members assigned one of the roles named here, beside
+ * itself. A role left out, a custom role included, reads itself alone, so a
+ * key to read people never by itself opens the staff to a portal role.
+ */
+export const peopleAudience: Readonly<Record<string, readonly string[]>> = {
+  // add-on: courses
+  // The students it enrols, never the staff.
+  instructor: ['student'],
+  // end add-on: courses
+}
+
+/**
  * The read the person's own rows are ANDed with, so it narrows and never widens:
  * the members of the organization the actor's session has active, read off the
- * store. The organization is the trusted snapshot's, so a claim is no one's.
+ * store, all of them to a holder of `member.find`, who lists them through the
+ * provider anyway, and otherwise the actor and its roles' `peopleAudience`. The
+ * organization is the trusted snapshot's, so a claim is no one's.
  */
 export const membersOf = (store: Pick<Store, 'find'>) => async ({ user: actor }: { user: unknown }) => {
   // A platform role reads every person in the platform app; the rows answer who holds one.
   if (onPlatform()) return true
   const active = currentOrganization(actor)
   if (!active) return false
-  const members = await store.find({ kayan: 'member', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organizationId: { equals: active } } } })
+  const all = { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } } as const
+  const members = await store.find({ kayan: 'member', args: { ...all, where: { organizationId: { equals: active } } } })
   const ids = members.docs.map((row) => row.userId).filter((id): id is string => typeof id === 'string')
-  return ids.length ? { id: { in: ids } } : false
+  const held = actorPermissions(actor)
+  if (held === true || held?.has('member.find')) return ids.length ? { id: { in: ids } } : false
+  const seen = new Set([authActor(actor)?.id])
+  // add-on: roles
+  const audience = [...new Set(assignedRoles(actor as OrganizationActor).flatMap((slug) => peopleAudience[slug] ?? []))]
+  if (audience.length) {
+    const assigned = await store.find({ kayan: 'memberRoles', args: { ...all, where: { organization: { equals: active }, role: { in: audience } } } })
+    for (const row of assigned.docs) seen.add(row.user)
+  }
+  // end add-on: roles
+  // An assignment can outlive its membership, so only a current member is seen.
+  const reached = ids.filter((id) => seen.has(id))
+  return reached.length ? { id: { in: reached } } : false
 }
 
 /**
