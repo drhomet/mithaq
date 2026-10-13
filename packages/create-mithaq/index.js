@@ -59,7 +59,7 @@ export const addOns = {
   roles: {
     needs: [],
     files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
-    without: ['packages/mithaq/src/roles/default-member-roles.ts'],
+    without: ['packages/mithaq/src/roles/default-member-roles.ts', 'packages/mithaq/src/roles/member-access.ts'],
     tables: true,
   },
   'audit-log': {
@@ -108,6 +108,8 @@ export function keepAddOns(text, chosen) {
   const kept = []
   for (const line of text.split('\n')) {
     const marker = /^\s*\/\/ (end )?(without )?add-on: (.+)$/.exec(line)
+    // A misspelled marker would otherwise read as a comment, and leave its region in every project.
+    if (!marker && /^\s*\/\/.*\badd-?on\b:/.test(line)) throw new Error(`The template holds "${line.trim()}", which reads like an add-on marker and is none.`)
     if (!marker) {
       if (open.every((one) => one.keep)) kept.push(open.some((one) => one.without) ? line.replace(/^(\s*)\/\/ ?/, '$1') : line)
       continue

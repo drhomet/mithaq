@@ -18,9 +18,6 @@ import {
   // add-on: roles
   rbacTarget,
   // end add-on: roles
-  // without add-on: roles
-  // memberRoleTarget,
-  // end without add-on: roles
   Refusal,
   screenTarget,
   serviceTarget,
@@ -39,6 +36,9 @@ import { systemRoles } from './roles/system-roles.ts'
 import { storageConfig } from './storage/index.ts'
 import { onPlatform } from './mithaq/auth/index.ts'
 import { assignedRoles, platformRolesOf, tenantAccess } from './roles/tenant-access.ts'
+// without add-on: roles
+// import { accessTarget } from './roles/member-access.ts'
+// end without add-on: roles
 
 /**
  * A local PostgreSQL on its default port, which `vite dev` falls back to when
@@ -155,13 +155,7 @@ export const accessTarget = (roles: typeof systemRoles = systemRoles) => {
 }
 // end add-on: roles
 // without add-on: roles
-// /**
-//  * The access target over these roles: a member holds what Better Auth's own
-//  * `member.role` names in the organization, owner, admin or member, and no
-//  * custom role or assignment table exists. The roles add-on swaps this for
-//  * `rbacTarget` over its `roles` and `memberRoles` kayan.
-//  */
-// export const accessTarget = (roles: typeof systemRoles = systemRoles) => memberRoleTarget({ roles, rolesOf: assignedRoles, access: tenantAccess })
+// export { accessTarget }
 // end without add-on: roles
 
 /**

@@ -206,6 +206,9 @@ test('a region keeps its lines only where its add-ons are chosen, a without regi
   assert.throws(() => keepAddOns('// add-on: roles\nb', []), /leaves "add-on: roles" open/)
   assert.throws(() => keepAddOns('// add-on: roles\n// end add-on: courses', []), /closes "add-on: courses" where no such region is open/)
   assert.throws(() => keepAddOns('// add-on: rolls\n// end add-on: rolls', []), /the add-on "rolls", which the table does not hold/)
+  for (const misspelled of ['// addon: roles', '//add-on: roles', '  // ends add-on: roles', '// without addon: roles']) {
+    assert.throws(() => keepAddOns(`a\n${misspelled}\nb`, []), /reads like an add-on marker and is none/, misspelled)
+  }
 })
 
 test('a minimal project holds auth and the tags example alone: no other feature, no file only an add-on reads, and access over Better Auth\'s own member roles', () => {
@@ -219,7 +222,8 @@ test('a minimal project holds auth and the tags example alone: no other feature,
   // Its code, the comments aside, which may name what an add-on would bring.
   const code = (file: string) => read(file).replaceAll(/^\s*(\/\/|\/?\*).*$/gm, '')
   const language = code('minimal/packages/mithaq/src/mithaq.ts')
-  assert.match(language, /^export const accessTarget = \(roles: typeof systemRoles = systemRoles\) => memberRoleTarget\(/m)
+  assert.match(language, /^import \{ accessTarget \} from '\.\/roles\/member-access\.ts'$/m)
+  assert.match(language, /^export \{ accessTarget \}$/m)
   assert.doesNotMatch(language, /rbacTarget|auditSink|sessionLabels|softDelete|'courses'|'roles'|'auditLog'|'settings'/)
   assert.match(read('minimal/packages/mithaq/src/roles/tenant-roles.ts'), /\.\.\.defaultMemberRoles,/)
   assert.doesNotMatch(code('minimal/packages/mithaq/src/mithaq/auth/index.ts'), /memberRoles|enrollments/)
@@ -236,7 +240,7 @@ test('a full project holds every add-on and the template\'s migrations, none of 
   for (const file of Object.values(addOns).flatMap((one) => one.files)) assert.ok(existsSync(join(at, file)), file)
   for (const file of Object.values(addOns).flatMap((one) => one.without)) assert.ok(!existsSync(join(at, file)), file)
   assert.match(read('my-app/packages/mithaq/src/mithaq.ts'), /rbacTarget\(\{ \.\.\.accessOptions, roles \}\)/)
-  assert.doesNotMatch(read('my-app/packages/mithaq/src/mithaq.ts'), /memberRoleTarget/)
+  assert.doesNotMatch(read('my-app/packages/mithaq/src/mithaq.ts'), /member-access/)
   assert.ok(readdirSync(join(at, 'packages/asas/src/migrations')).length > 2)
   const sources = filesUnder(at).filter((file) => /\.tsx?$/.test(file))
   assert.deepEqual(sources.filter((file) => /add-on: /.test(readFileSync(file, 'utf8'))).map((file) => file.slice(at.length)), [], 'no marker is left')
