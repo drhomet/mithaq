@@ -45,7 +45,7 @@ test('a project takes the published mithaq and mithaq-admin under the names its 
   assert.match(read('my-app/packages/asas/src/asas.ts'), /from '@my-app\/courses'/)
   assert.match(read('my-app/packages/mithaq/src/mithaq.ts'), /language: '@my-app\/mithaq',\n/)
   const sources = filesUnder(join(scratch, 'my-app')).filter((file) => /\.(tsx?|json|css)$/.test(file))
-  assert.deepEqual(sources.filter((file) => /@asas\/|\.\.\/templates\//.test(readFileSync(file, 'utf8'))).map((file) => file.slice(join(scratch, 'my-app').length)), [], 'no scope or folder of the mithaq repository is left')
+  assert.deepEqual(sources.filter((file) => /@asas\/|\.\.\/templates\b/.test(readFileSync(file, 'utf8'))).map((file) => file.slice(join(scratch, 'my-app').length)), [], 'no scope or folder of the mithaq repository is left')
 })
 
 test('a project is a workspace every package manager reads, named for it, of the language, its features, the asas and the apps, ignoring its .env', () => {

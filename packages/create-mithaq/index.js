@@ -41,10 +41,13 @@ export function updatePackageJSONDependencies({ mithaq, mithaqAdmin, packageJson
   }
 }
 
-/** Replaces `from` exactly once, so a template line that moved fails creation instead of shipping a wrong path. */
-const once = (text, from, to) => {
-  if (text.split(from).length !== 2) throw new Error(`The template no longer holds ${from} exactly once.`)
-  return text.replace(from, to)
+/**
+ * Replaces `from`, a string or a pattern with no group, where the template holds it exactly `count` times, so a
+ * template line that moved fails creation instead of shipping a wrong path.
+ */
+const once = (text, from, to, count = 1) => {
+  if (text.split(from).length !== count + 1) throw new Error(`The template no longer holds ${from} ${count === 1 ? 'exactly once' : `${count} times`}.`)
+  return typeof from === 'string' ? text.replaceAll(from, to) : text.replace(from, to)
 }
 /** Every text file a project's own commands or imports read, outside what an install writes. */
 const textsUnder = (folder) =>
@@ -72,7 +75,9 @@ const foldIntoOnePackage = (project) => {
       ["features: '../features/',", "features: 'src/features/',"],
       ["auth: '../features/auth/',", "auth: 'src/features/auth/',"],
       ["providers: '@asas/mithaq/auth',", "providers: '../../../mithaq/auth/index.ts',"],
-    ].reduce((one, [from, to]) => once(one, from, to), text).replaceAll("'../../apps/asas-tanstack/src/routes/(screens)/'", "'src/routes/(screens)/'"),
+      // The dashboard's and the portal's, which the tenant app serves.
+      ["'../../apps/asas-tanstack/src/routes/(screens)/'", "'src/routes/(screens)/'", 2],
+    ].reduce((one, [from, to, count]) => once(one, from, to, count), text),
   )
   for (const entry of readdirSync(at('packages/asas'))) if (!['package.json', 'components.json', 'src'].includes(entry)) renameSync(at('packages/asas', entry), at(entry))
   renameSync(at('packages/asas/src'), at('src'))
@@ -122,8 +127,8 @@ const foldIntoOnePackage = (project) => {
     const referenced = [...new Set([...readFileSync(join(folder, 'screen.json'), 'utf8').matchAll(/"(\.\/[^"#]+)#[^"]*"/g)].map(([, file]) => file))].sort()
     writeFileSync(join(folder, 'files.ts'), `// Written by \`mithaq generate screens\`. Do not edit.\n/// <reference types="vite/client" />\n// Every file the \`${screen}\` screen's references name, each loaded when a page draws it.\nexport const files = import.meta.glob([${referenced.map((file) => `'${file}'`).join(', ')}], { base: '/' })\n`)
   }
-  edit(at('src/styles.css'), (text) => text.replace(/\/\*[^*]*\*\/\n@source '[^']*';\n/, "/* The project's own shells, pages and components, which the screens load\n   (`src/ui/app-shell.tsx`). */\n@source './';\n"))
-  edit(at('tsconfig.json'), (text) => text.replace(/, "\.\.\/\.\.\/packages\/[^\]]*\]/, ']'))
+  edit(at('src/styles.css'), (text) => once(text, /\/\*[^*]*\*\/\n@source '[^']*';\n/, "/* The project's own shells, pages and components, which the screens load\n   (`src/ui/app-shell.tsx`). */\n@source './';\n"))
+  edit(at('tsconfig.json'), (text) => once(text, /, "\.\.\/\.\.\/packages\/[^\]]*\]/, ']'))
 }
 
 /**
@@ -150,7 +155,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   // The template's packages sit in `templates/` in the mithaq repository, beside the framework's own `packages/`; a
   // project holds them in `packages/`, and every relative path an app names into them follows.
   renameSync(join(project, 'templates'), join(project, 'packages'))
-  for (const file of textsUnder(project)) edit(file, (text) => text.replaceAll(/((?:\.\.\/)+)templates\//g, '$1packages/'))
+  for (const file of textsUnder(project)) edit(file, (text) => text.replaceAll(/((?:\.\.\/)+)templates(?=[/'"])/g, '$1packages'))
   const files = readdirSync(project, { recursive: true })
   // npm drops every `.gitignore` from a published package, so the stage keeps
   // each as `gitignore`.
