@@ -1118,6 +1118,11 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
       assert.equal(await sentTo(`${enters}/courses`, cookie), null, `and so is a page of it`)
       assert.equal(await sentTo(refused, cookie), '/unauthorized', `${refused} sends a ${role}, who does not hold its key, to /unauthorized`)
       assert.equal(await sentTo(`${refused}/courses`, cookie), '/unauthorized', `and so does a page of it`)
+      // The provider lists members to any member; the auth setup asks `member.find`, which no fixed role but the
+      // administrator holds.
+      assert.equal((await fetch(`${origin}/api/auth/user/organization/list-members`, { headers: { cookie } })).status, 403, `a ${role} lists no member through the provider`)
+      const full = (await (await fetch(`${origin}/api/auth/user/organization/get-full-organization`, { headers: { cookie } })).json()) as { members: unknown[] }
+      assert.deepEqual(full.members, [], `and reads its organization with no member`)
     })
   }
   // A page that names a key is served only to an actor holding it, and its nav entry is drawn only for one.
@@ -1994,7 +1999,7 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
     name: 'assigner',
     label: { en: 'Test role', ar: 'دور تجريبي' },
     permissions: [
-      'screen.dashboard', 'tags.find', 'tags.fields.id',
+      'screen.dashboard', 'tags.find', 'tags.fields.id', 'member.find', 'member.fields.id',
       'memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'memberRoles.fields.id', 'memberRoles.fields.user', 'memberRoles.fields.role', 'memberRoles.fields.organization',
       'roles.find', 'roles.findByID', 'roles.fields.id', 'roles.fields.name', 'roles.fields.label', 'roles.fields.permissions',
     ],

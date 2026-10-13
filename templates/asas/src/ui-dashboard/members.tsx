@@ -1,5 +1,5 @@
 // The dashboard's one page that belongs to no kayan: who works in the viewer's organization and the roles each holds, and the one place a member's roles are changed.
-// The `loader` reads as the viewer: members from the provider's `list-members` (the active organization only), assignments from `memberRoles`, and the roles the sheet offers: the fixed ones from their code and the organization's own from `roles`, never a platform role.
+// The `loader` reads as the viewer: members from the provider's `list-members` (the active organization only, gated by `member.find`), assignments from `memberRoles`, and the roles the sheet offers: the fixed ones from their code and the organization's own from `roles`, never a platform role.
 // Invitations, cancellations and removals go through the provider's own routes, which the auth template gates by `invitation.create`, `invitation.cancel` and `member.delete`.
 import { useEffect, useId, useRef, useState } from 'react'
 import { Lock } from 'lucide-react'
@@ -44,13 +44,47 @@ const isoOf = (value: string): string => {
   return Number.isNaN(when.getTime()) ? '' : when.toISOString()
 }
 
+/**
+ * Every row of a read that answers a page at a time, read until the total is reached: an organization outgrows any one
+ * page, and a page that drew the first hundred would leave the rest out without a word.
+ *
+ * The pages are offsets, so a row added or removed between two reads shifts the next page: a row then comes back twice,
+ * and is kept once by `key`, or is missed until the page loads again.
+ */
+// ponytail: every member is read and drawn at once, by offset; page the table itself, by a cursor, once an organization's size makes the page slow.
+export const everyPage = async <Row,>({ read, key }: { read: (offset: number) => Promise<{ rows: Row[]; total: number }>; key: (row: Row) => string }): Promise<Row[]> => {
+  const rows = new Map<string, Row>()
+  for (let offset = 0; ; ) {
+    const page = await read(offset)
+    for (const row of page.rows) if (!rows.has(key(row))) rows.set(key(row), row)
+    offset += page.rows.length
+    if (!page.rows.length || offset >= page.total) return [...rows.values()]
+  }
+}
+
 export const loader = async ({ access, client, request, maxLimit }: LoaderTools): Promise<MembersData> => {
-  const [listed, assigned, roles, invited] = await Promise.all([
-    request('/api/auth/user/organization/list-members?limit=100').then(async (response) => {
-      if (!response.ok) throw new Error(`list-members answered ${response.status}`)
-      return (await response.json()) as { members: { userId: string; role: string; createdAt: string; user: { name: string; email: string } }[] }
+  const [members, assignments, roles, invited] = await Promise.all([
+    everyPage({
+      key: (member) => member.userId,
+      read: async (offset: number) => {
+        // In id order, which no change to a member's other columns reorders.
+        const response = await request(`/api/auth/user/organization/list-members?limit=${maxLimit}&offset=${offset}&sortBy=id`)
+        if (!response.ok) throw new Error(`list-members answered ${response.status}`)
+        const page = (await response.json()) as { members: { userId: string; role: string; createdAt: string; user: { name: string; email: string } }[]; total: number }
+        return { rows: page.members, total: page.total }
+      },
     }),
-    client({ kayan: 'memberRoles', operation: 'find', input: { limit: maxLimit, depth: 0 } }) as Promise<{ docs: { id: string; user: string; role: string }[] }>,
+    // The page is served on `member.find`, so a viewer may list the members
+    // and not read who holds which role.
+    holds(access, 'memberRoles.find')
+      ? everyPage({
+          key: (row) => row.id,
+          read: async (offset: number) => {
+            const page = (await client({ kayan: 'memberRoles', operation: 'find', input: { limit: maxLimit, page: Math.ceil(offset / maxLimit) + 1, depth: 0 } })) as { docs: { id: string; user: string; role: string }[]; totalDocs: number }
+            return { rows: page.docs, total: page.totalDocs }
+          },
+        })
+      : [],
     // Asked only of a viewer the report lets read roles, so the page still
     // draws for one who may read the assignments and not the roles.
     holds(access, 'roles.find')
@@ -72,13 +106,13 @@ export const loader = async ({ access, client, request, maxLimit }: LoaderTools)
       : undefined,
   ])
   return {
-    members: listed.members.map((member) => ({
+    members: [...members].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((member) => ({
       userId: member.userId,
       name: member.user.name,
       email: member.user.email,
       joined: isoOf(member.createdAt),
       owner: isOwner(member.role),
-      roles: assigned.docs.filter((row) => row.user === member.userId).map((row) => ({ id: String(row.id), role: row.role })),
+      roles: assignments.filter((row) => row.user === member.userId).map((row) => ({ id: String(row.id), role: row.role })),
     })),
     roles: [
       ...Object.entries(tenantRoles).map(([name, role]): Role => ({ name, label: role.label, fixed: true, permissions: role.permissions === '*' ? ['*'] : role.permissions })),

@@ -315,11 +315,16 @@ packages/mithaq/
 
 **`src/mithaq/auth/`** is the Better Auth setup: `index.ts` holds the options and instances (`providers`), the platform session, `asPlatform` and `onPlatform`, and the two apps' URLs; `platform-roles.ts` the platform roles staff hold on `user.role`, the columns staff read, and `secret`, the columns no platform role reads. It is imported as `@my-app/mithaq/auth`.
 
+Better Auth's organization routes let any member read every member. The setup gates them by this project's keys, in the active organization alone: `list-members`, and `get-active-member-role` with a `userId`, need `member.find`; `list-invitations` needs `invitation.create`; `get-full-organization` answers the organization to every member, with its `members` empty (and loaded one at most) without `member.find` and its `invitations` empty without `invitation.create`; `get-invitation` answers the invitee without the inviter's address. Only the `administrator` role (and, without the roles add-on, `owner` and `admin`) holds `member.find`, and the Members page is served on it.
+
+`organizationLimits` in the same file sets the provider's limits rather than leaving its defaults: a person founds organizations (sign-up founds each person's own) only while they belong to fewer than five, an organization holds up to 10,000 members and 1,000 pending invitations, and the Members page reads every member a page at a time. A new session opens in the person's oldest membership (the first by id among ties), and leaving the active organization opens the next oldest.
+
 **Access and roles.**
 
 - `roles/tenant-roles.ts` holds the roles every organization has, written in code and never stored as rows. A key is `<kayan>.<operation>`, `<kayan>.fields.<field>` or `screen.<screen>`. Without the roles add-on they are Better Auth's own `owner`, `admin` and `member`, from `roles/default-member-roles.ts`, and the access target is `memberRoleTarget`, which answers each member what its `member.role` names in that organization.
 - `roles/system-roles.ts` joins them with the platform roles into `systemRoles`, which the access target takes.
 - `roles/tenant-access.ts` holds the row table every per-organization kayan inherits, the reader that answers an actor's roles, and the platform's checks; `roles/grants.ts` what the role form and the server both read.
+- `membersOf` in `roles/tenant-access.ts` is whom a `user` read reaches in a tenant: every member to a holder of `member.find`, and to anyone else itself and the members holding a role its own roles name in `peopleAudience` (the instructor reads the students). A role it leaves out, a custom role included, reads itself alone, whatever `user.*` keys it holds; so does a picker or a refusal that names people through that read.
 - `roles/statements.ts` holds the keys the project adds beside the kayan's own operations.
 
 **Configurable features**, each with its add-on.

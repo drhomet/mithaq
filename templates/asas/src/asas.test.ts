@@ -6559,7 +6559,7 @@ test('226a. over asas.handler no organization is deleted: the route answers 404 
   assert.equal(await active(), id, 'and the owner\'s active organization is still it')
 })
 
-test('226b. over asas.handler get-full-organization hands its invitations only to a caller holding invitation.create in that same organization, and no provider role is written in another organization or without its ac key', async () => {
+test('226b. over asas.handler get-full-organization hands its invitations only to a caller holding invitation.create, and its members only to one holding member.find, in that same organization, and no provider role is written in another organization or without its ac key', async () => {
   const orgOf = async (slug: string) => {
     const owner = await signedUp(`owner-${slug}`)
     const made = await server.api.createOrganization({ body: { name: `Tenant ${slug}`, slug }, headers: owner.headers })
@@ -6600,10 +6600,10 @@ test('226b. over asas.handler get-full-organization hands its invitations only t
     return { id: answer.id, members: answer.members.length, invitations: answer.invitations.map((one) => one.email) }
   }
 
-  assert.deepEqual(await full(keyless.headers), { id: a.id, members: 4, invitations: [] }, 'a member who may not invite reads the members and no invitation')
-  assert.deepEqual(await full(inviter.headers), { id: a.id, members: 4, invitations: ['pending-a-226b@example.com'] }, 'one who may invite reads them')
-  assert.deepEqual(await full(inviter.headers, `?organizationId=${b.id}`), { id: b.id, members: 4, invitations: [] }, 'but not another organization\'s, where it holds no key')
-  assert.deepEqual((await full(b.owner.headers)).invitations, ['pending-b-226b@example.com'], 'which that organization\'s own owner reads')
+  assert.deepEqual(await full(keyless.headers), { id: a.id, members: 0, invitations: [] }, 'a member who may not invite reads no invitation, and without member.find no member')
+  assert.deepEqual(await full(inviter.headers), { id: a.id, members: 0, invitations: ['pending-a-226b@example.com'] }, 'one who may invite reads them')
+  assert.deepEqual(await full(inviter.headers, `?organizationId=${b.id}`), { id: b.id, members: 0, invitations: [] }, 'but not another organization\'s, where it holds no key')
+  assert.deepEqual(await full(b.owner.headers), { id: b.id, members: 4, invitations: ['pending-b-226b@example.com'] }, 'which that organization\'s own owner reads, with its members')
 
   const permission = { member: ['delete'] }
   const named = async (organization: string, role: string) =>
@@ -6665,6 +6665,155 @@ test('226d. a sign-up completes on a pool of one client, because every hook of o
   ])
   assert.equal(answer, 'signed up', 'the sign-up finishes rather than waiting on its own pool')
   await one.$client.end()
+})
+
+test('226e. over asas.handler the provider\'s member reads answer people only to a caller holding member.find in that same organization: a student, a plain member and a keyless governance admin read no one, and nobody reads another organization\'s members', async () => {
+  const owner = await signedUp('owner-226e')
+  const made = await server.api.createOrganization({ body: { name: 'Tenant 226e', slug: 'tenant-226e' }, headers: owner.headers })
+  const a = made!.id as string
+  const otherOwner = await signedUp('other-226e')
+  const b = (await server.api.createOrganization({ body: { name: 'Other 226e', slug: 'other-226e' }, headers: otherOwner.headers }))!.id as string
+  const joined = async ({ slug, role, assigned }: { slug: string; role: string; assigned?: string }) => {
+    const one = await signedUp(slug)
+    await server.api.addMember({ body: { userId: one.id, organizationId: a, role } })
+    await server.api.setActiveOrganization({ body: { organizationId: a }, headers: one.headers })
+    if (assigned) await assignRole(a, one.id, assigned)
+    return one
+  }
+  const student = await joined({ slug: 'student-226e', role: 'member', assigned: 'student' })
+  const plain = await joined({ slug: 'plain-226e', role: 'member' })
+  const keyless = await joined({ slug: 'keyless-226e', role: 'admin' })
+  // An administrator of the other organization who is a plain member of this one, active there.
+  const across = await signedUp('across-226e')
+  await server.api.addMember({ body: { userId: across.id, organizationId: a, role: 'member' } })
+  await server.api.addMember({ body: { userId: across.id, organizationId: b, role: 'admin' } })
+  await assignRole(b, across.id, 'administrator')
+  await server.api.setActiveOrganization({ body: { organizationId: b }, headers: across.headers })
+  await server.api.createInvitation({ body: { email: 'pending-226e@example.com', role: 'member', organizationId: a }, headers: owner.headers })
+
+  const read = async (path: string, headers: Headers) => {
+    const response = await asas.handler(new Request(`http://test/api/auth/user/organization/${path}`, { headers: { cookie: headers.get('cookie') ?? '', origin: 'http://localhost:5173' } }))
+    const text = await response.text()
+    return { status: response.status, text, body: (text ? JSON.parse(text) : null) as { members?: { user?: { email?: string } }[]; invitations?: unknown[]; role?: string } | null }
+  }
+  for (const [said, who] of [['a student', student], ['a plain member', plain], ['a governance admin with no key', keyless]] as const) {
+    for (const path of ['list-members', `list-members?organizationId=${a}`, `get-active-member-role?userId=${owner.id}`]) {
+      const answer = await read(path, who.headers)
+      assert.equal(answer.status, 403, `${said} is refused ${path}: ${answer.text}`)
+      assert.doesNotMatch(answer.text, /owner-226e@example\.com/, `and reads no address from ${path}`)
+    }
+    const full = await read('get-full-organization', who.headers)
+    assert.equal(full.status, 200, `${said} still reads its organization: ${full.text}`)
+    assert.deepEqual([full.body?.members, full.body?.invitations], [[], []], `${said} reads it with no member and no invitation`)
+    assert.equal((await read('get-active-member-role', who.headers)).status, 200, `${said} still reads its own role`)
+  }
+
+  const listed = await read('list-members', owner.headers)
+  assert.equal(listed.status, 200, listed.text)
+  assert.equal(listed.body?.members?.length, 5, 'the administrator reads every member')
+  assert.ok(listed.body?.members?.some((one) => one.user?.email === 'student-226e@example.com'), 'with their addresses')
+  assert.equal((await read('get-full-organization', owner.headers)).body?.members?.length, 5, 'and the full organization with its members')
+  assert.equal((await read(`get-active-member-role?userId=${student.id}`, owner.headers)).body?.role, 'member', 'and anyone\'s role')
+
+  for (const path of [`list-members?organizationId=${a}`, 'list-members?organizationSlug=tenant-226e', `get-active-member-role?userId=${owner.id}&organizationId=${a}`, `get-active-member-role?userId=${owner.id}&organizationSlug=tenant-226e`]) {
+    const answer = await read(path, across.headers)
+    assert.equal(answer.status, 403, `keys held in another organization open nothing here: ${path}: ${answer.text}`)
+    assert.doesNotMatch(answer.text, /owner-226e@example\.com/)
+  }
+  const elsewhere = await read(`get-full-organization?organizationId=${a}`, across.headers)
+  assert.deepEqual([elsewhere.body?.members, elsewhere.body?.invitations], [[], []], `nor the full organization read by id: ${elsewhere.text}`)
+  assert.deepEqual((await read('get-full-organization?organizationSlug=tenant-226e', across.headers)).body?.members, [], 'or by slug')
+  assert.equal((await read(`list-members?organizationId=${a}`, otherOwner.headers)).status, 403, 'and a stranger to this organization reads none of it')
+
+  // A caller without the key learns from the refusal nothing of whether a slug names an organization.
+  for (const who of [new Headers(), student.headers]) {
+    const named = await read('list-members?organizationSlug=tenant-226e', who)
+    const unnamed = await read('list-members?organizationSlug=no-such-226e', who)
+    assert.deepEqual([named.status, named.text], [unnamed.status, unnamed.text], 'an existing slug and a missing one answer alike')
+  }
+
+  // The members a full read loads, which a caller without member.find never sees, are not loaded by the hundred either.
+  // The provider loads them as a join of its organization read.
+  const context = (await server.$context) as { adapter: { findOne(query: { model: string; join?: { member?: unknown } }): Promise<unknown> } }
+  const findOne = context.adapter.findOne
+  const loaded: unknown[] = []
+  context.adapter.findOne = (query) => {
+    if (query.model === 'organization') loaded.push(query.join?.member)
+    return findOne.call(context.adapter, query)
+  }
+  try {
+    await read('get-full-organization?membersLimit=10000', student.headers)
+    await read('get-full-organization', student.headers)
+  } finally {
+    context.adapter.findOne = findOne
+  }
+  assert.deepEqual(loaded, [{ limit: 1 }, { limit: 1 }], 'a student\'s full read loads one member at most, whatever it asks')
+
+  // The invitee reads its invitation, and not the inviter's address.
+  const invitee = await signedUp('pending-226e')
+  const invitation = ((await db.execute(`select id from invitation where email = 'pending-226e@example.com'`)).rows[0] as { id: string }).id
+  const opened = await read(`get-invitation?id=${invitation}`, invitee.headers)
+  assert.equal(opened.status, 200, opened.text)
+  assert.doesNotMatch(opened.text, /owner-226e@example\.com/, 'the inviter\'s address is not handed to the invitee')
+})
+
+test('226f. over asas.handler a person founds organizations only while they belong to fewer than five', async () => {
+  const founder = await signedUp('founder-226f')
+  const found = (n: number) => asas.handler(new Request('http://test/api/auth/user/organization/create', {
+    method: 'POST',
+    headers: { cookie: founder.headers.get('cookie') ?? '', 'content-type': 'application/json', origin: 'http://localhost:5173' },
+    body: JSON.stringify({ name: `Founded 226f ${n}`, slug: `founded-226f-${n}` }),
+  }))
+  for (const n of [1, 2, 3, 4, 5]) assert.equal((await found(n)).status, 200, `organization ${n} is founded`)
+  const sixth = await found(6)
+  assert.equal(sixth.status, 403, 'a sixth is refused')
+  assert.equal(((await sixth.json()) as { code?: string }).code, 'YOU_HAVE_REACHED_THE_MAXIMUM_NUMBER_OF_ORGANIZATIONS')
+})
+
+test('226h. an organization takes and lists members past the provider\'s silent hundred', async () => {
+  const owner = await signedUp('owner-226h')
+  const organization = (await server.api.createOrganization({ body: { name: 'Crowd 226h', slug: 'crowd-226h' }, headers: owner.headers }))!.id as string
+  // Written straight through SQL: a hundred sign-ups would hash a hundred passwords.
+  await db.execute(`insert into "user" (id, name, email, email_verified, created_at, updated_at) select 'crowd-226h-' || n, 'Crowd ' || n, 'crowd-226h-' || n || '@example.com', false, now(), now() from generate_series(1, 100) n`)
+  await db.execute(`insert into member (id, organization_id, user_id, role, created_at) select 'crowd-226h-member-' || n, '${organization}', 'crowd-226h-' || n, 'member', now() from generate_series(1, 100) n`)
+  const late = await signedUp('late-226h')
+  await server.api.addMember({ body: { userId: late.id, organizationId: organization, role: 'member' } })
+  const listed = (await (await asas.handler(new Request('http://test/api/auth/user/organization/list-members', { headers: { cookie: owner.headers.get('cookie') ?? '' } }))).json()) as { members: unknown[]; total: number }
+  assert.deepEqual([listed.members.length, listed.total], [102, 102], 'the hundred-and-second member is taken and listed')
+})
+
+test('226g. a new session opens in the person\'s oldest membership, and leaving the active organization opens the next oldest rather than none', async () => {
+  const owners = await Promise.all(['one', 'two', 'three'].map((n) => signedUp(`owner-226g-${n}`)))
+  const ids = await Promise.all(owners.map(async (owner, at) => (await server.api.createOrganization({ body: { name: `Joined 226g ${at}`, slug: `joined-226g-${at}` }, headers: owner.headers }))!.id as string))
+  const person = await signedUp('person-226g')
+  for (const id of ids) await server.api.addMember({ body: { userId: person.id, organizationId: id, role: 'member' } })
+  // Joined in the order the rows were written, the last of them first in time.
+  for (const [at, when] of [[0, '2021-01-01'], [1, '2022-01-01'], [2, '2020-01-01']] as const) {
+    await db.execute(`update member set created_at = '${when}' where user_id = '${person.id}' and organization_id = '${ids[at]}'`)
+  }
+  const signIn = async () => {
+    const answer = await server.api.signInEmail({ body: { email: 'person-226g@example.com', password: 'a-long-enough-password' }, returnHeaders: true })
+    return new Headers({ cookie: answer.headers.get('set-cookie') ?? '' })
+  }
+  const active = async (headers: Headers) => ((await server.api.getSession({ headers, query: { disableRefresh: true } })) as { session: { activeOrganizationId?: string | null } }).session.activeOrganizationId
+  const headers = await signIn()
+  assert.equal(await active(headers), ids[2], 'the oldest membership is active')
+  assert.equal(await active(await signIn()), ids[2], 'on every sign-in')
+  const left = await asas.handler(new Request('http://test/api/auth/user/organization/leave', {
+    method: 'POST',
+    headers: { cookie: headers.get('cookie') ?? '', 'content-type': 'application/json', origin: 'http://localhost:5173' },
+    body: JSON.stringify({ organizationId: ids[2] }),
+  }))
+  assert.equal(left.status, 200, await left.clone().text())
+  assert.equal(await active(headers), ids[0], 'leaving it opens the next oldest')
+
+  // Two memberships joined in the same instant open the one whose row sorts first by id, on every sign-in. The ids
+  // are rewritten so the row stored first sorts last, which a read in storage order would pick.
+  await db.execute(`update member set id = 'zz-226g' where user_id = '${person.id}' and organization_id = '${ids[0]}'`)
+  await db.execute(`update member set id = 'aa-226g' where user_id = '${person.id}' and organization_id = '${ids[1]}'`)
+  await db.execute(`update member set created_at = '2019-01-01' where user_id = '${person.id}'`)
+  const first = ids[1]
+  for (let again = 0; again < 3; again += 1) assert.equal(await active(await signIn()), first, 'a tie opens the membership first by id')
 })
 
 test('229a. over asas.handler an invitation is accepted only by the person signed in under its address, verified or not, makes them a member with that organization active, and is refused once accepted, cancelled or expired', async () => {
@@ -16989,6 +17138,36 @@ test('227d. an enrollment names a session and a student: a create naming no sess
   assert.equal(picked.body.student, tenant.people.student.id, 'the instructor enrolls the student it picked')
   const cleared = await tenant.as('admin', 'enrollments/update', { id: picked.body.id, student: null })
   assert.equal(cleared.status, 400, 'and no update takes the student away')
+})
+
+test('227g. a role reads the people its audience names and itself, unless it holds member.find: the instructor reads the students and not the staff, a student reads no one, a custom role reading people reads itself alone, and the administrator reads everyone', async () => {
+  const tenant = await roleTenant('people-227g')
+  const elsewhere = await roleTenant('people-227g-elsewhere')
+  const names = async (who: keyof typeof tenant.people) => {
+    const answer = await tenant.as(who, 'user/find', { limit: 100, sort: 'name' })
+    return answer.status === 200 ? (answer.body.docs as { name: string }[]).map((one) => one.name) : answer.status
+  }
+  assert.deepEqual(await names('admin'), ['people-227g-instructor', 'people-227g-owner', 'people-227g-registrar', 'people-227g-student'], 'the administrator reads every member')
+  assert.deepEqual(await names('instructor'), ['people-227g-instructor', 'people-227g-student'], 'the instructor reads the students and itself, and no other organization\'s student')
+  assert.equal(await names('student'), 403, 'a student reads no one')
+  assert.equal((await tenant.as('instructor', 'user/count', {})).body.totalDocs, 2, 'and the count agrees')
+  const staff = await tenant.as('instructor', 'user/findByID', { id: tenant.people.registrar.id })
+  assert.equal(staff.status, 404, `the instructor does not open a staff member: ${JSON.stringify(staff.body)}`)
+  const course = await courses.operations.create({ title: 'People 227g' }, tenant.options)
+  const session = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-02-01T09:00:00Z') }, tenant.options)
+  const enrolsStaff = await tenant.as('instructor', 'enrollments/create', { session: session.id, student: tenant.people.registrar.id })
+  assert.notEqual(enrolsStaff.status, 200, `nor enrolls one, whom it cannot name: ${JSON.stringify(enrolsStaff.body)}`)
+  assert.equal((await tenant.as('instructor', 'enrollments/create', { session: session.id, student: elsewhere.people.student.id })).status === 200, false, 'nor another organization\'s student')
+
+  await seedRoleRow(tenant.organization, 'reader-227g', ['screen.dashboard', 'user.find', 'user.fields.id', 'user.fields.name'])
+  await db.execute(`update member_roles set role = 'reader-227g' where user_id = '${tenant.people.registrar.id}'`)
+  assert.deepEqual(await names('registrar'), ['people-227g-registrar'], 'a custom role that reads people and is named in no audience reads itself alone')
+  for (const inherited of ['constructor', '__proto__', 'toString']) {
+    await seedRoleRow(tenant.organization, inherited, ['screen.dashboard', 'user.find', 'user.fields.id', 'user.fields.name'])
+    await db.execute(`update member_roles set role = '${inherited}' where user_id = '${tenant.people.registrar.id}'`)
+    assert.deepEqual(await names('registrar'), ['people-227g-registrar'], `and so does one named ${inherited}, a key every object inherits`)
+  }
+  await db.execute(`update member_roles set role = 'registrar' where user_id = '${tenant.people.registrar.id}'`)
 })
 
 test('227e. a person who holds a seat, a withdrawn one included, is not removed on the platform: the route answers 409 before anything goes, and their account and sessions stay', async () => {

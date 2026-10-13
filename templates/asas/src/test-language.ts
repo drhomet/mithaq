@@ -10,7 +10,7 @@ const languageOf = (roles: SystemRoles) => defineMithaq({
   locales: ['ar', 'en'] as const,
   arkan,
   // The dashboard alone, and without its key: the members page names
-  // `memberRoles.find` and the dashboard `courses.find`, which a build holding
+  // `member.find` and the dashboard `courses.find`, which a build holding
   // neither kayan's operations could never answer.
   // The platform lists the same four and the members, whose declarations write
   // `targets.platform` too.
