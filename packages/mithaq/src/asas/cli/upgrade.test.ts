@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { createServer } from 'vite'
 import { mithaqAdmin } from '../../vite.ts'
-import { hashOf, upgradeCheck } from './upgrade.ts'
+import { hashOf, stateOf, upgradeCheck } from './upgrade.ts'
 
 const exec = promisify(execFile)
 const bin = new URL('./mithaq.ts', import.meta.url).pathname
@@ -296,3 +296,15 @@ test('an edit only in the leading comments of an ejected file is an edit, so pru
   await mithaq(root, 'eject', '--prune')
   assert.deepEqual(['copy', 'list'].map((name) => existsSync(at(`src/components/mithaq/${name}.ts`))), [true, false], 'the pragma stands, and the unedited list goes')
 })
+
+test('a held file with a leading comment, freshly ejected, reads up to date by the check the repository holds its own files to', async (t) => {
+  const root = await project({})
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await mithaq(root, 'eject', 'probe')
+  const ejected = await readFile(new URL('src/rooted.ts', root), 'utf8')
+  assert.ok(ejected.startsWith(packaged), 'the leading comment is written')
+  assert.equal(stateOf(ejected, packaged), 'up to date')
+  assert.equal(stateOf(`// mine\n${ejected}`, packaged), 'up to date, edited')
+  assert.equal(stateOf(copied(upstream), packaged), 'up to date', 'and a copy shadcn add made reads as it always did')
+})
+

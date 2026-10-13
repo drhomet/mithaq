@@ -25,6 +25,14 @@ export const hashOf = (text: string) => sha(bodyOf(text).replace(leading, ''))
  */
 const hashFrom = (from: string) => (text: string) => (/^(?:[0-9a-f]{40}|unknown)$/.test(from) ? hashOf(text) : sha(bodyOf(text)))
 
+/** A held file's state against the package's text of it, read as `upgrade --check` reads it. */
+export const stateOf = (text: string, source: string): 'up to date' | 'up to date, edited' | 'differs' | 'differs, edited' | 'unknown' => {
+  const [, from, hash] = marker.exec(text) ?? []
+  if (!hash) return 'unknown'
+  const hashed = hashFrom(from!)
+  return `${hash !== hashed(source) ? 'differs' : 'up to date'}${hash !== hashed(text) ? ', edited' : ''}`
+}
+
 type Item = { name: string; dependencies?: string[]; registryDependencies?: string[]; files: { path: string; target: string }[] }
 
 /** The `mithaq-admin` the project installed: its folder, its version and its items, or none. */
@@ -107,15 +115,9 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
       }
       const text = path && (await readFile(new URL(path, project), 'utf8').catch(() => undefined))
       if (!path || text === undefined) continue
-      const [, from, hash] = marker.exec(text) ?? []
+      const state = stateOf(text, await readFile(source, 'utf8'))
       const to = installed.version
-      if (!hash) {
-        copied.push({ path, state: 'unknown', to })
-        continue
-      }
-      const differs = hash !== hashFrom(from!)(await readFile(source, 'utf8'))
-      const edited = hash !== hashFrom(from!)(text)
-      copied.push({ path, state: `${differs ? 'differs' : 'up to date'}${edited ? ', edited' : ''}`, from, to, ...(!ejected.has(folderOf(path)) && { item: name }) })
+      copied.push(state === 'unknown' ? { path, state, to } : { path, state, from: marker.exec(text)![1], to, ...(!ejected.has(folderOf(path)) && { item: name }) })
     }
   }
   // A marked file no item names any more: an item the package dropped, which the project deletes.

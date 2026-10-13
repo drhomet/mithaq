@@ -6,7 +6,7 @@ import { renderToStaticMarkup as staticMarkup } from 'react-dom/server'
 import { createElement, type ReactElement } from 'react'
 import { asas } from 'asas'
 import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
-import { hashOf } from 'mithaq/upgrade'
+import { stateOf } from 'mithaq/upgrade'
 import './tsx.ts'
 
 const { List } = await import('../registry/list.tsx')
@@ -531,18 +531,13 @@ test('12. the app holds the current source of every registry item it copied', ()
   const declaredFiles = declaredItems.filter((item) => owned.includes(item.name)).flatMap((item) => item.files.map((file) => ({ item: item.name, ...file })))
   assert.equal(declaredFiles.length, 19, 'the twelve host files, the five storage adapters, the step and the icon')
   for (const declared of declaredFiles) {
-    // An eject appends a hash marker, and an older `shadcn add` stripped a leading comment, so copies are compared by that hash.
+    // Read as `mithaq upgrade --check` reads it: a fresh eject hashes its whole text, a copy `shadcn add` made its text less leading comments.
     const target = declared.target
     // The storage adapters and the write step run on the server, so the project holding them is the template's root, not an app.
     const project = ['mithaq-storage', 'mithaq-expected-updated-at'].includes(declared.item) ? 'templates/asas' : 'apps/asas-tanstack'
     const copied = readFileSync(new URL(`../../../${project}/${appPathOf(target)}`, import.meta.url), 'utf8')
-    // `copied.length > 0` first: every string ends with the empty string, so an empty copy would pass `endsWith`.
-    assert.ok(copied.length > 0, `${project} has a non-empty copy of ${target}`)
     const source = readFileSync(new URL(`../${declared.path}`, import.meta.url), 'utf8')
-    assert.ok(
-      hashOf(copied) === hashOf(source) && copied.endsWith(` ${hashOf(source)}\n`),
-      `${project} has the current ${target}, marked; delete it and rerun "mithaq eject ${declared.item}" there`,
-    )
+    assert.equal(stateOf(copied, source), 'up to date', `${project} has the current ${target}, marked; delete it and rerun "mithaq eject ${declared.item}" there`)
   }
 })
 
