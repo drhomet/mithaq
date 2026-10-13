@@ -1,50 +1,44 @@
-import { actorPermissions, defaultFields, defaultOperations, folderOf, uploadFields, withUploadReference, type Where } from 'mithaq'
-import { defineKayan, serverTargets, organization } from '@asas/mithaq'
-import { courses } from '../courses/courses.ts'
-import { currentOrganization, readsPast } from '@asas/mithaq/roles/tenant-access.ts'
+import { defaultFields, defaultOperations, folderOf, uploadFields, withUploadReference, type Where } from 'mithaq'
+import { defineKayan, organization } from '@asas/mithaq'
+import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { appPage, danger } from '@asas/mithaq/mithaq/pages.ts'
 import { storageConfig } from '@asas/mithaq/storage/index.ts'
 
 const ui = folderOf(new URL('./ui/', import.meta.url))
 
 /**
- * The images an actor reads, inside its active organization: every image of
- * its organization where it holds `media.create`, and otherwise only the cover
- * of a course it reads. `media.create` is the line
- * because a role that adds images has to find one before any course names it,
- * in the cover's picker. So a student or an instructor reads no image of a
- * draft, of an archived course or of none, through find, findByID and
- * `GET /api/media/file/<id>`, and the administrator and the registrar read all of them.
- *
- * "A course it reads" is a published course of the organization the actor's session has
- * active, read off the trusted snapshot, under the courses kayan's own read
- * access for this actor. The courses are read straight through the store,
- * past the runner's scope, so the organization is named here and the read
- * never reaches past it whatever the access answers.
- * An image has no field that points at a course, so a row filter cannot reach
- * one, and the covers are read first and named by id.
+ * One way an actor that holds no `media.create` reads an image: the images it
+ * may read, or `false` for none. Never `true`, which would open every image of
+ * the organization to whoever the read answered it for.
  */
-const coversOfReadableCourses = async ({ user }: { user: unknown }) => {
+export type ImageRead = (args: { user: unknown }) => Promise<Where | false>
+
+/**
+ * The images an actor reads, inside its active organization: every image of
+ * its organization where it holds `media.create`, and otherwise only those one
+ * of `reads` answers. `media.create` is the line because a role that adds
+ * images has to find one before anything names it, in an upload field's
+ * picker. A file at `GET /api/media/file/<id>` is read through this kayan's
+ * own `findByID`, so the same answer decides who downloads it.
+ */
+const imagesReadBy = (reads: readonly ImageRead[]) => async ({ user }: { user: unknown }) => {
   if (readsPast(user, 'media.create')) return true
-  const held = actorPermissions(user)
-  if (held !== true && !held?.has('courses.find')) return false
-  const active = currentOrganization(user)
-  const readable = active && (await courses.access!.read!({ user }))
-  if (!readable) return false
-  const published: Where = { and: [{ organization: { equals: active } }, { _status: { equals: 'published' } }] }
-  const found = await serverTargets.drizzle.find({ kayan: 'courses', args: {
-    limit: 0,
-    page: 1,
-    sort: { field: 'id', direction: 'asc' },
-    where: readable === true ? published : { and: [readable, published] },
-  } })
-  const ids = [...new Set(found.docs.map((row) => row.cover).filter((id): id is string => typeof id === 'string'))]
-  return ids.length ? { id: { in: ids } } : false
+  const answered: unknown[] = await Promise.all(reads.map((read) => read({ user })))
+  // The type forbids it, but a cast `true` or a filter of nothing would open every image of the
+  // organization, so either throws and the actor reads none.
+  for (const [at, answer] of answered.entries()) {
+    if (answer !== false && (!answer || typeof answer !== 'object' || !Object.keys(answer).length)) {
+      throw new Error(`The image read ${reads[at]!.name || `at ${at}`} answered ${JSON.stringify(answer)}, which would open every image; a read answers false or a filter.`)
+    }
+  }
+  const answers = answered.filter((one): one is Where => one !== false)
+  if (!answers.length) return false
+  return answers.length === 1 ? answers[0]! : { or: answers }
 }
 
 /**
  * The organization's images: a row per file, whose object is kept where the
- * project's storage puts it. A course points at one as its cover.
+ * project's storage puts it. An upload field points at one, as a course's cover does.
  *
  * It spreads `uploadFields`, the columns the create writes from the upload it
  * verified and nobody writes after, and declares its own create and delete:
@@ -53,13 +47,13 @@ const coversOfReadableCourses = async ({ user }: { user: unknown }) => {
  * `uploaded`, and the delete runs its `removed` after the commit. `buildAsas`
  * refuses a create that skips the configured `uploaded`. A file is
  * read at `GET /api/media/file/<id>` through this kayan's own `findByID`, so
- * its organization and `coversOfReadableCourses` decide who reads it. It keeps no versions, since a file never changes once it is
- * made; a course keeps the versions of its cover instead.
+ * its organization and `reads` decide who reads it. It keeps no versions, since a file never changes once it is
+ * made; a kayan pointing at one keeps the versions of that pointer instead.
  */
-export const media = defineKayan({
+export const media = ({ reads }: { reads: readonly ImageRead[] }) => defineKayan({
   name: 'media',
   // ANDed with the inherited rows, so it narrows and never widens.
-  access: { read: coversOfReadableCourses },
+  access: { read: imagesReadBy(reads) },
   messages: {
     singular: { en: 'Image', ar: 'صورة' },
     plural: { en: 'Images', ar: 'الصور' },

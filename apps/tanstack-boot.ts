@@ -1580,7 +1580,7 @@ test('54. / is a real landing page, not a redirect: 200 with the hero and a sign
   const visitor = await fetch(`${origin}/`)
   assert.equal(visitor.status, 200, 'a visitor is served the page itself, not a 3xx')
   const visitorHtml = await visitor.text()
-  assert.ok(visitorHtml.includes('Run courses and enrollments without the busywork'), `the hero is in the served HTML:\n${visitorHtml.slice(0, 600)}`)
+  assert.ok(visitorHtml.includes('Run your organization without the busywork'), `the hero is in the served HTML:\n${visitorHtml.slice(0, 600)}`)
   assert.ok(visitorHtml.includes('href="/auth/sign-in"'), 'the header offers sign-in to a visitor')
   assert.ok(visitorHtml.includes('href="/auth/sign-up"'), 'and get started')
   assert.ok(!visitorHtml.includes('Open Dashboard'), 'and no dashboard link, because there is no session to open one for')
@@ -1638,7 +1638,7 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
   const sources = [
     fileURLToPath(new URL('../packages/mithaq-admin/registry', import.meta.url)),
     fileURLToPath(new URL('./asas-tanstack/src/routes', import.meta.url)),
-    ...['mithaq/src/ui', 'asas/src/ui-dashboard', 'features/courses/courses/ui', 'features/courses/enrollments/ui', 'features/roles/roles/ui', 'features/courses/media/ui'].map((where) => fileURLToPath(new URL(`../templates/${where}`, import.meta.url))),
+    ...['mithaq/src/ui', 'asas/src/ui-dashboard', 'features/courses/courses/ui', 'features/courses/enrollments/ui', 'features/roles/roles/ui', 'features/media/media/ui'].map((where) => fileURLToPath(new URL(`../templates/${where}`, import.meta.url))),
   ].flatMap((directory) => readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name)).map((entry) => readFileSync(`${directory}/${entry.name}`, 'utf8')))
   // The host's own bar, which draws the impersonation's words over every page.
   sources.push(readFileSync(new URL('./asas-tanstack/src/screens.tsx', import.meta.url), 'utf8'))

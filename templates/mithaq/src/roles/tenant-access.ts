@@ -1,7 +1,9 @@
 import { onPlatform, platformApp, platformRoles, platformURL } from '../mithaq/auth/index.ts'
 import { secret } from '../mithaq/auth/platform-roles.ts'
 import { actorPermissions, actorRoles, authActor, userRefs, type Held, type RowTable, type Store } from 'mithaq'
+// add-on: roles
 import { isOwner, OWNER_ROLE } from './grants.ts'
+// end add-on: roles
 
 /**
  * What a row may name on the actor: `user.<key>` in any kayan's row is checked
@@ -25,8 +27,8 @@ export type OrganizationActor = {
 
 /**
  * The platform administrator's slug. Platform roles live on Better Auth's
- * `user.role`, never in a tenant's `memberRoles`: `assignedRoles` drops any such
- * assignment, because the access target holds a slug's keys only where this
+ * `user.role`, never in a tenant's assignment: `assignedRoles` drops any such
+ * slug there, because the access target holds a slug's keys only where this
  * reader answers it.
  */
 export const PLATFORM = 'super_admin'
@@ -110,21 +112,22 @@ const secretClosed = Object.fromEntries(Object.keys(platformRoles).map((slug) =>
  */
 export const tenantAccess = {
   '*': { create: true, read: true, update: true, delete: true },
+  // add-on: courses
   /**
    * The one row keyed on a system slug, and it narrows: an instructor teaches and
    * never removes a row. Every operation is named in full, because a missing one
    * reads as `false` and a `false` in any applicable row wins.
    */
   instructor: { create: true, read: true, update: true, delete: false },
+  // end add-on: courses
   ...secretClosed,
 } as const satisfies RowTable
 
 /**
  * The roles a kayan's rows are read through; its parameter also types `user` for
- * every row this project writes. Slugs come from the `memberRoles` kayan for the
+ * every row this project writes. Slugs come from the access target for the
  * active organization, off the trusted snapshot, so an object naming its own
- * roles is no one. `member.role` grants one thing only: an owner always holds
- * `administrator` in its tenant, so the role that manages roles is never lost.
+ * roles is no one.
  */
 export const assignedRoles = (actor: OrganizationActor): readonly string[] => {
   if (!authActor(actor)) return []
@@ -134,7 +137,13 @@ export const assignedRoles = (actor: OrganizationActor): readonly string[] => {
   if (onPlatform()) return platformRolesOf(actor)
   if (!currentOrganization(actor)) return []
   const assigned = (actorRoles(actor) ?? []).filter((slug) => !Object.hasOwn(platformRoles, slug))
-  return isOwner(authActor(actor)?.memberRole) && !assigned.includes(OWNER_ROLE) ? [...assigned, OWNER_ROLE] : assigned
+  // add-on: roles
+  // The slugs are the `memberRoles` kayan's, and `member.role` grants one thing
+  // only: an owner always holds `administrator` in its tenant, so the role that
+  // manages roles is never lost.
+  if (isOwner(authActor(actor)?.memberRole) && !assigned.includes(OWNER_ROLE)) return [...assigned, OWNER_ROLE]
+  // end add-on: roles
+  return assigned
 }
 
 /**
@@ -213,8 +222,8 @@ export const membersOf = (store: Pick<Store, 'find'>) => async ({ user: actor }:
 /**
  * Whether an actor reads past what a kayan's own read narrows for roles not
  * holding `key`: in the platform app, whose staff read every tenant's rows whole,
- * or in a tenant, holding that key. Archived courses, sessions of unreadable
- * courses, covers of unreadable courses and other people's seats narrow this way.
+ * or in a tenant, holding that key. The courses add-on narrows archived courses,
+ * sessions and covers of unreadable courses and other people's seats this way.
  */
 export const readsPast = (actor: unknown, key: string) => {
   const held = actorPermissions(actor)

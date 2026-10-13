@@ -8,10 +8,14 @@ const stamps = ['id', 'createdAt', 'updatedAt'] as const
  * The columns of a kayan the platform lists that no staff role reads, each
  * one a decision written down rather than a name left out. No platform role
  * reads one, `super_admin`'s `'*'` included: the platform's row closes each
- * by name whatever keys the actor holds. `accessCode` is the code a live
- * course's learners join with, a tenant's secret.
+ * by name whatever keys the actor holds.
  */
-export const secret = ['courses.fields.accessCode'] as const
+export const secret: readonly `${string}.fields.${string}`[] = [
+  // add-on: courses
+  // The code a live course's learners join with, a tenant's secret.
+  'courses.fields.accessCode',
+  // end add-on: courses
+]
 
 /**
  * The kayan the platform lists that no staff role reads at all, a decision
@@ -32,6 +36,7 @@ const people = [
 
 /** Each tenant's business, across every organization. */
 const business = [
+  // add-on: courses
   // Every column but the one `secret` names.
   ...reads('courses', [...stamps, 'organization', 'title', 'summary', 'details', 'cover', 'fee', 'currency', 'level', 'notifications', 'delivery', 'audience', 'archived', 'topics', 'opensOn', 'archiveReason', 'tags', 'scheduledSessions', '_status']),
   // A course's versions, each cut to the columns above, so staff read a
@@ -41,11 +46,17 @@ const business = [
   'courses.findVersionByID',
   ...reads('sessions', [...stamps, 'organization', 'course', 'startsAt', 'capacity', 'venue', 'format', 'archived', 'details', 'enrollments']),
   ...reads('enrollments', [...stamps, 'organization', 'session', 'student', 'deletedAt']),
+  // end add-on: courses
   ...reads('tags', [...stamps, 'organization', 'name']),
 ]
 
 /** Who holds what inside each tenant: its role rows and its assignments. */
-const grants = [...reads('roles', [...stamps, 'organization', 'name', 'label', 'permissions']), ...reads('memberRoles', [...stamps, 'organization', 'user', 'role'])]
+const grants: string[] = [
+  // add-on: roles
+  ...reads('roles', [...stamps, 'organization', 'name', 'label', 'permissions']),
+  ...reads('memberRoles', [...stamps, 'organization', 'user', 'role']),
+  // end add-on: roles
+]
 
 /**
  * The platform roles: staff above every tenant, held on Better Auth's own

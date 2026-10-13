@@ -1,11 +1,22 @@
 import { providerStatements } from '@asas/mithaq/auth'
 // Each feature is read through its index alone, as a namespace, so its list
 // (`courses.kayan`) never collides with a kayan of the same name.
+// add-on: audit-log
 import * as auditLog from '@asas/audit-log'
+// end add-on: audit-log
 import * as auth from '@asas/auth'
+// add-on: courses
 import * as courses from '@asas/courses'
+// end add-on: courses
+// add-on: media
+import * as media from '@asas/media'
+// end add-on: media
+// add-on: roles
 import * as roles from '@asas/roles'
+// end add-on: roles
+// add-on: settings
 import * as settings from '@asas/settings'
+// end add-on: settings
 import * as tags from '@asas/tags'
 import { fetchHttp, Notice } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
@@ -15,8 +26,36 @@ import { projectStatements } from '@asas/mithaq/roles/statements.ts'
 import { superAdmin } from '@asas/mithaq/roles/tenant-access.ts'
 
 export const asas = buildAsas({
-  kayan: [...auth.kayan, ...roles.kayan, ...tags.kayan, ...courses.kayan, ...auditLog.kayan],
-  global: [...settings.global],
+  kayan: [
+    ...auth.kayan,
+    // add-on: roles
+    ...roles.kayan,
+    // end add-on: roles
+    ...tags.kayan,
+    // add-on: media
+    // An image is read by a holder of `media.create`, and otherwise through
+    // what the features pointing at images say of it.
+    ...media.kayan({
+      // add-on: courses
+      reads: [courses.coverReads],
+      // end add-on: courses
+      // without add-on: courses
+      // reads: [],
+      // end without add-on: courses
+    }),
+    // end add-on: media
+    // add-on: courses
+    ...courses.kayan,
+    // end add-on: courses
+    // add-on: audit-log
+    ...auditLog.kayan,
+    // end add-on: audit-log
+  ],
+  global: [
+    // add-on: settings
+    ...settings.global,
+    // end add-on: settings
+  ],
   // The HTTP layer, a list the handler asks in order. `orpcHttp()` is first
   // because it owns `/api/rpc`, where a typed client would reach the build, and
   // because `asas.router` is the first plug's. It also claims `/api`, so the
@@ -38,7 +77,7 @@ export const asas = buildAsas({
   // Better Auth's own actions, which no declaration of this project derives.
   // They join the catalog under the resources they name, so a role holds
   // `invitation.cancel` or `user.impersonate` exactly as it holds
-  // `courses.find`, and the hooks in @asas/mithaq/auth ask for them under whichever
+  // `tags.find`, and the hooks in @asas/mithaq/auth ask for them under whichever
   // store this project turned on. `organization.rename` is this project's own,
   // the key the platform's rename route asks, which is neither the
   // provider's `organization.update` nor the managed kayan's, both of which

@@ -10,25 +10,27 @@ The project is three steps, each named after what it holds, and each imports onl
 
 1. **The language**, `packages/mithaq` (`@asas/mithaq`). `src/mithaq.ts` declares it with `defineMithaq`, with its targets and screens, and exports `defineKayan`, `defineGlobal`, `buildAsas` and the tenant field `organization`. Beside it sits everything the language or more than one feature reads:
    - `src/mithaq/auth/`: the Better Auth setup, imported as `@asas/mithaq/auth`.
-   - `src/mithaq/pages.ts`, `audit-sink.ts` and `rich-text-nodes.ts`: the page trees every kayan page starts from, the audit sink and the rich-text nodes.
-   - `src/roles/`: `tenant-roles.ts`, the roles every organization gets and the permission keys each holds, and the access rows and grants beside it.
+   - `src/mithaq/pages.ts`, with the rich-text add-on `rich-text-nodes.ts`, and with the audit-log add-on `audit-sink.ts`: the page trees every kayan page starts from, the rich-text nodes and the audit sink.
+   - `src/roles/`: `tenant-roles.ts`, the roles every organization gets and the permission keys each holds, and the access rows and grants beside it. Without the roles add-on those roles are Better Auth's own `owner`, `admin` and `member`, listed in `default-member-roles.ts`, and a member holds the ones its `member.role` names.
    - `src/ui/`: the shells, layouts and pieces several screens draw.
-   - `src/steps/` and `src/storage/`: a write step and storage adapters ejected from `mithaq-admin`. They are this project's files.
-2. **The features**, `packages/features/<feature>` (`@asas/<feature>`), each holding one or more kayan. `index.ts` exports the feature's `kayan` list (and `global`, for a single-row kayan). Each kayan has a folder of its own, `<kayan>/<kayan>.ts`, with any page pieces only it draws in `<kayan>/ui/`; a child kayan is a sibling folder in its feature, never nested. `auth/user/` holds the Better Auth kayan, written by `mithaq generate auth`.
+   - `src/steps/` and, with the uploads add-on, `src/storage/`: a write step and storage adapters ejected from `mithaq-admin`. They are this project's files.
+2. **The features**, `packages/features/<feature>` (`@asas/<feature>`), each holding one or more kayan. `index.ts` exports the feature's `kayan` list (and `global`, for a single-row kayan). The media feature's `kayan` is a function of `reads`, what opens an image to an actor without `media.create`; a feature whose rows point at images exports its read (courses' `coverReads`), and the asas hands it in. Each kayan has a folder of its own, `<kayan>/<kayan>.ts`, with any page pieces only it draws in `<kayan>/ui/`; a child kayan is a sibling folder in its feature, never nested. `auth/user/` holds the Better Auth kayan, written by `mithaq generate auth`.
 3. **The asas**, `packages/asas` (`asas`). `src/asas.ts` is the build: it spreads each feature's `kayan` into `buildAsas`. Beside it are each screen's own pieces (`src/ui-dashboard/`, `src/ui-portal/`, `src/ui-platform/`), `src/messages/` (one copy file per kayan, which `mithaq generate messages` fills with missing keys; translate in place), `src/migrations/` (written by `mithaq migrate`; commit them) and `src/seed.ts`.
 
 A feature reaches another feature's kayan by its name (`relationTo: 'user'`) or through that feature's `index.ts`, never an inner file. The language never imports a feature or the asas.
 
-`apps/asas-tanstack/` is the tenant app, serving `/dashboard` and `/portal`; `apps/asas-platform/` is the platform console for staff across every organization. Both import the asas alone.
+`apps/asas-tanstack/` is the tenant app, serving `/dashboard` and `/portal`; `apps/asas-platform/`, with the platform add-on, is the platform console for staff across every organization. Both import the asas alone.
+
+The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `rich-text`, `uploads`, `media`, `courses`, `platform`); `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
 
 ## Adding a kayan
 
-Copy `packages/features/tags/`; `packages/features/courses/courses/courses.ts` shows custom operations and steps.
+Copy `packages/features/tags/`; with the courses add-on, `packages/features/courses/courses/courses.ts` shows custom operations and steps.
 
 1. Write `<name>/<name>.ts` in the feature it belongs to, or in a new feature `packages/features/<feature>/` with a `package.json` like `tags`' and an `index.ts`. Import `defineKayan` from `@asas/mithaq`. Spread `defaultFields` (id, createdAt, updatedAt) into `fields`, and `defaultOperations` into `targets.service.operations`, leaving out any operation the kayan should not have. Give every label and message one string per locale (`en` and `ar`).
 2. Place `organization` in `fields` when each row belongs to one organization. Leave it out for a kayan every organization shares.
 3. Add the kayan to its feature's `kayan` list. A new feature is a dependency of `packages/asas/package.json`, and its `kayan` is spread into `buildAsas` in `src/asas.ts`.
-4. Grant its keys (`<name>.find`, `<name>.create`, `<name>.fields.<field>` and so on) to the roles that use it in `packages/mithaq/src/roles/tenant-roles.ts`.
+4. Grant its keys (`<name>.find`, `<name>.create`, `<name>.fields.<field>` and so on) to the roles that use it in `packages/mithaq/src/roles/tenant-roles.ts`, or under `member` in `default-member-roles.ts` in a project without the roles add-on, where `owner` and `admin` already hold every key.
 5. To draw it, add it to a screen's `kayan` list in `packages/mithaq/src/mithaq.ts`, describe its pages under `targets.dashboard` in the kayan, and run `bunx mithaq generate screens`.
 6. Run `bunx mithaq generate messages` and fill any empty translation it adds.
 7. Write the migration: `bunx mithaq migrate --name add_<name>`. Commit the folder it writes.
@@ -45,6 +47,7 @@ Reads that reach further (`tenant: 'mine' | 'all'`), what is refused, and the in
 ## Migrations
 
 - In development `asas.connect()` pushes the schema; nothing needs a migration to run locally.
+- A project made without every add-on that holds tables starts with no migration: write its first, `bunx mithaq migrate --name init`, against an empty database before it first deploys.
 - `mithaq migrate` refuses to write against a pushed database. Point `DATABASE_URL` at a database built from the migrations: create an empty one, apply them with the `drizzle-kit` the installed mithaq depends on, then run `bunx mithaq migrate --name <slug>`. The slug is lowercase letters, digits and underscores.
 
   ```sh

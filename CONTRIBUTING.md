@@ -57,6 +57,8 @@ bunx mithaq upgrade --check    # in each of the other three
 
 The repository is a Bun workspace over `packages/*`, `templates/*`, `templates/features/*` and `apps/*`. The template and its two apps live in it as they ship, and `bun create mithaq` copies them out, the template's `templates/` becoming a project's `packages/`; [templates/asas/README.md](templates/asas/README.md#project-structure) maps a created project.
 
+The template holds every add-on, and the repository's tests build all of them. A project takes only the ones it asks for: `addOns` in `packages/create-mithaq/index.js` lists each add-on's needs and its own files, and a line only an add-on needs in a shared file sits in a `// add-on: <name>` region, with any line that stands in for it commented in a `// without add-on: <name>` region. `create-mithaq` keeps or drops each region and removes the markers; `bun run test:release` makes a minimal project, a full one and a pick, checks the full one speaks the frozen vocabulary, and each other one that vocabulary less the words of the add-ons it left out.
+
 ```
 mithaq/
   package.json        workspace root and the repository's scripts
@@ -132,7 +134,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 | `lint-args.ts` | `bun run lint:args`: fails an exported function, constructor, method or function type with three or more positional parameters, over `packages/mithaq/src`, the registry and the template's packages. `lint-args.test.ts` and `lint-args.fixture.ts` test it. |
 | `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package), `.pack/mithaq-admin/` (the pieces as source, at the same version) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
 | `release.ts` | `node apps/release.ts <version>` commits the version and tags it; `--publish` is release.yml's publish step. `release.test.ts` tests it. |
-| `release-consumer.ts` | `bun run test:release`: makes a project from the staged packages as `bun create mithaq` does, then typechecks, migrates, builds and boots it and runs `mithaq generate --check`. |
+| `release-consumer.ts` | `bun run test:release`: makes projects from the staged packages as `bun create mithaq` does, full, minimal and with add-ons picked, then typechecks, migrates, builds, boots and seeds each and runs `mithaq generate --check`. |
 | `tanstack-boot.ts`, `next-boot.ts` | `bun run test:tanstack` and `bun run test:next`: build and boot the apps and test them over a real socket. |
 | `migrated-database.ts` | Builds the boot tests' database with `drizzle-kit migrate`. |
 | `client-imports.test.ts` | Checks that no module a browser loads reaches the language, the storage config or `node:crypto`. |

@@ -1,0 +1,19 @@
+{
+  "name": "@asas/media",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@asas/mithaq": "*",
+    "mithaq": "*",
+    "mithaq-admin": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.3.0"
+  }
+}

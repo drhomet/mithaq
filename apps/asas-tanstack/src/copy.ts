@@ -1,15 +1,25 @@
 // Imports no router, stylesheet or React, so a test can load this under plain `node`.
+import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
+import organization from 'asas/messages/organization.json' with { type: 'json' }
+import tags from 'asas/messages/tags.json' with { type: 'json' }
+// add-on: audit-log
 import auditLog from 'asas/messages/auditLog.json' with { type: 'json' }
+// end add-on: audit-log
+// add-on: courses
 import courses from 'asas/messages/courses.json' with { type: 'json' }
 import enrollments from 'asas/messages/enrollments.json' with { type: 'json' }
-import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
+import sessions from 'asas/messages/sessions.json' with { type: 'json' }
+// end add-on: courses
+// add-on: media
 import media from 'asas/messages/media.json' with { type: 'json' }
-import organization from 'asas/messages/organization.json' with { type: 'json' }
+// end add-on: media
+// add-on: roles
 import memberRoles from 'asas/messages/memberRoles.json' with { type: 'json' }
 import roles from 'asas/messages/roles.json' with { type: 'json' }
-import sessions from 'asas/messages/sessions.json' with { type: 'json' }
+// end add-on: roles
+// add-on: settings
 import settings from 'asas/messages/settings.json' with { type: 'json' }
-import tags from 'asas/messages/tags.json' with { type: 'json' }
+// end add-on: settings
 
 // Restated, not imported: the original lives in a `.tsx` file and the test runner has no JSX compiler.
 type Translate = (key: string, fallback?: string) => string | undefined
@@ -47,6 +57,7 @@ export const dirOf = (locale: Locale): 'rtl' | 'ltr' => (locale === 'ar' ? 'rtl'
  * locale: a key left unanswered here shows an Arabic viewer the English fallback.
  */
 export const scopes: Record<string, Record<string, Record<string, string>>> = {
+  // add-on: courses
   courses: {
     ...courses,
     'delete.confirm': { en: 'Delete this course', ar: 'احذف هذه الدورة' },
@@ -69,6 +80,7 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'سبب الأرشفة 200 حرف على الأكثر.',
     },
   },
+  // end add-on: courses
   admin: {
     nav: { en: 'Admin', ar: 'الإدارة' },
     yes: { en: 'Yes', ar: 'نعم' },
@@ -380,25 +392,15 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     brand: { en: 'Asas', ar: 'أساس' },
     getStarted: { en: 'Get started', ar: 'ابدأ الآن' },
     openScreen: { en: 'Open {screen}', ar: 'افتح {screen}' },
-    heroTitle: { en: 'Run courses and enrollments without the busywork', ar: 'أدر الدورات والتسجيلات دون العمل الروتيني' },
+    heroTitle: { en: 'Run your organization without the busywork', ar: 'أدر مؤسستك دون العمل الروتيني' },
     heroSubtitle: {
-      en: 'Asas is a dashboard and a portal for organizations that teach: manage courses, see who enrolled, and keep every role to what it should see.',
-      ar: 'أساس لوحة تحكم وبوابة للمؤسسات التي تُعلّم: أدر الدورات، اطّلع على من سجل، واحصر كل دور بما ينبغي أن يراه.',
+      en: 'Asas is a dashboard and a portal for organizations: keep your records in one place, and keep every role to what it should see.',
+      ar: 'أساس لوحة تحكم وبوابة للمؤسسات: احفظ سجلاتك في مكان واحد، واحصر كل دور بما ينبغي أن يراه.',
     },
-    featuresTitle: { en: 'Everything a training organization needs', ar: 'كل ما تحتاجه مؤسسة تدريبية' },
+    featuresTitle: { en: 'Everything an organization needs', ar: 'كل ما تحتاجه مؤسسة' },
     featuresSubtitle: {
-      en: 'One system for the whole lifecycle, from listing a course to seeing who is enrolled in it.',
-      ar: 'نظام واحد لدورة الحياة كاملة، من نشر دورة إلى معرفة من سجل فيها.',
-    },
-    featureCoursesTitle: { en: 'Courses and sessions', ar: 'الدورات والجلسات' },
-    featureCoursesDescription: {
-      en: 'Create courses, set their fee and schedule, and open or archive them as they run.',
-      ar: 'أنشئ الدورات، حدد رسومها وجدولها، وافتحها أو أرشفها أثناء انعقادها.',
-    },
-    featureEnrollmentsTitle: { en: 'Enrollments', ar: 'التسجيلات' },
-    featureEnrollmentsDescription: {
-      en: 'See who enrolled in each course and when, with the day-by-day count on the dashboard.',
-      ar: 'اطلع على من سجل في كل دورة ومتى، مع العدد اليومي في لوحة التحكم.',
+      en: 'One system for your records, from the first entry to who may see it.',
+      ar: 'نظام واحد لسجلاتك، من أول إدخال إلى من يحق له رؤيته.',
     },
     featureRolesTitle: { en: 'Roles and permissions', ar: 'الأدوار والصلاحيات' },
     featureRolesDescription: {
@@ -418,19 +420,19 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     howTitle: { en: 'How it works', ar: 'كيف يعمل' },
     howStep1Title: { en: 'Set up your organization', ar: 'أنشئ مؤسستك' },
     howStep1Description: { en: 'Sign up and create your organization in one step.', ar: 'أنشئ حسابك ومؤسستك في خطوة واحدة.' },
-    howStep2Title: { en: 'Add courses and roles', ar: 'أضف الدورات والأدوار' },
+    howStep2Title: { en: 'Add your records and roles', ar: 'أضف سجلاتك وأدوارك' },
     howStep2Description: {
-      en: 'List your courses and decide what each role in your organization may do.',
-      ar: 'أدرج دوراتك وحدد ما يحق لكل دور في مؤسستك القيام به.',
+      en: 'List what your organization keeps and decide what each role may do.',
+      ar: 'أدرج ما تحفظه مؤسستك وحدد ما يحق لكل دور القيام به.',
     },
     howStep3Title: { en: 'Open the portal to your customers', ar: 'افتح البوابة لعملائك' },
     howStep3Description: {
-      en: 'Customers sign in to their own portal to see the courses they may enroll in.',
-      ar: 'يسجل العملاء الدخول إلى بوابتهم الخاصة لرؤية الدورات التي يمكنهم التسجيل فيها.',
+      en: 'Customers sign in to their own portal to see what is theirs.',
+      ar: 'يسجل العملاء الدخول إلى بوابتهم الخاصة لرؤية ما يخصهم.',
     },
-    ctaTitle: { en: 'Start running your courses on Asas', ar: 'ابدأ بإدارة دوراتك على أساس' },
-    ctaSubtitle: { en: 'Create your organization and add your first course in minutes.', ar: 'أنشئ مؤسستك وأضف أول دورة لك خلال دقائق.' },
-    footer: { en: 'Asas — courses and enrollments for training organizations.', ar: 'أساس — الدورات والتسجيلات للمؤسسات التدريبية.' },
+    ctaTitle: { en: 'Start running your organization on Asas', ar: 'ابدأ بإدارة مؤسستك على أساس' },
+    ctaSubtitle: { en: 'Create your organization and add your first record in minutes.', ar: 'أنشئ مؤسستك وأضف أول سجل لك خلال دقائق.' },
+    footer: { en: 'Asas — one place for an organization\'s records.', ar: 'أساس — مكان واحد لسجلات المؤسسة.' },
   },
   dashboard: {
     dashboard: { en: 'Dashboard', ar: 'لوحة التحكم' },
@@ -644,11 +646,14 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     createdAt: { en: 'Created at', ar: 'تاريخ الإنشاء' },
     updatedAt: { en: 'Updated at', ar: 'تاريخ التعديل' },
   },
+  // add-on: settings
   settings: {
     ...settings,
     singular: { en: 'Settings', ar: 'الإعدادات' },
     plural: { en: 'Settings', ar: 'الإعدادات' },
   },
+  // end add-on: settings
+  // add-on: roles
   roles: {
     ...roles,
     singular: { en: 'Role', ar: 'دور' },
@@ -665,6 +670,8 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'المعرف النصي للدور، الذي يسميه كل إسناد له، مثل course-editor. يقرأ الناس الدور بتسميته أدناه.',
     },
   },
+  // end add-on: roles
+  // add-on: courses
   sessions: {
     ...sessions,
     singular: { en: 'Session', ar: 'جلسة' },
@@ -674,6 +681,8 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     none: { en: 'No sessions yet.', ar: 'لا توجد جلسات بعد.' },
     dangerZoneWarning: { en: 'These actions change this session for everyone.', ar: 'هذه الإجراءات تغير هذه الجلسة للجميع.' },
   },
+  // end add-on: courses
+  // add-on: courses
   enrollments: {
     ...enrollments,
     singular: { en: 'Enrollment', ar: 'تسجيل' },
@@ -683,12 +692,14 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     none: { en: 'No enrollments yet.', ar: 'لا توجد تسجيلات بعد.' },
     dangerZoneWarning: { en: 'These actions change this enrollment for everyone.', ar: 'هذه الإجراءات تغير هذا التسجيل للجميع.' },
   },
+  // end add-on: courses
   tags: {
     ...tags,
     new: { en: 'New tag', ar: 'وسم جديد' },
     none: { en: 'No tags yet.', ar: 'لا توجد وسوم بعد.' },
     dangerZoneWarning: { en: 'These actions change this tag for everyone.', ar: 'هذه الإجراءات تغير هذا الوسم للجميع.' },
   },
+  // add-on: media
   media: {
     ...media,
     new: { en: 'New image', ar: 'صورة جديدة' },
@@ -699,16 +710,22 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     replaceAbout: { en: 'Replace file uploads a new image and opens it. This one stays until you delete it.', ar: 'يرفع استبدال الملف صورة جديدة ويفتحها. تبقى هذه الصورة حتى تحذفها.' },
     dangerZoneWarning: { en: 'These actions change this image for everyone.', ar: 'هذه الإجراءات تغير هذه الصورة للجميع.' },
   },
+  // end add-on: media
   localUsers: { ...localUsers, none: { en: 'No local accounts yet.', ar: 'لا توجد حسابات محلية بعد.' } },
+  // add-on: audit-log
   auditLog,
+  // end add-on: audit-log
+  // add-on: roles
   memberRoles: {
     ...memberRoles,
     singular: { en: 'Member role', ar: 'دور عضو' },
     plural: { en: 'Member roles', ar: 'أدوار الأعضاء' },
     none: { en: 'No member roles yet.', ar: 'لا توجد أدوار أعضاء بعد.' },
   },
+  // end add-on: roles
   version: {
     saveDraft: { en: 'Save draft', ar: 'حفظ المسودة' },
+    noReadableChange: { en: 'No field you may read changed.', ar: 'لم يتغير حقل يمكنك قراءته.' },
     publishChanges: { en: 'Publish changes', ar: 'نشر التغييرات' },
     status: { en: 'Status', ar: 'الحالة' },
     draft: { en: 'Draft', ar: 'مسودة' },

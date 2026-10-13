@@ -428,7 +428,9 @@ commands, run as `mithaq <target> <command>`.
 - **rbac** (`access`): system roles in code, custom roles and assignments in
   two kayan, and the `assign` command. `packages/mithaq/src/rbac/index.ts`
   `rbacTarget`. `betterAuthTarget` is the alternative that keeps custom roles
-  in the provider's own rows.
+  in the provider's own rows, and `memberRoleTarget` the one with no custom
+  role at all: a member holds the system roles its Better Auth `member.role`
+  names in that organization.
 - **service** (`service`): the runner. `packages/mithaq/src/service/index.ts`
   `serviceTarget`.
 - **screen** (`screen`): one admin app's pages. `packages/mithaq/src/screen/index.ts`

@@ -1,5 +1,9 @@
 import type { SystemRoles } from 'mithaq'
+// without add-on: roles
+// import { defaultMemberRoles } from './default-member-roles.ts'
+// end without add-on: roles
 
+// add-on: courses
 /** A session's columns but its `enrollments`, which the registrar and the instructor read alike. */
 const sessionColumns = [
   'sessions.fields.id',
@@ -32,37 +36,39 @@ const coverReads = [
   'media.fields.updatedAt',
   'media.fields.width',
 ] as const
+// end add-on: courses
 
 /**
  * The roles this project ships to every tenant, written in code and never a
- * row: the access target takes them whole and reads what each holds from here,
- * and the `roles` kayan holds a tenant's own roles alone. A page lists them from
- * here too, which is why this file imports nothing.
+ * row: the access target takes them whole and reads what each holds from here.
+ * A page lists them from here too, which is why this file imports no server
+ * code.
  *
  * A slug here is the whole vocabulary of role names: a row table may be keyed on
  * one of them or on `'*'` and on nothing else, and `buildAsas` refuses a key
  * that is not in this project's catalog exactly as it does for a row's own.
  *
- * **These are business roles and never governance.** Better Auth's own
- * `member.role`, which holds `owner`, `admin` or `member`, stays what the
- * provider uses for settings, members and invitations, and nothing here reads
- * it. Sharing one comma-joined column would inherit the provider's own open
- * comma-in-a-role-name bug.
- *
- * A new organization's creator is assigned `administrator` while the
- * organization is being created, by the hook the template wires into the
- * provider, so a fresh tenant has a root granter from its first moment. That
- * row is written straight through the store, because a managed create is graded
- * against the actor making it and the creator is in no organization until that
- * route puts it in one.
- *
  * The platform roles, `super_admin` among them, are not here: they are staff
  * above every tenant, held on Better Auth's `user.role`, and the access target
  * holds their keys in the platform app alone. Inside a tenant every actor, a
  * `super_admin` included, holds what its membership's roles hold and nothing
- * more. These are the roles an assignment may name.
+ * more.
  */
 export const tenantRoles = {
+  // add-on: roles
+  // These are business roles and never governance, and the `roles` kayan holds
+  // a tenant's own roles beside them; an assignment names one of either. Better
+  // Auth's own `member.role`, which holds `owner`, `admin` or `member`, stays
+  // what the provider uses for settings, members and invitations, and nothing
+  // here reads it. Sharing one comma-joined column would inherit the provider's
+  // own open comma-in-a-role-name bug.
+  //
+  // A new organization's creator is assigned `administrator` while the
+  // organization is being created, by the hook the template wires into the
+  // provider, so a fresh tenant has a root granter from its first moment. That
+  // row is written straight through the store, because a managed create is
+  // graded against the actor making it and the creator is in no organization
+  // until that route puts it in one.
   /**
    * The tenant's root granter: every key of the project, which is what lets it
    * author a custom role at all. `'*'` holds every screen's key too, so it
@@ -80,6 +86,7 @@ export const tenantRoles = {
     label: { ar: 'مسجل', en: 'Registrar' },
     permissions: [
       'screen.dashboard',
+      // add-on: courses
       'courses.create',
       'courses.find',
       'courses.count',
@@ -113,6 +120,7 @@ export const tenantRoles = {
       // read of it is refused for its fields and its pages draw nothing. Not a
       // session's `enrollments`, which reads a kayan this role does not.
       ...sessionColumns,
+      // end add-on: courses
       'tags.find',
       'tags.count',
       'tags.findByID',
@@ -121,6 +129,7 @@ export const tenantRoles = {
       'tags.fields.updatedAt',
       'tags.fields.organization',
       'tags.fields.name',
+      // add-on: media
       // The images a course's cover is picked from, which it uploads,
       // re-describes and deletes once no course points at one.
       'media.create',
@@ -141,6 +150,8 @@ export const tenantRoles = {
       'media.fields.organization',
       'media.fields.updatedAt',
       'media.fields.width',
+      // end add-on: media
+      // add-on: audit-log
       // The activity panel on each edit page it opens: the entries of the
       // kayan it lists, each change graded by the column's own key above.
       'auditLog.find',
@@ -152,8 +163,10 @@ export const tenantRoles = {
       'auditLog.fields.actor',
       'auditLog.fields.impersonatedBy',
       'auditLog.fields.changes',
+      // end add-on: audit-log
     ],
   },
+  // add-on: courses
   /**
    * Teaches: reads the catalogue and enrols. It holds no `courses.archive`. It
    * works in the portal, which draws the courses and the enrolments, and never
@@ -259,4 +272,9 @@ export const tenantRoles = {
       ...coverReads,
     ],
   },
+  // end add-on: courses
+  // end add-on: roles
+  // without add-on: roles
+  // ...defaultMemberRoles,
+  // end without add-on: roles
 } as const satisfies SystemRoles

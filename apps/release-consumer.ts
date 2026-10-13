@@ -1,13 +1,16 @@
 // Run with DATABASE_URL set to a dedicated local PostgreSQL database named mithaq, which this check writes to.
 // It proves what the boot tests do not: the staged packages (`apps/pack.ts`) make a project the way `bun create mithaq` and
 // `npm create mithaq` do, with `mithaq` and `mithaq-admin` installed from the packed tarballs and no framework source; each
-// consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request and passes
-// `mithaq generate --check`: a monorepo with Bun and with npm, and with Bun a single package and a monorepo with no
-// platform console, which boots with no PLATFORM_URL. A project with no rich text, `mithaq` alone with npm, proves no
-// Lexical is installed with it.
+// consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request, seeds and passes
+// `mithaq generate --check`: a monorepo with every add-on with Bun, a minimal one (auth and the tags example) with npm,
+// which writes its own first migration and boots with no PLATFORM_URL, a single package with every add-on it can hold,
+// and a monorepo with settings, rich text, media without courses and the platform console but no roles, whose staff hold their keys through
+// Better Auth's member roles' access target as they do through the roles add-on's. A full project speaks the frozen
+// vocabulary, and every other one that vocabulary less the words its missing add-ons bring. A project with no rich text,
+// `mithaq` alone with npm, proves no Lexical is installed with it.
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
@@ -15,8 +18,13 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { testDatabase } from '../templates/asas/src/test-database.ts'
+import { base, storage } from '../packages/mithaq/src/index.ts'
+import { richText } from '../packages/mithaq/src/rich-text/index.ts'
+import { vocabularyOf } from '../packages/mithaq/src/mithaq/lock.ts'
+import { richTextNodes } from '../templates/mithaq/src/mithaq/rich-text-nodes.ts'
+import { storageConfig } from '../templates/mithaq/src/storage/index.ts'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const database = process.env.DATABASE_URL
@@ -40,6 +48,34 @@ const installed = (folder: string, name: string): string => {
   return installed(dirname(folder), name)
 }
 
+/** The vocabulary the language `folder` runs its commands from speaks, read through the mithaq whose files are under `source`. */
+const vocabularyIn = ({ folder, source, extension }: { folder: string; source: string; extension: string }) => {
+  const script = [
+    `const { receivedLanguage } = await import(${JSON.stringify(pathToFileURL(join(source, `mithaq/language${extension}`)).href)})`,
+    `const { vocabularyOf } = await import(${JSON.stringify(pathToFileURL(join(source, `mithaq/lock${extension}`)).href)})`,
+    "const { defineKayan } = await import('./src/mithaq.ts')",
+    'console.log(JSON.stringify(vocabularyOf(receivedLanguage(defineKayan))))',
+  ].join('\n')
+  const read = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd: folder, encoding: 'utf8' })
+  assert.equal(read.status, 0, read.stderr)
+  return read.stdout.trim().split('\n').at(-1)
+}
+// The template's, which holds every add-on and so every word, frozen until the owner signs a change.
+const vocabulary = vocabularyIn({ folder: join(root, 'templates/asas'), source: join(root, 'packages/mithaq/src'), extension: '.ts' })
+assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), '9fbe5ee8c20646b5e2455af0c88d5dab7e2da418763c73ffdbde6a8d24955b10', 'the template speaks the frozen vocabulary')
+type Words = Record<'kinds' | 'rules' | 'targets', Record<string, unknown>>
+const bare = vocabularyOf({ arkan: [base] }) as Words
+/** The words each add-on that brings any adds to the language: its rukn's kinds, rules and targets beyond `base`'s. */
+const wordsOf = Object.fromEntries(Object.entries({ 'rich-text': richText({ nodes: richTextNodes }), uploads: storage(storageConfig) }).map(([name, rukn]) => {
+  const own = vocabularyOf({ arkan: [base, rukn] }) as Words
+  return [name, (['kinds', 'rules', 'targets'] as const).flatMap((part) => Object.keys(own[part]).filter((key) => !Object.hasOwn(bare[part], key)).map((key) => [part, key] as const))]
+}))
+/** The template's vocabulary less the words of each add-on a project left out. */
+const vocabularyWithout = (missing: readonly string[]) => {
+  const words = JSON.parse(vocabulary!) as Words
+  for (const [part, key] of missing.flatMap((name) => wordsOf[name] ?? [])) delete words[part][key]
+  return words
+}
 const scratch = mkdtempSync(join(tmpdir(), 'mithaq-release-'))
 try {
   command(process.execPath, ['apps/pack.ts'], root)
@@ -52,7 +88,12 @@ try {
   const tarball = `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`
   const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
   withoutRichText(tarball)
-  for (const run of [{ manager: 'bun' }, { manager: 'npm' }, { manager: 'bun', layout: 'single' }, { manager: 'bun', platform: false }]) await release({ tarball, adminTarball, ...run })
+  for (const run of [
+    { manager: 'bun', addOns: ['--full'] },
+    { manager: 'npm', addOns: [] },
+    { manager: 'bun', layout: 'single', addOns: ['--full'] },
+    { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text,media'] },
+  ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
   rmSync(scratch, { recursive: true, force: true })
@@ -89,16 +130,19 @@ function withoutRichText(tarball: string) {
   console.log('release consumer passed: npm-without-rich-text')
 }
 
-async function release({ manager, tarball, adminTarball, layout = 'monorepo', platform = layout === 'monorepo' }: { manager: string; tarball: string; adminTarball: string; layout?: string; platform?: boolean }) {
-  const name = `${manager}-${layout === 'single' ? 'single' : platform ? 'monorepo' : 'tenant'}`
-  const consumer = join(scratch, name)
+async function release({ manager, tarball, adminTarball, layout = 'monorepo', addOns }: { manager: string; tarball: string; adminTarball: string; layout?: string; addOns: string[] }) {
   const single = layout === 'single'
+  const full = addOns.includes('--full')
+  // `--full` holds the platform console where the layout can.
+  const platform = !single && (full || addOns.some((one) => /(^|,)platform(,|$)/.test(one)))
+  const name = `${manager}-${layout}-${full ? 'full' : addOns.length ? 'pick' : 'minimal'}`
+  const consumer = join(scratch, name)
   const servers: ReturnType<typeof spawn>[] = []
   let output = ''
   try {
     // The project as `<manager> create mithaq` makes it, with `mithaq` and `mithaq-admin` pointed at the tarballs through flags
     // only this check passes, so neither is fetched from npm.
-    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, platform ? '--platform' : '--no-platform', '--mithaq', tarball, '--mithaq-admin', adminTarball], {
+    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, ...addOns, '--mithaq', tarball, '--mithaq-admin', adminTarball], {
       cwd: scratch,
       encoding: 'utf8',
       timeout: 600_000,
@@ -106,6 +150,8 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', pl
     })
     assert.equal(created.status, 0, `${created.stdout}\n${created.stderr}`)
     assert.ok(!created.stderr.includes('Not installed'), created.stderr)
+    assert.ok(!created.stderr.includes('The screens are not written'), created.stderr)
+    const chosen = /^Created .*?, (?:with (.+)|minimal)\.$/m.exec(created.stdout)?.[1]?.split(', ') ?? []
     assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev   # the tenant app`))
     assert.equal(created.stdout.includes(`from apps/asas-platform: ${manager} run dev`), platform)
     assert.equal(created.stdout.includes('The package is named asas'), single)
@@ -137,7 +183,9 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', pl
     const language = single ? consumer : join(consumer, 'packages/mithaq')
     // The files each workspace always holds (the host, the icon, the storage adapters and the step) are read against the
     // installed mithaq-admin and must be up to date; with no package there the check answers undefined and this fails.
-    for (const [workspace, files] of single ? [[consumer, 19]] as const : [[app, 13], ...(platform ? [[platformApp, 12]] as const : []), [language, 6]] as const) {
+    // The storage adapters and their defaults come with uploads; the step is every project's.
+    const held = chosen.includes('uploads') ? 6 : 1
+    for (const [workspace, files] of single ? [[consumer, 13 + held]] as const : [[app, 13], ...(platform ? [[platformApp, 12]] as const : []), [language, held]] as const) {
       installed(workspace, '.bin/mithaq')
       const check = spawnSync(process.execPath, ['--input-type=module', '-e', "import { pathToFileURL } from 'node:url'; import { upgradeCheck } from 'mithaq/upgrade'; console.log(JSON.stringify(await upgradeCheck(pathToFileURL(`${process.cwd()}/`))))"], { cwd: workspace, encoding: 'utf8' })
       assert.equal(check.status, 0, check.stderr)
@@ -171,8 +219,17 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', pl
     // The database as a deploy leaves it: emptied, then migrated with the `drizzle-kit` the installed `mithaq` resolves.
     // Node runs the rest: the project's `.ts` lies outside `node_modules`, where Node strips types.
     command(process.execPath, ['--input-type=module', '-e', "import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute('drop schema if exists public cascade; create schema public; drop schema if exists drizzle cascade;'); await asas.destroy()"], template)
+    // The template's migrations build every table, so a project short of an add-on writes its own first one, as a new
+    // project does before it first deploys.
+    const migrations = join(template, 'src/migrations')
+    assert.equal(readdirSync(migrations).length > 1, full, `${name} ships the template's migrations only when it holds every add-on with tables`)
+    if (readdirSync(migrations).length === 1) command(installed(template, '.bin/mithaq'), ['migrate', '--name', 'init'], template)
     const drizzleKit = createRequire(join(mithaq, 'package.json')).resolve('drizzle-kit')
     command(process.execPath, [join(dirname(drizzleKit), 'bin.cjs'), 'migrate', '--config', 'src/migrations/drizzle.config.ts'], template)
+    const spoken = vocabularyIn({ folder: template, source: join(mithaq, 'dist'), extension: '.js' })!
+    if (full) assert.equal(spoken, vocabulary, `${name} speaks the frozen vocabulary`)
+    const missing = Object.keys(wordsOf).filter((one) => !chosen.includes(one))
+    assert.deepEqual(JSON.parse(spoken), vocabularyWithout(missing), `${name} speaks the template's vocabulary less what ${missing.join(' and ') || 'nothing'} would bring`)
     command(installed(template, '.bin/mithaq'), ['lock', '--check'], template)
     // Without `--bun`, each program the build script runs starts under the `node` its shebang names.
     command(manager, ['run', 'build'], app)
@@ -247,6 +304,36 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', pl
       signal: AbortSignal.timeout(10_000),
     })
     assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
+    if (platform) {
+      // A staff member who belongs to no organization, so the platform session has none active: the access target is
+      // asked with no tenant, and only the project's role reader answers the platform role. Whichever target the
+      // project's add-ons chose, staff hold every key there.
+      const email = `staff-${stamp}@example.com`
+      const joined = await fetch(`${origin}/api/auth/user/sign-up/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin },
+        body: JSON.stringify({ name: 'Staff', email, password: 'release-test-password' }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      assert.equal(joined.status, 200, `${await joined.text()}\n${output}`)
+      command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = '${email}'"); await asas.destroy()`], template)
+      const staff = await fetch(`${platformOrigin}/api/auth/user/sign-in/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: platformOrigin },
+        body: JSON.stringify({ email, password: 'release-test-password' }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
+      const staffCookie = staff.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
+      const session = await (await fetch(`${platformOrigin}/api/auth/user/get-session`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { session?: { activeOrganizationId?: string | null } } | null
+      assert.equal(session?.session?.activeOrganizationId ?? null, null, `the staff session has no organization active: ${JSON.stringify(session).slice(0, 400)}`)
+      const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
+      assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s platform staff hold every key: ${JSON.stringify(report).slice(0, 400)}`)
+    }
+    // The sample rows of whatever the project holds, written through its own operations as that organization's owner.
+    const seeded = spawnSync(process.execPath, ['src/seed.ts'], { cwd: template, encoding: 'utf8', env: { ...process.env, NODE_ENV: 'development' } })
+    assert.equal(seeded.status, 0, `${seeded.stdout}\n${seeded.stderr}`)
+    assert.match(seeded.stdout, /"totals":\{"tags":6[,}]/, seeded.stdout)
     command(installed(template, '.bin/mithaq'), ['generate', '--check'], template)
     console.log(`release consumer passed: ${name}`)
   } finally {

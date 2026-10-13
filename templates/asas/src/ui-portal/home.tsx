@@ -1,22 +1,28 @@
 // What `/portal` itself draws, inside the portal's top shell: a greeting, then
-// the dashboard home's figure card for each of the portal's two lists, with how
-// many rows of it the viewer may read and a link to it, the courses on offer
-// alone. A list the nav does not offer the viewer has no card, and a list whose
+// the dashboard home's figure card for each list below, with how many rows of
+// it the viewer may read and a link to it. A list the nav does not offer the viewer has no card, and a list whose
 // count the viewer may not read, or whose count failed, shows a dash in place
 // of the figure.
 import type { ReactNode } from 'react'
+// add-on: courses
 import { BookOpen, ClipboardList } from 'lucide-react'
+// end add-on: courses
 import type { LoaderTools, PageProps } from 'mithaq/admin'
 import { useLocale, useScreen, useUser } from 'mithaq/admin/react'
 import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
 import { ScreenNav, navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 import { PortalTopShell } from '@asas/mithaq/ui/top-shell.tsx'
+// add-on: courses
 import { onOffer } from '@asas/courses/domain/on-offer.ts'
+// end add-on: courses
 
 /** The lists the home counts, each with its card's icon and the rows its list is held to. */
 const figures: readonly [kayan: string, icon: ReactNode, where?: object][] = [
+  // add-on: courses
+  // The courses on offer alone.
   ['courses', <BookOpen className="size-4" />, onOffer],
   ['enrollments', <ClipboardList className="size-4" />],
+  // end add-on: courses
 ]
 
 /**

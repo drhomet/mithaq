@@ -697,14 +697,18 @@ const moveHistory = async ({ db, directory, check }: { db: Database; directory: 
   )
 }
 
-// drizzle's own rule, which matches a folder to a row by `name` alone.
-const unapplied = async ({ db, directory }: { db: Database; directory: URL }) => {
-  let localMigrations: ReturnType<typeof readMigrationFiles> = []
+const migrationsIn = (directory: URL): ReturnType<typeof readMigrationFiles> => {
   try {
-    localMigrations = readMigrationFiles({ migrationsFolder: fileURLToPath(directory) })
+    return readMigrationFiles({ migrationsFolder: fileURLToPath(directory) })
   } catch (error) {
     if ((error as { code?: string }).code !== 'ENOENT') throw error
+    return []
   }
+}
+
+// drizzle's own rule, which matches a folder to a row by `name` alone.
+const unapplied = async ({ db, directory }: { db: Database; directory: URL }) => {
+  const localMigrations = migrationsIn(directory)
   if (!localMigrations.length) return []
   let dbMigrations: Parameters<typeof getMigrationsToRun>[0]['dbMigrations'] = []
   try {
@@ -731,6 +735,12 @@ export const bootMigrations = async ({ db, prodMigrations }: { db: NodePgDatabas
     )
   }
   const directory = pathToFileURL(`${resolvePath(migrationsFolder)}/`)
+  // A new project's folder holds the config and no migration, which would read as nothing pending.
+  if (!migrationsIn(directory).length) {
+    throw new Refusal(
+      `prodMigrations names ${migrationsFolder}, which holds no migration yet, so a production boot would serve a database nothing built. Write the first with \`mithaq migrate --name init\` against an empty database, ship it, and start again. Nothing was checked or applied.`,
+    )
+  }
   const history = `${migrationsTable.schema}.${migrationsTable.table}`
   // Read from mithaq's table alone, an unmoved history says nothing was applied.
   if ((await moveHistory({ db, directory, check: true })) !== undefined) {

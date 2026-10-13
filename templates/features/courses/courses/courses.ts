@@ -4,7 +4,6 @@ import { defineKayan, organization } from '@asas/mithaq'
 import { activity, appPage, danger, platformList, platformRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { sessions } from '../sessions/sessions.ts'
-import { media } from '../media/media.ts'
 import { onOffer } from '../domain/on-offer.ts'
 import { expectedUpdatedAt } from '@asas/mithaq/steps/expected-updated-at.ts'
 
@@ -606,6 +605,6 @@ export const courses = defineKayan({
     // The course's cover, one of the organization's images. Its row cannot be
     // deleted while a course points at it, since an upload restricts. Declared
     // last, for the same column order.
-    cover: { kind: 'upload', relationTo: () => media, label: { en: 'Cover image', ar: 'صورة الغلاف' } },
+    cover: { kind: 'upload', relationTo: 'media', label: { en: 'Cover image', ar: 'صورة الغلاف' } },
   },
 })

@@ -1,14 +1,18 @@
 // The two role columns the platform lists, each named in the viewer's locale
 // where the column holds a slug, so an Arabic page reads no English word and
 // no slug for them.
+import type { CellProps } from 'mithaq/admin'
+import { useLocale } from 'mithaq/admin/react'
+import { listed } from 'mithaq-admin/format.tsx'
+// add-on: roles
 import { use } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { CellProps, Row } from 'mithaq/admin'
-import { ListContext, useClient, useLocale, useScreen } from 'mithaq/admin/react'
+import type { Row } from 'mithaq/admin'
+import { ListContext, useClient, useScreen } from 'mithaq/admin/react'
 import type { asas } from '../asas.ts'
-import { listed } from 'mithaq-admin/format.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 import { systemRoles } from '@asas/mithaq/roles/system-roles.ts'
+// end add-on: roles
 
 /**
  * A membership's role, which is the provider's own governance role, `owner`,
@@ -20,6 +24,7 @@ export function MembershipRole({ value }: CellProps) {
   return listed(value.split(',').map((one) => t(`platform.membership.${one.trim()}`) ?? one.trim()), locale)
 }
 
+// add-on: roles
 /**
  * A business role an assignment names by its slug, by its label: a fixed
  * role's from its code, and a custom role's from its row of the assignment's own tenant, one read for
@@ -51,3 +56,4 @@ export function RoleName({ value, row }: CellProps) {
     : (custom?.find((one) => one.name === value && one.organization === row.organization)?.label as Record<string, string> | undefined)
   return label?.[locale] ?? value
 }
+// end add-on: roles

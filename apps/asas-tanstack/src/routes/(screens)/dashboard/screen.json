@@ -2280,8 +2280,8 @@
       ],
       "useAsTitle": "name",
       "description": {
-        "en": "Labels that group courses in the catalogue.",
-        "ar": "تسميات تجمع الدورات في الدليل."
+        "en": "Labels the organization groups its records by.",
+        "ar": "تسميات تجمع بها المؤسسة سجلاتها."
       },
       "pages": {
         "list": {
@@ -2681,7 +2681,7 @@
                       "columns": [
                         {
                           "field": "filename",
-                          "cell": "@asas/courses:./media/ui/preview.tsx#FileName",
+                          "cell": "@asas/media:./media/ui/preview.tsx#FileName",
                           "decided": "leaf"
                         },
                         {
@@ -2696,7 +2696,7 @@
                         },
                         {
                           "field": "filesize",
-                          "cell": "@asas/courses:./media/ui/preview.tsx#FileSize",
+                          "cell": "@asas/media:./media/ui/preview.tsx#FileSize",
                           "decided": "leaf"
                         },
                         {
@@ -2718,7 +2718,7 @@
         },
         "create": {
           "path": "/media/new",
-          "component": "@asas/courses:./media/ui/preview.tsx#NewImage"
+          "component": "@asas/media:./media/ui/preview.tsx#NewImage"
         },
         "edit": {
           "path": "/media/:id",
@@ -2790,7 +2790,7 @@
                 ],
                 "side": [
                   {
-                    "component": "@asas/courses:./media/ui/preview.tsx#MediaPreview"
+                    "component": "@asas/media:./media/ui/preview.tsx#MediaPreview"
                   }
                 ],
                 "danger": [

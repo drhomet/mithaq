@@ -21,6 +21,7 @@ import {
   defineMithaq,
   betterAuthTarget,
   betterAuthTenant,
+  memberRoleTarget,
   grantedPermissions,
   holdsPermission,
   rbacTarget,
@@ -2401,4 +2402,71 @@ test('63. a system role holding an operation key of a kayan and no field key of 
     /System role "clerk" holds operation key "tags\.find" of kayan "tags" and no "tags\.fields\.<field>" key/,
     'and a field key of tag is no field key of tags',
   )
+})
+
+test('64. memberRoleTarget answers a member the system roles its Better Auth membership names in that organization, reads no role table, and refuses a build without the member kayan', async () => {
+  const roles = {
+    owner: { label: { ar: 'مالك', en: 'Owner' }, permissions: '*' },
+    member: { label: { ar: 'عضو', en: 'Member' }, permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'] },
+    super_admin: { label: { ar: 'مدير المنصة', en: 'Platform administrator' }, permissions: '*' },
+  } as const satisfies SystemRoles
+  const store = memoryStore()
+  // As the template's reader answers: the platform role in the platform app alone, and never off a membership.
+  const rolesOf = (actor: RbacActor & { platform?: boolean }) =>
+    actor.platform ? ['super_admin'] : (actorRoles(actor) ?? []).filter((slug) => slug !== 'super_admin')
+  const target = memberRoleTarget({ roles, access: rbacTable, rolesOf })
+  const mithaq = defineMithaq({
+    arkan: [base],
+    targets: { memory: store, zod: zodTarget, rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+  })
+  const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, access: mithaq.rows(rbacTable), targets: { service: { operations: defaultOperations } } })
+  const membership = mithaq.defineKayan({
+    name: 'member',
+    fields: {
+      id: { kind: 'number', label: { en: 'ID', ar: 'المعرف' } },
+      organizationId: { kind: 'text', label: { en: 'Organization', ar: 'المنظمة' } },
+      userId: { kind: 'text', label: { en: 'User', ar: 'المستخدم' } },
+      role: { kind: 'text', label: { en: 'Role', ar: 'الدور' } },
+    },
+    targets: { service: { operations: defaultOperations } },
+  })
+  assert.throws(() => mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses] }), /The access target reads kayan "member", which this build does not declare/)
+  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, membership] })
+  // `owner,stray` names a role the project does not ship, which grants nothing beside the one it does.
+  store.rows.set('member', [
+    { id: 1, organizationId: 'org1', userId: 'u-owner', role: 'owner,stray' },
+    { id: 2, organizationId: 'org1', userId: 'u-member', role: 'member' },
+    { id: 3, organizationId: 'org2', userId: 'u-elsewhere', role: 'owner' },
+    { id: 4, organizationId: 'org1', userId: 'u-minted', role: 'super_admin' },
+    { id: 5, organizationId: 'org1', userId: 'u-spaced', role: 'member, owner' },
+  ])
+  const held = (member: string, tenant = 'org1', platform = false) => target.resolve({ store: store as never, tenant, member, actor: { activeOrganizationId: tenant, platform }, ownership: () => undefined })
+  assert.deepEqual(await held('u-owner'), { permissions: '*', roles: ['owner', 'stray'] }, 'an owner holds every key')
+  assert.deepEqual(await held('u-member'), { permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'], roles: ['member'] }, 'a member holds what its role lists')
+  assert.deepEqual(await held('u-elsewhere'), { permissions: [], roles: [] }, 'a membership of another organization holds nothing here')
+  assert.deepEqual(await held('u-nobody'), { permissions: [], roles: [] }, 'and no membership holds nothing')
+  assert.deepEqual(await held('u-owner', ''), { permissions: [], roles: [] }, 'nor does a read with no organization')
+  assert.deepEqual(await held('u-staff', '', true), { permissions: '*', roles: ['super_admin'] }, 'platform staff, with no organization, hold what their platform role does')
+  assert.deepEqual(await held('u-minted'), { permissions: [], roles: [] }, 'a platform role a tenant minted into member.role holds nothing')
+  assert.deepEqual(await held('u-spaced'), { permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'], roles: ['member', ' owner'] }, '` owner` is no owner, and grants nothing')
+  // Through the strategy, so the keys are the ones the actor carries into an operation.
+  const resolve = ({ tenant, member, actor }: { tenant: unknown; member: unknown; actor: object }) => target.resolve({ store: store as never, tenant, member, actor, ownership: () => undefined })
+  store.rows.set('courses', [{ id: 1, title: 'Mine', fee: 300, tenant: 'org1' }])
+  const strategy = betterAuthStrategy({
+    server: {
+      api: {
+        getSession: async () => ({ session: { activeOrganizationId: 'org1' }, user: { id: 'u-member' } }),
+        getActiveMemberRole: async () => ({ role: 'member' }),
+        listOrganizations: async () => [{ id: 'org1' }],
+      },
+      handler: async () => new Response(null),
+    } as never,
+    collection: 'user',
+    onError: console.error,
+    assigned: resolve as never,
+  })
+  const actor = (await strategy.authenticate({ headers: new Headers() })).user
+  assert.equal((await built.kayan.courses.operations.find({}, { actor: actor as never })).docs.length, 1, 'a member reads what its role lists')
+  const refused = await built.kayan.courses.operations.delete({ id: 1 }, { actor: actor as never }).catch((thrown: unknown) => thrown)
+  assert.ok(refused instanceof AsasError && refused.status === 403, 'and is refused what it does not')
 })

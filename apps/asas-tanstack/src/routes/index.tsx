@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { BookOpen, LayoutDashboard, Languages, ShieldCheck, Users } from 'lucide-react'
+import { LayoutDashboard, Languages, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useHomeLabel } from '../auth-frame.tsx'
@@ -39,7 +39,7 @@ function EntryActions({ screens, size }: { screens: readonly { name: string; pat
   )
 }
 
-function Feature({ icon: Icon, title, description }: { icon: typeof BookOpen; title: string; description: string }) {
+function Feature({ icon: Icon, title, description }: { icon: typeof ShieldCheck; title: string; description: string }) {
   return (
     <Card>
       <CardHeader>
@@ -69,15 +69,13 @@ function Landing() {
   // `t` answers `string | undefined` for a key no locale carries; the fallback only satisfies that type.
   const tt = (key: string, fallback: string) => t(key, fallback) ?? fallback
   const features = [
-    { icon: BookOpen, title: tt('marketing.featureCoursesTitle', 'Courses and sessions'), description: tt('marketing.featureCoursesDescription', '') },
-    { icon: Users, title: tt('marketing.featureEnrollmentsTitle', 'Enrollments'), description: tt('marketing.featureEnrollmentsDescription', '') },
     { icon: ShieldCheck, title: tt('marketing.featureRolesTitle', 'Roles and permissions'), description: tt('marketing.featureRolesDescription', '') },
     { icon: Languages, title: tt('marketing.featureBilingualTitle', 'Arabic and English, either direction'), description: tt('marketing.featureBilingualDescription', '') },
     { icon: LayoutDashboard, title: tt('marketing.featurePortalTitle', 'A dashboard and a customer portal'), description: tt('marketing.featurePortalDescription', '') },
   ]
   const steps = [
     { title: tt('marketing.howStep1Title', 'Set up your organization'), description: tt('marketing.howStep1Description', '') },
-    { title: tt('marketing.howStep2Title', 'Add courses and roles'), description: tt('marketing.howStep2Description', '') },
+    { title: tt('marketing.howStep2Title', 'Add your records and roles'), description: tt('marketing.howStep2Description', '') },
     { title: tt('marketing.howStep3Title', 'Open the portal to your customers'), description: tt('marketing.howStep3Description', '') },
   ]
   return (
@@ -94,7 +92,7 @@ function Landing() {
 
       <main className="flex-1">
         <section className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-4 py-20 text-center sm:px-6 sm:py-28">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{t('marketing.heroTitle', 'Run courses and enrollments without the busywork')}</h1>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{t('marketing.heroTitle', 'Run your organization without the busywork')}</h1>
           <p className="max-w-2xl text-lg text-muted-foreground">{t('marketing.heroSubtitle', '')}</p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <EntryActions screens={screens} size="lg" />
@@ -103,7 +101,7 @@ function Landing() {
 
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <div className="mx-auto mb-12 max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight">{t('marketing.featuresTitle', 'Everything a training organization needs')}</h2>
+            <h2 className="text-3xl font-bold tracking-tight">{t('marketing.featuresTitle', 'Everything an organization needs')}</h2>
             <p className="mt-3 text-muted-foreground">{t('marketing.featuresSubtitle', '')}</p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -125,7 +123,7 @@ function Landing() {
         </section>
 
         <section className="mx-auto flex max-w-3xl flex-col items-center gap-6 px-4 py-20 text-center sm:px-6">
-          <h2 className="text-3xl font-bold tracking-tight">{t('marketing.ctaTitle', 'Start running your courses on Asas')}</h2>
+          <h2 className="text-3xl font-bold tracking-tight">{t('marketing.ctaTitle', 'Start running your organization on Asas')}</h2>
           <p className="text-muted-foreground">{t('marketing.ctaSubtitle', '')}</p>
           <EntryActions screens={screens} size="lg" />
         </section>
@@ -133,10 +131,10 @@ function Landing() {
 
       <footer className="border-t py-8">
         <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground sm:px-6">
-          {t('marketing.footer', 'Asas — courses and enrollments for training organizations.')}
+          {t('marketing.footer', 'Asas — one place for an organization\'s records.')}
         </div>
       </footer>
     </div>
   )
 }
-// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 32a4513d4cf4a984b7845056965d48edff53542ce962b466af67a87983832a6d
+// mithaq-admin 0.0.0 39255ad7b5ea7b82a2654c5b026c50bca1b72de2c3a38ce9f574b01eb383bb8a

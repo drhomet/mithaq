@@ -6,7 +6,6 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { same, type ClientField, type ComponentProps, type Row } from 'mithaq/admin'
 import { FormContext, useAccess, useClient, useKayan, useLocale, useRecord, useScreen } from 'mithaq/admin/react'
-import { empty } from '@asas/mithaq/mithaq/audit-sink.ts'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +32,13 @@ import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 import { endonym } from 'mithaq-admin/locale-menu.ts'
 import { CloseButton } from 'mithaq-admin/record-frame.tsx'
 import { useRelationshipTitles } from 'mithaq-admin/relationship-cell.tsx'
+
+/**
+ * What a version's column draws as a dash: absent, `null`, an empty string or
+ * an empty list, as the audit log's activity panel reads it. Its own here, so a
+ * project without the audit log keeps its versions.
+ */
+const empty = (value: unknown) => value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length)
 
 /** One version as `findVersions` answers it. */
 export type Version = {
@@ -354,7 +360,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
           ) : 'failed' in prior && !against ? (
             <p role="alert" className="text-destructive text-sm">{t('version.failed', 'The versions could not be read.')}</p>
           ) : !rows.length ? (
-            <p className="text-muted-foreground text-sm">{t('auditLog.none', 'No field you may read changed.')}</p>
+            <p className="text-muted-foreground text-sm">{t('version.noReadableChange', 'No field you may read changed.')}</p>
           ) : (
             <ul className="grid gap-3 text-sm">
               {/* Which side is which, over the two columns, since on a phone

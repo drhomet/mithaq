@@ -119,6 +119,19 @@ try {
       assert.equal(await absent('drizzle.__mithaq_migrations'), 0)
     })
 
+    await t.test('a migrations folder holding no migration yet is refused, since it would serve a database nothing built', async () => {
+      await mkdir(new URL('unwritten/', root))
+      await writeFile(new URL('unwritten/drizzle.config.ts', root), '')
+      for (const pending of ['run', 'refuse']) {
+        const refused = await boot(production, 'adapter.ts', pending, '', 'unwritten')
+        assert.notEqual(refused.code, 0)
+        assert.match(refused.stderr, /prodMigrations names unwritten, which holds no migration yet.*`mithaq migrate --name init`/)
+        assert.doesNotMatch(refused.stdout, /booted/)
+      }
+      assert.equal(await absent('public.notes'), 0)
+      assert.equal(await absent('drizzle.__mithaq_migrations'), 0)
+    })
+
     await t.test('"refuse" with a folder pending throws naming it and writes nothing', async () => {
       const refused = await boot(production, 'adapter.ts', 'refuse')
       assert.notEqual(refused.code, 0)
@@ -661,6 +674,9 @@ test('a production boot running drizzle\'s migrator beside connects making the h
   const migrationsFolder = await mkdtemp(join(tmpdir(), 'mithaq-boot-race-'))
   try {
     await writeFile(join(migrationsFolder, 'drizzle.config.ts'), '')
+    // One migration that any round may apply again, since a folder holding none is refused.
+    await mkdir(join(migrationsFolder, '20260101000000_noop'))
+    await writeFile(join(migrationsFolder, '20260101000000_noop/migration.sql'), 'select 1;')
     for (let round = 0; round < 20; round++) {
       await db.execute(sql`drop schema if exists drizzle cascade`)
       // Staggered, since a boot reads the history before its migrator makes the schema.
