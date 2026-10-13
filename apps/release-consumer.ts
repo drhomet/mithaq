@@ -4,7 +4,8 @@
 // consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request, seeds and passes
 // `mithaq generate --check`: a monorepo with every add-on with Bun, a minimal one (auth and the tags example) with npm,
 // which writes its own first migration and boots with no PLATFORM_URL, a single package with every add-on it can hold,
-// and a monorepo with two add-ons picked. Each speaks the template's vocabulary. A project with no rich text, `mithaq`
+// and a monorepo with settings and the platform console but no roles, whose staff hold their keys through Better Auth's
+// member roles' access target as they do through the roles add-on's. Each speaks the template's vocabulary. A project with no rich text, `mithaq`
 // alone with npm, proves no Lexical is installed with it.
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
@@ -71,7 +72,7 @@ try {
     { manager: 'bun', addOns: ['--full'] },
     { manager: 'npm', addOns: [] },
     { manager: 'bun', layout: 'single', addOns: ['--full'] },
-    { manager: 'bun', addOns: ['--with', 'roles,settings'] },
+    { manager: 'bun', addOns: ['--with', 'settings,platform'] },
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
@@ -113,7 +114,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
   const single = layout === 'single'
   const full = addOns.includes('--full')
   // `--full` holds the platform console where the layout can.
-  const platform = !single && full
+  const platform = !single && (full || addOns.some((one) => /(^|,)platform(,|$)/.test(one)))
   const name = `${manager}-${layout}-${full ? 'full' : addOns.length ? 'pick' : 'minimal'}`
   const consumer = join(scratch, name)
   const servers: ReturnType<typeof spawn>[] = []
@@ -277,6 +278,21 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       signal: AbortSignal.timeout(10_000),
     })
     assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
+    if (platform) {
+      // Staff hold their platform role in the platform app with no organization active, whichever access target the
+      // project's add-ons chose.
+      command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = 'release-${stamp}@example.com'"); await asas.destroy()`], template)
+      const staff = await fetch(`${platformOrigin}/api/auth/user/sign-in/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: platformOrigin },
+        body: JSON.stringify({ email: `release-${stamp}@example.com`, password: 'release-test-password' }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
+      const staffCookie = staff.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
+      const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
+      assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s platform staff hold every key: ${JSON.stringify(report).slice(0, 400)}`)
+    }
     // The sample rows of whatever the project holds, written through its own operations as that organization's owner.
     const seeded = spawnSync(process.execPath, ['src/seed.ts'], { cwd: template, encoding: 'utf8', env: { ...process.env, NODE_ENV: 'development' } })
     assert.equal(seeded.status, 0, `${seeded.stdout}\n${seeded.stderr}`)
