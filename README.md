@@ -4,7 +4,7 @@
 
 mithaq is a TypeScript language for declaring a backend and its admin once, and building the database, API, validation, access rules and admin screens from that one declaration.
 
-The package is `@drhomet/mithaq`, at version 0.1.1. It is pre-1.0, so the API may still change between releases.
+The package is `@drhomet/mithaq`. It is pre-1.0, so the API may still change between releases.
 
 The name is Arabic for a covenant. The other words in the API are Arabic too, and each is defined where it first appears below.
 

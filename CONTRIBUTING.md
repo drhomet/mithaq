@@ -62,6 +62,7 @@ mithaq/
   package.json        workspace root and the repository's scripts
   tsconfig.json       the root type check
   README.md  AGENTS.md  CONTRIBUTING.md  LICENSE  LICENSES/
+  .github/workflows/  ci.yml runs the checks; release.yml publishes a pushed v tag
   packages/
     mithaq/           the framework, published as @drhomet/mithaq
     mithaq-admin/     the admin's pieces, the screen host, storage adapters and steps, published as @drhomet/mithaq-admin
@@ -128,6 +129,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 |---|---|
 | `lint-args.ts` | `bun run lint:args`: fails an exported function, constructor, method or function type with three or more positional parameters, over `packages/mithaq/src`, the registry and `templates/asas/src`. `lint-args.test.ts` and `lint-args.fixture.ts` test it. |
 | `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package), `.pack/mithaq-admin/` (the pieces as source, at the same version) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
+| `release.ts` | `node apps/release.ts <version>` commits the version and tags it; `--publish` is release.yml's publish step. `release.test.ts` tests it. |
 | `release-consumer.ts` | `bun run test:release`: makes a project from the staged packages as `bun create mithaq` does, then typechecks, migrates, builds and boots it and runs `mithaq generate --check`. |
 | `tanstack-boot.ts`, `next-boot.ts` | `bun run test:tanstack` and `bun run test:next`: build and boot the apps and test them over a real socket. |
 | `migrated-database.ts` | Builds the boot tests' database with `drizzle-kit migrate`. |
@@ -141,6 +143,24 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 - Package tests sit beside their source in `packages/mithaq/src`, in `packages/mithaq-admin/test/`, and in `packages/create-mithaq/index.test.ts`. App tests sit in `apps/asas-tanstack/src`.
 - `bun run test` runs `lint:args` and every `*.test.ts`. `bun run typecheck` runs the root config and the configs of `packages/mithaq-admin` and both apps.
 - Generated files in the template and apps are committed, as they are in a project. Build output is not: `.pack/` and `node_modules/` are ignored.
+
+## Release
+
+The three packages share one version, `publishConfig.version` in `packages/mithaq/package.json`. The maintainer releases:
+
+```sh
+node apps/release.ts 0.2.0          # on a clean, up-to-date main: commits the version and tags v0.2.0
+git push --atomic origin main v0.2.0
+```
+
+The `release` run runs every check and stages the packages, then waits for the maintainer's approval in the repository's Actions tab. Approved, it publishes the three packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release from the commit subjects since the previous tag. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
+
+Set up once:
+
+1. Publish `@drhomet/mithaq-admin` once by hand, since trusted publishing cannot create a package: `bun run pack && npm publish .pack/mithaq-admin --access public`.
+2. Tag the current release, so the next release's notes start there rather than at the first commit: `git tag -a v0.1.1 4527ae1 -m v0.1.1 && git push origin v0.1.1`. That commit has no `release.yml`, so the tag starts no run.
+3. On npmjs.com, for each of `@drhomet/mithaq`, `@drhomet/mithaq-admin` and `create-mithaq`, add a Trusted Publisher: GitHub Actions, repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`, allowed action `npm publish`. Then set Publishing access to "Require two-factor authentication and disallow tokens", and revoke the old tokens.
+4. In the repository's settings, create the environment `npm` with the maintainer as required reviewer and deployment tags limited to `v*`, and add a tag ruleset so only the maintainer creates `v*` tags.
 
 ## Send a pull request
 

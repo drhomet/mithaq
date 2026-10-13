@@ -20,7 +20,7 @@ This file is for an agent changing mithaq itself. An agent working inside a crea
 - `packages/mithaq-admin/`: the admin's pieces, which the apps import as `mithaq-admin/<file>` and a project ejects one by one. Read `packages/mithaq-admin/AGENTS.md` before you edit it.
 - `packages/create-mithaq/`: the `bun create mithaq` starter.
 - `templates/asas/`: the template project that ships into every created project, and the worked example. `templates/auth/` is its Better Auth setup (`@asas/auth`).
-- `apps/`: the hosts (`asas-tanstack` for the tenant app, `asas-platform` for the platform console, `asas-next`), plus the repository's own scripts: `lint-args.ts`, `pack.ts`, `release-consumer.ts` and the boot tests.
+- `apps/`: the hosts (`asas-tanstack` for the tenant app, `asas-platform` for the platform console, `asas-next`), plus the repository's own scripts: `lint-args.ts`, `pack.ts`, `release.ts`, `release-consumer.ts` and the boot tests. `.github/workflows/` runs the checks and publishes releases.
 - `LICENSES/`: notices for code mithaq adapts.
 - `.claude/skills/ponytail/`: the skill behind `ponytail:` comments.
 
