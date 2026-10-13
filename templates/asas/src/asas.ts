@@ -36,11 +36,12 @@ export const asas = buildAsas({
     // An image is read by a holder of `media.create`, and otherwise through
     // what the features pointing at images say of it.
     ...media.kayan({
-      reads: [
-        // add-on: courses
-        courses.coverReads,
-        // end add-on: courses
-      ],
+      // add-on: courses
+      reads: [courses.coverReads],
+      // end add-on: courses
+      // without add-on: courses
+      // reads: [],
+      // end without add-on: courses
     }),
     // end add-on: media
     // add-on: courses

@@ -16945,6 +16945,11 @@ test('227f. the media feature reads an image for an actor without media.create o
   assert.deepEqual(await readOf([coverReads])({ user: student }), { id: { in: [shown] } }, 'with the courses add-on\'s, the cover of the course it reads and nothing else')
   assert.ok(!JSON.stringify(await readOf([coverReads])({ user: student })).includes(loose), 'never an image no course names')
   assert.equal(await readOf([])({ user: registrar }), true, 'a holder of media.create reads every image of its organization either way')
+  // A read that would open every image, by a cast `true` or a filter of nothing, refuses rather than opens.
+  for (const [answer, what] of [[true, 'true'], [{}, 'an empty filter'], [null, 'null']] as const) {
+    const opening = Object.defineProperty(async () => answer as never, 'name', { value: 'openingRead' })
+    await assert.rejects(readOf([coverReads, opening])({ user: student }), /openingRead answered .* which would open every image/, `a read answering ${what} is refused`)
+  }
 })
 
 test('227c. a title, a tag\'s name, a role\'s name and label and the site title are trimmed, so one of spaces alone is refused as required on publish, and a draft keeps it', async () => {

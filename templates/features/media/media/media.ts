@@ -23,7 +23,15 @@ export type ImageRead = (args: { user: unknown }) => Promise<Where | false>
  */
 const imagesReadBy = (reads: readonly ImageRead[]) => async ({ user }: { user: unknown }) => {
   if (readsPast(user, 'media.create')) return true
-  const answers = (await Promise.all(reads.map((read) => read({ user })))).filter((one): one is Where => one !== false)
+  const answered: unknown[] = await Promise.all(reads.map((read) => read({ user })))
+  // The type forbids it, but a cast `true` or a filter of nothing would open every image of the
+  // organization, so either throws and the actor reads none.
+  for (const [at, answer] of answered.entries()) {
+    if (answer !== false && (!answer || typeof answer !== 'object' || !Object.keys(answer).length)) {
+      throw new Error(`The image read ${reads[at]!.name || `at ${at}`} answered ${JSON.stringify(answer)}, which would open every image; a read answers false or a filter.`)
+    }
+  }
+  const answers = answered.filter((one): one is Where => one !== false)
   if (!answers.length) return false
   return answers.length === 1 ? answers[0]! : { or: answers }
 }
