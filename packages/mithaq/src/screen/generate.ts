@@ -79,20 +79,23 @@ const globOf = ({ screen, client, root, app, appName, from }: { screen: string; 
     if (!inProject(folder)) throw new Refusal(`The ${screen} screen's files are read from ${folder}, outside the project at ${project}.`)
     return `${relative(here, folder).replaceAll('\\', '/')}/`
   }
+  const linkFrom = ({ start, name }: { start: string; name: string }) => {
+    for (let folder = start; ; folder = dirname(folder)) {
+      const link = join(folder, 'node_modules', name)
+      if (existsSync(link)) return link
+      if (folder === project || dirname(folder) === folder) return undefined
+    }
+  }
   // A workspace package is read where it is, which npm, pnpm, yarn and Bun
   // agree on. Any other is read through its `node_modules` link, because the
   // folder behind it names a version and a hash, or lies outside the project.
+  // An app that depends on the asas alone links no feature package under an
+  // isolated install (pnpm, Bun), so the asas, which depends on each, is asked next.
   const installed = (name: string) => {
-    for (let folder = realApp; ; folder = dirname(folder)) {
-      const link = join(folder, 'node_modules', name)
-      if (existsSync(link)) {
-        const real = realpathSync(link)
-        return baseOf(inProject(real) && !relative(project, real).split(sep).includes('node_modules') ? real : link)
-      }
-      if (folder === project || dirname(folder) === folder) {
-        throw new Refusal(`The ${screen} screen names files of ${name}, which no node_modules in the project holds. Install it in the app.`)
-      }
-    }
+    const link = linkFrom({ start: realApp, name }) ?? linkFrom({ start: ours.join(sep), name })
+    if (!link) throw new Refusal(`The ${screen} screen names files of ${name}, which no node_modules in the project holds. Install it in the app.`)
+    const real = realpathSync(link)
+    return baseOf(inProject(real) && !relative(project, real).split(sep).includes('node_modules') ? real : link)
   }
   const linked = app.href === root.href ? '/' : baseOf(ours.join(sep))
   const byPackage = new Map<string, string[]>()
