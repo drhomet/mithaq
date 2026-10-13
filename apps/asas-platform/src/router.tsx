@@ -5,8 +5,8 @@ import type { Language } from 'asas'
 import { ComponentsProvider, RouteError, type ComponentsOf } from './components/mithaq/components.tsx'
 import { defaultComponents } from './components/mithaq/default-components.tsx'
 
-// Typed against the language, so a kind of the project's own with no control here is a type error. Spread
-// defaultComponents.controls to add or replace one.
+// Typed against the language, so a kind of the project's own with no control or cell here is a type error.
+// Spread defaultComponents.controls or defaultComponents.cells to add or replace one.
 export const components: ComponentsOf<Language> = defaultComponents
 
 // routeTree.gen.ts is committed: a clean checkout has to typecheck before any build.

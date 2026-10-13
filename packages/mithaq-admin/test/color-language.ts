@@ -1,4 +1,4 @@
-// A language whose own rukn brings a `color` kind no registry control draws, built offline: its tables are made and nothing connects.
+// A language whose own rukn brings a `color` kind no registry control or cell draws, built offline: its tables are made and nothing connects.
 import {
   base,
   defaultAuthorize,
@@ -28,7 +28,7 @@ const color = kind<string>((value): value is string => typeof value === 'string'
   label: { en: 'Color', ar: 'لون' },
   message: { en: 'This is not a color.', ar: 'هذا ليس لونا.' },
   rules: ['required'],
-  targets: { drizzle: drizzleKinds.text, zod: zodKinds.text, screen: { control: 'color', cell: 'text' } },
+  targets: { drizzle: drizzleKinds.text, zod: zodKinds.text, screen: { control: 'color', cell: 'color' } },
 })
 
 export const language = defineMithaq({

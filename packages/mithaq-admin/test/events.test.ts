@@ -30,7 +30,8 @@ timeoutManager.setTimeoutProvider({
   clearInterval,
 })
 const { createRoot } = await import('react-dom/client')
-const { Form, DiscardDialog } = await import('../registry/form.tsx')
+const { Form } = await import('../registry/form.tsx')
+const { DiscardDialog } = await import('../registry/discard-dialog.tsx')
 const { List } = await import('../registry/list.tsx')
 const { Filters } = await import('../registry/list-filters.tsx')
 const { findOf, readQuery, remembered, rulesOf, writeQuery } = await import('../registry/list-query.ts')
@@ -40,9 +41,12 @@ const homeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 const { defaultComponents } = await import('../registry/default-components.tsx')
 const { ComponentsProvider } = await import('../registry/components.tsx')
 const controls: Readonly<Record<string, import('../registry/control-props.ts').Control>> = defaultComponents.controls
-const withComponents = (element: ReactElement) => createElement(ComponentsProvider, { components: defaultComponents }, element)
+// A template file imports the app's copy of the map, which the registry's own provider does not reach, so both are mounted.
+const { ComponentsProvider: AppComponents } = await import('@/components/mithaq/components.tsx')
+const { defaultComponents: appDefaults } = await import('@/components/mithaq/default-components.tsx')
+const withComponents = (element: ReactElement) => createElement(ComponentsProvider, { components: defaultComponents }, createElement(AppComponents, { components: appDefaults }, element))
 const { arm, clientOf } = await import('../registry/host/api.ts')
-const { cells } = await import('../registry/cells.tsx')
+const cells: Readonly<Record<string, import('../registry/control-props.ts').Cell>> = defaultComponents.cells
 const { CalloutNode } = await import('./callout-node.ts')
 const confirmYes = async () => {
   const yes = window.document.querySelector('[data-button="confirm-operation"]')
@@ -294,7 +298,7 @@ const render = async (element: ReactElement, over: Partial<ScreenState> = {}) =>
   const root = createRoot(host)
   mounted = root
   await act(async () => {
-    root.render(createElement(ScreenContext, { value: { ...state, ...over } }, createElement(ComponentsProvider, { components: defaultComponents }, element)))
+    root.render(createElement(ScreenContext, { value: { ...state, ...over } }, withComponents(element)))
   })
   return host
 }
@@ -2411,7 +2415,7 @@ test('215h. a bulk update says only the boxes filled in change, and with none fi
   mounted = undefined
 
   // An operation of the project's own whose input is `{ data }` is not a bulk update, so its dialog sends with every box empty.
-  const { OperationButton } = await import('../registry/form.tsx')
+  const { OperationButton } = await import('../registry/operation-button.tsx')
   const sent: unknown[] = []
   await render(createElement(OperationButton, {
     busy: false,
@@ -3096,7 +3100,8 @@ test('78. a page\'s button is drawn where its node sits, and the form draws its 
 test('79. the form marks a box touched when the person leaves it and shows nothing until something is wrong, while a refusal the server sent is under its box whether or not that box was ever left', async () => {
   // Read from a component the project registered through `useKayanField`: the only way to read the two halves separately, since the shell draws a message and never a "touched".
   // A box is told it is wrong once a person has left it, so nothing is red while they are still typing the first letter.
-  const { Form: Bound, useKayanField } = await import('../registry/form.tsx')
+  const { Form: Bound } = await import('../registry/form.tsx')
+  const { useKayanField } = await import('../registry/form-context.tsx')
   const Probe = () => {
     const bound = useKayanField('title')
     return createElement('span', { 'data-touched': String(bound.touched), 'data-error': bound.error ?? '' })
@@ -4058,7 +4063,7 @@ test('174a. Publish changes is green and Save draft amber, in both themes, and t
 const platform = asas.targets.platform.client
 
 test('155a. a platform record page draws each field it names by its cell under its label, in its sections, a relationship by the row\'s title, and a field the report hides not at all; no box takes input and nothing on it writes', async () => {
-  const { FieldValue } = await import('../registry/form.tsx')
+  const { FieldValue } = await import('../registry/field-value.tsx')
   const { pageOf: drawPage, frameOf } = await import('../registry/nodes.tsx')
   const full = platform.kayan.courses!
   const view = full.pages.view as Extract<PageClient, { page: unknown }> | undefined
@@ -5835,7 +5840,7 @@ test('177q. a moment drawn on the client alone reads in the viewer\'s zone on it
 const enrolled = (queries: unknown, client: unknown, docs: Record<string, unknown>[], cell: unknown) => {
   const path = enrollments.fields.find((one) => one.name === 'session')!.cell
   const list = listOn(enrollments, docs, { screen: screenOf(enrollments.pages.list!, enrollments, { [path]: cell as never }) })
-  return createElement(ScreenContext, { value: { ...state, client: client as never, kayan: enrollments } }, createElement(QueryClientProvider, { client: queries }, createElement(ListContext, { value: list.props as never }, list)))
+  return createElement(ScreenContext, { value: { ...state, client: client as never, kayan: enrollments } }, createElement(QueryClientProvider, { client: queries }, createElement(ListContext, { value: list.props as never }, withComponents(list))))
 }
 
 test('177r. a read a refusal answered reads as no rows and is not tried again, and one that failed is', async () => {
@@ -6244,7 +6249,7 @@ test('185e. a rich text cell is the words of the value\'s first block, cut where
   assert.equal(long.endsWith('word…'), true)
   assert.equal(cell(null), '—', 'and nothing is a dash')
 
-  const { FieldValue } = await import('../registry/form.tsx')
+  const { FieldValue } = await import('../registry/field-value.tsx')
   const host = await render(createElement(FieldValue, { copy: { t, locale: 'en' }, field: details, kayan: courses, row: { id: 'c1', details: value } }))
   await act(async () => sleep(20))
   assert.equal(host.querySelector('[data-field-value="details"] h2')?.textContent, 'Quantum', 'the record page draws the heading as a heading')

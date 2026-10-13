@@ -10,11 +10,11 @@ import { empty } from '../sink.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cellFor } from '@/components/mithaq/cells.tsx'
-import type { FindApi, FoundPage } from '@/components/mithaq/control-props.ts'
+import { cellFor, useComponents } from '@/components/mithaq/components.tsx'
+import type { FindApi, FoundPage, RelationshipTitles } from '@/components/mithaq/control-props.ts'
 import { labelFor, operationLabelFor, type Translate } from '@/components/mithaq/copy.ts'
 import { formatDate } from '@/components/mithaq/format.tsx'
-import { useRelationshipTitles, type RelationshipTitles } from '@/components/mithaq/relationship-cell.tsx'
+import { useRelationshipTitles } from '@/components/mithaq/relationship-cell.tsx'
 
 /** One entry as the log's `find` answers it. */
 export type Entry = {
@@ -77,6 +77,7 @@ type EntriesProps = {
 /** The entries drawn, with nothing read: what the panel shows once a page has come back. */
 export function ActivityEntries({ entries, kayan, titles, t, locale, viewer, people }: EntriesProps) {
   const copy = { t, locale }
+  const { cells } = useComponents()
   // A person the title read did not name, one the reader may not read among
   // them, is someone, never the raw id.
   const named = (id: string | null | undefined) => {
@@ -92,7 +93,7 @@ export function ActivityEntries({ entries, kayan, titles, t, locale, viewer, peo
     return typeof title === 'string' ? title : (t('auditLog.someone', 'Someone') ?? 'Someone')
   }
   const drawn = (field: ClientField, value: unknown): ReactNode =>
-    empty(value) ? '—' : cellFor(field)({ kayan, field, value, t, locale, titles })
+    empty(value) ? '—' : cellFor({ cells, field })({ kayan, field, value, t, locale, titles })
   return (
     <ol className="grid gap-4 text-sm">
       {entries.map((entry) => {

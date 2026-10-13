@@ -1,18 +1,10 @@
 import { use, useEffect, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { ScreenContext } from 'mithaq/admin/react'
-import type { CellProps } from './cells.tsx'
-import type { FindApi } from './control-props.ts'
+import type { CellProps, FindApi, RelationshipTitles } from './control-props.ts'
 import { listed } from './format.tsx'
 import { isForbidden } from './refusal.ts'
 import { findByIds, idsOf, nameOfRow, titleFieldOf } from './relationship-control.tsx'
-
-/**
- * What the table knows about the rows its relationship columns point at, keyed by target and id.
- * `null` is loading, a string is the row's title, `false` is a row the read did not answer for
- * (the access answer), an `Error` is a failed read, and an absent key was never asked for.
- */
-export type RelationshipTitles = ReadonlyMap<string, string | Record<string, unknown> | null | false | Error>
 
 export const titleKey = (target: string, id: string): string => `${target}:${id}`
 
@@ -126,4 +118,4 @@ export function RelationshipCell({ field, locale, t, titles, value }: CellProps)
     </span>
   )
 }
-// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 9c05e3885308f9d3d7378963c5d5177f12cd62ddd537e454336efa814c0eb466
+// mithaq-admin 914e73d025b4a93b51a0cfbb2087704b3548f352 52af7cf2873cd831df9c737f3774eaa1117412c9b9d3639eb807c42fd9b00d37

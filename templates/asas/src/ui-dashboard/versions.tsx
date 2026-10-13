@@ -24,7 +24,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetClose, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { blocksOf, cellFor, richTextPlainText } from '@/components/mithaq/cells.tsx'
+import { blocksOf, richTextPlainText } from '@/components/mithaq/cells.tsx'
+import { cellFor, useComponents } from '@/components/mithaq/components.tsx'
 import type { FindApi, FoundPage } from '@/components/mithaq/control-props.ts'
 import { labelFor, titleOf } from '@/components/mithaq/copy.ts'
 import { formatDate } from '@/components/mithaq/format.tsx'
@@ -260,6 +261,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
     [kayans],
   )
   const titles = useRelationshipTitles({ fields: kayan.fields, docs: [version.version, from?.version ?? {}], context: { api, client: kayans, locale } })
+  const { cells } = useComponents()
   const copy = { t, locale }
   // A rich text value whole, a block to a line, where its list cell draws the
   // first block alone: a change further down would read as no change. A block the
@@ -268,7 +270,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
   // as well as tinted, so the mark does not rest on colour alone.
   const drawn = (field: ClientField, value: unknown, other: unknown, mark: 'del' | 'ins') => {
     if (empty(value)) return '—'
-    if (field.kind !== 'richText') return cellFor(field)({ kayan, field, value, t, locale, titles })
+    if (field.kind !== 'richText') return cellFor({ cells, field })({ kayan, field, value, t, locale, titles })
     const blocks = changedBlocks({ side: value, other })
     // A value of images or empty blocks alone has no words, and reads as empty.
     if (!blocks.length) return '—'

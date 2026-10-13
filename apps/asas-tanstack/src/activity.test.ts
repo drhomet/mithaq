@@ -9,6 +9,8 @@ import { dirOf, translator, type Locale } from './copy.ts'
 
 const { createRoot } = await import('react-dom/client')
 const { Activity } = await import('asas/audit-log/ui/activity.tsx')
+const { ComponentsProvider } = await import('./components/mithaq/components.tsx')
+const { defaultComponents } = await import('./components/mithaq/default-components.tsx')
 
 const screen = asas.targets.dashboard.client
 const courses = screen.kayan.courses!
@@ -49,7 +51,7 @@ const draw = async (locale: Locale, viewer?: string) => {
   const host = mount()
   const root = createRoot(host)
   const redraw = async (record: Record<string, unknown>) => {
-    await act(async () => root.render(createElement(ScreenContext, { value: { ...state, record } }, createElement(Activity, { page: courses.pages.edit! }))))
+    await act(async () => root.render(createElement(ScreenContext, { value: { ...state, record } }, createElement(ComponentsProvider, { components: defaultComponents }, createElement(Activity, { page: courses.pages.edit! })))))
     await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
   }
   await redraw(state.record!)

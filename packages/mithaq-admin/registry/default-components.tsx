@@ -1,3 +1,4 @@
+import { cells } from './cells.tsx'
 import { ButtonGroupControl, CheckboxGroupControl, ComboboxControl, RadioControl, SelectControl, ToggleGroupControl } from './choice-control.tsx'
 import { CheckboxControl, SwitchControl, ToggleControl } from './checkbox-control.tsx'
 import type { Components } from './components.tsx'
@@ -41,4 +42,5 @@ export const defaultComponents: Components = {
     checkboxGroup: CheckboxGroupControl,
     calendar: CalendarControl,
   },
+  cells,
 }

@@ -17,8 +17,8 @@ hand. Where it lives: `packages/mithaq/src/asas/cli/upgrade.ts` `upgradeCheck`.
 
 ## Add or replace a control
 
-Every screen draws a field's control from the components map the app hands
-`ComponentsProvider`. The app mounts it around every route in
+Every screen draws a field's control, and a list or a read-only value its
+cell, from the components map the app hands `ComponentsProvider`. The app mounts it around every route in
 `src/router.tsx`, typed against the project's language:
 
 ```tsx
@@ -28,16 +28,17 @@ Wrap: ({ children }) => <ComponentsProvider components={components}>{children}</
 ```
 
 To draw a shipped kind or control name with your own control, spread the
-defaults and replace that one name. A kind your own rukn brings, which no
-control the registry ships draws, names itself as its control, and the map
-draws it under that name:
+defaults and replace that one name; a cell is replaced the same way under
+`cells`. A kind your own rukn brings, which no control or cell the registry
+ships draws, names itself as its control or its cell, and the map draws it
+under that name:
 
 ```ts
 const color = kind<string>(isColor)({
   label: { en: 'Color', ar: 'لون' },
   message: { en: 'This is not a color.', ar: 'هذا ليس لونا.' },
   rules: ['required'],
-  targets: { drizzle: drizzleKinds.text, zod: zodKinds.text, screen: { control: 'color', cell: 'text' } },
+  targets: { drizzle: drizzleKinds.text, zod: zodKinds.text, screen: { control: 'color', cell: 'color' } },
 })
 ```
 
@@ -45,21 +46,29 @@ const color = kind<string>(isColor)({
 const components: ComponentsOf<Language> = {
   ...defaultComponents,
   controls: { ...defaultComponents.controls, color: ColorControl, text: MyTextControl },
+  cells: { ...defaultComponents.cells, color: ColorCell },
 }
 ```
 
-`ComponentsOf<Language>` requires one control per name the registry ships and
-one per kind of the language that no shipped control draws, so leaving `color`
-out, naming a key that is neither, or a control that does not take
-`ControlProps` is a type error. A kind the language declares needs its entry
+`ComponentsOf<Language>` requires one control and one cell per name the
+registry ships, and one of each per kind of the language that no shipped one
+draws, so leaving `color` out, naming a key that is neither, or a control that
+does not take `ControlProps` or a cell that does not take `CellProps` is a type
+error. A kind the language declares needs its entry
 even when no kayan uses it, since the type reads the language and not the
 kayan. A kind drawn by a `ui()` reference needs a map entry too, because an
 operation's dialog, the upload dialog and a form drawn with no page draw it
-through the map.
+through the map. For the same reason the type does not see a cell that a list
+column or a leaf names on a kayan's page: a column naming its kind's own name
+(`{ field: 'color', cell: 'color' }` where the kind draws `text`) needs
+`cells.color` in the map without the type asking for it.
 
 Each app's `src/server.ts` checks every screen it serves against the map as it
-starts, through `checkComponents`, so a field whose kind has no control stops
-the start with the kind and the field named. A route that throws while drawing
+starts, through `checkComponents`, so a field whose kind has no control or no
+cell stops the start with the kind and the field named, and a cell a list
+column or a leaf names that the map does not carry stops it with the screen,
+the page, the node and the cell named. On the page, such a cell is an error and
+never the field's own cell in its place. A route that throws while drawing
 is replaced by `RouteError`, the router's `defaultErrorComponent`, and the shell
 around it stays.
 

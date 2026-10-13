@@ -1,4 +1,4 @@
-import { useKayanField, useValues } from '../registry/form.tsx'
+import { useKayanField, useValues } from '../registry/form-context.tsx'
 
 type CoursesValues = { currency: 'SAR' | 'USD'; fee: number }
 
@@ -39,7 +39,7 @@ import {
 } from 'mithaq/admin/react'
 import type { NodeMap, Places } from '../registry/nodes.tsx'
 import type { Components, ComponentsOf } from '../registry/components.tsx'
-import type { Control } from '../registry/control-props.ts'
+import type { Cell, Control } from '../registry/control-props.ts'
 
 export const probes: { [Place in keyof Places]: Places[Place] } = {
   provider: ({ children }: ProviderProps<ReactNode>) => children,
@@ -94,18 +94,43 @@ export const wrongSignature: Components = {
 }
 const { text: _text, ...textless } = components.controls
 // @ts-expect-error a map that leaves a kind out is refused
-export const missing: Components = { controls: textless }
+export const missing: Components = { ...components, controls: textless }
+export const replacedCell: Components = { ...components, cells: { ...components.cells, number: components.cells.integer } }
+export const unknownCell: Components = {
+  ...components,
+  // @ts-expect-error no cell the registry ships is named color, so no screen could ask for it
+  cells: { ...components.cells, color: components.cells.text },
+}
+export const wrongCell: Components = {
+  ...components,
+  // @ts-expect-error a cell is handed CellProps, whose value is unknown, not a number
+  cells: { ...components.cells, number: ({ value }: { value: number }) => value.toFixed() },
+}
+const { join: _join, ...joinless } = components.cells
+// @ts-expect-error a map that leaves a shipped cell out is refused
+export const missingCell: Components = { ...components, cells: joinless }
 
 type ColorLanguage = typeof import('./color-language.ts').language
 declare const ColorControl: Control
-export const colored: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl } }
+declare const ColorCell: Cell
+const colorCells = { ...components.cells, color: ColorCell }
+export const colored: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl }, cells: colorCells }
 // @ts-expect-error a kind the language's own rukn brings needs a control in the map
-export const colorless: ComponentsOf<ColorLanguage> = { controls: components.controls }
+export const colorless: ComponentsOf<ColorLanguage> = { controls: components.controls, cells: colorCells }
+// @ts-expect-error and a cell, where it names its own
+export const uncelled: ComponentsOf<ColorLanguage> = { controls: { ...components.controls, color: ColorControl }, cells: components.cells }
 export const misspelled: ComponentsOf<ColorLanguage> = {
   // @ts-expect-error and only the kinds it declares do
   controls: { ...components.controls, color: ColorControl, colour: ColorControl },
+  cells: colorCells,
+}
+export const misspelledCell: ComponentsOf<ColorLanguage> = {
+  controls: { ...components.controls, color: ColorControl },
+  // @ts-expect-error a cell under a name no kind of the language draws with
+  cells: { ...colorCells, colour: ColorCell },
 }
 export const wrongColor: ComponentsOf<ColorLanguage> = {
   // @ts-expect-error a color control is handed ControlProps like any other
   controls: { ...components.controls, color: ({ value }: { value: number }) => value.toFixed() },
+  cells: colorCells,
 }

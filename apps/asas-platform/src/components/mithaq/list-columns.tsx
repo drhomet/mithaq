@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { checkboxSize } from './control-props.ts'
 import { labelFor, type Translate } from './copy.ts'
-import type { ColumnChoice } from './list-query.ts'
+import { columnsFrom, columnsTo, type ColumnChoice, type ListQuery } from './list-query.ts'
 
 export type ColumnsProps = {
   kayan: ClientKayan
@@ -106,4 +106,40 @@ export function Columns({ columns, kayan, locale, onChange, t }: ColumnsProps): 
     </Popover>
   )
 }
-// mithaq-admin 98077394ab68bdf56d5bf3e255c233120e7a13c1 d1fded045599c33ba401ce1c5405fd56858c98a454c8bac33f3fd5bd07539ecc
+
+/**
+ * Which columns a list shows, in order: the URL's list when it carries one, else the list node's `columns`, else every field. Never a field this actor may not read.
+ */
+export const columnsOf = ({
+  kayan,
+  cols,
+  reads,
+  opens,
+}: {
+  kayan: ClientKayan
+  cols?: readonly string[]
+  reads?: (kayan: string, field: string) => boolean
+  /** The columns a page's list node opens with, which is every field where there is no node. */
+  opens?: readonly string[]
+}): readonly ColumnChoice[] => {
+  const isDefault = (_kayan: ClientKayan, field: ClientField) => !opens || opens.includes(field.name)
+  const candidates = columnCandidates(kayan, reads)
+  const offered = new Set(candidates.map((field) => field.name))
+  const fromUrl = columnsFrom(cols).filter((one) => offered.has(one.name))
+  const named = new Set(fromUrl.map((one) => one.name))
+  const rest = candidates.filter((field) => !named.has(field.name))
+  if (fromUrl.length) {
+    // A column the URL did not name keeps the declaration's answer, so a field added to a kayan is not hidden from old links.
+    return [...fromUrl, ...rest.map((field) => ({ name: field.name, active: isDefault(kayan, field) }))]
+  }
+  return candidates.map((field) => ({ name: field.name, active: isDefault(kayan, field) }))
+}
+
+/**
+ * The query a column change asks for. It keeps the page it is on, since it changes what a row shows and never which rows match.
+ */
+export const withColumns = (query: ListQuery, columns: readonly ColumnChoice[]): ListQuery => ({
+  ...query,
+  cols: columnsTo(columns),
+})
+// mithaq-admin 7fc64834f9ec8682c4c34f35d23a21736cf89a50 1e92da3fbe5fb015e191b88ed92e1ad7a43898bf4fb142432fa7947b723c8c9c

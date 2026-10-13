@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import type { Translate } from './copy.ts'
 
@@ -73,6 +73,30 @@ export type ControlProps = {
 
 /** A control, as the components map holds it. */
 export type Control = (props: ControlProps) => ReactElement
+
+/**
+ * What the table knows about the rows its relationship columns point at, keyed by target and id.
+ * `null` is loading, a string is the row's title, `false` is a row the read did not answer for
+ * (the access answer), an `Error` is a failed read, and an absent key was never asked for.
+ */
+export type RelationshipTitles = ReadonlyMap<string, string | Record<string, unknown> | null | false | Error>
+
+/** What every cell is handed. The locale is the browser's; `t` is here because a cell that renders a word rather than the value is rendering the project's copy. */
+export type CellProps = {
+  kayan: ClientKayan
+  field: ClientField
+  value: unknown
+  t: Translate
+  locale: string
+  /**
+   * The titles of the rows the relationship columns point at, read once per page. Absent on a
+   * server render, where every relationship cell reads as loading; no cell shows the id it holds.
+   */
+  titles?: RelationshipTitles
+}
+
+/** A cell, as the components map holds it. */
+export type Cell = (props: CellProps) => ReactNode
 
 /**
  * What a control reports a change through: a read-only control reports none, which still holds where a control is not a native input.
