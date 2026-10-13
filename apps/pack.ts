@@ -29,7 +29,7 @@ writeFileSync(join(staged, 'package.json'), `${JSON.stringify({ ...manifest, ...
 const admin = join(root, 'packages/mithaq-admin')
 const stagedAdmin = join(root, '.pack/mithaq-admin')
 rmSync(stagedAdmin, { recursive: true, force: true })
-const { publishConfig: adminPublished, private: _adminPrivate, devDependencies: _adminDev, peerDependencies: adminPeers, ...adminManifest } = JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { publishConfig: Record<string, unknown>; peerDependencies: Record<string, string>; [key: string]: unknown }
+const { publishConfig: adminPublished, private: _adminPrivate, devDependencies: _adminDev, ...adminManifest } = JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { publishConfig: Record<string, unknown>; [key: string]: unknown }
 // Committed files only, as the template is staged, so nothing left in the working tree ships.
 const adminFiles = execFileSync('git', ['ls-files', '-z', 'registry', 'registry.json', 'source.css', 'README.md'], { cwd: admin, encoding: 'utf8' })
   .split('\0')
@@ -37,8 +37,10 @@ const adminFiles = execFileSync('git', ['ls-files', '-z', 'registry', 'registry.
 for (const file of adminFiles) cpSync(join(admin, file), join(stagedAdmin, file))
 const { items } = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; files: { path: string }[] }[] }
 for (const { name, files } of items) for (const { path } of files) assert.ok(existsSync(join(stagedAdmin, path)), `${name} names ${path}, which ships`)
-// One version for the three packages, so a project that pins them together cannot pair two that drifted apart.
-writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version, peerDependencies: { ...adminPeers, mithaq: publishConfig.version } }, null, 2)}\n`)
+// One version for the three packages, so a project that pins them together cannot pair two that drifted apart. The
+// `mithaq` peer stays "*": Bun links no peer whose range the installed alias does not satisfy by version, and a pin
+// of an exact version left the store folder without `mithaq` when it was installed from a tarball.
+writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version }, null, 2)}\n`)
 cpSync(join(root, 'LICENSE'), join(stagedAdmin, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(stagedAdmin, 'LICENSES'), { recursive: true })
 console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
