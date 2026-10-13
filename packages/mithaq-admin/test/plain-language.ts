@@ -18,7 +18,7 @@ import {
   serviceTarget,
   zodTarget,
 } from 'mithaq'
-import { dashboardScreen } from '../../../templates/asas/src/mithaq.ts'
+import { dashboardScreen } from '../../../templates/mithaq/src/mithaq.ts'
 
 export const language = defineMithaq({
   locales: ['ar', 'en'] as const,

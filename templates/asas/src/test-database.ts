@@ -1,5 +1,5 @@
 // Test support: the one database a test may drop, push, migrate and fill.
-import { devDatabaseUrl } from './mithaq.ts'
+import { devDatabaseUrl } from '../../mithaq/src/mithaq.ts'
 
 /**
  * The URL in DATABASE_URL, answered only when a person named it for this run.

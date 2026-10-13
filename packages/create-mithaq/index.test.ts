@@ -14,13 +14,13 @@ const scratch = mkdtempSync(join(tmpdir(), 'create-mithaq-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
 const template = join(scratch, 'template')
-for (const folder of ['templates/asas', 'templates/auth', 'apps/asas-tanstack', 'apps/asas-platform']) {
+for (const folder of ['templates/mithaq', 'templates/features', 'templates/asas', 'apps/asas-tanstack', 'apps/asas-platform']) {
   // What `apps/pack.ts` leaves out: what an install or a build writes, and the repository's own tests and their support.
   const staged = (from: string) => !['node_modules', 'dist', '.tanstack', '.env', '.storage'].includes(basename(from)) && !/(\.test\.tsx?|\.probe\.ts|\.smoke\.ts|\.support\.ts|\.fixture\.[^/]+|(^|\/)(test-[^/]*|memory-store|standard-schema-target)\.ts)$/.test(from)
   cpSync(join(root, folder), join(template, folder), { recursive: true, filter: staged })
 }
 for (const folder of ['apps/asas-tanstack', 'apps/asas-platform']) renameSync(join(template, folder, '.gitignore'), join(template, folder, 'gitignore'))
-writeFileSync(join(template, 'package.json'), JSON.stringify({ private: true, type: 'module', engines: { node: '>=24' }, workspaces: ['templates/*', 'apps/*', 'packages/features/*'], devDependencies: { '@types/node': '^24.12.3' } }))
+writeFileSync(join(template, 'package.json'), JSON.stringify({ private: true, type: 'module', engines: { node: '>=24' }, workspaces: ['packages/mithaq', 'packages/features/*', 'packages/asas', 'apps/*'], devDependencies: { '@types/node': '^24.12.3' } }))
 const filesUnder = (folder: string) => readdirSync(folder, { recursive: true, encoding: 'utf8' }).map((file) => join(folder, file))
 
 const read = (...path: string[]) => readFileSync(join(scratch, ...path), 'utf8')
@@ -28,38 +28,46 @@ const json = (...path: string[]) => JSON.parse(read(...path))
 
 test('a project takes the published mithaq and mithaq-admin under the names its imports use, at exactly one version', () => {
   create({ name: 'my-app', cwd: scratch, template, version: '1.2.3' })
-  for (const workspace of ['templates/asas', 'templates/auth', 'apps/asas-tanstack', 'apps/asas-platform']) {
+  const features = readdirSync(join(scratch, 'my-app/packages/features')).map((one) => `packages/features/${one}`)
+  assert.deepEqual(features, ['audit-log', 'auth', 'courses', 'roles', 'settings', 'tags'].map((one) => `packages/features/${one}`))
+  for (const workspace of ['packages/mithaq', 'packages/asas', ...features, 'apps/asas-tanstack', 'apps/asas-platform']) {
     const { dependencies, devDependencies = {} } = json('my-app', workspace, 'package.json')
     assert.equal(dependencies.mithaq, 'npm:@drhomet/mithaq@1.2.3', workspace)
     assert.equal(devDependencies['mithaq-admin'], undefined, workspace)
-    assert.equal(dependencies['mithaq-admin'], workspace === 'templates/auth' ? undefined : 'npm:@drhomet/mithaq-admin@1.2.3', workspace)
+    if ('mithaq-admin' in dependencies) assert.equal(dependencies['mithaq-admin'], 'npm:@drhomet/mithaq-admin@1.2.3', workspace)
   }
   assert.equal(json('my-app/apps/asas-tanstack/package.json').dependencies.asas, '*')
   assert.equal(json('my-app/apps/asas-platform/package.json').dependencies.asas, '*')
-  assert.equal(json('my-app/templates/asas/package.json').dependencies['@asas/auth'], '*')
+  // The project's own scope, on its packages and every import of one.
+  assert.equal(json('my-app/packages/mithaq/package.json').name, '@my-app/mithaq')
+  assert.equal(json('my-app/packages/features/courses/package.json').name, '@my-app/courses')
+  for (const name of ['mithaq', 'auth', 'courses']) assert.equal(json('my-app/packages/asas/package.json').dependencies[`@my-app/${name}`], '*', name)
+  assert.match(read('my-app/packages/asas/src/asas.ts'), /from '@my-app\/courses'/)
+  assert.match(read('my-app/packages/mithaq/src/mithaq.ts'), /language: '@my-app\/mithaq',\n/)
+  const sources = filesUnder(join(scratch, 'my-app')).filter((file) => /\.(tsx?|json|css)$/.test(file))
+  assert.deepEqual(sources.filter((file) => /@asas\/|\.\.\/templates\//.test(readFileSync(file, 'utf8'))).map((file) => file.slice(join(scratch, 'my-app').length)), [], 'no scope or folder of the mithaq repository is left')
 })
 
-test('a project is a workspace every package manager reads, named for it, with room for feature packages, ignoring its .env', () => {
+test('a project is a workspace every package manager reads, named for it, of the language, its features, the asas and the apps, ignoring its .env', () => {
   const manifest = json('my-app/package.json')
   assert.equal(manifest.name, 'my-app')
-  assert.deepEqual(manifest.workspaces, ['templates/*', 'apps/*', 'packages/features/*'])
+  assert.deepEqual(manifest.workspaces, ['packages/mithaq', 'packages/features/*', 'packages/asas', 'apps/*'])
   assert.equal(manifest.devDependencies['@types/node'], '^24.12.3')
   // pnpm reads its own file, and takes a `"*"` workspace over the registry's `asas` only when told to.
-  assert.equal(read('my-app/pnpm-workspace.yaml'), 'packages:\n  - templates/*\n  - apps/*\n  - packages/features/*\nlinkWorkspacePackages: true\npreferWorkspacePackages: true\nonlyBuiltDependencies:\n  - esbuild\nallowBuilds:\n  esbuild: true\n')
+  assert.equal(read('my-app/pnpm-workspace.yaml'), 'packages:\n  - packages/mithaq\n  - packages/features/*\n  - packages/asas\n  - apps/*\nlinkWorkspacePackages: true\npreferWorkspacePackages: true\nonlyBuiltDependencies:\n  - esbuild\nallowBuilds:\n  esbuild: true\n')
   assert.equal(read('my-app/.yarnrc.yml'), 'nodeLinker: node-modules\n', 'Yarn 2 and later lay out node_modules, not Plug\'n\'Play')
   assert.ok(!existsSync(join(scratch, 'my-app/bunfig.toml')), 'no installer is required')
-  assert.ok(existsSync(join(scratch, 'my-app/packages/features/.gitkeep')))
-  assert.equal(json('my-app/templates/asas/package.json').scripts.seed, 'node --env-file-if-exists=.env src/seed.ts', 'run by node, whichever manager runs the script')
+  assert.equal(json('my-app/packages/asas/package.json').scripts.seed, 'node --env-file-if-exists=.env src/seed.ts', 'run by node, whichever manager runs the script')
   const ignored = read('my-app/.gitignore').split('\n')
   for (const entry of ['node_modules', '.env', 'dist', '.storage/']) assert.ok(ignored.includes(entry), entry)
   assert.ok(existsSync(join(scratch, 'my-app/apps/asas-tanstack/.gitignore')))
   assert.ok(!existsSync(join(scratch, 'my-app/apps/asas-tanstack/gitignore')))
-  assert.deepEqual(json('my-app/tsconfig.json').include, ['templates/*/src/**/*.ts', 'apps/*/src/**/*.ts'])
+  assert.deepEqual(json('my-app/tsconfig.json').include, ['packages/*/src/**/*.ts', 'packages/features/**/*.ts', 'apps/*/src/**/*.ts'])
   assert.deepEqual(json('my-app/tsconfig.json').exclude, ['apps/*/src/server.ts', 'apps/*/src/components.ts'], 'the server entries and the components maps are checked by each app\'s own config, which reads their .tsx')
 })
 
 test('the template and both apps get the same .env, with fresh secrets only their owner can read', () => {
-  const env = read('my-app/templates/asas/.env')
+  const env = read('my-app/packages/asas/.env')
   // One BETTER_AUTH_SECRET across the two apps, since each signs the sessions the other reads.
   for (const app of ['apps/asas-tanstack', 'apps/asas-platform']) {
     assert.equal(read('my-app', app, '.env'), env, app)
@@ -71,15 +79,15 @@ test('the template and both apps get the same .env, with fresh secrets only thei
   assert.match(env, /^# STORAGE_SECRET=$/m)
   // Left for the owner to choose: a code written here would be one anybody with the repository holds.
   assert.match(env, /^SETUP_CODE=$/m)
-  assert.equal(statSync(join(scratch, 'my-app/templates/asas/.env')).mode & 0o777, 0o600)
+  assert.equal(statSync(join(scratch, 'my-app/packages/asas/.env')).mode & 0o777, 0o600)
   create({ name: 'other-app', cwd: scratch, template, version: '1.2.3', mithaq: 'file:/tmp/mithaq.tgz' })
   const secret = /^LOCAL_AUTH_SECRET=(.*)$/m
-  assert.notEqual(secret.exec(read('other-app/templates/asas/.env'))![1], secret.exec(env)![1])
+  assert.notEqual(secret.exec(read('other-app/packages/asas/.env'))![1], secret.exec(env)![1])
   assert.equal(json('other-app/apps/asas-tanstack/package.json').dependencies.mithaq, 'file:/tmp/mithaq.tgz')
 })
 
 test('each components.json names no @mithaq registry: the pieces come from the installed mithaq-admin, and shadcn adds only primitives', () => {
-  for (const workspace of ['templates/asas', 'apps/asas-tanstack', 'apps/asas-platform']) {
+  for (const workspace of ['packages/mithaq', 'apps/asas-tanstack', 'apps/asas-platform']) {
     assert.equal(json('my-app', workspace, 'components.json').registries?.['@mithaq'], undefined, workspace)
   }
 })
@@ -108,12 +116,12 @@ test('without the platform console, its app and its .env are left out, and gener
   create({ name: 'tenant-only', cwd: scratch, template, version: '1.2.3', platform: false })
   assert.ok(!existsSync(join(scratch, 'tenant-only/apps/asas-platform')))
   assert.ok(existsSync(join(scratch, 'tenant-only/apps/asas-tanstack/.env')))
-  assert.match(read('tenant-only/templates/asas/src/mithaq.ts'), /^      platform: false,$/m)
-  assert.doesNotMatch(read('tenant-only/templates/asas/src/mithaq.ts'), /apps\/asas-platform\/src/)
-  assert.match(read('tenant-only/templates/auth/src/index.ts'), /^export const platformApp: boolean = false$/m, 'the provider asks for no PLATFORM_URL and links nobody to a platform')
+  assert.match(read('tenant-only/packages/mithaq/src/mithaq.ts'), /^      platform: false,$/m)
+  assert.doesNotMatch(read('tenant-only/packages/mithaq/src/mithaq.ts'), /apps\/asas-platform\/src/)
+  assert.match(read('tenant-only/packages/mithaq/src/mithaq/auth/index.ts'), /^export const platformApp: boolean = false$/m, 'the provider asks for no PLATFORM_URL and links nobody to a platform')
 })
 
-test('a single package holds the language, the kayan, its auth and the tenant app, reaching itself by the name asas', () => {
+test('a single package holds the language, its features, the asas and the tenant app, reaching itself by the name asas and every other part by path', () => {
   create({ name: 'one', cwd: scratch, template, version: '1.2.3', layout: 'single', platform: false })
   const at = join(scratch, 'one')
   assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', '.yarnrc.yml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
@@ -122,21 +130,24 @@ test('a single package holds the language, the kayan, its auth and the tenant ap
   assert.equal(manifest.workspaces, undefined)
   assert.equal(read('one/pnpm-workspace.yaml'), 'onlyBuiltDependencies:\n  - esbuild\nallowBuilds:\n  esbuild: true\n', 'pnpm\'s settings, and no workspace')
   assert.equal(manifest.exports['.'], './src/asas.ts')
-  assert.equal(manifest.exports['./auth'], './src/auth/index.ts')
-  assert.equal(manifest.exports['./auth/platform-roles'], './src/auth/platform-roles.ts')
   assert.equal(manifest.scripts.build, 'mithaq lock --check && vite build')
   assert.equal(manifest.scripts.seed, 'node --env-file-if-exists=.env src/seed.ts')
   assert.equal(manifest.dependencies.mithaq, 'npm:@drhomet/mithaq@1.2.3')
   for (const name of ['react', 'better-auth', '@tanstack/react-start', 'drizzle-orm']) assert.ok(manifest.dependencies[name], name)
-  for (const name of ['asas', '@asas/auth']) assert.equal(manifest.dependencies[name], undefined, name)
+  for (const name of ['asas', '@asas/mithaq', '@asas/auth', '@asas/courses']) assert.equal(manifest.dependencies[name], undefined, name)
   assert.equal(manifest.devDependencies.vite, json('template/apps/asas-tanstack/package.json').devDependencies.vite)
   assert.equal(manifest.devDependencies['mithaq-admin'], undefined)
   assert.equal(manifest.dependencies['mithaq-admin'], 'npm:@drhomet/mithaq-admin@1.2.3')
   for (const name of ['typescript', '@types/node']) assert.ok(manifest.devDependencies[name], name)
-  for (const file of ['src/asas.ts', 'src/mithaq.ts', 'src/auth/index.ts', 'src/auth/platform-roles.ts', 'src/screens.tsx', 'src/routes/__root.tsx', 'src/ui/app-shell.tsx', 'public/favicon.svg']) assert.ok(existsSync(join(at, file)), file)
+  for (const file of ['src/asas.ts', 'src/mithaq.ts', 'src/mithaq/auth/index.ts', 'src/mithaq/auth/platform-roles.ts', 'src/roles/tenant-roles.ts', 'src/storage/index.ts', 'src/features/courses/index.ts', 'src/features/courses/courses/courses.ts', 'src/features/auth/user/user.ts', 'src/ui-dashboard/dashboard.tsx', 'src/screens.tsx', 'src/routes/__root.tsx', 'src/ui/app-shell.tsx', 'public/favicon.svg']) assert.ok(existsSync(join(at, file)), file)
   const sources = filesUnder(join(at, 'src')).filter((file) => /\.(tsx?|json|css)$/.test(file))
-  assert.deepEqual(sources.filter((file) => /@asas\/auth|templates\/asas|apps\/asas/.test(readFileSync(file, 'utf8').replaceAll(/^\s*(\/\/|\*).*$/gm, ''))).map((file) => file.slice(at.length)), [], 'no path or name of the monorepo is left')
-  assert.match(read('one/src/auth/index.ts'), /^export const platformApp: boolean = false$/m)
+  assert.deepEqual(sources.filter((file) => /@asas\/|templates\/|packages\/|apps\/asas/.test(readFileSync(file, 'utf8').replaceAll(/^\s*(\/\/|\*).*$/gm, ''))).map((file) => file.slice(at.length)), [], 'no path or name of the monorepo is left')
+  assert.match(read('one/src/mithaq/auth/index.ts'), /^export const platformApp: boolean = false$/m)
+  assert.match(read('one/src/asas.ts'), /from '\.\/features\/courses\/index\.ts'/)
+  assert.match(read('one/src/features/courses/courses/courses.ts'), /from '\.\.\/\.\.\/\.\.\/mithaq\.ts'/)
+  assert.match(read('one/src/mithaq.ts'), /language: '\.\.\/\.\.\/\.\.\/mithaq\.ts',\n    features: 'src\/features\/',\n    auth: 'src\/features\/auth\/',\n    providers: '\.\.\/\.\.\/\.\.\/mithaq\/auth\/index\.ts',/)
+  assert.match(read('one/src/mithaq.ts'), /const asasSource = new URL\('\.\/', import\.meta\.url\)/)
+  assert.doesNotMatch(read('one/src/routes/(screens)/dashboard/screen.json'), /"@asas\//, 'every file a screen names is the package\'s own')
   assert.match(read('one/src/mithaq.ts'), /dashboard: 'src\/routes\/\(screens\)\/',\n      portal: 'src\/routes\/\(screens\)\/',\n      platform: false,/)
   assert.match(read('one/src/routes/(screens)/portal/files.ts'), /\], \{ base: '\/' \}\)\n/, 'off Vite\'s root, the project\'s own')
   assert.match(read('one/src/styles.css'), /\(`src\/ui\/app-shell\.tsx`\)\. \*\/\n@source '\.\/';\n/)

@@ -47,7 +47,7 @@ import {
 } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
 import { memoryStore } from './memory-store.ts'
-import { storageConfig } from './storage/index.ts'
+import { storageConfig } from '../../mithaq/src/storage/index.ts'
 import { testDatabase } from './test-database.ts'
 
 const label = (en: string) => ({ en, ar: en })

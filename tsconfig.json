@@ -11,7 +11,7 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["packages/*/src/**/*.ts", "templates/*/src/**/*.ts", "apps/*/src/**/*.ts", "apps/*/next.config.ts", "apps/*.ts", "*.ts"],
+  "include": ["packages/*/src/**/*.ts", "templates/*/src/**/*.ts", "templates/features/**/*.ts", "apps/*/src/**/*.ts", "apps/*/next.config.ts", "apps/*.ts", "*.ts"],
   // The tests that draw the app's own `.tsx`, which the app's config checks with
   // its JSX and its `@/` alias (`apps/asas-tanstack/tsconfig.json`), and the one
   // that draws the template's, which no config here carries JSX for.

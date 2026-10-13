@@ -58,7 +58,7 @@ const creatorSource = join(root, 'packages/create-mithaq')
 rmSync(creator, { recursive: true, force: true })
 const { private: _creatorPrivate, publishConfig: creatorPublished, ...creatorManifest } = JSON.parse(readFileSync(join(creatorSource, 'package.json'), 'utf8')) as { publishConfig: Record<string, unknown>; [key: string]: unknown }
 const excluded = /(\.test\.tsx?|\.probe\.ts|\.smoke\.ts|\.support\.ts|\.fixture\.[^/]+|(^|\/)(test-[^/]*|memory-store|standard-schema-target)\.ts)$/
-const templateFiles = execFileSync('git', ['ls-files', '-z', 'templates/asas', 'templates/auth', 'apps/asas-tanstack', 'apps/asas-platform'], { cwd: root, encoding: 'utf8' })
+const templateFiles = execFileSync('git', ['ls-files', '-z', 'templates/mithaq', 'templates/features', 'templates/asas', 'apps/asas-tanstack', 'apps/asas-platform'], { cwd: root, encoding: 'utf8' })
   .split('\0')
   .filter((file) => file && !excluded.test(file))
 for (const file of templateFiles) {
@@ -69,7 +69,7 @@ for (const file of templateFiles) {
 // optional peer of better-auth's would refuse, installs better-auth and mithaq again under every workspace, and two copies of
 // mithaq are two languages.
 const { engines, devDependencies: { typescript: _typescript, ...devDependencies } } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { engines: unknown; devDependencies: Record<string, string> }
-writeFileSync(join(creator, 'template/package.json'), `${JSON.stringify({ private: true, type: 'module', engines, workspaces: ['templates/*', 'apps/*', 'packages/features/*'], devDependencies }, null, 2)}\n`)
+writeFileSync(join(creator, 'template/package.json'), `${JSON.stringify({ private: true, type: 'module', engines, workspaces: ['packages/mithaq', 'packages/features/*', 'packages/asas', 'apps/*'], devDependencies }, null, 2)}\n`)
 writeFileSync(join(creator, 'package.json'), `${JSON.stringify({ ...creatorManifest, ...creatorPublished, version: publishConfig.version }, null, 2)}\n`)
 cpSync(join(creatorSource, 'index.js'), join(creator, 'index.js'))
 cpSync(join(root, 'LICENSE'), join(creator, 'LICENSE'))

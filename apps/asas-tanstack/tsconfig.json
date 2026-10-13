@@ -15,5 +15,5 @@
     "types": ["node", "vite/client"],
     "paths": { "@/*": ["./src/*"], "mithaq-admin/*": ["./src/components/mithaq/*", "./node_modules/mithaq-admin/registry/*"] }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "../../templates/asas/src/ui/*.tsx", "../../templates/asas/src/ui-*/*.tsx", "../../templates/asas/src/features/*/*/ui/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "../../templates/mithaq/src/ui/*.tsx", "../../templates/asas/src/ui-*/*.tsx", "../../templates/features/*/*/ui/*.tsx"]
 }

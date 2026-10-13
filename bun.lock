@@ -252,7 +252,13 @@
       "name": "asas",
       "version": "0.0.0",
       "dependencies": {
+        "@asas/audit-log": "*",
         "@asas/auth": "*",
+        "@asas/courses": "*",
+        "@asas/mithaq": "*",
+        "@asas/roles": "*",
+        "@asas/settings": "*",
+        "@asas/tags": "*",
         "@lexical/extension": "0.52.0",
         "@lexical/link": "0.52.0",
         "@lexical/list": "0.52.0",
@@ -280,18 +286,109 @@
         "typescript": "^7.0.2",
       },
     },
-    "templates/auth": {
+    "templates/features/audit-log": {
+      "name": "@asas/audit-log",
+      "version": "0.0.0",
+      "dependencies": {
+        "@asas/mithaq": "*",
+        "mithaq": "*",
+      },
+    },
+    "templates/features/auth": {
       "name": "@asas/auth",
       "version": "0.0.0",
       "dependencies": {
-        "@better-auth/core": "1.7.4",
-        "better-auth": "1.7.4",
+        "@asas/mithaq": "*",
         "mithaq": "*",
+      },
+    },
+    "templates/features/courses": {
+      "name": "@asas/courses",
+      "version": "0.0.0",
+      "dependencies": {
+        "@asas/mithaq": "*",
+        "mithaq": "*",
+        "mithaq-admin": "*",
+        "zod": "^4.6.5",
+      },
+      "devDependencies": {
+        "@tanstack/react-query": "^5.104.0",
+        "@types/react": "^19.3.0",
+        "lucide-react": "^1.16.0",
+        "react": "^19.3.0",
+      },
+    },
+    "templates/features/roles": {
+      "name": "@asas/roles",
+      "version": "0.0.0",
+      "dependencies": {
+        "@asas/auth": "*",
+        "@asas/mithaq": "*",
+        "mithaq": "*",
+        "mithaq-admin": "*",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "lucide-react": "^1.16.0",
+        "react": "^19.3.0",
+      },
+    },
+    "templates/features/settings": {
+      "name": "@asas/settings",
+      "version": "0.0.0",
+      "dependencies": {
+        "@asas/mithaq": "*",
+        "mithaq": "*",
+      },
+    },
+    "templates/features/tags": {
+      "name": "@asas/tags",
+      "version": "0.0.0",
+      "dependencies": {
+        "@asas/mithaq": "*",
+        "mithaq": "*",
+        "zod": "^4.6.5",
+      },
+    },
+    "templates/mithaq": {
+      "name": "@asas/mithaq",
+      "version": "0.0.0",
+      "dependencies": {
+        "@better-auth/core": "1.7.4",
+        "@lexical/extension": "0.52.0",
+        "@lexical/link": "0.52.0",
+        "@lexical/list": "0.52.0",
+        "@lexical/rich-text": "0.52.0",
+        "aws4fetch": "1.0.20",
+        "better-auth": "1.7.4",
+        "file-type": "22.0.1",
+        "image-dimensions": "2.5.1",
+        "lexical": "0.52.0",
+        "mithaq": "*",
+        "mithaq-admin": "*",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "lucide-react": "^1.16.0",
+        "react": "^19.3.0",
+        "zod": "^4.6.5",
       },
     },
   },
   "packages": {
-    "@asas/auth": ["@asas/auth@workspace:templates/auth"],
+    "@asas/audit-log": ["@asas/audit-log@workspace:templates/features/audit-log"],
+
+    "@asas/auth": ["@asas/auth@workspace:templates/features/auth"],
+
+    "@asas/courses": ["@asas/courses@workspace:templates/features/courses"],
+
+    "@asas/mithaq": ["@asas/mithaq@workspace:templates/mithaq"],
+
+    "@asas/roles": ["@asas/roles@workspace:templates/features/roles"],
+
+    "@asas/settings": ["@asas/settings@workspace:templates/features/settings"],
+
+    "@asas/tags": ["@asas/tags@workspace:templates/features/tags"],
 
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
 

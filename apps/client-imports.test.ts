@@ -17,15 +17,15 @@ const trackedFiles = (root: string) =>
   execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter((file) => file && existsSync(join(root, file)))
 const apps = ['apps/asas-tanstack', 'apps/asas-platform']
 const forbidden = [
-  (path: string) => path === 'templates/asas/src/mithaq.ts',
-  (path: string) => path.startsWith('templates/asas/src/storage/'),
+  (path: string) => path === 'templates/mithaq/src/mithaq.ts',
+  (path: string) => path.startsWith('templates/mithaq/src/storage/'),
   (path: string) => path === 'packages/mithaq/src/storage/storage.ts',
   (path: string) => path === 'node:crypto' || path === 'crypto',
 ]
 
-const code = trackedFiles(root).filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.d.ts') && /^(apps\/asas-(tanstack|platform)\/src|templates\/(asas|auth)\/src|packages\/mithaq\/src)\//.test(file))
+const code = trackedFiles(root).filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.d.ts') && /^(apps\/asas-(tanstack|platform)\/src|templates\/((mithaq|asas)\/src|features)|packages\/mithaq\/src)\//.test(file))
 const routeFixture = (options: string) => `import { createFileRoute } from '@tanstack/react-router'
-import { arkan } from '../../../../templates/asas/src/mithaq.ts'
+import { arkan } from '../../../../templates/mithaq/src/mithaq.ts'
 export const Route = createFileRoute('/fixture')({ ${options} })
 `
 const routes = 'apps/asas-tanstack/src/routes'
@@ -133,7 +133,7 @@ const walk = ({ app, from: given }: { app: string; from?: readonly string[] }) =
 for (const app of apps) {
   test(`no module ${app} hands a browser reaches the language, the storage config, core's storage target or node:crypto`, () => {
     const { reached, chain, skipped } = walk({ app })
-    assert.ok(reached.includes('templates/asas/src/ui/app-shell.tsx'), 'the glob of the screens\' files is walked')
+    assert.ok(reached.includes('templates/mithaq/src/ui/app-shell.tsx'), 'the glob of the screens\' files is walked')
     assert.ok(reached.includes('packages/mithaq/src/screen/client.ts'), 'mithaq/admin is walked')
     assert.ok(skipped > 0, 'the dynamic imports of the server functions are seen and left alone')
     const bad = reached.filter((path) => forbidden.some((one) => one(path)))
@@ -143,6 +143,6 @@ for (const app of apps) {
 
 test('a route whose server handler sits beside a loader is the browser\'s, and a route that is a server handler alone is not', () => {
   const loaded = walk({ app: 'apps/asas-tanstack', from: [`${routes}/fixture-loader.tsx`] })
-  assert.ok(loaded.reached.includes('templates/asas/src/mithaq.ts'), 'the loader runs in the browser, so its module\'s imports are walked')
+  assert.ok(loaded.reached.includes('templates/mithaq/src/mithaq.ts'), 'the loader runs in the browser, so its module\'s imports are walked')
   assert.deepEqual(walk({ app: 'apps/asas-tanstack', from: [`${routes}/fixture-server.tsx`] }).reached, [])
 })

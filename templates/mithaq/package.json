@@ -1,0 +1,32 @@
+{
+  "name": "@asas/mithaq",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/mithaq.ts",
+    "./auth": "./src/mithaq/auth/index.ts",
+    "./auth/platform-roles": "./src/mithaq/auth/platform-roles.ts",
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "@better-auth/core": "1.7.4",
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "aws4fetch": "1.0.20",
+    "better-auth": "1.7.4",
+    "file-type": "22.0.1",
+    "image-dimensions": "2.5.1",
+    "lexical": "0.52.0",
+    "mithaq": "*",
+    "mithaq-admin": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.3.0",
+    "zod": "^4.6.5"
+  }
+}

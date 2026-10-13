@@ -50,11 +50,11 @@ import {
   versionOperations,
   versionsTarget,
 } from 'mithaq'
-import { dashboardScreen, serverTargets } from './mithaq.ts'
+import { dashboardScreen, serverTargets } from '../../mithaq/src/mithaq.ts'
 import { memoryStore } from './memory-store.ts'
 import { orpcHttp } from 'mithaq/orpc'
 import { plainTarget } from './standard-schema-target.ts'
-import { expectedUpdatedAt } from './steps/expected-updated-at.ts'
+import { expectedUpdatedAt } from '../../mithaq/src/steps/expected-updated-at.ts'
 // The comparison a version's merge makes, reached where it lives, since no public operation shows a
 // jsonb key order on its own.
 import { changedColumns } from '../../../packages/mithaq/src/versions/versions.ts'

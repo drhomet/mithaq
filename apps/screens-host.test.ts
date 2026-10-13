@@ -11,7 +11,7 @@ import { referencesIn, type ScreenClient } from '../packages/mithaq/src/screen/c
 import { generateScreens } from '../packages/mithaq/src/screen/generate.ts'
 import { eject } from '../packages/mithaq/src/asas/cli/upgrade.ts'
 import { asas } from '../templates/asas/src/asas.ts'
-import { generate, locales } from '../templates/asas/src/mithaq.ts'
+import { generate, locales } from '../templates/mithaq/src/mithaq.ts'
 
 const template = new URL('../templates/asas/', import.meta.url)
 const project = new URL('../', import.meta.url)
@@ -40,7 +40,8 @@ test('each app names no template path but the base a generated glob reads the pr
   for (const folder of apps.keys()) {
     const app = appOf(folder)
     for (const file of [...(await filesUnder(new URL('src/', app))).map((one) => `src/${one}`), 'vite.config.ts']) {
-      if (!/\.(ts|tsx)$/.test(file)) continue
+      // A test is the repository's and never ships, so it may reach a template file by path.
+      if (!/\.(ts|tsx)$/.test(file) || /\.test\.tsx?$/.test(file)) continue
       // A glob's base is the project's real folder, which no package manager moves.
       const text = await readFile(new URL(file, app), 'utf8')
       // `files.ts` is committed, so no base it names may lead out of the project, where each machine differs.

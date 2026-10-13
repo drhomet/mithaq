@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { generateKeyPairSync } from 'node:crypto'
+import { globSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
@@ -38,14 +39,14 @@ import {
 import type { ColumnRule, MessageRegistry, ZodRule } from 'mithaq'
 import { richText } from 'mithaq/rich-text'
 import { asas } from './asas.ts'
-import { options } from '@asas/auth'
-import { betterAuth } from './features/auth/user/index.ts'
+import { options } from '@asas/mithaq/auth'
+import { betterAuth } from '../../features/auth/user/index.ts'
 import { buildAsas, defineKayan } from './test-language.ts'
-import { dashboardScreen as templateDashboard } from './mithaq.ts'
-import { memberRoles } from './features/roles/member-roles/member-roles.ts'
+import { dashboardScreen as templateDashboard } from '../../mithaq/src/mithaq.ts'
+import { memberRoles } from '../../features/roles/member-roles/member-roles.ts'
 import { memoryStore } from './memory-store.ts'
-import { richTextNodes } from './mithaq/rich-text-nodes.ts'
-import { roles } from './features/roles/roles/roles.ts'
+import { richTextNodes } from '../../mithaq/src/mithaq/rich-text-nodes.ts'
+import { roles } from '../../features/roles/roles/roles.ts'
 import { Refusal } from '../../../packages/mithaq/src/mithaq/refusal.ts'
 import { formatLock, sealLanguage, vocabularyOf } from '../../../packages/mithaq/src/mithaq/lock.ts'
 import { receivedLanguage } from '../../../packages/mithaq/src/mithaq/language.ts'
@@ -1956,12 +1957,14 @@ export const { defineKayan, generate } = defineMithaq({
 `,
   )
   await writeFile(new URL('src/auth.ts', root), 'export const providers = {}\n')
-  // The template's screens draw their pages from the template's own `src/`, and a screen's bare
+  // The template's screens draw their root pages from the asas's own `src/`, and a screen's bare
   // files are globbed off the app or the project, which refuses them anywhere else, so the project
-  // holds those folders as links.
-  for (const folder of ['audit-log', 'courses', 'enrollments', 'media', 'roles', 'ui', 'ui-dashboard', 'ui-platform', 'ui-portal']) {
+  // holds those folders as links; the language's and the features' files are read through the
+  // asas's `node_modules`, linked too.
+  for (const folder of ['ui-dashboard', 'ui-platform', 'ui-portal']) {
     await symlink(fileURLToPath(new URL(`${folder}/`, import.meta.url)), fileURLToPath(new URL(`src/${folder}`, root)))
   }
+  await symlink(fileURLToPath(new URL('../node_modules/', import.meta.url)), fileURLToPath(new URL('node_modules', root)))
   return root
 }
 const generated = async (root: URL) => {
@@ -2643,10 +2646,10 @@ test('mithaq generate auth refuses an instance whose tables hold no kayan of its
 })
 
 test('generate auth on the template imports providers from the package generate.providers names, and --check is green', async () => {
-  // The provider is a workspace package of its own, so the generated kayan imports it by its bare
-  // name and needs no relative depth.
-  const kayan = await readFile(new URL('features/auth/user/user.ts', import.meta.url), 'utf8')
-  assert.match(kayan, /\nimport \{ providers \} from '@asas\/auth'\n/)
+  // The language and its auth setup are a workspace package, so the generated kayan imports each by
+  // its bare name and needs no relative depth.
+  const kayan = await readFile(new URL('../../features/auth/user/user.ts', import.meta.url), 'utf8')
+  assert.match(kayan, /\nimport \{ defineKayan \} from '@asas\/mithaq'\nimport \{ providers \} from '@asas\/mithaq\/auth'\n/)
   assert.equal(await quietly(() => runAuth(new URL('../', import.meta.url), true)), 0)
 })
 
@@ -2724,18 +2727,18 @@ test('mithaq generate auth refuses a generate record that names no language, or 
   }
 })
 
-test('the provider package depends on Better Auth\'s own two packages and mithaq alone, and no non-test source of asas outside the generated kayan imports better-auth', async () => {
-  const manifest = JSON.parse(await readFile(new URL('../../auth/package.json', import.meta.url), 'utf8'))
-  assert.equal(manifest.name, '@asas/auth')
-  assert.deepEqual(Object.keys(manifest.dependencies).sort(), ['@better-auth/core', 'better-auth', 'mithaq'])
+test('the language pins Better Auth\'s own two packages at one version, and no non-test source of the project outside the language\'s auth setup imports better-auth', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../../mithaq/package.json', import.meta.url), 'utf8'))
+  assert.equal(manifest.name, '@asas/mithaq')
   // The core `better-auth` itself runs on, never a second version beside it.
+  assert.ok(manifest.dependencies['better-auth'])
   assert.equal(manifest.dependencies['@better-auth/core'], manifest.dependencies['better-auth'])
-  assert.equal(manifest.devDependencies, undefined)
-  const source = new URL('./', import.meta.url)
+  const templates = new URL('../../', import.meta.url)
   const importers: string[] = []
-  for (const file of await readdir(source, { recursive: true })) {
-    if (!/\.tsx?$/.test(file) || file.endsWith('.test.ts') || file.startsWith('kayan/auth/')) continue
-    if (/from 'better-auth/.test(await readFile(new URL(file, source), 'utf8'))) importers.push(file)
+  // Each package's `node_modules` links the others, so a recursive read of the folder never ends.
+  for (const file of globSync('**/*.{ts,tsx}', { cwd: fileURLToPath(templates), exclude: (name) => name === 'node_modules' })) {
+    if (file.endsWith('.test.ts') || file.startsWith('mithaq/src/mithaq/auth/')) continue
+    if (/from 'better-auth/.test(await readFile(new URL(file, templates), 'utf8'))) importers.push(file)
   }
   assert.deepEqual(importers, [])
 })

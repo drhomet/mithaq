@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { devDatabaseUrl } from './mithaq.ts'
+import { devDatabaseUrl } from '../../mithaq/src/mithaq.ts'
 import { testDatabase } from './test-database.ts'
 
 const here = fileURLToPath(new URL('.', import.meta.url))

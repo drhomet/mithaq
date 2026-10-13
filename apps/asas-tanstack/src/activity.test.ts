@@ -8,7 +8,7 @@ import { click, mount } from '../../../packages/mithaq-admin/test/dom.ts'
 import { dirOf, translator, type Locale } from './copy.ts'
 
 const { createRoot } = await import('react-dom/client')
-const { Activity } = await import('asas/ui/activity.tsx')
+const { Activity } = await import('../../../templates/mithaq/src/ui/activity.tsx')
 const { ComponentsProvider } = await import('mithaq-admin/components.tsx')
 const { defaultComponents } = await import('mithaq-admin/default-components.tsx')
 

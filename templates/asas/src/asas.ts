@@ -1,18 +1,18 @@
-import { providerStatements } from '@asas/auth'
+import { providerStatements } from '@asas/mithaq/auth'
 // Each feature is read through its index alone, as a namespace, so its list
 // (`courses.kayan`) never collides with a kayan of the same name.
-import * as auditLog from './features/audit-log/index.ts'
-import * as auth from './features/auth/index.ts'
-import * as courses from './features/courses/index.ts'
-import * as roles from './features/roles/index.ts'
-import * as settings from './features/settings/index.ts'
-import * as tags from './features/tags/index.ts'
+import * as auditLog from '@asas/audit-log'
+import * as auth from '@asas/auth'
+import * as courses from '@asas/courses'
+import * as roles from '@asas/roles'
+import * as settings from '@asas/settings'
+import * as tags from '@asas/tags'
 import { fetchHttp, Notice } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
-import { buildAsas, requestContext } from './mithaq.ts'
+import { buildAsas, requestContext } from '@asas/mithaq'
 import { platformHttp } from './platform-http.ts'
-import { projectStatements } from './roles/statements.ts'
-import { superAdmin } from './roles/tenant-access.ts'
+import { projectStatements } from '@asas/mithaq/roles/statements.ts'
+import { superAdmin } from '@asas/mithaq/roles/tenant-access.ts'
 
 export const asas = buildAsas({
   kayan: [...auth.kayan, ...roles.kayan, ...tags.kayan, ...courses.kayan, ...auditLog.kayan],
@@ -38,7 +38,7 @@ export const asas = buildAsas({
   // Better Auth's own actions, which no declaration of this project derives.
   // They join the catalog under the resources they name, so a role holds
   // `invitation.cancel` or `user.impersonate` exactly as it holds
-  // `courses.find`, and the hooks in @asas/auth ask for them under whichever
+  // `courses.find`, and the hooks in @asas/mithaq/auth ask for them under whichever
   // store this project turned on. `organization.rename` is this project's own,
   // the key the platform's rename route asks, which is neither the
   // provider's `organization.update` nor the managed kayan's, both of which
@@ -66,9 +66,9 @@ export const asas = buildAsas({
 // The platform slug, the screen the platform app serves, the reader that
 // answers the platform roles, and the tenant app's link to the platform, for a
 // host.
-export { PLATFORM, PLATFORM_SCREEN, assignedRoles, platformEntry } from './roles/tenant-access.ts'
+export { PLATFORM, PLATFORM_SCREEN, assignedRoles, platformEntry } from '@asas/mithaq/roles/tenant-access.ts'
 // What the platform app wraps every request it serves in, whether a request is
 // one of those, and where each app is served: re-exported here so a host reaches
 // the one instance of the store behind it through the same module the build reads.
-export { asPlatform, onPlatform, platformURL, tenantURL } from '@asas/auth'
-export type { Language } from './mithaq.ts'
+export { asPlatform, onPlatform, platformURL, tenantURL } from '@asas/mithaq/auth'
+export type { Language } from '@asas/mithaq'

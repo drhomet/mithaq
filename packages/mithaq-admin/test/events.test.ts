@@ -13,7 +13,7 @@ import './tsx.ts'
 import { click, fire, mount, press, window, type as typeInto } from './dom.ts'
 
 // TanStack Query is resolved from the cell that imports it, so the test's provider and the cell's hook are one module.
-const queryHost = new URL('../../../templates/asas/src/features/courses/enrollments/ui/session-cell.tsx', import.meta.url).href
+const queryHost = new URL('../../../templates/features/courses/enrollments/ui/session-cell.tsx', import.meta.url).href
 registerHooks({
   resolve: (specifier, context, next) => (specifier === '@tanstack/react-query' ? next(specifier, { ...context, parentURL: queryHost }) : next(specifier, context)),
 })
@@ -63,10 +63,10 @@ type ClientField = import('mithaq/admin').ClientField
 type ClientKayan = import('mithaq/admin').ClientKayan
 type PageClient = import('mithaq/admin').PageClient
 type ComponentProps = import('mithaq/admin').ComponentProps
-const { RecordPage } = await import('../../../templates/asas/src/ui/record-page.tsx')
-const { AppShell } = await import('../../../templates/asas/src/ui/app-shell.tsx')
+const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
+const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
 const { Dashboard, loader: dashboardLoader } = await import('../../../templates/asas/src/ui-dashboard/dashboard.tsx')
-const { DeleteRole } = await import('../../../templates/asas/src/features/roles/roles/ui/roles.tsx')
+const { DeleteRole } = await import('../../../templates/features/roles/roles/ui/roles.tsx')
 const { loader: membersLoader } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
 const { RoleName } = await import('../../../templates/asas/src/ui-platform/role-cells.tsx')
 
@@ -950,7 +950,7 @@ test('29. a target that declares no useAsTitle is searched and shown by its id, 
 })
 
 test('218b. a session reads as its course and its start in the enrollment picker, held or listed, and by its start alone where the course is not read', async () => {
-  const { SessionLabels } = await import('../../../templates/asas/src/ui/session-labels.tsx')
+  const { SessionLabels } = await import('../../../templates/features/courses/enrollments/ui/session-labels.tsx')
   // The picker as the template imports it, by the package's name.
   const { RelationshipControl } = await import('mithaq-admin/relationship-control.tsx')
   const at = ['2026-10-12T09:00:00.000Z', '2026-10-12T13:00:00.000Z']
@@ -979,7 +979,7 @@ test('218b. a session reads as its course and its start in the enrollment picker
 })
 
 test('218c. an image lists by its thumbnail and its size in kilobytes or megabytes, its page leads with the image, Download and Replace file, and its New page opens the upload dialog', async (t) => {
-  const { FileName, FileSize, MediaPreview, NewImage } = await import('../../../templates/asas/src/features/courses/media/ui/preview.tsx')
+  const { FileName, FileSize, MediaPreview, NewImage } = await import('../../../templates/features/courses/media/ui/preview.tsx')
   const { sizeOf } = await import('../registry/upload.tsx')
   // The template's page imports the upload dialog by the package's name, and the dialog reads the map the same way.
   const { ComponentsProvider: AppComponents } = await import('mithaq-admin/components.tsx')
@@ -1215,7 +1215,7 @@ test('229g. Remove is offered only where the viewer may take every role the memb
 test('229f. a role\'s form refused on save marks its name and both labels required and refused, each with its sentence under it, and its permissions group refused where the server names it', async () => {
   // The form by the package's name, as the role form binds its fields through it.
   const { Form: AppForm } = await import('mithaq-admin/form.tsx')
-  const { RoleForm } = await import('../../../templates/asas/src/features/roles/roles/ui/role-form.tsx')
+  const { RoleForm } = await import('../../../templates/features/roles/roles/ui/role-form.tsx')
   const roles = screen.kayan.roles!
   const sent: Record<string, unknown>[] = []
   // The server refuses the permissions, as it would a key the role may not hold.
@@ -1229,7 +1229,7 @@ test('229f. a role\'s form refused on save marks its name and both labels requir
   }
   const page = roles.pages.create as Extract<PageClient, { page: unknown }>
   const host = await render(
-    createElement(AppForm, { kayan: roles, screen: screenOf(page, roles, { './src/features/roles/roles/ui/role-form.tsx#RoleForm': RoleForm }), client, value: null, t, locale: 'en', onDone: () => {} }),
+    createElement(AppForm, { kayan: roles, screen: screenOf(page, roles, { '@asas/roles:./roles/ui/role-form.tsx#RoleForm': RoleForm }), client, value: null, t, locale: 'en', onDone: () => {} }),
     { kayan: roles, access: { permissions: '*' } as never },
   )
   const ids = ['roles-name', 'roles-label-en', 'roles-label-ar']
@@ -3435,7 +3435,7 @@ test('the site header\'s trigger stays in view over a page wider than the phone,
 })
 
 test('276c. the sidebar on a phone is titled and described in the viewer\'s language and holds no English close, and the record sheet is the phone\'s whole width', async () => {
-  const { AppShell } = await import('../../../templates/asas/src/ui/app-shell.tsx')
+  const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
   const width = window.innerWidth
   window.happyDOM.setViewport({ width: 375 })
@@ -5597,7 +5597,7 @@ test('177e. a date and a moment read in one long format per locale from Intl, th
 })
 
 test('177f. a course\'s fee reads with the row\'s currency in both locales', async () => {
-  const { FeeCell } = await import('../../../templates/asas/src/features/courses/courses/ui/fee-cell.tsx')
+  const { FeeCell } = await import('../../../templates/features/courses/courses/ui/fee-cell.tsx')
   const path = courses.fields.find((one) => one.name === 'fee')!.cell
   const row = { ...draftRow, fee: 450, currency: 'SAR' }
   const fee = async (locale: string) => {
@@ -5609,7 +5609,7 @@ test('177f. a course\'s fee reads with the row\'s currency in both locales', asy
 })
 
 test('177g. an enrollment\'s session reads as its course with its start, from one read of the page\'s sessions and one of their courses', async () => {
-  const { SessionCell } = await import('../../../templates/asas/src/features/courses/enrollments/ui/session-cell.tsx')
+  const { SessionCell } = await import('../../../templates/features/courses/enrollments/ui/session-cell.tsx')
   const path = enrollments.fields.find((one) => one.name === 'session')!.cell
   const rows: Record<string, Record<string, unknown>[]> = {
     sessions: [{ id: 's1', course: 'c1', startsAt: '2026-10-01T09:00:00.000Z' }, { id: 's2', course: 'c1', startsAt: '2026-10-08T09:00:00.000Z' }],
@@ -5689,14 +5689,14 @@ test('177i. a moment hydrates against markup drawn in another zone without a mis
 })
 
 test('177j. a fee in a currency code Intl does not know reads as the plain number', async () => {
-  const { FeeCell } = await import('../../../templates/asas/src/features/courses/courses/ui/fee-cell.tsx')
+  const { FeeCell } = await import('../../../templates/features/courses/courses/ui/fee-cell.tsx')
   const path = courses.fields.find((one) => one.name === 'fee')!.cell
   const host = await render(listOn(courses, [{ ...draftRow, fee: 450, currency: 'not-a-code' }], { screen: screenOf(courses.pages.list!, courses, { [path]: FeeCell }) }))
   assert.match(host.querySelector('tr[data-row="a-row"]')?.textContent ?? '', /450/, 'the row is drawn, and its fee with it')
 })
 
 test('177k. a session whose course and start the viewer may not read says the viewer cannot see it, never the id the column holds', async () => {
-  const { SessionCell } = await import('../../../templates/asas/src/features/courses/enrollments/ui/session-cell.tsx')
+  const { SessionCell } = await import('../../../templates/features/courses/enrollments/ui/session-cell.tsx')
   const path = enrollments.fields.find((one) => one.name === 'session')!.cell
   const queries = new QueryClient()
   const list = listOn(enrollments, [{ id: 'e1', session: 's1', student: 'u1' }], { screen: screenOf(enrollments.pages.list!, enrollments, { [path]: SessionCell }) })
@@ -5712,7 +5712,7 @@ test('177k. a session whose course and start the viewer may not read says the vi
 })
 
 test('177l. a session\'s read runs again when its query is invalidated, a read that failed is not kept, and a renamed course shows', async () => {
-  const { SessionCell } = await import('../../../templates/asas/src/features/courses/enrollments/ui/session-cell.tsx')
+  const { SessionCell } = await import('../../../templates/features/courses/enrollments/ui/session-cell.tsx')
   const path = enrollments.fields.find((one) => one.name === 'session')!.cell
   const rows: Record<string, Record<string, unknown>[]> = {
     sessions: [{ id: 's1', course: 'c1', startsAt: '2026-10-01T09:00:00.000Z' }],
@@ -5846,7 +5846,7 @@ const enrolled = (queries: unknown, client: unknown, docs: Record<string, unknow
 }
 
 test('177r. a read a refusal answered reads as no rows and is not tried again, and one that failed is', async () => {
-  const { SessionCell } = await import('../../../templates/asas/src/features/courses/enrollments/ui/session-cell.tsx')
+  const { SessionCell } = await import('../../../templates/features/courses/enrollments/ui/session-cell.tsx')
   const refusal = Object.assign(new Error('refused'), { data: { key: 'error.forbidden' } })
   const attempts = async (thrown: Error) => {
     let calls = 0
@@ -5867,7 +5867,7 @@ test('177r. a read a refusal answered reads as no rows and is not tried again, a
 })
 
 test('177s. the same rows in another order are the same read', async () => {
-  const { SessionCell } = await import('../../../templates/asas/src/features/courses/enrollments/ui/session-cell.tsx')
+  const { SessionCell } = await import('../../../templates/features/courses/enrollments/ui/session-cell.tsx')
   const reads: string[] = []
   const client = async ({ kayan, input }: { kayan: string; input: Record<string, unknown> }) => {
     reads.push(kayan)
@@ -5914,7 +5914,7 @@ test('182b. a create opened as a drawer draws only its page: its title once, the
 
 test('182c. the nav marks the page\'s own kayan current, Home only on a page of the screen\'s own, and the portal header keeps its title over a menu that shrinks to its avatar on a phone', async () => {
   const { NavLinks } = await import('../registry/nav-links.tsx')
-  const { PortalTopShell } = await import('../../../templates/asas/src/ui/top-shell.tsx')
+  const { PortalTopShell } = await import('../../../templates/mithaq/src/ui/top-shell.tsx')
   const { Home } = await import('../../../templates/asas/src/ui-portal/home.tsx')
   const current = (host: Element) => [...host.querySelectorAll('a[aria-current]')].map((one) => `${one.getAttribute('href')} ${one.getAttribute('aria-current')}`)
   const shell = (nav: ReactElement) => createElement(PortalTopShell, { regions: { header: createElement('h1', null, 'Courses'), nav, main: null } })
@@ -5975,7 +5975,7 @@ test('182f. a page opened as a drawer draws no nav at any depth', async () => {
 
 test('182g. the portal\'s page and main column are one shrinkable track, so no wide child stretches the page past the screen', async () => {
   const { Page } = await import('../../../templates/asas/src/ui-portal/page.tsx')
-  const { PortalTopShell } = await import('../../../templates/asas/src/ui/top-shell.tsx')
+  const { PortalTopShell } = await import('../../../templates/mithaq/src/ui/top-shell.tsx')
   const track = 'grid-cols-[minmax(0,1fr)]'
   const grid = await render(createElement(Page, { regions: { main: 'x' }, page: { path: '/courses' } as never }))
   assert.equal(classesOf(grid.querySelector('[data-layout="page"]')).includes(track), true, 'the page layout')
@@ -6579,13 +6579,13 @@ test('220h. a dashboard page and a portal page each hold one main landmark: the 
   const bare = await render(createElement(Form, { kayan: courses, client: publishedClient([], []), value: draftRow, t, locale: 'en', onDone: () => {} }))
   assert.equal(bare.querySelectorAll('main').length, 0, 'a form drawn with no page draws none of its own, so the page around it holds the one')
   const { Page } = await import('../../../templates/asas/src/ui-portal/page.tsx')
-  const { PortalTopShell } = await import('../../../templates/asas/src/ui/top-shell.tsx')
+  const { PortalTopShell } = await import('../../../templates/mithaq/src/ui/top-shell.tsx')
   const portal = await render(createElement(PortalTopShell, { regions: { header: null, nav: null, main: createElement(Page, { regions: { main: 'x' }, page: { path: '/courses' } as never }) } }))
   assert.equal(portal.querySelectorAll('main').length, 1, 'and a portal page, its layout inside its shell, holds one')
 })
 
 test('220i. the sidebar header draws the organizations the session came with, never a skeleton, and one organization is its name with nothing to open', async () => {
-  const { AppShell } = await import('../../../templates/asas/src/ui/app-shell.tsx')
+  const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
   const shell = (organizations?: { id: string; name: string }[]) =>
     render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', ...(organizations && { organizations, activeOrganizationId: 'b' }) } })
   const two = await shell([{ id: 'a', name: 'First org' }, { id: 'b', name: 'Second org' }])
@@ -6704,7 +6704,7 @@ test('231i. the template\'s sidebar is one named navigation landmark holding its
 })
 
 test('231d. the portal\'s two navs are named differently', async () => {
-  const { PortalTopShell } = await import('../../../templates/asas/src/ui/top-shell.tsx')
+  const { PortalTopShell } = await import('../../../templates/mithaq/src/ui/top-shell.tsx')
   const page = { path: '/courses/new', page: { shell: screen.layouts.app!, header: [{ title: {} }], main: [{ nav: {} }, { form: ['title'] }] } } as unknown as PageClient
   const body = createElement(Form, { kayan: courses, screen: screenOf(page), client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })
   const host = await render(createElement(PortalTopShell, { regions: { header: null, nav: body, main: null } }), { kayan: courses })
@@ -6789,7 +6789,7 @@ test('231h. the theme group is drawn only where a provider keeps the choice and 
 const rendered = (host: Element) => host.innerHTML.replace(/\s+/g, ' ')
 
 test('233a. a fee reads in a left-to-right isolate, so Arabic never reorders its currency, and a fee nobody set reads as a dash', async () => {
-  const { FeeCell } = await import('../../../templates/asas/src/features/courses/courses/ui/fee-cell.tsx')
+  const { FeeCell } = await import('../../../templates/features/courses/courses/ui/fee-cell.tsx')
   const field = courses.fields.find((one) => one.name === 'fee')!
   const draw = async (value: unknown, row: Record<string, unknown>, locale: string) => rendered(await render(createElement(FeeCell, { field, value, row } as never), { locale }))
   assert.match(await draw(900, { currency: 'USD' }, 'ar'), /^<bdi dir="ltr">.*US\$.*<\/bdi>$/, 'a priced fee in Arabic')
@@ -6799,7 +6799,7 @@ test('233a. a fee reads in a left-to-right isolate, so Arabic never reorders its
 })
 
 test('233b. an enrollment with no session reads as a dash, and a session\'s start never breaks across lines', async () => {
-  const { SessionCell } = await import('../../../templates/asas/src/features/courses/enrollments/ui/session-cell.tsx')
+  const { SessionCell } = await import('../../../templates/features/courses/enrollments/ui/session-cell.tsx')
   const field = enrollments.fields.find((one) => one.name === 'session')!
   const queries = new QueryClient()
   const none = await render(createElement(QueryClientProvider, { client: queries }, createElement(SessionCell, { field, value: null, row: { id: 'e1' } } as never)), { client: (async () => pageOf([])) as never, kayan: enrollments })
@@ -6815,7 +6815,7 @@ test('233b. an enrollment with no session reads as a dash, and a session\'s star
 })
 
 test('233c. a session in the picker holds its start together, so a narrow box breaks between the course and the date and never inside the date', async () => {
-  const { SessionLabels } = await import('../../../templates/asas/src/ui/session-labels.tsx')
+  const { SessionLabels } = await import('../../../templates/features/courses/enrollments/ui/session-labels.tsx')
   const { RelationshipControl } = await import('mithaq-admin/relationship-control.tsx')
   const { api } = fakeApi({ sessions: [{ id: 's1', course: 'c1', startsAt: '2026-10-12T09:00:00.000Z' }] })
   const client = async ({ kayan }: { kayan: string }) => pageOf(kayan === 'courses' ? [{ id: 'c1', title: 'Tajweed' }] : [])
@@ -6863,7 +6863,7 @@ test('233e. a record with no title is headed Untitled, muted, whether its title 
 })
 
 test('233f. a list\'s Status says what the header says: Draft, Published, or Changed for a published course whose newest version is a draft', async () => {
-  const { StatusCell } = await import('../../../templates/asas/src/features/courses/courses/ui/status-cell.tsx')
+  const { StatusCell } = await import('../../../templates/features/courses/courses/ui/status-cell.tsx')
   const path = courses.fields.find((one) => one.name === '_status')!.cell
   const rows = [
     { ...draftRow, id: 'p', title: 'Published', _status: 'published' },

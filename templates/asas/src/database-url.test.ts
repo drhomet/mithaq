@@ -13,7 +13,7 @@ import { test } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { formatLock, sealLanguage, vocabularyOf } from '../../../packages/mithaq/src/mithaq/lock.ts'
 import { receivedLanguage } from '../../../packages/mithaq/src/mithaq/language.ts'
-import { defineKayan, devDatabaseUrl } from './mithaq.ts'
+import { defineKayan, devDatabaseUrl } from '../../mithaq/src/mithaq.ts'
 
 const bin = new URL('../../../packages/mithaq/src/asas/cli/mithaq.ts', import.meta.url)
 /** This project's own root, which holds `src/asas.ts` the bin imports. */
@@ -71,14 +71,15 @@ test('the `generate --check` sweep with no DATABASE_URL refuses before opening a
   // The template's lock may be pending, red or signed, and the sweep checks it
   // first, so the sweep runs here from a stand-in root beside a lock a test key
   // signed over this very language: this project's own `src`, `package.json` and
-  // `node_modules`, linked, and an `apps` two levels up, linked too, so every
-  // `generate` path resolves where it does from the template. Nothing writes the
+  // `node_modules`, linked, and the `features` beside it and an `apps` two levels
+  // up, linked too, so every `generate` path resolves where it does from the template. Nothing writes the
   // template's own lock, which another test file may be reading.
   const wrap = await mkdtemp(join(tmpdir(), 'mithaq-sweep-'))
   const root = pathToFileURL(`${wrap}/templates/asas/`)
   try {
     await mkdir(root, { recursive: true })
     await symlink(fileURLToPath(new URL('../../apps/', project)), join(wrap, 'apps'))
+    await symlink(fileURLToPath(new URL('../features/', project)), join(wrap, 'templates/features'))
     for (const name of ['src', 'package.json', 'node_modules']) await symlink(fileURLToPath(new URL(name, project)), fileURLToPath(new URL(name, root)))
     const language = vocabularyOf(receivedLanguage(defineKayan))
     await writeFile(new URL('mithaq.lock', root), formatLock(sealLanguage({ language, key: generateKeyPairSync('ed25519').privateKey })))
@@ -104,7 +105,7 @@ test('with no DATABASE_URL the drizzle target still resolves the dev database co
       [
         '--input-type=module',
         '-e',
-        "const { serverTargets, devDatabaseUrl } = await import('./mithaq.ts'); console.log(serverTargets.drizzle.connectionString === devDatabaseUrl ? 'ok' : 'mismatch: ' + serverTargets.drizzle.connectionString)",
+        "const { serverTargets, devDatabaseUrl } = await import('../../mithaq/src/mithaq.ts'); console.log(serverTargets.drizzle.connectionString === devDatabaseUrl ? 'ok' : 'mismatch: ' + serverTargets.drizzle.connectionString)",
       ],
       { cwd: fileURLToPath(new URL('.', import.meta.url)), env },
     )
@@ -141,7 +142,7 @@ test('a production boot with no DATABASE_URL refuses on import, before any conne
     delete env.DATABASE_URL
     const child = execFile(
       process.execPath,
-      ['--input-type=module', '-e', "const { serverTargets } = await import('./mithaq.ts'); console.log(serverTargets.drizzle.connectionString)"],
+      ['--input-type=module', '-e', "const { serverTargets } = await import('../../mithaq/src/mithaq.ts'); console.log(serverTargets.drizzle.connectionString)"],
       { cwd: fileURLToPath(new URL('.', import.meta.url)), env },
     )
     let stdout = ''
@@ -168,7 +169,7 @@ test('under node --test, an import with no DATABASE_URL refuses before any conne
     delete env.DATABASE_URL
     const child = execFile(
       process.execPath,
-      ['--input-type=module', '-e', "const { serverTargets } = await import('./mithaq.ts'); console.log(serverTargets.drizzle.connectionString)"],
+      ['--input-type=module', '-e', "const { serverTargets } = await import('../../mithaq/src/mithaq.ts'); console.log(serverTargets.drizzle.connectionString)"],
       { cwd: fileURLToPath(new URL('.', import.meta.url)), env },
     )
     let stdout = ''

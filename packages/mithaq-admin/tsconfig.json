@@ -31,7 +31,7 @@
     // `import { cn } from '../lib/utils'`).
     // Any other `@/` is the app's own, which the template's shells import as
     // the app they compile in does, and which the tests reach through them
-    // (`../../templates/asas/src/ui/app-shell.tsx` `from '@/copy.ts'`).
+    // (`../../templates/mithaq/src/ui/app-shell.tsx` `from '@/copy.ts'`).
     "paths": {
       "@/components/ui/*": ["./registry/ui/*"],
       "@/hooks/*": ["./registry/hooks/*"],

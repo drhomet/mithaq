@@ -15,9 +15,9 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from 'mithaq-admin/format.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
-import { grantable, isOwner, managesRoles, OWNER_ROLE } from '../roles/grants.ts'
-import { tenantRoles } from '../roles/tenant-roles.ts'
-import { AppShell } from '../ui/app-shell.tsx'
+import { grantable, isOwner, managesRoles, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
+import { tenantRoles } from '@asas/mithaq/roles/tenant-roles.ts'
+import { AppShell } from '@asas/mithaq/ui/app-shell.tsx'
 
 /**
  * One member as the page draws it: each role assignment by its row, and whether they own the organization, which holds `administrator` whatever the rows say.

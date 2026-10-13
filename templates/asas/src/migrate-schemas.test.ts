@@ -465,7 +465,7 @@ test('7. TB\'s shape: a providers entry with schemaName \'auth\' generates every
   const providersOf = (schemaName: string, customers = '') =>
     writeFile(
       new URL('src/auth.ts', root),
-      `import { providers as template } from '@asas/auth'
+      `import { providers as template } from '@asas/mithaq/auth'
 export const providers = {
   user: { ...template.user, schemaName: ${schemaName} },
   customers: {

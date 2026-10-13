@@ -1,0 +1,411 @@
+import {
+  audit,
+  base,
+  betterAuthTenant,
+  defaultAuthorize,
+  defaultBulkLimit,
+  defaultDepth,
+  defaultJoinLimit,
+  defaultLimit,
+  defaultMaxLimit,
+  screenKinds,
+  defineMithaq,
+  drizzleAdapter,
+  drizzleTarget,
+  folderOf,
+  rbacTarget,
+  Refusal,
+  screenTarget,
+  serviceTarget,
+  storage,
+  versions,
+  zodTarget,
+  type CommandInput,
+} from 'mithaq'
+import { richText } from 'mithaq/rich-text'
+import { fileURLToPath } from 'node:url'
+import { auditSink } from './mithaq/audit-sink.ts'
+import { richTextNodes } from './mithaq/rich-text-nodes.ts'
+import { systemRoles } from './roles/system-roles.ts'
+import { storageConfig } from './storage/index.ts'
+import { onPlatform } from './mithaq/auth/index.ts'
+import { assignedRoles, platformRolesOf, tenantAccess } from './roles/tenant-access.ts'
+
+/**
+ * A local PostgreSQL on its default port, which `vite dev` falls back to when
+ * no DATABASE_URL is set; it is also the URL `.env.example` names. A
+ * deployment passes its own. `testDatabase` refuses an unset DATABASE_URL and
+ * this URL's port, so a test never reaches it.
+ */
+export const devDatabaseUrl = 'postgres://postgres:postgres@localhost:5432/mithaq'
+/**
+ * Production refuses the dev fallback, whose password sits in this file. This
+ * runs on import, before anything connects.
+ */
+if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+  throw new Error('A production boot needs DATABASE_URL, the database this deployment uses. Nothing here falls back to the dev database in production.')
+}
+/**
+ * `node --test` sets `NODE_TEST_CONTEXT` on every process it runs, so a test
+ * that forgot DATABASE_URL never reaches the dev database.
+ */
+if (process.env.NODE_TEST_CONTEXT && !process.env.DATABASE_URL) {
+  throw new Error('A test run needs DATABASE_URL, a database of its own: set DATABASE_URL. Nothing under node --test falls back to the dev database.')
+}
+const connectionString = process.env.DATABASE_URL ?? devDatabaseUrl
+
+/**
+ * Refuses a command that would open a real connection with no DATABASE_URL
+ * named. `vite dev` never calls it and uses the dev fallback.
+ */
+const requireDatabaseUrl = () => {
+  if (!process.env.DATABASE_URL) {
+    throw new Refusal(
+      'Refusing to connect: set DATABASE_URL to the database this command should use. Nothing here falls back to the dev database.',
+    )
+  }
+}
+
+/**
+ * The asas's own source folder, which holds the migrations and each screen's
+ * own pieces. The language names it, and a feature's folder, by path and
+ * imports neither, so the packages depend one way: the asas on the language.
+ */
+const asasSource = new URL('../../asas/src/', import.meta.url)
+const featuresFolder = new URL('../../features/', import.meta.url)
+
+/**
+ * A production `connect()` refuses to start while migrations are unapplied, so
+ * a deploy changes the database only when someone runs
+ * `drizzle-kit migrate --config src/migrations/drizzle.config.ts`; `'run'`
+ * applies them on boot instead. The folder comes from this file because each
+ * app calls `connect()` from its own folder.
+ */
+const drizzleStore = drizzleAdapter({
+  connectionString,
+  ...drizzleTarget,
+  prodMigrations: { migrationsFolder: fileURLToPath(new URL('migrations/', asasSource)), pending: 'refuse' },
+})
+
+/**
+ * A drizzle store whose `connect()` (the schema push) and `migrate` command are
+ * refused without DATABASE_URL, since either could silently reach the dev
+ * database. `init` returns a fresh store per build, so it is guarded too.
+ */
+const guarded = (store: typeof drizzleStore): typeof drizzleStore => ({
+  ...store,
+  init: (kayan) => guarded((store.init(kayan) ?? store) as typeof drizzleStore) as never,
+  connect: async (args?: { readOnly?: boolean }) => {
+    requireDatabaseUrl()
+    await store.connect(args)
+  },
+  commands: {
+    migrate: async (input: CommandInput) => {
+      requireDatabaseUrl()
+      return store.commands!.migrate!(input)
+    },
+  },
+})
+// A build has one `access` target. Swapping this line for `betterAuthTarget` moves
+// custom roles into the provider's own rows, but the assignment guard
+// `assignableRole` stays bound to this shape: it reads the `roles` kayan by a
+// `name` filter and a `permissions` list, where the provider keys rows on `role`
+// and holds a `permission` object. It fails closed (an unreadable role is every
+// key of the project), so a project that swaps this must teach the guard the
+// provider's table and columns too.
+const accessOptions = {
+  /** The roles this project ships, and the names a row may be keyed on. */
+  roles: systemRoles,
+  /** How an actor's assigned slugs are read, for every row table. */
+  rolesOf: assignedRoles,
+  // The rows every kayan placing `tenant.field` answers from. A kayan drops them
+  // with `access: { tenant: false }`; a shared one never had them, which is how
+  // the generated auth kayan keep their default deny, except the two whose
+  // `<kayan>.access.ts` the generator imports.
+  access: tenantAccess,
+  /** Where the target seeds the system roles and reads the assignments. */
+  kayan: { roles: 'roles', memberRoles: 'memberRoles' },
+} as const
+
+/**
+ * The access target over these roles: `rbacTarget` whole, except `assign`,
+ * which writes and is refused without DATABASE_URL unless run with `--check`.
+ */
+export const accessTarget = (roles: typeof systemRoles = systemRoles) => {
+  const target = rbacTarget({ ...accessOptions, roles })
+  return {
+    ...target,
+    commands: {
+      assign: async (input: CommandInput) => {
+        if (!input.flags.includes('--check')) requireDatabaseUrl()
+        return target.commands!.assign!(input)
+      },
+    },
+  }
+}
+
+/**
+ * Every target but the screens. A screen names the kayan it draws, so a build
+ * holding only some of this project's kayan, as a test's does, is refused by it
+ * and uses a language whose screen draws only what it holds.
+ */
+export const serverTargets = {
+  drizzle: guarded(drizzleStore),
+  zod: zodTarget,
+  rbac: accessTarget(),
+  // Every kayan placing `organization` belongs to one organization,
+  // the session's active one. `restrict`: an organization that still holds a row
+  // is not deleted, so no row is left behind with no tenant to read it.
+  tenant: betterAuthTenant({
+    relationTo: 'organization',
+    onDelete: 'restrict',
+    // Staff read every organization with `tenant: 'all'` in the platform app
+    // alone, which is the app's own fact and never the request's; their rows
+    // there write nothing.
+    platform: ({ user }) => onPlatform() && platformRolesOf(user).length > 0,
+  }),
+  // The runner is a target too (`capability: 'service'`); a build has exactly
+  // one, under this name. It holds no operations: each kayan spreads
+  // `defaultOperations` into its own `targets.service.operations` and leaves
+  // out any it does not want, such as `count`.
+  service: serviceTarget({
+    // One of the three lists every write runs around its own. `audit` runs last
+    // inside the write's transaction and writes one `auditLog` row in it. A
+    // precondition goes in `beforeSteps`, and a webhook or email after a durable
+    // write in `afterCommit`.
+    afterSteps: [audit],
+    /** Where the `audit` step hands each write: the template's audit log. */
+    audit: auditSink,
+    /** The access evaluator every operation runs before its first step. */
+    authorize: defaultAuthorize,
+    /** The deepest a read or a write may nest another before it is refused, eight. */
+    depth: defaultDepth,
+    /**
+     * The page a `find` or a `findVersions` answers when its caller names no
+     * `limit`, ten, and the most rows a served one may ask for, a hundred.
+     */
+    defaultLimit,
+    maxLimit: defaultMaxLimit,
+    /** How many child rows a populated join carries where its field names none, ten. */
+    joinLimit: defaultJoinLimit,
+    /** The most rows one bulk write may match, a thousand. */
+    bulkLimit: defaultBulkLimit,
+    // The field that marks a row deleted. A kayan takes soft delete by declaring
+    // a field of this name, as `enrollments` does. A build where no kayan
+    // declares it is refused, because every delete in it would remove rows for
+    // good. Spreading the field into every kayan is refused where a permission
+    // store reads the kayan, since a role row the delete marked would still grant
+    // its keys.
+    softDelete: 'deletedAt',
+    /** The database a kayan writes through when it names no other. */
+    store: 'drizzle',
+    /** The target a write is validated against when a kayan names no other. */
+    schema: 'zod',
+  }),
+}
+
+/**
+ * Files: the `upload` kind and the storage target, from the storage rukn over
+ * this project's config. `mithaq storage sweep` reads every row, so it is
+ * refused without DATABASE_URL like `migrate`.
+ */
+const files = storage(storageConfig)
+const guardedFiles = {
+  ...files,
+  targets: {
+    ...files.targets,
+    storage: {
+      ...files.targets.storage,
+      commands: {
+        ...files.targets.storage.commands,
+        sweep: async (input: CommandInput) => {
+          requireDatabaseUrl()
+          return files.targets.storage.commands.sweep(input)
+        },
+      },
+    },
+  },
+}
+
+/**
+ * The pillars the language's kinds, rules and built targets come from: `base`
+ * brings the shipped kinds and rules, `richText` the rich text kind over this
+ * project's node list, the files rukn the `upload` kind and storage target, and
+ * `versions` the target a kayan keeps its past and drafts through by writing
+ * `targets.versions`. One row keeps its last hundred versions unless its kayan
+ * names another window. A rukn of the project's own goes beside them.
+ */
+export const arkan = [
+  base,
+  richText({ nodes: richTextNodes }),
+  guardedFiles,
+  versions({ max: 100 }),
+] as const
+
+/**
+ * The context every served call and first registration hands its steps, built
+ * here from the request: mithaq reads no header and no body key into it. A
+ * fresh id per request, so nothing a client sends names it. A step reads the
+ * key untyped unless the runner declares `context`, for example
+ * `context: {} as { requestId: string }`, and then every call in the app passes
+ * one too.
+ */
+export const requestContext = (_request: Request) => ({ requestId: crypto.randomUUID() })
+
+/**
+ * Each screen file is named `ui('file.tsx#Export')` off a folder URL taken from
+ * this file, so the build reads it wherever it runs and refuses a missing file
+ * or export. `ui/` holds what several screens draw with, each screen's own
+ * folder what only it does.
+ */
+export const ui = folderOf(new URL('./ui/', import.meta.url))
+export const dashboardUi = folderOf(new URL('ui-dashboard/', asasSource))
+export const portalUi = folderOf(new URL('ui-portal/', asasSource))
+export const platformUi = folderOf(new URL('ui-platform/', asasSource))
+/** Every screen's provider of course titles for a session's label, which the courses feature draws. */
+const sessionLabels = folderOf(new URL('courses/enrollments/ui/', featuresFolder))('session-labels.tsx#SessionLabels')
+
+/**
+ * Written once and spread into each screen: what draws each kind and the
+ * shared layouts. A piece only one screen draws is written on that screen.
+ */
+const shared = {
+  controls: screenKinds,
+  layouts: {
+    app: ui('app-shell.tsx#AppShell'),
+    record: ui('record-page.tsx#RecordPage'),
+    table: ui('table-page.tsx#TablePage'),
+  },
+}
+
+/** The portal screen, the students' and instructors' own. The test language narrows it to the kayan a test builds. */
+export const portalScreen = screenTarget({
+  ...shared,
+  path: '/portal',
+  // `sessions` is listed for its title alone, which an enrollment's session
+  // reads by; it has no page here and so no nav entry.
+  // `media` is listed for a course's cover alone, which a course page draws read-only.
+  // `user` is listed for its title alone, which the enrollment drawer's student picker reads by.
+  kayan: ['courses', 'enrollments', 'sessions', 'media', 'user'],
+  providers: [ui('rich-text-nodes.tsx#RichTextNodes'), sessionLabels],
+  pages: { home: { path: '/', component: portalUi('home.tsx#Home') } },
+  // Its own top shell, which draws no link to the platform app: staff reach it
+  // from the dashboard alone. Every portal page is that shell over one of its
+  // layouts: its own single column, or the dashboard's record layout, which a
+  // course's edit page draws.
+  layouts: { top: ui('top-shell.tsx#PortalTopShell'), page: portalUi('page.tsx#Page'), record: shared.layouts.record },
+  components: {},
+})
+
+/** The dashboard screen, the tenant back office. The test language narrows it to the kayan a test builds. */
+export const dashboardScreen = screenTarget({
+  ...shared,
+  // The top-bar shell too, which the courses board page is rooted at.
+  layouts: { ...shared.layouts, top: ui('top-shell.tsx#TopShell') },
+  path: '/dashboard',
+  // `user` and `organization` are listed for their titles alone: they have no
+  // page and so no nav entry, and a relationship to either shows the row's name.
+  // `auditLog` is listed for its access report alone, which the edit pages'
+  // activity panel is drawn by. `memberRoles` is listed for its access report
+  // alone too, which the members page's sheet is drawn by; it has no page of
+  // its own.
+  kayan: ['courses', 'sessions', 'enrollments', 'tags', 'media', 'roles', 'memberRoles', 'settings', 'user', 'organization', 'auditLog'],
+  providers: [dashboardUi('theme-provider.tsx#ThemeProvider'), ui('rich-text-nodes.tsx#RichTextNodes'), sessionLabels],
+  pages: {
+    // The page at `/`, served only to an actor who reads the courses it counts.
+    dashboard: { path: '/', component: dashboardUi('dashboard.tsx#Dashboard'), permission: 'courses.find' },
+    // A page that belongs to no kayan, listed in the nav under its own label
+    // and served only to an actor holding the key it names.
+    members: {
+      path: '/members',
+      component: dashboardUi('members.tsx#Members'),
+      nav: { label: { en: 'Members', ar: 'الأعضاء' } },
+      permission: 'memberRoles.find',
+    },
+  },
+  // A piece only one kayan draws is named by `ui()` in that kayan's file; these
+  // are drawn by name from many.
+  components: {
+    // A record's own audit entries, which each edit page draws in its side column.
+    activity: ui('activity.tsx#Activity'),
+    // A row's versions, with their restore, which the edit page of a kayan that
+    // keeps drafts draws in a tab of its own.
+    versions: dashboardUi('versions.tsx#Versions'),
+  },
+})
+
+/**
+ * The platform screen: staff above every tenant, entered by `screen.platform`,
+ * which only a platform role holds, and served by its own app,
+ * `apps/asas-platform`, whose requests alone get the platform roles from the
+ * template's role reader. It lists the provider's generated kayan and every
+ * tenant kayan across organizations, read-only: a platform role reads every
+ * tenant's rows by its keys and writes none. Local accounts are listed for a
+ * super admin alone, who verifies a sign-up there. The settings global is not
+ * listed: a list across tenants reads by `find`, which a global declares none
+ * of.
+ */
+export const platformScreen = screenTarget({
+  ...shared,
+  // The dashboard's frame with no organization switcher, which staff have no
+  // use for, and a record page with a link back to its list.
+  layouts: { ...shared.layouts, app: ui('app-shell.tsx#PlatformShell'), record: platformUi('record-page.tsx#PlatformRecordPage') },
+  path: '/platform',
+  kayan: ['user', 'organization', 'member', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'memberRoles', 'localUsers'],
+  providers: [dashboardUi('theme-provider.tsx#ThemeProvider'), ui('rich-text-nodes.tsx#RichTextNodes'), sessionLabels],
+  pages: { home: { path: '/', component: platformUi('home.tsx#Home') } },
+  components: {},
+})
+
+const language = defineMithaq({
+  /** Every locale this project's copy is written in, so a missing one is a type error. */
+  locales: ['ar', 'en'] as const,
+  arkan,
+  // A project's own target spreads in here beside the shipped ones and is
+  // checked exactly like them.
+  targets: {
+    ...serverTargets,
+    // The three screens, each a target of capability `screen` under its own key.
+    // A kayan says what each screen draws of it under `targets.<screen>`, and
+    // `mithaq generate screens` writes each screen's `screen.json`, `types.ts`,
+    // glob and route files under `generate.screens`.
+    dashboard: dashboardScreen,
+    portal: portalScreen,
+    platform: platformScreen,
+  },
+  // Not a key the language knows: the project's own, passed through typed, and
+  // read by `mithaq generate auth`, `messages` and `screens` to find where each
+  // writes. `providers` is the module `generate auth` reads the Better Auth
+  // instances from and writes into each generated kayan's import, and `language`
+  // the module each of them imports `defineKayan` from. `screens` is
+  // the host app's routes folder, one per screen because more than one app
+  // serves them: the tenant's two by `apps/asas-tanstack`, the platform by
+  // `apps/asas-platform`.
+  // Each path is from the asas's folder, where every `mithaq` command runs.
+  generate: {
+    language: '@asas/mithaq',
+    features: '../features/',
+    auth: '../features/auth/',
+    providers: '@asas/mithaq/auth',
+    messages: 'src/messages/',
+    migrations: 'src/migrations/',
+    screens: {
+      dashboard: '../../apps/asas-tanstack/src/routes/(screens)/',
+      portal: '../../apps/asas-tanstack/src/routes/(screens)/',
+      platform: '../../apps/asas-platform/src/routes/(screens)/',
+    },
+  },
+})
+
+// `targets` is the language's own, which `mithaq generate auth` reads beside
+// `generate` to title a provider kayan on each screen that lists it.
+export const { defineKayan, defineGlobal, buildAsas, rows, user, generate, locales, targets, targets: { tenant } } = language
+/** The language's type, which the apps check their admin components map against: a kind of this project's own needs a control there. */
+export type Language = typeof language
+
+/**
+ * The field every tenant-owned kayan places, as `organization`: the tenant target's own, under the
+ * platform's word for a tenant. Its copy is all a kayan may change of it, and a kayan that places
+ * none is shared.
+ */
+export const organization = { ...tenant.field, label: { en: 'Organization', ar: 'المؤسسة' } }
