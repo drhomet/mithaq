@@ -34,7 +34,7 @@ test('the tag that triggered the run must be v and the staged version', () => {
 test('a plain release takes its notes from the last plain release, a prerelease from the last tag of any kind', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'mithaq-release-test-'))
   try {
-    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, stdio: 'ignore' })
+    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', ...args], { cwd, stdio: 'ignore' })
     const release = (tag: string) => {
       git('commit', '--allow-empty', '-qm', tag)
       git('tag', '-a', tag, '-m', tag)

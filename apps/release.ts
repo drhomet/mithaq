@@ -42,8 +42,8 @@ const succeeds = (program: string, args: string[]) => spawnSync(program, args, {
 /** Fails closed: only npm's own 404 counts as free, so a network error never reads as "not yet published". */
 const published = (spec: string) => {
   const result = spawnSync('npm', ['view', spec, 'version'], { cwd: root, encoding: 'utf8' })
-  // npm 11 answers E404 for a missing version as for a missing package.
-  if (result.status === 0) return true
+  // npm 11 answers E404 for a missing version, but an npm that answers 0 with nothing printed means the same.
+  if (result.status === 0) return result.stdout.trim() !== ''
   assert.match(result.stderr, /E404/, `npm view ${spec} failed\n${result.stderr}`)
   return false
 }
