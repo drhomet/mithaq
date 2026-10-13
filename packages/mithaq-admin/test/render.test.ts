@@ -423,7 +423,7 @@ test('184c. a search runs only over what the viewer reads, across one relationsh
 })
 
 test('12. the app holds the current source of every registry item it copied', () => {
-  // `r/` is not read: it is `shadcn build` output built on install, so no stored copy can drift. The app's copy can.
+  // The package's own file is the source; the copy a project holds can drift.
   const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8'))
   const names: string[] = source.items.map((item: { name: string }) => item.name)
   assert.deepEqual(
@@ -531,7 +531,7 @@ test('12. the app holds the current source of every registry item it copied', ()
   const declaredFiles = declaredItems.filter((item) => owned.includes(item.name)).flatMap((item) => item.files.map((file) => ({ item: item.name, ...file })))
   assert.equal(declaredFiles.length, 19, 'the twelve host files, the five storage adapters, the step and the icon')
   for (const declared of declaredFiles) {
-    // The CLI strips a file's leading comment block and the build appends a hash marker, so copies are compared by that hash.
+    // An eject appends a hash marker, and an older `shadcn add` stripped a leading comment, so copies are compared by that hash.
     const target = declared.target
     // The storage adapters and the write step run on the server, so the project holding them is the template's root, not an app.
     const project = ['mithaq-storage', 'mithaq-expected-updated-at'].includes(declared.item) ? 'templates/asas' : 'apps/asas-tanstack'
@@ -541,7 +541,7 @@ test('12. the app holds the current source of every registry item it copied', ()
     const source = readFileSync(new URL(`../${declared.path}`, import.meta.url), 'utf8')
     assert.ok(
       hashOf(copied) === hashOf(source) && copied.endsWith(` ${hashOf(source)}\n`),
-      `${project} has the current ${target}, marked; rerun "shadcn add ./node_modules/mithaq-admin/r/${declared.item}.json --overwrite --yes"`,
+      `${project} has the current ${target}, marked; delete it and rerun "mithaq eject ${declared.item}" there`,
     )
   }
 })
@@ -1146,7 +1146,7 @@ test('40b. the host and the defaults reach no rich text or upload piece and no L
 })
 
 test('40. every item names the shadcn primitive it imports in registryDependencies, and names no primitive it does not import', () => {
-  // A bare name in `registryDependencies` makes `shadcn add` install shadcn's own primitive beside ours; read off the source so a new import is compared.
+  // A bare name in `registryDependencies` is the shadcn primitive `mithaq eject` tells a project to add when it lacks it; read off the source so a new import is compared.
   const source = JSON.parse(readFileSync(new URL('../registry.json', import.meta.url), 'utf8')) as {
     items: { name: string; registryDependencies?: string[]; files: { path: string }[] }[]
   }

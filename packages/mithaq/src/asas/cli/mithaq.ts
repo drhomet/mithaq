@@ -7,10 +7,10 @@ import type { Command } from '../../mithaq/language.ts'
 import { Refusal } from '../../mithaq/refusal.ts'
 import type { ScreenClient } from '../../screen/index.ts'
 
-const verbs = ['generate', 'lock', 'migrate', 'screens', 'upgrade']
+const verbs = ['eject', 'generate', 'lock', 'migrate', 'screens', 'upgrade']
 const nouns = ['auth', 'messages', 'screens']
 const usage =
-  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq screens | mithaq upgrade --check | mithaq <target> <command> [--check]'
+  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq screens | mithaq upgrade --check | mithaq eject <item> | mithaq eject --prune | mithaq <target> <command> [--check]'
 
 type Built = {
   targets: Record<string, { commands?: Record<string, Command> } | undefined>
@@ -33,7 +33,10 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
     // and never a second word; a target named `migrate` is reached by no spelling.
     const misplaced = (verb === 'migrate' || verb === 'upgrade') && noun !== undefined && !noun.startsWith('--')
     const unchecked = verb === 'upgrade' && !flags.includes('--check')
-    if (verb === undefined || misplaced || unchecked || (verb === 'generate' && !(sweeping || nouns.includes(noun ?? '')))) {
+    // `eject` takes one item or `--prune`, never both and never neither.
+    const ejecting = noun !== undefined && !noun.startsWith('--')
+    const unejected = verb === 'eject' && (ejecting ? flags.length > 0 : flags.join(' ') !== '--prune')
+    if (verb === undefined || misplaced || unchecked || unejected || (verb === 'generate' && !(sweeping || nouns.includes(noun ?? '')))) {
       console.error(usage)
       process.exit(1)
     }
@@ -87,6 +90,10 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
       await upgrade().catch((error: Error) => console.error(`upgrade --check could not read the copies: ${error.message}`))
     } else if (verb === 'lock') {
       const code = await lock(noun?.startsWith('--') ? undefined : noun, flags)
+      if (code) process.exit(code)
+    } else if (verb === 'eject') {
+      const { eject, prune } = await import('./upgrade.ts')
+      const code = ejecting ? await eject(project, noun!) : await prune(project)
       if (code) process.exit(code)
     } else if (verb === 'upgrade') {
       const code = await upgrade()
