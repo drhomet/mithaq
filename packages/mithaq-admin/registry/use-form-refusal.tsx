@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { AnyFormApi } from '@tanstack/react-form'
 import type { ClientKayan } from 'mithaq/admin'
-import { labelFor, type Copy } from './copy.ts'
-import { issuesOf, refusalWords } from './form-rules.tsx'
-import { refusalKeyOf } from './refusal.ts'
+import { labelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { issuesOf, refusalWords } from 'mithaq-admin/form-rules.tsx'
+import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
 /**
  * The refusal a form holds, its own or the one the host caught: its key, the fields it names with each one's

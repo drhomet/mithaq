@@ -4,9 +4,9 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $isLinkNode } from '@lexical/link'
 import { $dfs, $findMatchingParent, mergeRegister } from '@lexical/utils'
 import { $getSelection, $isLineBreakNode, $isNodeSelection, $isRangeSelection, BLUR_COMMAND, COMMAND_PRIORITY_CRITICAL, COMMAND_PRIORITY_LOW, SELECTION_CHANGE_COMMAND, type EditorState } from 'lexical'
-import type { Translate } from './copy.ts'
-import { FloatingLinkEditor } from './rich-text-link-editor.tsx'
-import { dropPlaceholders, getSelectedNode, newLink, typingLink } from './rich-text-selection.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { FloatingLinkEditor } from 'mithaq-admin/rich-text-link-editor.tsx'
+import { dropPlaceholders, getSelectedNode, newLink, typingLink } from 'mithaq-admin/rich-text-selection.ts'
 
 /** Draws the link editor over the anchor while the selection sits in one link. */
 export function FloatingLinkEditorPlugin({ anchorElem, isLinkEditMode, setIsLinkEditMode, t }: {

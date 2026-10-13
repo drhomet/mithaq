@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react'
 import type { ClientKayan, LeafClient } from 'mithaq/admin'
-import { besideLabel, controlFor, namedControl, useComponents } from './components.tsx'
-import type { ControlProps, FindApi } from './control-props.ts'
-import { descriptionFor, labelFor, placeholderFor, type Copy } from './copy.ts'
-import { FieldShell, describedBy } from './field-shell.tsx'
-import { refOf, type ScreenPage } from './screen-refs.ts'
+import { besideLabel, controlFor, namedControl, useComponents } from 'mithaq-admin/components.tsx'
+import type { ControlProps, FindApi } from 'mithaq-admin/control-props.ts'
+import { descriptionFor, labelFor, placeholderFor, type Copy } from 'mithaq-admin/copy.ts'
+import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
+import { refOf, type ScreenPage } from 'mithaq-admin/screen-refs.ts'
 
 /**
  * One field's control in its shell, as the form draws a leaf. The leaf's copy, width and read-only win over the field's;

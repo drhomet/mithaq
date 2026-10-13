@@ -8,12 +8,12 @@ import { ScreenContext } from 'mithaq/admin/react'
 import { UploadNode } from 'mithaq/rich-text'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { ControlProps, FindApi, FoundPage } from './control-props.ts'
-import type { Translate } from './copy.ts'
-import { FileValue, Missing } from './file-thumb.tsx'
-import type { RichTextPick } from './rich-text-picks.tsx'
-import type { Row } from './upload-api.ts'
-import { UploadControl } from './upload-control.tsx'
+import type { ControlProps, FindApi, FoundPage } from 'mithaq-admin/control-props.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { FileValue, Missing } from 'mithaq-admin/file-thumb.tsx'
+import type { RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
+import type { Row } from 'mithaq-admin/upload-api.ts'
+import { UploadControl } from 'mithaq-admin/upload-control.tsx'
 
 // The rich text node is opt-in: a project lists `UploadNode` from `mithaq/rich-text` among its nodes,
 // `UploadView` among its views, `imagePick` among its picks and `UploadPlugin` as the editor's plugin.

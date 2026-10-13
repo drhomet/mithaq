@@ -1,6 +1,6 @@
 import type { ClientKayan, Row } from 'mithaq/admin'
-import type { Copy } from './copy.ts'
-import { nameOfRow } from './relationship-control.tsx'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { nameOfRow } from 'mithaq-admin/relationship-control.tsx'
 
 /**
  * What one row is called by its kayan's own title field, in the viewer's

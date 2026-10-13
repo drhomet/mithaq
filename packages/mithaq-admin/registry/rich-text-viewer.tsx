@@ -10,10 +10,10 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { $getRoot, $isElementNode, HISTORY_MERGE_TAG, type Klass, type LexicalNode } from 'lexical'
 import { useDirection } from '@/components/ui/direction'
 import { cn } from '@/lib/utils'
-import type { Translate } from './copy.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
 import { richTextBounds, safeUrl, typesOf } from 'mithaq/rich-text'
-import { RichTextContext } from './rich-text-picks.tsx'
-import { configOf, unreadable, valueOf, type RichTextDirection, type RichTextNode, type RichTextValue } from './rich-text-value.ts'
+import { RichTextContext } from 'mithaq-admin/rich-text-picks.tsx'
+import { configOf, unreadable, valueOf, type RichTextDirection, type RichTextNode, type RichTextValue } from 'mithaq-admin/rich-text-value.ts'
 
 /**
  * Clears the direction of the root and every block, so Lexical writes `dir="auto"` per block and

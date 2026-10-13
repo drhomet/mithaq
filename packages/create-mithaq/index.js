@@ -138,8 +138,8 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
     writeJson(join(project, 'tsconfig.json'), {
       compilerOptions: { target: 'es2024', module: 'nodenext', moduleResolution: 'nodenext', strict: true, noUncheckedIndexedAccess: true, noEmit: true, skipLibCheck: true, erasableSyntaxOnly: true, allowImportingTsExtensions: true, types: ['node'] },
       include: ['templates/*/src/**/*.ts', 'apps/*/src/**/*.ts'],
-      // Each server entry reads its app's `.tsx` components map and Vite's `import.meta.glob`, which the app's own config checks.
-      exclude: ['apps/*/src/server.ts'],
+      // Each server entry reads Vite's `import.meta.glob`, and each components map mithaq-admin's `.tsx`, which the app's own config checks.
+      exclude: ['apps/*/src/server.ts', 'apps/*/src/components.ts'],
     })
   }
   // npm, yarn and Bun read `workspaces`; pnpm 10.6 and later read this file.

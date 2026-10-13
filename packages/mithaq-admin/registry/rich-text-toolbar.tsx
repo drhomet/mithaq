@@ -16,11 +16,11 @@ import { AlignCenterIcon, AlignJustifyIcon, AlignLeftIcon, AlignRightIcon, Inden
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { Toggle } from '@/components/ui/toggle'
-import type { Translate } from './copy.ts'
-import { BlockDropdown, ClearFormatting, FormatButtons, HistoryButtons } from './rich-text-format-buttons.tsx'
-import type { RichTextPick } from './rich-text-picks.tsx'
-import { getSelectedNode, newLink, useSelectionChange } from './rich-text-selection.ts'
-import type { RichTextDirection } from './rich-text-value.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { BlockDropdown, ClearFormatting, FormatButtons, HistoryButtons } from 'mithaq-admin/rich-text-format-buttons.tsx'
+import type { RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
+import { getSelectedNode, newLink, useSelectionChange } from 'mithaq-admin/rich-text-selection.ts'
+import type { RichTextDirection } from 'mithaq-admin/rich-text-value.ts'
 
 function LinkButton({ t, setLinkEditMode }: { t: Translate; setLinkEditMode: (editing: boolean) => void }) {
   const [editor] = useLexicalComposerContext()

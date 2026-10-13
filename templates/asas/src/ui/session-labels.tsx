@@ -10,8 +10,8 @@ import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { ProviderProps, Row } from 'mithaq/admin'
 import { useClient, useLocale, useScreen } from 'mithaq/admin/react'
-import { formatDate } from '@/components/mithaq/format.tsx'
-import { nameOfRow, RowLabelContext, titleFieldOf, type UseRowLabel } from '@/components/mithaq/relationship-control.tsx'
+import { formatDate } from 'mithaq-admin/format.tsx'
+import { nameOfRow, RowLabelContext, titleFieldOf, type UseRowLabel } from 'mithaq-admin/relationship-control.tsx'
 import { coursesOf } from '../enrollments/ui/session-cell.tsx'
 
 /** The session's course and its start, or nothing for any other kayan and for a session whose course is not read yet. */

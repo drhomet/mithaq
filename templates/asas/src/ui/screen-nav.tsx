@@ -4,7 +4,7 @@
 import { use } from 'react'
 import type { NavEntry, ScreenClient, Translate } from 'mithaq/admin'
 import { ScreenContext, useLocale, useScreen } from 'mithaq/admin/react'
-import { currentOf } from '@/components/mithaq/nav-links.tsx'
+import { currentOf } from 'mithaq-admin/nav-links.tsx'
 
 /** What an entry is called: its own label, else its kayan's name in the singular for a global and the plural otherwise. */
 export const navLabel = ({ entry, screen, locale, t }: { entry: NavEntry; screen: ScreenClient; locale: string; t: Translate }) =>

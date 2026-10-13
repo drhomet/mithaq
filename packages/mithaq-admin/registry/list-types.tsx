@@ -1,10 +1,10 @@
 import type { ClientKayan } from 'mithaq/admin'
-import type { FindApi } from './control-props.ts'
-import type { Translate } from './copy.ts'
-import type { FormProps } from './form-types.tsx'
-import type { ListQuery } from './list-query.ts'
-import type { ListNode } from './node-tree.ts'
-import type { ScreenPage } from './screen-refs.ts'
+import type { FindApi } from 'mithaq-admin/control-props.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import type { FormProps } from 'mithaq-admin/form-types.tsx'
+import type { ListQuery } from 'mithaq-admin/list-query.ts'
+import type { ListNode } from 'mithaq-admin/node-tree.ts'
+import type { ScreenPage } from 'mithaq-admin/screen-refs.ts'
 
 /** One page, as the managed reader answers it. */
 export type Page = {

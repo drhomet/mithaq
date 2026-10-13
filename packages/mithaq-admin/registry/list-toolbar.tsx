@@ -3,10 +3,10 @@ import { ChevronDown, Search as SearchIcon, X } from 'lucide-react'
 import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { FindApi } from './control-props.ts'
-import { labelFor, type Copy, type Translate } from './copy.ts'
-import { Filters } from './list-filters.tsx'
-import type { FilterWhere } from './list-query.ts'
+import type { FindApi } from 'mithaq-admin/control-props.ts'
+import { labelFor, type Copy, type Translate } from 'mithaq-admin/copy.ts'
+import { Filters } from 'mithaq-admin/list-filters.tsx'
+import type { FilterWhere } from 'mithaq-admin/list-query.ts'
 
 /** The search box, which asks after 300 ms of stillness and names the fields it runs over. */
 export function Search({

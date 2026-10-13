@@ -1,8 +1,8 @@
 import { createContext, use, type ComponentType, type ReactElement, type ReactNode } from 'react'
 import type { builtInScreenKinds, ClientField, ClientKayan, NodeKind, registryCells, registryControls } from 'mithaq/admin'
-import type { Cell, Control } from './control-props.ts'
-import { kindsIn, nodesOf, type NodeProps } from './node-tree.ts'
-import type { TreePage } from './screen-refs.ts'
+import type { Cell, Control } from 'mithaq-admin/control-props.ts'
+import { kindsIn, nodesOf, type NodeProps } from 'mithaq-admin/node-tree.ts'
+import type { TreePage } from 'mithaq-admin/screen-refs.ts'
 
 type Shipped = (typeof registryControls)[number]
 // `join` among them: no form draws a join, so it needs no control.

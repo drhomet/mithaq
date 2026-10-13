@@ -3,7 +3,7 @@
 // the dot of "ر.س." on the wrong side.
 import type { CellProps } from 'mithaq/admin'
 import { useLocale } from 'mithaq/admin/react'
-import { noValue } from '@/components/mithaq/format.tsx'
+import { noValue } from 'mithaq-admin/format.tsx'
 
 const amount = (text: string) => <bdi dir="ltr">{text}</bdi>
 

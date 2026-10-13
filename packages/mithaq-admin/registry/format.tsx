@@ -1,4 +1,4 @@
-import type { Translate } from './copy.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
 
 /**
  * Several values as one phrase in the viewer's own language, by `Intl.ListFormat`. The type is `unit`, so English joins with commas alone and Arabic with its own conjunction.

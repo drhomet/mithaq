@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
-import type { Translate } from './copy.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
 
 /**
  * One page, as much of the managed reader's answer as a control reads. Every list `Page` is assignable to it.

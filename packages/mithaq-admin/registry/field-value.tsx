@@ -1,12 +1,12 @@
 import { useId, type ReactElement } from 'react'
 import type { ClientField, ClientKayan, LeafClient } from 'mithaq/admin'
-import { cellFor, useComponents } from './components.tsx'
-import type { FindApi } from './control-props.ts'
-import { descriptionFor, labelFor, type Copy } from './copy.ts'
-import { useKayanField } from './form-context.tsx'
-import { LeafControl } from './leaf-control.tsx'
-import { refOf, type ScreenPage } from './screen-refs.ts'
-import { useRelationshipTitles } from './relationship-cell.tsx'
+import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
+import type { FindApi } from 'mithaq-admin/control-props.ts'
+import { descriptionFor, labelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { useKayanField } from 'mithaq-admin/form-context.tsx'
+import { LeafControl } from 'mithaq-admin/leaf-control.tsx'
+import { refOf, type ScreenPage } from 'mithaq-admin/screen-refs.ts'
+import { useRelationshipTitles } from 'mithaq-admin/relationship-cell.tsx'
 
 /** One field of the form, bound to its value, change, blur and refusal. */
 export function BoundField({

@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { checkboxSize } from './control-props.ts'
-import { labelFor, type Translate } from './copy.ts'
-import { columnsFrom, columnsTo, type ColumnChoice, type ListQuery } from './list-query.ts'
+import { checkboxSize } from 'mithaq-admin/control-props.ts'
+import { labelFor, type Translate } from 'mithaq-admin/copy.ts'
+import { columnsFrom, columnsTo, type ColumnChoice, type ListQuery } from 'mithaq-admin/list-query.ts'
 
 export type ColumnsProps = {
   kayan: ClientKayan

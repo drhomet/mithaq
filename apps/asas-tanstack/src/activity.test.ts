@@ -9,8 +9,8 @@ import { dirOf, translator, type Locale } from './copy.ts'
 
 const { createRoot } = await import('react-dom/client')
 const { Activity } = await import('asas/audit-log/ui/activity.tsx')
-const { ComponentsProvider } = await import('./components/mithaq/components.tsx')
-const { defaultComponents } = await import('./components/mithaq/default-components.tsx')
+const { ComponentsProvider } = await import('mithaq-admin/components.tsx')
+const { defaultComponents } = await import('mithaq-admin/default-components.tsx')
 
 const screen = asas.targets.dashboard.client
 const courses = screen.kayan.courses!

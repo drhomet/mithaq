@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react'
 import type { ClientKayan, Row } from 'mithaq/admin'
-import type { FindApi } from './control-props.ts'
-import type { Copy } from './copy.ts'
-import { DeleteButton } from './delete-button.tsx'
-import type { PageButton } from './node-buttons.tsx'
-import { rowWarning } from './row-title.tsx'
-import { OperationButton } from './operation-button.tsx'
+import type { FindApi } from 'mithaq-admin/control-props.ts'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { DeleteButton } from 'mithaq-admin/delete-button.tsx'
+import type { PageButton } from 'mithaq-admin/node-buttons.tsx'
+import { rowWarning } from 'mithaq-admin/row-title.tsx'
+import { OperationButton } from 'mithaq-admin/operation-button.tsx'
 
 /**
  * The delete and the operation dialog a row's menu opens. They are drawn once below the table rather than inside

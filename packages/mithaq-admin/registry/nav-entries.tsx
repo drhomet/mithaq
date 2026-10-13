@@ -2,7 +2,7 @@ import { BookOpen, Building2, CalendarDays, ClipboardList, Mail, PlusCircle, Set
 import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
-import { titleOf, type Translate } from './copy.ts'
+import { titleOf, type Translate } from 'mithaq-admin/copy.ts'
 
 /**
  * As much of the access report as this screen reads: one `read` per kayan, keyed by its name.

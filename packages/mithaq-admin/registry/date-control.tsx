@@ -6,9 +6,9 @@ import { Calendar } from '@/components/ui/calendar'
 import { useDirection } from '@/components/ui/direction'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { ariaRequired, changeOf, type ControlProps } from './control-props.ts'
-import { labelFor } from './copy.ts'
-import { asMoment, formatDate } from './format.tsx'
+import { ariaRequired, changeOf, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { labelFor } from 'mithaq-admin/copy.ts'
+import { asMoment, formatDate } from 'mithaq-admin/format.tsx'
 
 const dayPickerLocales: Record<string, typeof enUS> = { ar, en: enUS }
 

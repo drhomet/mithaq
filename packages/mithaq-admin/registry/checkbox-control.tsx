@@ -2,8 +2,8 @@ import type { ReactElement } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Toggle } from '@/components/ui/toggle'
-import { ariaRequired, changeOf, checkboxSize, type ControlProps } from './control-props.ts'
-import { labelFor } from './copy.ts'
+import { ariaRequired, changeOf, checkboxSize, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { labelFor } from 'mithaq-admin/copy.ts'
 
 export function CheckboxControl(props: ControlProps): ReactElement {
   const { describedBy, field, id, readOnly, value } = props

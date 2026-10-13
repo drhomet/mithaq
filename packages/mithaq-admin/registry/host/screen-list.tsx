@@ -2,11 +2,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactElement } from 'react'
 import { ListContext, useScreen } from 'mithaq/admin/react'
 import { Button } from '@/components/ui/button'
-import { List } from './components/mithaq/list.tsx'
-import type { ListProps, Page } from './components/mithaq/list-types.tsx'
-import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from './components/mithaq/list-query.ts'
-import { counted } from './components/mithaq/format.tsx'
-import { listOf } from './components/mithaq/node-tree.ts'
+import { List } from 'mithaq-admin/list.tsx'
+import type { ListProps, Page } from 'mithaq-admin/list-types.tsx'
+import { QueryRefused, findOf, readQuery, readRaw, rulesOf, scopedTo, writeQuery, type ListQuery, type RawQuery } from 'mithaq-admin/list-query.ts'
+import { counted } from 'mithaq-admin/format.tsx'
+import { listOf } from 'mithaq-admin/node-tree.ts'
 
 /**
  * The list's search as the router carries it: the URL's pairs as strings, each

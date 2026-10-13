@@ -5,9 +5,9 @@ import { DirectionalIcon } from '@/components/ui/directional-icon'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { Translate } from './copy.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
 import { useScreen } from 'mithaq/admin/react'
-import { limitsUpTo } from './list-query.ts'
+import { limitsUpTo } from 'mithaq-admin/list-query.ts'
 
 /** As much of one page as the pager reads. */
 export type PageInfo = {

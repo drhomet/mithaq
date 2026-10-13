@@ -2,9 +2,9 @@ import type { ReactElement } from 'react'
 import type { ButtonClient, ClientField, ClientKayan, Row } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { Copy } from './copy.ts'
-import type { Places } from './screen-refs.ts'
-import { useConfirm } from './use-confirm.tsx'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import type { Places } from 'mithaq-admin/screen-refs.ts'
+import { useConfirm } from 'mithaq-admin/use-confirm.tsx'
 
 /** One button a page draws where its node sits: the operation, and what the node says about it. */
 export type PageButton = ClientKayan['operations'][number] & Pick<ButtonClient, 'label' | 'component' | 'confirm'>

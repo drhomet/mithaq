@@ -24,6 +24,7 @@
     "image-dimensions": "2.5.1",
     "jose": "6.2.12",
     "mithaq": "*",
+    "mithaq-admin": "*",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -31,7 +32,6 @@
     "@types/pg": "^8.15.6",
     "@types/react": "^19.3.0",
     "lucide-react": "^1.16.0",
-    "mithaq-admin": "*",
     "react": "^19.3.0",
     "recharts": "3.8.0",
     "typescript": "^7.0.2"

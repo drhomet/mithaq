@@ -5,8 +5,8 @@ import { $getSelection, $isRangeSelection, COMMAND_PRIORITY_HIGH, COMMAND_PRIORI
 import { CheckIcon, PencilIcon, TrashIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { Translate } from './copy.ts'
-import { dropPlaceholders, getSelectedNode, newLink } from './rich-text-selection.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { dropPlaceholders, getSelectedNode, newLink } from 'mithaq-admin/rich-text-selection.ts'
 import { safeUrl } from 'mithaq/rich-text'
 
 // Held apart from the JSX, so `shadcn add` in a right-to-left project does not rewrite `left-0` to `start-0`: the bubble

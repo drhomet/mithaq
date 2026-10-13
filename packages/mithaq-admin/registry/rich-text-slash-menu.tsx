@@ -4,7 +4,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { LexicalTypeaheadMenuPlugin, MenuOption, useBasicTypeaheadTriggerMatch } from '@lexical/react/LexicalTypeaheadMenuPlugin'
 import type { TextNode } from 'lexical'
 import { cn } from '@/lib/utils'
-import { pickLabel, type RichTextPick } from './rich-text-picks.tsx'
+import { pickLabel, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 
 class PickerOption extends MenuOption {
   item: RichTextPick

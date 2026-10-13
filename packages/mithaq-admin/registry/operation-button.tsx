@@ -12,14 +12,14 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { besideLabel, controlFor, useComponents } from './components.tsx'
-import type { FindApi } from './control-props.ts'
-import { operationFieldLabelFor, operationLabelFor, type Copy } from './copy.ts'
-import { FieldShell, describedBy } from './field-shell.tsx'
-import { issuesOf, refusalWords } from './form-rules.tsx'
-import { BulkChoice, type PageButton } from './node-buttons.tsx'
-import { initialFocusIn } from './record-frame.tsx'
-import { refusalKeyOf } from './refusal.ts'
+import { besideLabel, controlFor, useComponents } from 'mithaq-admin/components.tsx'
+import type { FindApi } from 'mithaq-admin/control-props.ts'
+import { operationFieldLabelFor, operationLabelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
+import { issuesOf, refusalWords } from 'mithaq-admin/form-rules.tsx'
+import { BulkChoice, type PageButton } from 'mithaq-admin/node-buttons.tsx'
+import { initialFocusIn } from 'mithaq-admin/record-frame.tsx'
+import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
 /**
  * One of a kayan's own operations, as a button and the dialog behind it. The dialog is controlled so a

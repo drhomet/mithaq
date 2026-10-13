@@ -9,9 +9,9 @@ import { useAccess, useForm, useKayan, useLocale, useScreen } from 'mithaq/admin
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ariaRequired } from '@/components/mithaq/control-props.ts'
-import { FieldShell, describedBy } from '@/components/mithaq/field-shell.tsx'
-import { useKayanField } from '@/components/mithaq/form-context.tsx'
+import { ariaRequired } from 'mithaq-admin/control-props.ts'
+import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
+import { useKayanField } from 'mithaq-admin/form-context.tsx'
 import { grantable } from '../grants.ts'
 import { projectStatements } from '../../statements.ts'
 

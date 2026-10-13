@@ -1,6 +1,6 @@
 import { compareDecimals, decimalDigits, isDecimal, type ClientField } from 'mithaq/admin'
-import type { Copy } from './copy.ts'
-import { counted, listed } from './format.tsx'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { counted, listed } from 'mithaq-admin/format.tsx'
 
 /**
  * Which fields a schema refusal names, and what it says about each, keyed by the first segment of

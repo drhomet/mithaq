@@ -19,4 +19,4 @@ export const slide = async ({
   // Set once with every strategy's cookies: a second set replaces the first.
   if (cookies.length) setResponseHeader('set-cookie', cookies)
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 bc0221e1088103f8638e0333b84aafb6b326e3991a187ced198bce2d090ecbe9
+// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 bc0221e1088103f8638e0333b84aafb6b326e3991a187ced198bce2d090ecbe9

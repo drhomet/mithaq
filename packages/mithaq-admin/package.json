@@ -4,16 +4,56 @@
   "license": "MIT",
   "private": true,
   "type": "module",
-  "files": [
-    "r",
-    "registry",
-    "!registry/ui",
-    "!registry/lib",
-    "!registry/hooks"
-  ],
+  "exports": {
+    "./package.json": "./package.json",
+    "./registry.json": "./registry.json",
+    "./source.css": "./source.css",
+    "./*": "./registry/*"
+  },
   "scripts": {
     "build": "shadcn build --output r && node --input-type=module -e \"import { pathToFileURL } from 'node:url'; import { mark } from 'mithaq/upgrade'; await mark(pathToFileURL('r/'))\"",
     "prepare": "bun run build"
+  },
+  "publishConfig": {
+    "name": "@drhomet/mithaq-admin",
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/drhomet/mithaq.git",
+      "directory": "packages/mithaq-admin"
+    },
+    "homepage": "https://github.com/drhomet/mithaq#readme",
+    "bugs": {
+      "url": "https://github.com/drhomet/mithaq/issues"
+    }
+  },
+  "peerDependencies": {
+    "@hugeicons/core-free-icons": "^4.1.4",
+    "@hugeicons/react": "^1.1.6",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/react": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "@lexical/selection": "0.52.0",
+    "@lexical/utils": "0.52.0",
+    "@tanstack/react-form": "^1.33.5",
+    "@types/react": "^19.3.0",
+    "input-otp": "^1.5.0",
+    "lexical": "0.52.0",
+    "lucide-react": "^1.16.0",
+    "mithaq": "*",
+    "react": "^19.3.0",
+    "react-day-picker": "^10.0.1",
+    "react-dom": "^19.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@lexical/link": { "optional": true },
+    "@lexical/list": { "optional": true },
+    "@lexical/react": { "optional": true },
+    "@lexical/rich-text": { "optional": true },
+    "@lexical/selection": { "optional": true },
+    "@lexical/utils": { "optional": true },
+    "@types/react": { "optional": true },
+    "lexical": { "optional": true }
   },
   "devDependencies": {
     "@base-ui/react": "^1.5.0",

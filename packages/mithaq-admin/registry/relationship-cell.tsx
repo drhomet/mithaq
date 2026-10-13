@@ -1,10 +1,10 @@
 import { use, useEffect, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { ScreenContext } from 'mithaq/admin/react'
-import type { CellProps, FindApi, RelationshipTitles } from './control-props.ts'
-import { listed } from './format.tsx'
-import { isForbidden } from './refusal.ts'
-import { findByIds, idsOf, nameOfRow, titleFieldOf } from './relationship-control.tsx'
+import type { CellProps, FindApi, RelationshipTitles } from 'mithaq-admin/control-props.ts'
+import { listed } from 'mithaq-admin/format.tsx'
+import { isForbidden } from 'mithaq-admin/refusal.ts'
+import { findByIds, idsOf, nameOfRow, titleFieldOf } from 'mithaq-admin/relationship-control.tsx'
 
 export const titleKey = (target: string, id: string): string => `${target}:${id}`
 

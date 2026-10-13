@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useForm, useStore } from '@tanstack/react-form'
 import type { ClientKayan } from 'mithaq/admin'
-import { seedOf } from './field-values.ts'
-import type { DraftStatus, FormProps } from './form-types.tsx'
+import { seedOf } from 'mithaq-admin/field-values.ts'
+import type { DraftStatus, FormProps } from 'mithaq-admin/form-types.tsx'
 
 /** What a form was seeded from: the row the host handed, the values it opened with, what the server holds, the draft status and the instant the row stands at. */
 export type Seed = {

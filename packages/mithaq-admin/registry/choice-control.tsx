@@ -6,7 +6,7 @@ import { Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList } 
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ariaRequired, changeOf, checkboxSize, comboboxPhone, type ControlProps } from './control-props.ts'
+import { ariaRequired, changeOf, checkboxSize, comboboxPhone, type ControlProps } from 'mithaq-admin/control-props.ts'
 
 export function SelectControl(props: ControlProps): ReactElement {
   const options = props.field.options ?? []

@@ -12,14 +12,11 @@ import './tsx.ts'
 import { click, fire, mount, type, window } from './dom.ts'
 
 const { createRoot } = await import('react-dom/client')
-// The host item imports its siblings from the app's `./components/mithaq/`, which here are the
-// registry's own files; TanStack Query is the app's dependency, so it resolves from the app.
+// TanStack Query is the app's dependency, so it resolves from the app.
 const app = new URL('../../../apps/asas-tanstack/src/screen-list.tsx', import.meta.url).href
 registerHooks({
   resolve: (specifier, context, next) =>
-    specifier.startsWith('./components/mithaq/') && context.parentURL?.includes('/registry/host/')
-      ? { shortCircuit: true, url: new URL(`../registry/${specifier.slice('./components/mithaq/'.length)}`, import.meta.url).href }
-      : specifier === '@tanstack/react-query' ? next(specifier, { ...context, parentURL: app }) : next(specifier, context),
+    specifier === '@tanstack/react-query' ? next(specifier, { ...context, parentURL: app }) : next(specifier, context),
 })
 const { QueryClient, QueryClientProvider } = (await import('@tanstack/react-query' as string)) as {
   QueryClient: new () => { clear(): void }

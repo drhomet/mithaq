@@ -1,6 +1,6 @@
 import { allowedType, type FetchClient } from 'mithaq/admin'
-import type { Translate } from './copy.ts'
-import { refusalKeyOf } from './refusal.ts'
+import type { Translate } from 'mithaq-admin/copy.ts'
+import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
 export type Row = Record<string, unknown>
 

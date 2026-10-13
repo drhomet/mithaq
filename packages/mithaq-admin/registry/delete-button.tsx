@@ -12,9 +12,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import type { Copy, Translate } from './copy.ts'
-import { rowWarning } from './row-title.tsx'
-import { refusalKeyOf } from './refusal.ts'
+import type { Copy, Translate } from 'mithaq-admin/copy.ts'
+import { rowWarning } from 'mithaq-admin/row-title.tsx'
+import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
 /**
  * The delete, in two clicks. The dialog stays open until the delete lands, so a refusal is said inside it.
