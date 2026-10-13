@@ -66,8 +66,8 @@ let built: ReturnType<typeof language.buildAsas>
 let tables: Record<string, unknown>
 
 before(async () => {
-  await generateAuth({ options: uuidOptions, directory: uuidDirectory, schemaName })
-  await generateAuth({ options: plainOptions, directory: textDirectory })
+  await generateAuth({ language: '../../../mithaq.ts', options: uuidOptions, directory: uuidDirectory, schemaName })
+  await generateAuth({ language: '../../../mithaq.ts', options: plainOptions, directory: textDirectory })
   const { betterAuth: kayan } = (await import(new URL('index.ts', uuidDirectory).href)) as { betterAuth: { core: never[] } }
   built = language.buildAsas({ http: [fetchHttp()], kayan: kayan.core, auth: { onError: console.error } })
   tables = built.targets.drizzle.tables
@@ -97,7 +97,7 @@ test('generateAuth writes a uuid id when generateId is "uuid", and the text id i
   }
   for (const generateId of [false, 'serial', () => 'id']) {
     const directory = new URL(`other/${typeof generateId}/`, root)
-    await generateAuth({ options: { advanced: { database: { generateId } } } as never, directory })
+    await generateAuth({ language: '../../../mithaq.ts', options: { advanced: { database: { generateId } } } as never, directory })
     assert.match(await readFile(new URL('user.ts', directory), 'utf8'), /\n {4}id: \{ kind: 'text' \},\n/, `${String(generateId)} keeps text`)
   }
 })

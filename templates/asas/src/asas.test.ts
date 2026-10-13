@@ -782,13 +782,13 @@ before(async () => {
 after(() => asas.destroy())
 
 test('1. the committed auth kayan are what the generator writes', async () => {
-  assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
+  assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
 
   // Dropping every plugin drops the organization plugin's four tables and every column a
   // plugin adds to a table Better Auth ships, so the barrel and six files go stale.
   const withoutPlugins = { ...options, plugins: [] }
   assert.deepEqual(
-    await generateAuth({ options: withoutPlugins, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }),
+    await generateAuth({ language: '../../../mithaq.ts', options: withoutPlugins, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }),
     ['index.ts', 'invitation.ts', 'member.ts', 'organization.ts', 'organizationRole.ts', 'session.ts', 'user.ts'],
   )
 
@@ -797,8 +797,8 @@ test('1. the committed auth kayan are what the generator writes', async () => {
   const sibling = new URL('user-extras.ts', authDirectory)
   await writeFile(sibling, `export const useAsTitle = 'name'\n`)
   try {
-    assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: false, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
-    assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory: authDirectory, check: false, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
   } finally {
     await rm(sibling)
   }
@@ -2421,7 +2421,7 @@ test('13. the generator makes its directory, and never overwrites a file it did 
   try {
     // The directory a project points a generator at need not exist yet.
     const fresh = new URL('kayan/auth/', temporary)
-    assert.equal((await generateAuth({ options, directory: fresh })).length, 9)
+    assert.equal((await generateAuth({ language: '../../../mithaq.ts', options, directory: fresh })).length, 9)
 
     // A foreign key's column name is the snake case of the property name, and a
     // name that opens on a capital has nothing to break before it, so it gets no
@@ -2430,7 +2430,7 @@ test('13. the generator makes its directory, and never overwrites a file it did 
       ...options,
       user: { additionalFields: { AvatarId: { type: 'string', references: { model: 'user' } } } },
     }
-    await generateAuth({ options: capitalised as typeof options, directory: fresh })
+    await generateAuth({ language: '../../../mithaq.ts', options: capitalised as typeof options, directory: fresh })
     const written = await readFile(new URL('user.ts', fresh), 'utf8')
     assert.match(written, /AvatarId: \{ kind: 'relationship', relationTo: \(\) => user, dbName: 'avatar_id'/)
 
@@ -2441,14 +2441,14 @@ test('13. the generator makes its directory, and never overwrites a file it did 
     // removal, so a refused run leaves the directory exactly as it was.
     await writeFile(new URL('gone.ts', mine), `${header}\n`)
     await assert.rejects(
-      () => generateAuth({ options, directory: mine }),
+      () => generateAuth({ language: '../../../mithaq.ts', options, directory: mine }),
       /user\.ts was not written by/,
     )
     assert.deepEqual((await readdir(mine)).sort(), ['gone.ts', 'user.ts'])
 
     await writeFile(new URL('session.ts', mine), 'export const session = { mine: true }\n')
     await assert.rejects(
-      () => generateAuth({ options, directory: mine }),
+      () => generateAuth({ language: '../../../mithaq.ts', options, directory: mine }),
       /session\.ts, user\.ts were not written by/,
     )
   } finally {
@@ -11126,7 +11126,7 @@ const impersonate = async (headers: Headers, userId: string) => {
 test('126. the admin plugin adds its five columns to the generated kayan and to the committed migrations, and brings no table, so the barrel is unchanged', async () => {
   // The committed files are exactly what the generator writes from the options in
   // @asas/auth, the admin plugin among them.
-  assert.deepEqual(await generateAuth({ options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
+  assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/auth', screens: authScreens }), [])
 
   const fieldsOf = (kayan: unknown) => Object.keys((kayan as { fields: Record<string, unknown> }).fields)
   for (const column of ['role', 'banned', 'banReason', 'banExpires']) {

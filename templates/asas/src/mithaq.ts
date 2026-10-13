@@ -378,12 +378,14 @@ const language = defineMithaq({
   // Not a key the language knows: the project's own, passed through typed, and
   // read by `mithaq generate auth`, `messages` and `screens` to find where each
   // writes. `providers` is the module `generate auth` reads the Better Auth
-  // instances from and writes into each generated kayan's import. `screens` is
+  // instances from and writes into each generated kayan's import, and `language`
+  // the module each of them imports `defineKayan` from. `screens` is
   // the host app's routes folder, one per screen because more than one app
   // serves them: the tenant's two by `apps/asas-tanstack`, the platform by
   // `apps/asas-platform`.
   generate: {
     auth: 'src/kayan/auth/',
+    language: '../../../mithaq.ts',
     providers: '@asas/auth',
     messages: 'src/messages/',
     screens: {

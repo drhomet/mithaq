@@ -25,10 +25,13 @@ Every command except `lock` and `generate --check` first checks `mithaq.lock`. I
 
 Writes one kayan file for each table Better Auth uses, plus an `index.ts` barrel that groups them by plugin. A kayan is an entity: one data type with its fields, access and operations. Run it after you change the Better Auth plugins in `templates/auth/src/index.ts`.
 
-It reads two keys from `generate` in `src/mithaq.ts`:
+It reads three keys from `generate` in `src/mithaq.ts`:
 
 - `auth`: the folder to write into. The template sets `'src/kayan/auth/'`.
+- `language`: the module each generated kayan imports `defineKayan` from, written as given: a package name, or a path relative to a generated file. The template sets `'../../../mithaq.ts'`.
 - `providers`: the module that exports `providers`, the Better Auth instances. The template sets `'@asas/auth'`.
+
+It refuses when `language` or `providers` is missing or cannot be found from a generated file.
 
 It writes a subfolder for each provider, such as `src/kayan/auth/user/`. It never overwrites or deletes a file that lacks its header comment.
 

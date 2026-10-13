@@ -109,8 +109,8 @@ test('generateAuth maps Better Auth modelName and fieldName to its Drizzle schem
   }
 
   try {
-    await generateAuth({ options, directory })
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), [])
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), [])
 
     const user = await readFile(new URL('user.ts', directory), 'utf8')
     const session = await readFile(new URL('session.ts', directory), 'utf8')
@@ -137,7 +137,7 @@ test('generateAuth maps Better Auth modelName and fieldName to its Drizzle schem
     assert.equal(generated.session.fields.personAPI.relationTo().name, "people'sProfiles")
 
     await writeFile(new URL('user.ts', directory), `${user}\n`)
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), ['user.ts'])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), ['user.ts'])
   } finally {
     await rm(root, { recursive: true })
   }
@@ -159,8 +159,8 @@ test('generateAuth spreads the shipped operations onto every generated kayan, na
   }
 
   try {
-    await generateAuth({ options, directory })
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), [])
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), [])
 
     const read = async (file: string) => readFile(new URL(file, directory), 'utf8')
     assert.match(await read('team.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \} \},\n/)
@@ -181,14 +181,14 @@ test('generateAuth titles a table that has a name field by it, on each screen th
   }
   const screens = { dashboard: ['user', 'team', 'ticket'], portal: ['team'], platform: [] }
   try {
-    await generateAuth({ options, directory, screens })
-    assert.deepEqual(await generateAuth({ options, directory, screens, check: true }), [])
+    await generateAuth({ language: '../../../mithaq.ts', options, directory, screens })
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens, check: true }), [])
     const read = async (file: string) => readFile(new URL(file, directory), 'utf8')
     assert.match(await read('team.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \}, dashboard: \{ useAsTitle: 'name' \}, portal: \{ useAsTitle: 'name' \} \},\n/)
     assert.match(await read('user.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \}, dashboard: \{ useAsTitle: 'displayName' \} \},\n/, 'a renamed name field titles under the name Better Auth gave it')
     assert.match(await read('ticket.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \} \},\n/, 'a table with no name field keeps its id')
     assert.match(await read('session.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \} \},\n/, 'a kayan no screen lists writes no screen block')
-    assert.deepEqual(await generateAuth({ options, directory, screens: { ...screens, portal: [] }, check: true }), ['team.ts'])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens: { ...screens, portal: [] }, check: true }), ['team.ts'])
   } finally {
     await rm(root, { recursive: true })
   }
@@ -201,21 +201,21 @@ test('generateAuth imports a kayan\'s access from a <kayan>.access.ts beside it,
   const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-auth-access-'))}/`)
   const directory = new URL('kayan/auth/user/', root)
   try {
-    await generateAuth({ options, directory })
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
     const read = async (file: string) => readFile(new URL(file, directory), 'utf8')
     assert.doesNotMatch(await read('user.ts'), /import \{ access \}|\n  access,/, 'with no sibling the kayan names no access')
     const sibling = new URL('user.access.ts', directory)
     await writeFile(sibling, 'export const access = { read: () => true }\n')
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), ['user.ts'], 'a sibling that came is drift')
-    await generateAuth({ options, directory })
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), ['user.ts'], 'a sibling that came is drift')
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
     const user = await read('user.ts')
     assert.match(user, /\nimport \{ access \} from '\.\/user\.access\.ts'\n/)
     assert.match(user, /\n  access,\n  fields: \{/)
     assert.doesNotMatch(await read('session.ts'), /import \{ access \}|\n  access,/, 'and only the kayan it sits beside imports it')
     assert.equal(await read('user.access.ts'), 'export const access = { read: () => true }\n', 'the sibling is the project\'s and is left as written')
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), [])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), [])
     await rm(sibling)
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), ['user.ts'], 'and so is one that went')
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), ['user.ts'], 'and so is one that went')
   } finally {
     await rm(root, { recursive: true })
   }
@@ -228,21 +228,21 @@ test('generateAuth takes what the screens draw of a kayan from a <kayan>.screens
   const directory = new URL('kayan/auth/user/', root)
   const screens = { dashboard: ['user'], platform: ['user'] }
   try {
-    await generateAuth({ options, directory, screens })
+    await generateAuth({ language: '../../../mithaq.ts', options, directory, screens })
     const read = async (file: string) => readFile(new URL(file, directory), 'utf8')
     const sibling = new URL('user.screens.ts', directory)
     const written = "export const screens = { platform: { useAsTitle: 'name', pages: {} } } as const\n"
     await writeFile(sibling, written)
-    assert.deepEqual(await generateAuth({ options, directory, screens, check: true }), ['user.ts'], 'a sibling that came is drift')
-    await generateAuth({ options, directory, screens })
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens, check: true }), ['user.ts'], 'a sibling that came is drift')
+    await generateAuth({ language: '../../../mithaq.ts', options, directory, screens })
     const user = await read('user.ts')
     assert.match(user, /\nimport \{ screens \} from '\.\/user\.screens\.ts'\n/)
     assert.match(user, /\n  targets: \{ dashboard: \{ useAsTitle: 'name' \}, \.\.\.screens, service: \{ operations: defaultOperations \} \},\n/, 'the dashboard the sibling does not name keeps its generated title, the platform is the sibling\'s, and the service stays the generator\'s')
     assert.match(await read('session.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \} \},\n/, 'and only the kayan it sits beside imports it')
     assert.equal(await read('user.screens.ts'), written, 'the sibling is the project\'s and is left as written')
-    assert.deepEqual(await generateAuth({ options, directory, screens, check: true }), [])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens, check: true }), [])
     await rm(sibling)
-    assert.deepEqual(await generateAuth({ options, directory, screens, check: true }), ['user.ts'], 'and so is one that went')
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens, check: true }), ['user.ts'], 'and so is one that went')
   } finally {
     await rm(root, { recursive: true })
   }
@@ -254,7 +254,7 @@ test('mithaq generate auth reads the screens off the language\'s own targets in 
   await writeFile(
     new URL('src/mithaq.ts', root),
     [
-      "export const generate = { auth: 'src/kayan/auth/', providers: '../../../providers.ts' }",
+      "export const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../providers.ts' }",
       "export const targets = { store: { capability: 'store' }, back: { capability: 'screen', kayan: ['user'] }, front: { capability: 'screen', kayan: [] } }",
       '',
     ].join('\n'),
@@ -274,12 +274,12 @@ test('mithaq generate auth --check writes nothing, not even the folder, and repo
   await mkdir(new URL('src/', root), { recursive: true })
   await writeFile(
     new URL('src/mithaq.ts', root),
-    "export const generate = { auth: 'src/kayan/auth/', providers: '../../../providers.ts' }\n",
+    "export const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../providers.ts' }\n",
   )
   await writeFile(new URL('src/providers.ts', root), 'export const providers = { user: { options: {}, server: () => ({}) } }\n')
   try {
     assert.deepEqual(
-      await generateAuth({ options: {}, directory: new URL('src/kayan/auth/user/', root), check: true }),
+      await generateAuth({ language: '../../../mithaq.ts', options: {}, directory: new URL('src/kayan/auth/user/', root), check: true }),
       ['account.ts', 'index.ts', 'session.ts', 'user.ts', 'verification.ts'],
     )
     assert.equal(await quietly(() => runAuth(root, true)), 1)
@@ -293,13 +293,13 @@ test('generateAuth marks Better Auth onUpdate fields as application-supplied on 
   const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-auth-'))}/`)
   const directory = new URL('kayan/auth/user/', root)
   try {
-    await generateAuth({ options, directory })
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
     for (const file of ['user.ts', 'session.ts']) {
       const source = await readFile(new URL(file, directory), 'utf8')
       assert.match(source, /updatedAt: \{ kind: 'datetime', rules: \{ required: true, nowOnUpdate: true, providedBy: \{ update: 'application' \} \} \}/)
       assert.doesNotMatch(source, /defaultNow: true/)
     }
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), [])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), [])
   } finally {
     await rm(root, { recursive: true })
   }
@@ -312,12 +312,12 @@ test('generateAuth keeps a non-date onUpdate field away from clients without a d
     const options = {
       plugins: [{ id: 'test', schema: { audit: { fields: { label: { type: 'string' as const, onUpdate: () => 'next' } } } } }],
     }
-    await generateAuth({ options, directory })
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
     assert.match(
       await readFile(new URL('audit.ts', directory), 'utf8'),
       /label: \{ kind: 'text', rules: \{ providedBy: \{ update: 'application' \} \} \}/,
     )
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), [])
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), [])
   } finally {
     await rm(root, { recursive: true })
   }
@@ -329,7 +329,7 @@ test('generateAuth rejects reserved exported names but permits reserved property
     for (const name of ['class', 'await', 'implements', 'eval', 'arguments']) {
       const options = { plugins: [{ id: 'test', schema: { [name]: { fields: {} } } }] }
       await assert.rejects(
-        () => generateAuth({ options, directory: new URL(`${name}/`, root) }),
+        () => generateAuth({ language: '../../../mithaq.ts', options, directory: new URL(`${name}/`, root) }),
         /cannot be a generated file or export name/,
       )
     }
@@ -338,7 +338,7 @@ test('generateAuth rejects reserved exported names but permits reserved property
     const options = {
       plugins: [{ id: 'test', schema: { validName: { fields: { await: { type: 'string' as const } } } } }],
     }
-    await generateAuth({ options, directory })
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
     assert.match(await readFile(new URL('validName.ts', directory), 'utf8'), /  await: \{ kind: 'text' \}/)
   } finally {
     await rm(root, { recursive: true })
@@ -1951,7 +1951,7 @@ const sweepProject = async (fields = withSummary) => {
 export const { defineKayan, generate } = defineMithaq({
   arkan: [base],
   targets: {},
-  generate: { migrations: 'src/migrations/', messages: 'src/messages/', auth: 'src/kayan/auth/', providers: '../../../auth.ts', screens: 'src/routes/' },
+  generate: { migrations: 'src/migrations/', messages: 'src/messages/', auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../auth.ts', screens: 'src/routes/' },
 })
 `,
   )
@@ -2209,7 +2209,7 @@ test('`mithaq generate --check` with no noun checks the lock first, then stops a
   await writeFile(
     new URL('src/mithaq.ts', root),
     `import { base, defineMithaq } from '${core}'
-export const { defineKayan, generate } = defineMithaq({ arkan: [base], targets: {}, generate: { auth: 'src/kayan/auth/', providers: '../../../auth.ts' } })
+export const { defineKayan, generate } = defineMithaq({ arkan: [base], targets: {}, generate: { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../auth.ts' } })
 `,
   )
   // Better Auth's own defaults under one instance, so the sweep's first command
@@ -2315,8 +2315,8 @@ test('generateAuth writes a barrel naming one key per plugin, with core for Bett
   const directory = new URL('kayan/auth/', root)
 
   try {
-    await generateAuth({ options, directory })
-    assert.deepEqual(await generateAuth({ options, directory, check: true }), [], 'a second run over what the first wrote reports no drift')
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), [], 'a second run over what the first wrote reports no drift')
 
     const barrel = await readFile(new URL('index.ts', directory), 'utf8')
     assert.ok(barrel.startsWith(authHeader), 'the barrel carries the header every generated file carries, so the generator owns it')
@@ -2331,6 +2331,7 @@ test('generateAuth writes a barrel naming one key per plugin, with core for Bett
     await assert.rejects(
       () =>
         generateAuth({
+          language: '../../../mithaq.ts',
           options: { plugins: [{ id: 'test', schema: { index: { fields: {} } } }] },
           directory: new URL('clash/', root),
         }),
@@ -2347,18 +2348,18 @@ test('a vocabulary that drops its plugins writes core alone, and the check repor
   const withoutPlugin = { ...options, plugins: [] }
 
   try {
-    await generateAuth({ options, directory })
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
     assert.deepEqual(
-      (await generateAuth({ options: withoutPlugin, directory, check: true })).toSorted(),
+      (await generateAuth({ language: '../../../mithaq.ts', options: withoutPlugin, directory, check: true })).toSorted(),
       ['index.ts', 'invitation.ts', 'member.ts', 'organization.ts', 'organizationRole.ts', 'session.ts', 'user.ts'],
       'the organization plugin\'s four tables, the barrel that spread them, and the two core tables the admin plugin added its five columns to',
     )
 
-    await generateAuth({ options: withoutPlugin, directory })
+    await generateAuth({ language: '../../../mithaq.ts', options: withoutPlugin, directory })
     const barrel = await readFile(new URL('index.ts', directory), 'utf8')
     assert.match(barrel, /export const betterAuth = \{\n  core: \[user, session, account, verification\],\n\} as const\n/, 'the rewritten barrel names core alone')
     assert.doesNotMatch(barrel, /organization/, 'and nothing of the plugin that left is still spread')
-    assert.deepEqual(await generateAuth({ options: withoutPlugin, directory, check: true }), [], 'after which the check is green again')
+    assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options: withoutPlugin, directory, check: true }), [], 'after which the check is green again')
   } finally {
     await rm(root, { recursive: true })
   }
@@ -2506,7 +2507,7 @@ test('`mithaq generate --check` runs every declared target command with `--check
   // A real, empty language and its pending lock, so the sweep's first step, the lock, passes.
   await writeFile(
     new URL('src/mithaq.ts', root),
-    `import { defineMithaq } from ${JSON.stringify(new URL('../../../packages/mithaq/src/index.ts', import.meta.url).href)}\nexport const { defineKayan } = defineMithaq({ targets: {}, arkan: [] })\nexport const generate = { auth: 'src/kayan/auth/', providers: '../../../auth.ts', messages: 'src/messages/' }\n`,
+    `import { defineMithaq } from ${JSON.stringify(new URL('../../../packages/mithaq/src/index.ts', import.meta.url).href)}\nexport const { defineKayan } = defineMithaq({ targets: {}, arkan: [] })\nexport const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../auth.ts', messages: 'src/messages/' }\n`,
   )
   {
     const { defineKayan } = (await import(new URL('src/mithaq.ts', root).href)) as { defineKayan: unknown }
@@ -2559,7 +2560,7 @@ test('`mithaq generate --check` runs every declared target command with `--check
 test('mithaq generate auth writes one directory per kayan a Better Auth instance authenticates, with the auth key on the kayan named, and --check is green for two of them', async () => {
   const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-two-instances-'))}/`)
   await mkdir(new URL('src/', root), { recursive: true })
-  await writeFile(new URL('src/mithaq.ts', root), "export const generate = { auth: 'src/kayan/auth/', providers: '../../../auth.ts' }\n")
+  await writeFile(new URL('src/mithaq.ts', root), "export const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../auth.ts' }\n")
   // Two populations on two instances: staff on `user`, shoppers on `customers`. One database holds
   // both, so the second instance renames every table it brings.
   await writeFile(
@@ -2629,7 +2630,7 @@ test('mithaq generate auth writes one directory per kayan a Better Auth instance
 test('mithaq generate auth refuses an instance whose tables hold no kayan of its own name, because the auth key would be written onto nothing', async () => {
   const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-misnamed-instance-'))}/`)
   await mkdir(new URL('src/', root), { recursive: true })
-  await writeFile(new URL('src/mithaq.ts', root), "export const generate = { auth: 'src/kayan/auth/', providers: '../../../auth.ts' }\n")
+  await writeFile(new URL('src/mithaq.ts', root), "export const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../auth.ts' }\n")
   await writeFile(new URL('src/auth.ts', root), "export const providers = { shoppers: { options: {}, server: () => ({}) } }\n")
   try {
     await assert.rejects(
@@ -2678,7 +2679,7 @@ test('generate.providers as a relative path is written into the generated kayan 
   await mkdir(new URL('src/', root), { recursive: true })
   await writeFile(
     new URL('src/mithaq.ts', root),
-    "export const generate = { auth: 'src/kayan/auth/', providers: '../../../providers.ts' }\n",
+    "export const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '../../../providers.ts' }\n",
   )
   await writeFile(new URL('src/providers.ts', root), 'export const providers = { user: { options: {}, server: () => ({}) } }\n')
   try {
@@ -2687,6 +2688,39 @@ test('generate.providers as a relative path is written into the generated kayan 
     assert.match(kayan, /\nimport \{ providers \} from '\.\.\/\.\.\/\.\.\/providers\.ts'\n/)
   } finally {
     await rm(root, { recursive: true })
+  }
+})
+
+test('generate.language is written into each generated kayan as the module defineKayan comes from, wherever generate.auth puts it', async () => {
+  const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-language-path-'))}/`)
+  await mkdir(new URL('src/', root), { recursive: true })
+  await writeFile(
+    new URL('src/mithaq.ts', root),
+    "export const generate = { auth: 'src/auth/', language: '../../mithaq.ts', providers: '../../providers.ts' }\n",
+  )
+  await writeFile(new URL('src/providers.ts', root), 'export const providers = { user: { options: {}, server: () => ({}) } }\n')
+  try {
+    assert.equal(await quietly(() => runAuth(root, false)), 0)
+    const kayan = await readFile(new URL('src/auth/user/user.ts', root), 'utf8')
+    assert.match(kayan, /\nimport \{ defineKayan \} from '\.\.\/\.\.\/mithaq\.ts'\n/)
+  } finally {
+    await rm(root, { recursive: true })
+  }
+})
+
+test('mithaq generate auth refuses a generate record that names no language, or one it cannot find, and writes nothing', async () => {
+  // One project each, since a module is imported once per URL.
+  for (const [language, refused] of [[undefined, 'names no `generate.language`'], ['@nowhere/language', '"@nowhere/language"']] as const) {
+    const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-language-missing-'))}/`)
+    await mkdir(new URL('src/', root), { recursive: true })
+    await writeFile(new URL('src/providers.ts', root), 'export const providers = { user: { options: {}, server: () => ({}) } }\n')
+    await writeFile(new URL('src/mithaq.ts', root), `export const generate = ${JSON.stringify({ auth: 'src/kayan/auth/', language, providers: '../../../providers.ts' })}\n`)
+    try {
+      await assert.rejects(() => runAuth(root, false), (error: Error) => error instanceof Refusal && error.message.includes(refused))
+      assert.deepEqual((await readdir(new URL('src/', root))).sort(), ['mithaq.ts', 'providers.ts'])
+    } finally {
+      await rm(root, { recursive: true })
+    }
   }
 })
 
@@ -2711,7 +2745,7 @@ test('mithaq generate auth refuses a generate.providers it cannot find, naming t
   await mkdir(new URL('src/', root), { recursive: true })
   await writeFile(
     new URL('src/mithaq.ts', root),
-    "export const generate = { auth: 'src/kayan/auth/', providers: '@nowhere/auth' }\n",
+    "export const generate = { auth: 'src/kayan/auth/', language: '../../../mithaq.ts', providers: '@nowhere/auth' }\n",
   )
   try {
     await assert.rejects(

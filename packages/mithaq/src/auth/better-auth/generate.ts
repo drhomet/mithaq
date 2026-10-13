@@ -73,6 +73,7 @@ const fieldSource = (name: string, field: AuthField) => {
 const kayanSource = ({
   name,
   table,
+  language,
   provider,
   providers,
   screens = {},
@@ -83,6 +84,7 @@ const kayanSource = ({
 }: {
   name: string
   table: { modelName?: string; fields: Record<string, AuthField> }
+  language: string
   provider?: string
   providers?: string
   screens?: Readonly<Record<string, readonly string[]>>
@@ -114,7 +116,7 @@ const kayanSource = ({
   const key = identifier.test(provider ?? '') ? `.${provider}` : `[${sourceString(provider ?? '')}]`
   const imports = [
     `import { betterAuth, defaultFields, defaultOperations } from 'mithaq'`,
-    `import { defineKayan } from '../../../mithaq.ts'`,
+    `import { defineKayan } from ${sourceString(language)}`,
     ...(carries ? [`import { providers } from ${sourceString(providers ?? '')}`] : []),
     ...references.map((model) => `import { ${exportName(model)} } from './${exportName(model)}.ts'`),
     ...(access ? [`import { access } from './${exported}.access.ts'`] : []),
@@ -193,6 +195,7 @@ ${[...groups].map(([key, list]) => `  ${sourceKey(key)}: [${list.join(', ')}],`)
 export const generateAuth = async ({
   options,
   directory,
+  language,
   check = false,
   provider,
   providers,
@@ -201,6 +204,8 @@ export const generateAuth = async ({
 }: {
   options: Parameters<typeof getAuthTables>[0]
   directory: URL
+  /** The module each generated kayan imports `defineKayan` from: `generate.language`, as given. */
+  language: string
   check?: boolean
   /** The Postgres schema every kayan of this instance is built in, from its `providers` entry. */
   schemaName?: string
@@ -243,7 +248,7 @@ export const generateAuth = async ({
   const wanted = new Map(
     Object.entries(tables).map(([name, table]) => [
       `${name}.ts`,
-      kayanSource({ name, table: table as never, provider, providers, screens, access: siblings.has(`${name}.access.ts`), drawn: drawnBy.get(`${name}.screens.ts`), schemaName, idKind }),
+      kayanSource({ name, table: table as never, language, provider, providers, screens, access: siblings.has(`${name}.access.ts`), drawn: drawnBy.get(`${name}.screens.ts`), schemaName, idKind }),
     ]),
   )
   // Otherwise the `auth` key would be written onto nothing.
@@ -291,7 +296,7 @@ export const generateAuth = async ({
 /** The auth generator as the CLI runs it. */
 export const run = async (project: URL, check: boolean): Promise<number> => {
   const { generate, targets } = (await import(new URL('src/mithaq.ts', project).href)) as {
-    generate?: { auth?: string; providers?: unknown }
+    generate?: { auth?: string; language?: unknown; providers?: unknown }
     targets?: Record<string, Parameters<typeof isScreen>[0]>
   }
   const screens = Object.fromEntries(
@@ -323,6 +328,21 @@ export const run = async (project: URL, check: boolean): Promise<number> => {
       `\`generate.providers\` names "${from}", which cannot be found from a generated file under ${sourceString(folder)}. Name a package this project depends on, or a path relative to a generated file.`,
     )
   }
+  // The language sits wherever the project's layout puts it, a package or a file, so nothing stands in for it either.
+  const language: unknown = generate?.language
+  if (typeof language !== 'string') {
+    throw new Refusal(
+      `src/mithaq.ts names no \`generate.language\`, which is the module each generated kayan imports \`defineKayan\` from. Add \`language: '<package name, or a path relative to a generated file>'\` to \`generate\`, beside \`auth: ${sourceString(folder)}\`.`,
+    )
+  }
+  try {
+    createRequire(new URL('instance/index.ts', root)).resolve(language)
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'MODULE_NOT_FOUND') throw error
+    throw new Refusal(
+      `\`generate.language\` names "${language}", which cannot be found from a generated file under ${sourceString(folder)}. Name the language's package, or a path relative to a generated file.`,
+    )
+  }
   const { providers } = (await import(pathToFileURL(resolved).href)) as {
     providers?: Record<string, { options: Parameters<typeof getAuthTables>[0]; schemaName?: unknown }>
   }
@@ -348,7 +368,7 @@ export const run = async (project: URL, check: boolean): Promise<number> => {
   const changed: string[] = []
   for (const [provider, one] of Object.entries(providers)) {
     const schemaName = one.schemaName as string | undefined
-    const files = await generateAuth({ options: one.options, directory: new URL(`${provider}/`, root), check, provider, providers: from, screens, schemaName })
+    const files = await generateAuth({ options: one.options, directory: new URL(`${provider}/`, root), language, check, provider, providers: from, screens, schemaName })
     changed.push(...files.map((file) => `${provider}/${file}`))
   }
   // A directory of an instance no longer declared is reported, never removed: the
