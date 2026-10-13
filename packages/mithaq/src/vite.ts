@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import type { Plugin } from 'vite'
+import { normalizePath, type Plugin } from 'vite'
 
 /**
  * Serves the admin's pieces from the installed `mithaq-admin`, and a file the project ejected into `ejected`
@@ -27,9 +27,11 @@ export const mithaqAdmin = (ejected: string): Plugin => {
     // reach `mithaq-admin/<file>` by walking up, so the plugin answers for every importer.
     resolveId(source) {
       const [, file] = /^mithaq-admin\/(.+\.tsx?)$/.exec(source) ?? []
-      if (!file) return
+      // A piece names a sibling by its file alone, so a climb out of the package is no import of ours.
+      if (!file || file.split('/').includes('..')) return
       const own = join(ejected, file)
-      return existsSync(own) ? own : join(registry, file)
+      // The real path, as Vite names every other module, so a symlinked folder is never a second module.
+      return normalizePath(existsSync(own) ? realpathSync(own) : join(registry, file))
     },
   }
 }

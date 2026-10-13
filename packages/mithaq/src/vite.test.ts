@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -25,7 +25,9 @@ const project = async (store = false) => {
   await write(`${at}/registry/copy.ts`, counted('package'))
   await write(`${at}/registry/widget.ts`, "import { who } from 'mithaq-admin/copy.ts'\nexport const widget = `widget sees ${who}`\n")
   await write(`${at}/registry/list.ts`, "import { widget } from 'mithaq-admin/widget.ts'\nexport const list = `list holds ${widget}`\n")
-  await write('src/entry.ts', "import { who } from 'mithaq-admin/copy.ts'\nimport { list } from 'mithaq-admin/list.ts'\nexport const seen = { who, list, loads: globalThis.copyLoads }\n")
+  // A shell of the template, outside the app's root, which imports a piece the same way.
+  await write('../template/app-shell.ts', "import { who } from 'mithaq-admin/copy.ts'\nexport const shell = who\n")
+  await write('src/entry.ts', "import '../../template/app-shell.ts'\nimport { who } from 'mithaq-admin/copy.ts'\nimport { list } from 'mithaq-admin/list.ts'\nexport const seen = { who, list, loads: globalThis.copyLoads }\n")
   return { root, write, counted }
 }
 
@@ -38,6 +40,48 @@ const load = async (root: string) => {
     await server.close()
   }
 }
+
+/** Every URL a browser is sent for `copy.ts`, following the imports of the app, the template's shell and the pieces. */
+const clientCopies = async (root: string) => {
+  const server = await createServer({ root, configFile: false, logLevel: 'silent', appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, plugins: [mithaqAdmin(join(root, 'src/components/mithaq/'))] })
+  try {
+    const seen = new Set<string>()
+    const copies = new Set<string>()
+    const queue = ['/src/entry.ts']
+    for (let url = queue.pop(); url; url = queue.pop()) {
+      if (seen.has(url)) continue
+      seen.add(url)
+      for (const [, imported] of (await server.transformRequest(url))!.code.matchAll(/(?:from |import )["']([^"']+)["']/g)) {
+        if (/copy\.ts(\?|$)/.test(imported!)) copies.add(imported!)
+        queue.push(imported!)
+      }
+    }
+    assert.ok(seen.size >= 5, `the app, the shell and three pieces were transformed: ${[...seen].join(', ')}`)
+    return [...copies]
+  } finally {
+    await server.close()
+  }
+}
+
+test('on the client, the app, the shell of the template and the pieces are sent one URL for a piece, and the ejected file once there is one', async (t) => {
+  const { root, write, counted } = await project(true)
+  t.after(() => rm(join(root, '..'), { recursive: true, force: true }))
+  const [shipped, ...others] = await clientCopies(root)
+  assert.deepEqual(others, [])
+  assert.match(shipped!, /\/store\/node_modules\/@drhomet\/mithaq-admin\/registry\/copy\.ts$/)
+  await write('src/components/mithaq/copy.ts', counted('ejected'))
+  assert.deepEqual(await clientCopies(root), ['/src/components/mithaq/copy.ts'])
+})
+
+test('a specifier that climbs out of the package is left to Vite, and an ejected file is named by its real path', async (t) => {
+  const { root, write, counted } = await project()
+  t.after(() => rm(join(root, '..'), { recursive: true, force: true }))
+  await write('src/components/mithaq/copy.ts', counted('ejected'))
+  await symlink(root, join(root, '../linked'))
+  const resolveId = mithaqAdmin(join(root, '../linked/src/components/mithaq/')).resolveId as (source: string) => string | undefined
+  assert.equal(resolveId('mithaq-admin/../../escape.ts'), undefined)
+  assert.equal(resolveId('mithaq-admin/copy.ts'), await realpath(join(root, 'src/components/mithaq/copy.ts')))
+})
 
 test('with nothing ejected, every importer draws the package file', async (t) => {
   const { root } = await project()
