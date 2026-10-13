@@ -6,6 +6,17 @@ import { nodeFor, useComponents } from './components.tsx'
 import { blank, inside, listOf, shown, type Draw, type Node, type NodeProps } from './node-tree.ts'
 import { refOf, type ScreenPage } from './screen-refs.ts'
 
+// ponytail: what this file exported before its pieces were split out, kept for one version so a project's own file
+// importing one from here still builds after recopying; drop it the next minor and import each from its piece.
+export { LeafControl } from './leaf-control.tsx'
+export { NavLinks, currentOf } from './nav-links.tsx'
+export { BulkChoice, NodeButton, OwnButton, pageButtonOf, type PageButton } from './node-buttons.tsx'
+export { drawsKind, formIn, leavesOf, listIn, listOf, nodesOf, readsAsValues, relatedIn, scopeOf, shown, type Draw, type ListNode, type Node } from './node-tree.ts'
+export { CloseButton, RecordFrame, holdFocus, initialFocusIn } from './record-frame.tsx'
+export { isUntitled, rowTitle, rowWarning } from './row-title.tsx'
+export { refOf, type Places, type Refs, type ScreenPage, type TreePage } from './screen-refs.ts'
+export { useConfirm } from './use-confirm.tsx'
+
 /** One node, drawn by its kind's entry in the components map. */
 function DrawNode(props: NodeProps): ReactElement {
   const Drawn = nodeFor(useComponents().nodes, kindOf(props.node)!)
@@ -27,27 +38,25 @@ const loose = new Set(['field', 'row', 'separator'])
 export const carded = (nodes: readonly Node[], draw: Draw): ReactNode[] => {
   const drawn: ReactNode[] = []
   let run: Node[] = []
-  const flush = () => {
-    const held = run.filter((one) => shown(one, draw.scope) && !blank(one, draw.kayan))
+  // Keyed by where each sits among the nodes, and the run drawn whole, so a `when` that hides a node never shifts
+  // the key of what follows it: a shifted key remounts the box being typed in.
+  const flush = (at: number) => {
     // A separator divides what a card holds, so a card holding nothing else is not drawn.
-    if (held.some((one) => kindOf(one) !== 'separator')) {
+    if (run.some((one) => kindOf(one) !== 'separator' && shown(one, draw.scope) && !blank(one, draw.kayan))) {
       drawn.push(
-        <Card key={`card-${drawn.length}`} className="overflow-visible rounded-lg">
-          <CardContent className="flex flex-col gap-4">{drawNodes({ nodes: held, draw: { ...draw, inCard: true } })}</CardContent>
+        <Card key={`card-${at - run.length}`} className="overflow-visible rounded-lg">
+          <CardContent className="flex flex-col gap-4">{drawNodes({ nodes: run, draw: { ...draw, inCard: true } })}</CardContent>
         </Card>,
       )
     }
     run = []
   }
-  for (const one of nodes) {
-    if (loose.has(kindOf(one)!)) {
-      run.push(one)
-      continue
-    }
-    flush()
-    drawn.push(<Fragment key={`node-${drawn.length}`}>{drawNodes({ nodes: [one], draw })}</Fragment>)
-  }
-  flush()
+  nodes.forEach((one, at) => {
+    if (loose.has(kindOf(one)!)) return void run.push(one)
+    flush(at)
+    drawn.push(<Fragment key={`node-${at}`}>{drawNodes({ nodes: [one], draw })}</Fragment>)
+  })
+  flush(nodes.length)
   return drawn
 }
 
@@ -105,4 +114,4 @@ export const pageOf = (screen: ScreenPage, draw: Draw): ReactNode => {
   // Over the list the page draws only itself, and a nav node at any depth draws nothing there.
   return regionsIn(screen.page.page).map(([region, nodes]) => <Fragment key={region}>{drawNodes({ nodes, draw: { ...drawn, framed: true } })}</Fragment>)
 }
-// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 6dd2600bcf002dadb0f1f7e934a1dc948a20e9235896a4b9d7760b2febf43082
+// mithaq-admin c65ee154c09c87c98014d1edc7e6a3fac4d73794 338a39f10a0e0ae5e1e3dfd493b2e1736c3d5c092524df3e326db0b31e9062d3

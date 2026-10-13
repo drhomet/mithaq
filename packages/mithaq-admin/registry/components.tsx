@@ -75,7 +75,8 @@ export const namedCell = (cells: Cells, name: string | undefined) => named<Cell>
 
 /** The component a node of this kind is drawn by; a kind the map does not carry is an error, never drawn as nothing. */
 export const nodeFor = (nodes: Nodes, kind: string): ComponentType<NodeProps> => {
-  const found = named<ComponentType<NodeProps>>(nodes, kind)
+  // A map written before it carried nodes has none, which reads as every kind missing rather than a bare TypeError.
+  const found = nodes && named<ComponentType<NodeProps>>(nodes, kind)
   if (!found) throw new Error(`components.nodes has no node "${kind}". Spread defaultComponents.nodes into the map and add one under that name.`)
   return found
 }
@@ -124,7 +125,7 @@ export const checkComponents = ({ client, components }: { client: { path?: strin
   const { cells, controls, nodes } = components
   const missing = Object.values(client.kayan).flatMap((kayan) => [
     ...Object.entries(kayan.pages ?? {}).flatMap(([page, drawn]) => ('page' in drawn && drawn.page ? kindsIn(nodesOf(drawn as TreePage)) : [])
-      .filter((kind) => !Object.hasOwn(nodes, kind))
+      .filter((kind) => !nodes || !Object.hasOwn(nodes, kind))
       .map((kind) => `components.nodes has no node "${kind}", which screen ${client.path} ${kayan.name} page "${page}" draws.`)),
     ...Object.entries(kayan.pages ?? {}).flatMap(([page, drawn]) => namedCells(drawn, `screen ${client.path} ${kayan.name} page "${page}" leaf`))
       .filter(({ cell }) => !namedCell(cells, cell))

@@ -18,6 +18,15 @@ import { NavUserMenu, type NavUser } from './nav-user.tsx'
 import { OrganizationSwitcher, type NavOrganization } from './organization-switcher.tsx'
 import { ModeToggle } from './theme.tsx'
 
+// ponytail: what this file exported before its pieces were split out, kept for one version so a project's own file
+// importing one from here still builds after recopying; drop it the next minor and import each from its piece.
+export { endonym, localeEntries } from './locale-menu.ts'
+export { NavMain, iconOf, navEntries, navIcons, type AccessReport, type NavEntry, type NavKayan } from './nav-entries.tsx'
+export { NavDocuments, NavSecondary } from './nav-secondary.tsx'
+export { NavUserMenu, type NavUser } from './nav-user.tsx'
+export { OrganizationSwitcher, type NavOrganization } from './organization-switcher.tsx'
+export { ModeToggle, ThemeProvider, defaultThemes, useTheme, type Theme } from './theme.tsx'
+
 /**
  * What the header's `<h1>` says: the kayan's plural on its list, its singular on a row of it, the
  * shell's own heading anywhere else. A row is matched by the rule `NavMain` marks an entry active by.
@@ -227,4 +236,4 @@ export function SiteHeader({ t, title }: { t: Translate; title?: string }) {
     </header>
   )
 }
-// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 76b08a8f74ff36f507b21bea60b28c77d3ef7fd628c60612f29f3b51012c8f4f
+// mithaq-admin c65ee154c09c87c98014d1edc7e6a3fac4d73794 0623561becfcd9ea7b7df5c3c99ffffacb144caa8400d52f93e21ee9f0994d85

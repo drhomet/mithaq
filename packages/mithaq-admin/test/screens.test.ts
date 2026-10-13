@@ -974,3 +974,29 @@ test('266b. an edit page edits a row\'s drafts only where findVersions finds a v
   assert.equal(await rowReadsDrafts({ kayan: {}, operations: holds, id: 'a-row', findVersions: answering([{ id: 'v1' }]) }), false, 'and so does every actor on a kayan keeping no drafts')
   assert.deepEqual(asked, [], 'asking nothing where the key decides')
 })
+
+test('a field keeps its box when a when hides a node before it, so typing never remounts the box being typed in', async () => {
+  const shownWhileTajweed = { title: { equals: 'Tajweed' } }
+  const host = await render(createElement(Form, {
+    kayan: courses,
+    nodes: [
+      { field: 'summary', when: shownWhileTajweed },
+      { field: 'title' },
+      { section: 'more', label: { en: 'More' }, fields: [{ field: 'level' }] },
+      { field: 'fee', when: shownWhileTajweed },
+      { field: 'currency' },
+    ],
+    client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+    value: { id: 'c1', title: 'Tajweed' },
+    t,
+    locale: 'en',
+    onDone: () => {},
+  }))
+  const title = host.querySelector('#courses-title')!
+  const later = host.querySelector('#courses-currency')
+  assert.ok(host.querySelector('#courses-summary') && later, 'the summary is shown while the title matches')
+  await act(async () => type(title, 'Tajwee'))
+  assert.equal(host.querySelector('#courses-summary'), null, 'and hidden once it does not')
+  assert.equal(host.querySelector('#courses-title'), title, 'the title is the same box, not a new one')
+  assert.equal(host.querySelector('#courses-currency'), later, 'and so is a field in a later run whose own earlier node was hidden')
+})

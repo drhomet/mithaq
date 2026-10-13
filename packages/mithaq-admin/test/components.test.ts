@@ -183,3 +183,31 @@ test('a node kind the map leaves out stops the start and the page, naming the ki
   )
   assert.doesNotThrow(() => checkComponents({ client: screen, components: { ...defaultComponents, nodes: { ...defaultComponents.nodes, section: () => null } } }), 'a replaced node is a node the map carries')
 })
+
+test('the start reads every kind of node a page holds, nested in a group or on a page that opens over its list, and a map with no nodes at all says so', () => {
+  const group = (fields: unknown[]) => ({ label: { en: 'G' }, fields })
+  const client = {
+    path: '/dashboard',
+    kayan: {
+      notes: {
+        name: 'notes',
+        fields: [],
+        operations: [],
+        pages: {
+          edit: { path: '/notes/:id', page: { main: [{ tabs: [{ tab: 't', ...group([{ section: 's', ...group([{ field: 'title' }]) }]) }] }] } },
+          create: { path: '/notes/new', mode: 'dialog', page: { main: [{ separator: true }] } },
+        },
+      },
+    },
+  } as unknown as Parameters<typeof checkComponents>[0]['client']
+  const { section: _section, separator: _separator, ...rest } = defaultComponents.nodes
+  assert.throws(
+    () => checkComponents({ client, components: { ...defaultComponents, nodes: rest as Components['nodes'] } }),
+    (error: Error) =>
+      /components\.nodes has no node "section", which screen \/dashboard notes page "edit" draws\./.test(error.message)
+      && /components\.nodes has no node "separator", which screen \/dashboard notes page "create" draws\./.test(error.message),
+  )
+  const { nodes: _nodes, ...nodeless } = defaultComponents
+  assert.throws(() => checkComponents({ client, components: nodeless as Components }), /components\.nodes has no node "tabs"/)
+  assert.throws(() => sectioned(nodeless as Components), /components\.nodes has no node "form"\. Spread defaultComponents\.nodes into the map/)
+})

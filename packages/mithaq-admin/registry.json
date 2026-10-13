@@ -724,8 +724,14 @@
       "registryDependencies": [
         "card",
         "./node_modules/mithaq-admin/r/mithaq-components.json",
+        "./node_modules/mithaq-admin/r/mithaq-leaf-control.json",
+        "./node_modules/mithaq-admin/r/mithaq-nav-links.json",
+        "./node_modules/mithaq-admin/r/mithaq-node-buttons.json",
         "./node_modules/mithaq-admin/r/mithaq-node-tree.json",
-        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json"
+        "./node_modules/mithaq-admin/r/mithaq-record-frame.json",
+        "./node_modules/mithaq-admin/r/mithaq-row-title.json",
+        "./node_modules/mithaq-admin/r/mithaq-screen-refs.json",
+        "./node_modules/mithaq-admin/r/mithaq-use-confirm.json"
       ],
       "files": [
         {
@@ -1275,6 +1281,7 @@
         "sheet",
         "sidebar",
         "./node_modules/mithaq-admin/r/mithaq-copy.json",
+        "./node_modules/mithaq-admin/r/mithaq-locale-menu.json",
         "./node_modules/mithaq-admin/r/mithaq-nav-entries.json",
         "./node_modules/mithaq-admin/r/mithaq-nav-secondary.json",
         "./node_modules/mithaq-admin/r/mithaq-nav-user.json",

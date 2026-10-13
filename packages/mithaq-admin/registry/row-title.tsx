@@ -35,5 +35,5 @@ export const rowWarning = ({ kayan, row, operation, copy: { t, locale } }: { kay
   const name = rowTitle({ kayan, row, locale })
   if (!name) return t('admin.rowWarning', 'This applies to this row.') ?? 'This applies to this row.'
   const sentence = (operation && t(`${kayan.name}.operations.${operation}.warning`)) || (t('admin.rowNamedWarning', 'This applies to {name}.') ?? 'This applies to {name}.')
-  return sentence.replace('{name}', () => `⁨${name}⁩`)
+  return sentence.replace('{name}', () => `\u2068${name}\u2069`)
 }

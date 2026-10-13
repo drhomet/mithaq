@@ -35,6 +35,6 @@ export const rowWarning = ({ kayan, row, operation, copy: { t, locale } }: { kay
   const name = rowTitle({ kayan, row, locale })
   if (!name) return t('admin.rowWarning', 'This applies to this row.') ?? 'This applies to this row.'
   const sentence = (operation && t(`${kayan.name}.operations.${operation}.warning`)) || (t('admin.rowNamedWarning', 'This applies to {name}.') ?? 'This applies to {name}.')
-  return sentence.replace('{name}', () => `⁨${name}⁩`)
+  return sentence.replace('{name}', () => `\u2068${name}\u2069`)
 }
-// mithaq-admin 18e80532b8fb462dbba313622bcd6ee8762c2c92 fb700db9be8ae508504c2bcdb5ebbc5e562fb1f42aaf4882c4a1210f6c9b2a58
+// mithaq-admin c65ee154c09c87c98014d1edc7e6a3fac4d73794 204d046ae3e09f0dd663f94cca59d0da2d16a4f154a3dbde6754102d4c30f9b5
