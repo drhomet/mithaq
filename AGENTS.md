@@ -45,6 +45,11 @@ From `templates/asas/`, with `DATABASE_URL` exported (the `mithaq` bin runs unde
 
 ```sh
 bunx mithaq generate --check   # the lock, generated files, migrations, messages, screens
+```
+
+From `templates/mithaq/`, `apps/asas-tanstack/` and `apps/asas-platform/`, each of which holds files from mithaq-admin where its `components.json` says:
+
+```sh
 bunx mithaq upgrade --check    # the files a project holds from mithaq-admin against the package
 ```
 

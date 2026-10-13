@@ -35,11 +35,11 @@ bun run test:next
 
 Before a release, `bun run pack` stages the three published packages in `.pack/`, and `bun run test:release` creates a project from them and runs it end to end.
 
-From `templates/asas/`, with `DATABASE_URL` exported:
+From `templates/asas/`, with `DATABASE_URL` exported, and then from `templates/mithaq/`, `apps/asas-tanstack/` and `apps/asas-platform/`, which hold files from mithaq-admin:
 
 ```sh
-bunx mithaq generate --check
-bunx mithaq upgrade --check
+bunx mithaq generate --check   # in templates/asas
+bunx mithaq upgrade --check    # in each of the other three
 ```
 
 ## Rules
