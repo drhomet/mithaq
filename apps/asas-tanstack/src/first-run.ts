@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 type FirstRun = { open: false } | { open: true; code: 'none' | 'required' | 'unset'; name: boolean }
 
 /**
- * Whether this app of one organization or none still waits for its first owner, and while it does,
+ * Whether this app of one organization still waits for its first owner, and while it does,
  * whether first-run asks the setup code and a name: the provider's own state, read in process. With
  * many organizations nobody waits: each sign-up founds one.
  */

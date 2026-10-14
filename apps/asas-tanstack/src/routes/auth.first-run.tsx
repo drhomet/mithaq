@@ -7,7 +7,7 @@ import { documentHead } from '../copy.ts'
 import { firstRun } from '../first-run.ts'
 import { useCopy } from './__root.tsx'
 
-// The first owner of an app of one organization or none, and the organization itself: open once,
+// The first owner of an app of one organization, and the organization itself: open once,
 // to the holder of the setup code, and closed for good once the organization exists.
 export const Route = createFileRoute('/auth/first-run')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.firstRun')),

@@ -20,7 +20,7 @@ export const Route = createFileRoute('/auth/sign-up')({
   component: SignUp,
 })
 
-/** With many organizations each sign-up founds its own; with one or none, it joins the one or waits for an invitation. */
+/** With many organizations each sign-up founds its own; with one, it joins the one or waits for an invitation. */
 const founds = organizations === 'many'
 /** Whether a new account proves its address before it signs in, so the sign-up answers with no session. */
 const verifies = !founds && signUp === 'open' && verifyEmail

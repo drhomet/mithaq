@@ -275,16 +275,16 @@ test('buildAsas refuses a group within anything but the tenant field, a group na
   )
 })
 
-test('betterAuthTenant takes the organization mode, none, one or many, and nothing else', () => {
-  for (const organizations of ['none', 'one', 'many'] as const) assert.equal(betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations }).organizations, organizations)
-  for (const organizations of ['some', undefined]) {
-    assert.throws(() => betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: organizations as never }), /organizations: 'none', 'one' or 'many'/)
+test('betterAuthTenant takes the organization mode, one or many, and nothing else: a project that hid its one organization says so in its own settings', () => {
+  for (const organizations of ['one', 'many'] as const) assert.equal(betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations }).organizations, organizations)
+  for (const organizations of ['none', 'some', undefined]) {
+    assert.throws(() => betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: organizations as never }), /organizations: 'one' or 'many'/)
   }
 })
 
-test('connect() refuses a store holding more than one organization where the tenant target says none or one, and starts otherwise', async () => {
+test('connect() refuses a store holding more than one organization where the tenant target says one, and starts otherwise', async () => {
   /** A build over the memory store holding `count` organizations, connected under the mode given. */
-  const connected = async (organizations: 'none' | 'one' | 'many', count: number, readOnly = false) => {
+  const connected = async (organizations: 'one' | 'many', count: number, readOnly = false) => {
     const store = memoryStore()
     const language = defineMithaq({
       arkan: [base],
@@ -299,11 +299,9 @@ test('connect() refuses a store holding more than one organization where the ten
     for (let at = 0; at < count; at++) await store.insert({ tx: undefined, kayan: 'organization', data: { id: `org-${at}`, name: `Org ${at}` } })
     return built.connect({ readOnly })
   }
-  for (const organizations of ['none', 'one'] as const) {
-    await assert.rejects(connected(organizations, 2), new RegExp(`organizations: '${organizations}'[\\s\\S]*more than one[\\s\\S]*'many'`), `${organizations}: two organizations refuse the start, naming the mode and the way out`)
-    await connected(organizations, 1)
-    await connected(organizations, 0)
-    await connected(organizations, 2, true)
-  }
+  await assert.rejects(connected('one', 2), /organizations: 'one'[\s\S]*more than one[\s\S]*'many'/, 'two organizations refuse the start, naming the mode and the way out')
+  await connected('one', 1)
+  await connected('one', 0)
+  await connected('one', 2, true)
   await connected('many', 3)
 })

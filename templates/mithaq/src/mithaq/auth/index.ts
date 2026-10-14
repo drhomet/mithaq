@@ -14,7 +14,7 @@ import { sql } from 'mithaq/drizzle'
 import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
 // A module of its own so a screen can list the roles without loading the provider.
 import { platformRoles } from './platform-roles.ts'
-import { allowedDomains, joinRole, organizations, signUp, verifyEmail } from './organizations.ts'
+import { allowedDomains, joinRole, organizations, showOrganization, signUp, verifyEmail } from './organizations.ts'
 // add-on: roles
 import { tenantRoles } from '../../roles/tenant-roles.ts'
 // end add-on: roles
@@ -204,12 +204,13 @@ const logsLinks = process.env.NODE_ENV === 'development' && isLocalHost(tenantUR
 export type AuthSettings = {
   mailer: Mailer | undefined
   organizations: typeof organizations
+  showOrganization: boolean
   signUp: typeof signUp
   joinRole: string | null
   verifyEmail: boolean
   allowedDomains: readonly string[]
 }
-export const authSettings: AuthSettings = { mailer: configuredMailer ?? (logsLinks ? logMailer : undefined), organizations, signUp, joinRole, verifyEmail, allowedDomains }
+export const authSettings: AuthSettings = { mailer: configuredMailer ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains }
 
 /** A lowercase ASCII host of two labels or more, which an `xn--` international one is. */
 const host = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
@@ -250,9 +251,10 @@ const grantsPower = (key: string) => /^(roles|member(Roles)?|invitation|ac|organ
  * machine.
  */
 export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: AuthSettings; deployed: boolean; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
-  const { organizations, signUp, joinRole, verifyEmail, allowedDomains, mailer } = settings
+  const { organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains, mailer } = settings
   const problems: string[] = []
   if (organizations === 'many') {
+    if (!showOrganization) problems.push("organizations = 'many' takes showOrganization = true: a person who belongs to several switches between them by name.")
     if (signUp !== 'open') problems.push("organizations = 'many' takes signUp = 'open': each sign-up founds its own organization, and nobody joins one but by invitation.")
     if (joinRole !== null) problems.push("organizations = 'many' takes joinRole = null: nobody joins an organization there but by invitation.")
     if (verifyEmail) problems.push("organizations = 'many' verifies no address yet: set verifyEmail = false.")
@@ -300,8 +302,8 @@ const letter = ({ to, subject, en, ar, link }: { to: string; subject: string; en
 
 // The subject is fixed and only the body names the organization, escaped: its name is words an
 // administrator wrote. With no organization shown, the invitation is to the app, as every page says.
-const invitationMail = ({ mailer, organizations }: { mailer: Mailer; organizations: AuthSettings['organizations'] }) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) => {
-  const [en, ar] = organizations === 'none' ? ['this app', 'هذا التطبيق'] : [organization.name, organization.name]
+const invitationMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganization: boolean }) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) => {
+  const [en, ar] = showOrganization ? [organization.name, organization.name] : ['this app', 'هذا التطبيق']
   await mailer.send(letter({
     to: email,
     subject: 'You are invited · لديك دعوة',
@@ -317,7 +319,7 @@ const invitationMail = ({ mailer, organizations }: { mailer: Mailer; organizatio
  * members and listing them at 100.
  *
  * - `allowUserToCreateOrganization`: in `'many'`, sign-up founds each person's own organization. In
- *   `'one'` and `'none'` nobody founds one over HTTP; first-run makes the one on the server.
+ *   `'one'` nobody founds one over HTTP; first-run makes the one on the server.
  * - `organizationLimit`: a person who belongs to this many organizations, however they joined, founds
  *   no more, so one account cannot fill the database with organizations. An invitation still adds
  *   them to more.
@@ -328,9 +330,9 @@ const invitationMail = ({ mailer, organizations }: { mailer: Mailer; organizatio
 export const organizationLimitsFor = (mode: AuthSettings['organizations']) => ({
   allowUserToCreateOrganization: mode === 'many',
   organizationLimit: 5,
-  // In `'none'` the one organization is every person of the app, so it takes members without
-  // end. A function, so the provider's unasked member lists keep their own 100 rather than this.
-  membershipLimit: mode === 'none' ? async () => Number.MAX_SAFE_INTEGER : 10_000,
+  // In `'one'` the one organization is every person of the app, so it takes members without end.
+  // A function, so the provider's unasked member lists keep their own 100 rather than this.
+  membershipLimit: mode === 'one' ? async () => Number.MAX_SAFE_INTEGER : 10_000,
   invitationLimit: 1_000,
 })
 
@@ -341,7 +343,7 @@ export const organizationLimitsFor = (mode: AuthSettings['organizations']) => ({
 // is inside `createOrganization`, where the creator is in no organization yet and holds no key, so
 // gating it would make creating an organization impossible. `member.create` is left to the
 // provider's static roles.
-const organizationOptionsFor = ({ mailer, organizations }: AuthSettings) => ({
+const organizationOptionsFor = ({ mailer, organizations, showOrganization }: AuthSettings) => ({
   ...organizationLimitsFor(organizations),
   dynamicAccessControl: { enabled: true as const },
   // An organization that was ever used holds rows that cannot all be removed (an audit log,
@@ -358,8 +360,8 @@ const organizationOptionsFor = ({ mailer, organizations }: AuthSettings) => ({
   // the log in development and is handed over elsewhere, and no founder sends words of their own to
   // any address through the project's mailer.
   ...(organizations === 'many'
-    ? (logsLinks ? { sendInvitationEmail: invitationMail({ mailer: logMailer, organizations }) } : {})
-    : mailer ? { sendInvitationEmail: invitationMail({ mailer, organizations }) } : {}),
+    ? (logsLinks ? { sendInvitationEmail: invitationMail({ mailer: logMailer, showOrganization }) } : {})
+    : mailer ? { sendInvitationEmail: invitationMail({ mailer, showOrganization }) } : {}),
   organizationHooks: {
     beforeUpdateOrganization: gate('organization.update'),
     beforeRemoveMember: gate('member.delete'),
@@ -718,7 +720,7 @@ export const optionsFor = (settings: AuthSettings) => ({
   // answer every sign-in and reset request unlimited. Off a local host it limits whatever
   // `NODE_ENV` says.
   //
-  // With one organization or none invitations are mailed, so they are limited apart: ten a minute.
+  // With one organization invitations are mailed, so they are limited apart: ten a minute.
   rateLimit: { enabled: !onLocalHost, ...(settings.organizations !== 'many' && { customRules: { '/organization/invite-member': { window: 60, max: 10 } } }) },
   // Better Auth reads it for the links it writes into mail and the origin it checks a request
   // against; without it every boot prints `Base URL is not set`.
@@ -969,7 +971,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   const organizationTable = store.tables.organization
   const organized = async (db: Executes) => (await db.execute(sql`select 1 from ${organizationTable} limit 1`)).rows.length > 0
   const oneOrganization = settings.organizations !== 'many'
-  // The tenant's first-run, in one organization or none: the first owner and the one organization,
+  // The tenant's first-run, in one organization: the first owner and the one organization,
   // which nothing else makes, under the lock first-register takes and the setup code. It makes
   // the owner platform staff too while the platform app is served and has none, so one person
   // sets up both. The account is verified: the setup code is the proof.
@@ -978,7 +980,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     id: 'first-run',
     endpoints: {
       firstRunState: createAuthEndpoint('/first-run/state', { method: 'GET' }, async (ctx) =>
-        ctx.json((await organized(store.db as Executes)) ? { open: false } : { open: true, code: setupCodeState(tenantURL), name: settings.organizations === 'one' })),
+        ctx.json((await organized(store.db as Executes)) ? { open: false } : { open: true, code: setupCodeState(tenantURL), name: settings.showOrganization })),
       // `formCsrfMiddleware`, as sign-up has: no session guards this route.
       firstRun: createAuthEndpoint('/first-run', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
         if (!onLocalHost && !ipAddressHeaders && overFirstRunLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
@@ -990,7 +992,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
         if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
           throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
         }
-        const named = settings.organizations === 'none' ? 'Main' : typeof organization === 'string' ? organization.trim() : ''
+        const named = settings.showOrganization ? (typeof organization === 'string' ? organization.trim() : '') : 'Main'
         if (!named || named.length > 100) throw new APIError('BAD_REQUEST', { message: 'The organization has a name of 1 to 100 characters.' })
         return ctx.json(await store.transaction(async (tx) => {
           await (tx as Executes).execute(sql`set transaction isolation level read committed`)
@@ -1003,7 +1005,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           const adapter = (await bound.$context).adapter
           return runWithAdapter(adapter, () => firstRegistering.run(true, async () => {
             const { user } = await bound.api.createUser({ body: { name, email, password, role: (staff ? 'super_admin' : 'user') as never, data: { emailVerified: true } } })
-            const slug = settings.organizations === 'none' ? 'main' : `${named.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${randomBytes(3).toString('hex')}`
+            const slug = !settings.showOrganization ? 'main' : `${named.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${randomBytes(3).toString('hex')}`
             const made = (await bound.api.createOrganization({ body: { name: named, slug, userId: user.id } }))!
             authAudit({ action: 'first-run', user: user.id, organization: made.id, platform: staff })
             return { user: { id: user.id }, organization: { id: made.id } }
@@ -1025,7 +1027,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // an account or an invitation.
   const inviteOnly = () => new APIError('FORBIDDEN', { code: 'SIGN_UP_INVITE_ONLY', message: 'Sign-up here is by invitation: open the link of the invitation sent to you.' })
   const outsideDomains = () => new APIError('FORBIDDEN', { code: 'SIGN_UP_DOMAIN', message: 'This address is not at a domain that may sign up here.' })
-  // Who may make an account in one organization or none, asked before the provider's route, which
+  // Who may make an account in one organization, asked before the provider's route, which
   // would answer an address that has an account differently from one that has none.
   const signUpGate = {
     id: 'sign-up-gate',
@@ -1052,7 +1054,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   }
   // Whether a new account proves its address before it signs in and joins.
   const verifying = oneOrganization && settings.signUp === 'open' && settings.verifyEmail
-  // Who joins the one organization by signing up: in one organization or none with an open sign-up,
+  // Who joins the one organization by signing up: in one organization with an open sign-up,
   // when the account is made or, where addresses are verified, when its address is proved. The
   // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.
   // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or was
@@ -1135,7 +1137,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       // end add-on: roles
       ...(oneOrganization ? [firstRun, signUpGate] : []),
     ],
-    // In one organization or none, nobody founds another or leaves the one: leaving would leave the
+    // In one organization, nobody founds another or leaves the one: leaving would leave the
     // person in no organization at all, where every read is refused.
     disabledPaths: [
       ...tenantOnly,

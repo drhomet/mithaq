@@ -805,16 +805,16 @@ const modePassword = 'a-long-enough-password'
 const setupCode = 'asas-test-setup-code-of-thirty-two-characters'
 const modeRows = async (sql: string) => (await db.execute(sql)).rows as Record<string, unknown>[]
 
-test('0a. with one organization or none and none made yet, every sign-up is refused, and first-run is open but refuses without SETUP_CODE and with a wrong one', async () => {
+test('0a. with one organization and none made yet, every sign-up is refused, and first-run is open but refuses without SETUP_CODE and with a wrong one', async () => {
   await db.execute(`delete from organization where id = 'borrowed-organization'`)
   const coded = await codedProvider()
-  for (const organizations of ['none', 'one'] as const) {
-    const settings = { organizations, signUp: 'open', joinRole: null, verifyEmail: false } as const
+  for (const showOrganization of [false, true]) {
+    const settings = { organizations: 'one', showOrganization, signUp: 'open', joinRole: null, verifyEmail: false } as const
     const one = modeServer(settings)
-    assert.deepEqual(await (await askedOf(one, '/first-run/state')).json(), { open: true, code: 'unset', name: organizations === 'one' }, `${organizations}: first-run is open, asks a name in one alone, and says the code is unset`)
-    assert.deepEqual(await answerOf(await askedOf(one, '/sign-up/email', { name: 'Early', email: 'early@example.com', password: modePassword })), [403, 'FIRST_RUN_PENDING'], `${organizations}: a sign-up before first-run is refused`)
-    assert.deepEqual(await answerOf(await askedOf(one, '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early' })), [403, 'SETUP_CODE_UNSET'], `${organizations}: first-run refuses while SETUP_CODE is unset`)
-    assert.deepEqual(await answerOf(await askedOf(modeServer(settings, coded), '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early', code: 'not-the-code-not-the-code-not-the-code' })), [403, 'SETUP_CODE_WRONG'], `${organizations}: and where it is set, a wrong code`)
+    assert.deepEqual(await (await askedOf(one, '/first-run/state')).json(), { open: true, code: 'unset', name: showOrganization }, `${showOrganization}: first-run is open, asks a name only where the organization is shown, and says the code is unset`)
+    assert.deepEqual(await answerOf(await askedOf(one, '/sign-up/email', { name: 'Early', email: 'early@example.com', password: modePassword })), [403, 'FIRST_RUN_PENDING'], `${showOrganization}: a sign-up before first-run is refused`)
+    assert.deepEqual(await answerOf(await askedOf(one, '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early' })), [403, 'SETUP_CODE_UNSET'], `${showOrganization}: first-run refuses while SETUP_CODE is unset`)
+    assert.deepEqual(await answerOf(await askedOf(modeServer(settings, coded), '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early', code: 'not-the-code-not-the-code-not-the-code' })), [403, 'SETUP_CODE_WRONG'], `${showOrganization}: and where it is set, a wrong code`)
   }
   assert.deepEqual(await modeRows(`select id from "user" where email = 'early@example.com'`), [], 'and no account was made')
 })

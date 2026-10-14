@@ -1,5 +1,5 @@
 // Imports no router, stylesheet or React, so a test can load this under plain `node`.
-import { organizations } from 'asas/organizations'
+import { organizations, showOrganization } from 'asas/organizations'
 import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
 import organization from 'asas/messages/organization.json' with { type: 'json' }
 import tags from 'asas/messages/tags.json' with { type: 'json' }
@@ -878,8 +878,8 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
 
 type Wording = Record<string, Record<string, { en: string; ar: string }>>
 
-/** With one organization or none, nobody founds one on signing up: an owner sets the app up once. */
-const oneOrNone: Wording = {
+/** With one organization, nobody founds one on signing up: an owner sets the app up once. */
+const one: Wording = {
   auth: {
     signUpDescription: { en: 'Make an account.', ar: 'أنشئ حسابا.' },
     noOrganization: { en: '{email} has no access here yet. Ask an administrator to invite you.', ar: 'لا يملك {email} وصولا هنا بعد. اطلب من أحد المسؤولين أن يدعوك.' },
@@ -891,8 +891,8 @@ const oneOrNone: Wording = {
   },
 }
 
-/** With none, the one organization is the app itself, so no page names an organization. */
-const none: Wording = {
+/** With the one organization never shown, it is the app itself, so no page names an organization. */
+const unnamed: Wording = {
   auth: {
     invitationJoin: { en: 'You are invited to join this app.', ar: 'أنت مدعو للانضمام إلى هذا التطبيق.' },
     invitationInviterGone: {
@@ -949,8 +949,8 @@ const none: Wording = {
 }
 
 /** The words the organization mode changes, laid over the base copy key by key. */
-export const wordingFor = (mode: 'none' | 'one' | 'many'): Wording =>
-  mode === 'many' ? {} : mode === 'one' ? oneOrNone : Object.fromEntries([...new Set([...Object.keys(oneOrNone), ...Object.keys(none)])].map((scope) => [scope, { ...oneOrNone[scope], ...none[scope] }]))
+export const wordingFor = (mode: { organizations: 'one' | 'many'; showOrganization: boolean }): Wording =>
+  mode.organizations === 'many' ? {} : mode.showOrganization ? one : Object.fromEntries([...new Set([...Object.keys(one), ...Object.keys(unnamed)])].map((scope) => [scope, { ...one[scope], ...unnamed[scope] }]))
 
 /** The base copy with `wording` laid over it, so a key the mode changes reads the mode's words. */
 export const withWording = (base: typeof ownScopes, wording: Wording) =>
@@ -961,7 +961,7 @@ export const withWording = (base: typeof ownScopes, wording: Wording) =>
  * carries a string per declared locale: a key left unanswered here shows an Arabic viewer the
  * English fallback.
  */
-export const scopes = withWording(ownScopes, wordingFor(organizations))
+export const scopes = withWording(ownScopes, wordingFor({ organizations, showOrganization }))
 
 // A `Map`, so a code named for a key of `Object.prototype` answers nothing. A taken organization
 // name has no entry: names may repeat, and sign-up makes the slug unique itself.

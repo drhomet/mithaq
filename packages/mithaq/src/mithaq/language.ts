@@ -107,8 +107,8 @@ export type TenantTarget<RelationTo extends string = string> = {
   readonly capability: 'tenant'
   readonly relationTo: RelationTo
   readonly onDelete: 'restrict'
-  /** How many organizations the project holds; in `'one'` and `'none'` a `connect()` over more refuses to start. */
-  readonly organizations: 'none' | 'one' | 'many'
+  /** How many organizations the project holds; in `'one'` a `connect()` over more refuses to start. */
+  readonly organizations: 'one' | 'many'
   readonly field: TenantField<RelationTo>
   /**
    * Whether this actor is platform staff in the trusted platform app, who may read every

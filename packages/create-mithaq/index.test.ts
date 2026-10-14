@@ -161,7 +161,7 @@ test('a single package holds the language, its features, the asas and the tenant
 test('--help prints each question\'s flag', () => {
   const done = spawnSync(process.execPath, [fileURLToPath(new URL('./index.js', import.meta.url)), '--help'], { encoding: 'utf8' })
   assert.equal(done.status, 0, done.stderr)
-  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', '--organizations none|one|many', '--sign-up invite|open', 'courses (needs media, roles, audit-log, rich-text)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
+  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', '--organizations one|many', '--show-organization yes|no', '--sign-up invite|open', 'courses (needs media, roles, audit-log, rich-text)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
   assert.match(done.stdout, /npm, pnpm 10\.6 or later, Yarn 1 or Bun 1\.3\. Yarn 2 and later/, 'and which package managers a project installs with')
 })
 
@@ -258,24 +258,26 @@ test('organizations.ts says the mode and who may sign up: one organization by in
   const settingsOf = (name: string) => {
     const text = read(name, 'packages/mithaq/src/mithaq/auth/organizations.ts')
     const value = (key: string) => new RegExp(`^export const ${key}: [^=]+ = (.+)$`, 'm').exec(text)?.[1]
-    return Object.fromEntries(['organizations', 'signUp', 'joinRole', 'verifyEmail', 'allowedDomains'].map((key) => [key, value(key)]))
+    return Object.fromEntries(['organizations', 'showOrganization', 'signUp', 'joinRole', 'verifyEmail', 'allowedDomains'].map((key) => [key, value(key)]))
   }
   create({ name: 'school', cwd: scratch, template, version: '1.2.3', addOns: every })
-  assert.deepEqual(settingsOf('school'), { organizations: "'one'", signUp: "'invite'", joinRole: "'student'", verifyEmail: 'true', allowedDomains: '[]' })
+  assert.deepEqual(settingsOf('school'), { organizations: "'one'", showOrganization: 'true', signUp: "'invite'", joinRole: "'student'", verifyEmail: 'true', allowedDomains: '[]' })
   create({ name: 'plain', cwd: scratch, template, version: '1.2.3' })
-  assert.deepEqual(settingsOf('plain'), { organizations: "'one'", signUp: "'invite'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' }, 'without the roles add-on nobody is given a role on joining')
-  create({ name: 'hidden', cwd: scratch, template, version: '1.2.3', organizations: 'none', signUp: 'open' })
-  assert.deepEqual(settingsOf('hidden'), { organizations: "'none'", signUp: "'open'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' })
+  assert.deepEqual(settingsOf('plain'), { organizations: "'one'", showOrganization: 'true', signUp: "'invite'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' }, 'without the roles add-on nobody is given a role on joining')
+  create({ name: 'hidden', cwd: scratch, template, version: '1.2.3', showOrganization: false, signUp: 'open' })
+  assert.deepEqual(settingsOf('hidden'), { organizations: "'one'", showOrganization: 'false', signUp: "'open'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' }, 'one organization the app never names')
   create({ name: 'many', cwd: scratch, template, version: '1.2.3', addOns: every, organizations: 'many' })
-  assert.deepEqual(settingsOf('many'), { organizations: "'many'", signUp: "'open'", joinRole: 'null', verifyEmail: 'false', allowedDomains: '[]' }, 'many founds an organization by every sign-up and verifies no address yet')
+  assert.deepEqual(settingsOf('many'), { organizations: "'many'", showOrganization: 'true', signUp: "'open'", joinRole: 'null', verifyEmail: 'false', allowedDomains: '[]' }, 'many founds an organization by every sign-up and verifies no address yet')
   assert.throws(() => create({ name: 'invited-many', cwd: scratch, template, version: '1.2.3', organizations: 'many', signUp: 'invite' }), /many organizations take --sign-up open/)
-  assert.throws(() => create({ name: 'some', cwd: scratch, template, version: '1.2.3', organizations: 'some' }), /--organizations is none, one or many, not "some"/)
+  assert.throws(() => create({ name: 'hidden-many', cwd: scratch, template, version: '1.2.3', organizations: 'many', showOrganization: false }), /many organizations are shown by name/)
+  assert.throws(() => create({ name: 'none', cwd: scratch, template, version: '1.2.3', organizations: 'none' }), /--organizations is one or many, not "none": one organization never shown is --organizations one --show-organization no/)
+  assert.throws(() => create({ name: 'some', cwd: scratch, template, version: '1.2.3', organizations: 'some' }), /--organizations is one or many, not "some"/)
   assert.throws(() => create({ name: 'closed', cwd: scratch, template, version: '1.2.3', signUp: 'closed' }), /--sign-up is invite or open, not "closed"/)
   for (const name of ['school', 'plain', 'hidden', 'many']) assert.equal(existsSync(join(scratch, name, 'packages/asas/src/organizations.ts')), true, `${name}: the apps read the mode through the asas`)
 })
 
 test('a single package reaches the organization mode by path', () => {
-  create({ name: 'single-modes', cwd: scratch, template, version: '1.2.3', layout: 'single', organizations: 'none' })
+  create({ name: 'single-modes', cwd: scratch, template, version: '1.2.3', layout: 'single', showOrganization: false })
   assert.match(read('single-modes/src/organizations.ts'), /from '\.\/mithaq\/auth\/organizations\.ts'/)
-  assert.match(read('single-modes/src/mithaq/auth/organizations.ts'), /^export const organizations: [^=]+ = 'none'$/m)
+  assert.match(read('single-modes/src/mithaq/auth/organizations.ts'), /^export const showOrganization: [^=]+ = false$/m)
 })

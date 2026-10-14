@@ -89,11 +89,11 @@ try {
   const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
   withoutRichText(tarball)
   // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
-  // by sign-up; none with an open sign-up, which a production start refuses without a mailer.
+  // by sign-up; one never shown, with an open sign-up, which a production start refuses without a mailer.
   for (const run of [
     { manager: 'bun', addOns: ['--full'], modes: [] },
     { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
-    { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'none', '--sign-up', 'open'] },
+    { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
     { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text,media'], modes: ['--organizations', 'many'] },
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
@@ -252,7 +252,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const origin = `http://127.0.0.1:${port}`
     const platformOrigin = `http://127.0.0.1:${platformPort}`
     const { BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _fallback, PLATFORM_URL: _platform, ...withoutAuthSecret } = process.env
-    // One organization or none is set up with the code alone; many leaves it unset, so the platform says to set it.
+    // One organization is set up with the code alone; many leaves it unset, so the platform says to set it.
     const setupCode = 'mithaq-release-consumer-setup-code-of-40-chars'
     // A production boot needs these settings, PLATFORM_URL only where a platform app is served. `BETTER_AUTH_SECRET` is
     // left out on purpose: each app answering proves it read the `.env` `create-mithaq` wrote, which TanStack Start
@@ -319,10 +319,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const codeOf = async (response: Response) => [response.status, ((await response.json().catch(() => null)) as { code?: string } | null)?.code] as const
     const cookieOf = (response: Response) => response.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
     if (!many) {
-      // One organization or none: nothing signs up before its owner is made, and only the setup code makes them.
+      // One organization: nothing signs up before its owner is made, and only the setup code makes them.
       const setUp = await (await fetch(`${origin}/auth/first-run`, { signal: AbortSignal.timeout(10_000) })).text()
       assert.ok(setUp.includes('The SETUP_CODE this server was started with.'), `first-run asks for the setup code:\n${setUp.slice(0, 600)}`)
-      assert.equal(setUp.includes('id="organization"'), !modes.includes('none'), 'and a name for the organization in one alone')
+      assert.equal(setUp.includes('id="organization"'), !modes.includes('no'), 'and a name for the organization only where it is shown')
       assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Early', email: `early-${stamp}@example.com`, password: 'release-test-password' })), [403, 'FIRST_RUN_PENDING'], 'a sign-up before first-run is refused')
       // The takeover race over HTTP: three at once, one owner.
       const runs = await Promise.all([0, 1, 2].map(async (at) => [at, await codeOf(await post('first-run', { name: `Owner ${at}`, email: `owner-${at}-${stamp}@example.com`, password: 'release-test-password', organization: 'Release', code: setupCode }))] as const))
@@ -386,7 +386,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       sql("insert into organization (id, name, slug, created_at) values ('release-second', 'Second', 'release-second', now())")
       const restarted = spawnSync(process.execPath, ['--env-file=.env', '--input-type=module', '-e', "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"], { cwd: template, encoding: 'utf8', env: production })
       assert.notEqual(restarted.status, 0, `${name}: a start over two organizations is refused`)
-      assert.match(restarted.stderr, /organizations: '(one|none)', and the "organization" table holds more than one/, restarted.stderr)
+      assert.match(restarted.stderr, /organizations: 'one', and the "organization" table holds more than one/, restarted.stderr)
       sql("delete from organization where id = 'release-second'")
     }
     command(installed(template, '.bin/mithaq'), ['generate', '--check'], template)

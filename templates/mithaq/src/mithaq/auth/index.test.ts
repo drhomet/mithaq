@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { authOptions, authSettings, backgroundSettled, domainAllowed, options, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
+import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
 test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
   assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
@@ -239,12 +239,13 @@ const problems = (settings: AuthSettings, deployed = false) => settingsProblems(
 test('the organization settings refuse every combination that would mean nothing or open a door, each naming what to change', () => {
   assert.deepEqual(problems(authSettings), [], 'the repository\'s own settings, many organizations, are sound')
   assert.deepEqual(problems(school), [], 'and so is a school: one organization, invitations only')
-  assert.deepEqual(problems(settingsWith({ organizations: 'none', signUp: 'open', joinRole: null, verifyEmail: false, allowedDomains: [] })), [])
+  assert.deepEqual(problems(settingsWith({ organizations: 'one', showOrganization: false, signUp: 'open', joinRole: null, verifyEmail: false, allowedDomains: [] })), [], 'and one organization the app never names')
   const refused: [string, Partial<AuthSettings>, RegExp][] = [
     ['many by invitation', { signUp: 'invite' }, /'many'[\s\S]*signUp = 'open'/],
     ['many with a join role', { joinRole: 'student' }, /'many'[\s\S]*joinRole = null/],
     ['many verifying addresses', { verifyEmail: true }, /'many'[\s\S]*verifyEmail = false/],
     ['many with domains', { allowedDomains: ['example.com'] }, /'many'[\s\S]*allowedDomains/],
+    ['many hiding its organizations', { showOrganization: false }, /'many'[\s\S]*showOrganization = true/],
   ]
   for (const [name, changes, said] of refused) assert.match(problems(settingsWith(changes)).join('\n'), said, name)
   const ofSchool: [string, Partial<AuthSettings>, RegExp][] = [
@@ -298,8 +299,8 @@ test('an allowed domain matches exactly after lowercasing and punycode, a subdom
   for (const [email, expected] of cases) assert.equal(domainAllowed(email, allowed), expected, email)
 })
 
-test('in one organization or none, nobody founds an organization over the provider\'s routes, and many founds as before', async () => {
-  for (const [settings, founds] of [[school, false], [{ ...school, organizations: 'none' as const }, false], [authSettings, true]] as const) {
+test('in one organization, shown or not, nobody founds an organization over the provider\'s routes, and many founds as before', async () => {
+  for (const [settings, founds] of [[school, false], [{ ...school, showOrganization: false }, false], [authSettings, true]] as const) {
     const server = betterAuthServer({ ...authOptions({}, settings).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
     const headers = new Headers({ cookie: (await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
     const made = await server.api.createOrganization({ body: { name: 'Org', slug: 'org' }, headers }).then(() => true, (error: { body?: { code?: string } }) => error.body?.code)
@@ -309,7 +310,7 @@ test('in one organization or none, nobody founds an organization over the provid
 
 test('with no organization shown, an invitation invites to the app and never names the organization', async () => {
   const sent: { subject: string; text: string }[] = []
-  const settings = { ...authSettings, organizations: 'none' as const, signUp: 'invite' as const, mailer: { send: async (mail: (typeof sent)[number]) => void sent.push(mail) } }
+  const settings = { ...authSettings, organizations: 'one' as const, showOrganization: false, signUp: 'invite' as const, mailer: { send: async (mail: (typeof sent)[number]) => void sent.push(mail) } }
   const server = betterAuthServer({ ...authOptions({}, settings).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
   const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
   await server.api.createOrganization({ body: { name: 'Main', slug: 'main', userId: user.id } })
@@ -318,6 +319,12 @@ test('with no organization shown, an invitation invites to the app and never nam
   assert.equal(sent.length, 1)
   assert.doesNotMatch(`${sent[0]!.subject} ${sent[0]!.text}`, /Main/, 'the organization is not named')
   assert.match(sent[0]!.text, /this app/)
+})
+
+test('one organization holds every person of the app, so it takes members without end, while each of many holds 10,000', async () => {
+  const one = organizationLimitsFor('one').membershipLimit
+  assert.equal(typeof one === 'function' ? await one() : one, Number.MAX_SAFE_INTEGER)
+  assert.equal(organizationLimitsFor('many').membershipLimit, 10_000)
 })
 
 test('a mailer is never waited on: a reset is answered as fast for an address with an account as for one without, and the mail follows', async () => {
