@@ -310,8 +310,8 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     outsideDomains: { en: 'This email address is not at a domain that may sign up here.', ar: 'هذا البريد الإلكتروني ليس من نطاق يُسمح له بإنشاء حساب هنا.' },
     verifySent: { en: 'Check your email', ar: 'تحقق من بريدك الإلكتروني' },
     verifySentDescription: {
-      en: 'We sent a link to {email}. Open it to confirm your address and sign in. It lasts an hour.',
-      ar: 'أرسلنا رابطا إلى {email}. افتحه لتأكيد عنوانك وتسجيل الدخول. وهو صالح ساعة.',
+      en: 'We sent a link to {email}. Open it to confirm your address and choose your password, then sign in. It lasts an hour.',
+      ar: 'أرسلنا رابطا إلى {email}. افتحه لتأكيد عنوانك واختيار كلمة المرور، ثم سجل الدخول. وهو صالح ساعة.',
     },
     failed: { en: 'That sign-in did not work.', ar: 'لم ينجح تسجيل الدخول.' },
     signUp: { en: 'Sign up', ar: 'إنشاء حساب' },
@@ -362,8 +362,8 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     tooManyRequests: { en: 'Too many attempts. Wait a moment and try again.', ar: 'محاولات كثيرة جدا. انتظر قليلا ثم حاول مرة أخرى.' },
     invalidCredentials: { en: 'The email or password provided is incorrect.', ar: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' },
     emailNotVerified: {
-      en: 'This email address is not confirmed yet. Open the link we sent to it; a new one is on its way.',
-      ar: 'لم يُؤكَّد هذا البريد الإلكتروني بعد. افتح الرابط الذي أرسلناه إليه؛ فرابط جديد في طريقه إليك.',
+      en: 'This email address is not confirmed yet. Open the link we sent to it, or ask for a password reset to get a new one.',
+      ar: 'لم يُؤكَّد هذا البريد الإلكتروني بعد. افتح الرابط الذي أرسلناه إليه، أو اطلب إعادة تعيين كلمة المرور لتحصل على رابط جديد.',
     },
     banned: { en: 'This account is banned, so it cannot sign in.', ar: 'هذا الحساب محظور، لذا لا يمكنه تسجيل الدخول.' },
     userExists: { en: 'An account with this email already exists. Use another email.', ar: 'يوجد حساب بهذا البريد الإلكتروني. استخدم بريدا آخر.' },

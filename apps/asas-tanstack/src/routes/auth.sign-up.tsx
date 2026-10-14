@@ -120,7 +120,7 @@ function SignUp() {
     return (
       <AuthFrame
         title={t('auth.verifySent', 'Check your email')}
-        description={<span className="[overflow-wrap:anywhere]">{t('auth.verifySentDescription', 'We sent a link to {email}. Open it to confirm your address and sign in. It lasts an hour.')!.split(/(\{email\})/).map((part, at) => (part === '{email}' ? <bdi key={at}>{sent}</bdi> : part))}</span>}
+        description={<span className="[overflow-wrap:anywhere]">{t('auth.verifySentDescription', 'We sent a link to {email}. Open it to confirm your address and choose your password, then sign in. It lasts an hour.')!.split(/(\{email\})/).map((part, at) => (part === '{email}' ? <bdi key={at}>{sent}</bdi> : part))}</span>}
       >
         {toSignIn}
       </AuthFrame>

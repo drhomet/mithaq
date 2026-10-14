@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { authOptions, authSettings, domainAllowed, options, settingsProblems, trustedIpHeaders, type AuthSettings } from './index.ts'
+import { authOptions, authSettings, domainAllowed, options, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
 test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
   assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
@@ -184,14 +184,21 @@ test('an invitation writes its accept link to the log under NODE_ENV=development
   }
 })
 
-test('with a mailer the reset and the invitation are mailed through it, each in both locales with its link, and nothing is logged', async () => {
+/** A server of `settings` with a mailer that keeps what it sends, whose owner founded `Org` and is signed in. */
+const mailingOwner = async (settings: AuthSettings, organizationName = 'Org') => {
   const sent: { to: string; subject: string; text: string; html: string }[] = []
   const mailer = { send: async (mail: (typeof sent)[number]) => void sent.push(mail) }
-  const server = betterAuthServer({ ...authOptions({}, { ...authSettings, mailer }).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
-  const headers = new Headers({ cookie: (await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  const server = betterAuthServer({ ...authOptions({}, { ...settings, mailer }).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+  const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
+  await server.api.createOrganization({ body: { name: organizationName, slug: 'org', userId: user.id } })
+  const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  return { sent, server, headers }
+}
+
+test('with a mailer the reset and, with one organization, the invitation are mailed through it, each in both locales with its link, and nothing is logged', async () => {
+  const { sent, server, headers } = await mailingOwner({ ...authSettings, organizations: 'one', signUp: 'invite', joinRole: null, verifyEmail: true })
   const log = await printed(async () => {
     await server.api.requestPasswordReset({ body: { email: 'owner@example.com' } })
-    await server.api.createOrganization({ body: { name: 'Org', slug: 'org' }, headers })
     await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
   })
   assert.deepEqual(sent.map((one) => one.to), ['owner@example.com', 'invitee@example.com'], 'one message to each address')
@@ -201,12 +208,30 @@ test('with a mailer the reset and the invitation are mailed through it, each in 
   assert.equal(log.includes('token='), false, 'and the log holds no link')
 })
 
+test('with many organizations, which anyone founds, no invitation is mailed: a founder never sends their words to any address through the mailer', async () => {
+  const { sent, server, headers } = await mailingOwner(authSettings)
+  await printed(() => server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers }))
+  assert.deepEqual(sent, [])
+  assert.equal(authOptions({}, authSettings).options.rateLimit.customRules?.['/organization/invite-member'], undefined, 'and many keeps the provider\'s own limits')
+})
+
+test('with one organization an invitation\'s subject is fixed, its body escapes the organization\'s name, invitations are rate limited, and no subject carries a line break', async () => {
+  const { sent, server, headers } = await mailingOwner({ ...authSettings, organizations: 'one', signUp: 'invite', joinRole: null, verifyEmail: true }, 'Evil <b>\r\nBcc: x@example.com')
+  await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+  assert.equal(sent[0]!.subject.includes('Evil'), false, 'the subject names no organization')
+  assert.equal(/[\r\n]/.test(sent[0]!.subject), false)
+  assert.equal(sent[0]!.html.includes('<b>'), false, 'the name is escaped in the HTML')
+  assert.ok(authOptions({}, { ...authSettings, organizations: 'one', signUp: 'invite', joinRole: null, verifyEmail: true }).options.rateLimit.customRules?.['/organization/invite-member'], 'invitations have a limit of their own')
+  assert.equal(subjectLine('Reset\r\nBcc: x@example.com\u0007'), 'Reset Bcc: x@example.com')
+})
+
 /** The repository's own settings with the changes given. */
 const settingsWith = (changes: Partial<AuthSettings>): AuthSettings => ({ ...authSettings, ...changes })
 const school = settingsWith({ organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true, allowedDomains: [] })
 const mailer = { send: async () => {} }
 /** What `settingsProblems` says of `settings`, as one string per problem, read in development unless said. */
-const problems = (settings: AuthSettings, production = false) => settingsProblems({ settings, production, joinRoles: ['administrator', 'registrar', 'instructor', 'student'], everything: ['administrator'] })
+const schoolRoles = { administrator: '*', registrar: ['courses.find', 'memberRoles.create'], instructor: ['courses.find', 'invitation.create'], student: ['courses.find', 'courses.fields.title', 'memberRoles.find', 'screen.portal'] } as const
+const problems = (settings: AuthSettings, deployed = false) => settingsProblems({ settings, deployed, joinRoles: schoolRoles })
 
 test('the organization settings refuse every combination that would mean nothing or open a door, each naming what to change', () => {
   assert.deepEqual(problems(authSettings), [], 'the repository\'s own settings, many organizations, are sound')
@@ -223,14 +248,16 @@ test('the organization settings refuse every combination that would mean nothing
     ['domains by invitation', { allowedDomains: ['example.com'] }, /allowedDomains[\s\S]*signUp = 'open'/],
     ['domains with no verification', { signUp: 'open', verifyEmail: false, allowedDomains: ['example.com'] }, /allowedDomains[\s\S]*verifyEmail = true/],
     ['an unknown join role', { joinRole: 'janitor' }, /joinRole[\s\S]*"janitor"/],
-    ['a join role holding every key', { joinRole: 'administrator' }, /joinRole[\s\S]*"administrator"[\s\S]*every key/],
+    ['a join role holding every key', { joinRole: 'administrator' }, /joinRole[\s\S]*"administrator"[\s\S]*gives roles or invites/],
+    ['a join role that gives roles', { joinRole: 'registrar' }, /joinRole[\s\S]*"registrar"[\s\S]*memberRoles\.create/],
+    ['a join role that invites', { joinRole: 'instructor' }, /joinRole[\s\S]*"instructor"[\s\S]*invitation\.create/],
   ]
   for (const [name, changes, said] of ofSchool) assert.match(problems({ ...school, ...changes }).join('\n'), said, name)
   for (const entry of ['Example.com', 'example.com.', '*example.com', 'exa mple.com', 'ex\u0430mple.com', '@example.com', '*.*.example.com', 'com']) {
     assert.match(problems({ ...school, signUp: 'open', allowedDomains: [entry] }).join('\n'), /allowedDomains/, `"${entry}" is no domain entry`)
   }
   assert.deepEqual(problems({ ...school, signUp: 'open', allowedDomains: ['example.com', '*.example.org', 'xn--mnchen-3ya.de'] }), [], 'lowercase ASCII hosts and one leading *. are')
-  assert.equal(settingsProblems({ settings: { ...school, joinRole: 'student' }, production: false, joinRoles: null, everything: [] }).length, 1, 'without the roles add-on a join role is refused')
+  assert.equal(settingsProblems({ settings: { ...school, joinRole: 'student' }, deployed: false, joinRoles: null }).length, 1, 'without the roles add-on a join role is refused')
 })
 
 test('in production an open sign-up of one organization needs a mailer, and invitations alone or many organizations do not', () => {
@@ -257,6 +284,10 @@ test('an allowed domain matches exactly after lowercasing and punycode, a subdom
     ['a@corp.org', false],
     ['a@evilcorp.org', false],
     ['a@m\u00fcnchen.de', true],
+    ['a@\uff45xample.com', false],
+    ['a@example\uff0ecom', false],
+    ['a@example%2ecom', false],
+    ['a@EXAMPLE.COM.', false],
     ['no-at-sign', false],
     ['a@', false],
   ]

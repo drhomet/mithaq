@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { domainToUnicode } from 'node:url'
 import { runWithAdapter } from '@better-auth/core/context'
 import { BASE_ERROR_CODES, betterAuth as betterAuthServer, getCurrentAdapter } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
@@ -221,21 +222,32 @@ const host = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0
 export const domainAllowed = (email: string, allowed: readonly string[]) => {
   const at = email.lastIndexOf('@')
   if (at < 0 || at === email.length - 1) return false
+  const written = email.slice(at + 1).toLowerCase()
   let domain: string
   try {
-    domain = new URL(`http://${email.slice(at + 1).toLowerCase()}`).hostname
+    domain = new URL(`http://${written}`).hostname
   } catch {
     return false
   }
+  // A URL also decodes `%2e` and folds a fullwidth `ｅ` or `．` into ASCII, which no mail server
+  // does, so the domain must read back as written: an international one does, a disguised one not.
+  if (domainToUnicode(domain) !== written) return false
   return allowed.some((entry) => (entry.startsWith('*.') ? domain.endsWith(entry.slice(1)) : domain === entry))
 }
 
 /**
- * Every way `settings` means nothing or opens a door, one sentence each naming the line of
- * `organizations.ts` to change. `joinRoles` is the roles a joiner may be given (`null` without the
- * roles add-on) and `everything` those of them that hold every key, which no stranger is given.
+ * A key no stranger who signs up is given: one that gives a role, writes a role, invites, or changes
+ * the people or the organization. Reading them is not one.
  */
-export const settingsProblems = ({ settings, production, joinRoles, everything }: { settings: AuthSettings; production: boolean; joinRoles: readonly string[] | null; everything: readonly string[] }) => {
+const grantsPower = (key: string) => /^(roles|member(Roles)?|invitation|ac|organization)\.(?!(find|findByID|count|read)$|fields\.)/.test(key)
+
+/**
+ * Every way `settings` means nothing or opens a door, one sentence each naming the line of
+ * `organizations.ts` to change. `joinRoles` is the roles a joiner may be given, each with what it
+ * holds (`null` without the roles add-on). `deployed` is a start anywhere but development on this
+ * machine.
+ */
+export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: AuthSettings; deployed: boolean; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
   const { organizations, signUp, joinRole, verifyEmail, allowedDomains, mailer } = settings
   const problems: string[] = []
   if (organizations === 'many') {
@@ -250,42 +262,47 @@ export const settingsProblems = ({ settings, production, joinRoles, everything }
   for (const entry of allowedDomains) {
     if (!host.test(entry.startsWith('*.') ? entry.slice(2) : entry)) problems.push(`allowedDomains holds ${JSON.stringify(entry)}, which is no lowercase ASCII domain, or *. and one: write an international domain as its xn-- form.`)
   }
+  const held = joinRole === null || joinRoles === null || !Object.hasOwn(joinRoles, joinRole) ? undefined : joinRoles[joinRole]!
+  const powers = held === '*' ? ['every key'] : (held ?? []).filter(grantsPower)
   if (joinRole !== null && joinRoles === null) problems.push('joinRole is a role of the roles add-on, which this project does not hold: set joinRole = null, and a joiner holds the provider\'s member.')
-  else if (joinRole !== null && !joinRoles!.includes(joinRole)) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which is none of roles/tenant-roles.ts: ${joinRoles!.join(', ')}.`)
-  else if (joinRole !== null && everything.includes(joinRole)) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which holds every key, and a stranger who signs up is never given every key.`)
-  if (production && signUp === 'open' && !mailer) problems.push("signUp = 'open' needs a mailer in production, which verifies each address and sends each reset: set RESEND_API_KEY and MAIL_FROM.")
+  else if (joinRole !== null && held === undefined) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which is none of roles/tenant-roles.ts: ${Object.keys(joinRoles!).join(', ')}.`)
+  else if (powers.length) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which holds ${powers.join(', ')}, and a stranger who signs up is never given a role that gives roles or invites.`)
+  if (deployed && signUp === 'open' && !mailer) problems.push("signUp = 'open' needs a mailer in production, which verifies each address and sends each reset: set RESEND_API_KEY and MAIL_FROM.")
   return problems
 }
 
 // add-on: roles
-const joinRoles: readonly string[] | null = Object.keys(tenantRoles)
-const holdsEverything = Object.entries(tenantRoles).filter(([, role]) => (role as { permissions: unknown }).permissions === '*').map(([slug]) => slug)
+const joinRoles: Record<string, '*' | readonly string[]> | null = Object.fromEntries(Object.entries(tenantRoles).map(([slug, role]) => [slug, (role as { permissions: '*' | readonly string[] }).permissions]))
 // end add-on: roles
 // without add-on: roles
-// const joinRoles: readonly string[] | null = null
-// const holdsEverything: readonly string[] = []
+// const joinRoles: Record<string, '*' | readonly string[]> | null = null
 // end without add-on: roles
-const settingsRefused = settingsProblems({ settings: authSettings, production, joinRoles, everything: holdsEverything })
+// Refused wherever the other start checks refuse: in production, or off this machine whatever
+// `NODE_ENV` says.
+const settingsRefused = settingsProblems({ settings: authSettings, deployed: production || !isLocalHost(tenantURL), joinRoles })
 if (settingsRefused.length) throw new Error(`src/mithaq/auth/organizations.ts: ${settingsRefused.join(' ')}`)
 
 const escaped = (text: string) => text.replace(/[&<>"']/g, (one) => `&#${one.charCodeAt(0)};`)
+/** A subject on one line: a line break in it would start a header of the writer's own. */
+export const subjectLine = (subject: string) => subject.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/ {2,}/g, ' ').trim()
 /**
  * One message in both of the project's locales, English then Arabic, since a mail is sent before
  * anyone says which they read. The link sits on a line of its own in each.
  */
 const letter = ({ to, subject, en, ar, link }: { to: string; subject: string; en: string; ar: string; link: string }): Mail => ({
   to,
-  subject,
+  subject: subjectLine(subject),
   text: `${en}\n\n${link}\n\n${ar}\n\n${link}\n`,
   html: `<p>${escaped(en)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p><div dir="rtl" lang="ar"><p>${escaped(ar)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p></div>`,
 })
 
-// With no organization shown, the invitation is to the app, as every page says.
+// The subject is fixed and only the body names the organization, escaped: its name is words an
+// administrator wrote. With no organization shown, the invitation is to the app, as every page says.
 const invitationMail = ({ mailer, organizations }: { mailer: Mailer; organizations: AuthSettings['organizations'] }) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) => {
   const [en, ar] = organizations === 'none' ? ['this app', 'هذا التطبيق'] : [organization.name, organization.name]
   await mailer.send(letter({
     to: email,
-    subject: `You are invited to ${en} · دعوة إلى ${ar}`,
+    subject: 'You are invited · لديك دعوة',
     en: `You are invited to join ${en}. Open the link below with this address to accept; it lasts 48 hours.`,
     ar: `أنت مدعو للانضمام إلى ${ar}. افتح الرابط أدناه بهذا العنوان لقبول الدعوة؛ وهو صالح 48 ساعة.`,
     link: new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href,
@@ -331,9 +348,16 @@ const organizationOptionsFor = ({ mailer, organizations }: AuthSettings) => ({
   disableOrganizationDeletion: true,
   // The provider compares the invited address with the signed-in one on every invitation route.
   // `requireEmailVerificationOnInvitation` stays unset rather than `false`, so the provider asks
-  // for a verified address only if invitation ids become guessable. The template sends no mail that
-  // would verify an address, so asking for one would leave every invitation unanswerable.
-  ...(mailer ? { sendInvitationEmail: invitationMail({ mailer, organizations }) } : {}),
+  // for a verified address only if invitation ids become guessable. An account made by invitation
+  // is not verified, since holding the id is its proof, so asking for one would leave every
+  // invitation unanswerable.
+  //
+  // With many organizations anyone founds one and may invite, so nothing is mailed: the link goes to
+  // the log in development and is handed over elsewhere, and no founder sends words of their own to
+  // any address through the project's mailer.
+  ...(organizations === 'many'
+    ? (logsLinks ? { sendInvitationEmail: invitationMail({ mailer: logMailer, organizations }) } : {})
+    : mailer ? { sendInvitationEmail: invitationMail({ mailer, organizations }) } : {}),
   organizationHooks: {
     beforeUpdateOrganization: gate('organization.update'),
     beforeRemoveMember: gate('member.delete'),
@@ -643,16 +667,17 @@ const ipAddressHeaders = trustedIpHeaders(process.env.TRUSTED_IP_HEADER)
 // The link is the tenant app's reset page, not the provider's `url`, which names
 // `/api/auth/reset-password` while this project serves the provider under `/api/auth/user`.
 const onLocalHost = !production && isLocalHost(tenantURL)
-// The tenant app's own verification link, not the provider's `url`, which names `/api/auth` while
-// this project serves the provider under `/api/auth/user`. Verifying signs the person in and lands
-// on the sign-in page, which sends a signed-in person on.
-const verificationMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
+// An address is proved by choosing the account's password from a link mailed to it: the reset
+// page's link, which ends every session and marks the address verified. Proving it never keeps a
+// password somebody else typed at sign-up, so whoever signed up first with another's address never
+// signs in once its owner proves it.
+const confirmMail = (mailer: Mailer) => async ({ email, token }: { email: string; token: string }) =>
   mailer.send(letter({
-    to: user.email,
+    to: email,
     subject: 'Confirm your address · تأكيد عنوانك',
-    en: 'Someone made an account with this address. If it was you, open the link below within an hour to confirm it. If not, ignore this message: an account nobody confirms never signs in.',
-    ar: 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.',
-    link: new URL(`/api/auth/user/verify-email?token=${encodeURIComponent(token)}&callbackURL=${encodeURIComponent('/auth/sign-in')}`, tenantURL).href,
+    en: 'Someone made an account with this address. If it was you, open the link below within an hour to confirm it and choose your password. If not, ignore this message: an account nobody confirms never signs in.',
+    ar: 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.',
+    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
   }))
 
 const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
@@ -677,7 +702,9 @@ export const optionsFor = (settings: AuthSettings) => ({
   // The provider rate limits only when `NODE_ENV` is `production`, so a deploy that sets none would
   // answer every sign-in and reset request unlimited. Off a local host it limits whatever
   // `NODE_ENV` says.
-  rateLimit: { enabled: !onLocalHost },
+  //
+  // With one organization or none invitations are mailed, so they are limited apart: ten a minute.
+  rateLimit: { enabled: !onLocalHost, ...(settings.organizations !== 'many' && { customRules: { '/organization/invite-member': { window: 60, max: 10 } } }) },
   // Better Auth reads it for the links it writes into mail and the origin it checks a request
   // against; without it every boot prints `Base URL is not set`.
   baseURL: tenantURL,
@@ -969,7 +996,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // Whether `id` names a pending invitation, unexpired, sent to `email` as the provider compares
   // addresses, lowercased. The id is ~190 random bits, so holding it is the proof.
   type Finds = { findOne<Row>(query: { model: string; where: { field: string; value: string }[] }): Promise<Row | null> }
-  const invitedAs = async ({ adapter, id, email }: { adapter: Finds; id: unknown; email: unknown }) => {
+  const holdsInvitation = async ({ adapter, id, email }: { adapter: Finds; id: unknown; email: unknown }) => {
     if (typeof id !== 'string' || typeof email !== 'string') return false
     const invitation = await adapter.findOne<{ email: string; status: string; expiresAt: Date | string }>({ model: 'invitation', where: [{ field: 'id', value: id }] })
     return !!invitation && invitation.status === 'pending' && new Date(invitation.expiresAt) > new Date() && invitation.email.toLowerCase() === email.toLowerCase()
@@ -987,19 +1014,20 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       handler: createAuthMiddleware(async (ctx) => {
         if (!(await organized(store.db as Executes))) throw new APIError('FORBIDDEN', { code: 'FIRST_RUN_PENDING', message: 'This app is not set up yet: its administrator opens /auth/first-run first.' })
         const { email, invitationId } = (ctx.body ?? {}) as { email?: unknown; invitationId?: unknown }
-        if (settings.signUp === 'invite' && !(await invitedAs({ adapter: ctx.context.adapter as unknown as Finds, id: invitationId, email }))) throw inviteOnly()
+        if (settings.signUp === 'invite' && !(await holdsInvitation({ adapter: ctx.context.adapter as unknown as Finds, id: invitationId, email }))) throw inviteOnly()
         if (settings.signUp === 'open' && settings.allowedDomains.length && !(typeof email === 'string' && domainAllowed(email, settings.allowedDomains))) throw outsideDomains()
       }),
     }] },
   }
-  // The same rule wherever an account is made, so a sign-in method added later (social, a magic
-  // link, a one-time code) never opens a way past it. Only first-run and first-register make one
-  // with no sign-up, and they hold `firstRegistering`.
+  // The same rule wherever the tenant app makes an account, so a sign-in method added later
+  // (social, a magic link, a one-time code) never opens a way past it. First-run holds
+  // `firstRegistering`. The platform console's `/admin/create-user`, which only staff reach, makes
+  // accounts on its own instance and is not asked: staff add whom they choose.
   const accountGate = async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
     if (!oneOrganization || firstRegistering.getStore()) return
     if (settings.signUp === 'invite') {
       const invitationId = (context?.body as { invitationId?: unknown } | undefined)?.invitationId
-      if (!context || !(await invitedAs({ adapter: (await getCurrentAdapter(context.context.adapter as never)) as unknown as Finds, id: invitationId, email: user.email }))) throw inviteOnly()
+      if (!context || !(await holdsInvitation({ adapter: (await getCurrentAdapter(context.context.adapter as never)) as unknown as Finds, id: invitationId, email: user.email }))) throw inviteOnly()
     } else if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) throw outsideDomains()
   }
   // Whether a new account proves its address before it signs in and joins.
@@ -1009,55 +1037,61 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.
   // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or was
   // ever invited, is passed over: an invitation is how they join, and an accepted one means they
-  // were a member, perhaps removed since.
+  // were a member, perhaps removed since. An account joins once in its life, recorded beside it, so
+  // a removed member whose address is made unverified and proved again stays out.
+  const joinedOnce = (user: string) => `joined-open:${user}`
   const joinOpen = async (user: { id: string; email: string; role?: unknown }) => {
     if (!oneOrganization || settings.signUp !== 'open') return
     if (holdsRole(user.role, (one) => Object.hasOwn(platformRoles, one))) return
     if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) return
     const [organization] = (await store.find({ kayan: 'organization', args: { limit: 1, page: 1, sort: { field: 'createdAt', direction: 'asc' } } })).docs
     if (!organization) return
+    const { internalAdapter } = await tenant.$context
+    if (await internalAdapter.findVerificationValue(joinedOnce(user.id))) return
     if (await store.count!({ kayan: 'member', args: { where: { userId: { equals: user.id } } } })) return
     if (await store.count!({ kayan: 'invitation', args: { where: { email: { equals: user.email.toLowerCase() } } } })) return
     const joined = String(organization.id)
+    // ponytail: the record is a verification row that never expires, the one table the provider
+    // lets a project write a fact about an account to with no column of its own; a column on the
+    // user, written by `generate auth`, if more such facts come.
+    await internalAdapter.createVerificationValue({ identifier: joinedOnce(user.id), value: joined, expiresAt: new Date('9999-12-31T00:00:00Z') })
     await tenant.api.addMember({ body: { userId: user.id, organizationId: joined, role: 'member' } })
     // add-on: roles
     if (settings.joinRole !== null) await store.transaction((tx) => grantRole({ tx, organization: joined, user: user.id, role: settings.joinRole! }))
     // end add-on: roles
     // A session made before the join names no organization, and every read would be refused in it.
-    const { internalAdapter } = await tenant.$context
     for (const one of await internalAdapter.listSessions(user.id)) {
       // The organization plugin's own column, which the core session type does not name.
       if (!(one as { activeOrganizationId?: string | null }).activeOrganizationId) await internalAdapter.updateSession(one.token, { activeOrganizationId: joined })
     }
     authAudit({ action: 'join', user: user.id, organization: joined, role: settings.joinRole })
   }
-  // The provider calls `afterEmailVerification` on a first proof and on an address change alike, and
-  // `beforeEmailVerification` on the first alone, so only the first joins.
-  const proving = new Set<string>()
+  // The set-password link that proves an address, stored as the provider stores a reset's, so the
+  // reset page and route answer it. It lasts an hour, as a reset link does.
+  const confirmLink = async (user: { id: string; email: string }) => {
+    if (!settings.mailer) return
+    const token = randomBytes(24).toString('base64url')
+    await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) })
+    await confirmMail(settings.mailer)({ email: user.email, token })
+  }
   const tenant = betterAuthServer({
     ...built,
     emailAndPassword: {
       ...built.emailAndPassword,
       requireEmailVerification: verifying,
-      // A reset proves the mailbox as a verification link does.
-      onPasswordReset: async ({ user }: { user: { id: string } }) => {
+      // A reset proves the mailbox, and an account proved so for the first time joins as a verified
+      // one would. The user is read before the reset, so `emailVerified` says whether it was proved.
+      onPasswordReset: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean; role?: unknown } }) => {
         await (await tenant.$context).internalAdapter.updateUser(user.id, { emailVerified: true })
+        if (!user.emailVerified) await joinOpen(user)
       },
+      // A second sign-up with the address of an account nobody proved, such as its owner's after
+      // someone squatted it, is answered as any sign-up and mails the address the link that proves it.
+      ...(verifying && { onExistingUserSignUp: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean } }) => (user.emailVerified ? undefined : confirmLink(user)) }),
     },
-    ...(verifying && settings.mailer && {
-      emailVerification: {
-        sendVerificationEmail: verificationMail(settings.mailer),
-        sendOnSignUp: true,
-        sendOnSignIn: true,
-        autoSignInAfterVerification: true,
-        beforeEmailVerification: async (user: { id: string }) => {
-          proving.add(user.id)
-        },
-        afterEmailVerification: async (user: { id: string; email: string; role?: unknown }) => {
-          if (proving.delete(user.id)) await joinOpen(user)
-        },
-      },
-    }),
+    // A sign-up mails the link once. A sign-in before the proof mails nothing, and the provider's own
+    // resend and verify routes are off, so nobody pushes a link to an address on demand.
+    ...(verifying && { emailVerification: { sendVerificationEmail: ({ user }: { user: { id: string; email: string } }) => confirmLink(user), sendOnSignUp: true } }),
     plugins: [
       ...built.plugins,
       // add-on: roles
@@ -1067,7 +1101,11 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     ],
     // In one organization or none, nobody founds another or leaves the one: leaving would leave the
     // person in no organization at all, where every read is refused.
-    disabledPaths: settings.organizations === 'many' ? tenantOnly : [...tenantOnly, '/organization/create', '/organization/leave'],
+    disabledPaths: [
+      ...tenantOnly,
+      ...(oneOrganization ? ['/organization/create', '/organization/leave'] : []),
+      ...(verifying ? ['/send-verification-email', '/verify-email'] : []),
+    ],
     databaseHooks: {
       ...built.databaseHooks,
       user: {

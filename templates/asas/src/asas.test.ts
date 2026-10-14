@@ -896,34 +896,59 @@ const followed = (one: ModeServer, link: string) => {
   return one.handler(new Request(`${tenantOrigin}${url.pathname.replace('/api/auth/user/', '/api/auth/')}${url.search}`, { redirect: 'manual' }))
 }
 
-test('0d. an open sign-up with verification and allowed domains: an address outside the domains is refused, one inside proves its address before it signs in and joins as the join role, and a removed member never joins again', async () => {
+/** The token of the set-password link last mailed to `to`. */
+const tokenMailed = (mail: ReturnType<typeof keptMail>, to: string) => {
+  const link = mail.linkTo(to)
+  return link ? new URL(link).searchParams.get('token') ?? undefined : undefined
+}
+
+test('0d. an open sign-up with verification and allowed domains: an address outside the domains is refused, one inside proves its address by choosing its password from the mailed link and joins as the join role, and a removed member never joins again, even unverified again', async () => {
   const mail = keptMail()
   const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: 'student', verifyEmail: true, allowedDomains: ['school.example', '*.staff.example'], mailer: mail.mailer })
   const [organization] = await modeRows('select id from organization')
   const signUp = (email: string) => askedOf(open, '/sign-up/email', { name: 'Pupil', email, password: modePassword })
-  for (const email of ['pupil@other.example', 'pupil@notschool.example', 'pupil@school.example.evil.example', 'pupil@staff.example']) {
+  for (const email of ['pupil@other.example', 'pupil@notschool.example', 'pupil@school.example.evil.example', 'pupil@staff.example', 'pupil@\uff53chool.example', 'pupil@school%2eexample', 'pupil@school\uff0eexample']) {
     assert.deepEqual(await answerOf(await signUp(email)), [403, 'SIGN_UP_DOMAIN'], `${email} is outside the domains`)
   }
   const made = await signUp('pupil@school.example')
   assert.equal(made.status, 200, 'an address at an allowed domain signs up')
   assert.equal(cookieOf(made).includes('session_token'), false, 'with no session until the address is proved')
   assert.deepEqual(await modeRows(`select member.id from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`), [], 'and no membership')
+  const mailed = mail.sent.length
   assert.deepEqual(await answerOf(await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })), [403, 'EMAIL_NOT_VERIFIED'], 'a sign-in before the proof is refused')
-  const link = mail.linkTo('pupil@school.example')
-  assert.match(link ?? '', /^http:\/\/localhost:5173\/api\/auth\/user\/verify-email\?token=/, 'the mailed link is the tenant app\'s own')
-  const verified = await followed(open, link!)
-  assert.ok([200, 302].includes(verified.status), `the link verifies: ${verified.status}`)
-  const [pupil] = await modeRows(`select "user".id, member.role from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`)
-  assert.equal(pupil?.role, 'member', 'the proved address joins the one organization')
+  assert.equal(mail.sent.length, mailed, 'and mails nothing, so nobody pushes a link on demand')
+  assert.equal((await askedOf(open, '/send-verification-email', { email: 'pupil@school.example' })).status, 404, 'nor through the provider\'s resend')
+  assert.match(mail.linkTo('pupil@school.example') ?? '', /^http:\/\/localhost:5173\/auth\/reset-password\?token=/, 'the mailed link chooses the password on the tenant app\'s own page')
+  const token = tokenMailed(mail, 'pupil@school.example')!
+  assert.equal((await askedOf(open, '/reset-password', { token, newPassword: 'the-pupil-chose-this' })).status, 200, 'the link sets the password')
+  const [pupil] = await modeRows(`select "user".id, "user".email_verified, member.role from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`)
+  assert.deepEqual([pupil?.role, pupil?.email_verified], ['member', true], 'which proves the address and joins the one organization')
   assert.deepEqual(await modeRows(`select role from member_roles where user_id = '${pupil!.id}'`), [{ role: 'student' }], 'as the join role')
-  const signedIn = await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })
+  const signedIn = await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: 'the-pupil-chose-this' })
   const session = await (await askedOf(open, '/get-session', undefined, { cookie: cookieOf(signedIn) })).json() as { session: { activeOrganizationId: string } }
   assert.equal(session.session.activeOrganizationId, organization!.id, 'and signs in there')
-  await db.execute(`delete from member_roles where user_id = '${pupil!.id}'; delete from member where user_id = '${pupil!.id}'`)
-  await followed(open, link!)
-  const resent = await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })
-  assert.equal(resent.status, 200, 'the removed member still signs in')
-  assert.deepEqual(await modeRows(`select id from member where user_id = '${pupil!.id}'`), [], 'and neither the old link nor a sign-in joins them again')
+  await db.execute(`delete from member_roles where user_id = '${pupil!.id}'; delete from member where user_id = '${pupil!.id}'; update "user" set email_verified = false where id = '${pupil!.id}'`)
+  await askedOf(open, '/request-password-reset', { email: 'pupil@school.example' })
+  assert.equal((await askedOf(open, '/reset-password', { token: tokenMailed(mail, 'pupil@school.example')!, newPassword: 'the-pupil-chose-again' })).status, 200, 'the removed member, made unverified again, proves the address again')
+  assert.equal((await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: 'the-pupil-chose-again' })).status, 200, 'and still signs in')
+  assert.deepEqual(await modeRows(`select id from member where user_id = '${pupil!.id}'`), [], 'but never joins again')
+})
+
+test('0f. a squatted address: whoever signed up first with another\'s address never signs in with their own password once its owner proves it', async () => {
+  const mail = keptMail()
+  const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: 'student', verifyEmail: true, allowedDomains: [], mailer: mail.mailer })
+  const signUp = (password: string) => askedOf(open, '/sign-up/email', { name: 'Victim', email: 'victim@example.com', password })
+  assert.equal((await signUp('the-attacker-password')).status, 200, 'the attacker signs up with the victim\'s address')
+  const squatted = mail.sent.length
+  assert.equal((await signUp('the-victim-password')).status, 200, 'the victim\'s own sign-up gets the same answer')
+  assert.equal(mail.sent.length, squatted + 1, 'and mails the address a link, since its account is not proved')
+  const pushed = mail.sent.length
+  assert.deepEqual(await answerOf(await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-attacker-password' })), [403, 'EMAIL_NOT_VERIFIED'], 'the attacker cannot sign in')
+  assert.equal(mail.sent.length, pushed, 'nor push another link to the victim')
+  assert.equal((await askedOf(open, '/reset-password', { token: tokenMailed(mail, 'victim@example.com')!, newPassword: 'the-victim-chose-this' })).status, 200, 'the victim proves the address by choosing the password')
+  assert.equal((await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-attacker-password' })).status, 401, 'the attacker\'s password no longer signs in')
+  assert.equal((await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-victim-chose-this' })).status, 200, 'the victim\'s does')
+  assert.equal((await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'victim@example.com'`))[0]?.role, 'member', 'and the victim joined')
 })
 
 test('0e. an open sign-up without verification joins at once with no role, and its first session opens in the one organization', async () => {
