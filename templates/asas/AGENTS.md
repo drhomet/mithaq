@@ -81,6 +81,7 @@ bunx mithaq migrate --name <slug>
 bunx mithaq migrate --check
 bunx mithaq lock --check
 bunx mithaq upgrade --check
+bun run dev:setup --seed        # a fresh dev database: the schema, the dev admin .env names, sample rows
 bun run seed
 ```
 

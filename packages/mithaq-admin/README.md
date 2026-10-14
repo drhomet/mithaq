@@ -22,7 +22,9 @@ Each app wires the package in three places, all visible to the project:
   ```
 
   It keeps the package out of Vite's pre-bundling, so a piece the app imports and the same piece another piece
-  imports are one module, and it serves an ejected file in place of the package's for every importer.
+  imports are one module, and it serves an ejected file in place of the package's for every importer. It pre-bundles
+  from the start the libraries the pieces import that the project installed, so a cold start never finds one
+  mid-page and reloads it.
 - `tsconfig.json` `paths`: `"mithaq-admin/*": ["./src/components/mithaq/*", "./node_modules/mithaq-admin/registry/*"]`.
   TypeScript tries the ejected folder first, so an ejected file is checked in place of the package's, then the
   package, which a piece installed in a store's own folder cannot reach by its name.

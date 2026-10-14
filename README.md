@@ -29,14 +29,14 @@ Then, with PostgreSQL 15 or later serving the database that `DATABASE_URL` names
 ```sh
 cd my-app
 cd packages/asas
-# push the schema once, development only
-bun -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"
+# push the schema, make the dev admin and fill its organization, development only
+bun run dev:setup --seed
 cd ../..
 bun run --cwd apps/asas-tanstack dev   # the tenant app, http://localhost:5173
 bun run --cwd apps/asas-platform dev   # in a second terminal: the platform console, http://localhost:5174
 ```
 
-Sign up `admin@admin.com` with the organization "Admin org", then run `bun run seed` in `packages/asas`.
+Sign in to both apps with `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` from `packages/asas/.env`: the dev admin owns "Dev admin's workspace", which `--seed` filled, and is the platform's `super_admin`.
 
 In production, `connect()` does not push the schema; it checks the migration files instead. [Running in production](https://github.com/drhomet/mithaq/blob/main/templates/asas/README.md#running-in-production) explains how to apply them.
 

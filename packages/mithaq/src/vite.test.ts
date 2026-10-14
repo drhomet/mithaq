@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { createServer } from 'vite'
+import { createServer, resolveConfig, type Plugin } from 'vite'
 import { mithaqAdmin } from './vite.ts'
 
 /**
@@ -109,6 +109,45 @@ test('an ejected importer draws the package leaf it did not eject', async (t) =>
   t.after(() => rm(join(root, '..'), { recursive: true, force: true }))
   await write('src/components/mithaq/widget.ts', "import { who } from 'mithaq-admin/copy.ts'\nexport const widget = `own widget sees ${who}`\n")
   assert.deepEqual(await load(root), { who: 'package', list: 'list holds own widget sees package', loads: 1 })
+})
+
+test('what the pieces import is pre-bundled from the start, where the project has it installed and nothing excludes it', async (t) => {
+  const { root, write } = await project()
+  t.after(() => rm(join(root, '..'), { recursive: true, force: true }))
+  for (const name of ['@scope/kit', 'plain', 'shunned', 'mithaq', 'primitive', 'deeper']) await write(`node_modules/${name}/package.json`, JSON.stringify({ name }))
+  // A workspace package, linked: Vite serves it as source, and an include would stop the scan at it.
+  await write('../linked/package.json', JSON.stringify({ name: 'linked' }))
+  await symlink(join(root, '../linked'), join(root, 'node_modules/linked'))
+  await write(
+    'node_modules/mithaq-admin/registry/ui/avatar.tsx',
+    [
+      "import { Root } from '@scope/kit/avatar'",
+      "import { Other } from '@scope/kit/avatar'",
+      "import {\n  type Shape,\n  draw,\n} from 'plain'",
+      "import 'plain/style'",
+      "export { lexical } from 'missing-optional'",
+      "import type { Only } from 'types-only'",
+      "import { shunned } from 'shunned'",
+      "import { source } from 'linked/admin'",
+      // Its rich text needs Lexical, which a project without rich text has not installed.
+      "import { safeUrl } from 'mithaq/rich-text'",
+      // The app's own primitives, which the published package does not hold, through the app's alias.
+      "import { Button } from '@/components/ui/button'",
+      "import { who } from 'mithaq-admin/copy.ts'",
+      "import { join } from 'node:path'",
+      "const lazy = () => import('plain/lazy')",
+    ].join('\n'),
+  )
+  await write('src/components/ui/button.tsx', "import { Primitive } from 'primitive/button'\nimport { deeper } from '../../lib/deeper'\n")
+  await write('src/lib/deeper.ts', "import { more } from 'deeper'\n")
+  // The defaults ejected into the language run on the server, never in the browser.
+  await write('node_modules/mithaq-admin/registry/steps/step.ts', "import { conflict } from 'plain/server'\n")
+  // A plugin after this one keeps a package out, as TanStack Start keeps its own.
+  const shuns: Plugin = { name: 'shuns', configEnvironment: (name) => (name === 'client' ? { optimizeDeps: { exclude: ['shunned'] } } : undefined) }
+  const resolve = { alias: [{ find: /^@\//, replacement: join(root, 'src/') }] }
+  const { environments } = await resolveConfig({ root, configFile: false, logLevel: 'silent', resolve, plugins: [mithaqAdmin(join(root, 'src/components/mithaq/')), shuns] }, 'serve')
+  assert.deepEqual(environments.client!.optimizeDeps.include, ['@scope/kit/avatar', 'deeper', 'plain', 'plain/style', 'primitive/button'])
+  assert.deepEqual(environments.ssr!.optimizeDeps.include, [])
 })
 
 test('the package is kept out of pre-bundling, so a piece the app imports and the same piece a sibling imports are one module', async (t) => {

@@ -57,7 +57,7 @@ if (production && ((platformApp && !process.env.PLATFORM_URL) || !process.env.BE
 
 // `NODE_ENV` is unset when a deploy runs plain `node` or `bun`, so the check above never runs and
 // both apps would boot on a public secret. Refuse on a non-local host with no secret instead.
-const isLocalHost = (url: string): boolean => {
+export const isLocalHost = (url: string): boolean => {
   try {
     return ['localhost', '127.0.0.1', '::1'].includes(new URL(url).hostname)
   } catch {

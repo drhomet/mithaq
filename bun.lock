@@ -275,6 +275,7 @@
         "lexical": "0.52.0",
         "mithaq": "*",
         "mithaq-admin": "*",
+        "pg-connection-string": "2.14.0",
         "zod": "^4.6.5",
       },
       "devDependencies": {

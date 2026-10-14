@@ -15,6 +15,7 @@
 // change between runs and is skipped where it is already there.
 import { createHmac } from 'node:crypto'
 import { organizations as mode } from '@asas/mithaq/auth/organizations'
+import { databaseOf } from './local-database.ts'
 // add-on: courses
 import type { RichTextNode, RichTextValue } from 'mithaq'
 // end add-on: courses
@@ -33,13 +34,11 @@ if (process.env.NODE_ENV === 'production') refuse('NODE_ENV is production, and t
 const { SEED_EMAIL, SEED_ORGANIZATION } = process.env
 // Without a name the seed picks whoever signed up first, which on a shared
 // database is someone's real organization. So it fills only this machine's
-// database by itself, and another only when told whose and told twice. pg
-// takes a `?host=` over the URL's own host, the last one when repeated, and a
-// path there is a socket on this machine.
-const { hostname, port, pathname, searchParams } = new URL(process.env.DATABASE_URL)
-const host = searchParams.getAll('host').at(-1) || hostname
-const database = `${host}:${searchParams.getAll('port').at(-1) || port || '5432'}/${decodeURIComponent(pathname.slice(1))}`
-if (!host.startsWith('/') && !['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)) {
+// database by itself, and another only when told whose and told twice.
+const at = databaseOf(process.env.DATABASE_URL)
+if (!at) refuse('DATABASE_URL is not a connection string pg reads.')
+const { database, local } = at
+if (!local) {
   if (!SEED_EMAIL) refuse(`DATABASE_URL names ${database}, which is not this machine. Name the owner whose organization to fill there with SEED_EMAIL, and set SEED_ALLOW_REMOTE=1.`)
   if (process.env.SEED_ALLOW_REMOTE !== '1') {
     refuse(`DATABASE_URL names ${database}, which is not this machine. Set SEED_ALLOW_REMOTE=1 to fill ${SEED_ORGANIZATION ? `the organization "${SEED_ORGANIZATION}"` : 'the first organization'} that ${SEED_EMAIL} owns there.`)

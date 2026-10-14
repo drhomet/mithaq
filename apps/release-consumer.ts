@@ -182,6 +182,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     assert.ok(!created.stderr.includes('The screens are not written'), created.stderr)
     const chosen = /^Created .*?, (?:with (.+)|minimal)\.$/m.exec(created.stdout)?.[1]?.split(', ') ?? []
     assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev   # the tenant app`))
+    assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev:setup${manager === 'npm' ? ' --' : ''} --seed\\n`))
     assert.equal(created.stdout.includes(`from apps/asas-platform: ${manager} run dev`), platform)
     assert.equal(created.stdout.includes('The package is named asas'), single)
     const features = single ? [] : readdirSync(join(consumer, 'packages/features')).map((one) => `packages/features/${one}`)
@@ -431,6 +432,28 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       sql("delete from organization where id = 'release-second'")
     }
     command(installed(template, '.bin/mithaq'), ['generate', '--check'], template)
+    // An empty database of its own, as a fresh clone starts from, set up by the command the next steps name: pushed, the
+    // dev admin `.env` names made and its organization seeded. The dev admin then signs in to each app the project serves.
+    const fresh = Object.assign(new URL(databaseUrl), { pathname: '/mithaq_dev_setup' }).href
+    const recreate = "import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute('drop database if exists mithaq_dev_setup with (force)'); await asas.targets.drizzle.db.execute('create database mithaq_dev_setup'); await asas.destroy()"
+    command(process.execPath, ['--input-type=module', '-e', recreate], template)
+    const setUp = spawnSync(manager, ['run', 'dev:setup', ...(manager === 'npm' ? ['--'] : []), '--seed'], { cwd: template, encoding: 'utf8', timeout: 600_000, env: { ...process.env, DATABASE_URL: fresh } })
+    assert.equal(setUp.status, 0, `${setUp.stdout}\n${setUp.stderr}`)
+    assert.match(setUp.stdout, /"totals":\{"tags":6[,}]/, setUp.stdout)
+    const signIn = [
+      "import { asas } from './src/asas.ts'",
+      `const { asPlatform, platformApp } = await import('${single ? './src/mithaq/auth/index.ts' : `@${name}/mithaq/auth`}')`,
+      "const server = asas.auth.strategies.find((one) => one.name === 'user').server",
+      'const body = { email: process.env.DEV_ADMIN_EMAIL, password: process.env.DEV_ADMIN_PASSWORD }',
+      'const tenant = (await server.api.signInEmail({ body, asResponse: true })).status',
+      'const platform = platformApp ? (await asPlatform(() => server.api.signInEmail({ body, asResponse: true }))).status : null',
+      'console.log(JSON.stringify({ tenant, platform }))',
+      'await asas.destroy()',
+    ].join('\n')
+    const signedIn = spawnSync(process.execPath, ['--env-file=.env', '--input-type=module', '-e', signIn], { cwd: template, encoding: 'utf8', env: { ...process.env, DATABASE_URL: fresh } })
+    assert.equal(signedIn.status, 0, signedIn.stderr)
+    assert.deepEqual(JSON.parse(signedIn.stdout.trim().split('\n').at(-1)!), { tenant: 200, platform: platform ? 200 : null }, `${name}'s dev admin signs in to each app`)
+    command(process.execPath, ['--input-type=module', '-e', recreate.replace("; await asas.targets.drizzle.db.execute('create database mithaq_dev_setup')", '')], template)
     console.log(`release consumer passed: ${name}`)
   } finally {
     for (const server of servers) {

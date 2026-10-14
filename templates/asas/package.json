@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:setup": "node --env-file-if-exists=.env src/dev-setup.ts",
     "seed": "node --env-file-if-exists=.env src/seed.ts"
   },
   "exports": {
@@ -37,6 +38,7 @@
     "lexical": "0.52.0",
     "mithaq": "*",
     "mithaq-admin": "*",
+    "pg-connection-string": "2.14.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
