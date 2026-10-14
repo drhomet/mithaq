@@ -177,8 +177,9 @@ From `base` (`packages/mithaq/src/base/kinds.ts` `defaultKinds`):
 - `textArray`: a list of strings.
 - `uuid`: a uuid string; also the kind of the shipped `id`.
 - `relationship`: the id of one row of another kayan, or a set of ids with
-  `hasMany: true`. Without `onDelete`, a required one restricts and an optional
-  one is set null.
+  `hasMany: true`. Without `onDelete` it restricts: a row a live row or a row's
+  latest draft still names is not deleted, and the refusal counts those rows and
+  names the ones the caller reads.
 - `join`: the rows of another kayan whose `on` relationship points back at
   this row. It builds no column; a read populates it through the child kayan's
   own access.
@@ -211,7 +212,8 @@ From `base` (`packages/mithaq/src/base/rules.ts` `defaultRules`):
 - `minRows`, `maxRows`: how few and how many entries a list holds.
 - `uppercase`, `lowercase`, `trim`: rewrite the value before it is checked.
 - `onDelete`: what happens to this row when the row it points at is deleted:
-  `cascade`, `restrict` or `set null`.
+  `restrict`, the default of `relationship` and `upload`, `cascade` or `set null`.
+  A set takes `restrict` or `cascade`, since its join row holds no null.
 
 Each kind lists the rules it accepts; a rule a kind does not accept is a type
 error on the field.

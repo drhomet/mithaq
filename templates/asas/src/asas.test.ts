@@ -2885,7 +2885,7 @@ test('11b. a push that fails part way leaves nothing it ran before the failure, 
   await db.execute('drop table pushed_broken')
 })
 
-test('12. onDelete is a rule, and a required Better Auth foreign key cascades', async () => {
+test('12. onDelete is a rule, a relationship that names none restricts, and a required Better Auth foreign key cascades', async () => {
   const language = offline()
   const nodes = language.buildAsas({
     http: [fetchHttp()],
@@ -2896,6 +2896,7 @@ test('12. onDelete is a rule, and a required Better Auth foreign key cascades', 
           id: { kind: 'text' },
           parent: { kind: 'relationship', relationTo: 'nodes', rules: { required: true } },
           child: { kind: 'relationship', relationTo: 'nodes' },
+          loose: { kind: 'relationship', relationTo: 'nodes', rules: { onDelete: 'set null' } },
         },
         targets: { service: { operations: defaultOperations } },
       }),
@@ -2903,7 +2904,8 @@ test('12. onDelete is a rule, and a required Better Auth foreign key cascades', 
   })
   const fields = nodes.kayan.nodes.fields as Record<string, { rules?: { onDelete?: string } }>
   assert.equal(fields.parent?.rules?.onDelete, 'restrict')
-  assert.equal(fields.child?.rules?.onDelete, 'set null')
+  assert.equal(fields.child?.rules?.onDelete, 'restrict', 'an optional one restricts too, the kind\'s default')
+  assert.equal(fields.loose?.rules?.onDelete, 'set null', 'and one that says set null is set null')
   await nodes.destroy()
 
   // And at the database, one field for each action, on the pushed schema: `r` is restrict
@@ -9958,15 +9960,19 @@ test('100. a hasMany relationship is refused where a rule would build on a colum
 
   // Every rule that builds something on a column builds nothing for a field the
   // store keeps in a join table, so each is refused by name rather than applied
-  // to nothing.
-  for (const rule of ['defaultValue', 'index', 'onDelete', 'unique'] as const) {
+  // to nothing. `onDelete` builds the join table's own key, where a set has no null.
+  assert.throws(
+    many({ tags: { kind: 'relationship', relationTo: 'manyTargets', hasMany: true, rules: { onDelete: 'set null' } } }),
+    /field "tags" is a relationship with hasMany and onDelete "set null", and a set's join row holds no null\./,
+  )
+  for (const rule of ['defaultValue', 'index', 'unique'] as const) {
     assert.throws(
       many({
         tags: {
           kind: 'relationship',
           relationTo: 'manyTargets',
           hasMany: true,
-          rules: { [rule]: rule === 'onDelete' ? 'cascade' : rule === 'defaultValue' ? 'x' : true },
+          rules: { [rule]: rule === 'defaultValue' ? 'x' : true },
         },
       }),
       new RegExp(`field "tags" is a relationship with hasMany[\\s\\S]*rule "${rule}" would build nothing`),
@@ -17284,7 +17290,7 @@ test('186m. the template\'s media takes an image through its own storage, a cour
   assert.ok(refused instanceof AsasError)
   assert.equal(refused.status, 409)
   assert.equal(refused.key, 'error.conflict.referenced')
-  assert.deepEqual(refused.params, { kayan: 'media', by: 'courses' }, 'naming the kayan whose row still points at it')
+  assert.deepEqual(refused.params, { kayan: 'media', by: 'courses', uses: [{ by: 'courses', count: 1, titles: ['Covered'] }] }, 'naming the kayan whose row still points at it, and the row')
   assert.equal((await courses.operations.findByID({ id: course.id }, options))!.cover, image.id)
 
   await courses.operations.delete({ id: course.id }, options)
@@ -17308,10 +17314,39 @@ test('186o. a file held in a gallery of many is not deleted while the gallery na
   assert.ok(refused instanceof AsasError, 'the delete is refused')
   assert.equal(refused.status, 409)
   assert.equal(refused.key, 'error.conflict.referenced')
-  assert.deepEqual(refused.params, { kayan: 'probeMedia', by: 'galleries' }, 'naming the kayan whose join table still points at it')
+  assert.deepEqual(refused.params, { kayan: 'probeMedia', by: 'galleries', uses: [{ by: 'galleries', count: 1, titles: [] }] }, 'naming the kayan whose join table still points at it, and counting a row it titles none of')
   assert.deepEqual((await galleryAsas.kayan.galleries.operations.findByID({ id: gallery.id }))!.images, [image.id], 'and the gallery keeps the file')
   await galleryAsas.kayan.galleries.operations.delete({ id: gallery.id })
   await galleryAsas.kayan.probeMedia.operations.delete({ id: image.id } as never)
+})
+
+test('186p. a tag a live course or a course\'s latest draft names is not deleted: the refusal counts every course and names the ones the caller reads, and the course and its drafts keep the tag', async () => {
+  const options = await tenantOptions()
+  const { tags, courses } = asas.kayan
+  const [live, drafted, never, unused] = await Promise.all(['Live 186p', 'Drafted 186p', 'Never 186p', 'Unused 186p'].map((name) => tags.operations.create({ name: { en: name, ar: name } }, options)))
+  const published = await courses.operations.create({ title: 'Published 186p', tags: [live!.id] }, options)
+  const second = await courses.operations.create({ title: 'Second 186p', tags: [live!.id] }, options)
+  await courses.operations.update({ id: second.id, tags: [live!.id, drafted!.id] }, { ...options, draft: true })
+  const draftOnly = await courses.operations.create({ title: 'Draft only 186p', tags: [never!.id] }, { ...options, draft: true })
+  const refusalOf = (id: string) => tags.operations.delete({ id }, options).then(() => undefined, (error: unknown) => error)
+
+  const refused = await refusalOf(live!.id)
+  assert.ok(refused instanceof AsasError, 'the tag two courses carry is not deleted')
+  assert.equal(refused.status, 409)
+  assert.equal(refused.key, 'error.conflict.referenced')
+  assert.deepEqual(refused.params, { kayan: 'tags', by: 'courses', uses: [{ by: 'courses', count: 2, titles: ['Published 186p', 'Second 186p'] }] }, 'naming how many and which')
+  const byDraft = await refusalOf(drafted!.id)
+  assert.ok(byDraft instanceof AsasError && byDraft.status === 409, 'a tag only a pending draft names is not deleted either')
+  assert.deepEqual(byDraft.params, { kayan: 'tags', by: 'courses', uses: [{ by: 'courses', count: 1, titles: ['Second 186p'] }] })
+  const byNever = await refusalOf(never!.id)
+  assert.ok(byNever instanceof AsasError && byNever.status === 409, 'nor one a never-published course names')
+  assert.deepEqual(byNever.params, { kayan: 'tags', by: 'courses', uses: [{ by: 'courses', count: 1, titles: ['Draft only 186p'] }] }, 'which the caller, who reads drafts, sees named')
+  assert.deepEqual((await courses.operations.findByID({ id: second.id }, { ...options, draft: true }))!.tags, [live!.id, drafted!.id], 'and the draft still names both')
+  assert.deepEqual((await courses.operations.findByID({ id: published.id }, options))!.tags, [live!.id], 'and the course keeps its tag')
+
+  await tags.operations.delete({ id: unused!.id }, options)
+  for (const course of [published, second, draftOnly]) await courses.operations.delete({ id: course.id }, options)
+  for (const tag of [live, drafted, never]) await tags.operations.delete({ id: tag!.id }, options)
 })
 
 test('208. a tag update carrying the instant its caller read is refused 409 once the tag has changed, and of two writers holding one read the row lock lets exactly one win, through both plugs', async () => {

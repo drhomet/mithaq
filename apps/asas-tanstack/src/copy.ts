@@ -202,6 +202,9 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     noMatches: { en: 'No rows match this filter.', ar: 'لا توجد صفوف تطابق هذا المرشح.' },
     refused: { en: 'That list could not be read.', ar: 'تعذرت قراءة هذه القائمة.' },
     cannotSee: { en: 'You can\'t see this', ar: 'لا يمكنك رؤية هذا' },
+    // A held id with no row: one a read of its kayan answered without, and one the viewer may not read.
+    deleted: { en: 'Deleted', ar: 'محذوف' },
+    notAvailable: { en: 'Not available', ar: 'غير متاح' },
     clearFilters: { en: 'Clear filters', ar: 'مسح المرشحات' },
     selectAll: { en: 'Select every row on this page', ar: 'حدد كل صف في هذه الصفحة' },
     selectRow: { en: 'Select this row', ar: 'حدد هذا الصف' },
@@ -885,15 +888,16 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     'invalid.upload_reference': { en: 'The upload has expired or is not this one. Upload the file again.', ar: 'انتهت صلاحية الرفع أو أنه ليس لهذا الملف. ارفع الملف مرة أخرى.' },
     'invalid.upload_verify': { en: 'The file is not what it said it was, so it was not kept. Upload another.', ar: 'الملف ليس كما ادّعى، لذا لم يُحفظ. ارفع ملفا آخر.' },
     'not_found.file': { en: 'That file is not here.', ar: 'هذا الملف غير موجود.' },
-    'conflict.referenced': {
-      en: 'Something still uses this, so it is not deleted. An image stays while a course shows it. A session stays while an enrollment records a seat in it, and a person stays while one records their seat, a withdrawn one included.',
-      ar: 'ما زال شيء يستخدم هذا، لذا لا يُحذف. تبقى الصورة ما دامت دورة تعرضها. وتبقى الحصة ما دام تسجيل يحفظ مقعدا فيها، ويبقى الشخص ما دام تسجيل يحفظ مقعده، ولو كان قد انسحب.',
-    },
+    'conflict.referenced': { en: 'Something still uses this, so it is not deleted.', ar: 'ما زال شيء يستخدم هذا، لذا لا يُحذف.' },
     'conflict.member_holds_roles': {
       en: 'This member still holds a role in this organization. Take each role from them first, then remove them.',
       ar: 'ما زال هذا العضو يشغل دورا في هذه المؤسسة. اسحب منه كل دور أولا، ثم أزله.',
     },
     'conflict.referencedBy': { en: '{kind} still use this, so it is not deleted.', ar: 'ما زالت {kind} تستخدم هذا، لذا لا يُحذف.' },
+    'conflict.usedBy': { en: 'Used by {count} {kind}: {titles}.', ar: 'تستخدمه {kind} ({count}): {titles}.' },
+    'conflict.usedByUnnamed': { en: 'Used by {count} {kind}.', ar: 'تستخدمه {kind} ({count}).' },
+    'conflict.usedMore': { en: '{count} more', ar: '{count} أخرى' },
+    'conflict.usedHint': { en: 'Take it out of them first.', ar: 'أزله منها أولا.' },
     'conflict.sole_owner': {
       en: 'This person is the only owner of an organization, so they are not deleted. Make another member its owner first.',
       ar: 'هذا الشخص هو المالك الوحيد لمؤسسة، لذا لا يُحذف. اجعل عضوا آخر مالكا لها أولا.',

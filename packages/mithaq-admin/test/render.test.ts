@@ -1757,7 +1757,7 @@ test('276a. a command actor reads in the viewer\'s locale for a reader of the pe
 
 test('214d. the platform answers the refusal copy in both locales, through the tenant copy it re-exports', async () => {
   const { translator } = await import('../../../apps/asas-platform/src/copy.ts')
-  for (const key of ['admin.cannotSee', 'admin.noColumns']) {
+  for (const key of ['admin.cannotSee', 'admin.noColumns', 'admin.deleted', 'admin.notAvailable', 'error.conflict.usedBy', 'error.conflict.usedByUnnamed', 'error.conflict.usedMore', 'error.conflict.usedHint']) {
     const en = translator('en')(key, 'fallback')
     const ar = translator('ar')(key, 'fallback')
     assert.ok(en !== 'fallback' && ar !== 'fallback' && ar !== en, `${key}: ${en} | ${ar}`)

@@ -503,6 +503,10 @@ What a project made before the organization lifecycle round changes when it take
 - **Organization names are one line of at most 100 characters.** A name stored before with a line break, a control character or a direction override, or longer, is refused on its next rename until it is put right: rename it on the platform, or once in SQL, `update organization set name = btrim(regexp_replace(name, '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]+', ' ', 'g')) where name ~ '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]'`, and shorten any past 100 by hand.
 - **`src/mail/`.** `configuredMailer` in `src/mail/index.ts` is a function the auth setup calls as it loads, and `resendMailer` takes `baseURL`; `bunx mithaq upgrade --check` names `src/mail/mailers.ts` as differing.
 
+What a project made before the data round changes:
+
+- **A relationship restricts unless it says otherwise.** A row another row points at, through a single relationship, a set or an upload, or that a row's latest draft names, is not deleted; the refusal counts them and names the ones the caller reads. An optional relationship that relied on being set null writes `rules: { onDelete: 'set null' }`, and a set that should let its rows go writes `onDelete: 'cascade'`. Run `bunx mithaq migrate --name restrict` for the foreign keys that change.
+
 ## Adding to the project
 
 Paths are written from the root of a project made by `bun create mithaq`, as laid out in [Project structure](#project-structure). `packages/mithaq` holds the language, its Better Auth setup and roles, `packages/features/*` every kayan, `packages/asas` the build, and `apps/asas-tanstack` and `apps/asas-platform` are the two host apps. The worked examples in the template are `courses` (`packages/features/courses/courses/courses.ts`) and `tags` (`packages/features/tags/tags/tags.ts`). Read them for shape.

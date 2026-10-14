@@ -1409,16 +1409,16 @@ test('32. a row the read did not answer for says the viewer cannot see it, never
   const waiting = await render(listWith(fakeApi({ sessions: [], user: [] }, { silent: true }).api))
   assert.ok(waiting.textContent?.includes('Loading…'), `a cell whose read has not answered says so:\n${waiting.textContent?.slice(0, 200)}`)
 
-  // Answered without the row reads as a row the viewer cannot see, not as loading nor as the raw id the column holds.
+  // Answered without the row: the viewer reads the kayan and the row is gone, never loading nor the raw id the column holds.
   const missing = await render(listWith(fakeApi({ sessions: [], user: [] }).api))
   assert.ok(!missing.textContent?.includes('Loading…'), 'a settled read leaves nothing loading')
-  assert.ok(missing.textContent?.includes('You can\'t see this'), `and the row the read did not answer for says the viewer cannot see it:\n${missing.textContent?.slice(0, 300)}`)
+  assert.ok(missing.textContent?.includes('Deleted'), `and the row the read did not answer for reads as deleted:\n${missing.textContent?.slice(0, 300)}`)
   assert.ok(!missing.textContent?.includes('u1') && !missing.textContent?.includes('s1'), 'never an id the column holds')
 
   // Refused outright: the 403 a role with the key and no field of the target meets.
   const refused = await render(listWith({ sessions: { find: async () => { throw Object.assign(new Error('Forbidden.'), { status: 403 }) } }, user: { find: async () => { throw Object.assign(new Error('Forbidden.'), { status: 403 }) } } }))
   await act(async () => sleep(0))
-  assert.ok(refused.textContent?.includes('You can\'t see this') && !refused.textContent?.includes('u1') && !refused.textContent?.includes('s1'), `a refused read says the same: ${refused.textContent?.slice(0, 300)}`)
+  assert.ok(refused.textContent?.split('Not available').length === 3 && !refused.textContent?.includes('u1') && !refused.textContent?.includes('s1'), `a refused read says only that it is not available: ${refused.textContent?.slice(0, 300)}`)
 })
 
 const recording = () => {
@@ -5306,6 +5306,42 @@ test('228c. the delete dialog names the row, confirms in a shipped key, says ins
   assert.equal(dialogText(), undefined, 'and the dialog closes')
 })
 
+test('228g. a delete refused because rows still use it says how many, names the ones the viewer reads in the viewer\'s locale, and counts the rest', async () => {
+  const edit = plus(recordPage([{ form: ['title'] }]), 'danger', { button: 'delete', label: { en: 'Delete', ar: 'حذف' } })
+  let uses: unknown[] = []
+  const words: Record<string, string> = { 'courses.singular': 'Course', 'courses.plural': 'Courses', 'sessions.plural': 'Sessions', 'admin.deleteConfirm': 'Delete for good' }
+  const host = await render(createElement(Form, {
+    kayan: courses,
+    screen: screenOf(edit),
+    client: { create: async () => ({}), update: async () => ({}), run: async () => ({}), delete: async () => {
+      throw Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.referenced', params: { kayan: 'tags', by: 'courses', uses } } })
+    } },
+    value: { id: 'a-row', title: 'Tajweed' },
+    t: (key: string, fallback?: string) => words[key] ?? fallback,
+    locale: 'en',
+    onDone: () => {},
+    onCancel: () => {},
+    operations: { delete: true },
+  }))
+  const refusalFor = async (given: unknown[]) => {
+    uses = given
+    await act(async () => {
+      click(host.querySelector('[data-region="danger"] [data-button="delete"]')!)
+    })
+    await act(async () => {
+      click(dialogButton('Delete for good')!)
+    })
+    const said = window.document.querySelector('[data-slot="alert-dialog-content"] [role="alert"]')?.textContent
+    await act(async () => {
+      click(dialogButton('Cancel')!)
+    })
+    return said
+  }
+  assert.equal(await refusalFor([{ by: 'courses', count: 2, titles: ['Course 2', 'First Course'] }]), 'Used by 2 Courses: Course 2, First Course. Take it out of them first.')
+  assert.equal(await refusalFor([{ by: 'courses', count: 3, titles: [{ en: 'Course 2', ar: 'دورة 2' }] }]), 'Used by 3 Courses: Course 2, 2 more. Take it out of them first.', 'a localized title in the viewer\'s locale, and the rest counted')
+  assert.equal(await refusalFor([{ by: 'courses', count: 1, titles: [] }, { by: 'sessions', count: 4, titles: [] }]), 'Used by 1 Course. Used by 4 Sessions. Take it out of them first.', 'rows the viewer does not read are counted, never named')
+})
+
 test('172l. the status in a form with no header is coloured like the header\'s pill and keeps its word', async () => {
   for (const [status, words, colour] of [['draft', 'Draft', 'bg-muted'], ['published', 'Published', 'bg-emerald-500/15'], ['changed', 'Changed', 'bg-amber-500/15']] as const) {
     const host = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status } }))
@@ -5740,7 +5776,7 @@ test('177k. a session whose course and start the viewer may not read says the vi
   await act(async () => sleep(10))
   assert.equal(host.querySelectorAll('tr[data-row="e1"] .grid').length, 0, 'no empty box drawn in its place')
   const said = host.querySelector('tr[data-row="e1"]')?.textContent ?? ''
-  assert.ok(said.includes('You can\'t see this') && !said.includes('s1') && !said.includes('u1'), `no id stands: ${said}`)
+  assert.ok(said.includes('Not available') && !said.includes('s1') && !said.includes('u1'), `no id stands: ${said}`)
   await release(queries)
 })
 
@@ -5895,7 +5931,7 @@ test('177r. a read a refusal answered reads as no rows and is not tried again, a
   }
   const refused = await attempts(refusal)
   assert.equal(refused.calls, 1, 'a refusal is the viewer\'s access answering, so it is asked once')
-  assert.ok(refused.text.includes('You can\'t see this') && !refused.text.includes('s1'), `and says the viewer cannot see it, never the id: ${refused.text}`)
+  assert.ok(refused.text.includes('Not available') && !refused.text.includes('s1'), `and says it is not available, never the id: ${refused.text}`)
   assert.equal((await attempts(new Error('network'))).calls, 2, 'a failure is asked again')
 })
 
@@ -6477,10 +6513,10 @@ test('214a. a relationship field whose held rows the server refuses names each o
   // A set of which the viewer reads nothing says so once, in the one note and no chip each.
   const noted = async (api: FindApi | undefined) => {
     assert.deepEqual(await chips(api), [], 'no chip for a row nobody may see')
-    return window.document.body.textContent?.split('You can\'t see this').length === 2
+    return window.document.body.textContent?.split('Not available').length === 2
   }
   assert.equal(await noted({ tags: { find: forbidden } }), true, 'a 403 on the read names neither id, and says so once')
-  assert.deepEqual(await chips(fakeApi({ tags: [{ id: 't1', name: 'Recitation' }] }).api), ['Recitation', 'You can\'t see this'], 'a row the answer leaves out is one the viewer cannot see, beside the one it named')
+  assert.deepEqual(await chips(fakeApi({ tags: [{ id: 't1', name: 'Recitation' }] }).api), ['Recitation', 'Deleted'], 'a row the answer leaves out is gone, beside the one it named')
   assert.equal(await noted(undefined), true, 'and a target the screen does not cross reads the same')
 })
 
@@ -6518,7 +6554,7 @@ test('214c. a relationship cell never draws its id: loading in the server render
   const root = createRoot(host)
   await act(async () => root.render(createElement(Bare, { api: fakeApi({ tags: [{ id: 't1', name: 'Recitation' }] }).api })))
   await act(async () => sleep(10))
-  assert.equal(host.textContent, 'You can\'t see this', 'with no screen the cell settles')
+  assert.equal(host.textContent, 'Not available', 'with no screen the cell settles')
   await act(async () => root.unmount())
 
   const down = async () => { throw new Error('network') }
@@ -6969,14 +7005,14 @@ test('233h. the compare sheet offers no restore on the version the row already h
 test('233i. a set whose every row the viewer may not read says so once, and a set of some keeps a chip for each', async () => {
   const tags = courses.fields.find((field) => field.name === 'tags')!
   const changes: unknown[] = []
-  const draw = async (rows: Record<string, unknown>[]) => {
-    const { api } = fakeApi({ tags: rows })
+  const draw = async (rows: Record<string, unknown>[] | 'forbidden') => {
+    const api = rows === 'forbidden' ? { tags: { find: async () => { throw Object.assign(new Error('Forbidden.'), { status: 403 }) } } } : fakeApi({ tags: rows }).api
     const host = await render(createElement(RelationshipControl, { field: tags, values: {}, setValue: () => {}, kayan: courses, client: kayans, api, id: 'courses-tags', t, value: ['t1', 't2', 't3'], readOnly: false, onChange: (next: unknown) => changes.push(next) }))
     await act(async () => sleep(30))
     return host
   }
-  const refused = await draw([])
-  assert.equal(refused.textContent?.split('You can\'t see this').length, 2, `one note: ${refused.textContent}`)
+  const refused = await draw('forbidden')
+  assert.equal(refused.textContent?.split('Not available').length, 2, `one note: ${refused.textContent}`)
   assert.equal(refused.querySelectorAll('[data-slot="combobox-chip"]').length, 0, 'and no chip for each')
   // Backspace in the empty box takes the last chip off a set, and here the chips are not drawn, so it would drop a tag nobody sees.
   await act(async () => press(refused.querySelector('#courses-tags') as unknown as Element, 'Backspace'))
@@ -6985,7 +7021,7 @@ test('233i. a set whose every row the viewer may not read says so once, and a se
   await act(async () => press(some.querySelector('#courses-tags') as unknown as Element, 'Backspace'))
   assert.deepEqual(changes.at(-1), ['t1', 't2'], 'where each chip is drawn Backspace still takes the last off')
   assert.equal(some.querySelectorAll('[data-slot="combobox-chip"]').length, 3, 'a set of which the viewer reads one keeps a chip for each of the three')
-  assert.equal(some.textContent?.split('You can\'t see this').length, 3, 'two of them said so')
+  assert.equal(some.textContent?.split('Deleted').length, 3, 'two of them said they are gone')
 })
 
 test('233j. the user menu asks before it switches the language over a form holding a change, in the app\'s own dialog, and switches at once over none', async () => {

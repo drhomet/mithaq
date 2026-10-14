@@ -1,0 +1,1 @@
+ALTER TABLE "courses_tags" DROP CONSTRAINT "courses_tags_target_id_tags_id_fkey", ADD CONSTRAINT "courses_tags_target_id_tags_id_fkey" FOREIGN KEY ("target_id") REFERENCES "tags"("id") ON DELETE RESTRICT;

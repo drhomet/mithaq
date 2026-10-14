@@ -3,7 +3,6 @@ import { defineRukn } from '../mithaq/rukn.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
 import type { ResolvedField } from '../mithaq/types.ts'
 import { kinds as drizzleKinds } from '../drizzle/kinds.ts'
-import type { Tables } from '../drizzle/index.ts'
 import { kinds as zodKinds } from '../zod/kinds.ts'
 import { storageTarget, type StorageConfig } from './storage.ts'
 
@@ -27,9 +26,7 @@ export const upload = kind<number | string>(
   // A file a row still names is never deleted from under it, whether or not the field is required.
   onDelete: 'restrict',
   targets: {
-    // A set's join table restricts too, where a relationship's cascades.
-    drizzle: (field: ResolvedField, tables: Tables) =>
-      drizzleKinds.relationship(field.hasMany ? { ...field, rules: { ...field.rules, onDelete: 'restrict' } } : field, tables),
+    drizzle: drizzleKinds.relationship,
     zod: zodKinds.relationship,
     standardSchema: (field: ResolvedField): StandardSchemaV1<unknown, number | string> => ({
       '~standard': {

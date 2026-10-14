@@ -76,10 +76,18 @@ export type Control = (props: ControlProps) => ReactElement
 
 /**
  * What the table knows about the rows its relationship columns point at, keyed by target and id.
- * `null` is loading, a string is the row's title, `false` is a row the read did not answer for
- * (the access answer), an `Error` is a failed read, and an absent key was never asked for.
+ * `null` is loading, a string is the row's title, `true` is a row a read of its kayan answered without
+ * (gone), `false` is one the viewer may not read at all, an `Error` is a failed read, and an absent key
+ * was never asked for.
  */
-export type RelationshipTitles = ReadonlyMap<string, string | Record<string, unknown> | null | false | Error>
+export type RelationshipTitles = ReadonlyMap<string, string | Record<string, unknown> | boolean | null | Error>
+
+/**
+ * What a held id the viewer is shown no row for reads as: `Deleted` where it reads the kayan and the
+ * row is not among it, and otherwise `Not available`, which says nothing of whether the row exists.
+ */
+export const missingRow = ({ t, gone }: { t: (key: string, fallback?: string) => string | undefined; gone: boolean }): string =>
+  gone ? (t('admin.deleted', 'Deleted') ?? 'Deleted') : (t('admin.notAvailable', 'Not available') ?? 'Not available')
 
 /** What every cell is handed. The locale is the browser's; `t` is here because a cell that renders a word rather than the value is rendering the project's copy. */
 export type CellProps = {

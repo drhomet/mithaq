@@ -12,7 +12,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import type { Copy, Translate } from 'mithaq-admin/copy.ts'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { listed } from 'mithaq-admin/format.tsx'
 import { rowWarning } from 'mithaq-admin/row-title.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
@@ -68,7 +69,7 @@ export function DeleteButton({
         </AlertDialogHeader>
         {refused === undefined ? null : (
           <p role="alert" className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive">
-            {deleteRefusal({ refused, t })}
+            {deleteRefusal({ refused, copy })}
           </p>
         )}
         <AlertDialogFooter className="max-sm:[&_button]:h-11">
@@ -89,12 +90,26 @@ export function DeleteButton({
   )
 }
 
-const deleteRefusal = ({ refused, t }: { refused: unknown; t: Translate }): string => {
+const deleteRefusal = ({ refused, copy }: { refused: unknown; copy: Copy }): string => {
+  const { t, locale } = copy
   const key = refusalKeyOf(refused)
   if (!key) return t('admin.deleteFailed', 'Something went wrong, so nothing was deleted. Try again.') ?? 'Something went wrong, so nothing was deleted. Try again.'
-  const by = (refused as { data?: { params?: { by?: unknown } } }).data?.params?.by
-  if (key === 'error.conflict.referenced' && typeof by === 'string') {
-    const kind = t(`${by}.plural`, by) ?? by
+  const params = (refused as { data?: { params?: { by?: unknown; uses?: unknown } } }).data?.params
+  // Each kayan whose rows still name this one: how many, and the titles of those the viewer reads,
+  // a localized one in the viewer's locale.
+  if (key === 'error.conflict.referenced' && Array.isArray(params?.uses) && params.uses.length) {
+    const said = (params.uses as { by: string; count: number; titles: unknown[] }[]).map(({ by, count, titles }) => {
+      const kind = t(`${by}.${count === 1 ? 'singular' : 'plural'}`, by) ?? by
+      const names = titles.map((title) => String(title !== null && typeof title === 'object' ? (title as Record<string, unknown>)[locale] ?? '' : title)).filter(Boolean)
+      const rest = count - names.length
+      const listedNames = listed([...names, ...(names.length && rest > 0 ? [(t('error.conflict.usedMore', '{count} more') ?? '{count} more').replace('{count}', () => rest.toLocaleString(locale || undefined))] : [])], locale)
+      const sentence = names.length ? (t('error.conflict.usedBy', 'Used by {count} {kind}: {titles}.') ?? 'Used by {count} {kind}: {titles}.') : (t('error.conflict.usedByUnnamed', 'Used by {count} {kind}.') ?? 'Used by {count} {kind}.')
+      return sentence.replace('{count}', () => count.toLocaleString(locale || undefined)).replace('{kind}', () => kind).replace('{titles}', () => listedNames)
+    })
+    return [...said, t('error.conflict.usedHint', 'Take it out of them first.') ?? 'Take it out of them first.'].join(' ')
+  }
+  if (key === 'error.conflict.referenced' && typeof params?.by === 'string') {
+    const kind = t(`${params.by}.plural`, params.by) ?? params.by
     return (t('error.conflict.referencedBy', '{kind} still use this, so it is not deleted.') ?? '{kind} still use this, so it is not deleted.').replace('{kind}', () => kind)
   }
   return t(key, key) ?? key

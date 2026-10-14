@@ -1263,7 +1263,8 @@
             "ar": "الوسوم"
           },
           "rules": {
-            "required": false
+            "required": false,
+            "onDelete": "restrict"
           },
           "relationTo": "tags",
           "hasMany": true,

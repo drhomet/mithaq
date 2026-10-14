@@ -1,7 +1,7 @@
 import { use, useEffect, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { ScreenContext } from 'mithaq/admin/react'
-import type { CellProps, FindApi, RelationshipTitles } from 'mithaq-admin/control-props.ts'
+import { missingRow, type CellProps, type FindApi, type RelationshipTitles } from 'mithaq-admin/control-props.ts'
 import { listed } from 'mithaq-admin/format.tsx'
 import { isForbidden } from 'mithaq-admin/refusal.ts'
 import { findByIds, idsOf, nameOfRow, titleFieldOf } from 'mithaq-admin/relationship-control.tsx'
@@ -48,7 +48,7 @@ export const useRelationshipTitles = ({
 
   useEffect(() => {
     let live = true
-    const answers = new Map<string, string | Record<string, unknown> | null | false | Error>()
+    const answers = new Map<string, string | Record<string, unknown> | boolean | null | Error>()
     // A target with no reader or no known read cap settles as `false` now, rather than loading on a read that is never made.
     for (const [target, ids] of groups) {
       for (const id of ids) {
@@ -67,8 +67,8 @@ export const useRelationshipTitles = ({
         const title = titleFieldOf(kayan)
         const kind = kayan?.fields.find((one) => one.name === title)?.kind
         // A forbidden read is the same answer as a missing row; any other failure is held as its Error. Neither may reject: that would leave every cell loading.
-        const found = await findByIds({ reads, ids, maxLimit }).catch((thrown: unknown) => (isForbidden(thrown) ? [] : thrown instanceof Error ? thrown : new Error(String(thrown))))
-        if (found instanceof Error) {
+        const found = await findByIds({ reads, ids, maxLimit }).catch((thrown: unknown) => (isForbidden(thrown) ? false : thrown instanceof Error ? thrown : new Error(String(thrown))))
+        if (found === false || found instanceof Error) {
           for (const id of ids) {
             answers.set(titleKey(target, id), found)
             answers.set(rowKey(target, id), found)
@@ -76,11 +76,11 @@ export const useRelationshipTitles = ({
           return
         }
         const byId = new Map(found.map((row) => [String(row.id ?? ''), row]))
-        // An id the answer lacks is a row this actor may not read, so `false`, never left `null`.
+        // An id a read of the kayan answers without is a row gone, so `true`, never left `null`.
         for (const id of ids) {
           const row = byId.get(id)
-          answers.set(titleKey(target, id), row ? nameOfRow({ row, title, locale, kind }) : false)
-          answers.set(rowKey(target, id), row ?? false)
+          answers.set(titleKey(target, id), row ? nameOfRow({ row, title, locale, kind }) : true)
+          answers.set(rowKey(target, id), row ?? true)
         }
       }),
     ).then(() => {
@@ -105,8 +105,8 @@ export function RelationshipCell({ field, locale, t, titles, value }: CellProps)
     const found = titles?.get(titleKey(target, id))
     if (found === null || found === undefined) return t('admin.loading', 'Loading…') ?? 'Loading…'
     if (found instanceof Error) return '—'
-    // A row not answered for reads as unseeable, never as the raw id the column holds.
-    return typeof found === 'string' ? found : (t('admin.cannotSee', 'You can\'t see this') ?? 'You can\'t see this')
+    // A row not answered for reads as gone or not available, never as the raw id the column holds.
+    return typeof found === 'string' ? found : missingRow({ t, gone: found === true })
   })
   const rest = ids.length - names.length
   return (

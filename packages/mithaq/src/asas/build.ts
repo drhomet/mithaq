@@ -5,7 +5,7 @@ import { holdsVerificationSteps, isLocalAuthTarget, localAuthStrategy, type Loca
 import { bulkSeals, outputOf, sealOf, storeSeals, type AuditHandler, type DerivedShapes, type OperationEffect, type OperationScreen, type WriteStep, type WriteTools } from './runner/steps.ts'
 import { running } from './runner/runtime.ts'
 import { tenancy } from './runner/tenant.ts'
-import { assertWhere, defaultAccess, defaultAuthorize, projectReadableFields, type Authorize, type Globals, type ManagedAdmin, type Options, type Procedures, type Row, type Writes } from './runner/write.ts'
+import { assertWhere, defaultAccess, defaultAuthorize, projectReadableFields, restrictingPointers, type Authorize, type Pointer, type Globals, type ManagedAdmin, type Options, type Procedures, type Row, type Writes } from './runner/write.ts'
 import { combineWhere } from '../mithaq/where.ts'
 import type { ReaderMap } from './runner/read.ts'
 import { bulk, read as readers, write, type ServiceTarget } from '../service/index.ts'
@@ -283,6 +283,8 @@ const operations = <Actor>(
   /** The most rows a served read of many may ask for, and one bulk write may match. */
   { maxLimit, bulkLimit }: Pick<ServiceTarget, 'maxLimit' | 'bulkLimit'>,
   tenant: { active: (actor: unknown) => string | undefined; seal: (writes: WriteTools['store']) => WriteTools['store'] },
+  /** The fields of every kayan that keep a row of this one while they name it. */
+  pointers: readonly Pointer[],
 ) => {
   // Bound, so a step cannot reach `transaction` or the adapter's own client, and sealed, so no
   // step writes a tenant-owned row outside the active organization.
@@ -397,7 +399,7 @@ const operations = <Actor>(
         bulkLists.push({ operation, declaration, tools, input })
         continue
       }
-      const run = write<Actor>({ kayan, declaration, tools, store, cap, authorize, admin, tenantOf: tenant.active })
+      const run = write<Actor>({ kayan, declaration, tools, store, cap, authorize, admin, tenantOf: tenant.active, pointers })
       methods[operation] = publish(operation, declaration.effect, input, run)
   }
   for (const { operation, declaration, tools, input } of bulkLists) {
@@ -871,6 +873,7 @@ export const buildAsas = <
         service.context !== undefined,
         service,
         { active: tenant.active, seal: (writes) => tenant.sealWrites({ writes, find: store.find.bind(store), kayanOf: (name) => resolvedByName.get(name) }) },
+        restrictingPointers(resolved, one),
       )
       operationTable.push(...table)
       const bound = Object.freeze(methods)

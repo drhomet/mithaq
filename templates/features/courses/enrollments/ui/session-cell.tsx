@@ -49,10 +49,10 @@ export function SessionCell({ field, value, row }: CellProps) {
   const course = session?.course ? nameOfRow({ row: session.course as Row, title: titleFieldOf(courses), locale }) : undefined
   // Never the id the column holds, as the relationship cell draws none:
   // loading until the read answers, the server's render among it, a dash
-  // where it failed, and a row the viewer cannot see for a session it may
-  // not read or one of which it may read neither the course nor the start.
+  // where it failed, and not available for a session it may not read or one
+  // of which it may read neither the course nor the start.
   if (!when && !course) {
-    if (sessions) return t('admin.cannotSee', 'You can\'t see this')
+    if (sessions) return t('admin.notAvailable', 'Not available')
     return isError ? '—' : t('admin.loading', 'Loading…')
   }
   // Two lines, the course over its start, so a narrow column wraps each

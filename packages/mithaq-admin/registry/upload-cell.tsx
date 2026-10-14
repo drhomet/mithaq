@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { CellProps, RelationshipTitles } from 'mithaq-admin/control-props.ts'
+import { missingRow, type CellProps, type RelationshipTitles } from 'mithaq-admin/control-props.ts'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { FileThumb, FileValue, type sizes } from 'mithaq-admin/file-thumb.tsx'
 import { noValue } from 'mithaq-admin/format.tsx'
@@ -19,7 +19,7 @@ const heldFile = ({ titles, target, id, t, locale, size }: {
   if (found === null || found === undefined) return <span key={id}>{t('admin.loading', 'Loading…') ?? 'Loading…'}</span>
   if (found instanceof Error) return <span key={id}>—</span>
   if (found && typeof found === 'object') return size === 'lg' ? <FileValue key={id} row={found} t={t} locale={locale} /> : <FileThumb key={id} row={found} t={t} locale={locale} size={size} />
-  return <span key={id} className="text-muted-foreground text-xs">{t('admin.cannotSee', 'You can\'t see this') ?? 'You can\'t see this'}</span>
+  return <span key={id} className="text-muted-foreground text-xs">{missingRow({ t, gone: found === true })}</span>
 }
 
 const totalToShow = 3

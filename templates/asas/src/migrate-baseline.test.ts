@@ -42,7 +42,7 @@ export const asas = buildAsas({
       fields: {
         id: { kind: 'uuid' },
         title: { kind: 'text', rules: { required: true, index: true } },
-        author: { kind: 'relationship', relationTo: 'authors', dbName: 'author_id' },
+        author: { kind: 'relationship', relationTo: 'authors', dbName: 'author_id', rules: { onDelete: 'set null' } },
         tenant: { kind: 'text', dbName: 'tenant_id' },${posts}
       },
     }),

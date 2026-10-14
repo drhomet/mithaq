@@ -623,10 +623,9 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
               required: field.rules?.required ?? false,
               // A join holds no column here, so `providedBy: never` keeps the key off every write shape.
               ...(field.kind === 'join' && { providedBy: { create: 'never', update: 'never' } }),
-              // A `hasMany` field holds no column on this table; its join rows go with the parent by cascade.
-              ...(pointsAtRow(field.kind) && field.relationTo && !field.hasMany && {
-                // A required field restricts, since `set null` would break it; any other takes its kind's default.
-                onDelete: field.rules?.onDelete ?? (field.rules?.required ? 'restrict' : language.kinds[field.kind]!.onDelete),
+              // A required field and a set restrict, since neither has a null to set; any other takes its kind's default.
+              ...(pointsAtRow(field.kind) && field.relationTo && {
+                onDelete: field.rules?.onDelete ?? (field.rules?.required || field.hasMany ? 'restrict' : language.kinds[field.kind]!.onDelete),
               }),
             },
             // A join builds no column, but takes a name so the one place that prints it prints no blank.
@@ -780,7 +779,12 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
         // A rule that silently builds nothing is what this file exists to prevent.
         // `required` is not one: the schema target reads it off the array.
         if (field.hasMany) {
-          const columnRule = (['defaultValue', 'index', 'onDelete', 'unique'] as const).find(
+          if (field.rules?.onDelete === 'set null') {
+            throw new Error(
+              `${where} is a relationship with hasMany and onDelete "set null", and a set's join row holds no null. Write "restrict", which keeps the row while a set names it, or "cascade", which takes it out of every set.`,
+            )
+          }
+          const columnRule = (['defaultValue', 'index', 'unique'] as const).find(
             (rule) => field.rules?.[rule] !== undefined,
           )
           if (columnRule) {

@@ -112,7 +112,9 @@ export const defaultKinds = {
     message: { en: 'Pick one of the listed entries.', ar: 'اختر عنصرًا من القائمة.' },
     rules: ['providedBy', 'required', 'unique', 'index', 'defaultValue', 'onDelete'],
     pointsAtRow: true,
-    onDelete: 'set null',
+    // A row another still names is never deleted from under it, its drafts included; a field says
+    // `set null` or `cascade` to let it go.
+    onDelete: 'restrict',
   }),
   // The rows of another kayan whose `on` relationship points at this one. It builds
   // no column: the id lives on the child, and a read populates it through the child's access.

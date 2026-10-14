@@ -12,7 +12,7 @@ import {
   ComboboxList,
 } from '@/components/ui/combobox'
 import { Spinner } from '@/components/ui/spinner'
-import { ariaRequired, changeOf, comboboxPhone, type ControlProps, type FindApi } from 'mithaq-admin/control-props.ts'
+import { ariaRequired, changeOf, comboboxPhone, missingRow, type ControlProps, type FindApi } from 'mithaq-admin/control-props.ts'
 import { formatDate } from 'mithaq-admin/format.tsx'
 import { isForbidden } from 'mithaq-admin/refusal.ts'
 
@@ -140,10 +140,11 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
   const chipsRef = useRef<HTMLDivElement | null>(null)
 
   /**
-   * Held ids the read settled without a row: `unseen` when refused or left out (as is every id of a target the screen
-   * does not cross), `failed` on a 500 or lost network, which says nothing about access.
+   * Held ids the read settled without a row: `gone` when the read answered without it, `unseen` when it was refused
+   * (as is every id of a target the screen does not cross), `failed` on a 500 or lost network, which says nothing
+   * about access.
    */
-  const [settled, setSettled] = useState<ReadonlyMap<string, 'unseen' | 'failed'>>(() => new Map())
+  const [settled, setSettled] = useState<ReadonlyMap<string, 'unseen' | 'gone' | 'failed'>>(() => new Map())
 
   const titleKind = target?.fields.find((one) => one.name === title)?.kind
   const named = use(RowLabelContext)(field.relationTo ?? '', [...rows, ...chosen.values()])
@@ -151,8 +152,8 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
   const rowOf = (held: string) => chosen.get(held) ?? rows.find((one) => String(one.id ?? '') === held)
   const stateOf = (held: string) => (reads ? settled.get(held) : 'unseen')
   /**
-   * What one held id reads as: the row's own title where something named it, a row this viewer cannot
-   * see where the read settled without it, a dash where the read failed, and loading until then. Never
+   * What one held id reads as: the row's own title where something named it, deleted or not available
+   * where the read settled without it, a dash where the read failed, and loading until then. Never
    * the raw id, which reads as data and is none of the viewer's.
    */
   const labelOf = (held: string) => {
@@ -160,9 +161,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
     if (row) return nameOf(row)
     const state = stateOf(held)
     if (state === 'failed') return '—'
-    return state === 'unseen'
-      ? (t('admin.cannotSee', 'You can\'t see this') ?? 'You can\'t see this')
-      : (t('admin.loading', 'Loading…') ?? 'Loading…')
+    return state ? missingRow({ t, gone: state === 'gone' }) : (t('admin.loading', 'Loading…') ?? 'Loading…')
   }
   /**
    * A set whose every row the viewer cannot see says so once, in place of one chip for each. The chips
@@ -242,7 +241,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
     void findByIds({ reads, ids: missing, maxLimit: most })
       .then((docs) => {
         const found = new Set(docs.map((row) => String(row.id ?? '')))
-        setSettled((already) => new Map([...already, ...missing.filter((one) => !found.has(one)).map((one) => [one, 'unseen'] as const)]))
+        setSettled((already) => new Map([...already, ...missing.filter((one) => !found.has(one)).map((one) => [one, 'gone'] as const)]))
         if (!docs.length) return
         setChosen((already) => new Map([...already, ...docs.map((row) => [String(row.id ?? ''), row] as const)]))
       })

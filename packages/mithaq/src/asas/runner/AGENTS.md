@@ -37,3 +37,5 @@ A nested write through `tools.of(kayan)` or `tools.kayans` joins the outer trans
 ## Refusals
 
 Refuse through `denied`, `invalid`, `missing` and `conflict` from `errors.ts`, each with a message and a copy `key`, so a screen can translate it.
+
+A delete that removes its row asks `refuseReferenced` first, in its transaction: every field of every kayan whose `onDelete` is `restrict` (a set's always is), over live rows and each row's latest version. It counts every row naming the deleted one and titles only those the actor reads, through `authorize`, so the count is all it says of rows past the scope. A soft delete keeps its row and is not asked.

@@ -2,8 +2,8 @@
 import { rowsOfField, type Rows } from '../../mithaq/rows.ts'
 import { heldPermissions } from '../../rbac/index.ts'
 import { authActor } from '../actor.ts'
-import { AfterCommitError, AsasError, denied, invalid, missing } from './errors.ts'
-import type { AdminAccess, FieldAccess, LocalesOf, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
+import { AfterCommitError, AsasError, conflict, denied, invalid, missing } from './errors.ts'
+import type { AdminAccess, FieldAccess, LocalesOf, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
 import { defaultKinds, type Kind } from '../../base/kinds.ts'
 import type { RichTextValue } from '../../rich-text/value.ts'
@@ -202,6 +202,85 @@ export const aliveWhere = (kayan: ResolvedKayan): Where | undefined =>
 // A row made as a draft and never published is read by nothing but a draft read.
 export const publishedWhere = (kayan: ResolvedKayan): Where | undefined =>
   combineWhere(aliveWhere(kayan), kayan.versions?.drafts ? { _status: { equals: 'published' } } : undefined)
+
+/** A field of one kayan that points at rows of another, which a delete of one of those rows answers to. */
+export type Pointer = { kayan: ResolvedKayan; field: ResolvedField }
+
+/** Every field of `kayans` whose `onDelete` keeps a row of `target` while it names it. */
+export const restrictingPointers = (kayans: readonly ResolvedKayan[], target: ResolvedKayan): Pointer[] =>
+  kayans.flatMap((kayan) => Object.values(kayan.fields)
+    .filter((field) => field.kind !== 'join' && field.target?.name === target.name && field.rules?.onDelete === 'restrict')
+    .map((field) => ({ kayan, field })))
+
+/** How many of the rows that still name a row the refusal names by title; its count says the rest. */
+const namedUses = 5
+const byId = { field: 'id', direction: 'asc' } as const
+
+/**
+ * Refuses the delete while a live row or the latest version of a row names it, in the delete's own
+ * transaction. The foreign key holds live rows alone, so a pending draft would otherwise keep an id
+ * nothing answers for. The refusal counts every row and names by title only those the actor reads.
+ */
+// ponytail: a draft saved by a write that read the row before this delete committed can still name it;
+// lock the referenced row in `assertReferences` if that race is ever seen.
+const refuseReferenced = async <Actor>({ kayan, id, pointers, store, tx, authorize, admin, actor }: {
+  kayan: ResolvedKayan
+  id: unknown
+  pointers: readonly Pointer[]
+  store: Store
+  tx: unknown
+  authorize: Authorize
+  admin: ManagedAdmin<Actor> | undefined
+  actor: Actor | null
+}) => {
+  const uses: { by: string; count: number; titles: unknown[] }[] = []
+  for (const one of new Set(pointers.map((pointer) => pointer.kayan))) {
+    const ids = new Set<string>()
+    for (const { field } of pointers.filter((pointer) => pointer.kayan === one)) {
+      const rows = await store.find({ kayan: one.name, args: { limit: 0, page: 1, sort: byId, where: { [field.name]: { equals: id as Scalar } } }, tx })
+      for (const row of rows.docs) ids.add(String(row.id))
+      if (!one.versions) continue
+      const versions = await store.find({ kayan: one.versions.table, args: { limit: 0, page: 1, sort: byId, where: { and: [{ latest: { equals: true } }, { [`version.${field.name}`]: { equals: id as Scalar } }] } }, tx })
+      for (const version of versions.docs) ids.add(String(version.parent))
+    }
+    // A row that names itself goes with itself.
+    if (one === kayan) ids.delete(String(id))
+    if (ids.size) uses.push({ by: one.name, count: ids.size, titles: await titlesOf({ kayan: one, ids: [...ids], store, tx, authorize, admin, actor }) })
+  }
+  if (!uses.length) return
+  throw conflict({
+    message: `A "${kayan.name}" row is still named by ${uses.map(({ by, count }) => `${count} "${by}" row${count === 1 ? '' : 's'}`).join(' and ')}, so it is not deleted.`,
+    key: 'error.conflict.referenced',
+    params: { kayan: kayan.name, by: uses[0]!.by, uses },
+  })
+}
+
+/** The titles of the rows among `ids` this actor reads, a draft only where it reads drafts. */
+const titlesOf = async <Actor>({ kayan, ids, store, tx, authorize, admin, actor }: {
+  kayan: ResolvedKayan
+  ids: string[]
+  store: Store
+  tx: unknown
+  authorize: Authorize
+  admin: ManagedAdmin<Actor> | undefined
+  actor: Actor | null
+}) => {
+  const title = Object.values(kayan.targets ?? {}).map((target) => (target as { useAsTitle?: unknown } | undefined)?.useAsTitle).find((one) => typeof one === 'string') as string | undefined
+  if (!title || !Object.hasOwn(kayan.fields, title)) return []
+  const asked = (operation?: string) => authorize({ admin, actor, data: {}, effect: 'read', kayan, operation }).then((where) => ({ where }), (thrown: unknown) => {
+    if (thrown instanceof AsasError && thrown.status === 403) return undefined
+    throw thrown
+  })
+  const readable = await asked()
+  if (!readable) return []
+  const drafts = kayan.versions?.drafts ? await asked('findVersions') : undefined
+  const shown = kayan.versions?.drafts && drafts
+    ? combineWhere(aliveWhere(kayan), drafts.where && { or: [{ _status: { equals: 'published' } }, drafts.where] })
+    : publishedWhere(kayan)
+  const sort = kayan.fields[title]!.rules?.localized ? byId : { field: title, direction: 'asc' as const }
+  const found = await store.find({ kayan: kayan.name, args: { limit: namedUses, page: 1, sort, where: { and: [{ id: { in: ids } }, readable.where, shown].filter(Boolean) as Where[] } }, tx })
+  return found.docs.map((row) => row[title])
+}
 
 const fieldAccess = async <Actor>(
   operation: 'create' | 'update',
@@ -659,6 +738,7 @@ export const write = <Actor = unknown>({
   authorize,
   admin,
   tenantOf,
+  pointers = [],
 }: {
   kayan: ResolvedKayan
   declaration: ResolvedOperation
@@ -669,6 +749,8 @@ export const write = <Actor = unknown>({
   admin?: ManagedAdmin<Actor>
   /** The organization the actor's session names, which a tenant-owned row is made in. */
   tenantOf: (actor: unknown) => string | undefined
+  /** The fields that keep a row of this kayan while they name it, which a delete answers to. */
+  pointers?: readonly Pointer[]
 }) =>
   async (data: Record<string, unknown> = {}, options?: Options<Actor>) => {
     const list = atEffect<WriteStep>(declaration.steps)
@@ -850,10 +932,12 @@ export const write = <Actor = unknown>({
           // A soft delete keeps the `remove` seal, so the effect, the access answer and the 404 stay
           // the delete's; the mark is refused as a field any caller supplies.
 
-          remove: ({ tx: heldTx, kayan: name, id }) =>
-            kayan.softDelete
-              ? tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
-              : tools.store.remove({ tx: heldTx, kayan: name, id: targetId ?? id, where: writeWhere }),
+          remove: async ({ tx: heldTx, kayan: name, id }) => {
+            if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
+            // A marked row is kept, so only a delete that removes it answers to the rows naming it.
+            if (name === kayan.name && pointers.length) await refuseReferenced({ kayan, id: targetId ?? id, pointers, store, tx: heldTx, authorize, admin, actor })
+            return tools.store.remove({ tx: heldTx, kayan: name, id: targetId ?? id, where: writeWhere })
+          },
         })
         // Its absence is a build fault: the partial update shape would make a row without its required fields.
         if (kind !== tools.kind && !tools.insertSchema) {
