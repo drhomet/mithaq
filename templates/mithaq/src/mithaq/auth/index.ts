@@ -1105,6 +1105,31 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     }
     authAudit({ action: 'join', user: user.id, organization: joined, role: settings.joinRole })
   }
+  // The invitation a sign-up carried is accepted for the account it made: at once where holding the id
+  // is the proof, or once the address is proved, the id kept beside the account until then. It is
+  // read again when accepted, so one cancelled, expired or sent to another address joins nobody.
+  const kept = (user: string) => `invited:${user}`
+  const acceptCarried = async ({ user, invitationId }: { user: { id: string; email: string }; invitationId: unknown }) => {
+    const { adapter, internalAdapter } = await tenant.$context
+    if (!(await holdsInvitation({ adapter: adapter as unknown as Finds, id: invitationId, email: user.email }))) return
+    const id = invitationId as string
+    // Pending to accepted once, so a second proof never adds the person twice.
+    const accepted = await adapter.update<{ organizationId: string; role: string }>({ model: 'invitation', where: [{ field: 'id', value: id }, { field: 'status', value: 'pending' }], update: { status: 'accepted' } })
+    if (!accepted) return
+    await tenant.api.addMember({ body: { userId: user.id, organizationId: accepted.organizationId, role: accepted.role as 'member' } })
+    // A session made before the acceptance names no organization, and every read would be refused in it.
+    for (const one of await internalAdapter.listSessions(user.id)) {
+      if (!(one as { activeOrganizationId?: string | null }).activeOrganizationId) await internalAdapter.updateSession(one.token, { activeOrganizationId: accepted.organizationId })
+    }
+    authAudit({ action: 'accept', user: user.id, organization: accepted.organizationId, invitation: id })
+  }
+  const acceptKept = async (user: { id: string; email: string }) => {
+    const { internalAdapter } = await tenant.$context
+    const held = await internalAdapter.findVerificationValue(kept(user.id))
+    if (!held) return
+    await internalAdapter.deleteVerificationByIdentifier(kept(user.id))
+    await acceptCarried({ user, invitationId: held.value })
+  }
   // Whether the account was mailed a link to choose its password in the last five minutes, other
   // than `except`: that one still works, so nobody fills a mailbox by asking again and again.
   const resetLinks = [{ field: 'identifier', operator: 'starts_with' as const, value: 'reset-password:' }]
@@ -1132,7 +1157,10 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
         await internalAdapter.updateUser(user.id, { emailVerified: true })
         // The password is chosen, so every other link to choose it is spent.
         await adapter.deleteMany({ model: 'verification', where: [{ field: 'value', value: user.id }, ...resetLinks] })
-        if (!user.emailVerified) await joinOpen(user)
+        if (!user.emailVerified) {
+          await acceptKept(user)
+          await joinOpen(user)
+        }
       },
       // A second sign-up with the address of an account nobody proved, such as its owner's after
       // someone squatted it, is answered as any sign-up and mails the address the link that proves it.
@@ -1167,8 +1195,13 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           before: async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
             await accountGate(user, context)
           },
-          after: async (user: { id: string; email: string; role?: unknown }) => {
+          after: async (user: { id: string; email: string; role?: unknown }, context: { body?: unknown } | null) => {
             authAudit({ action: 'sign-up', user: user.id })
+            const invitationId = (context?.body as { invitationId?: unknown } | undefined)?.invitationId
+            if (typeof invitationId === 'string' && !firstRegistering.getStore()) {
+              if (!verifying) await acceptCarried({ user, invitationId })
+              else await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: kept(user.id), value: invitationId, expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) })
+            }
             if (!verifying) await joinOpen(user)
           },
         },

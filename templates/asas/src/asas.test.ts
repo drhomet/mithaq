@@ -859,7 +859,7 @@ const ownerOf = async (one: ModeServer) => {
   return { headers: new Headers({ cookie: cookieOf(signedIn) }), organization: String(owner!.organization_id), email: String(owner!.email) }
 }
 
-test('0c. by invitation only, a sign-up without a matching invitation id gets one answer, whether or not the address has an account, and the invited address with its id signs up', async () => {
+test('0c. by invitation only, a sign-up without a matching invitation id gets one answer, whether or not the address has an account, and the invited address with its id signs up and is in, its invitation accepted on the server', async () => {
   const school = modeServer(schoolSettings)
   const owner = await ownerOf(school)
   const { id: invitationId } = (await school.api.createInvitation({ body: { email: 'invited@example.com', role: 'member' }, headers: owner.headers })) as { id: string }
@@ -883,8 +883,10 @@ test('0c. by invitation only, a sign-up without a matching invitation id gets on
   assert.deepEqual(await modeRows(`select id from "user" where email = 'stranger@example.com'`), [], 'and nobody was made')
   const invited = await signUp({ email: 'Invited@Example.com', invitationId })
   assert.equal(invited.status, 200, 'the invited address, in any case, signs up with its invitation id')
-  await school.api.acceptInvitation({ body: { invitationId }, headers: new Headers({ cookie: cookieOf(invited) }) })
-  assert.equal((await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'invited@example.com'`))[0]?.role, 'member', 'and joins by accepting it')
+  assert.equal((await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'invited@example.com'`))[0]?.role, 'member', 'and is a member at once: holding the id is the proof, so nobody presses Accept')
+  assert.deepEqual(await modeRows(`select status from invitation where id = '${invitationId}'`), [{ status: 'accepted' }], 'the invitation is spent')
+  const session = await (await askedOf(school, '/get-session', undefined, { cookie: cookieOf(invited) })).json() as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, owner.organization, 'and the sign-up\'s own session opens in the organization')
   const internal = (await school.$context).internalAdapter
   await assert.rejects(internal.createUser({ name: 'Elsewhere', email: 'elsewhere@example.com' }, {} as never), /invitation/i, 'an account made past the sign-up route, as another sign-in method would, is refused as well')
   assert.deepEqual(await modeRows(`select id from "user" where email = 'elsewhere@example.com'`), [], 'and not made')
@@ -1068,6 +1070,26 @@ test('0j. with many organizations a person in none reads the invitations sent to
   const another = await proved({ one: many, mail, email: 'founding-0j@example.com' })
   const founded = await askedOf(many, '/organization/create', { name: "Founding's workspace", slug: 'founding-workspace-0j' }, { cookie: another.get('cookie')! })
   assert.equal(founded.status, 200, 'a person in none founds an organization of their own once their address is proved')
+})
+
+test('0k. with many organizations an invited sign-up joins nothing until its address is proved, and is then in the organization that invited it, while an id sent to another address joins nobody', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  const founder = await proved({ one: many, mail, email: 'founder-0k@example.com' })
+  const organization = (await many.api.createOrganization({ body: { name: 'Invites 0k', slug: 'invites-0k' }, headers: founder }))!.id
+  const { id: invitationId } = (await many.api.createInvitation({ body: { email: 'invitee-0k@example.com', role: 'member', organizationId: organization }, headers: founder })) as { id: string }
+  const memberOf = async (email: string) => (await modeRows(`select member.organization_id from member join "user" on "user".id = member.user_id where "user".email = '${email}'`)).map((one) => one.organization_id)
+  assert.equal((await askedOf(many, '/sign-up/email', { name: 'Elsewhere', email: 'elsewhere-0k@example.com', password: modePassword, invitationId })).status, 200)
+  assert.equal((await askedOf(many, '/reset-password', { token: (await tokenMailed(mail, 'elsewhere-0k@example.com'))!, newPassword: modePassword })).status, 200)
+  assert.deepEqual(await memberOf('elsewhere-0k@example.com'), [], 'an invitation id carried by another address joins nobody')
+  assert.equal((await askedOf(many, '/sign-up/email', { name: 'Invitee', email: 'invitee-0k@example.com', password: 'typed-at-sign-up', invitationId })).status, 200)
+  assert.deepEqual(await memberOf('invitee-0k@example.com'), [], 'no membership before the address is proved')
+  assert.equal((await askedOf(many, '/reset-password', { token: (await tokenMailed(mail, 'invitee-0k@example.com'))!, newPassword: modePassword })).status, 200)
+  assert.deepEqual(await memberOf('invitee-0k@example.com'), [organization], 'once proved, the person is a member of the organization that invited them')
+  assert.deepEqual(await modeRows(`select status from invitation where id = '${invitationId}'`), [{ status: 'accepted' }])
+  const signedIn = await askedOf(many, '/sign-in/email', { email: 'invitee-0k@example.com', password: modePassword })
+  const session = await (await askedOf(many, '/get-session', undefined, { cookie: cookieOf(signedIn) })).json() as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, organization, 'and signs in there')
 })
 
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {

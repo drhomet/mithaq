@@ -73,7 +73,8 @@ function SignUp() {
     if (!made.ok) return setRefusal(refused(made, t('auth.signUpFailed', 'That sign-up did not work.')))
     // An account that proves its address first has no session yet, invited or not, so it is told to open its mail.
     if (verifies) return setSent(email)
-    await navigate({ to: wanted({ asked: search.redirect, home: (await authGate()).home.path }) })
+    // The server accepted the invitation the sign-up carried, so its page would only say it is spent.
+    await navigate({ to: wanted({ asked: invited ? undefined : search.redirect, home: (await authGate()).home.path }) })
   }
 
   const toSignIn = (
