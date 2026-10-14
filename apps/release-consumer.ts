@@ -88,11 +88,13 @@ try {
   const tarball = `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`
   const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
   withoutRichText(tarball)
+  // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
+  // by sign-up; none with an open sign-up, which a production start refuses without a mailer.
   for (const run of [
-    { manager: 'bun', addOns: ['--full'] },
-    { manager: 'npm', addOns: [] },
-    { manager: 'bun', layout: 'single', addOns: ['--full'] },
-    { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text,media'] },
+    { manager: 'bun', addOns: ['--full'], modes: [] },
+    { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
+    { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'none', '--sign-up', 'open'] },
+    { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text,media'], modes: ['--organizations', 'many'] },
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
@@ -130,8 +132,10 @@ function withoutRichText(tarball: string) {
   console.log('release consumer passed: npm-without-rich-text')
 }
 
-async function release({ manager, tarball, adminTarball, layout = 'monorepo', addOns }: { manager: string; tarball: string; adminTarball: string; layout?: string; addOns: string[] }) {
+async function release({ manager, tarball, adminTarball, layout = 'monorepo', addOns, modes }: { manager: string; tarball: string; adminTarball: string; layout?: string; addOns: string[]; modes: string[] }) {
   const single = layout === 'single'
+  const many = modes.includes('many')
+  const open = modes.includes('open')
   const full = addOns.includes('--full')
   // `--full` holds the platform console where the layout can.
   const platform = !single && (full || addOns.some((one) => /(^|,)platform(,|$)/.test(one)))
@@ -142,7 +146,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
   try {
     // The project as `<manager> create mithaq` makes it, with `mithaq` and `mithaq-admin` pointed at the tarballs through flags
     // only this check passes, so neither is fetched from npm.
-    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, ...addOns, '--mithaq', tarball, '--mithaq-admin', adminTarball], {
+    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, ...addOns, ...modes, '--mithaq', tarball, '--mithaq-admin', adminTarball], {
       cwd: scratch,
       encoding: 'utf8',
       timeout: 600_000,
@@ -183,8 +187,8 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const language = single ? consumer : join(consumer, 'packages/mithaq')
     // The files each workspace always holds (the host, the icon, the storage adapters and the step) are read against the
     // installed mithaq-admin and must be up to date; with no package there the check answers undefined and this fails.
-    // The storage adapters and their defaults come with uploads; the step is every project's.
-    const held = chosen.includes('uploads') ? 6 : 1
+    // The storage adapters and their defaults come with uploads; the step and the mailers are every project's.
+    const held = chosen.includes('uploads') ? 7 : 2
     for (const [workspace, files] of single ? [[consumer, 13 + held]] as const : [[app, 13], ...(platform ? [[platformApp, 12]] as const : []), [language, held]] as const) {
       installed(workspace, '.bin/mithaq')
       const check = spawnSync(process.execPath, ['--input-type=module', '-e', "import { pathToFileURL } from 'node:url'; import { upgradeCheck } from 'mithaq/upgrade'; console.log(JSON.stringify(await upgradeCheck(pathToFileURL(`${process.cwd()}/`))))"], { cwd: workspace, encoding: 'utf8' })
@@ -248,13 +252,34 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const origin = `http://127.0.0.1:${port}`
     const platformOrigin = `http://127.0.0.1:${platformPort}`
     const { BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _fallback, PLATFORM_URL: _platform, ...withoutAuthSecret } = process.env
+    // One organization or none is set up with the code alone; many leaves it unset, so the platform says to set it.
+    const setupCode = 'mithaq-release-consumer-setup-code-of-40-chars'
+    // A production boot needs these settings, PLATFORM_URL only where a platform app is served. `BETTER_AUTH_SECRET` is
+    // left out on purpose: each app answering proves it read the `.env` `create-mithaq` wrote, which TanStack Start
+    // loads into `process.env`, a variable already set winning. An open sign-up starts only with a mailer; no message is
+    // sent here, so the key is never asked of Resend.
+    const production: NodeJS.ProcessEnv = {
+      ...withoutAuthSecret,
+      NODE_ENV: 'production',
+      BETTER_AUTH_URL: origin,
+      ...(platform && { PLATFORM_URL: platformOrigin }),
+      STORAGE_SECRET: 'mithaq-release-consumer-storage-secret-32',
+      STORAGE_PREFIX: 'mithaq/asas',
+      STORAGE_ADAPTER: 'local',
+      STORAGE_DIR: join(consumer, '.storage'),
+      ...(!many && { SETUP_CODE: setupCode }),
+      ...(open && { RESEND_API_KEY: 're_release_consumer_never_sent', MAIL_FROM: 'Release <mail@example.com>' }),
+    }
+    if (open) {
+      const { RESEND_API_KEY: _key, MAIL_FROM: _from, ...unmailed } = production
+      const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./src/mithaq/auth/index.ts')"], { cwd: language, encoding: 'utf8', env: { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' } })
+      assert.notEqual(refused.status, 0, `${name}: an open sign-up refuses a production start with no mailer`)
+      assert.match(refused.stderr, /signUp = 'open' needs a mailer in production/, refused.stderr)
+    }
     const start = (cwd: string, at: number) => {
       const child = spawn(process.execPath, [join(installed(cwd, 'vite'), 'bin/vite.js'), 'preview', '--port', String(at), '--host', '127.0.0.1', '--strictPort'], {
         cwd,
-        // A production boot needs these settings, PLATFORM_URL only where a platform app is served. `BETTER_AUTH_SECRET` is
-        // left out on purpose: each app answering proves it read the `.env` `create-mithaq` wrote, which TanStack Start
-        // loads into `process.env`, a variable already set winning.
-        env: { ...withoutAuthSecret, NODE_ENV: 'production', BETTER_AUTH_URL: origin, ...(platform && { PLATFORM_URL: platformOrigin }), STORAGE_SECRET: 'mithaq-release-consumer-storage-secret-32', STORAGE_PREFIX: 'mithaq/asas', STORAGE_ADAPTER: 'local', STORAGE_DIR: join(consumer, '.storage') },
+        env: production,
         stdio: ['ignore', 'pipe', 'pipe'],
       })
       servers.push(child)
@@ -282,58 +307,88 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const tenantFirst = await fetch(`${origin}/api/auth/user/first-register`, { method: 'POST', headers: { 'content-type': 'application/json', origin }, body: '{}', signal: AbortSignal.timeout(10_000) })
     assert.equal(tenantFirst.status, 404, 'the tenant app serves no first-register')
     if (platform) {
-      // The `.env` `create-mithaq` wrote leaves SETUP_CODE empty, and a production platform says to set it.
+      // The `.env` `create-mithaq` wrote leaves SETUP_CODE empty, and a production platform says to set it; set, it asks for it.
       const page = await (await fetch(`${platformOrigin}/auth/create-first-user`, { signal: AbortSignal.timeout(10_000) })).text()
-      assert.ok(page.includes('SETUP_CODE is unset or shorter than 32 characters'), `the first-administrator page asks for SETUP_CODE:\n${page.slice(0, 600)}`)
+      assert.equal(page.includes('SETUP_CODE is unset or shorter than 32 characters'), many, `the first-administrator page says whether SETUP_CODE is set:\n${page.slice(0, 600)}`)
+      assert.equal(page.includes('The SETUP_CODE this server was started with.'), !many, 'and asks for it where it is')
     }
 
     const stamp = randomUUID()
-    const signUp = await fetch(`${origin}/api/auth/user/sign-up/email`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', origin },
-      body: JSON.stringify({ name: 'Release', email: `release-${stamp}@example.com`, password: 'release-test-password' }),
-      signal: AbortSignal.timeout(10_000),
-    })
-    assert.equal(signUp.status, 200, `${await signUp.text()}\n${output}`)
-    const cookie = signUp.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
-    assert.ok(cookie, 'the sign-up answered with a session cookie')
-    const organization = await fetch(`${origin}/api/auth/user/organization/create`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', origin, cookie },
-      body: JSON.stringify({ name: 'Release', slug: `release-${stamp}` }),
-      signal: AbortSignal.timeout(10_000),
-    })
-    assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
-    if (platform) {
-      // A staff member who belongs to no organization, so the platform session has none active: the access target is
-      // asked with no tenant, and only the project's role reader answers the platform role. Whichever target the
-      // project's add-ons chose, staff hold every key there.
-      const email = `staff-${stamp}@example.com`
-      const joined = await fetch(`${origin}/api/auth/user/sign-up/email`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', origin },
-        body: JSON.stringify({ name: 'Staff', email, password: 'release-test-password' }),
-        signal: AbortSignal.timeout(10_000),
-      })
-      assert.equal(joined.status, 200, `${await joined.text()}\n${output}`)
-      command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = '${email}'"); await asas.destroy()`], template)
-      const staff = await fetch(`${platformOrigin}/api/auth/user/sign-in/email`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', origin: platformOrigin },
-        body: JSON.stringify({ email, password: 'release-test-password' }),
-        signal: AbortSignal.timeout(10_000),
-      })
-      assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
-      const staffCookie = staff.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
-      const session = await (await fetch(`${platformOrigin}/api/auth/user/get-session`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { session?: { activeOrganizationId?: string | null } } | null
-      assert.equal(session?.session?.activeOrganizationId ?? null, null, `the staff session has no organization active: ${JSON.stringify(session).slice(0, 400)}`)
-      const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
-      assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s platform staff hold every key: ${JSON.stringify(report).slice(0, 400)}`)
+    const post = (path: string, body: unknown, headers: Record<string, string> = {}, at = origin) =>
+      fetch(`${at}/api/auth/user/${path}`, { method: 'POST', headers: { 'content-type': 'application/json', origin: at, ...headers }, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) })
+    const codeOf = async (response: Response) => [response.status, ((await response.json().catch(() => null)) as { code?: string } | null)?.code] as const
+    const cookieOf = (response: Response) => response.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
+    if (!many) {
+      // One organization or none: nothing signs up before its owner is made, and only the setup code makes them.
+      const setUp = await (await fetch(`${origin}/auth/first-run`, { signal: AbortSignal.timeout(10_000) })).text()
+      assert.ok(setUp.includes('The SETUP_CODE this server was started with.'), `first-run asks for the setup code:\n${setUp.slice(0, 600)}`)
+      assert.equal(setUp.includes('id="organization"'), !modes.includes('none'), 'and a name for the organization in one alone')
+      assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Early', email: `early-${stamp}@example.com`, password: 'release-test-password' })), [403, 'FIRST_RUN_PENDING'], 'a sign-up before first-run is refused')
+      // The takeover race over HTTP: three at once, one owner.
+      const runs = await Promise.all([0, 1, 2].map(async (at) => [at, await codeOf(await post('first-run', { name: `Owner ${at}`, email: `owner-${at}-${stamp}@example.com`, password: 'release-test-password', organization: 'Release', code: setupCode }))] as const))
+      const won = runs.filter(([, [status]]) => status === 200)
+      assert.equal(won.length, 1, `one first-run wins: ${JSON.stringify(runs)}\n${output}`)
+      assert.deepEqual(runs.filter(([, [status]]) => status !== 200).map(([, answer]) => answer), [[403, 'FIRST_RUN_CLOSED'], [403, 'FIRST_RUN_CLOSED']])
+      const owner = `owner-${won[0]![0]}-${stamp}@example.com`
+      const signedIn = await post('sign-in/email', { email: owner, password: 'release-test-password' })
+      assert.equal(signedIn.status, 200, `the owner signs in\n${output}`)
+      const session = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { origin, cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).json()) as { session?: { activeOrganizationId?: string | null } } | null
+      assert.ok(session?.session?.activeOrganizationId, 'into the one organization')
+      if (!open) assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Stranger', email: `stranger-${stamp}@example.com`, password: 'release-test-password' })), [403, 'SIGN_UP_INVITE_ONLY'], 'by invitation, a sign-up with none is refused')
+      if (platform) {
+        // First-run made the owner the platform's administrator too, since it had none.
+        const staff = await post('sign-in/email', { email: owner, password: 'release-test-password' }, {}, platformOrigin)
+        assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
+        const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: cookieOf(staff) }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
+        assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s first owner holds every platform key: ${JSON.stringify(report).slice(0, 400)}`)
+      }
+    } else {
+      const signUp = await post('sign-up/email', { name: 'Release', email: `release-${stamp}@example.com`, password: 'release-test-password' })
+      assert.equal(signUp.status, 200, `${await signUp.text()}\n${output}`)
+      const cookie = cookieOf(signUp)
+      assert.ok(cookie, 'the sign-up answered with a session cookie')
+      const organization = await post('organization/create', { name: 'Release', slug: `release-${stamp}` }, { cookie })
+      assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
+      if (platform) {
+        // A staff member who belongs to no organization, so the platform session has none active: the access target is
+        // asked with no tenant, and only the project's role reader answers the platform role. Whichever target the
+        // project's add-ons chose, staff hold every key there.
+        const email = `staff-${stamp}@example.com`
+        const joined = await fetch(`${origin}/api/auth/user/sign-up/email`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin },
+          body: JSON.stringify({ name: 'Staff', email, password: 'release-test-password' }),
+          signal: AbortSignal.timeout(10_000),
+        })
+        assert.equal(joined.status, 200, `${await joined.text()}\n${output}`)
+        command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = '${email}'"); await asas.destroy()`], template)
+        const staff = await fetch(`${platformOrigin}/api/auth/user/sign-in/email`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin: platformOrigin },
+          body: JSON.stringify({ email, password: 'release-test-password' }),
+          signal: AbortSignal.timeout(10_000),
+        })
+        assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
+        const staffCookie = staff.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
+        const session = await (await fetch(`${platformOrigin}/api/auth/user/get-session`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { session?: { activeOrganizationId?: string | null } } | null
+        assert.equal(session?.session?.activeOrganizationId ?? null, null, `the staff session has no organization active: ${JSON.stringify(session).slice(0, 400)}`)
+        const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
+        assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s platform staff hold every key: ${JSON.stringify(report).slice(0, 400)}`)
+      }
     }
     // The sample rows of whatever the project holds, written through its own operations as that organization's owner.
     const seeded = spawnSync(process.execPath, ['src/seed.ts'], { cwd: template, encoding: 'utf8', env: { ...process.env, NODE_ENV: 'development' } })
     assert.equal(seeded.status, 0, `${seeded.stdout}\n${seeded.stderr}`)
     assert.match(seeded.stdout, /"totals":\{"tags":6[,}]/, seeded.stdout)
+    if (!many) {
+      // A second organization in a project of one: the next production start refuses, naming the mode.
+      const sql = (statement: string) => command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute(${JSON.stringify(statement)}); await asas.destroy()`], template)
+      sql("insert into organization (id, name, slug, created_at) values ('release-second', 'Second', 'release-second', now())")
+      const restarted = spawnSync(process.execPath, ['--env-file=.env', '--input-type=module', '-e', "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"], { cwd: template, encoding: 'utf8', env: production })
+      assert.notEqual(restarted.status, 0, `${name}: a start over two organizations is refused`)
+      assert.match(restarted.stderr, /organizations: '(one|none)', and the "organization" table holds more than one/, restarted.stderr)
+      sql("delete from organization where id = 'release-second'")
+    }
     command(installed(template, '.bin/mithaq'), ['generate', '--check'], template)
     console.log(`release consumer passed: ${name}`)
   } finally {
