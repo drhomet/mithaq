@@ -408,10 +408,13 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     },
     switchTo: { en: 'Switch to {organization}', ar: 'التبديل إلى {organization}' },
     accountStatus: { en: 'See your account status', ar: 'اطّلع على حالة حسابك' },
-    noOrganization: {
-      en: '{email} belongs to no organization yet. Ask an administrator to invite you.',
-      ar: '{email} لا ينتمي إلى أي مؤسسة بعد. اطلب من أحد المسؤولين أن يدعوك.',
-    },
+    noOrganization: { en: '{email} belongs to no organization yet.', ar: '{email} لا ينتمي إلى أي مؤسسة بعد.' },
+    yourInvitations: { en: 'Your invitations', ar: 'دعواتك' },
+    invitationDecline: { en: 'Decline', ar: 'رفض' },
+    createOrganization: { en: 'Create an organization', ar: 'أنشئ مؤسسة' },
+    createOrganizationSubmit: { en: 'Create', ar: 'إنشاء' },
+    workspaceOf: { en: '{name}\'s workspace', ar: 'مساحة عمل {name}' },
+    askToBeInvited: { en: 'Ask an administrator to invite {email}.', ar: 'اطلب من أحد المسؤولين أن يدعو {email}.' },
   },
   marketing: {
     brand: { en: 'Asas', ar: 'أساس' },
@@ -881,7 +884,7 @@ type Wording = Record<string, Record<string, { en: string; ar: string }>>
 /** With one organization, nobody founds one on signing up: an owner sets the app up once. */
 const one: Wording = {
   auth: {
-    noOrganization: { en: '{email} has no access here yet. Ask an administrator to invite you.', ar: 'لا يملك {email} وصولا هنا بعد. اطلب من أحد المسؤولين أن يدعوك.' },
+    noOrganization: { en: '{email} has no access here yet.', ar: 'لا يملك {email} وصولا هنا بعد.' },
   },
   marketing: {
     howStep1Title: { en: 'Set it up once', ar: 'أعدّه مرة واحدة' },

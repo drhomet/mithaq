@@ -28,9 +28,9 @@ test('each organization mode\'s words replace keys the copy has, in both locales
       }
     }
   }
-  // Read only where many organizations are: the sign-up's organization box, the switcher and its
+  // Read only where many organizations are: founding one, the switcher and its
   // switch, and the platform, whose staff work across organizations whatever the mode.
-  const manyOnly = new Set(['auth.organization', 'auth.organizationFailed', 'auth.switchTo', 'admin.organizations', 'admin.organization', 'admin.noOrganization'])
+  const manyOnly = new Set(['auth.organization', 'auth.organizationFailed', 'auth.createOrganization', 'auth.switchTo', 'admin.organizations', 'admin.organization', 'admin.noOrganization'])
   const none = withWording(scopes, wordingFor({ organizations: 'one', showOrganization: false }))
   const named = Object.entries(none)
     .filter(([scope]) => ['auth', 'dashboard', 'marketing', 'admin', 'error'].includes(scope))

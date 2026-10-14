@@ -1041,6 +1041,35 @@ test('0i. with many organizations a squatted address is its owner\'s: the squatt
   assert.equal((await askedOf(many, '/sign-in/email', { email: 'squatted-many@example.com', password: 'the-owner-chose-this' })).status, 200, 'the owner\'s does')
 })
 
+test('0j. with many organizations a person in none reads the invitations sent to their proved address, declines one, accepts another and opens in it, and founds one of their own', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  const founders = await Promise.all(['Alpha', 'Beta'].map(async (name) => {
+    const headers = await proved({ one: many, mail, email: `founder-${name.toLowerCase()}-0j@example.com` })
+    const made = (await many.api.createOrganization({ body: { name: `${name} 0j`, slug: `${name.toLowerCase()}-0j` }, headers }))!
+    return { headers, id: made.id }
+  }))
+  const person = await proved({ one: many, mail, email: 'unplaced-0j@example.com' })
+  const asked = async (path: string, body?: unknown) => {
+    const answered = await askedOf(many, path, body, { cookie: person.get('cookie')! })
+    return { status: answered.status, body: (await answered.json().catch(() => null)) as unknown }
+  }
+  for (const founder of founders) await many.api.createInvitation({ body: { email: 'unplaced-0j@example.com', role: 'member', organizationId: founder.id }, headers: founder.headers })
+  const listed = await asked('/organization/list-user-invitations')
+  assert.equal(listed.status, 200, JSON.stringify(listed.body))
+  const invitations = listed.body as { id: string; organizationName: string }[]
+  assert.deepEqual(invitations.map((one) => one.organizationName).sort(), ['Alpha 0j', 'Beta 0j'], 'the person reads the invitations sent to their address, each naming its organization')
+  const [declined, accepted] = [invitations.find((one) => one.organizationName === 'Alpha 0j')!, invitations.find((one) => one.organizationName === 'Beta 0j')!]
+  assert.equal((await asked('/organization/reject-invitation', { invitationId: declined.id })).status, 200, 'declines one')
+  assert.equal((await asked('/organization/accept-invitation', { invitationId: accepted.id })).status, 200, 'accepts the other')
+  const session = (await asked('/get-session')).body as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, founders[1]!.id, 'and opens in it')
+  assert.deepEqual(await modeRows(`select status from invitation where id in ('${declined.id}', '${accepted.id}') order by status`), [{ status: 'accepted' }, { status: 'rejected' }])
+  const another = await proved({ one: many, mail, email: 'founding-0j@example.com' })
+  const founded = await askedOf(many, '/organization/create', { name: "Founding's workspace", slug: 'founding-workspace-0j' }, { cookie: another.get('cookie')! })
+  assert.equal(founded.status, 200, 'a person in none founds an organization of their own once their address is proved')
+})
+
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
   const made = (await modeRows(`select id from organization where id <> 'borrowed-organization'`)).map((one) => `'${one.id}'`)
   if (made.length) {

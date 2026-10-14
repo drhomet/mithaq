@@ -19,6 +19,7 @@
     "apps/asas-tanstack/src/screen-form.test.ts",
     "apps/asas-tanstack/src/screen-list.test.ts",
     "apps/asas-tanstack/src/auth.test.ts",
+    "apps/asas-tanstack/src/no-organization.test.ts",
     "apps/asas-tanstack/src/activity.test.ts",
     "templates/asas/src/ui-dashboard/members.test.ts",
     // The server entries check each screen against the app's components map, which they read from its \`.tsx\`

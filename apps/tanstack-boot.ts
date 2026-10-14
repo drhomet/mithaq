@@ -2748,7 +2748,10 @@ test('74. every template role signs in to the first screen it enters, the landin
   // Read as the text it shows: each name put in is its own isolated element.
   const told = async () => (await (await fetch(`${origin}/unauthorized`, { headers: { cookie: unplaced } })).text()).replace(/&#x27;|&#39;/g, "'").replace(/<!-- -->|<\/?(bdi|span)[^>]*>/g, '')
   const said = (key: 'noOrganization' | 'noAccessDescription') => scopes.auth![key]!.en!.replace('{email}', `unplaced-${stamp}@example.com`).replaceAll('{organization}', organizationName)
-  assert.ok((await told()).includes(said('noOrganization')), 'a person in no organization is told to ask for an invitation')
+  assert.ok((await told()).includes(said('noOrganization')), 'a person in no organization is told so')
+  const unplacedPage = await (await fetch(`${origin}/unauthorized`, { headers: { cookie: unplaced } })).text()
+  assert.ok(unplacedPage.includes('data-create-organization') && unplacedPage.includes('id="new-organization"'), 'and, with many organizations, offered to found one')
+  assert.ok((await told()).includes(scopes.auth!.askToBeInvited!.en!.replace('{email}', `unplaced-${stamp}@example.com`)), 'or to ask an administrator to invite their address')
   const me = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string } }).session.activeOrganizationId
   const db = (asas.targets.drizzle as unknown as { db: { execute(query: string): Promise<unknown> } }).db
   await db.execute(`insert into member (id, organization_id, user_id, role, created_at) values ('unplaced-${stamp}', '${me}', '${unplacedId}', 'member', now())`)

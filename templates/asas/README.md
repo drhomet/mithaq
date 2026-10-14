@@ -98,7 +98,7 @@ Each `dev` script first runs `mithaq lock --check`. The template has no `mithaq.
 
 With one organization, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization (you name it there, unless it is never shown) and, with the platform console, is its first `super_admin` too. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
 
-With many organizations, open `http://localhost:5173/auth/sign-up` and sign up with the name of an organization: signing up creates it and makes you its owner. The platform console's first administrator is made on its own `/auth/create-first-user`.
+With many organizations, open `http://localhost:5173/auth/sign-up` and sign up, then open the link the server log shows to choose your password, which proves your address. Signed in and in no organization yet, you are offered your invitations and a box to create an organization: creating it makes you its owner. The platform console's first administrator is made on its own `/auth/create-first-user`.
 
 Either way the owner holds every permission in the organization: through the `administrator` role the roles add-on gives an owner, or through `owner` itself without it.
 
@@ -317,7 +317,7 @@ packages/mithaq/
 
 Better Auth's organization routes let any member read every member. The setup gates them by this project's keys, in the active organization alone: `list-members`, and `get-active-member-role` with a `userId`, need `member.find`; `list-invitations` needs `invitation.create`; `get-full-organization` answers the organization to every member, with its `members` empty (and loaded one at most) without `member.find` and its `invitations` empty without `invitation.create`; `get-invitation` answers the invitee without the inviter's address. Only the `administrator` role (and, without the roles add-on, `owner` and `admin`) holds `member.find`, and the Members page is served on it.
 
-`organizationLimitsFor` in the same file sets the provider's limits rather than leaving its defaults: with many organizations a person founds organizations (sign-up founds each person's own) only while they belong to fewer than five, and with one nobody founds one over HTTP; an organization holds up to 10,000 members (without end with one) and 1,000 pending invitations, and the Members page reads every member a page at a time. A new session opens in the person's oldest membership (the first by id among ties), and leaving the active organization opens the next oldest.
+`organizationLimitsFor` in the same file sets the provider's limits rather than leaving its defaults: with many organizations a person founds organizations only while they belong to fewer than five, and with one nobody founds one over HTTP; an organization holds up to 10,000 members (without end with one) and 1,000 pending invitations, and the Members page reads every member a page at a time. A new session opens in the person's oldest membership (the first by id among ties), and leaving the active organization opens the next oldest.
 
 **Access and roles.**
 
@@ -412,6 +412,7 @@ apps/asas-tanstack/
     components/ui/       the shadcn primitives the pieces draw with
     lib/  hooks/         shadcn's utils and hooks
     router.tsx  start.ts  server.ts  styles.css  theme.ts  redirect.ts  quiet-abort.ts
+    no-organization.tsx  what /unauthorized offers someone in no organization
     routeTree.gen.ts     written by TanStack Router
 ```
 
@@ -443,7 +444,7 @@ How the project holds its people is six values in `packages/mithaq/src/mithaq/au
 
 | Value | What it says |
 | --- | --- |
-| `organizations` | `'one'`: one organization, made on `/auth/first-run`. `'many'`: each sign-up founds its own. The tenant target reads it too: in one, a start over more than one organization is refused. |
+| `organizations` | `'one'`: one organization, made on `/auth/first-run`. `'many'`: anyone who signed up and proved their address founds their own, or joins one by invitation. The tenant target reads it too: in one, a start over more than one organization is refused. |
 | `showOrganization` | With one, whether a page names the organization. `false`: first-run asks no name, the Members page is Users, the sidebar shows the app's name and no page names an organization. `'many'` takes `true`. |
 | `signUp` | With one, who makes an account: `'invite'`, only someone holding an invitation, or `'open'`, anyone. `'many'` takes `'open'` alone. |
 | `joinRole` | The role an open joiner is given, from `roles/tenant-roles.ts`, or `null`: they join with none, read nothing, and an administrator gives them a role on the Members page. That is how a project approves each joiner. A role that holds every key is refused. Without the roles add-on it is `null`. |
@@ -458,12 +459,14 @@ A combination that means nothing or opens a door refuses to load, naming the lin
 
 **Open.** With `verifyEmail`, and always with many organizations, the sign-up answers with no session and mails a link to choose the account's password, and it answers a new address, one nobody proved and one proved the same. Choosing the password proves the address, ends every session and, with one organization, joins the person to it as `joinRole`; a password reset proves it the same way. The password typed at sign-up never signs in, so whoever signs up first with another's address gains nothing: the link goes to the address, and its owner's own sign-up is answered alike and, once the first link is five minutes old, mails another. A sign-in before the proof is refused and mails nothing, so nobody pushes links at an address on demand. Without `verifyEmail`, the account joins at once. An account joins once in its life, recorded as a `joined-open:<user id>` row in the `verification` table that never expires: never purge those rows, or a removed member who resets their password joins again. One address is mailed at most one link in five minutes: a second sign-up or reset within five minutes mails nothing, since the first link still works, and a reset ends every other link to the account. Mail goes out after the answer, so how long a sign-up or a reset takes says nothing about whether an address has an account. The join reads the settings when it happens, never joins someone who was ever invited (their invitation is how they join), and never joins a member who was removed: removing someone keeps them out.
 
+**In no organization.** Someone signed in who belongs to no organization (a new account with many organizations, or a member removed from their last) is shown, under the sentence saying so, the invitations sent to their address once it is proved, each to accept or decline; with many organizations a box to create one, named "{name}'s workspace" until they change it, which `organizationLimit` still caps; and the address an administrator would invite. The app draws this from `src/no-organization.tsx`, which the screen host's `/unauthorized` imports.
+
 In one organization, nobody founds another organization or leaves the one over HTTP. Each sign-up, join, first-run and role the setup gives writes one JSON line to the server log (`"audit":"auth"`), beside the platform's own; keep that output.
 
 **Changing the mode.**
 
 - `showOrganization`: change the value and run `bunx mithaq generate screens`, which renames the Members page. No row moves.
-- `'one'` to `'many'`: set `organizations = 'many'`, `showOrganization = true`, `signUp = 'open'`, `joinRole = null`, `verifyEmail = true` and `allowedDomains = []`. Organization creation and the sign-up's organization box come back, and the switcher appears once someone belongs to two. Review every kayan without `organization`, which every organization will share.
+- `'one'` to `'many'`: set `organizations = 'many'`, `showOrganization = true`, `signUp = 'open'`, `joinRole = null`, `verifyEmail = true` and `allowedDomains = []`. Organization creation comes back on the page of someone in no organization, and the switcher appears once someone belongs to two. Review every kayan without `organization`, which every organization will share.
 - `'many'` to `'one'`: a start is refused while more than one organization exists. Merging them is a migration of your own: point every per-organization row at one organization, resolve what each held once (a `within` unique value, the settings row, roles of the same name) and keep one owner.
 - `'open'` to `'invite'`: every account and membership stays, and nobody joins without an invitation from then on. `'invite'` to `'open'`: accounts that exist with no membership are not joined; new ones are.
 
