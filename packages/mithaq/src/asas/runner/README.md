@@ -28,7 +28,9 @@ words kayan, rukn, asas, target or operation are new.
 
    `relationTo` names the kayan an organization is. `onDelete: 'restrict'` is
    the only value it takes: an organization that still holds a row is not
-   deleted. `organizations` is required; see [Organization modes](#organization-modes).
+   deleted. `organizations` is required; see [Organization modes](#organization-modes). It is
+   new: a language that lays down `betterAuthTenant` without it is refused, so a project made
+   before it adds `organizations: 'many'`, the behaviour it had.
    `platform` is optional; see [The platform app](#the-platform-app).
 
 2. **Export the field.** The language returns the target as `targets: {
