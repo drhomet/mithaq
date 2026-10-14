@@ -20,12 +20,25 @@ const enrollment = [{ section: 'enrollment', label: { en: 'Enrollment', ar: 'Ø§Ù
  * no seat. Every read answers from it, a session's join of its enrollments
  * included.
  */
-const ownSeats = ({ user }: { user: unknown }) => {
-  if (readsPast(user, 'enrollments.others')) return true
+const ownId = (user: unknown) => {
   const actor = user && typeof user === 'object' ? (user as Record<string, unknown>) : undefined
   const id = actor && Object.hasOwn(actor, 'id') ? actor.id : undefined
-  return typeof id === 'string' && id ? { student: { equals: id } } : false
+  return typeof id === 'string' && id ? id : undefined
 }
+const ownSeats = ({ user }: { user: unknown }) => {
+  if (readsPast(user, 'enrollments.others')) return true
+  const id = ownId(user)
+  return id ? { student: { equals: id } } : false
+}
+
+/**
+ * Whether a write names another person as a seat's student for an actor that
+ * writes its own seats alone. Refused on a create and on an update, so a seat
+ * is never made for, or handed to, someone the actor may not write for.
+ */
+const namesAnother = ({ user, data }: { user: unknown; data?: unknown }) =>
+  !readsPast(user, 'enrollments.others') && !!data && typeof data === 'object' && Object.hasOwn(data, 'student')
+  && (data as { student?: unknown }).student !== ownId(user)
 
 /**
  * Whom a seat's student picker offers: the people holding the student role in
@@ -43,7 +56,12 @@ const students: FilterOptions = async ({ user }) => {
 
 export const enrollments = defineKayan({
   name: 'enrollments',
-  access: { read: ownSeats, update: ownSeats, delete: ownSeats },
+  access: {
+    read: ownSeats,
+    create: (args: { user: unknown; data?: unknown }) => !namesAnother(args),
+    update: (args: { user: unknown; data?: unknown }) => (namesAnother(args) ? false : ownSeats(args)),
+    delete: ownSeats,
+  },
   // What a form says where a second seat of one student in one session is
   // refused, over the shared words for a unique value taken.
   messages: {

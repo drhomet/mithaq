@@ -17929,13 +17929,17 @@ test('222b. a role reads and writes every seat of its organization only while it
   await server.api.addMember({ body: { userId: clerk.id, organizationId: tenant.organization, role: 'member' } })
   await server.api.setActiveOrganization({ body: { organizationId: tenant.organization }, headers: clerk.headers })
   const keys = [
-    'enrollments.find', 'enrollments.count', 'enrollments.findByID', 'enrollments.update', 'enrollments.delete',
-    'enrollments.fields.id', 'enrollments.fields.createdAt', 'enrollments.fields.updatedAt', 'enrollments.fields.organization', 'enrollments.fields.session',
+    'enrollments.find', 'enrollments.count', 'enrollments.findByID', 'enrollments.create', 'enrollments.update', 'enrollments.delete',
+    'enrollments.fields.id', 'enrollments.fields.createdAt', 'enrollments.fields.updatedAt', 'enrollments.fields.organization', 'enrollments.fields.session', 'enrollments.fields.student',
     'sessions.find', 'sessions.findByID', 'sessions.fields.id', 'sessions.fields.organization', 'sessions.fields.course', 'sessions.fields.startsAt', 'sessions.fields.enrollments',
+    // The organization's people, so the reference a seat names is one it reads.
+    'member.find', 'member.fields.id', 'member.fields.userId', 'user.find', 'user.fields.id', 'user.fields.name',
   ]
   const role = await tenant.as('admin', 'roles/create', { name: 'clerk-222b', label: { en: 'Clerk', ar: 'كاتب' }, permissions: keys })
   assert.equal(role.status, 200, JSON.stringify(role.body))
   await assignRole(tenant.organization, clerk.id, 'clerk-222b')
+  // A student too, as every seat's holder is.
+  await assignRole(tenant.organization, clerk.id, 'student')
   const own = await enrollments.operations.create({ session: session.id, student: clerk.id }, tenant.options)
   const theirs = await enrollments.operations.create({ session: session.id, student: tenant.people.student.id }, tenant.options)
   const as = async (path: string, input: unknown) => {
@@ -17957,6 +17961,18 @@ test('222b. a role reads and writes every seat of its organization only while it
   assert.equal((await as('enrollments/delete', { id: theirs.id })).status, 404, 'and so does its delete')
   assert.equal((await enrollments.operations.findByID({ id: theirs.id }, tenant.options))?.id, theirs.id, 'which is still there')
   assert.equal((await as('enrollments/update', { id: own.id, session: session.id })).status, 200, 'its own seat it edits')
+  // Its own seat stays its own, since a seat moved to another person is one it would write without the key.
+  const pupil = await signedUp('others-222b-pupil')
+  await server.api.addMember({ body: { userId: pupil.id, organizationId: tenant.organization, role: 'member' } })
+  await assignRole(tenant.organization, pupil.id, 'student')
+  const moved = await as('enrollments/update', { id: own.id, student: pupil.id })
+  assert.equal(moved.status, 403, `a role without enrollments.others moves no seat to another person: ${JSON.stringify(moved.body)}`)
+  const bulk = await as('enrollments/updateMany', { where: { id: { equals: own.id } }, data: { student: pupil.id } })
+  assert.notEqual((bulk.body as { docs?: unknown[] }).docs?.length, 1, `nor in bulk: ${JSON.stringify(bulk.body)}`)
+  assert.equal((await enrollments.operations.findByID({ id: own.id }, tenant.options))?.student, clerk.id, 'and the seat is still its own')
+  const later = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-06-08T09:00:00Z') }, tenant.options)
+  assert.equal((await as('enrollments/create', { session: later.id, student: pupil.id })).status, 403, 'nor makes one for another person')
+  assert.equal((await as('enrollments/create', { session: later.id, student: clerk.id })).status, 200, 'while it makes its own')
 
   const widened = await tenant.as('admin', 'roles/update', { id: role.body.id, permissions: [...keys, 'enrollments.others'] })
   assert.equal(widened.status, 200, JSON.stringify(widened.body))
