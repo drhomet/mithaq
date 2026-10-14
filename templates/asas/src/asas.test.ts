@@ -12586,6 +12586,26 @@ test('142g. every platform action on a person is audited once it succeeds, and a
   assert.ok(await asPlatform(async () => asas.auth.actor((await onPlatform(support.headers)))), 'support is still signed in to the platform app')
 })
 
+test('142g2. a platform role without a route\'s permission is answered 403 before its input is judged, whatever it sends, and nothing is written', async () => {
+  const person = await signedUp('person-142g2')
+  const support = await signedUp('support-142g2')
+  await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
+  const before = (await db.execute(`select role, banned, ban_reason from "user" where id = '${person.id}'`)).rows
+  for (const [route, body] of [
+    ['ban-user', { userId: person.id, banReason: 'Spam' }],
+    ['ban-user', { userId: person.id }],
+    ['ban-user', { userId: person.id, banReason: '   ' }],
+    ['update-user', { userId: person.id, data: { banned: true } }],
+    ['update-user', { userId: person.id, data: { banned: 'true', banReason: 'Spam' } }],
+    ['create-user', { email: 'made-142g2@example.com', password: 'a-long-enough-password', name: 'Made', data: { banned: true } }],
+    ['set-role', { userId: person.id, role: 'explorer' }],
+  ] as const) {
+    assert.equal((await adminRoute(route, support.headers, body)).status, 403, `${route} with ${JSON.stringify(body)} is refused for the permission first`)
+  }
+  assert.deepEqual((await db.execute(`select role, banned, ban_reason from "user" where id = '${person.id}'`)).rows, before, 'and the person is as they were')
+  assert.equal((await db.execute(`select 1 from "user" where email = 'made-142g2@example.com'`)).rows.length, 0, 'and no one was made')
+})
+
 test('142h. the two apps keep two session cookies, and a one-time link is spent once and never in the platform app', async () => {
   const person = await signedUp('person-142h')
   // Someone both apps sign in, which in the platform app is staff alone.

@@ -464,6 +464,13 @@ const roleOf = (body: { role?: unknown; data?: { role?: unknown } }) => body.rol
 const isOwnerRole = (role: unknown) => typeof role === 'string' && role.split(',').includes('owner')
 /** Whether a `user.role` value names a role `test` admits, read as the plugin reads it, comma-separated. */
 const holdsRole = (role: unknown, test: (one: string) => boolean) => typeof role === 'string' && role.split(',').some((one) => test(one.trim()))
+/** The plugin's own permission for each admin route whose input this hook judges, as its routes ask it. */
+const routePermissions: Record<string, { user: string[] } | undefined> = {
+  '/admin/ban-user': { user: ['ban'] },
+  '/admin/update-user': { user: ['update'] },
+  '/admin/create-user': { user: ['create'] },
+  '/admin/set-role': { user: ['set-role'] },
+}
 /** The key this project asks for each of the provider's role-writing routes. */
 const roleWrites = new Map([
   ['/organization/create-role', 'ac.create'],
@@ -549,6 +556,14 @@ const auditBefore = async (ctx: HookContext) => {
   // A caller with no session is left to the provider's own 401, so the answer never says whether an
   // id names staff.
   if (!acts || !caller) return
+  // The route's own permission, asked as the plugin asks it, before any input is judged: a caller who
+  // may not use the route learns nothing of what it takes.
+  const asks = routePermissions[ctx.path]
+  // The serving instance's own plugin roles, which a project's second instance may hold differently.
+  const roles = (ctx.context.options.plugins?.find((one) => one.id === 'admin') as { options?: { roles?: Record<string, { authorize: (asked: typeof asks) => { success: boolean } } | undefined> } } | undefined)?.options?.roles ?? {}
+  if (asks && !String(caller.user.role ?? 'user').split(',').some((one) => roles[one]?.authorize(asks).success)) {
+    throw new APIError('FORBIDDEN', { message: 'This role may not use this route.' })
+  }
   // A ban needs a reason. The provider writes `data.banned` raw unless it is `=== true`, so a
   // non-boolean such as `'true'` would store a ban with no reason and end no session.
   const writes = ctx.path === '/admin/update-user' || ctx.path === '/admin/create-user'
