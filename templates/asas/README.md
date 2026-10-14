@@ -53,6 +53,8 @@ LOCAL_AUTH_SECRET=<64 random hex characters>
 BETTER_AUTH_SECRET=<64 random hex characters>
 BETTER_AUTH_URL=http://localhost:5173
 PLATFORM_URL=http://localhost:5174
+DEV_ADMIN_EMAIL=admin@example.com
+DEV_ADMIN_PASSWORD=dev-admin-password
 # STORAGE_SECRET=
 # STORAGE_PREFIX=mithaq/asas
 # STORAGE_ADAPTER=local
@@ -70,17 +72,29 @@ docker run -d --name mithaq-dev -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=mit
 
 To use a Postgres you already run, create a database for the project and change `DATABASE_URL` in all three `.env` files.
 
-### 3. Create the schema
-
-In development, `asas.connect()` pushes the schema: it creates or changes the tables to match your kayan, and refuses any change that would lose data. Run it once:
+### 3. Set up the database
 
 ```sh
 cd my-app/packages/asas
-# push the schema once, development only
+bun run dev:setup --seed
+```
+
+`dev:setup` makes a fresh development database usable in one command:
+
+- It pushes the schema: in development, `asas.connect()` creates or changes the tables to match your kayan, and refuses any change that would lose data.
+- It makes the dev admin that `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` in `.env` name, with its address proved: the owner of "Dev admin's workspace" (with one organization through first-run's own path) and, with the platform console, its `super_admin`. The output names the two variables, never their values.
+- With `--seed`, it fills that organization with sample rows (step 5).
+
+It refuses unless `NODE_ENV` is `development` or unset and `DATABASE_URL` is on this machine, since every project's `.env.example` holds the same development password, and it refuses a database that already holds a user, saying how to sign in instead.
+
+Whenever you add or change a kayan, push the schema again:
+
+```sh
+# development only
 bun -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"
 ```
 
-`bun` reads `.env` for you, so `DATABASE_URL` is already set. Run the same line again whenever you add or change a kayan.
+`bun` reads `.env` for you, so `DATABASE_URL` is already set.
 
 A pushed database is for development only. Production applies the migration files in `src/migrations/` instead, and refuses a database that was pushed. [Running in production](#running-in-production) explains how.
 
@@ -94,15 +108,17 @@ bun run --cwd apps/asas-platform dev   # in a second terminal: the platform cons
 
 Each `dev` script first runs `mithaq lock --check`. The template has no `mithaq.lock`, so this prints a notice and carries on.
 
-### 5. Set up and seed
+### 5. Sign in and seed
 
-With one organization, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization (you name it there, unless it is never shown) and, with the platform console, is its first `super_admin` too. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
+Sign in to the tenant app at `http://localhost:5173`, and to the platform console at `http://localhost:5174`, with `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD`.
+
+A deploy has no dev admin, and is set up by hand, as you can here on a database `dev:setup` did not set up. With one organization, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization (you name it there, unless it is never shown) and, with the platform console, is its first `super_admin` too. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
 
 With many organizations, open `http://localhost:5173/auth/sign-up` and sign up, then open the link the server log shows to choose your password, which proves your address. Signed in and in no organization yet, you are offered your invitations and a box to create an organization: creating it makes you its owner. The platform console's first administrator is made on its own `/auth/create-first-user`.
 
 Either way the owner holds every permission in the organization: through the `administrator` role the roles add-on gives an owner, or through `owner` itself without it.
 
-Then fill the organization with sample rows of what the project holds: tags, and with the add-ons courses, sessions, enrollments, roles and settings:
+`--seed` filled the organization with sample rows of what the project holds: tags, and with the add-ons courses, sessions, enrollments, roles and settings. To fill it again, or one you set up by hand:
 
 ```sh
 cd packages/asas
@@ -111,7 +127,7 @@ bun run seed
 
 The seed takes the first user and that user's first organization, or the ones `SEED_EMAIL` and `SEED_ORGANIZATION` name, and writes every row through the asas's own operations, as that owner. Running it twice adds nothing.
 
-The platform console admits platform staff only. Sign in at `http://localhost:5174` as the owner first-run made, or, with many organizations, as the administrator made on its first-administrator page.
+The platform console admits platform staff only: the dev admin, the owner first-run made, or, with many organizations, the administrator made on its first-administrator page.
 
 ### 6. Add your first kayan
 
@@ -805,6 +821,7 @@ In production, set these in the host's environment rather than in a file.
 | `STORAGE_ADAPTER` | `storage/index.ts` | Required. Where new uploads go: `local`, or `r2` once R2 is set. | `local` |
 | `STORAGE_DIR` | `storage/index.ts` | The folder of the `local` adapter. | `.storage`, relative to the process's working directory. |
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | `storage/index.ts` | All four or none. When all four are set, the `r2` adapter exists. If only some are set, start refuses. | Same. |
+| `DEV_ADMIN_EMAIL`, `DEV_ADMIN_PASSWORD` | `dev-setup.ts` | Never read. | The account `bun run dev:setup` makes. `.env.example` holds a development value, which is why `dev:setup` refuses a database not on this machine. |
 | `NODE_ENV` | the apps, the drizzle store, auth, storage | Must be `production`. See below. | Unset or `development`. With no mailer configured, mail is written to the server log only when it is `development` and the tenant URL is `localhost`. |
 | `MITHAQ_COUNT_TIMEOUT_MS` | `mithaq migrate` | The per-query timeout, in milliseconds, for counting rows the rules would refuse. The default is 5000. | Same. |
 

@@ -182,6 +182,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     assert.ok(!created.stderr.includes('The screens are not written'), created.stderr)
     const chosen = /^Created .*?, (?:with (.+)|minimal)\.$/m.exec(created.stdout)?.[1]?.split(', ') ?? []
     assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev   # the tenant app`))
+    assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev:setup${manager === 'npm' ? ' --' : ''} --seed\\n`))
     assert.equal(created.stdout.includes(`from apps/asas-platform: ${manager} run dev`), platform)
     assert.equal(created.stdout.includes('The package is named asas'), single)
     const features = single ? [] : readdirSync(join(consumer, 'packages/features')).map((one) => `packages/features/${one}`)
@@ -431,6 +432,17 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       sql("delete from organization where id = 'release-second'")
     }
     command(installed(template, '.bin/mithaq'), ['generate', '--check'], template)
+    // The database a fresh clone starts from, emptied, set up by the command its next steps name: pushed, the dev admin
+    // `.env` names made and its organization seeded. The dev admin then signs in to each app the project serves.
+    command(process.execPath, ['--input-type=module', '-e', "import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute('drop schema if exists public cascade; create schema public; drop schema if exists drizzle cascade;'); await asas.destroy()"], template)
+    const setUp = spawnSync(manager, ['run', 'dev:setup', ...(manager === 'npm' ? ['--'] : []), '--seed'], { cwd: template, encoding: 'utf8', timeout: 600_000 })
+    assert.equal(setUp.status, 0, `${setUp.stdout}\n${setUp.stderr}`)
+    assert.match(setUp.stdout, /"totals":\{"tags":6[,}]/, setUp.stdout)
+    const devAdmin = Object.fromEntries([...readFileSync(join(template, '.env'), 'utf8').matchAll(/^DEV_ADMIN_(EMAIL|PASSWORD)=(.+)$/gm)].map(([, key, value]) => [key!.toLowerCase(), value]))
+    for (const at of [origin, ...(platform ? [platformOrigin] : [])]) {
+      const signedIn = await post('sign-in/email', devAdmin, {}, at)
+      assert.equal(signedIn.status, 200, `the dev admin signs in on ${at}: ${await signedIn.text()}\n${output}`)
+    }
     console.log(`release consumer passed: ${name}`)
   } finally {
     for (const server of servers) {
