@@ -271,3 +271,16 @@ test('in one organization or none, nobody founds an organization over the provid
     assert.equal(made, founds || 'YOU_ARE_NOT_ALLOWED_TO_CREATE_A_NEW_ORGANIZATION', `${settings.organizations}: an organization is ${founds ? '' : 'not '}founded`)
   }
 })
+
+test('with no organization shown, an invitation invites to the app and never names the organization', async () => {
+  const sent: { subject: string; text: string }[] = []
+  const settings = { ...authSettings, organizations: 'none' as const, signUp: 'invite' as const, mailer: { send: async (mail: (typeof sent)[number]) => void sent.push(mail) } }
+  const server = betterAuthServer({ ...authOptions({}, settings).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+  const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
+  await server.api.createOrganization({ body: { name: 'Main', slug: 'main', userId: user.id } })
+  const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+  assert.equal(sent.length, 1)
+  assert.doesNotMatch(`${sent[0]!.subject} ${sent[0]!.text}`, /Main/, 'the organization is not named')
+  assert.match(sent[0]!.text, /this app/)
+})

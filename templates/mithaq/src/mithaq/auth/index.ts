@@ -280,14 +280,17 @@ const letter = ({ to, subject, en, ar, link }: { to: string; subject: string; en
   html: `<p>${escaped(en)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p><div dir="rtl" lang="ar"><p>${escaped(ar)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p></div>`,
 })
 
-const invitationMail = (mailer: Mailer) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) =>
-  mailer.send(letter({
+// With no organization shown, the invitation is to the app, as every page says.
+const invitationMail = ({ mailer, organizations }: { mailer: Mailer; organizations: AuthSettings['organizations'] }) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) => {
+  const [en, ar] = organizations === 'none' ? ['this app', 'هذا التطبيق'] : [organization.name, organization.name]
+  await mailer.send(letter({
     to: email,
-    subject: `You are invited to ${organization.name} · دعوة إلى ${organization.name}`,
-    en: `You are invited to join ${organization.name}. Open the link below with this address to accept; it lasts 48 hours.`,
-    ar: `أنت مدعو للانضمام إلى ${organization.name}. افتح الرابط أدناه بهذا العنوان لقبول الدعوة؛ وهو صالح 48 ساعة.`,
+    subject: `You are invited to ${en} · دعوة إلى ${ar}`,
+    en: `You are invited to join ${en}. Open the link below with this address to accept; it lasts 48 hours.`,
+    ar: `أنت مدعو للانضمام إلى ${ar}. افتح الرابط أدناه بهذا العنوان لقبول الدعوة؛ وهو صالح 48 ساعة.`,
     link: new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href,
   }))
+}
 
 /**
  * The provider's organization limits, each set here so none is a silent default of the provider's:
@@ -330,7 +333,7 @@ const organizationOptionsFor = ({ mailer, organizations }: AuthSettings) => ({
   // `requireEmailVerificationOnInvitation` stays unset rather than `false`, so the provider asks
   // for a verified address only if invitation ids become guessable. The template sends no mail that
   // would verify an address, so asking for one would leave every invitation unanswerable.
-  ...(mailer ? { sendInvitationEmail: invitationMail(mailer) } : {}),
+  ...(mailer ? { sendInvitationEmail: invitationMail({ mailer, organizations }) } : {}),
   organizationHooks: {
     beforeUpdateOrganization: gate('organization.update'),
     beforeRemoveMember: gate('member.delete'),
