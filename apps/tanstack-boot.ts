@@ -1012,7 +1012,9 @@ const walkScreen = async (name: 'dashboard' | 'portal') => {
   }
   // A layout's `when` is its condition, not a region.
   const regionsOf = (frame: Record<string, unknown>) => Object.entries(frame).filter(([key]) => !['shell', 'layout', 'when'].includes(key)).map(([, nodes]) => nodes as unknown[])
-  const enrollment = await post('/api/enrollments/create', { session: screenSession }, { cookie })
+  // A student holds one seat in a session, so the second screen's walk reads the seat the first one made.
+  const seated = ((await post('/api/enrollments/find', { where: { session: { equals: screenSession } }, limit: 1 }, { cookie })).body.docs as { id: string }[])[0]
+  const enrollment = seated ? { response: { status: 200 }, body: seated } : await post('/api/enrollments/create', { session: screenSession }, { cookie })
   assert.equal(enrollment.response.status, 200, JSON.stringify(enrollment.body))
   const ids: Record<string, string> = { courses: screenCourse, sessions: screenSession, tags: screenTag, enrollments: String(enrollment.body.id) }
   for (const kayan of ['roles', 'memberRoles']) {
@@ -1905,7 +1907,9 @@ test('59. an enrollment served over HTTP names the tenant\'s own member as its s
   const crossed = await post('/api/enrollments/create', { session: screenSession, student: stranger.id }, { cookie })
   assert.equal(crossed.response.status, 400, `another tenant's user is refused as the student: ${JSON.stringify(crossed.body)}`)
   assert.equal((crossed.body.data as { key?: string }).key, 'error.invalid.reference', 'under the reference key')
-  const own = await post('/api/enrollments/create', { session: screenSession, student: me.user.id }, { cookie })
+  // A session of its own, since the actor already holds its one seat in the screen's session.
+  const session = (await post('/api/sessions/create', { course: screenCourse, startsAt: new Date(Date.now() + 86_400_000).toISOString() }, { cookie })).body as { id: string }
+  const own = await post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie })
   assert.equal(own.response.status, 200, `the tenant's own member is admitted: ${JSON.stringify(own.body)}`)
 })
 
@@ -2494,7 +2498,7 @@ test('72. the portal holds what its viewer may do: its home counts each list, th
   assert.equal(figure(home, 'courses'), String(listed.body.totalDocs), 'the home counts the courses on offer this viewer may read, as the list reads them')
   const searched = `?search=${encodeURIComponent(shelved)}`
   assert.ok(!(await screenHtml(`/portal/courses${searched}`)).includes(`data-row="${shelf}"`), 'the portal does not list the archived course')
-  assert.ok((await screenHtml(`/dashboard/courses${searched}`)).includes(`data-row="${shelf}"`), 'and the dashboard still does')
+  assert.ok((await screenHtml(`/dashboard/courses${searched}&tab=archived`)).includes(`data-row="${shelf}"`), 'and the dashboard still does, under its Archived tab')
   assert.equal(figure(home, 'enrollments'), String((await post('/api/enrollments/count', {}, { cookie })).body.totalDocs), 'and the enrollments')
   const arabic = await (await fetch(`${origin}/portal`, { headers: { cookie: `${cookie}; locale=ar` } })).text()
   assert.match(arabic, new RegExp(`<h1[^>]*>مرحبا، ${actorName}</h1>`), 'the Arabic greeting takes the Arabic comma')
@@ -2675,9 +2679,12 @@ test('74. every template role signs in to the first screen it enters, the landin
   // A seat of the actor's own and one of another member's, so the student's list has a row to draw and one to leave out.
   const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { addMember(args: unknown): Promise<unknown> } } }).server
   const classmate = await signedUpHere('classmate')
-  const organization = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string } }).session.activeOrganizationId
+  const current = (await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string }; user: { id: string } }
+  const organization = current.session.activeOrganizationId
   await server.api.addMember({ body: { userId: classmate.id, organizationId: organization, role: 'member' } })
-  const ownSeat = (await post('/api/enrollments/create', { session: screenSession }, { cookie })).body as { id: string }
+  // The actor's own seat, which the screen walk made already: a student holds one seat in a session.
+  const held = ((await post('/api/enrollments/find', { where: { and: [{ session: { equals: screenSession } }, { student: { equals: current.user.id } }] }, limit: 1 }, { cookie })).body.docs as { id: string }[])[0]
+  const ownSeat = held ?? (await post('/api/enrollments/create', { session: screenSession }, { cookie })).body as { id: string }
   const classmateSeat = (await post('/api/enrollments/create', { session: screenSession, student: classmate.id }, { cookie })).body as { id: string }
   assert.equal(typeof ownSeat.id, 'string', JSON.stringify(ownSeat))
   assert.equal(typeof classmateSeat.id, 'string', JSON.stringify(classmateSeat))

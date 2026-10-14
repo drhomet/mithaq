@@ -96,7 +96,8 @@ export const sessions = defineKayan({
                 columns: ['student', 'createdAt'],
               }, when: { '$user.collections.enrollments.operations.find': { equals: true } } }] },
             ] }],
-            side: [course, { section: 'state', label: { en: 'State', ar: 'الحالة' }, fields: [{ field: 'archived', readOnly: true }, { field: 'archiveReason', readOnly: true }] }, activity],
+            // Whether it is archived and why, read only: a session is archived through its own operations.
+            side: [{ ...course, fields: [...course.fields, { field: 'archived', readOnly: true }, { field: 'archiveReason', readOnly: true }] }, activity],
             // Archived and brought back as a course is, each with its reason, before the delete.
             danger: danger({
               button: 'archive',
