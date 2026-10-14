@@ -894,6 +894,10 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'ما زال هذا العضو يشغل دورا في هذه المؤسسة. اسحب منه كل دور أولا، ثم أزله.',
     },
     'conflict.referencedBy': { en: '{kind} still use this, so it is not deleted.', ar: 'ما زالت {kind} تستخدم هذا، لذا لا يُحذف.' },
+    'conflict.sole_owner': {
+      en: 'This person is the only owner of an organization, so they are not deleted. Make another member its owner first.',
+      ar: 'هذا الشخص هو المالك الوحيد لمؤسسة، لذا لا يُحذف. اجعل عضوا آخر مالكا لها أولا.',
+    },
   },
 }
 
@@ -965,6 +969,7 @@ const unnamed: Wording = {
     'invalid.role': { en: 'That role is not one of this app\'s.', ar: 'هذا الدور ليس من أدوار هذا التطبيق.' },
     'conflict.role_assigned': { en: 'An assignment still names that role, so no role takes the name until it is removed.', ar: 'ما زال إسناد يسمي هذا الدور، لذا لا يأخذ أي دور هذا الاسم حتى يُزال.' },
     'conflict.member_holds_roles': { en: 'This user still holds a role. Take each role from them first, then remove them.', ar: 'ما زال هذا المستخدم يشغل دورا. اسحب منه كل دور أولا، ثم أزله.' },
+    'conflict.sole_owner': { en: 'This person is the app\'s only owner, so they are not deleted. Make another user an owner first.', ar: 'هذا الشخص هو المالك الوحيد للتطبيق، لذا لا يُحذف. اجعل مستخدما آخر مالكا أولا.' },
   },
 }
 

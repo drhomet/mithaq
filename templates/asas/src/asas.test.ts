@@ -17626,6 +17626,24 @@ test('227e. a person who holds a seat, a withdrawn one included, is not removed 
   assert.equal((await adminRoute('remove-user', platform.headers, { userId: removable.id })).status, 200, 'a person holding no seat is removed')
 })
 
+test('227h. the only owner of an organization is not removed on the platform, nor by a delete of their own: the organization would be left with nobody who governs it; with a second owner they are', async () => {
+  const owner = await signedUp('sole-owner-227h')
+  const made = (await server.api.createOrganization({ body: { name: 'Sole 227h', slug: 'sole-227h' }, headers: owner.headers }))!
+  const platform = await signedUp('platform-227h')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const refused = await adminRoute('remove-user', platform.headers, { userId: owner.id })
+  assert.equal(refused.status, 409, await refused.clone().text())
+  assert.equal(((await refused.json()) as { code?: string }).code, 'error.conflict.sole_owner')
+  assert.equal((await db.execute(`select id from "user" where id = '${owner.id}'`)).rows.length, 1, 'the owner is still there')
+  const own = await asas.handler(new Request('http://test/api/auth/user/delete-user', { method: 'POST', headers: { cookie: owner.headers.get('cookie')!, 'content-type': 'application/json', origin: 'http://localhost:5173' }, body: '{}' }))
+  assert.equal(((await own.json()) as { code?: string }).code, 'error.conflict.sole_owner', 'and their own delete, were it enabled, is refused the same')
+  const second = await signedUp('second-owner-227h')
+  await server.api.addMember({ body: { userId: second.id, organizationId: made.id, role: 'owner' } })
+  // Their roles go first, as the Members page takes them before a removal.
+  await db.execute(`delete from member_roles where user_id = '${owner.id}'`)
+  assert.equal((await adminRoute('remove-user', platform.headers, { userId: owner.id })).status, 200, 'with another owner, they are removed')
+})
+
 test('222a. a student reads its own enrollments alone, in its own tenant, over HTTP: find, count and findByID leave out another student\'s seat and another tenant\'s, writes are refused, and the instructor still reads every seat', async () => {
   const tenant = await roleTenant('own-222a')
   const course = await courses.operations.create({ title: 'Own 222a' }, tenant.options)

@@ -441,6 +441,8 @@ type Caller = { user: { id: string; role?: unknown }; session: Record<string, un
 const callers = new WeakMap<object, Caller>()
 /** The role a call writes, on `set-role` and `create-user` as `role` and on `update-user` and `create-user` as `data.role`. */
 const roleOf = (body: { role?: unknown; data?: { role?: unknown } }) => body.role ?? body.data?.role
+/** Whether a provider `member.role` names the owner, matched exactly as the provider matches it. */
+const isOwnerRole = (role: unknown) => typeof role === 'string' && role.split(',').includes('owner')
 /** Whether a `user.role` value names a role `test` admits, read as the plugin reads it, comma-separated. */
 const holdsRole = (role: unknown, test: (one: string) => boolean) => typeof role === 'string' && role.split(',').some((one) => test(one.trim()))
 /** The key this project asks for each of the provider's role-writing routes. */
@@ -1184,6 +1186,31 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) })
     await confirmMail(settings.mailer)({ email: user.email, token })
   }
+  // The only owner of an organization is not deleted, by staff or by themselves: the provider would
+  // take their member row with them and leave an organization nobody governs. Asked before the route,
+  // which deletes sessions and accounts before the person, so nothing goes. Another owner first.
+  const soleOwner = async (user: string) => {
+    const owned = (await store.find({ kayan: 'member', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { userId: { equals: user }, role: { contains: 'owner' } } } })).docs.filter((one) => isOwnerRole(one.role))
+    for (const one of owned) {
+      const owners = (await store.find({ kayan: 'member', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organizationId: { equals: String(one.organizationId) }, role: { contains: 'owner' } } } })).docs.filter((other) => isOwnerRole(other.role))
+      if (owners.length < 2) return true
+    }
+    return false
+  }
+  const keepsOwner = {
+    id: 'keeps-owner',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ['/admin/remove-user', '/delete-user', '/delete-user/callback'].includes(ctx.path ?? ''),
+      handler: createAuthMiddleware(async (ctx) => {
+        const caller = await getSessionFromCtx(ctx).catch(() => null)
+        if (!caller) return
+        // The id read the way the route reads it, after its own `z.coerce.string()`.
+        const raw = ctx.path === '/admin/remove-user' ? (ctx.body as { userId?: unknown } | undefined)?.userId : caller.user.id
+        if (raw === undefined || raw === null || !(await soleOwner(String(raw)))) return
+        throw new APIError('CONFLICT', { code: 'error.conflict.sole_owner', message: 'This person is the only owner of an organization, so they are not deleted. Make another member its owner first.' })
+      }),
+    }] },
+  }
   // add-on: roles
   // Whether the caller may hand over `role` in `organization`, measured as `assignableRole` measures
   // an assignment: a root granter any role, anyone else one whose every key they hold.
@@ -1286,6 +1313,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       // add-on: roles
       keepsRoles,
       // end add-on: roles
+      keepsOwner,
       ...(oneOrganization ? [firstRun, signUpGate, addPerson] : []),
     ],
     // In one organization, nobody founds another or leaves the one: leaving would leave the
@@ -1398,6 +1426,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     ...built,
     plugins: [
       ...built.plugins,
+      keepsOwner,
       // add-on: courses
       seated,
       // end add-on: courses

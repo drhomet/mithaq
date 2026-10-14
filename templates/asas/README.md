@@ -465,6 +465,8 @@ A combination that means nothing or opens a door refuses to load, naming the lin
 
 **In no organization.** Someone signed in who belongs to no organization (a new account with many organizations, or a member removed from their last) is shown, under the sentence saying so, the invitations sent to their address once it is proved, each to accept or decline; with many organizations a box to create one, named "{name}'s workspace" until they change it, which `organizationLimit` still caps; and the address an administrator would invite. The app draws this from `src/no-organization.tsx`, which the screen host's `/unauthorized` imports.
 
+The only owner of an organization is never deleted, by the platform's remove-user or by a delete of their own should one be turned on: the organization would be left with nobody who governs it. Make another member an owner first.
+
 In one organization, nobody founds another organization or leaves the one over HTTP. Each sign-up, join, first-run and role the setup gives writes one JSON line to the server log (`"audit":"auth"`), beside the platform's own; keep that output.
 
 **Changing the mode.**
