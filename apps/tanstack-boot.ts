@@ -1567,8 +1567,8 @@ test('52. a when decides what each screen draws: the access code follows the del
   await holding('registrar', async () => {
     // What a page draws is no permission: the operation behind a button no
     // page draws is still the server's to refuse.
-    const refused = await post('/api/courses/archive', { id, reason: 'Again' }, { cookie })
-    assert.equal(refused.response.status, 403, `the server refuses the registrar the archive: ${JSON.stringify(refused.body)}`)
+    const refused = await post('/api/courses/unpublish', { id, _status: 'draft' }, { cookie })
+    assert.equal(refused.response.status, 403, `the server refuses the registrar the unpublish: ${JSON.stringify(refused.body)}`)
   })
 })
 
