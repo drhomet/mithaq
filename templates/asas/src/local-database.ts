@@ -1,13 +1,22 @@
+import { parse } from 'pg-connection-string'
+
 /**
  * The database `url` names, as `host:port/name`, and whether it is on this machine, for the scripts that write to a
- * development database. pg takes a `?host=` and a `?port=` over the URL's own, the last one when repeated, and a path
- * there is a socket on this machine.
+ * development database; nothing when pg cannot read it. Read by pg's own parser, so the guard and the connection never
+ * disagree on the host, and a host left out is pg's default. Nothing of the URL is repeated on a failure, since it
+ * holds the password.
  */
 export const databaseOf = (url: string) => {
-  const { hostname, port, pathname, searchParams } = new URL(url)
-  const host = searchParams.getAll('host').at(-1) || hostname
+  let config: ReturnType<typeof parse>
+  try {
+    config = parse(url)
+  } catch {
+    return undefined
+  }
+  const host = config.host || process.env.PGHOST || 'localhost'
   return {
-    database: `${host}:${searchParams.getAll('port').at(-1) || port || '5432'}/${decodeURIComponent(pathname.slice(1))}`,
+    database: `${host}:${config.port || process.env.PGPORT || '5432'}/${config.database ?? ''}`,
+    // A path is a socket on this machine.
     local: host.startsWith('/') || ['localhost', '127.0.0.1', '::1', '[::1]'].includes(host),
   }
 }

@@ -35,7 +35,9 @@ const { SEED_EMAIL, SEED_ORGANIZATION } = process.env
 // Without a name the seed picks whoever signed up first, which on a shared
 // database is someone's real organization. So it fills only this machine's
 // database by itself, and another only when told whose and told twice.
-const { database, local } = databaseOf(process.env.DATABASE_URL)
+const at = databaseOf(process.env.DATABASE_URL)
+if (!at) refuse('DATABASE_URL is not a connection string pg reads.')
+const { database, local } = at
 if (!local) {
   if (!SEED_EMAIL) refuse(`DATABASE_URL names ${database}, which is not this machine. Name the owner whose organization to fill there with SEED_EMAIL, and set SEED_ALLOW_REMOTE=1.`)
   if (process.env.SEED_ALLOW_REMOTE !== '1') {

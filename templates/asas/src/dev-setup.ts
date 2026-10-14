@@ -11,6 +11,7 @@
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core'
 import { organizations as mode } from '@asas/mithaq/auth/organizations'
 import { databaseOf } from './local-database.ts'
 
@@ -25,7 +26,9 @@ if (!process.env.DATABASE_URL) refuse('set DATABASE_URL to the development datab
 if (process.env.NODE_ENV && process.env.NODE_ENV !== 'development') refuse(`NODE_ENV is ${process.env.NODE_ENV}, and it sets up a development database only.`)
 // The account it makes signs in with a password every project's .env.example
 // holds, so it is made on this machine's database alone.
-const { database, local } = databaseOf(process.env.DATABASE_URL)
+const at = databaseOf(process.env.DATABASE_URL)
+if (!at) refuse('DATABASE_URL is not a connection string pg reads.')
+const { database, local } = at
 if (!local) refuse(`DATABASE_URL names ${database}, which is not this machine.`)
 const { DEV_ADMIN_EMAIL: email, DEV_ADMIN_PASSWORD: password } = process.env
 if (!email || !password) refuse('set DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD in .env, as .env.example does.')
@@ -34,24 +37,35 @@ if (!email || !password) refuse('set DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD in .
 Object.assign(process.env, { NODE_ENV: 'development' })
 
 const { asas } = await import('./asas.ts')
-const { platformApp, platformURL, tenantURL } = await import('@asas/mithaq/auth')
+const { isLocalHost, platformApp, platformURL, tenantURL } = await import('@asas/mithaq/auth')
+// A deploy run with plain `node` sets no NODE_ENV and may hold its database on this machine; its address is what
+// tells it apart, as the auth setup reads it, so an app served elsewhere gets no dev admin.
+for (const [variable, url] of [['BETTER_AUTH_URL', tenantURL], ...(platformApp ? [['PLATFORM_URL', platformURL]] : [])] as const) {
+  if (!isLocalHost(url)) refuse(`${variable} names ${url}, which is not this machine.`)
+}
 const signIn = `Sign in at ${tenantURL}${platformApp ? ` or ${platformURL}` : ''}`
 type Row = Record<string, unknown> & { id: string }
-const client = (asas.targets.drizzle as unknown as { db: { $client: { query(text: string): Promise<{ rows: { held: boolean }[] }> } } }).db.$client
+const { db, tables } = asas.targets.drizzle as unknown as { db: { $client: { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> } }; tables: Record<'user' | 'organization', PgTable> }
+const client = db.$client
+/** A table of the build's own, as SQL names it. */
+const named = (table: PgTable) => {
+  const { schema = 'public', name } = getTableConfig(table)
+  return [schema, name].map((part) => `"${part.replaceAll('"', '""')}"`).join('.')
+}
 // The provider's own routes and adapter: the generated auth kayan answer no
 // operation to anyone.
 const server = (asas.auth.strategies.find((strategy) => strategy.name === 'user') as unknown as {
   server: {
     $context: Promise<{
-      password: { hash(password: string): Promise<string> }
+      password: { hash(password: string): Promise<string>; config: { minPasswordLength: number; maxPasswordLength: number } }
       internalAdapter: {
         createUser(user: Record<string, unknown>): Promise<Row>
         linkAccount(account: { userId: string; providerId: string; accountId: string; password: string }): Promise<unknown>
       }
     }>
     api: {
-      firstRun(input: { body: Record<string, string> }): Promise<unknown>
-      createOrganization(input: { body: { name: string; slug: string; userId: string } }): Promise<unknown>
+      firstRun(input: { body: Record<string, string> }): Promise<{ organization: { id: string } }>
+      createOrganization(input: { body: { name: string; slug: string; userId: string } }): Promise<{ id: string }>
     }
   }
 }).server
@@ -59,30 +73,40 @@ const name = 'Dev admin'
 const workspace = `${name}'s workspace`
 try {
   // Asked before the push, so a database someone already uses is never changed by it.
-  const [table] = (await client.query(`select to_regclass('public."user"') is not null as held`)).rows
-  if (table!.held && (await client.query('select exists (select 1 from "user") as held')).rows[0]!.held) {
+  const users = named(tables.user)
+  const [table] = (await client.query('select to_regclass($1) is not null as held', [users])).rows
+  if (table!.held && (await client.query(`select exists (select 1 from ${users}) as held`)).rows[0]!.held) {
     refuse(`the database already holds a user. ${signIn} as DEV_ADMIN_EMAIL with DEV_ADMIN_PASSWORD from .env, or as the account you made.`)
   }
-  await asas.connect()
   const auth = await server.$context
+  // First-run asks the same of its owner; the path with many makes the account itself, so it asks here.
+  const { minPasswordLength: min, maxPasswordLength: max } = auth.password.config
+  if (password.length < min || password.length > max) refuse(`DEV_ADMIN_PASSWORD holds ${min} to ${max} characters.`)
+  await asas.connect()
+  let organization: string
   if (mode === 'one') {
     // First-run's own path: the owner, the one organization and, with the platform console, its super_admin.
-    await server.api.firstRun({ body: { name, email, password, organization: workspace } })
+    organization = (await server.api.firstRun({ body: { name, email, password, organization: workspace } })).organization.id
   } else {
     // With many, an account proves its address by a mailed link and then founds its organization; the dev admin is
     // made proved, as first-run makes its owner, and its workspace made for it, as the page of someone in none would.
     const user = await auth.internalAdapter.createUser({ name, email, emailVerified: true, ...(platformApp && { role: 'super_admin' }) })
     await auth.internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password: await auth.password.hash(password) })
-    await server.api.createOrganization({ body: { name: workspace, slug: 'dev-admin-workspace', userId: user.id } })
+    organization = (await server.api.createOrganization({ body: { name: workspace, slug: 'dev-admin-workspace', userId: user.id } })).id
   }
-  console.log(`Made the dev admin, owner of "${workspace}"${platformApp ? ' and platform super_admin' : ''}. ${signIn} with DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD from .env.`)
+  // Read back, since first-run names the organization Main where none is shown.
+  const [made] = (await client.query(`select name from ${named(tables.organization)} where id = $1`, [organization])).rows
+  console.log(`Made the dev admin, owner of "${String(made!.name)}"${platformApp ? ' and platform super_admin' : ''}. ${signIn} with DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD from .env.`)
 } finally {
   await asas.destroy()
 }
 
 if (values.seed) {
-  // The seed reports whose organization it fills by address, which stays in .env.
-  const seeded = spawnSync(process.execPath, [fileURLToPath(new URL('./seed.ts', import.meta.url))], { env: { ...process.env, SEED_EMAIL: email }, stdio: ['inherit', 'pipe', 'inherit'], encoding: 'utf8' })
-  process.stdout.write(seeded.stdout.replaceAll(email, 'DEV_ADMIN_EMAIL'))
+  // The seed names whose organization it fills by address, which stays in .env, in any case: the provider stores it
+  // lowercased.
+  const seeded = spawnSync(process.execPath, [fileURLToPath(new URL('./seed.ts', import.meta.url))], { env: { ...process.env, SEED_EMAIL: email }, stdio: ['inherit', 'pipe', 'pipe'], encoding: 'utf8' })
+  const address = new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+  process.stdout.write(seeded.stdout.replace(address, 'DEV_ADMIN_EMAIL'))
+  process.stderr.write(seeded.stderr.replace(address, 'DEV_ADMIN_EMAIL'))
   process.exitCode = seeded.status ?? 1
 }

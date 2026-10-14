@@ -85,7 +85,7 @@ bun run dev:setup --seed
 - It makes the dev admin that `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` in `.env` name, with its address proved: the owner of "Dev admin's workspace" (with one organization through first-run's own path) and, with the platform console, its `super_admin`. The output names the two variables, never their values.
 - With `--seed`, it fills that organization with sample rows (step 5).
 
-It refuses unless `NODE_ENV` is `development` or unset and `DATABASE_URL` is on this machine, since every project's `.env.example` holds the same development password, and it refuses a database that already holds a user, saying how to sign in instead.
+It refuses unless `NODE_ENV` is `development` or unset and `DATABASE_URL`, `BETTER_AUTH_URL` and, with the platform console, `PLATFORM_URL` are on this machine, since every project's `.env.example` holds the same development password and a deploy run with plain `node` sets no `NODE_ENV`. It refuses a database that already holds a user, saying how to sign in instead, and a `DEV_ADMIN_PASSWORD` of a length sign-up would refuse.
 
 Whenever you add or change a kayan, push the schema again:
 
