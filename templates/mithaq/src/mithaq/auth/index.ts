@@ -334,8 +334,11 @@ const invitationMail = ({ mailer, organizations, showOrganization }: { mailer: M
  * organizations, and its name goes into the plain text of every mail that names it, where a line
  * break would be the founder's own line.
  */
+// Control characters (NEL among them), the line and paragraph separators, and the direction
+// overrides and isolates, which would make a name read as other words than it holds.
+export const oneLine = /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]+/gu
 const organizationName = (name: unknown) => {
-  const line = typeof name === 'string' ? name.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/ {2,}/g, ' ').trim() : ''
+  const line = typeof name === 'string' ? name.replace(oneLine, ' ').replace(/ {2,}/g, ' ').trim() : ''
   if (!line || line.length > 100) throw new APIError('BAD_REQUEST', { code: 'ORGANIZATION_NAME', message: 'An organization has a name of 1 to 100 characters on one line.' })
   return line
 }
@@ -1226,31 +1229,49 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     await confirmMail(settings.mailer)({ email: user.email, token, ...(joining !== undefined && { joining }) })
   }
   // Every invitation an organization mails, new or sent again, and every person it adds, is one
-  // `mailed:<organization>` row, counted against `invitationLimits` before it goes, so every process
-  // of the deploy keeps one count. A row is written for each mail the limits let through.
+  // `mailed:<organization>` row, written once the request succeeds and counted against
+  // `invitationLimits` before the next goes, so every process of the deploy keeps one count and a
+  // refused request spends nothing.
   // ponytail: two at the same instant may both pass the last place; a lock per organization if that
   // is ever seen.
-  const mailedFor = async (organization: string) => {
+  const withinLimits = async (organization: string) => {
     const since = (ago: number) => store.count!({ kayan: 'verification', args: { where: { value: { equals: `mailed:${organization}` }, createdAt: { greater_than: new Date(Date.now() - ago) } } } })
     if ((await since(60_000)) >= invitationLimits.perMinute) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_MINUTE', message: `This organization has sent ${invitationLimits.perMinute} invitations in the last minute. Wait a minute and try again.` })
     if ((await since(86_400_000)) >= invitationLimits.perDay) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_DAY', message: `This organization has sent ${invitationLimits.perDay} invitations in the last day. Try again tomorrow.` })
-    await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `mailed:${randomBytes(16).toString('base64url')}`, value: `mailed:${organization}`, expiresAt: new Date(Date.now() + 86_400_000) })
   }
-  // The provider's invite route sends an invitation again on `resend` with no hook of its own, so
-  // the limits are asked of the route. Only a caller who may invite in that organization is counted:
-  // anyone else is refused by the route, and must not spend another organization's day.
+  const mailedFor = async (organization: string) =>
+    (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `mailed:${randomBytes(16).toString('base64url')}`, value: `mailed:${organization}`, expiresAt: new Date(Date.now() + 86_400_000) })
+  // The organization an invitation is made in, where the caller may invite there: the active one, as
+  // every key of theirs is.
+  const invitingIn = async (ctx: HookContext) => {
+    const caller = await getSessionFromCtx(ctx).catch(() => null)
+    const named = (ctx.body as { organizationId?: unknown } | undefined)?.organizationId ?? (caller?.session as { activeOrganizationId?: unknown } | undefined)?.activeOrganizationId
+    const active = requestOrganization()
+    return caller && typeof named === 'string' && (active === undefined || active === named) && holdsPermission('invitation.create') ? named : undefined
+  }
+  // The provider's invite route sends an invitation again on `resend` with no hook of its own, which
+  // its governance `admin` passes holding no key of this project's, so the route itself asks the
+  // key and the limits.
   const invitationLimit = {
     id: 'invitation-limit',
-    hooks: { before: [{
-      matcher: (ctx: { path?: string }) => ctx.path === '/organization/invite-member',
-      handler: createAuthMiddleware(async (ctx) => {
-        const caller = await getSessionFromCtx(ctx).catch(() => null)
-        const named = (ctx.body as { organizationId?: unknown } | undefined)?.organizationId ?? (caller?.session as { activeOrganizationId?: unknown } | undefined)?.activeOrganizationId
-        const active = requestOrganization()
-        if (!caller || typeof named !== 'string' || (active !== undefined && active !== named) || !holdsPermission('invitation.create')) return
-        await mailedFor(named)
-      }),
-    }] },
+    hooks: {
+      before: [{
+        matcher: (ctx: { path?: string }) => ctx.path === '/organization/invite-member',
+        handler: createAuthMiddleware(async (ctx) => {
+          const organization = await invitingIn(ctx)
+          if (organization) return withinLimits(organization)
+          if ((ctx.body as { resend?: unknown } | undefined)?.resend) throw new APIError('FORBIDDEN', { message: 'Sending an invitation again needs the permission "invitation.create" in your active organization.' })
+        }),
+      }],
+      after: [{
+        matcher: (ctx: { path?: string }) => ctx.path === '/organization/invite-member',
+        handler: createAuthMiddleware(async (ctx) => {
+          if (ctx.context.returned instanceof Error) return
+          const organization = await invitingIn(ctx)
+          if (organization) await mailedFor(organization)
+        }),
+      }],
+    },
   }
   // The only owner of an organization is not deleted, by staff or by themselves: the provider would
   // take their member row with them and leave an organization nobody governs. Asked before the route,
@@ -1330,7 +1351,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
         }
         // With no mailer the link is answered to the caller, which only this machine's own app may ask.
         if (!settings.mailer && !isLocalHost(ctx.headers?.get('origin') ?? '')) throw new APIError('FORBIDDEN', { message: 'Adding a person mails them a link, and no mailer is configured.' })
-        if (settings.mailer) await mailedFor(organization)
+        if (settings.mailer) await withinLimits(organization)
         // ponytail: the steps below are not one transaction. A failure part-way leaves an account with
         // no password nobody can sign in to, which the next Add of that address takes up as any
         // account nobody proved; one transaction over the provider's writes if that is ever seen.
@@ -1351,6 +1372,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
         if (!settings.mailer) return ctx.json({ added: true, user: { id: user.id }, link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href })
         const named = (await adapter.findOne<{ name: string }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
         await ctx.context.runInBackgroundOrAwait(addedMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email, organization: named, token }))
+        await mailedFor(organization)
         return ctx.json({ added: true, user: { id: user.id } })
       }),
     },

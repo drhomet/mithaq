@@ -1243,6 +1243,32 @@ test('0o. a planted invitation joins nobody: an administrator who signs up with 
   }
 })
 
+test('0r. sending an invitation again asks invitation.create in the active organization, so a provider admin who holds no key of the project re-mails nothing, and a refused request spends none of the day', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  // Served as `asas.handler` serves it, so the project's keys gate the route.
+  const gated = betterAuthStrategy({ server: many, collection: 'user', assigned: accessResolve as never, onError: console.error })
+  const founder = await proved({ one: many, mail, email: 'founder-0r@example.com' })
+  const organization = (await many.api.createOrganization({ body: { name: 'Resend 0r', slug: 'resend-0r' }, headers: founder }))!.id
+  await many.api.createInvitation({ body: { email: 'pending-0r@example.com', role: 'member', organizationId: organization }, headers: founder })
+  // A governance admin, which a member.update holder may make, with no role of the project's.
+  const admin = await proved({ one: many, mail, email: 'admin-0r@example.com' })
+  const adminId = (await modeRows(`select id from "user" where email = 'admin-0r@example.com'`))[0]!.id
+  await many.api.addMember({ body: { userId: String(adminId), organizationId: organization, role: 'admin' } })
+  await many.api.setActiveOrganization({ body: { organizationId: organization }, headers: admin })
+  const counted = async () => (await modeRows(`select id from verification where value = 'mailed:${organization}'`)).length
+  const before = await counted()
+  const sent = mail.sent.length
+  const resent = await gated.handler(new Request('http://test/api/auth/user/organization/invite-member', { method: 'POST', headers: { cookie: admin.get('cookie')!, 'content-type': 'application/json', origin: tenantOrigin }, body: JSON.stringify({ email: 'pending-0r@example.com', role: 'member', resend: true }) }))
+  assert.equal(resent.status, 403, await resent.clone().text())
+  await backgroundSettled()
+  assert.equal(mail.sent.length, sent, 'and nothing is mailed')
+  assert.equal(await counted(), before, 'nor counted')
+  const refused = await askedOf(many, '/organization/invite-member', { email: 'admin-0r@example.com', role: 'member' }, { cookie: founder.get('cookie')! })
+  assert.equal(refused.status, 400, 'inviting a member is refused by the provider')
+  assert.equal(await counted(), before, 'and a refused invitation spends none of the organization\'s day')
+})
+
 test('0p. with many organizations nobody adds a person: the route is one organization\'s alone', async () => {
   const many = modeServer({ ...manySettings, mailer: keptMail().mailer })
   assert.equal((await askedOf(many, '/organization/add-person', { name: 'Nobody', email: 'nobody-0p@example.com' })).status, 404)
@@ -15285,6 +15311,9 @@ test('151c. the platform renames an organization and its slug through its own ro
     [{ id: a!.organization, name: 'Taken', slug: 'tenant-151c-b' }, 409],
     [{ id: a!.organization, name: 'x'.repeat(256), slug: 'long-name' }, 400],
     [{ id: a!.organization, name: 'Line\r\nbreak', slug: 'line-break' }, 400],
+    [{ id: a!.organization, name: 'Line\u2028break', slug: 'line-break' }, 400],
+    [{ id: a!.organization, name: '\u202eReversed', slug: 'reversed' }, 400],
+    [{ id: a!.organization, name: 'x'.repeat(101), slug: 'past-100' }, 400],
     [{ id: a!.organization, name: 'Long slug', slug: 'a'.repeat(256) }, 400],
   ] as const) {
     assert.equal((await rename(administrator.headers, body)).status, status, `${JSON.stringify(body)} answers ${status}`)

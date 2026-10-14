@@ -13,7 +13,7 @@
 // owner rules by, and staff do each by impersonating a member, which is
 // audited under the real person's name.
 import { AsasError, actorPermissions, denied, invalid, missing, type HttpPlug } from 'mithaq'
-import { platformRoles } from '@asas/mithaq/auth'
+import { oneLine, platformRoles } from '@asas/mithaq/auth'
 import { targets } from '@asas/mithaq'
 import { assignedRoles, type OrganizationActor } from '@asas/mithaq/roles/tenant-access.ts'
 
@@ -29,10 +29,10 @@ const slugShape = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 /**
  * The longest name and slug a rename writes. The columns are unbounded `text`,
- * so the caps are this route's own: a name as long as a course's title and a
- * slug that fits in a URL segment.
+ * so the caps are this route's own: a name as long as the auth setup lets a
+ * founder write one, and a slug that fits in a URL segment.
  */
-const most = { name: 120, slug: 64 }
+const most = { name: 100, slug: 64 }
 
 /** The body the shipped plain plug answers every refusal with. */
 const codes: Record<number, string> = { 400: 'BAD_REQUEST', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'CONFLICT' }
@@ -65,7 +65,7 @@ export const platformHttp = () => (): HttpPlug => ({
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
       const slug = typeof body?.slug === 'string' ? body.slug.trim() : ''
       // A name is one line: mail bodies carry it, where a break would be a line of the writer's own.
-      if (typeof id !== 'string' || !id || !name || name.length > most.name || /[\u0000-\u001f\u007f]/.test(name) || !slugShape.test(slug) || slug.length > most.slug) {
+      if (typeof id !== 'string' || !id || !name || name.length > most.name || new RegExp(oneLine.source, 'u').test(name) || !slugShape.test(slug) || slug.length > most.slug) {
         throw invalid({
           message: `An organization is renamed with its id, a name of one line and at most ${most.name} characters, and a slug of at most ${most.slug} lowercase letters, digits and hyphens.`,
           key: 'error.invalid.value',

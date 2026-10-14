@@ -332,8 +332,8 @@ test('an organization\'s name, which founders write and mail bodies carry, is on
   for (const settings of [authSettings, { ...authSettings, organizations: 'one' as const }]) {
     const server = betterAuthServer({ ...authOptions({}, settings).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
     const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
-    const made = (await server.api.createOrganization({ body: { name: ' Evil\r\nBcc: x@example.com\u0007 ', slug: 'evil', userId: user.id } }))!
-    assert.equal(made.name, 'Evil Bcc: x@example.com', `${settings.organizations}: a line break or control character is taken out`)
+    const made = (await server.api.createOrganization({ body: { name: ' Evil\r\nBcc: x@example.com\u0007\u0085\u2028\u2029 \u202eKnown\u2066 ', slug: 'evil', userId: user.id } }))!
+    assert.equal(made.name, 'Evil Bcc: x@example.com Known', `${settings.organizations}: a line break, a control character or a direction override is taken out`)
     await assert.rejects(server.api.createOrganization({ body: { name: 'x'.repeat(101), slug: 'long', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: a name past 100 characters is refused`)
     await assert.rejects(server.api.createOrganization({ body: { name: '\r\n', slug: 'blank', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: and one of nothing but breaks`)
     const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
