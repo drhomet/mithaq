@@ -75,32 +75,53 @@ if (remoteWithNoSecret) {
  */
 export const platformURL = process.env.PLATFORM_URL ?? 'http://localhost:5174'
 
-// The platform's first administrator is made by first-register, which asks for the `SETUP_CODE`
-// the deploy set, so nobody who merely reaches a new deploy first becomes its administrator. Only
-// `vite dev` on this machine skips it: a deploy run with plain `node` sets no `NODE_ENV`, and an
-// unset `PLATFORM_URL` falls back to localhost. The code is the one bar, so a value short enough to
-// guess is no code at all.
+// The platform's first administrator is made by first-register, and the first owner of a project
+// of one organization by first-run, and both ask for the `SETUP_CODE` the deploy set, so nobody who
+// merely reaches a new deploy first takes it. Only `vite dev` on this machine skips it: a deploy
+// run with plain `node` sets no `NODE_ENV`, and an unset URL falls back to localhost. The code is
+// the one bar, so a value short enough to guess is no code at all.
 const setupCode = (process.env.SETUP_CODE?.length ?? 0) >= 32 ? process.env.SETUP_CODE : undefined
-const setupCodeState: 'none' | 'required' | 'unset' = process.env.NODE_ENV === 'development' && isLocalHost(platformURL) ? 'none' : setupCode ? 'required' : 'unset'
+const developing = process.env.NODE_ENV === 'development'
+const setupCodeState = (url: string): 'none' | 'required' | 'unset' => (developing && isLocalHost(url) ? 'none' : setupCode ? 'required' : 'unset')
 // Mirrors the tenant's `rateLimit.enabled`, read off the platform's own address.
 const platformLimited = production || !isLocalHost(platformURL)
 // Digests, so both sides are always 32 bytes and `timingSafeEqual` neither throws on nor answers
 // sooner for a code of another length.
 const digest = (text: string) => createHash('sha256').update(text).digest()
 const isSetupCode = (given: unknown) => typeof given === 'string' && setupCode !== undefined && timingSafeEqual(digest(given), digest(setupCode))
-// Set only around the one `create-user` call first-register makes once it found no platform
-// administrator under its lock, which is the only call with no caller that may write a role.
+/** Why a setup route served at `url` refuses `code`, or nothing; `app` names where SETUP_CODE is set. */
+const refusedSetup = ({ url, code, app }: { url: string; code: unknown; app: string }) => {
+  const state = setupCodeState(url)
+  if (state === 'unset') return new APIError('FORBIDDEN', { code: 'SETUP_CODE_UNSET', message: `Set SETUP_CODE where the ${app} runs, to a random value of 32 characters or more: the first administrator is made only with it.` })
+  if (state === 'required' && !isSetupCode(code)) return new APIError('FORBIDDEN', { code: 'SETUP_CODE_WRONG', message: 'That is not the setup code.' })
+  return undefined
+}
+// Set only around the calls first-register and first-run make once they found nobody under their
+// lock: the only calls with no caller that may write a role or make an account no sign-up would.
 const firstRegistering = new AsyncLocalStorage<true>()
 // Without TRUSTED_IP_HEADER, Better Auth keys its limit on an `x-forwarded-for` the caller writes,
-// so first-register also keeps one window that every caller shares.
+// so each setup route also keeps one window that every caller shares.
 // ponytail: process-local, and a flood holds setup off for everyone until it stops; set
 // TRUSTED_IP_HEADER for per-address limits alone.
-const sharedTries: number[] = []
-const overSharedLimit = () => {
-  const now = Date.now()
-  while (sharedTries.length && now - sharedTries[0]! >= 60_000) sharedTries.shift()
-  return sharedTries.length >= 10 || (sharedTries.push(now), false)
+const sharedWindow = () => {
+  const tries: number[] = []
+  return () => {
+    const now = Date.now()
+    while (tries.length && now - tries[0]! >= 60_000) tries.shift()
+    return tries.length >= 10 || (tries.push(now), false)
+  }
 }
+const overSharedLimit = sharedWindow()
+const overFirstRunLimit = sharedWindow()
+// First-register and first-run take one lock, so neither reads "nobody yet" while the other is
+// making the first administrator.
+const setupLock = sql`select pg_advisory_xact_lock(hashtext('mithaq.setup'))`
+
+/**
+ * One JSON line, in the shape of the platform's audit, for what the provider does where no kayan
+ * logs it: a sign-up, a join, a first-run and a role given. Operators keep this output.
+ */
+const authAudit = (line: Record<string, unknown>) => console.log(JSON.stringify({ audit: 'auth', ...line, at: new Date().toISOString() }))
 
 /**
  * Where the tenant app is served, the tenant instance's `baseURL` and the target of an
@@ -803,30 +824,29 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     })
   }
   // end add-on: roles
-  const built = authOptions({
+  // add-on: roles
+  // A role given by the auth setup itself, which nothing inside the project can give: straight
+  // through the store rather than through `asas.kayan.memberRoles.operations.create`, which is
+  // graded against the actor making it.
+  const grantRole = async ({ tx, organization, user, role }: { tx: unknown; organization: string; user: string; role: string }) => {
+    const written = new Date()
+    await store.insert({ tx, kayan: 'memberRoles', data: { createdAt: written, role, organization, updatedAt: written, user } })
+    authAudit({ action: 'role', user, organization, role })
+  }
+  // end add-on: roles
+  // The hooks that write this project's rows, in their own transaction, or in `tx` where a route
+  // that holds one makes the organization: a second client would wait on the rows it has not
+  // committed.
+  const storeHooks = (tx?: unknown): StoreHooks => ({
     // add-on: roles
-    // The tenant's first assignment, which nothing inside the project can make: a role holding
-    // `memberRoles.create` has to be assigned before it can assign anything, and the caller of
-    // `createOrganization` is in no organization until that route puts it in one. So it goes
-    // straight through the store rather than through `asas.kayan.memberRoles.operations.create`,
-    // which is graded against the actor making it. The row is `administrator`, which holds
-    // `'*'`, so the organization has a root granter from its first moment and every later
-    // assignment is the gated one.
+    // The tenant's first assignment: a role holding `memberRoles.create` has to be assigned before
+    // it can assign anything, and the caller of `createOrganization` is in no organization until
+    // that route puts it in one. The row is `administrator`, which holds `'*'`, so the
+    // organization has a root granter from its first moment and every later assignment is the
+    // gated one.
     afterCreateOrganization: async ({ organization, user: creator }) => {
-      const written = new Date()
-      await store.transaction((tx) =>
-        store.insert({
-          tx,
-          kayan: 'memberRoles',
-          data: {
-            createdAt: written,
-            role: 'administrator',
-            organization: organization.id,
-            updatedAt: written,
-            user: creator.id,
-          },
-        }),
-      )
+      const granted = { organization: organization.id, user: creator.id, role: 'administrator' }
+      await (tx === undefined ? store.transaction((own) => grantRole({ tx: own, ...granted })) : grantRole({ tx, ...granted }))
     },
     // A member who still holds a role of this project in the organization is not removed. The
     // provider deletes the member row alone and leaves this project's rows behind, which are
@@ -844,7 +864,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     beforeAcceptInvitation: ({ user, organization }) => clearsLeftRoles({ organization: organization.id, user: user.id }),
     beforeAddMember: ({ member, organization }) => clearsLeftRoles({ organization: organization.id, user: member.userId }),
     // end add-on: roles
-  }, settings).options
+  })
+  const built = authOptions(storeHooks(), settings).options
   // `transaction: true` makes the provider's own transaction helper open a real transaction
   // wherever it asks for one: a sign-up writes its user, account and session in one, and an
   // accepted invitation its member and the session's organization. Without it each statement
@@ -876,6 +897,96 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     }] },
   }
   // end add-on: roles
+  // Whether anyone holds a platform role, read as `holdsRole` reads `user.role`: comma-separated,
+  // each name trimmed of the whitespace `.trim()` takes. Every tenant user's `user` is passed
+  // over before the split, and the scan stops at the first holder.
+  type Executes = { execute(query: unknown): Promise<{ rows: unknown[] }> }
+  const users = store.tables.user as { role: unknown }
+  const administered = async (db: Executes) =>
+    (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(platformRoles)}) limit 1`)).rows.length > 0
+  const organizationTable = store.tables.organization
+  const organized = async (db: Executes) => (await db.execute(sql`select 1 from ${organizationTable} limit 1`)).rows.length > 0
+  const oneOrganization = settings.organizations !== 'many'
+  // The tenant's first-run, in one organization or none: the first owner and the one organization,
+  // which nothing else makes, under the lock first-register takes and the setup code. It makes
+  // the owner platform staff too while the platform app is served and has none, so one person
+  // sets up both. The account is verified: the setup code is the proof.
+  const firstRunClosed = () => new APIError('FORBIDDEN', { code: 'FIRST_RUN_CLOSED', message: 'This app has its organization, so first-run is closed. Sign in instead.' })
+  const firstRun = {
+    id: 'first-run',
+    endpoints: {
+      firstRunState: createAuthEndpoint('/first-run/state', { method: 'GET' }, async (ctx) =>
+        ctx.json((await organized(store.db as Executes)) ? { open: false } : { open: true, code: setupCodeState(tenantURL), name: settings.organizations === 'one' })),
+      // `formCsrfMiddleware`, as sign-up has: no session guards this route.
+      firstRun: createAuthEndpoint('/first-run', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
+        if (!onLocalHost && !ipAddressHeaders && overFirstRunLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
+        if (await organized(store.db as Executes)) throw firstRunClosed()
+        const { name, email, password, code, organization } = (ctx.body ?? {}) as Record<string, unknown>
+        const refused = refusedSetup({ url: tenantURL, code, app: 'tenant app' })
+        if (refused) throw refused
+        const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
+        if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
+          throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
+        }
+        const named = settings.organizations === 'none' ? 'Main' : typeof organization === 'string' ? organization.trim() : ''
+        if (!named || named.length > 100) throw new APIError('BAD_REQUEST', { message: 'The organization has a name of 1 to 100 characters.' })
+        return ctx.json(await store.transaction(async (tx) => {
+          await (tx as Executes).execute(sql`set transaction isolation level read committed`)
+          await (tx as Executes).execute(setupLock)
+          if (await organized(tx as Executes)) throw firstRunClosed()
+          const staff = platformApp && !(await administered(tx as Executes))
+          // ponytail: an instance per call over this transaction, as first-register's; it runs
+          // once in a project's life.
+          const bound = betterAuthServer({ ...authOptions(storeHooks(tx), settings).options, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
+          const adapter = (await bound.$context).adapter
+          return runWithAdapter(adapter, () => firstRegistering.run(true, async () => {
+            const { user } = await bound.api.createUser({ body: { name, email, password, role: (staff ? 'super_admin' : 'user') as never, data: { emailVerified: true } } })
+            const slug = settings.organizations === 'none' ? 'main' : `${named.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${randomBytes(3).toString('hex')}`
+            const made = (await bound.api.createOrganization({ body: { name: named, slug, userId: user.id } }))!
+            authAudit({ action: 'first-run', user: user.id, organization: made.id, platform: staff })
+            return { user: { id: user.id }, organization: { id: made.id } }
+          }))
+        }))
+      }),
+    },
+    rateLimit: [{ pathMatcher: (path: string) => path === '/first-run', window: 60, max: 3 }],
+  }
+  // Whether `id` names a pending invitation, unexpired, sent to `email` as the provider compares
+  // addresses, lowercased. The id is ~190 random bits, so holding it is the proof.
+  type Finds = { findOne<Row>(query: { model: string; where: { field: string; value: string }[] }): Promise<Row | null> }
+  const invitedAs = async ({ adapter, id, email }: { adapter: Finds; id: unknown; email: unknown }) => {
+    if (typeof id !== 'string' || typeof email !== 'string') return false
+    const invitation = await adapter.findOne<{ email: string; status: string; expiresAt: Date | string }>({ model: 'invitation', where: [{ field: 'id', value: id }] })
+    return !!invitation && invitation.status === 'pending' && new Date(invitation.expiresAt) > new Date() && invitation.email.toLowerCase() === email.toLowerCase()
+  }
+  // One answer for every refused sign-up by invitation, so it tells nobody whether an address has
+  // an account or an invitation.
+  const inviteOnly = () => new APIError('FORBIDDEN', { code: 'SIGN_UP_INVITE_ONLY', message: 'Sign-up here is by invitation: open the link of the invitation sent to you.' })
+  const outsideDomains = () => new APIError('FORBIDDEN', { code: 'SIGN_UP_DOMAIN', message: 'This address is not at a domain that may sign up here.' })
+  // Who may make an account in one organization or none, asked before the provider's route, which
+  // would answer an address that has an account differently from one that has none.
+  const signUpGate = {
+    id: 'sign-up-gate',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ctx.path === '/sign-up/email',
+      handler: createAuthMiddleware(async (ctx) => {
+        if (!(await organized(store.db as Executes))) throw new APIError('FORBIDDEN', { code: 'FIRST_RUN_PENDING', message: 'This app is not set up yet: its administrator opens /auth/first-run first.' })
+        const { email, invitationId } = (ctx.body ?? {}) as { email?: unknown; invitationId?: unknown }
+        if (settings.signUp === 'invite' && !(await invitedAs({ adapter: ctx.context.adapter as unknown as Finds, id: invitationId, email }))) throw inviteOnly()
+        if (settings.signUp === 'open' && settings.allowedDomains.length && !(typeof email === 'string' && domainAllowed(email, settings.allowedDomains))) throw outsideDomains()
+      }),
+    }] },
+  }
+  // The same rule wherever an account is made, so a sign-in method added later (social, a magic
+  // link, a one-time code) never opens a way past it. Only first-run and first-register make one
+  // with no sign-up, and they hold `firstRegistering`.
+  const accountGate = async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
+    if (!oneOrganization || firstRegistering.getStore()) return
+    if (settings.signUp === 'invite') {
+      const invitationId = (context?.body as { invitationId?: unknown } | undefined)?.invitationId
+      if (!context || !(await invitedAs({ adapter: (await getCurrentAdapter(context.context.adapter as never)) as unknown as Finds, id: invitationId, email: user.email }))) throw inviteOnly()
+    } else if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) throw outsideDomains()
+  }
   const tenant = betterAuthServer({
     ...built,
     plugins: [
@@ -883,10 +994,22 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       // add-on: roles
       keepsRoles,
       // end add-on: roles
+      ...(oneOrganization ? [firstRun, signUpGate] : []),
     ],
     // In one organization or none, nobody founds another or leaves the one: leaving would leave the
     // person in no organization at all, where every read is refused.
     disabledPaths: settings.organizations === 'many' ? tenantOnly : [...tenantOnly, '/organization/create', '/organization/leave'],
+    databaseHooks: {
+      ...built.databaseHooks,
+      user: {
+        create: {
+          before: async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
+            await accountGate(user, context)
+          },
+          after: async (user: { id: string }) => authAudit({ action: 'sign-up', user: user.id }),
+        },
+      },
+    },
     database,
   })
   // add-on: courses
@@ -912,13 +1035,6 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     }] },
   }
   // end add-on: courses
-  // Whether anyone holds a platform role, read as `holdsRole` reads `user.role`: comma-separated,
-  // each name trimmed of the whitespace `.trim()` takes. Every tenant user's `user` is passed
-  // over before the split, and the scan stops at the first holder.
-  type Executes = { execute(query: unknown): Promise<{ rows: unknown[] }> }
-  const users = store.tables.user as { role: unknown }
-  const administered = async (db: Executes) =>
-    (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(platformRoles)}) limit 1`)).rows.length > 0
   // One answer however often and by whomever it is asked, naming nobody.
   const closed = () => new APIError('FORBIDDEN', { code: 'FIRST_REGISTER_CLOSED', message: 'This platform has its administrator, so first-register is closed. Sign in instead.' })
   // The platform's first `super_admin`, which nothing else can make: the provider's own
@@ -928,15 +1044,15 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     id: 'first-register',
     endpoints: {
       init: createAuthEndpoint('/init', { method: 'GET' }, async (ctx) =>
-        ctx.json((await administered(store.db as Executes)) ? { initialized: true } : { initialized: false, code: setupCodeState })),
+        ctx.json((await administered(store.db as Executes)) ? { initialized: true } : { initialized: false, code: setupCodeState(platformURL) })),
       // `formCsrfMiddleware`, as sign-up has: no session guards this route, so another site's
       // form must not post to it.
       firstRegister: createAuthEndpoint('/first-register', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
         if (platformLimited && !ipAddressHeaders && overSharedLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
         if (await administered(store.db as Executes)) throw closed()
         const { name, email, password, code } = (ctx.body ?? {}) as Record<string, unknown>
-        if (setupCodeState === 'unset') throw new APIError('FORBIDDEN', { code: 'SETUP_CODE_UNSET', message: 'Set SETUP_CODE where the platform app runs, to a random value of 32 characters or more: the first administrator is made only with it.' })
-        if (setupCodeState === 'required' && !isSetupCode(code)) throw new APIError('FORBIDDEN', { code: 'SETUP_CODE_WRONG', message: 'That is not the setup code.' })
+        const refused = refusedSetup({ url: platformURL, code, app: 'platform app' })
+        if (refused) throw refused
         // `create-user` checks the address but not the password's length, which sign-up does.
         const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
         if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
@@ -946,7 +1062,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           // Read committed whatever the database's default, so the read below sees an
           // administrator another call committed while this one waited on the lock.
           await (tx as Executes).execute(sql`set transaction isolation level read committed`)
-          await (tx as Executes).execute(sql`select pg_advisory_xact_lock(hashtext('mithaq.first-register'))`)
+          await (tx as Executes).execute(setupLock)
           if (await administered(tx as Executes)) throw closed()
           // ponytail: an instance per call, built over this transaction; it runs once in a
           // project's life. `built` carries the admin plugin and the audit hooks, which is all
@@ -958,7 +1074,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           const adapter = (await bound.$context).adapter
           // The plugin types a role from `adminOptions.roles`, whose platform roles are built at
           // runtime, so it names `user` alone.
-          return runWithAdapter(adapter, () => firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never } })))
+          // Verified, as first-run's owner is: the setup code is the proof, and staff are never
+          // asked to verify an address.
+          return runWithAdapter(adapter, () => firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never, data: { emailVerified: true } } })))
         }))
       }),
     },
