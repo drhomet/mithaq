@@ -2113,12 +2113,6 @@
                     },
                     "fields": [
                       {
-                        "field": "organization",
-                        "readOnly": true,
-                        "component": "relationship",
-                        "decided": "table"
-                      },
-                      {
                         "field": "createdAt",
                         "readOnly": true,
                         "component": "datetime",

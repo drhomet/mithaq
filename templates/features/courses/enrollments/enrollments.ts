@@ -108,14 +108,14 @@ export const enrollments = defineKayan({
         } }] }]) },
         create: { path: '/enrollments/new', page: appPage([{ layout: 'record', main: [{ form: enrollment }] }]) },
         // The editor layout, and the one timestamp worth reading here, named and
-        // read-only: when the student enrolled, beside the organization it
-        // belongs to, read by its name.
+        // read-only: when the student enrolled. Not the organization, which on the
+        // dashboard is always the active one.
         edit: {
           path: '/enrollments/:id',
           page: appPage([{
             layout: 'record',
             main: [{ form: enrollment }],
-            side: [{ section: 'record', label: { en: 'Record', ar: 'السجل' }, fields: [{ field: 'organization', readOnly: true }, { field: 'createdAt', readOnly: true }] }, activity],
+            side: [{ section: 'record', label: { en: 'Record', ar: 'السجل' }, fields: [{ field: 'createdAt', readOnly: true }] }, activity],
             danger: danger(),
           }]),
         },
