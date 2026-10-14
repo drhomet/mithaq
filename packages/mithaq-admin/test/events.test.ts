@@ -673,6 +673,33 @@ test('178i. a required moment with a day and no time is refused as required and 
   assert.deepEqual([time.getAttribute('aria-required'), time.getAttribute('aria-invalid')], ['true', 'true'], 'and the time box is marked required and refused')
 })
 
+test('178m. a session\'s start picked as a day and typed as a time saves as that instant, an edit saves the new time, and a required start cleared is refused as required', async () => {
+  const page = (path: string) => screenOf(recordPage([{ form: [{ field: 'startsAt' }, { field: 'capacity' }] }], path), sessions)
+  const created = recording()
+  const host = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/new'), client: created.client, value: null, t, locale: 'en', onDone: () => {} }))
+  await act(async () => click(host.querySelector('button#sessions-startsAt') as unknown as Element))
+  await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
+  await act(async () => typeInto(host.querySelector('input[type="time"]')!, '12:30'))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(host.querySelector('#sessions-startsAt-error'), null, 'the start is not refused')
+  assert.equal(created.written.length, 1, 'the create is sent')
+  assert.equal(new Date(created.written[0]!.startsAt as string).toISOString(), new Date(`${today}T12:30`).toISOString(), `as the local moment: ${JSON.stringify(created.written[0])}`)
+
+  const edited = recording()
+  const stored = new Date(2026, 9, 15, 12, 30).toISOString()
+  const edit = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/:id'), client: edited.client, value: { id: 's1', course: 'c1', capacity: 5, startsAt: stored }, t, locale: 'en', onDone: () => {} }))
+  const time = () => edit.querySelector('input[type="time"]') as unknown as HTMLInputElement
+  assert.equal(time().value, '12:30', 'the edit draws the stored time')
+  await act(async () => typeInto(time() as unknown as Element, '14:45'))
+  await act(async () => fire(edit.querySelector('form')!, 'submit'))
+  assert.equal(new Date(edited.written[0]!.startsAt as string).getTime(), new Date(2026, 9, 15, 14, 45).getTime(), `the edit saves the new time on the same day: ${JSON.stringify(edited.written[0])}`)
+
+  await act(async () => typeInto(time() as unknown as Element, ''))
+  await act(async () => fire(edit.querySelector('form')!, 'submit'))
+  assert.equal(edited.written.length, 1, 'a cleared required start sends nothing')
+  assert.equal(edit.querySelector('#sessions-startsAt-error')?.textContent, 'sessions.startsAt.required', 'and is refused as required')
+})
+
 test('178j. a moment in a side region belongs to the page\'s form, so a submit from its time box saves the page', async () => {
   const saved: Record<string, unknown>[] = []
   const page = plus(recordPage([{ form: ['capacity'] }], '/sessions/:id'), 'side', { field: 'startsAt' })
@@ -6308,6 +6335,28 @@ test('185k. a stored value nested past the server\'s own bound is drawn read-onl
     assert.equal(host.textContent?.includes('Shallow words') && host.textContent.includes('…'), true, 'and draws its words to the bound')
     assert.equal(host.querySelectorAll('[contenteditable]').length, 0, 'with no editor mounted')
   }
+})
+
+test('185n. a rich text field with no value yet, absent, null or an empty root, mounts an empty editor that takes words, while a node no class registers still draws the fallback', async () => {
+  const { RichTextEditor } = await import('../registry/rich-text.tsx')
+  const { RichTextNodes } = await import('../../../templates/mithaq/src/ui/rich-text-nodes.tsx')
+  for (const value of [undefined, null, richOf()]) {
+    const changes: unknown[] = []
+    const host = await render(createElement(RichTextNodes, null, createElement(RichTextEditor, { value, onChange: (next: unknown) => void changes.push(next), direction: 'ltr', t, locale: 'en', id: 'courses-details' })))
+    await act(async () => sleep(20))
+    assert.equal(host.querySelector('[role="alert"]'), null, `${JSON.stringify(value)} is not refused: ${host.querySelector('[role="alert"]')?.textContent}`)
+    const editable = host.querySelector('#courses-details')
+    assert.equal(editable?.getAttribute('contenteditable'), 'true', `${JSON.stringify(value)} mounts an editable editor`)
+    const editor = (editable as unknown as { __lexicalEditor: import('lexical').LexicalEditor }).__lexicalEditor
+    const { $getRoot, $createParagraphNode, $createTextNode } = await import('lexical')
+    await act(async () => editor.update(() => void $getRoot().clear().append($createParagraphNode().append($createTextNode('First words')))))
+    await act(async () => sleep(20))
+    assert.equal(JSON.stringify(changes.at(-1)).includes('First words'), true, `and reports what is written into it: ${JSON.stringify(changes.at(-1))}`)
+  }
+  const unknown = await render(createElement(RichTextEditor, { value: richOf(blockOf('mystery', [textOf('Odd')])), onChange: () => {}, direction: 'ltr', t, locale: 'en', id: 'courses-details' }))
+  await act(async () => sleep(20))
+  assert.equal(unknown.querySelector('[role="alert"]') !== null, true, 'a node no class registers is still refused')
+  assert.equal(unknown.querySelectorAll('[contenteditable]').length, 0, 'with no editor mounted')
 })
 
 test('185l. a list cell over a stored value nested past the server\'s own bound draws its words to the bound', () => {
