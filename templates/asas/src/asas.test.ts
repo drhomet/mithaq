@@ -2886,6 +2886,21 @@ test('11b. a push that fails part way leaves nothing it ran before the failure, 
   await db.execute('drop table pushed_broken')
 })
 
+test('12b. a required relationship declared set null is refused at build by name, rather than failing its delete in the database', () => {
+  const language = offline()
+  assert.throws(
+    () => language.buildAsas({
+      http: [fetchHttp()],
+      kayan: [language.defineKayan({
+        name: 'nodes',
+        fields: { id: { kind: 'text' }, parent: { kind: 'relationship', relationTo: 'nodes', rules: { required: true, onDelete: 'set null' } } },
+        targets: { service: { operations: defaultOperations } },
+      })],
+    }),
+    /Kayan "nodes" field "parent" is required and declares onDelete "set null", and a required column holds no null\. Write "restrict" or "cascade"\./,
+  )
+})
+
 test('12. onDelete is a rule, a relationship that names none restricts, and a required Better Auth foreign key cascades', async () => {
   const language = offline()
   const nodes = language.buildAsas({

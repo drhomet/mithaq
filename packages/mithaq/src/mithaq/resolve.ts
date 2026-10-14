@@ -776,6 +776,10 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
             `${where} carries "mode", which a field does not take: a relationship points at one row, and "hasMany: true" makes it hold a set.`,
           )
         }
+        // Its delete would fail in the database on the not-null column instead.
+        if (!field.hasMany && field.rules?.required && field.rules.onDelete === 'set null') {
+          throw new Error(`${where} is required and declares onDelete "set null", and a required column holds no null. Write "restrict" or "cascade".`)
+        }
         // A rule that silently builds nothing is what this file exists to prevent.
         // `required` is not one: the schema target reads it off the array.
         if (field.hasMany) {
