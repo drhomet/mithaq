@@ -421,6 +421,9 @@
             "ar": "مؤرشف"
           },
           "rules": {
+            "providedBy": {
+              "create": "never"
+            },
             "required": false
           },
           "component": "checkbox",
@@ -653,6 +656,30 @@
           ]
         },
         {
+          "name": "unarchive",
+          "effect": "update",
+          "fields": [
+            {
+              "name": "reason",
+              "kind": "text",
+              "label": {
+                "en": "Reason",
+                "ar": "السبب"
+              },
+              "rules": {
+                "required": true,
+                "maxLength": 200
+              },
+              "component": "text",
+              "cell": "text"
+            }
+          ]
+        },
+        {
+          "name": "unpublish",
+          "effect": "update"
+        },
+        {
           "name": "findWithSessions",
           "effect": "read"
         }
@@ -693,11 +720,6 @@
                           "field": "fee",
                           "cell": "@asas/courses:./courses/ui/fee-cell.tsx#FeeCell",
                           "decided": "field"
-                        },
-                        {
-                          "field": "archived",
-                          "cell": "checkbox",
-                          "decided": "table"
                         },
                         {
                           "field": "opensOn",
@@ -757,7 +779,7 @@
                           },
                           "fields": [
                             "fee",
-                            "archived"
+                            "notifications"
                           ]
                         }
                       ],
@@ -784,6 +806,93 @@
                                 }
                               }
                             ]
+                          }
+                        },
+                        {
+                          "button": "unarchive",
+                          "label": {
+                            "en": "Unarchive",
+                            "ar": "إلغاء الأرشفة"
+                          },
+                          "fields": [
+                            "reason"
+                          ],
+                          "when": {
+                            "record.archived": {
+                              "equals": true
+                            }
+                          }
+                        }
+                      ],
+                      "tabs": [
+                        {
+                          "tab": "active",
+                          "label": {
+                            "en": "Active",
+                            "ar": "النشطة"
+                          },
+                          "where": {
+                            "or": [
+                              {
+                                "archived": {
+                                  "exists": false
+                                }
+                              },
+                              {
+                                "archived": {
+                                  "equals": false
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "tab": "drafts",
+                          "label": {
+                            "en": "Drafts",
+                            "ar": "المسودات"
+                          },
+                          "where": {
+                            "and": [
+                              {
+                                "or": [
+                                  {
+                                    "archived": {
+                                      "exists": false
+                                    }
+                                  },
+                                  {
+                                    "archived": {
+                                      "equals": false
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "_status": {
+                                  "equals": "draft"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "tab": "archived",
+                          "label": {
+                            "en": "Archived",
+                            "ar": "المؤرشفة"
+                          },
+                          "where": {
+                            "archived": {
+                              "equals": true
+                            }
+                          }
+                        },
+                        {
+                          "tab": "all",
+                          "label": {
+                            "en": "All",
+                            "ar": "الكل"
                           }
                         }
                       ]
@@ -925,6 +1034,14 @@
                 "title": {}
               },
               {
+                "component": "@asas/courses:./courses/ui/archived-badge.tsx#ArchivedBadge",
+                "when": {
+                  "record.archived": {
+                    "equals": true
+                  }
+                }
+              },
+              {
                 "controls": {}
               }
             ],
@@ -1059,6 +1176,30 @@
                         ],
                         "danger": [
                           {
+                            "button": "unpublish",
+                            "label": {
+                              "en": "Unpublish",
+                              "ar": "إلغاء النشر"
+                            },
+                            "reload": true,
+                            "component": "@asas/courses:./courses/ui/unpublish-button.tsx#UnpublishButton",
+                            "confirm": {
+                              "title": {
+                                "en": "Unpublish this course?",
+                                "ar": "إلغاء نشر هذه الدورة؟"
+                              },
+                              "body": {
+                                "en": "It goes back to a draft that no student sees, until it is published again.",
+                                "ar": "تعود مسودة لا يراها أي طالب حتى تُنشر مجددا."
+                              }
+                            },
+                            "when": {
+                              "record._status": {
+                                "equals": "published"
+                              }
+                            }
+                          },
+                          {
                             "button": "archive",
                             "label": {
                               "en": "Archive",
@@ -1091,6 +1232,32 @@
                                   }
                                 }
                               ]
+                            }
+                          },
+                          {
+                            "button": "unarchive",
+                            "label": {
+                              "en": "Unarchive",
+                              "ar": "إلغاء الأرشفة"
+                            },
+                            "fields": [
+                              "reason"
+                            ],
+                            "reload": true,
+                            "confirm": {
+                              "title": {
+                                "en": "Unarchive this course?",
+                                "ar": "إلغاء أرشفة هذه الدورة؟"
+                              },
+                              "body": {
+                                "en": "It is back in the catalogue as it was.",
+                                "ar": "تعود إلى الدليل كما كانت."
+                              }
+                            },
+                            "when": {
+                              "record.archived": {
+                                "equals": true
+                              }
                             }
                           },
                           {
@@ -1406,6 +1573,9 @@
             "ar": "مؤرشفة"
           },
           "rules": {
+            "providedBy": {
+              "create": "never"
+            },
             "required": false
           },
           "component": "checkbox",
@@ -1443,6 +1613,20 @@
           "on": "session",
           "component": "join",
           "cell": "join"
+        },
+        {
+          "name": "archiveReason",
+          "kind": "text",
+          "label": {
+            "en": "Archive reason",
+            "ar": "سبب الأرشفة"
+          },
+          "rules": {
+            "maxLength": 200,
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
         }
       ],
       "operations": [
@@ -1483,6 +1667,46 @@
           "name": "archiveMany",
           "effect": "update",
           "updatesMany": true
+        },
+        {
+          "name": "archive",
+          "effect": "update",
+          "fields": [
+            {
+              "name": "reason",
+              "kind": "text",
+              "label": {
+                "en": "Reason",
+                "ar": "السبب"
+              },
+              "rules": {
+                "required": true,
+                "maxLength": 200
+              },
+              "component": "text",
+              "cell": "text"
+            }
+          ]
+        },
+        {
+          "name": "unarchive",
+          "effect": "update",
+          "fields": [
+            {
+              "name": "reason",
+              "kind": "text",
+              "label": {
+                "en": "Reason",
+                "ar": "السبب"
+              },
+              "rules": {
+                "required": true,
+                "maxLength": 200
+              },
+              "component": "text",
+              "cell": "text"
+            }
+          ]
         }
       ],
       "useAsTitle": "startsAt",
@@ -1787,6 +2011,27 @@
                     ]
                   },
                   {
+                    "section": "state",
+                    "label": {
+                      "en": "State",
+                      "ar": "الحالة"
+                    },
+                    "fields": [
+                      {
+                        "field": "archived",
+                        "readOnly": true,
+                        "component": "checkbox",
+                        "decided": "table"
+                      },
+                      {
+                        "field": "archiveReason",
+                        "readOnly": true,
+                        "component": "text",
+                        "decided": "table"
+                      }
+                    ]
+                  },
+                  {
                     "component": "@asas/mithaq:./src/ui/activity.tsx#Activity",
                     "when": {
                       "$user.collections.auditLog.operations.find": {
@@ -1796,6 +2041,67 @@
                   }
                 ],
                 "danger": [
+                  {
+                    "button": "archive",
+                    "label": {
+                      "en": "Archive",
+                      "ar": "أرشفة"
+                    },
+                    "fields": [
+                      "reason"
+                    ],
+                    "reload": true,
+                    "confirm": {
+                      "title": {
+                        "en": "Archive this session?",
+                        "ar": "أرشفة هذه الجلسة؟"
+                      },
+                      "body": {
+                        "en": "It stays on the course, marked archived.",
+                        "ar": "تبقى في الدورة، معلمة بأنها مؤرشفة."
+                      }
+                    },
+                    "when": {
+                      "or": [
+                        {
+                          "record.archived": {
+                            "exists": false
+                          }
+                        },
+                        {
+                          "record.archived": {
+                            "equals": false
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "button": "unarchive",
+                    "label": {
+                      "en": "Unarchive",
+                      "ar": "إلغاء الأرشفة"
+                    },
+                    "fields": [
+                      "reason"
+                    ],
+                    "reload": true,
+                    "confirm": {
+                      "title": {
+                        "en": "Unarchive this session?",
+                        "ar": "إلغاء أرشفة هذه الجلسة؟"
+                      },
+                      "body": {
+                        "en": "It is open again as it was.",
+                        "ar": "تعود مفتوحة كما كانت."
+                      }
+                    },
+                    "when": {
+                      "record.archived": {
+                        "equals": true
+                      }
+                    }
+                  },
                   {
                     "button": "delete",
                     "label": {

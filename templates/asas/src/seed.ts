@@ -280,8 +280,6 @@ try {
       notifications: random() < 0.7,
       opensOn: new Date(now - (age - 7) * DAY).toISOString().slice(0, 10),
       tags: tagIds.filter(() => random() < 0.35),
-      // Two of the twenty are archived, with the reason the archive form asks for.
-      ...(index % 9 === 8 && { archived: true, archiveReason: 'Replaced by a newer course.' }),
     }
     const sessionCount = 2 + Math.floor(random() * 5)
     const found = (await courses.operations.find({ where: { title: { equals: title } }, limit: 1 }, options)).docs[0]
@@ -289,6 +287,8 @@ try {
     if (!found) {
       created.courses++
       backdate.push({ table: 'courses', id: course.id, at: new Date(now - age * DAY) })
+      // Two of the twenty are archived, with the reason the archive form asks for.
+      if (index % 9 === 8) await courses.operations.archive({ id: course.id, reason: 'Replaced by a newer course.' }, options)
     } else if (!found.details) {
       // A course seeded without details is given them, once.
       await courses.operations.update({ id: found.id, details: input.details }, options)

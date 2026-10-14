@@ -23,6 +23,14 @@
     "ar": "استُعيد إصدار",
     "en": "Restored a version"
   },
+  "action.unarchive": {
+    "ar": "أُلغيت أرشفته",
+    "en": "Unarchived"
+  },
+  "action.unpublish": {
+    "ar": "أُلغي نشره",
+    "en": "Unpublished"
+  },
   "action.update": {
     "ar": "حُدِّث",
     "en": "Updated"

@@ -846,12 +846,11 @@ test('27. a field cleared to empty is written as empty, and a field nothing touc
   const created = written[1]!
   assert.deepEqual(
     Object.keys(created).sort(),
-    ['archived', 'notifications', 'title'],
-    'a create carries the typed field and the two checkbox values it drew, and nothing else',
+    ['notifications', 'title'],
+    'a create carries the typed field and the checkbox value it drew, and nothing else: archived is never a create\'s',
   )
   assert.equal(created.title, 'New course')
   // A create still carries an untouched checkbox (drawn unchecked, which is a value) and a required list of text; an optional list stays out.
-  assert.equal(created.archived, false)
   assert.equal(created.notifications, false)
 })
 
@@ -1510,7 +1509,8 @@ test('34. a checkbox on a row that carries no value for it is left out of an upd
   await act(async () => {
     fire(made.querySelector('form')!, 'submit')
   })
-  assert.equal(written[1]!.archived, false, 'a create still carries the box it drew')
+  assert.equal(written[1]!.notifications, false, 'a create still carries the box it drew')
+  assert.ok(!('archived' in written[1]!), 'and none it never draws, archived being no create\'s')
 })
 
 test('35. a form handed another row seeds from that row, so a screen that navigates between two rows without unmounting writes neither row\'s values under the other\'s id', async () => {
@@ -5615,6 +5615,28 @@ const listOn = (kayan: ClientKayan, docs: Record<string, unknown>[], over: Recor
     ...over,
   })
 
+test('235a. a list with tabs opens on its first, holds the find to each tab\'s where, takes a tab off the URL only where the list names it, and a click goes to that tab\'s first page', async () => {
+  const tabs = [
+    { tab: 'active', label: { en: 'Active', ar: 'النشطة' }, where: { archived: { not_equals: true } } },
+    { tab: 'archived', label: { en: 'Archived', ar: 'المؤرشفة' }, where: { archived: { equals: true } } },
+    { tab: 'all', label: { en: 'All', ar: 'الكل' } },
+  ]
+  const { listOf } = await import('../registry/node-tree.ts')
+  const node = { ...listOf(screenOf(courses.pages.list!, courses))!, tabs }
+  const rules = rulesOf({ kayan: courses, node, maxLimit: screen.maxLimit })
+  assert.deepEqual(findOf({ kayan: courses, query: {}, node }).where, { archived: { not_equals: true } }, 'the first tab holds a list that names none')
+  assert.deepEqual(findOf({ kayan: courses, query: readQuery({ tab: 'archived' }, rules), node }).where, { archived: { equals: true } }, 'and the URL\'s tab its own')
+  assert.equal(findOf({ kayan: courses, query: readQuery({ tab: 'all' }, rules), node }).where, undefined, 'a tab with no where holds nothing')
+  assert.throws(() => readQuery({ tab: 'deleted' }, rules), /This link names tab "deleted", which this list does not offer\./)
+  assert.deepEqual(writeQuery({ tab: 'archived', page: 2 }), { tab: 'archived', page: '2' }, 'and the tab is written back')
+  const asked: unknown[] = []
+  const host = await render(listOn(courses, [{ id: 'c1', title: 'Tajweed' }], { node, query: { page: 3 }, onQuery: (next: unknown) => asked.push(next) }))
+  const drawn = [...host.querySelectorAll('[data-list-tab]')]
+  assert.deepEqual(drawn.map((one) => [one.textContent, one.getAttribute('aria-selected')]), [['Active', 'true'], ['Archived', 'false'], ['All', 'false']], 'each tab, the first selected')
+  await act(async () => click(drawn[1]!))
+  assert.deepEqual(asked.at(-1), { page: 1, tab: 'archived' }, 'a tab opens on its first page')
+})
+
 test('177a. a list page\'s header names the kayan by its plural and an edit page by its singular', async () => {
   const { pageOf: drawPage } = await import('../registry/nodes.tsx')
   // The key itself, so the two words are told apart whatever the copy says.
@@ -6984,13 +7006,14 @@ test('233e. a record with no title is headed Untitled, muted, whether its title 
   assert.notEqual((await heading({ id: 'x1', title: 'x1' }))?.textContent, 'Untitled', 'a title that happens to equal the row\'s id is a title')
 })
 
-test('233f. a list\'s Status says what the header says: Draft, Published, or Changed for a published course whose newest version is a draft', async () => {
+test('233f. a list\'s Status says what the header says: Draft, Published, Changed for a published course whose newest version is a draft, and Archived over any of them', async () => {
   const { StatusCell } = await import('../../../templates/features/courses/courses/ui/status-cell.tsx')
   const path = courses.fields.find((one) => one.name === '_status')!.cell
   const rows = [
     { ...draftRow, id: 'p', title: 'Published', _status: 'published' },
     { ...draftRow, id: 'c', title: 'Changed', _status: 'draft' },
     { ...draftRow, id: 'd', title: 'Draft', _status: 'draft' },
+    { ...draftRow, id: 'a', title: 'Archived', _status: 'published', archived: true },
   ]
   const reads: Record<string, unknown>[] = []
   // The plain read finds the rows that have a published copy, p and c.
@@ -7003,7 +7026,7 @@ test('233f. a list\'s Status says what the header says: Draft, Published, or Cha
   const host = await render(createElement(QueryClientProvider, { client: queries }, createElement(ListContext, { value: list.props as never }, list)), { client: client as never })
   await act(async () => sleep(20))
   const status = (id: string) => host.querySelector(`tr[data-row="${id}"] [data-status]`)?.textContent
-  assert.deepEqual(['p', 'c', 'd'].map(status), ['Published', 'Changed', 'Draft'])
+  assert.deepEqual(['p', 'c', 'd', 'a'].map(status), ['Published', 'Changed', 'Draft', 'Archived'])
   assert.deepEqual(reads, [{ kayan: 'courses', draft: undefined, ids: ['c', 'd'] }], 'one plain read of the draft rows alone, for the whole page')
   await release(queries)
 })

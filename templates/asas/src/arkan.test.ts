@@ -532,4 +532,7 @@ test('a project kind says for itself which operators it takes, that it cannot or
     () => notes({ list: { path: '/notes', page: { shell: 'app', main: [{ layout: 'table', main: [{ list: { columns: ['tag'], sort: 'tag' } }] }] } } }),
     /list sort names "tag", which cannot order a page\./,
   )
+  const tabbed = (tabs: unknown) => () => notes({ list: { path: '/notes', page: { shell: 'app', main: [{ layout: 'table', main: [{ list: { columns: ['tag'], tabs } }] }] } } })
+  assert.throws(tabbed([{ tab: 'some', label: { en: 'Some', ar: 'بعض' }, where: { tag: { in: ['a'] } } }]), /field "tag" operator "in" is not supported on a field of kind "tag"/, 'a tab\'s where is held to the kinds')
+  assert.throws(tabbed([{ tab: 'all', label: { en: 'All', ar: 'الكل' } }, { tab: 'all', label: { en: 'All', ar: 'الكل' } }]), /list tab 1 is named "all", and a tab is named once in a list, in letters and digits\./)
 })

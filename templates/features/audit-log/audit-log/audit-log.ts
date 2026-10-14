@@ -148,6 +148,8 @@ export const auditLog = defineKayan({
       restoreVersion: { en: 'Restored a version', ar: 'استُعيد إصدار' },
       archive: { en: 'Archived', ar: 'أُرشف' },
       archiveMany: { en: 'Archived', ar: 'أُرشف' },
+      unarchive: { en: 'Unarchived', ar: 'أُلغيت أرشفته' },
+      unpublish: { en: 'Unpublished', ar: 'أُلغي نشره' },
     },
     someone: { en: 'Someone', ar: 'شخص ما' },
     // A command line write, named for a reader of the people: the command and

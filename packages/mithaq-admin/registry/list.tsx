@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import type { ButtonClient, Row } from 'mithaq/admin'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { descriptionOf, titleOf, type Copy } from 'mithaq-admin/copy.ts'
 import { filterPathsOf } from 'mithaq-admin/filter-operators.ts'
 import { Form } from 'mithaq-admin/form.tsx'
@@ -110,6 +111,18 @@ export function List(props: ListProps): ReactElement {
         create={props.creates === false ? undefined : edits ? { label, onAdd: () => setEditing(null) } : { label, href: props.newHref }}
         t={t}
       />
+      {node?.tabs?.length ? (
+        // The list's tabs, each a `where` the list holds every page to, the first where the URL names none.
+        <Tabs value={query.tab ?? node.tabs[0]!.tab} onValueChange={(tab) => refine({ tab: String(tab) })}>
+          <TabsList variant="line" className="max-sm:min-h-12">
+            {node.tabs.map((one) => (
+              <TabsTrigger key={one.tab} value={one.tab} data-list-tab={one.tab} className="flex-none max-sm:min-h-11">
+                {one.label[locale] ?? one.tab}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      ) : null}
       <Card>
         <CardContent>
           <div className="w-full space-y-4">
@@ -188,7 +201,7 @@ export function List(props: ListProps): ReactElement {
                 )
               }}
             >
-              <ListMessage count={page.docs.length} empty={Empty && screen ? <Empty page={screen.page} /> : undefined} filtered={Boolean(query.where || query.search)} kayan={kayan} onClear={() => refine({ search: undefined, where: undefined })} t={t} unreadable={unreadable} />
+              <ListMessage count={page.docs.length} empty={Empty && screen ? <Empty page={screen.page} /> : undefined} filtered={Boolean(query.where || query.search || (query.tab && query.tab !== node?.tabs?.[0]?.tab))} kayan={kayan} onClear={() => refine({ search: undefined, where: undefined, tab: undefined })} t={t} unreadable={unreadable} />
             </ListTable>
 
             <span id={openHint} hidden>

@@ -68,6 +68,7 @@ export type SessionsValues = {
   archived: boolean | null
   details: { root: Record<string, unknown> } | null
   enrollments: Values['enrollments'][]
+  archiveReason: string | null
 }
 export type EnrollmentsValues = {
   id: string

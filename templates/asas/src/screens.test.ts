@@ -597,7 +597,7 @@ test('a list holds toolbar, bulk and row regions of buttons and a default sort a
   const smaller = { service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: 20, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) }
   assert.throws(() => build(list({ limit: 25 }), undefined, smaller), (error: Error) => error.message === `${at} limit is 25, and a limit is a whole number from 1 to 20.`)
   assert.equal(build(list({ limit: 20 }), undefined, smaller).targets.dashboard.client.maxLimit, 20)
-  refused({ pageSize: 10 }, 'carries "pageSize", which a list does not take. A list takes columns, filters, search, empty, menu, toolbar, bulk, row, sort, limit, of, where.')
+  refused({ pageSize: 10 }, 'carries "pageSize", which a list does not take. A list takes columns, filters, search, empty, menu, toolbar, bulk, row, sort, limit, tabs, of, where.')
   const menued = build(list({ menu: ui('kpi-card.tsx#KpiCard') })).targets.dashboard.client
   const menu = (treeOf(menued.kayan.courses!.pages.list).main[0]!.main[0] as { list: { menu?: string } }).list.menu
   assert.equal(menu, '@asas/mithaq:./src/ui/kpi-card.tsx#KpiCard', 'the projection carries the reference as every component\'s')
@@ -970,7 +970,7 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   const dashboard = asas.targets.dashboard.client
   const page = (name: 'create' | 'edit' | 'list') => (dashboard.kayan.courses!.pages[name] as { page: Record<string, unknown[]> }).page
   const edit = page('edit')
-  assert.deepEqual(edit.header, [{ title: {} }, { controls: {} }], 'the edit page\'s header holds its title and the form\'s controls')
+  assert.deepEqual(edit.header, [{ title: {} }, { component: '@asas/courses:./courses/ui/archived-badge.tsx#ArchivedBadge', when: { 'record.archived': { equals: true } } }, { controls: {} }], 'the edit page\'s header holds its title, the Archived badge over an archived course, and the form\'s controls')
   assert.deepEqual(page('create').header, [{ title: {} }, { controls: {} }], 'and so does the create page\'s')
   assert.deepEqual(page('list').header, [{ title: {} }], 'while a page holding no form has no controls')
   const [tabs, ...rest] = edit.main as { tabs: { tab: string; fields: Record<string, any>[] }[] }[]
@@ -985,7 +985,7 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   assert.ok(JSON.stringify(layout.main[0].form[2].fields).includes('"field":"notifications"'), 'Teaching holds notifications')
   assert.deepEqual(layout.side.map((node: { section?: string; component?: string }) => node.section ?? node.component), ['catalogue', '@asas/mithaq:./src/ui/activity.tsx#Activity'], 'its side Catalogue and the activity')
   assert.deepEqual(layout.side.at(-1), { component: '@asas/mithaq:./src/ui/activity.tsx#Activity', when: { '$user.collections.auditLog.operations.find': { equals: true } } })
-  assert.deepEqual(layout.danger.map((node: { button: string }) => node.button), ['archive', 'delete'], 'and its danger zone')
+  assert.deepEqual(layout.danger.map((node: { button: string }) => node.button), ['unpublish', 'archive', 'unarchive', 'delete'], 'and its danger zone')
   assert.deepEqual(sessions!.fields.map((node) => Object.keys(node)), [['list']], 'Sessions holds its list alone, at the full width')
   assert.deepEqual(versions!.fields.map((node) => node.component), [dashboard.components.versions], 'and Versions its panel alone')
 
@@ -1133,12 +1133,17 @@ test("a kayan's own operations project their name and effect, an operation's own
       fields: [{ name: 'reason', kind: 'text', label: { en: 'Reason', ar: 'السبب' }, rules: { required: true, maxLength: 200 }, component: 'text', cell: 'text' }],
     },
   )
-  assert.deepEqual(courses.operations.filter((operation) => operation.fields).map((operation) => operation.name), ['archive'])
+  assert.deepEqual(courses.operations.filter((operation) => operation.fields).map((operation) => operation.name), ['archive', 'unarchive'])
   assert.deepEqual(courses.operations.map((operation) => operation.name).sort(), Object.keys(asas.kayan.courses.operations).sort())
   assert.deepEqual(dashboard.kayan.settings!.operations, [{ name: 'update', effect: 'update' }, { name: 'findOne', effect: 'read' }])
   // The button's own copy lives on the node that draws it, not on the operation,
   // and where the node sits is where it is drawn.
-  assert.deepEqual(((treeOf(courses.pages.edit).main[0] as unknown as { tabs: { fields: { danger: Record<string, unknown>[] }[] }[] }).tabs[0]!.fields[0]!.danger).map(({ confirm: _confirm, when: _when, ...button }) => button), [{ button: 'archive', label: { en: 'Archive', ar: 'أرشفة' }, fields: ['reason'], reload: true }, { button: 'delete', label: { en: 'Delete', ar: 'حذف' } }])
+  assert.deepEqual(((treeOf(courses.pages.edit).main[0] as unknown as { tabs: { fields: { danger: Record<string, unknown>[] }[] }[] }).tabs[0]!.fields[0]!.danger).map(({ confirm: _confirm, when: _when, ...button }) => button), [
+    { button: 'unpublish', label: { en: 'Unpublish', ar: 'إلغاء النشر' }, component: '@asas/courses:./courses/ui/unpublish-button.tsx#UnpublishButton', reload: true },
+    { button: 'archive', label: { en: 'Archive', ar: 'أرشفة' }, fields: ['reason'], reload: true },
+    { button: 'unarchive', label: { en: 'Unarchive', ar: 'إلغاء الأرشفة' }, fields: ['reason'], reload: true },
+    { button: 'delete', label: { en: 'Delete', ar: 'حذف' } },
+  ])
 })
 
 test("a field's label, description or placeholder written as a function is left off, and a screen's value that is not the shape its type promised is left off too", () => {

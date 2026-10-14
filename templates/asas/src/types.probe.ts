@@ -2042,7 +2042,7 @@ type NoGlobalDeleteProcedure = Procedures['settings']['delete']
 type ProcedureNamesAreTheTable = Expect<
   Equal<
     keyof Procedures['courses'],
-    'create' | 'update' | 'delete' | 'updateMany' | 'deleteMany' | 'find' | 'findByID' | 'count' | 'archive' | 'findWithSessions' | 'findVersions' | 'findVersionByID' | 'restoreVersion'
+    'create' | 'update' | 'delete' | 'updateMany' | 'deleteMany' | 'find' | 'findByID' | 'count' | 'archive' | 'unarchive' | 'unpublish' | 'findWithSessions' | 'findVersions' | 'findVersionByID' | 'restoreVersion'
   >
 >
 type GlobalProcedureNamesAreTheTable = Expect<Equal<keyof Procedures['settings'], 'findOne' | 'update'>>

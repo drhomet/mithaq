@@ -16,6 +16,7 @@ const sessionColumns = [
   'sessions.fields.venue',
   'sessions.fields.format',
   'sessions.fields.archived',
+  'sessions.fields.archiveReason',
   'sessions.fields.details',
 ] as const
 

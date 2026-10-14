@@ -1377,6 +1377,7 @@ test('3. the tables carry exactly the columns the kayan describe', async () => {
     'archived',
     // Rich text, the last column of each.
     'details',
+    'archive_reason',
     'updated_at',
     'created_at',
   ])
@@ -5994,13 +5995,15 @@ test('48. every built operation of every kayan and every global is one entry of 
       'findVersionByID:read',
       'restoreVersion:update',
       'archive:update',
+      'unarchive:update',
+      'unpublish:update',
       'findWithSessions:read',
       // The two bulk operations come last, because `buildAsas` builds them in a second pass
       // over the single-row writes each of them runs per row.
       'updateMany:update',
       'deleteMany:delete',
     ],
-    'a kayan is in the table under its eight shipped operations, the three versions ones and the two it declares, each carrying its effect',
+    'a kayan is in the table under its eight shipped operations, the three versions ones and the four it declares, each carrying its effect',
   )
   assert.deepEqual(
     asas.operations.filter((one) => one.single).map((one) => `${one.kayan}.${one.name}`),
@@ -17980,4 +17983,35 @@ test('222c. a session is read by a role that does not run the catalogue only whe
   for (const who of ['admin', 'registrar'] as const) {
     assert.equal((await tenant.as(who, 'sessions/find', { where })).body.totalDocs, 3, `${who}: reads all three`)
   }
+})
+
+test('233a. a course is archived and brought back, each with its reason and an activity entry; it is unpublished back to a draft that no plain read shows; and a session is archived and brought back the same way, never made archived', async () => {
+  const [a] = await twoTenants('233a')
+  const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
+  const log = asas.kayan.auditLog.operations as unknown as Record<'find', (input: unknown, options: unknown) => Promise<{ docs: { operation: string; changes: string }[] }>>
+  const course = await courses.operations.create({ title: 'States 233a' }, owner)
+  await courses.operations.archive({ id: course.id, reason: 'Paused' }, owner)
+  const back = await courses.operations.unarchive({ id: course.id, reason: 'Running again' }, owner)
+  assert.equal(back.archived, false, 'an archived course is brought back')
+  assert.equal(back.archiveReason, 'Running again', 'with the reason it was brought back for')
+  const entries = (await log.find({ where: { record: { equals: course.id } }, sort: '-createdAt' }, owner)).docs
+  assert.deepEqual(entries.map((entry) => entry.operation), ['unarchive', 'archive', 'create'], 'each is a line of its own in the activity')
+  assert.deepEqual(JSON.parse(entries[0]!.changes).archived, { from: true, to: false })
+
+  const unpublished = await courses.operations.unpublish({ id: course.id, _status: 'draft' }, owner)
+  assert.equal(unpublished._status, 'draft', 'unpublishing puts the course back to a draft')
+  assert.equal(await courses.operations.findByID({ id: course.id }, owner).then(() => 200, (error: { status?: number }) => error.status), 404, 'which no plain read shows')
+  assert.equal((await courses.operations.findByID({ id: course.id }, { ...owner, draft: true }))?.title, 'States 233a', 'and a draft read does')
+
+  const published = await courses.operations.create({ title: 'Sessions 233a' }, owner)
+  const made = await asas.handler(new Request('http://test/api/sessions/create', {
+    method: 'POST',
+    headers: { cookie: a!.owner.headers.get('cookie') ?? '', 'content-type': 'application/json' },
+    body: JSON.stringify({ course: published.id, startsAt: '2027-09-01T09:00:00.000Z', archived: true }),
+  }))
+  assert.equal(made.status, 400, 'a session is not made archived')
+  const session = await sessions.operations.create({ course: published.id, startsAt: new Date('2027-09-01T09:00:00Z') }, owner)
+  assert.equal((await sessions.operations.archive({ id: session.id, reason: 'Moved' }, owner)).archived, true, 'a session is archived with its reason')
+  const reopened = await sessions.operations.unarchive({ id: session.id, reason: 'Back on' }, owner)
+  assert.deepEqual([reopened.archived, reopened.archiveReason], [false, 'Back on'], 'and brought back with one')
 })

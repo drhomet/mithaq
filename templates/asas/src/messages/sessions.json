@@ -1,4 +1,20 @@
 {
+  "archiveReason": {
+    "ar": "سبب الأرشفة",
+    "en": "Archive reason"
+  },
+  "archiveReason.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "archiveReason.maxLength": {
+    "ar": "القيمة طويلة جدًا.",
+    "en": "The value is too long."
+  },
+  "archiveReason.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
   "archived": {
     "ar": "مؤرشفة",
     "en": "Archived"
@@ -74,6 +90,14 @@
   "id.required": {
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
+  },
+  "operations.archive.reason": {
+    "ar": "السبب",
+    "en": "Reason"
+  },
+  "operations.unarchive.reason": {
+    "ar": "السبب",
+    "en": "Reason"
   },
   "organization": {
     "ar": "المؤسسة",

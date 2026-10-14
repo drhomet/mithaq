@@ -183,6 +183,10 @@
     "ar": "السبب",
     "en": "Reason"
   },
+  "operations.unarchive.reason": {
+    "ar": "السبب",
+    "en": "Reason"
+  },
   "organization": {
     "ar": "المؤسسة",
     "en": "Organization"

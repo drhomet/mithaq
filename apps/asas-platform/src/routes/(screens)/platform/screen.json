@@ -1186,6 +1186,9 @@
             "ar": "مؤرشف"
           },
           "rules": {
+            "providedBy": {
+              "create": "never"
+            },
             "required": false
           },
           "component": "checkbox",
@@ -1398,6 +1401,14 @@
         },
         {
           "name": "archive",
+          "effect": "update"
+        },
+        {
+          "name": "unarchive",
+          "effect": "update"
+        },
+        {
+          "name": "unpublish",
           "effect": "update"
         },
         {
@@ -1887,6 +1898,9 @@
             "ar": "مؤرشفة"
           },
           "rules": {
+            "providedBy": {
+              "create": "never"
+            },
             "required": false
           },
           "component": "checkbox",
@@ -1924,6 +1938,20 @@
           "on": "session",
           "component": "join",
           "cell": "join"
+        },
+        {
+          "name": "archiveReason",
+          "kind": "text",
+          "label": {
+            "en": "Archive reason",
+            "ar": "سبب الأرشفة"
+          },
+          "rules": {
+            "maxLength": 200,
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
         }
       ],
       "operations": [
@@ -1964,6 +1992,14 @@
           "name": "archiveMany",
           "effect": "update",
           "updatesMany": true
+        },
+        {
+          "name": "archive",
+          "effect": "update"
+        },
+        {
+          "name": "unarchive",
+          "effect": "update"
         }
       ],
       "useAsTitle": "startsAt",

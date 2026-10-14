@@ -120,12 +120,12 @@ const page = {
   totalPages: 1,
 }
 
-const listMarkup = (locale = 'en') =>
+const listMarkup = (locale = 'en', query: Record<string, unknown> = {}) =>
   renderToStaticMarkup(
     createElement(List, {
       kayan: courses,
       page,
-      query: {},
+      query,
       t: translator(locale),
       locale,
       onQuery: () => {},
@@ -381,13 +381,14 @@ test('10. delete takes two clicks, and the one that deletes is not rendered at a
 })
 
 test('11. a checkbox cell says true from false in words, so the column is not a glyph a screen reader skips', () => {
-  const html = listMarkup()
+  // The Status column says archived, so the checkbox column is one the URL turns on.
+  const html = listMarkup('en', { cols: ['title', 'archived'] })
   // Read as the glyph and word pair: `archived` is false here, so asserting the other glyph absent would pass on a broken cell.
   const cell = /<span aria-hidden="true"[^>]*>([^<]*)<\/span><span class="sr-only">([^<]*)<\/span>/.exec(html)
   assert.ok(cell, `the checkbox cell is a hidden glyph followed by the words for it:\n${html.slice(0, 600)}`)
   assert.equal(cell[1], '✗', 'the glyph is the one this row\'s false value renders')
   assert.equal(cell[2], 'Active', 'and the word beside it is what the project wrote for false')
-  const arabic = /<span aria-hidden="true"[^>]*>[^<]*<\/span><span class="sr-only">([^<]*)<\/span>/.exec(listMarkup('ar'))
+  const arabic = /<span aria-hidden="true"[^>]*>[^<]*<\/span><span class="sr-only">([^<]*)<\/span>/.exec(listMarkup('ar', { cols: ['title', 'archived'] }))
   assert.equal(arabic?.[1], 'نشط', 'and in the other locale it is the other word')
 })
 
@@ -1565,7 +1566,7 @@ test('66. a page\'s button runs a kayan\'s own operation on the edit page, under
   assert.equal(operationLabelFor({ kayan: courses, operation: archive!, copy }), 'Archive', 'which resolves in the locale asked for')
   assert.equal(operationLabelFor({ kayan: courses, operation: archive!, copy: { t: translator('ar'), locale: 'ar' } }), 'أرشفة', 'and in the other one')
   const everything = Object.fromEntries(courses.operations.map((one) => [one.name, true]))
-  assert.deepEqual(pageButtonsOf(courses, edit, everything).map((one) => one.name), ['archive', 'delete'], 'no screen draws a button the page does not list')
+  assert.deepEqual(pageButtonsOf(courses, edit, everything).map((one) => one.name), ['unpublish', 'archive', 'unarchive', 'delete'], 'no screen draws a button the page does not list')
 
   const drawn = (extra: Record<string, unknown>) =>
     formMarkup({ client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}), run: async () => ({}) }, screen: screenOf(edit), ...extra })

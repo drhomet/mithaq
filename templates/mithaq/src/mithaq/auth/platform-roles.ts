@@ -44,7 +44,7 @@ const business = [
   // staff role but `super_admin`'s `'*'` holds `courses.restoreVersion`.
   'courses.findVersions',
   'courses.findVersionByID',
-  ...reads('sessions', [...stamps, 'organization', 'course', 'startsAt', 'capacity', 'venue', 'format', 'archived', 'details', 'enrollments']),
+  ...reads('sessions', [...stamps, 'organization', 'course', 'startsAt', 'capacity', 'venue', 'format', 'archived', 'details', 'enrollments', 'archiveReason']),
   ...reads('enrollments', [...stamps, 'organization', 'session', 'student', 'deletedAt']),
   // end add-on: courses
   ...reads('tags', [...stamps, 'organization', 'name']),

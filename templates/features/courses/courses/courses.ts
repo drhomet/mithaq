@@ -6,6 +6,7 @@ import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { sessions } from '../sessions/sessions.ts'
 import { onOffer } from '../domain/on-offer.ts'
 import { expectedUpdatedAt } from '@asas/mithaq/steps/expected-updated-at.ts'
+import { archivedRow, marks, notArchived, reason, reasonInput, unarchived } from '../domain/archive.ts'
 
 /**
  * Page pieces only this kayan draws with. What both screens share is reached
@@ -17,40 +18,17 @@ const feeCell = ui('fee-cell.tsx#FeeCell')
 /** What the list's Status column draws. */
 const statusCell = ui('status-cell.tsx#StatusCell')
 
-/**
- * What `archive` parses. The error messages are this project's own copy keys: a
- * refusal's message is the key the form resolves. Without them the form draws what zod
- * wrote, in English.
- */
-const archiveInput = z.object({
-  id: z.guid(),
-  reason: z
-    .string({ error: 'courses.operations.archive.reason.required' })
-    .max(200, { error: 'courses.operations.archive.reason.maxLength' }),
-})
-
-/** The box `archive`'s dialog asks for on every screen that draws its button. */
-const reason = {
-  kind: 'text',
-  label: { en: 'Reason', ar: 'السبب' },
-  rules: { required: true, maxLength: 200 },
-} as const
-
-/**
- * The one step `archive` adds: it turns the operation's `reason` into the two
- * columns the kayan has, so `reason` never has to be a field.
- */
-const markArchived = (ctx: Ctx<z.infer<typeof archiveInput>>): Ctx => {
-  const { reason } = ctx.data
-  // Spread `ctx.data` to keep what the runner filled before this step, such as
-  // `updatedAt`. `reason` reaches no column: the store step writes the kayan's own fields alone.
-  return { ...ctx, data: { ...ctx.data, archived: true, archiveReason: reason } }
-}
-
 /** When the access code is drawn: while the form holds a live delivery, redrawn as the delivery changes. */
 const live = { delivery: { equals: 'live' } }
-/** When an archive button is drawn: over a row not archived yet, on every page that draws one. */
-const unarchived = { or: [{ 'record.archived': { exists: false } }, { 'record.archived': { equals: false } }] }
+/** The edit page's header pill for an archived course, beside its title and draft status. */
+const archivedBadge = { component: ui('archived-badge.tsx#ArchivedBadge'), when: archivedRow }
+/** Active, Drafts, Archived and All: Active is what a list opens on, so an archived course is out of the way. */
+const stateTabs = [
+  { tab: 'active', label: { en: 'Active', ar: 'النشطة' }, where: notArchived },
+  { tab: 'drafts', label: { en: 'Drafts', ar: 'المسودات' }, where: { and: [notArchived, { _status: { equals: 'draft' } }] } },
+  { tab: 'archived', label: { en: 'Archived', ar: 'المؤرشفة' }, where: { archived: { equals: true } } },
+  { tab: 'all', label: { en: 'All', ar: 'الكل' } },
+] as const
 
 /** Whether the actor runs the catalogue and so reads every course and every session. */
 export const runsCatalogue = (user: unknown): boolean => readsPast(user, 'courses.archive') || readsPast(user, 'screen.dashboard')
@@ -255,10 +233,24 @@ export const courses = defineKayan({
           // field it names no key for. The portal declares the same box, because a
           // screen that declares none has no dialog, sends no reason and is refused.
           targets: { dashboard: { fields: { reason } }, portal: { fields: { reason } } },
-          // The schema is named at the top of the file beside the step that reads it,
-          // so one shape types both the parse and `ctx.data`.
-          input: () => archiveInput,
-          steps: ({ steps }) => [markArchived, steps.update],
+          input: () => reasonInput('courses.operations.archive'),
+          steps: ({ steps }) => [marks(true), steps.update],
+        },
+        /** Brings an archived course back into the catalogue, with the reason, which the activity keeps. */
+        unarchive: {
+          targets: { dashboard: { fields: { reason } } },
+          input: () => reasonInput('courses.operations.unarchive'),
+          steps: ({ steps }) => [marks(false), steps.update],
+        },
+        /**
+         * Payload's Unpublish: the course goes back to a draft, kept as it is and
+         * read by draft readers alone until it is published again. The caller
+         * sends the status it asks for, since an operation of its own keeps the
+         * row's status unless the call names one.
+         */
+        unpublish: {
+          input: ({ id }) => id.extend({ _status: z.literal('draft') }),
+          steps: ({ steps }) => [steps.update],
         },
         /**
          * A read list with one step of its own and an `output` written the way
@@ -295,7 +287,7 @@ export const courses = defineKayan({
           page: appPage([{ layout: 'table', main: [{ list: {
             // `_status` says whether each row is a draft or published, since this
             // list reads every row's latest draft.
-            columns: ['title', 'fee', 'archived', 'opensOn', '_status', 'details', 'cover'],
+            columns: ['title', 'fee', 'opensOn', '_status', 'details', 'cover'],
             filters: ['title', 'fee', 'archived'],
             // `details` is searched because this list names it: a rich text field
             // offers itself to no search box on its own.
@@ -312,16 +304,15 @@ export const courses = defineKayan({
                   body: { en: 'This cannot be undone.', ar: 'لا يمكن التراجع عن هذا.' },
                 },
               },
-              { button: 'updateMany', label: { en: 'Update', ar: 'تحديث' }, fields: ['fee', 'archived'] },
+              // Archived is not among them: a course leaves and comes back through its own operations.
+              { button: 'updateMany', label: { en: 'Update', ar: 'تحديث' }, fields: ['fee', 'notifications'] },
             ],
-            // On each row not archived yet, the edit page's own archive,
-            // asking for its reason.
-            row: [{
-              button: 'archive',
-              when: unarchived,
-              label: { en: 'Archive', ar: 'أرشفة' },
-              fields: ['reason'],
-            }],
+            // On each row, the edit page's own archive or unarchive, asking for its reason.
+            row: [
+              { button: 'archive', when: unarchived, label: { en: 'Archive', ar: 'أرشفة' }, fields: ['reason'] },
+              { button: 'unarchive', when: archivedRow, label: { en: 'Unarchive', ar: 'إلغاء الأرشفة' }, fields: ['reason'] },
+            ],
+            tabs: stateTabs,
           } }] }]),
         },
         // The edit page's Details and Catalogue, and nothing that needs a row yet:
@@ -337,16 +328,27 @@ export const courses = defineKayan({
         // field it draws, and no id, tenant or timestamp.
         edit: {
           path: '/courses/:id',
-          page: appPage([{ tabs: [
+          page: { ...appPage([{ tabs: [
             { tab: 'details', label: { en: 'Details', ar: 'التفاصيل' }, fields: [{
               layout: 'record',
               main: [{ form: details }],
               // Beside the form, what was done to this row, by whom and when.
               side: [archivedCatalogue, activity],
-              // Where a button sits is where it is drawn: the archive in the record
-              // layout's danger zone, asking before it runs and only over a row not
-              // archived yet, before the delete every edit page ends its danger zone with.
+              // Where a button sits is where it is drawn: in the record layout's danger
+              // zone, Unpublish over a published course, Archive over one not archived and
+              // Unarchive over one that is, each asking before it runs, before the delete
+              // every edit page ends its danger zone with.
               danger: danger({
+                button: 'unpublish',
+                when: { 'record._status': { equals: 'published' } },
+                label: { en: 'Unpublish', ar: 'إلغاء النشر' },
+                component: ui('unpublish-button.tsx#UnpublishButton'),
+                reload: true,
+                confirm: {
+                  title: { en: 'Unpublish this course?', ar: 'إلغاء نشر هذه الدورة؟' },
+                  body: { en: 'It goes back to a draft that no student sees, until it is published again.', ar: 'تعود مسودة لا يراها أي طالب حتى تُنشر مجددا.' },
+                },
+              }, {
                 button: 'archive',
                 when: unarchived,
                 label: { en: 'Archive', ar: 'أرشفة' },
@@ -355,6 +357,16 @@ export const courses = defineKayan({
                 confirm: {
                   title: { en: 'Archive this course?', ar: 'أرشفة هذه الدورة؟' },
                   body: { en: 'It leaves the catalogue for every student.', ar: 'تخرج من الدليل لكل الطلاب.' },
+                },
+              }, {
+                button: 'unarchive',
+                when: archivedRow,
+                label: { en: 'Unarchive', ar: 'إلغاء الأرشفة' },
+                fields: ['reason'],
+                reload: true,
+                confirm: {
+                  title: { en: 'Unarchive this course?', ar: 'إلغاء أرشفة هذه الدورة؟' },
+                  body: { en: 'It is back in the catalogue as it was.', ar: 'تعود إلى الدليل كما كانت.' },
                 },
               }),
             }] },
@@ -384,7 +396,7 @@ export const courses = defineKayan({
             { tab: 'versions', label: { en: 'Versions', ar: 'الإصدارات' }, fields: [
               { component: 'versions', when: { '$user.collections.courses.operations.findVersions': { equals: true } } },
             ] },
-          ] }]),
+          ] }]), header: [{ title: {} }, archivedBadge, { controls: {} }] },
         },
         board: {
           path: '/courses/board',
@@ -556,7 +568,8 @@ export const courses = defineKayan({
       kind: 'text', label: { en: 'Access code', ar: 'رمز الدخول' }, rules: { maxLength: 6 },
       targets: { dashboard: { component: 'otp' } },
     },
-    archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشف' }, targets: { dashboard: { filter: true } } },
+    // Written by `archive` and `unarchive` alone after the row is made, which record why.
+    archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشف' }, rules: { providedBy: { create: 'never' } }, targets: { dashboard: { filter: true } } },
     // What a course covers, several at once out of a closed list. A course names
     // at most two, so a third box ticked is refused before the save. No floor: an
     // optional list left empty passes any `minRows`, and a list that is there

@@ -290,7 +290,7 @@ test('3. the list page is server-rendered with the row the create wrote, under t
   assert.equal(response.status, 200, 'the list page answers 200')
   const html = await response.text()
   assert.ok(html.includes(title), `the course this run created is in the served HTML, so the route resolved it on the server:\n${html.slice(0, 1200)}`)
-  for (const label of ['Title', 'Fee', 'Archived']) {
+  for (const label of ['Title', 'Fee', 'Status']) {
     assert.ok(html.includes(`>${label}<`), `the served HTML heads a column with the declared label "${label}"`)
   }
 })
@@ -451,7 +451,7 @@ test('9. the list page serves a filter, a sort and a hidden column off the URL, 
   assert.ok(!secondPage.includes(`${prefix} 00`), 'and not the first, which is on page one')
   assert.ok(secondPage.indexOf(`${prefix} 10`) < secondPage.indexOf(`${prefix} 11`), 'in the ascending order the sort asked for')
 
-  const hidden = await fetch(`${origin}/dashboard/courses?${where}&cols=title,-fee,archived`, { headers: { cookie } })
+  const hidden = await fetch(`${origin}/dashboard/courses?${where}&cols=title,-fee,_status`, { headers: { cookie } })
   assert.equal(hidden.status, 200, 'a column list on the URL is served')
   const hiddenHtml = await hidden.text()
   // Read off the table head: the filter panel also names `Title`, so the whole document would mix two screens.
@@ -459,7 +459,7 @@ test('9. the list page serves a filter, a sort and a hidden column off the URL, 
   assert.ok(head, `the table has a head:\n${hiddenHtml.slice(0, 600)}`)
   assert.ok(head.includes('>Title<'), 'the column the list kept is still headed')
   assert.ok(!head.includes('>Fee<'), `and the one the URL hid is not:\n${head}`)
-  assert.ok(head.includes('>Archived<'), 'while the third is untouched')
+  assert.ok(head.includes('>Status<'), 'while the third is untouched')
 
   // The app's select mounts its items only while open, so a server render carries the chosen field
   // and operator on the triggers, which is where the URL's `where` arrives.
@@ -875,7 +875,7 @@ test('36. each screen answers at its own path inside its providers and shell, an
 test('37. the dashboard list page draws its layout and its list node: the columns, the search and a row link to the edit page', async () => {
   const html = await screenHtml('/dashboard/courses')
   assert.match(html, /data-layout="table" data-page="\/courses"/, 'the registered table layout draws the page')
-  for (const label of ['Title', 'Fee', 'Archived', 'Opens on']) assert.ok(html.includes(`>${label}<`), `the list node's column ${label}`)
+  for (const label of ['Title', 'Fee', 'Status', 'Opens on']) assert.ok(html.includes(`>${label}<`), `the list node's column ${label}`)
   assert.ok(html.includes(`href="/dashboard/courses/${screenCourse}"`), 'a row links to its edit page on this screen')
   assert.ok(html.includes('href="/dashboard/courses/new"'), 'and the create button to the create page')
   assert.match(html, /placeholder="Title, Summary, or Details"/, 'the search runs over the node\'s three fields')
@@ -1588,7 +1588,9 @@ test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads
   const rowOf = (html: string, name: string) => [...body(html).matchAll(/<tr[\s\S]*?<\/tr>/g)].map((one) => one[0]).find((one) => one.includes(`>${name}<`)) ?? ''
   const where = `where[title][like]=${encodeURIComponent(prefix)}`
   for (const screen of ['dashboard', 'portal']) {
-    const url = `/${screen}/courses?${where}&sort=-fee&page=2&limit=10`
+    // The dashboard's All tab, since its list opens on Active, which leaves the archived row out.
+    const all = screen === 'dashboard' ? '&tab=all' : ''
+    const url = `/${screen}/courses?${where}&sort=-fee&page=2&limit=10${all}`
     const first = await screenHtml(url)
     // The portal lists the courses on offer alone, so the archived row is not on its page.
     const two = screen === 'portal' ? [`${prefix} 01`] : [`${prefix} 01`, `${prefix} 00`]
@@ -1603,10 +1605,14 @@ test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads
     }
 
     // Each row carries its menu, which offers the archive only where the button's `when` holds over the row once opened in the browser.
-    const page = await screenHtml(`/${screen}/courses?${where}&sort=fee`)
+    const page = await screenHtml(`/${screen}/courses?${where}&sort=fee${all}`)
     assert.ok(rowOf(page, `${prefix} 01`).includes('data-row-menu='), `the ${screen} draws the menu on a row not archived`)
     if (screen === 'dashboard') assert.ok(rowOf(page, `${prefix} 00`).includes('data-row-menu='), `and on the archived row`)
   }
+
+  const active = rows(await screenHtml(`/dashboard/courses?${where}&sort=fee&limit=25`))
+  assert.deepEqual([active.length, active.includes(`${prefix} 00`)], [11, false], 'the dashboard opens on Active, the archived row out of the way')
+  assert.deepEqual(rows(await screenHtml(`/dashboard/courses?${where}&tab=archived`)), [`${prefix} 00`], 'and its Archived tab holds that row alone')
 
   // The portal's list opens by title, 25 to a page, and the URL overrides both; the dashboard names neither, so it opens newest first, ten to a page.
   const portal = await screenHtml(`/portal/courses?${where}`)

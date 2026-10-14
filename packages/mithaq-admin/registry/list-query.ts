@@ -19,6 +19,8 @@ export type ListQuery = {
   limit?: number
   /** The column accessor, prefixed `-` when the column is hidden. */
   cols?: readonly string[]
+  /** The list's tab, where its node names tabs; the first where the URL names none. */
+  tab?: string
 }
 
 /** One column as the popup holds it, which is what the `-` prefix encodes. */
@@ -70,10 +72,13 @@ export const sortableOf = (kayan: { fields: readonly ClientField[] }) => kayan.f
  * sorts by, and the list node's own page size, which is one the URL may name
  * whether or not the pager offers it.
  */
-export type ListRules = { paths: readonly FilterPath[]; sortable: readonly string[]; limit?: number; maxLimit: number }
+export type ListRules = { paths: readonly FilterPath[]; sortable: readonly string[]; limit?: number; maxLimit: number; tabs?: readonly string[] }
 
-/** What a list node says about its query: what it filters and searches by, and the sort and limit it opens with. */
-export type ListDefaults = { filters?: readonly string[]; search?: readonly string[]; sort?: string; limit?: number }
+/** One tab of a list: its name in the URL, its label, and the rows it holds the list to. */
+export type ListTab = { tab: string; label: Readonly<Record<string, string>>; where?: unknown }
+
+/** What a list node says about its query: what it filters and searches by, the sort and limit it opens with, and its tabs. */
+export type ListDefaults = { filters?: readonly string[]; search?: readonly string[]; sort?: string; limit?: number; tabs?: readonly ListTab[] }
 
 /** The rules one list node reads its URL by. */
 export const rulesOf = ({ kayan, node, maxLimit, context = {} }: { kayan: ClientKayan; node: ListDefaults | undefined; maxLimit: number; context?: FilterContext }): ListRules => ({
@@ -81,6 +86,7 @@ export const rulesOf = ({ kayan, node, maxLimit, context = {} }: { kayan: Client
   sortable: sortableOf(kayan),
   maxLimit,
   ...(node?.limit !== undefined && { limit: node.limit }),
+  ...(node?.tabs && { tabs: node.tabs.map((one) => one.tab) }),
 })
 
 /** A `where` in `qs`'s bracket form: `where[or][0][and][0][title][like]`. */
@@ -204,7 +210,7 @@ export type RawQuery = Readonly<Record<string, string>>
 const baseOf = (key: string) => key.replace(/^[^.[\]]+\.[^.[\]]+\./, '')
 const listKey = (key: string) => {
   const base = baseOf(key)
-  return base.startsWith('where') || ['search', 'sort', 'page', 'limit', 'cols'].includes(base)
+  return base.startsWith('where') || ['search', 'sort', 'page', 'limit', 'cols', 'tab'].includes(base)
 }
 
 /** The prefix one list node's keys carry in the URL: none for a page's own list, `<of>.<where>.` for a list of another kayan. */
@@ -236,8 +242,9 @@ export const readRaw = (source: QuerySource): RawQuery =>
 export const readQuery = (source: QuerySource, rules: ListRules): ListQuery => {
   const raw = readRaw(source)
   const where = whereOf(rules.paths, treeOf(Object.entries(raw).filter(([key]) => key.startsWith('where'))))
-  const { search, sort, cols } = raw
+  const { search, sort, cols, tab } = raw
   if (sort && !rules.sortable.includes(sort.replace(/^-/, ''))) refuse(`sorts by "${sort.replace(/^-/, '')}", which this list does not sort by.`)
+  if (tab && !rules.tabs?.includes(tab)) refuse(`names tab "${tab}", which this list does not offer.`)
   const page = whole(raw.page)
   const limit = whole(raw.limit)
   const list = (cols ?? '').split(',').map((one) => one.trim()).filter(Boolean)
@@ -248,6 +255,7 @@ export const readQuery = (source: QuerySource, rules: ListRules): ListQuery => {
     ...(page && { page }),
     ...(limit && (limitsUpTo(rules.maxLimit).includes(limit) || limit === rules.limit) && { limit }),
     ...(list.length > 0 && { cols: list }),
+    ...(tab && { tab }),
   }
 }
 
@@ -269,6 +277,7 @@ export const writeQuery = (query: ListQuery): Record<string, string> => ({
   ...(query.page && query.page > 1 && { page: String(query.page) }),
   ...(query.limit && { limit: String(query.limit) }),
   ...(query.cols?.length && { cols: query.cols.join(',') }),
+  ...(query.tab && { tab: query.tab }),
 })
 
 /**
@@ -408,7 +417,10 @@ export const findOf = ({
   locales?: readonly string[]
   client?: readonly Searchable[]
 }) => {
-  const where = findWhere({ kayan, query, search: node?.search, locales, client })
+  const searched = findWhere({ kayan, query, search: node?.search, locales, client })
+  // The tab the URL names, or the list's first, holds every page to its rows.
+  const tab = (node?.tabs?.find((one) => one.tab === query.tab) ?? node?.tabs?.[0])?.where
+  const where = tab === undefined ? searched : searched === undefined ? tab : { and: [tab, searched] }
   const sort = query.sort ?? node?.sort
   return {
     ...(where !== undefined && { where }),
