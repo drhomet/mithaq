@@ -15260,6 +15260,7 @@ test('151c. the platform renames an organization and its slug through its own ro
     [{ id: 'no-such-organization', name: 'None', slug: 'none-151c' }, 404],
     [{ id: a!.organization, name: 'Taken', slug: 'tenant-151c-b' }, 409],
     [{ id: a!.organization, name: 'x'.repeat(256), slug: 'long-name' }, 400],
+    [{ id: a!.organization, name: 'Line\r\nbreak', slug: 'line-break' }, 400],
     [{ id: a!.organization, name: 'Long slug', slug: 'a'.repeat(256) }, 400],
   ] as const) {
     assert.equal((await rename(administrator.headers, body)).status, status, `${JSON.stringify(body)} answers ${status}`)

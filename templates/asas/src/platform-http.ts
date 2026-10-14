@@ -64,9 +64,10 @@ export const platformHttp = () => (): HttpPlug => ({
       const id = body?.id
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
       const slug = typeof body?.slug === 'string' ? body.slug.trim() : ''
-      if (typeof id !== 'string' || !id || !name || name.length > most.name || !slugShape.test(slug) || slug.length > most.slug) {
+      // A name is one line: mail bodies carry it, where a break would be a line of the writer's own.
+      if (typeof id !== 'string' || !id || !name || name.length > most.name || /[\u0000-\u001f\u007f]/.test(name) || !slugShape.test(slug) || slug.length > most.slug) {
         throw invalid({
-          message: `An organization is renamed with its id, a name of at most ${most.name} characters, and a slug of at most ${most.slug} lowercase letters, digits and hyphens.`,
+          message: `An organization is renamed with its id, a name of one line and at most ${most.name} characters, and a slug of at most ${most.slug} lowercase letters, digits and hyphens.`,
           key: 'error.invalid.value',
         })
       }

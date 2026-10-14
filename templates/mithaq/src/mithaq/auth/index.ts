@@ -329,6 +329,17 @@ const invitationMail = ({ mailer, organizations, showOrganization }: { mailer: M
 }
 
 /**
+ * An organization's name as it is kept: one line of 1 to 100 characters. Anyone founds one with many
+ * organizations, and its name goes into the plain text of every mail that names it, where a line
+ * break would be the founder's own line.
+ */
+const organizationName = (name: unknown) => {
+  const line = typeof name === 'string' ? name.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/ {2,}/g, ' ').trim() : ''
+  if (!line || line.length > 100) throw new APIError('BAD_REQUEST', { code: 'ORGANIZATION_NAME', message: 'An organization has a name of 1 to 100 characters on one line.' })
+  return line
+}
+
+/**
  * How many invitations one organization makes, whoever makes them, so no organization turns the
  * project's mailer into a flood: `perMinute` in any minute and `perDay` in any day.
  */
@@ -379,7 +390,11 @@ const organizationOptionsFor = ({ mailer, organizations, showOrganization }: Aut
   // is not verified, since holding the id is its proof, so asking for one would leave every
   // invitation unanswerable.
   organizationHooks: {
-    beforeUpdateOrganization: gate('organization.update'),
+    beforeCreateOrganization: async ({ organization }: { organization: { name?: unknown } & Record<string, unknown> }) => ({ data: { ...organization, name: organizationName(organization.name) } }),
+    beforeUpdateOrganization: async ({ organization }: { organization: { name?: unknown } & Record<string, unknown> }) => {
+      await gate('organization.update')({ organization })
+      return organization.name === undefined ? undefined : { data: { ...organization, name: organizationName(organization.name) } }
+    },
     beforeRemoveMember: gate('member.delete'),
     beforeUpdateMemberRole: async ({ newRole, organization }: { newRole: string; organization: { id: string } }) => {
       await gate('member.update')({ organization })

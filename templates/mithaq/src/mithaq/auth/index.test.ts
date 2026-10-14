@@ -328,6 +328,20 @@ test('one organization holds every person of the app, so it takes members withou
   assert.equal(organizationLimitsFor('many').membershipLimit, 10_000)
 })
 
+test('an organization\'s name, which founders write and mail bodies carry, is one line of at most 100 characters, however it is made or renamed', async () => {
+  for (const settings of [authSettings, { ...authSettings, organizations: 'one' as const }]) {
+    const server = betterAuthServer({ ...authOptions({}, settings).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+    const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
+    const made = (await server.api.createOrganization({ body: { name: ' Evil\r\nBcc: x@example.com\u0007 ', slug: 'evil', userId: user.id } }))!
+    assert.equal(made.name, 'Evil Bcc: x@example.com', `${settings.organizations}: a line break or control character is taken out`)
+    await assert.rejects(server.api.createOrganization({ body: { name: 'x'.repeat(101), slug: 'long', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: a name past 100 characters is refused`)
+    await assert.rejects(server.api.createOrganization({ body: { name: '\r\n', slug: 'blank', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: and one of nothing but breaks`)
+    const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+    const renamed = await server.api.updateOrganization({ body: { organizationId: made.id, data: { name: 'Line\none' } }, headers })
+    assert.equal(renamed?.name, 'Line one', `${settings.organizations}: a rename is one line too`)
+  }
+})
+
 test('a mailer is never waited on: a reset is answered as fast for an address with an account as for one without, and the mail follows', async () => {
   const sent: string[] = []
   const slow = { send: async ({ to }: { to: string }) => { await new Promise((done) => setTimeout(done, 1000)); sent.push(to) } }
