@@ -7277,6 +7277,8 @@ test('229a. over asas.handler an invitation is accepted only by the person signe
   assert.deepEqual(await memberships(stranger.id), [], 'and joins nothing')
 
   const invitee = await signedUp('invitee-229a')
+  // An account made by invitation where holding the id is the proof, which proved no address.
+  await db.execute(`update "user" set email_verified = false where id = '${invitee.id}'`)
   assert.equal(((await db.execute(`select email_verified from "user" where id = '${invitee.id}'`)).rows[0] as { email_verified: boolean }).email_verified, false, 'the invitee has no verified address')
   const read = await answer(auth(`get-invitation?id=${invitation}`, invitee.headers))
   assert.deepEqual([read.status, read.body?.organizationName], [200, 'Tenant 229a'], 'and reads the invitation, naming the organization')

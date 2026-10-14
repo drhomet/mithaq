@@ -1111,7 +1111,7 @@ test('229c. the members page refuses an empty or malformed address before sendin
 
   sent.length = 0
   answer = [200, {}]
-  assert.equal(host.querySelector('[data-copy-invite]'), null, 'outside development no link is offered to copy')
+  assert.equal(host.querySelector('[data-copy-invite="i1"]')?.getAttribute('aria-label'), 'Copy link: old@example.com', 'in every environment the link is offered to copy, for an address the mail does not reach')
   assert.equal(host.querySelector('[data-cancel-invite="i1"]')?.getAttribute('aria-label'), 'Cancel invitation: old@example.com', 'each Cancel names its invitation')
   await act(async () => click(host.querySelector('[data-cancel-invite="i1"]')!))
   await act(async () => sleep(10))

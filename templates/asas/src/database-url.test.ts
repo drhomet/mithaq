@@ -138,6 +138,10 @@ test('a production boot with no DATABASE_URL refuses on import, before any conne
       STORAGE_SECRET: 'a-production-storage-secret-of-32-characters',
       STORAGE_PREFIX: 'mithaq/asas',
       STORAGE_ADAPTER: 'local',
+      // Nothing here mails, and the discard port refuses what would.
+      RESEND_API_KEY: 're_never_sent',
+      MAIL_FROM: 'mail@example.com',
+      RESEND_BASE_URL: 'http://127.0.0.1:9',
     }
     delete env.DATABASE_URL
     const child = execFile(
