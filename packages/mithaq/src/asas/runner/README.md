@@ -21,13 +21,15 @@ words kayan, rukn, asas, target or operation are new.
    tenant: betterAuthTenant({
      relationTo: 'organization',
      onDelete: 'restrict',
+     organizations,
      platform: ({ user }) => onPlatform() && platformRolesOf(user).length > 0,
    }),
    ```
 
    `relationTo` names the kayan an organization is. `onDelete: 'restrict'` is
    the only value it takes: an organization that still holds a row is not
-   deleted. `platform` is optional; see [The platform app](#the-platform-app).
+   deleted. `organizations` is required; see [Organization modes](#organization-modes).
+   `platform` is optional; see [The platform app](#the-platform-app).
 
 2. **Export the field.** The language returns the target as `targets: {
    tenant }`, and its `field` is what a kayan places. The template exports a
@@ -234,6 +236,22 @@ The template does it like this:
 Where it lives: `templates/mithaq/src/mithaq/auth/index.ts` `asPlatform` and `onPlatform`;
 `templates/mithaq/src/roles/tenant-access.ts` `assignedRoles` and `platformReads`;
 `apps/asas-platform/src/screens.tsx` `inProcess`.
+
+## Organization modes
+
+`organizations` tells core how many organizations the project holds:
+
+- `'many'`: any number.
+- `'one'`: one, which the project names and shows.
+- `'none'`: one, which the project never shows.
+
+Tenancy is the same in all three: every per-organization kayan places the field, and the scope above is ANDed onto every managed operation. So switching between them moves no row.
+
+What core does with the value: in `'one'` and `'none'`, `connect()` reads the tenant kayan after the stores connect, and refuses to start when it holds more than one row. The message names the mode. A `connect({ readOnly: true })` does not check.
+
+Two organizations in a one-organization project would split its people and rows without a word. Leaving `'many'` therefore needs a merge first: re-key the field on every per-organization table and resolve what each organization held once (a `within` unique, a global's row, roles). That merge is a migration of the project's own.
+
+What the project does with the value: sign-up, joining and the screens follow it in the template's auth setup (`templates/mithaq/src/mithaq/auth/organizations.ts`). Core reads nothing there.
 
 ## Unique values and indexes
 

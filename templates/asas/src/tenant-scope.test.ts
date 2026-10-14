@@ -120,7 +120,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       zod: zodTarget,
       rbac: access,
       versions: versionsTarget({ max: 100 }),
-      tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', platform: ({ user }) => platformApp && staff.has((user as { id: string }).id) }),
+      tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', organizations: 'many', platform: ({ user }) => platformApp && staff.has((user as { id: string }).id) }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize }),
     } as {},
   })

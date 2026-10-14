@@ -743,6 +743,19 @@ export const buildAsas = <
     )
   }
   const tenant = tenancy({ language, assigned, onError: (error) => auth?.onError?.(error), collection: betterAuthKayan[0] })
+  // A project of one organization that came to hold two would split its people and rows between them
+  // without a word, so it does not start. Two rows are read, not counted, so every store can answer.
+  const refuseExtraTenants = async () => {
+    const target = language.targets.tenant
+    if (!isTenant(target) || target.organizations === 'many') return
+    const tenants = resolvedByName.get(target.relationTo)
+    if (!tenants) return
+    const found = await (buildTargets[tenants.store] as Store).find({ kayan: tenants.name, args: { limit: 2, page: 1, sort: { field: 'id', direction: 'asc' } } })
+    if (found.docs.length < 2) return
+    throw new Error(
+      `The tenant target says organizations: '${target.organizations}', and the "${tenants.name}" table holds more than one. Set organizations to 'many' where the project sets it, or merge them into one first; a merge is a migration of the project's own.`,
+    )
+  }
   // The tenant scope goes under both authorizers, so replacing either cannot leave it out.
   const authorize: Authorize = tenant.scoped(service.authorize === defaultAuthorize
     ? defaultAuthorize
@@ -1096,6 +1109,7 @@ export const buildAsas = <
     connect: async ({ readOnly }: { readOnly?: boolean } = {}) => {
       // `readOnly` writes nothing: no push.
       for (const [, store] of stores) await store.connect({ readOnly })
+      if (!readOnly) await refuseExtraTenants()
     },
     destroy: async () => {
       for (const [, store] of stores) await store.destroy()

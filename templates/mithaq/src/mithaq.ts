@@ -43,6 +43,7 @@ import { systemRoles } from './roles/system-roles.ts'
 import { storageConfig } from './storage/index.ts'
 // end add-on: uploads
 import { onPlatform } from './mithaq/auth/index.ts'
+import { organizations } from './mithaq/auth/organizations.ts'
 import { assignedRoles, platformRolesOf, tenantAccess } from './roles/tenant-access.ts'
 // without add-on: roles
 // import { accessTarget } from './roles/member-access.ts'
@@ -181,6 +182,8 @@ export const serverTargets = {
   tenant: betterAuthTenant({
     relationTo: 'organization',
     onDelete: 'restrict',
+    // How many organizations this project holds; in one or none a start over more is refused.
+    organizations,
     // Staff read every organization with `tenant: 'all'` in the platform app
     // alone, which is the app's own fact and never the request's; their rows
     // there write nothing.

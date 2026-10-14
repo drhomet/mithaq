@@ -30,7 +30,7 @@ const language = defineMithaq({
     drizzle: drizzleStore,
     zod: zodTarget,
     rbac: accessTarget(),
-    tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict' }),
+    tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }),
     service: serviceTarget({ /* ... */ }),
     dashboard: dashboardScreen,
   },
