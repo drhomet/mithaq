@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
+import { createServer as createHttpServer } from 'node:http'
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -28,6 +29,19 @@ const platformApp = fileURLToPath(new URL('./asas-platform', import.meta.url))
 
 let served: ReturnType<typeof spawn> | undefined
 let platformServed: ReturnType<typeof spawn> | undefined
+/**
+ * Every message the apps mail, caught on this machine: a production start needs a mailer, and the apps' Resend
+ * mailer posts here through `RESEND_BASE_URL`, so nothing reaches Resend.
+ */
+const mailed: { to: string[]; text: string }[] = []
+const mailbox = createHttpServer((request, response) => {
+  let body = ''
+  request.on('data', (chunk: Buffer) => { body += chunk })
+  request.on('end', () => {
+    mailed.push(JSON.parse(body) as (typeof mailed)[number])
+    response.writeHead(200, { 'content-type': 'application/json' }).end('{"id":"caught"}')
+  })
+})
 let env: NodeJS.ProcessEnv = process.env
 // `after` is not reached on these signals, and a child left running holds its port.
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
@@ -100,6 +114,8 @@ before(async () => {
   const builtIn = performance.now() - buildStarted
 
   const startStarted = performance.now()
+  mailbox.listen(0, '127.0.0.1')
+  await once(mailbox, 'listening')
   const [port, platformPort] = [await freePort(), await freePort()]
   origin = `http://127.0.0.1:${port}`
   platformOrigin = `http://127.0.0.1:${platformPort}`
@@ -115,6 +131,9 @@ before(async () => {
     PLATFORM_URL: platformOrigin,
     // A production platform makes its first administrator only with this code.
     SETUP_CODE: setupCode,
+    RESEND_API_KEY: 're_tanstack_boot_never_sent',
+    MAIL_FROM: 'Boot <mail@example.com>',
+    RESEND_BASE_URL: `http://127.0.0.1:${(mailbox.address() as { port: number }).port}`,
     STORAGE_SECRET: 'asas-tanstack-boot-storage-secret-of-32-chars',
     STORAGE_PREFIX: 'mithaq/asas',
     STORAGE_ADAPTER: 'local',
@@ -160,7 +179,47 @@ after(async () => {
     child.kill()
     await once(child, 'exit')
   }
+  mailbox.close()
 })
+
+/**
+ * A sign-in over the socket. The provider answers three sign-ins from one address in ten seconds and this file signs in
+ * more often, so a refusal for that alone waits the time it names and asks again.
+ */
+const signedInOver = async (email: string) => {
+  for (;;) {
+    const signedIn = await post('/api/auth/user/sign-in/email', { email, password }, { origin })
+    if (signedIn.response.status !== 429) return signedIn
+    await sleep(Number(signedIn.response.headers.get('x-retry-after') ?? 1) * 1000 + 100)
+  }
+}
+
+/** The link last mailed to `email`, waited for briefly: the apps mail after they answer. */
+const linkMailed = async (email: string) => {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const link = /https?:\/\/\S+/.exec(mailed.filter((one) => one.to.includes(email)).at(-1)?.text ?? '')?.[0]
+    if (link) return new URL(link)
+    await sleep(50)
+  }
+  assert.fail(`no link was mailed to ${email}`)
+}
+
+/**
+ * Signs `email` up over the socket and proves its address as its owner does, by choosing `password` from the mailed link:
+ * a sign-up opens no session until then. Answers the sign-up's own answer.
+ */
+const provedSignUp = async ({ name, email }: { name: string; email: string }) => {
+  const signedUp = await fetch(`${origin}/api/auth/user/sign-up/email`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin },
+    body: JSON.stringify({ name, email, password: 'typed-at-sign-up' }),
+  })
+  assert.equal(signedUp.status, 200, `the account is made: ${await signedUp.clone().text()}`)
+  const token = (await linkMailed(email)).searchParams.get('token')
+  const chosen = await post('/api/auth/user/reset-password', { token, newPassword: password }, { origin })
+  assert.equal(chosen.response.status, 200, `the mailed link proves the address: ${JSON.stringify(chosen.body)}`)
+  return signedUp
+}
 
 test('1. the /api catch-all still forwards every arm to asas.handler, and a path it does not own keeps the handler\'s own 404', async () => {
   const unowned = await fetch(`${origin}/api/not-ours`)
@@ -185,14 +244,12 @@ test('2. a session is signed up and an organization created through the auth arm
   const stamp = Date.now()
   // Better Auth's CSRF check requires the `origin` header a browser sends; `fetch` does not set it.
   actorEmail = `boot-${stamp}@example.com`
-  const signUp = await fetch(`${origin}/api/auth/user/sign-up/email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin },
-    body: JSON.stringify({ name: actorName, email: actorEmail, password }),
-  })
-  assert.equal(signUp.status, 200, `the auth arm signs the user up: ${await signUp.clone().text()}`)
-  cookie = (signUp.headers.getSetCookie?.() ?? []).map((one) => one.split(';')[0]).join('; ')
-  assert.ok(cookie, 'the sign-up answered with the session cookie the rest of this file is made with')
+  const signUp = await provedSignUp({ name: actorName, email: actorEmail })
+  assert.equal((signUp.headers.getSetCookie?.() ?? []).some((one) => one.includes('session_token')), false, 'the sign-up opens no session before its address is proved')
+  const signedIn = await signedInOver(actorEmail)
+  assert.equal(signedIn.response.status, 200, `the proved account signs in: ${JSON.stringify(signedIn.body)}`)
+  cookie = (signedIn.response.headers.getSetCookie?.() ?? []).map((one) => one.split(';')[0]).join('; ')
+  assert.ok(cookie, 'with the session cookie the rest of this file is made with')
 
   // `tenantAccess` keys rows on the active organization, so an actor in none holds no role and is denied.
   organizationName = `Boot ${stamp}`
@@ -319,15 +376,9 @@ test('7b. the sign-in page\'s own arm answers a session cookie for a signed-up a
   // The provider's CSRF check requires the `origin` header a browser sends; `fetch` does not set it.
   const stamp = Date.now()
   const email = `signin-${stamp}@example.com`
-  const signedUp = await fetch(`${origin}/api/auth/user/sign-up/email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin },
-    body: JSON.stringify({ name: 'Sign In', email, password: 'a-long-enough-password' }),
-  })
-  assert.equal(signedUp.status, 200, `the account is made: ${await signedUp.clone().text()}`)
-  assert.ok(signedUp.headers.getSetCookie?.().length, 'and the sign-up answered a session cookie')
+  await provedSignUp({ name: 'Sign In', email })
 
-  const signedIn = await post('/api/auth/user/sign-in/email', { email, password: 'a-long-enough-password' }, { origin })
+  const signedIn = await signedInOver(email)
   assert.equal(signedIn.response.status, 200, `the sign-in the page makes answers 200: ${JSON.stringify(signedIn.body)}`)
   const set = signedIn.response.headers.getSetCookie?.() ?? []
   assert.ok(set.length > 0, 'and answers with the session cookie a screen is then drawn from')
@@ -431,14 +482,11 @@ test('10. the empty state says whether the kayan is empty or the filter matched 
   assert.ok(!matchedHtml.includes('Nothing here yet.'), 'and not the sentence for an empty kayan')
 
   const stamp = Date.now()
-  const signUp = await fetch(`${origin}/api/auth/user/sign-up/email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin },
-    body: JSON.stringify({ name: 'Empty Person', email: `empty-${stamp}@example.com`, password: 'a-long-enough-password' }),
-  })
-  assert.equal(signUp.status, 200, `the second session is signed up: ${await signUp.clone().text()}`)
+  const signUp = await provedSignUp({ name: 'Empty Person', email: `empty-${stamp}@example.com` })
   const emptyUser = (await signUp.json()) as { user?: { id?: unknown } }
-  const empty = (signUp.headers.getSetCookie?.() ?? []).map((one) => one.split(';')[0]).join('; ')
+  const signedIn = await signedInOver(`empty-${stamp}@example.com`)
+  assert.equal(signedIn.response.status, 200, `the second session signs in: ${JSON.stringify(signedIn.body)}`)
+  const empty = (signedIn.response.headers.getSetCookie?.() ?? []).map((one) => one.split(';')[0]).join('; ')
   const organization = await post('/api/auth/user/organization/create', { name: `Empty ${stamp}`, slug: `empty-${stamp}` }, { cookie: empty, origin })
   assert.equal(organization.response.status, 200, `the second organization is created: ${JSON.stringify(organization.body)}`)
   // Its creator is already its administrator, and a second assignment of one role is refused.
@@ -614,7 +662,7 @@ test('13. a field cleared in the form is saved as empty, and the edit page rende
 test('15. a raw sign-in cookie lands with its active organization and reaches a screen with no page step between', async () => {
   // The provider sets the active organization when the session is made and every row is keyed on it,
   // so the list page reads rows on the first request the cookie is used for.
-  const signedIn = await post('/api/auth/user/sign-in/email', { email: actorEmail, password }, { origin })
+  const signedIn = await signedInOver(actorEmail)
   assert.equal(signedIn.response.status, 200, `the actor of test 2 signs in again: ${JSON.stringify(signedIn.body)}`)
   const fresh = (signedIn.response.headers.getSetCookie?.() ?? []).map((one) => one.split(';')[0]).join('; ')
   assert.ok(fresh, 'and the sign-in answers a session cookie of its own')
@@ -1193,11 +1241,15 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
   assert.equal(signInLocation.searchParams.get('redirect'), '/unauthorized', 'and carries /unauthorized itself as the redirect')
 })
 
-/** Signed up in this process, not over the socket, which the provider's sign-up rate limit would refuse after this file's first few. */
+/**
+ * Signed up in this process, not over the socket, which the provider's sign-up rate limit would refuse after this file's
+ * first few, and proved here as the mailed link proves it.
+ */
 const signedUpHere = async (slug: string) => {
   const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { signUpEmail(args: unknown): Promise<{ user: { id: string } }> } } }).server
   const email = `${slug}-${Date.now()}@example.com`
   const made = await server.api.signUpEmail({ body: { name: slug, email, password } })
+  await (asas.targets.drizzle as unknown as { db: { execute(query: string): Promise<unknown> } }).db.execute(`update "user" set email_verified = true where id = '${made.user.id}'`)
   return { id: made.user.id, email }
 }
 
@@ -2317,12 +2369,12 @@ test('69. every auth page reads cleanly in both locales: a way home, the languag
   }
   const badToken = await refused('reset-password', { newPassword: 'a-long-enough-password', token: 'not-a-real-one' })
   assert.equal(badToken.key, 'auth.tokenInvalid', `a token the provider does not hold is said as the link being no good: ${badToken.text}`)
-  // This boot is a production build, which serves no reset with no mail sender: the forgot request is refused alike
-  // for an address with an account and one without.
+  // A production build starts only with a mailer, so the forgot request is answered alike for an address with an
+  // account and one without.
   const held = await refused('request-password-reset', { email: actorEmail })
-  assert.equal(held.key, 'auth.resetDisabled', `the forgot request says reset is not available: ${held.text}`)
+  assert.equal(held.status, 200, `the forgot request is answered: ${held.text}`)
   assert.deepEqual(await refused('request-password-reset', { email: `nobody-${Date.now()}@example.com` }), held, 'and an address with no account is answered the same')
-  for (const key of [badToken.key, held.key]) {
+  for (const key of [badToken.key]) {
     for (const locale of ['en', 'ar'] as const) assert.ok(scopes.auth![key.slice('auth.'.length)]![locale], `${key} has words in ${locale}`)
   }
 
@@ -2688,13 +2740,10 @@ test('74. every template role signs in to the first screen it enters, the landin
   // The sentence is chosen on the memberships the actor holds, not on its active organization: a person in no organization
   // is told to ask for an invitation, and one made a member of one, with none active on the session, is told whom to ask.
   const stamp = Date.now()
-  const signUp = await fetch(`${origin}/api/auth/user/sign-up/email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin },
-    body: JSON.stringify({ name: 'Unplaced', email: `unplaced-${stamp}@example.com`, password: 'a-long-enough-password' }),
-  })
-  assert.equal(signUp.status, 200, `a person with no organization signs up: ${await signUp.clone().text()}`)
-  const unplaced = (signUp.headers.getSetCookie?.() ?? []).map((one) => one.split(';')[0]).join('; ')
+  const signUp = await provedSignUp({ name: 'Unplaced', email: `unplaced-${stamp}@example.com` })
+  const signedIn = await signedInOver(`unplaced-${stamp}@example.com`)
+  assert.equal(signedIn.response.status, 200, `a person with no organization signs in: ${JSON.stringify(signedIn.body)}`)
+  const unplaced = (signedIn.response.headers.getSetCookie?.() ?? []).map((one) => one.split(';')[0]).join('; ')
   const unplacedId = ((await signUp.json()) as { user: { id: string } }).user.id
   // Read as the text it shows: each name put in is its own isolated element.
   const told = async () => (await (await fetch(`${origin}/unauthorized`, { headers: { cookie: unplaced } })).text()).replace(/&#x27;|&#39;/g, "'").replace(/<!-- -->|<\/?(bdi|span)[^>]*>/g, '')

@@ -272,8 +272,8 @@ const keepOnly = ({ project, chosen }) => {
 /**
  * The organization mode and who may sign up, as `organizations.ts` writes them: one organization,
  * shown by name, by invitation unless asked, and many founding one by every sign-up. Open joiners of
- * the courses example are students; without the roles add-on nobody is given a role on joining. Only
- * one verifies addresses, which many does not yet.
+ * the courses example are students; without the roles add-on nobody is given a role on joining. Every
+ * open sign-up proves its address.
  */
 export function organizationSettings({ organizations = 'one', showOrganization = true, signUp, chosen }) {
   if (organizations === 'none') throw new Error('--organizations is one or many, not "none": one organization never shown is --organizations one --show-organization no.')
@@ -287,7 +287,7 @@ export function organizationSettings({ organizations = 'one', showOrganization =
     showOrganization,
     signUp: signUp ?? (many ? 'open' : 'invite'),
     joinRole: !many && chosen.includes('courses') ? 'student' : null,
-    verifyEmail: !many,
+    verifyEmail: true,
     allowedDomains: [],
   }
 }
@@ -468,7 +468,7 @@ Next, with PostgreSQL 15 or later serving the database DATABASE_URL names in ${l
   ${push}${single ? '' : '\n  cd ../../apps/asas-tanstack'}
   ${run} run dev   # the tenant app, http://localhost:5173${platform ? `\n  # in a second terminal, from apps/asas-platform: ${run} run dev   # the platform console, http://localhost:5174` : ''}
 
-${settings.organizations === 'many' ? 'Sign up in the tenant app and create an organization.' : `Open http://localhost:5173/auth/first-run and make the app's owner${settings.showOrganization ? ' and its organization' : ''}; vite dev on this machine asks no setup code, and a deploy asks the SETUP_CODE it was started with.${settings.signUp === 'open' ? ' An open sign-up needs a mailer in production: RESEND_API_KEY and MAIL_FROM.' : ''}`} Then ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills it with sample rows: it takes the first user and that user's first organization, or the ones SEED_EMAIL and SEED_ORGANIZATION name.${short ? `
+${settings.organizations === 'many' ? 'Sign up in the tenant app, open the link it writes to the server log to prove your address, sign in and create an organization.' : `Open http://localhost:5173/auth/first-run and make the app's owner${settings.showOrganization ? ' and its organization' : ''}; vite dev on this machine asks no setup code, and a deploy asks the SETUP_CODE it was started with.`} A production start needs a mailer: RESEND_API_KEY and MAIL_FROM. Then ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills it with sample rows: it takes the first user and that user's first organization, or the ones SEED_EMAIL and SEED_ORGANIZATION name.${short ? `
 
 The project holds no migration yet. Before it runs in production, write its first against an empty database with mithaq migrate --name init in ${single ? 'the project' : 'packages/asas'} (README.md, "Running in production").` : ''}`)
 }

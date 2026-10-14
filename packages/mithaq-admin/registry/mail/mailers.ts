@@ -14,13 +14,17 @@ export const logMailer: Mailer = {
   },
 }
 
+/** Where Resend's API answers, as its own SDK names it. */
+export const defaultResendBaseURL = 'https://api.resend.com'
+
 /**
  * Resend's HTTP API over `fetch`, so no SDK is installed. `from` is an address at a domain the Resend
- * account verified. A refusal throws with the status alone: the address and the body stay out of the log.
+ * account verified; `baseURL` is another address that speaks Resend's API, such as a test's catcher.
+ * A refusal throws with the status alone: the address and the body stay out of the log.
  */
-export const resendMailer = ({ apiKey, from }: { apiKey: string; from: string }): Mailer => ({
+export const resendMailer = ({ apiKey, from, baseURL }: { apiKey: string; from: string; baseURL: string }): Mailer => ({
   send: async ({ to, subject, text, html }) => {
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await fetch(`${baseURL}/emails`, {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
       body: JSON.stringify({ from, to: [to], subject, text, html }),

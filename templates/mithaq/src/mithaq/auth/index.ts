@@ -210,7 +210,7 @@ export type AuthSettings = {
   verifyEmail: boolean
   allowedDomains: readonly string[]
 }
-export const authSettings: AuthSettings = { mailer: configuredMailer ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains }
+export const authSettings: AuthSettings = { mailer: configuredMailer() ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains }
 
 /** A lowercase ASCII host of two labels or more, which an `xn--` international one is. */
 const host = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
@@ -257,10 +257,19 @@ export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: 
     if (!showOrganization) problems.push("organizations = 'many' takes showOrganization = true: a person who belongs to several switches between them by name.")
     if (signUp !== 'open') problems.push("organizations = 'many' takes signUp = 'open': each sign-up founds its own organization, and nobody joins one but by invitation.")
     if (joinRole !== null) problems.push("organizations = 'many' takes joinRole = null: nobody joins an organization there but by invitation.")
-    if (verifyEmail) problems.push("organizations = 'many' verifies no address yet: set verifyEmail = false.")
+    // Anyone founds an organization there, so a sign-up that answered an address with an account
+    // differently would tell anyone which addresses do, and an unproved account would keep one.
+    if (!verifyEmail) problems.push("organizations = 'many' takes verifyEmail = true: every sign-up proves its address, so a sign-up tells nobody which addresses have an account and nobody keeps another's.")
     if (allowedDomains.length) problems.push("organizations = 'many' takes no allowedDomains: nobody joins an organization there but by invitation.")
-    return problems
+  } else {
+    problemsOfOne({ problems, signUp, verifyEmail, allowedDomains, joinRole, joinRoles })
   }
+  // Without one no reset is offered, no invitation reaches anyone and no address is proved.
+  if (deployed && !mailer) problems.push('A start needs a mailer in production, which proves each address, sends each reset and mails each invitation: set RESEND_API_KEY and MAIL_FROM.')
+  return problems
+}
+/** `settingsProblems` of one organization. */
+const problemsOfOne = ({ problems, signUp, verifyEmail, allowedDomains, joinRole, joinRoles }: Omit<AuthSettings, 'mailer' | 'organizations' | 'showOrganization'> & { problems: string[]; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
   if (allowedDomains.length && signUp !== 'open') problems.push("allowedDomains is read only with signUp = 'open': empty it, or open the sign-up.")
   if (allowedDomains.length && !verifyEmail) problems.push('allowedDomains needs verifyEmail = true: an address nobody proved is any domain its writer wants.')
   for (const entry of allowedDomains) {
@@ -271,8 +280,6 @@ export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: 
   if (joinRole !== null && joinRoles === null) problems.push('joinRole is a role of the roles add-on, which this project does not hold: set joinRole = null, and a joiner holds the provider\'s member.')
   else if (joinRole !== null && held === undefined) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which is none of roles/tenant-roles.ts: ${Object.keys(joinRoles!).join(', ')}.`)
   else if (powers.length) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which holds ${powers.join(', ')}, and a stranger who signs up is never given a role that gives roles or invites.`)
-  if (deployed && signUp === 'open' && !mailer) problems.push("signUp = 'open' needs a mailer in production, which verifies each address and sends each reset: set RESEND_API_KEY and MAIL_FROM.")
-  return problems
 }
 
 // add-on: roles
@@ -715,7 +722,15 @@ export const backgroundSettled = async () => {
 
 export const optionsFor = (settings: AuthSettings) => ({
   // A reset ends every session of the account, in both apps, since they share one session table.
-  emailAndPassword: { enabled: true as const, revokeSessionsOnPasswordReset: true, ...(settings.mailer ? { sendResetPassword: resetMail(settings.mailer) } : {}) },
+  emailAndPassword: {
+    enabled: true as const,
+    revokeSessionsOnPasswordReset: true,
+    // Where a sign-up proves its address, an address with an account is answered with a made-up
+    // user. The admin plugin gives a real one its role as it is written, not as a default the
+    // made-up one reads, so without this the answer's `role` would say which addresses exist.
+    customSyntheticUser: ({ coreFields, additionalFields, id }: { coreFields: Record<string, unknown>; additionalFields: Record<string, unknown>; id: string }) => ({ ...coreFields, ...additionalFields, role: 'user', id }),
+    ...(settings.mailer ? { sendResetPassword: resetMail(settings.mailer) } : {}),
+  },
   // The provider rate limits only when `NODE_ENV` is `production`, so a deploy that sets none would
   // answer every sign-in and reset request unlimited. Off a local host it limits whatever
   // `NODE_ENV` says.
@@ -1052,8 +1067,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       if (!context || !(await holdsInvitation({ adapter: (await getCurrentAdapter(context.context.adapter as never)) as unknown as Finds, id: invitationId, email: user.email }))) throw inviteOnly()
     } else if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) throw outsideDomains()
   }
-  // Whether a new account proves its address before it signs in and joins.
-  const verifying = oneOrganization && settings.signUp === 'open' && settings.verifyEmail
+  // Whether a new account proves its address before it signs in and joins: with many organizations
+  // always, and with one where the sign-up is open and says so.
+  const verifying = settings.signUp === 'open' && settings.verifyEmail
   // Who joins the one organization by signing up: in one organization with an open sign-up,
   // when the account is made or, where addresses are verified, when its address is proved. The
   // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.

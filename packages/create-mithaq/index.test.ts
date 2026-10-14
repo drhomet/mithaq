@@ -267,7 +267,7 @@ test('organizations.ts says the mode and who may sign up: one organization by in
   create({ name: 'hidden', cwd: scratch, template, version: '1.2.3', showOrganization: false, signUp: 'open' })
   assert.deepEqual(settingsOf('hidden'), { organizations: "'one'", showOrganization: 'false', signUp: "'open'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' }, 'one organization the app never names')
   create({ name: 'many', cwd: scratch, template, version: '1.2.3', addOns: every, organizations: 'many' })
-  assert.deepEqual(settingsOf('many'), { organizations: "'many'", showOrganization: 'true', signUp: "'open'", joinRole: 'null', verifyEmail: 'false', allowedDomains: '[]' }, 'many founds an organization by every sign-up and verifies no address yet')
+  assert.deepEqual(settingsOf('many'), { organizations: "'many'", showOrganization: 'true', signUp: "'open'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' }, 'many founds an organization by every sign-up and proves every address')
   assert.throws(() => create({ name: 'invited-many', cwd: scratch, template, version: '1.2.3', organizations: 'many', signUp: 'invite' }), /many organizations take --sign-up open/)
   assert.throws(() => create({ name: 'hidden-many', cwd: scratch, template, version: '1.2.3', organizations: 'many', showOrganization: false }), /many organizations are shown by name/)
   assert.throws(() => create({ name: 'none', cwd: scratch, template, version: '1.2.3', organizations: 'none' }), /--organizations is one or many, not "none": one organization never shown is --organizations one --show-organization no/)

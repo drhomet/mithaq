@@ -14,13 +14,17 @@ export const logMailer: Mailer = {
   },
 }
 
+/** Where Resend's API answers, as its own SDK names it. */
+export const defaultResendBaseURL = 'https://api.resend.com'
+
 /**
  * Resend's HTTP API over `fetch`, so no SDK is installed. `from` is an address at a domain the Resend
- * account verified. A refusal throws with the status alone: the address and the body stay out of the log.
+ * account verified; `baseURL` is another address that speaks Resend's API, such as a test's catcher.
+ * A refusal throws with the status alone: the address and the body stay out of the log.
  */
-export const resendMailer = ({ apiKey, from }: { apiKey: string; from: string }): Mailer => ({
+export const resendMailer = ({ apiKey, from, baseURL }: { apiKey: string; from: string; baseURL: string }): Mailer => ({
   send: async ({ to, subject, text, html }) => {
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await fetch(`${baseURL}/emails`, {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
       body: JSON.stringify({ from, to: [to], subject, text, html }),
@@ -28,4 +32,4 @@ export const resendMailer = ({ apiKey, from }: { apiKey: string; from: string })
     if (!response.ok) throw new Error(`Resend refused a message: ${response.status} ${response.statusText}`)
   },
 })
-// mithaq-admin 0.0.0 4da7cbfec68fed45cef343ea05d0bfd2dcb27c221ad37919f4f402a99338bd0d
+// mithaq-admin 0.0.0 af49cff802636f724b56e53fe1391a0d46af0c92ef95e2bba0e7da98c5548c88

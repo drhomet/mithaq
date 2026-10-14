@@ -141,26 +141,16 @@ test('on a local host with NODE_ENV unset, password reset is off and prints noth
   assert.equal(typeof tokenIn(await printed(() => developed.api.requestPasswordReset({ body: { email: 'held@example.com' } }))), 'string', 'while under NODE_ENV=development the link is logged')
 })
 
-test('off a local host, or in production, password reset is off: a forgot request is refused the same for any address, and prints no token and no address', async () => {
+test('off a local host, or in production, the auth setup refuses to start without a mailer, since no reset, proof or invitation would reach anyone, and with one the provider rate limits', async () => {
   assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
   const deploys = {
     'a real host with no NODE_ENV': { BETTER_AUTH_URL: 'https://app.example', BETTER_AUTH_SECRET: 'a-deploy-secret' },
     'production on localhost': { NODE_ENV: 'production', BETTER_AUTH_URL: 'http://localhost:5173', PLATFORM_URL: 'http://localhost:5174', BETTER_AUTH_SECRET: 'a-deploy-secret' },
   }
   for (const [deploy, env] of Object.entries(deploys)) {
-    const imported = await importedUnder(env)
-    const server = betterAuthServer({ ...imported.authOptions().options, database: memoryAdapter(tables()), secret: 'test-secret' })
-    await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
-    const ask = (email: string) => server.api.requestPasswordReset({ body: { email }, asResponse: true })
-    let held = new Response(), missing = new Response()
-    const log = (await printed(async () => (held = await ask('held@example.com')))) + (await printed(async () => (missing = await ask('nobody@example.com'))))
-    const answer = await held.text()
-    assert.equal(held.status, 400, `${deploy}: the request is refused`)
-    // The provider's own code for a reset with no sender, thrown before it looks the address up.
-    assert.equal(JSON.parse(answer).code, 'RESET_PASSWORD_DISABLED', `${deploy}: as disabled`)
-    assert.deepEqual([missing.status, await missing.text()], [held.status, answer], `${deploy}: and an address with no account is answered the same`)
-    for (const leak of ['held@example.com', 'nobody@example.com', 'token=']) assert.equal(log.includes(leak), false, `${deploy}: nothing printed carries ${leak}`)
-    assert.equal(imported.options.rateLimit.enabled, true, `${deploy}: and the provider rate limits`)
+    await assert.rejects(importedUnder(env), /needs a mailer in production[\s\S]*RESEND_API_KEY/, `${deploy}: refused without a mailer`)
+    const imported = await importedUnder({ ...env, RESEND_API_KEY: 're_never_sent', MAIL_FROM: 'mail@example.com' })
+    assert.equal(imported.options.rateLimit.enabled, true, `${deploy}: and with one the provider rate limits`)
   }
 })
 
@@ -169,8 +159,8 @@ test('an invitation writes its accept link to the log under NODE_ENV=development
   assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
   const deploys: [string, Record<string, string>, boolean][] = [
     ['development on localhost', { NODE_ENV: 'development' }, true],
+    // A real host starts only with a mailer, which the link goes to instead.
     ['a local host with no NODE_ENV', {}, false],
-    ['development on a real host', { NODE_ENV: 'development', BETTER_AUTH_URL: 'https://app.example', BETTER_AUTH_SECRET: 'a-deploy-secret' }, false],
   ]
   for (const [deploy, env, logs] of deploys) {
     const imported = await importedUnder(env)
@@ -243,7 +233,7 @@ test('the organization settings refuse every combination that would mean nothing
   const refused: [string, Partial<AuthSettings>, RegExp][] = [
     ['many by invitation', { signUp: 'invite' }, /'many'[\s\S]*signUp = 'open'/],
     ['many with a join role', { joinRole: 'student' }, /'many'[\s\S]*joinRole = null/],
-    ['many verifying addresses', { verifyEmail: true }, /'many'[\s\S]*verifyEmail = false/],
+    ['many proving no address', { verifyEmail: false }, /'many'[\s\S]*verifyEmail = true/],
     ['many with domains', { allowedDomains: ['example.com'] }, /'many'[\s\S]*allowedDomains/],
     ['many hiding its organizations', { showOrganization: false }, /'many'[\s\S]*showOrganization = true/],
   ]
@@ -264,13 +254,13 @@ test('the organization settings refuse every combination that would mean nothing
   assert.equal(settingsProblems({ settings: { ...school, joinRole: 'student' }, deployed: false, joinRoles: null }).length, 1, 'without the roles add-on a join role is refused')
 })
 
-test('in production an open sign-up of one organization needs a mailer, and invitations alone or many organizations do not', () => {
+test('in production every mode needs a mailer: an open sign-up proves addresses by mail, invitations and resets are mailed, and many proves every address', () => {
   const open = { ...school, signUp: 'open' as const }
-  assert.match(problems({ ...open, mailer: undefined }, true).join('\n'), /signUp = 'open'[\s\S]*RESEND_API_KEY/)
-  assert.deepEqual(problems({ ...open, mailer }, true), [])
-  assert.deepEqual(problems({ ...open, mailer: undefined }, false), [], 'development logs its mail instead')
-  assert.deepEqual(problems({ ...school, mailer: undefined }, true), [])
-  assert.deepEqual(problems(settingsWith({ mailer: undefined }), true), [])
+  for (const [name, settings] of [['one, open', open], ['one, by invitation', school], ['many', authSettings]] as const) {
+    assert.match(problems({ ...settings, mailer: undefined }, true).join('\n'), /needs a mailer in production[\s\S]*RESEND_API_KEY/, name)
+    assert.deepEqual(problems({ ...settings, mailer }, true), [], `${name}, with a mailer`)
+    assert.deepEqual(problems({ ...settings, mailer: undefined }, false), [], `${name}: development logs its mail instead`)
+  }
 })
 
 test('an allowed domain matches exactly after lowercasing and punycode, a subdomain only through *., and never by suffix', () => {

@@ -121,7 +121,12 @@ const authScreens = Object.fromEntries(
   Object.entries(languageTargets as Record<string, { capability?: unknown; kayan?: readonly string[] }>).flatMap(([name, target]) => (target.capability === 'screen' ? [[name, target.kayan ?? []]] : [])),
 )
 const { courses, sessions, enrollments } = asas.kayan
-const server = (asas.auth.strategies.find((strategy) => strategy.name === 'user') as unknown as { server: any }).server
+// The asas's own provider with no address proof, over the same tables and secret: the suite's
+// fixtures sign up and act at once, which a proved address would hold off. The proof itself is
+// the modes series' (0d, 0f, 0h, 0i).
+const server = serverFor({ ...authSettings, verifyEmail: false })({ drizzle: asas.targets.drizzle as never }) as any
+/** The provider `asas.handler` itself serves. */
+const servedProvider = (asas.auth.strategies.find((strategy) => strategy.name === 'user') as unknown as { server: any }).server
 const allowAccess = { create: () => true, read: () => true, update: () => true, delete: () => true } as const
 
 /**
@@ -994,6 +999,46 @@ test('0g. links to one address are mailed at most once in five minutes, never wa
   assert.equal(await links(), 0, 'a reset ends every other link to the account')
   assert.equal((await reset()).status, 200)
   assert.equal(await mailCount(mail), 2, 'and the next request is mailed')
+})
+
+const manySettings = { organizations: 'many', showOrganization: true, signUp: 'open', joinRole: null, verifyEmail: true, allowedDomains: [] } as const
+/** `email` signed up on `one` and proved by choosing `password` from the mailed link, as its owner would. */
+const proved = async ({ one, mail, email, password = modePassword }: { one: ModeServer; mail: ReturnType<typeof keptMail>; email: string; password?: string }) => {
+  assert.equal((await askedOf(one, '/sign-up/email', { name: email.split('@')[0], email, password: 'typed-at-sign-up' })).status, 200)
+  assert.equal((await askedOf(one, '/reset-password', { token: (await tokenMailed(mail, email))!, newPassword: password })).status, 200, `${email} proves its address`)
+  const signedIn = await askedOf(one, '/sign-in/email', { email, password })
+  assert.equal(signedIn.status, 200, `${email} signs in`)
+  return new Headers({ cookie: cookieOf(signedIn) })
+}
+
+test('0h. with many organizations a sign-up answers alike for a new address, one nobody proved and one proved, and opens no session for any', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  await proved({ one: many, mail, email: 'founder-proved@example.com' })
+  assert.equal((await askedOf(many, '/sign-up/email', { name: 'Unproved', email: 'founder-unproved@example.com', password: modePassword })).status, 200)
+  const answers = await Promise.all(['founder-new@example.com', 'founder-unproved@example.com', 'founder-proved@example.com'].map(async (email) => {
+    const answered = await askedOf(many, '/sign-up/email', { name: 'Founder', email, password: modePassword })
+    const body = (await answered.json()) as { user: Record<string, unknown> }
+    // What differs by nature: the id made for the answer, its instant and the address asked.
+    const { id: _id, createdAt: _created, updatedAt: _updated, email: _email, ...rest } = body.user
+    return { status: answered.status, session: cookieOf(answered).includes('session_token'), body: { ...body, user: rest } }
+  }))
+  assert.deepEqual(answers[0], { status: 200, session: false, body: answers[0]!.body }, 'a new address is answered 200 with no session')
+  assert.deepEqual(answers[1], answers[0], 'an address nobody proved is answered the same')
+  assert.deepEqual(answers[2], answers[0], 'and so is one whose owner proved it')
+  assert.deepEqual(await answerOf(await askedOf(many, '/sign-in/email', { email: 'founder-new@example.com', password: modePassword })), [403, 'EMAIL_NOT_VERIFIED'], 'a new account signs in only once its address is proved')
+})
+
+test('0i. with many organizations a squatted address is its owner\'s: the squatter never signs in, and the owner proves it and signs in with their own password', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  const signUp = (password: string) => askedOf(many, '/sign-up/email', { name: 'Owner', email: 'squatted-many@example.com', password })
+  assert.equal((await signUp('the-squatter-password')).status, 200, 'the squatter signs up with the owner\'s address')
+  assert.equal((await signUp('the-owner-password')).status, 200, 'the owner\'s own sign-up gets the same answer')
+  assert.deepEqual(await answerOf(await askedOf(many, '/sign-in/email', { email: 'squatted-many@example.com', password: 'the-squatter-password' })), [403, 'EMAIL_NOT_VERIFIED'], 'the squatter cannot sign in')
+  assert.equal((await askedOf(many, '/reset-password', { token: (await tokenMailed(mail, 'squatted-many@example.com'))!, newPassword: 'the-owner-chose-this' })).status, 200, 'the link went to the address, whose owner chooses the password')
+  assert.equal((await askedOf(many, '/sign-in/email', { email: 'squatted-many@example.com', password: 'the-squatter-password' })).status, 401, 'the squatter\'s password never signs in')
+  assert.equal((await askedOf(many, '/sign-in/email', { email: 'squatted-many@example.com', password: 'the-owner-chose-this' })).status, 200, 'the owner\'s does')
 })
 
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
@@ -6958,7 +7003,7 @@ test('226e. over asas.handler the provider\'s member reads answer people only to
 
   // The members a full read loads, which a caller without member.find never sees, are not loaded by the hundred either.
   // The provider loads them as a join of its organization read.
-  const context = (await server.$context) as { adapter: { findOne(query: { model: string; join?: { member?: unknown } }): Promise<unknown> } }
+  const context = (await servedProvider.$context) as { adapter: { findOne(query: { model: string; join?: { member?: unknown } }): Promise<unknown> } }
   const findOne = context.adapter.findOne
   const loaded: unknown[] = []
   context.adapter.findOne = (query) => {
@@ -11792,6 +11837,8 @@ const signedUp = async (slug: string) => {
     body: { name: slug, email: `${slug}@example.com`, password: 'a-long-enough-password' },
     returnHeaders: true,
   })
+  // Proved, as its owner proves it from the mailed link, so `asas.handler` signs it in too.
+  await db.execute(`update "user" set email_verified = true where id = '${signUp.response.user.id}'`)
   return { id: signUp.response.user.id as string, headers: new Headers({ cookie: signUp.headers.get('set-cookie') ?? '' }) }
 }
 
@@ -12593,12 +12640,15 @@ test('181c. the platform app answers a person who holds no platform role exactly
   assert.equal(tenant.status, 200, 'and the person still signs in to the tenant app')
 })
 
+/** A production start needs a mailer; nothing here mails, and the discard port refuses what would. */
+const mailerEnv: Record<string, string> = { RESEND_API_KEY: 're_never_sent', MAIL_FROM: 'mail@example.com', RESEND_BASE_URL: 'http://127.0.0.1:9' }
+
 test('142j. a production boot is refused without PLATFORM_URL, BETTER_AUTH_URL or BETTER_AUTH_SECRET, and a live host with no secret set is refused whatever NODE_ENV says', async () => {
   const provider = new URL('../../mithaq/src/mithaq/auth/index.ts', import.meta.url).href
   const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const { PLATFORM_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
     execFile(process.execPath, ['--input-type=module', '-e', `const { platformOrigins, platformURL, tenantURL, options } = await import(${JSON.stringify(provider)}); console.log(JSON.stringify({ platformOrigins, platformURL, tenantURL, trustedOrigins: options.trustedOrigins }))`], {
-      env: { ...rest, ...env } as NodeJS.ProcessEnv,
+      env: { ...rest, ...mailerEnv, ...env } as NodeJS.ProcessEnv,
     }, (error: unknown, stdout: string, stderr: string) => resolve({ code: error && typeof error === 'object' && 'code' in error ? Number(error.code) : 0, stdout, stderr }))
   })
   for (const env of [
@@ -12648,7 +12698,7 @@ test('142k. a project that serves no platform console boots in production with B
   const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const { PLATFORM_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
     execFile(process.execPath, ['--input-type=module', '-e', `const { platformApp } = await import(${JSON.stringify(new URL('index.ts', copy).href)}); console.log(platformApp)`], {
-      env: { ...rest, ...env } as NodeJS.ProcessEnv,
+      env: { ...rest, ...mailerEnv, ...env } as NodeJS.ProcessEnv,
     }, (error: unknown, stdout: string, stderr: string) => resolve({ code: error && typeof error === 'object' && 'code' in error ? Number(error.code) : 0, stdout, stderr }))
   })
   const booted = await boot({ NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret', BETTER_AUTH_URL: 'https://app.example.com' })
@@ -12769,7 +12819,7 @@ test('142p. a first-register whose account row fails leaves no user behind, and 
   })
 })
 
-const deployed = { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret-of-at-least-32-characters', PLATFORM_URL: 'https://platform.example.com', BETTER_AUTH_URL: 'https://app.example.com' }
+const deployed = { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret-of-at-least-32-characters', PLATFORM_URL: 'https://platform.example.com', BETTER_AUTH_URL: 'https://app.example.com', ...mailerEnv }
 
 test('142n. outside vite dev on this machine first-register asks for a SETUP_CODE of 32 characters at least: refused while it is unset or short, refused for a wrong code compared by timingSafeEqual on two equal-length digests, answered for the right one, and rate limited', async () => {
   const password = 'a-long-enough-password'

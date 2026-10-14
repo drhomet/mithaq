@@ -41,10 +41,11 @@ export const signUp: 'invite' | 'open' = 'open'
 export const joinRole: string | null = null
 
 /**
- * In `'one'` with an open sign-up, whether a new account proves its address by a mailed
- * link before it signs in and joins. `'many'` verifies no address yet, so it takes `false`.
+ * Whether a new account proves its address by a mailed link before it signs in, read with an open
+ * sign-up: in `'one'`, before it joins too. `'many'` takes `true`: anyone founds an organization
+ * there, so a sign-up must tell nobody which addresses have an account.
  */
-export const verifyEmail: boolean = false
+export const verifyEmail: boolean = true
 
 /**
  * In `'one'` with an open sign-up and `verifyEmail`, the only address domains that may

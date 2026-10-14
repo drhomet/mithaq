@@ -12,6 +12,7 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
+import { createServer as createHttpServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -77,6 +78,29 @@ const vocabularyWithout = (missing: readonly string[]) => {
   return words
 }
 const scratch = mkdtempSync(join(tmpdir(), 'mithaq-release-'))
+/**
+ * Every message a consumer mails, caught on this machine: a production start needs a mailer, and the project's Resend
+ * mailer posts here through `RESEND_BASE_URL`, so nothing reaches Resend.
+ */
+const mailed: { to: string[]; text: string }[] = []
+const mailbox = createHttpServer((request, response) => {
+  let body = ''
+  request.on('data', (chunk: Buffer) => { body += chunk })
+  request.on('end', () => {
+    mailed.push(JSON.parse(body) as (typeof mailed)[number])
+    response.writeHead(200, { 'content-type': 'application/json' }).end('{"id":"caught"}')
+  })
+}).listen(0, '127.0.0.1')
+await once(mailbox, 'listening')
+/** The link last mailed to `email`, waited for briefly: an app mails after it answers. */
+const linkMailed = async (email: string) => {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const link = /https?:\/\/\S+/.exec(mailed.filter((one) => one.to.includes(email)).at(-1)?.text ?? '')?.[0]
+    if (link) return new URL(link)
+    await sleep(50)
+  }
+  assert.fail(`no link was mailed to ${email}`)
+}
 try {
   command(process.execPath, ['apps/pack.ts'], root)
   for (const name of ['mithaq', 'mithaq-admin']) command('npm', ['pack', `.pack/${name}`, '--pack-destination', scratch], root)
@@ -98,6 +122,7 @@ try {
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
+  mailbox.close()
   rmSync(scratch, { recursive: true, force: true })
 }
 
@@ -256,8 +281,8 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const setupCode = 'mithaq-release-consumer-setup-code-of-40-chars'
     // A production boot needs these settings, PLATFORM_URL only where a platform app is served. `BETTER_AUTH_SECRET` is
     // left out on purpose: each app answering proves it read the `.env` `create-mithaq` wrote, which TanStack Start
-    // loads into `process.env`, a variable already set winning. An open sign-up starts only with a mailer; no message is
-    // sent here, so the key is never asked of Resend.
+    // loads into `process.env`, a variable already set winning. Every production start needs a mailer, which mails into
+    // this check's own catcher.
     const production: NodeJS.ProcessEnv = {
       ...withoutAuthSecret,
       NODE_ENV: 'production',
@@ -268,13 +293,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       STORAGE_ADAPTER: 'local',
       STORAGE_DIR: join(consumer, '.storage'),
       ...(!many && { SETUP_CODE: setupCode }),
-      ...(open && { RESEND_API_KEY: 're_release_consumer_never_sent', MAIL_FROM: 'Release <mail@example.com>' }),
+      RESEND_API_KEY: 're_release_consumer_never_sent',
+      MAIL_FROM: 'Release <mail@example.com>',
+      RESEND_BASE_URL: `http://127.0.0.1:${(mailbox.address() as { port: number }).port}`,
     }
-    if (open) {
+    {
       const { RESEND_API_KEY: _key, MAIL_FROM: _from, ...unmailed } = production
       const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./src/mithaq/auth/index.ts')"], { cwd: language, encoding: 'utf8', env: { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' } })
-      assert.notEqual(refused.status, 0, `${name}: an open sign-up refuses a production start with no mailer`)
-      assert.match(refused.stderr, /signUp = 'open' needs a mailer in production/, refused.stderr)
+      assert.notEqual(refused.status, 0, `${name}: a production start with no mailer is refused`)
+      assert.match(refused.stderr, /needs a mailer in production/, refused.stderr)
     }
     const start = (cwd: string, at: number) => {
       const child = spawn(process.execPath, [join(installed(cwd, 'vite'), 'bin/vite.js'), 'preview', '--port', String(at), '--host', '127.0.0.1', '--strictPort'], {
@@ -343,10 +370,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
         assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s first owner holds every platform key: ${JSON.stringify(report).slice(0, 400)}`)
       }
     } else {
-      const signUp = await post('sign-up/email', { name: 'Release', email: `release-${stamp}@example.com`, password: 'release-test-password' })
+      const email = `release-${stamp}@example.com`
+      const signUp = await post('sign-up/email', { name: 'Release', email, password: 'typed-at-sign-up' })
       assert.equal(signUp.status, 200, `${await signUp.text()}\n${output}`)
-      const cookie = cookieOf(signUp)
-      assert.ok(cookie, 'the sign-up answered with a session cookie')
+      assert.equal(cookieOf(signUp).includes('session_token'), false, 'the sign-up opens no session before its address is proved')
+      const chosen = await post('reset-password', { token: (await linkMailed(email)).searchParams.get('token'), newPassword: 'release-test-password' })
+      assert.equal(chosen.status, 200, `the mailed link proves the address: ${await chosen.text()}\n${output}`)
+      const signedIn = await post('sign-in/email', { email, password: 'release-test-password' })
+      assert.equal(signedIn.status, 200, `${await signedIn.text()}\n${output}`)
+      const cookie = cookieOf(signedIn)
       const organization = await post('organization/create', { name: 'Release', slug: `release-${stamp}` }, { cookie })
       assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
       if (platform) {
