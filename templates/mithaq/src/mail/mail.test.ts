@@ -31,6 +31,15 @@ test('the Resend mailer posts to the base URL it is given, so a test run catches
   assert.deepEqual(sent, ['http://127.0.0.1:9/resend/emails', 'http://127.0.0.1:9/from-env/emails', 'https://api.resend.com/emails'])
 })
 
+test('a RESEND_BASE_URL that is not https is refused unless it is this machine, so no key or letter crosses the network in the clear', () => {
+  const env = { RESEND_API_KEY: 're_x', MAIL_FROM: 'mail@example.com' }
+  assert.throws(() => mailerFromEnv({ ...env, RESEND_BASE_URL: 'http://mail.example.com' }), /RESEND_BASE_URL/)
+  assert.throws(() => mailerFromEnv({ ...env, RESEND_BASE_URL: 'not a url' }), /RESEND_BASE_URL/)
+  assert.ok(mailerFromEnv({ ...env, RESEND_BASE_URL: 'https://mail.example.com' }))
+  assert.ok(mailerFromEnv({ ...env, RESEND_BASE_URL: 'http://127.0.0.1:9' }))
+  assert.ok(mailerFromEnv({ ...env, RESEND_BASE_URL: 'http://localhost:4000' }))
+})
+
 test('a message Resend refuses throws, naming the status and not the address', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => new Response('{"message":"bad key"}', { status: 401 }))
   await assert.rejects(resendMailer({ apiKey: 're_bad', from: 'mail@example.com', baseURL: defaultResendBaseURL }).send(mail), (error: Error) => error.message.includes('401') && !error.message.includes('reader@example.com'))

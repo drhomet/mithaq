@@ -10,6 +10,7 @@ import { createAccessControl } from 'better-auth/plugins/access'
 import { adminAc, defaultStatements as adminStatements, userAc } from 'better-auth/plugins/admin/access'
 import { defaultStatements } from 'better-auth/plugins/organization/access'
 import { holdsPermission, requestOrganization, type Where } from 'mithaq'
+import { z } from 'zod'
 import { sql } from 'mithaq/drizzle'
 import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
 // A module of its own so a screen can list the roles without loading the provider.
@@ -213,8 +214,8 @@ export type AuthSettings = {
 }
 export const authSettings: AuthSettings = { mailer: configuredMailer() ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains }
 
-/** An address as the provider takes one: something, one `@`, and a host with a dot, with no space. */
-const anAddress = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+/** An address as the provider's own sign-up takes one. */
+const anAddress = z.email()
 
 /** A lowercase ASCII host of two labels or more, which an `xn--` international one is. */
 const host = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
@@ -667,7 +668,8 @@ export type AssignFirstRole = (data: {
 /**
  * The organization hooks that need this project's store, which only the factory below holds. A
  * `beforeRemoveMember` or `beforeAcceptInvitation` here runs after the template's own, never in its
- * place.
+ * place. An invitation the server accepts for a sign-up, and a person Add person adds, run
+ * `beforeAddMember` and no accept hook: the membership is made without the accept route.
  */
 type Joining = { organization: { id: string } & Record<string, unknown> }
 export type StoreHooks = {
@@ -1165,6 +1167,13 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     const { adapter, internalAdapter } = await tenant.$context
     if (!(await holdsInvitation({ adapter: adapter as unknown as Finds, id: invitationId, email: user.email }))) return
     const id = invitationId as string
+    // The accept route's own rule on the role, which a row written past the invite route may break.
+    const asked = await adapter.findOne<{ role: unknown }>({ model: 'invitation', where: [{ field: 'id', value: id }] })
+    try {
+      exactRoles(asked?.role)
+    } catch {
+      return
+    }
     // Pending to accepted once, so a second proof never adds the person twice.
     const accepted = await adapter.update<{ organizationId: string; role: string }>({ model: 'invitation', where: [{ field: 'id', value: id }, { field: 'status', value: 'pending' }], update: { status: 'accepted' } })
     if (!accepted) return
@@ -1248,6 +1257,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // which deletes sessions and accounts before the person, so nothing goes. Another owner first.
   const soleOwner = async (user: string) => {
     const owned = (await store.find({ kayan: 'member', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { userId: { equals: user }, role: { contains: 'owner' } } } })).docs.filter((one) => isOwnerRole(one.role))
+    // ponytail: read with no lock, so two owners deleted at the same instant may both pass and leave
+    // none; a lock per organization if staff ever do that.
     for (const one of owned) {
       const owners = (await store.find({ kayan: 'member', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organizationId: { equals: String(one.organizationId) }, role: { contains: 'owner' } } } })).docs.filter((other) => isOwnerRole(other.role))
       if (owners.length < 2) return true
@@ -1302,7 +1313,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
         // Outside `asas.handler` no key is resolved, so the route answers nothing there.
         if (typeof organization !== 'string' || !holdsPermission('member.create')) throw new APIError('FORBIDDEN', { message: 'Adding a person needs the permission "member.create" in your active organization.' })
         const { name, email: written, role } = (ctx.body ?? {}) as Record<string, unknown>
-        if (typeof name !== 'string' || !name.trim() || name.length > 100 || typeof written !== 'string' || !anAddress.test(written) || (role !== undefined && (typeof role !== 'string' || !role))) {
+        if (typeof name !== 'string' || !name.trim() || name.length > 100 || typeof written !== 'string' || !anAddress.safeParse(written).success || (role !== undefined && (typeof role !== 'string' || !role))) {
           throw new APIError('BAD_REQUEST', { message: 'A name of 1 to 100 characters and an email are required, and a role, where given, is a role\'s name.' })
         }
         if (typeof role === 'string') await assignable({ organization, role })
@@ -1317,13 +1328,20 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           const invitation = await tenantApi().createInvitation({ body: { email, role: 'member', organizationId: organization }, headers: ctx.headers! })
           return ctx.json({ invited: true, invitation })
         }
+        // With no mailer the link is answered to the caller, which only this machine's own app may ask.
+        if (!settings.mailer && !isLocalHost(ctx.headers?.get('origin') ?? '')) throw new APIError('FORBIDDEN', { message: 'Adding a person mails them a link, and no mailer is configured.' })
         if (settings.mailer) await mailedFor(organization)
+        // ponytail: the steps below are not one transaction. A failure part-way leaves an account with
+        // no password nobody can sign in to, which the next Add of that address takes up as any
+        // account nobody proved; one transaction over the provider's writes if that is ever seen.
         const user = found ?? (await firstRegistering.run(true, () => internalAdapter.createUser({ name: name.trim(), email, emailVerified: false }, { method: 'admin' })))
         if (found) {
           await internalAdapter.deleteUserSessions(found.id)
           await adapter.deleteMany({ model: 'account', where: [{ field: 'userId', value: found.id }, { field: 'providerId', value: 'credential' }] })
         }
         await tenantApi().addMember({ body: { userId: user.id, organizationId: organization, role: 'member' } })
+        // Joined once, as an open sign-up records it, so removed they never join again by one.
+        if (!(await internalAdapter.findVerificationValue(joinedOnce(user.id)))) await internalAdapter.createVerificationValue({ identifier: joinedOnce(user.id), value: organization, expiresAt: new Date('9999-12-31T00:00:00Z') })
         // add-on: roles
         if (typeof role === 'string') await store.transaction((tx) => grantRole({ tx, organization, user: user.id, role }))
         // end add-on: roles

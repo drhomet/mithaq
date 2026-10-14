@@ -16,7 +16,13 @@ export const mailerFromEnv = (env: Record<string, string | undefined>): Mailer |
   if (!apiKey && !from) return undefined
   if (!apiKey) throw new Error('MAIL_FROM is set and RESEND_API_KEY is not. Set both, or neither.')
   if (!from) throw new Error('RESEND_API_KEY is set and MAIL_FROM is not: set MAIL_FROM to an address at a domain your Resend account verified.')
-  return resendMailer({ apiKey, from, baseURL: env.RESEND_BASE_URL || defaultResendBaseURL })
+  const baseURL = env.RESEND_BASE_URL || defaultResendBaseURL
+  // The key and every letter cross to it, so in the clear only to this machine, such as a test's catcher.
+  const at = URL.canParse(baseURL) ? new URL(baseURL) : undefined
+  if (!at || (at.protocol !== 'https:' && !(at.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(at.hostname)))) {
+    throw new Error(`RESEND_BASE_URL is ${JSON.stringify(baseURL)}: set an https address, or http on this machine.`)
+  }
+  return resendMailer({ apiKey, from, baseURL })
 }
 
 /**

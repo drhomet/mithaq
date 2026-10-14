@@ -1178,6 +1178,15 @@ test('0m. with one organization an administrator adds a person: account, members
   assert.equal((await add({ name: 'Refused', email: 'refused-0m@example.com', role: 'administrator' }, adder)).status, 403, 'nor hands over a role holding keys it does not hold')
   assert.deepEqual(await modeRows(`select id from "user" where email = 'refused-0m@example.com'`), [], 'and no account was made for either')
   assert.equal((await add({ name: 'Allowed', email: 'allowed-0m@example.com' }, adder)).status, 200, 'while it adds a person with no role')
+  const allowed = (await modeRows(`select id from "user" where email = 'allowed-0m@example.com'`))[0]!.id
+  assert.deepEqual(await modeRows(`select identifier from verification where identifier = 'joined-open:${allowed}'`), [{ identifier: `joined-open:${allowed}` }], 'a person added has joined once, so removed they never join again by an open sign-up')
+
+  // Staff hold the platform: their account is never handed to a mailbox from a tenant, proved or not.
+  const staff = await madeAccount({ email: 'staff-0m@example.com', verified: false, password: 'the-staff-password' })
+  await db.execute(`update "user" set role = 'support' where id = '${staff}'`)
+  const staffAdded = await add({ name: 'Staff', email: 'staff-0m@example.com' })
+  assert.equal(((await staffAdded.json()) as { invited?: boolean }).invited, true, 'a staff member is invited')
+  assert.deepEqual(await modeRows(`select provider_id from account where user_id = '${staff}'`), [{ provider_id: 'credential' }], 'and keeps their password')
 
   // A person added is mailed, so they count against the organization's invitations of the minute.
   await db.execute(`insert into verification (id, identifier, value, expires_at, created_at, updated_at) select 'full-0m-' || n, 'mailed:full-0m-' || n, 'mailed:${owner.organization}', now() + interval '1 day', now(), now() from generate_series(1, 10) as n`)
@@ -1232,6 +1241,21 @@ test('0o. a planted invitation joins nobody: an administrator who signs up with 
     assert.deepEqual(await memberOf(victim), [], `once the owner who ${claims} proves the address, they joined nobody`)
     assert.deepEqual(await modeRows(`select status from invitation where id = '${invitationId}'`), [{ status: 'pending' }], 'and the invitation is still theirs to answer')
   }
+})
+
+test('0p. with many organizations nobody adds a person: the route is one organization\'s alone', async () => {
+  const many = modeServer({ ...manySettings, mailer: keptMail().mailer })
+  assert.equal((await askedOf(many, '/organization/add-person', { name: 'Nobody', email: 'nobody-0p@example.com' })).status, 404)
+})
+
+test('0q. an invitation the server accepts for a sign-up is held to the rule the accept route keeps: a role value with whitespace around a name joins nobody', async () => {
+  const school = modeServer(schoolSettings)
+  const owner = await ownerOf(school)
+  const inviter = (await modeRows(`select id from "user" where email = '${owner.email}'`))[0]!.id
+  await db.execute(`insert into invitation (id, organization_id, email, role, status, expires_at, created_at, inviter_id) values ('spaced-0q', '${owner.organization}', 'spaced-0q@example.com', 'member, owner', 'pending', now() + interval '1 day', now(), '${inviter}')`)
+  assert.equal((await askedOf(school, '/sign-up/email', { name: 'Spaced', email: 'spaced-0q@example.com', password: modePassword, invitationId: 'spaced-0q' })).status, 200)
+  assert.deepEqual(await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'spaced-0q@example.com'`), [], 'the account joins nothing')
+  assert.deepEqual(await modeRows(`select status from invitation where id = 'spaced-0q'`), [{ status: 'pending' }])
 })
 
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
