@@ -10,6 +10,7 @@ import { adminAc, defaultStatements as adminStatements, userAc } from 'better-au
 import { defaultStatements } from 'better-auth/plugins/organization/access'
 import { holdsPermission, requestOrganization, type Where } from 'mithaq'
 import { sql } from 'mithaq/drizzle'
+import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
 // A module of its own so a screen can list the roles without loading the provider.
 import { platformRoles } from './platform-roles.ts'
 
@@ -167,11 +168,34 @@ const exactRoles = (role: unknown) => {
 // sets `NODE_ENV`, and an unset `BETTER_AUTH_URL` falls back to `localhost`.
 const logsLinks = process.env.NODE_ENV === 'development' && isLocalHost(tenantURL)
 
-// Development only: the link goes to the server's log. Anywhere else nothing is sent and nothing is
-// logged, so the inviter hands the link over themselves.
-const sendInvitationEmail = async ({ id, email }: { id: string; email: string }) => {
-  console.log(`[asas auth] Invitation link for "${email}": ${new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href}`)
-}
+/**
+ * What the auth setup reads beyond the provider's own options. `mailer` sends the password reset and
+ * the invitation: the deploy's configured one (`src/mail/index.ts`), else in development on this
+ * machine the log, else none, and then no reset is offered and the inviter hands the link over.
+ */
+export type AuthSettings = { mailer: Mailer | undefined }
+export const authSettings: AuthSettings = { mailer: configuredMailer ?? (logsLinks ? logMailer : undefined) }
+
+const escaped = (text: string) => text.replace(/[&<>"']/g, (one) => `&#${one.charCodeAt(0)};`)
+/**
+ * One message in both of the project's locales, English then Arabic, since a mail is sent before
+ * anyone says which they read. The link sits on a line of its own in each.
+ */
+const letter = ({ to, subject, en, ar, link }: { to: string; subject: string; en: string; ar: string; link: string }): Mail => ({
+  to,
+  subject,
+  text: `${en}\n\n${link}\n\n${ar}\n\n${link}\n`,
+  html: `<p>${escaped(en)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p><div dir="rtl" lang="ar"><p>${escaped(ar)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p></div>`,
+})
+
+const invitationMail = (mailer: Mailer) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) =>
+  mailer.send(letter({
+    to: email,
+    subject: `You are invited to ${organization.name} · دعوة إلى ${organization.name}`,
+    en: `You are invited to join ${organization.name}. Open the link below with this address to accept; it lasts 48 hours.`,
+    ar: `أنت مدعو للانضمام إلى ${organization.name}. افتح الرابط أدناه بهذا العنوان لقبول الدعوة؛ وهو صالح 48 ساعة.`,
+    link: new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href,
+  }))
 
 /**
  * The provider's organization limits, each set here so none is a silent default of the provider's:
@@ -200,7 +224,7 @@ export const organizationLimits = {
 // is inside `createOrganization`, where the creator is in no organization yet and holds no key, so
 // gating it would make creating an organization impossible. `member.create` is left to the
 // provider's static roles.
-const organizationOptions = {
+const organizationOptionsFor = ({ mailer }: AuthSettings) => ({
   ...organizationLimits,
   dynamicAccessControl: { enabled: true as const },
   // An organization that was ever used holds rows that cannot all be removed (an audit log,
@@ -211,7 +235,7 @@ const organizationOptions = {
   // `requireEmailVerificationOnInvitation` stays unset rather than `false`, so the provider asks
   // for a verified address only if invitation ids become guessable. The template sends no mail that
   // would verify an address, so asking for one would leave every invitation unanswerable.
-  ...(logsLinks ? { sendInvitationEmail } : {}),
+  ...(mailer ? { sendInvitationEmail: invitationMail(mailer) } : {}),
   organizationHooks: {
     beforeUpdateOrganization: gate('organization.update'),
     beforeRemoveMember: gate('member.delete'),
@@ -227,7 +251,7 @@ const organizationOptions = {
     beforeAcceptInvitation: async ({ invitation }: { invitation: { role: string } }) => exactRoles(invitation.role),
     beforeCancelInvitation: gate('invitation.cancel'),
   },
-}
+})
 
 // `'*'` is the plugin's `adminAc`, every action but `impersonate-admins`, so no platform
 // administrator mimics another.
@@ -514,16 +538,21 @@ export const trustedIpHeaders = (value: string | undefined): string[] | undefine
 
 const ipAddressHeaders = trustedIpHeaders(process.env.TRUSTED_IP_HEADER)
 
-// Where a password reset link goes. No mail sender is configured, so the link is written to the
-// server's log in development (see `logsLinks`). Anywhere else the provider refuses every address
-// alike before it looks one up, so no token or address is written anywhere.
+// Where a password reset link goes: through the mailer, which in development may be the server's
+// log. With no mailer the provider refuses every address alike before it looks one up, so no token
+// or address is written anywhere.
 //
 // The link is the tenant app's reset page, not the provider's `url`, which names
 // `/api/auth/reset-password` while this project serves the provider under `/api/auth/user`.
 const onLocalHost = !production && isLocalHost(tenantURL)
-const sendResetPassword = async ({ user, token }: { user: { email: string }; token: string }) => {
-  console.log(`[asas auth] Password reset link for "${user.email}": ${new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href}`)
-}
+const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
+  mailer.send(letter({
+    to: user.email,
+    subject: 'Reset your password · إعادة تعيين كلمة المرور',
+    en: 'Someone asked to reset the password of the account at this address. If it was you, open the link below within an hour. If not, ignore this message: nothing changes.',
+    ar: 'طلب أحدهم إعادة تعيين كلمة مرور الحساب بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة. وإلا فتجاهل هذه الرسالة: لن يتغير شيء.',
+    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+  }))
 
 /**
  * The Better Auth options, with no `database`: the strategy supplies the tables mithaq built.
@@ -532,9 +561,9 @@ const sendResetPassword = async ({ user, token }: { user: { email: string }; tok
  * The hooks that write rows of this project (`StoreHooks`) are a parameter of `authOptions`
  * instead. A hook changes no table, so the schema read here is the schema the runtime builds.
  */
-export const options = {
+export const optionsFor = (settings: AuthSettings) => ({
   // A reset ends every session of the account, in both apps, since they share one session table.
-  emailAndPassword: { enabled: true as const, revokeSessionsOnPasswordReset: true, ...(logsLinks ? { sendResetPassword } : {}) },
+  emailAndPassword: { enabled: true as const, revokeSessionsOnPasswordReset: true, ...(settings.mailer ? { sendResetPassword: resetMail(settings.mailer) } : {}) },
   // The provider rate limits only when `NODE_ENV` is `production`, so a deploy that sets none would
   // answer every sign-in and reset request unlimited. Off a local host it limits whatever
   // `NODE_ENV` says.
@@ -549,7 +578,7 @@ export const options = {
   ...(ipAddressHeaders ? { advanced: { ipAddress: { ipAddressHeaders } } } : {}),
   // How an impersonation crosses from the platform app into the tenant app (`handOff`). The plugin
   // adds no table, and no client may mint a token over HTTP.
-  plugins: [admin(adminOptions), organization(organizationOptions), oneTimeToken({ disableClientRequest: true })],
+  plugins: [admin(adminOptions), organization(organizationOptionsFor(settings)), oneTimeToken({ disableClientRequest: true })],
   hooks: platformAudit,
   // The active organization, set where the session is made. Every row this project reads is keyed
   // on it and the provider sets it only when an organization is created, so a user who signed in
@@ -573,7 +602,9 @@ export const options = {
       },
     },
   },
-}
+})
+/** This project's options, which `mithaq generate auth` reads. */
+export const options = optionsFor(authSettings)
 
 /**
  * The same options with the provider's own access control built, which is what the template builds
@@ -584,7 +615,9 @@ export const options = {
  * nothing of this project: what a member may do is the access target's answer, which reads the
  * project's own keys. A project narrows these where its own governance differs.
  */
-export const authOptions = (hooks: StoreHooks = {}) => {
+export const authOptions = (hooks: StoreHooks = {}, settings: AuthSettings = authSettings) => {
+  const options = optionsFor(settings)
+  const organizationOptions = organizationOptionsFor(settings)
   // Only the provider's own vocabulary. Merging this project's catalog in would make the provider's
   // `owner` hold every project key before any role row was read, and a `roles` row could then widen
   // and never narrow. The provider gates its own actions; this project's keys are the access

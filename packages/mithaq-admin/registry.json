@@ -1531,6 +1531,19 @@
       ]
     },
     {
+      "name": "mithaq-mail",
+      "type": "registry:lib",
+      "title": "Mithaq mail",
+      "description": "The mailers a project owns: the one `send({ to, subject, text, html })` interface, a mailer that writes each message to the development log, and Resend over fetch for production.",
+      "files": [
+        {
+          "path": "registry/mail/mailers.ts",
+          "type": "registry:lib",
+          "target": "~/src/mail/mailers.ts"
+        }
+      ]
+    },
+    {
       "name": "mithaq-expected-updated-at",
       "type": "registry:lib",
       "title": "Mithaq expectedUpdatedAt step",

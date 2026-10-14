@@ -32,7 +32,7 @@ Every library a piece imports is a peer dependency of the package: `mithaq`, Rea
 sets, `input-otp` and `react-day-picker`, and, for the rich text add-on, Lexical.
 
 A project holds a few files of the package from creation, because they import the app's own files or hold
-policy: the screen host (`mithaq-screens-host`), the storage adapters and defaults (`mithaq-storage`), the
+policy: the screen host (`mithaq-screens-host`), the storage adapters and defaults (`mithaq-storage`), the mailers (`mithaq-mail`), the
 `expectedUpdatedAt` step (`mithaq-expected-updated-at`) and `ui/directional-icon.tsx`. They are the project's
 to edit.
 

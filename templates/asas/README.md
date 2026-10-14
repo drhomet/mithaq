@@ -748,12 +748,13 @@ In production, set these in the host's environment rather than in a file.
 | `PLATFORM_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The platform console's public URL. | `http://localhost:5174` |
 | `LOCAL_AUTH_SECRET` | `packages/features/auth/local-users/local-users.ts` | 32 characters at least. If it is unset, local accounts are off: every `POST` under `/api/auth/local` answers 503 and the public sign-up answers 403. | Same. |
 | `TRUSTED_IP_HEADER` | `packages/mithaq/src/mithaq/auth/index.ts`, `local-users.ts` | The header names your proxy overwrites with the client address, comma-separated, such as `cf-connecting-ip`. Both rate limiters key on it. Trust it only behind exactly one proxy that overwrites it on every request. | Defaults to `x-forwarded-for`. |
+| `RESEND_API_KEY`, `MAIL_FROM` | `packages/mithaq/src/mail/index.ts` | Both or neither; one alone refuses to start. With both, password resets, invitations and email verification are mailed through Resend from `MAIL_FROM`, an address at a domain the Resend account verified. Without them no reset is offered, invitation links are handed over by hand, and an open sign-up refuses to start. Another service is a mailer of your own beside `src/mail/mailers.ts`, named in `src/mail/index.ts`. | Unset: every message is written to the server log, when `NODE_ENV` is `development` and the tenant URL is `localhost`. |
 | `STORAGE_SECRET` | `packages/mithaq/src/storage/index.ts` | Required. Signs every upload reference and local upload token. Every instance must share it. | A fresh random secret per process, with a warning. |
 | `STORAGE_PREFIX` | `storage/index.ts` | Required. The bucket folder this project owns, such as `mithaq/asas`. Every key starts with it, and the sweep lists only inside it. | `mithaq/asas` |
 | `STORAGE_ADAPTER` | `storage/index.ts` | Required. Where new uploads go: `local`, or `r2` once R2 is set. | `local` |
 | `STORAGE_DIR` | `storage/index.ts` | The folder of the `local` adapter. | `.storage`, relative to the process's working directory. |
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | `storage/index.ts` | All four or none. When all four are set, the `r2` adapter exists. If only some are set, start refuses. | Same. |
-| `NODE_ENV` | the apps, the drizzle store, auth, storage | Must be `production`. See below. | Unset or `development`. Password-reset and invitation links are written to the server log only when it is `development` and the tenant URL is `localhost`. |
+| `NODE_ENV` | the apps, the drizzle store, auth, storage | Must be `production`. See below. | Unset or `development`. With no mailer configured, mail is written to the server log only when it is `development` and the tenant URL is `localhost`. |
 | `MITHAQ_COUNT_TIMEOUT_MS` | `mithaq migrate` | The per-query timeout, in milliseconds, for counting rows the rules would refuse. The default is 5000. | Same. |
 
 ### `NODE_ENV`

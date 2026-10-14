@@ -519,22 +519,23 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-upload-node',
       'mithaq-screens-host',
       'mithaq-storage',
+      'mithaq-mail',
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the ninety-two items this file knows about',
+    'the registry declares the ninety-three items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`
   // Every other piece is drawn from the installed package; only these import app files or hold policy, so a project holds them.
-  const owned = ['mithaq-screens-host', 'mithaq-storage', 'mithaq-expected-updated-at', 'mithaq-directional-icon']
+  const owned = ['mithaq-screens-host', 'mithaq-storage', 'mithaq-mail', 'mithaq-expected-updated-at', 'mithaq-directional-icon']
   const declaredFiles = declaredItems.filter((item) => owned.includes(item.name)).flatMap((item) => item.files.map((file) => ({ item: item.name, ...file })))
-  assert.equal(declaredFiles.length, 19, 'the twelve host files, the five storage adapters, the step and the icon')
+  assert.equal(declaredFiles.length, 20, 'the twelve host files, the five storage adapters, the mailers, the step and the icon')
   for (const declared of declaredFiles) {
     // Read as `mithaq upgrade --check` reads it: a fresh eject hashes its whole text, a copy `shadcn add` made its text less leading comments.
     const target = declared.target
-    // The storage adapters and the write step run on the server, so the project holding them is the template's root, not an app.
-    const project = ['mithaq-storage', 'mithaq-expected-updated-at'].includes(declared.item) ? 'templates/mithaq' : 'apps/asas-tanstack'
+    // The storage adapters, the mailers and the write step run on the server, so the project holding them is the template's root, not an app.
+    const project = ['mithaq-storage', 'mithaq-mail', 'mithaq-expected-updated-at'].includes(declared.item) ? 'templates/mithaq' : 'apps/asas-tanstack'
     const copied = readFileSync(new URL(`../../../${project}/${appPathOf(target)}`, import.meta.url), 'utf8')
     const source = readFileSync(new URL(`../${declared.path}`, import.meta.url), 'utf8')
     assert.equal(stateOf(copied, source), 'up to date', `${project} has the current ${target}, marked; delete it and rerun "mithaq eject ${declared.item}" there`)

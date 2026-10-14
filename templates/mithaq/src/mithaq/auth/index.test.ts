@@ -183,3 +183,20 @@ test('an invitation writes its accept link to the log under NODE_ENV=development
     assert.equal(log.includes('invitee@example.com'), logs, `${deploy}: nor the address unless the link is`)
   }
 })
+
+test('with a mailer the reset and the invitation are mailed through it, each in both locales with its link, and nothing is logged', async () => {
+  const sent: { to: string; subject: string; text: string; html: string }[] = []
+  const mailer = { send: async (mail: (typeof sent)[number]) => void sent.push(mail) }
+  const server = betterAuthServer({ ...authOptions({}, { mailer }).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+  const headers = new Headers({ cookie: (await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  const log = await printed(async () => {
+    await server.api.requestPasswordReset({ body: { email: 'owner@example.com' } })
+    await server.api.createOrganization({ body: { name: 'Org', slug: 'org' }, headers })
+    await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+  })
+  assert.deepEqual(sent.map((one) => one.to), ['owner@example.com', 'invitee@example.com'], 'one message to each address')
+  assert.equal(typeof tokenIn(sent[0]!.text), 'string', 'the reset carries its link')
+  assert.match(sent[1]!.text, /http:\/\/localhost:5173\/auth\/accept-invitation\?id=\w+/, 'the invitation carries its accept link')
+  for (const one of sent) assert.match(one.html, /dir="rtl"[\s\S]*[؀-ۿ]/, 'with an Arabic part')
+  assert.equal(log.includes('token='), false, 'and the log holds no link')
+})
