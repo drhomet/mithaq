@@ -26,6 +26,8 @@ export const mithaqAdmin = (ejected: string): Plugin => {
     // what nothing excludes, since an include wins over an exclude: last, after every plugin has named its own.
     configEnvironment: { order: 'post', handler(name, { optimizeDeps, resolve }) {
       if (name !== 'client') return
+      // ponytail: an exclude a plugin adds later than configEnvironment (in configResolved) is not seen here and loses
+      // to the include; read the resolved config there if a plugin ever does.
       const excluded = optimizeDeps?.exclude ?? []
       const folders = createRequire(join(ejected, 'x')).resolve.paths('x') ?? []
       const alias = (resolve as { alias?: AliasOptions } | undefined)?.alias ?? []
