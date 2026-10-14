@@ -315,7 +315,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     },
     failed: { en: 'That sign-in did not work.', ar: 'لم ينجح تسجيل الدخول.' },
     signUp: { en: 'Sign up', ar: 'إنشاء حساب' },
-    signUpDescription: { en: 'Make an account and its organization.', ar: 'أنشئ حسابا ومؤسسته.' },
+    signUpDescription: { en: 'Make an account.', ar: 'أنشئ حسابا.' },
     signUpPending: { en: 'Signing up…', ar: 'جارٍ إنشاء الحساب…' },
     signUpFailed: { en: 'That sign-up did not work.', ar: 'لم ينجح إنشاء الحساب.' },
     organizationFailed: { en: 'That organization could not be created.', ar: 'تعذر إنشاء هذه المؤسسة.' },
@@ -881,7 +881,6 @@ type Wording = Record<string, Record<string, { en: string; ar: string }>>
 /** With one organization, nobody founds one on signing up: an owner sets the app up once. */
 const one: Wording = {
   auth: {
-    signUpDescription: { en: 'Make an account.', ar: 'أنشئ حسابا.' },
     noOrganization: { en: '{email} has no access here yet. Ask an administrator to invite you.', ar: 'لا يملك {email} وصولا هنا بعد. اطلب من أحد المسؤولين أن يدعوك.' },
   },
   marketing: {

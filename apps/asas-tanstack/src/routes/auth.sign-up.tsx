@@ -20,17 +20,11 @@ export const Route = createFileRoute('/auth/sign-up')({
   component: SignUp,
 })
 
-/** With many organizations each sign-up founds its own; with one, it joins the one or waits for an invitation. */
-const founds = organizations === 'many'
-/** Whether a new account proves its address before it signs in, so the sign-up answers with no session. */
-const verifies = !founds && signUp === 'open' && verifyEmail
-
 /**
- * Better Auth requires a unique slug, so a random tail keeps same-named organizations apart.
- * Padded before the cut, so the tail is always six characters and the slug never ends in `-`.
+ * Whether a new account proves its address before it signs in, so the sign-up answers with no session: with many
+ * organizations always, where the person then founds or joins one, and with one where an open sign-up says so.
  */
-const slugOf = (name: string) =>
-  `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${Math.random().toString(36).slice(2).padEnd(6, '0').slice(0, 6)}`
+const verifies = signUp === 'open' && verifyEmail
 
 function SignUp() {
   const navigate = useNavigate()
@@ -45,21 +39,16 @@ function SignUp() {
   // The invitation's id, which a sign-up by invitation carries: holding it is what lets it through.
   const invitationId = invited ? new URLSearchParams(asked.slice(asked.indexOf('?'))).get('id') ?? undefined : undefined
   const [name, setName] = useState('')
-  const [organization, setOrganization] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [pending, setPending] = useState(false)
   const [refusal, setRefusal] = useState<string | null>(null)
-  // The address this submit already signed up. A second sign-up with the same email is refused, so a
-  // retry after the organization call failed must skip it. An address and not a flag: a corrected typo signs up again.
-  const [signedUpAs, setSignedUpAs] = useState<string | null>(null)
   const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set())
   const [sent, setSent] = useState<string | null>(null)
   const required = t('auth.required', 'This field is required.')
   const wrong = {
     name: () => (name ? undefined : required),
-    organization: () => (!founds || invited || organization ? undefined : required),
     email: () => (!email ? required : notAnEmail(email) ? t('auth.invalidEmail', 'Invalid email') : undefined),
     password: () =>
       !password ? required
@@ -79,24 +68,11 @@ function SignUp() {
     if (Object.values(wrong).some((check) => check())) return
     setPending(true)
     setRefusal(null)
-    if (signedUpAs !== email) {
-      const made = await authArm('sign-up/email', { name, email, password, ...(invitationId && { invitationId }) })
-      if (!made.ok) {
-        setPending(false)
-        return setRefusal(refused(made, t('auth.signUpFailed', 'That sign-up did not work.')))
-      }
-      setSignedUpAs(email)
-    }
-    // A refusal here leaves an account that reads nothing, so the sentence names the organization;
-    // `signedUpAs` holds a retry to this call.
-    // An account that proves its address first has no session yet, invited or not, so it is told to open its mail.
-    if (verifies) {
-      setPending(false)
-      return setSent(email)
-    }
-    const created = !founds || invited ? undefined : await authArm('organization/create', { name: organization, slug: slugOf(organization) })
+    const made = await authArm('sign-up/email', { name, email, password, ...(invitationId && { invitationId }) })
     setPending(false)
-    if (created && !created.ok) return setRefusal(refused(created, t('auth.organizationFailed', 'That organization could not be created.')))
+    if (!made.ok) return setRefusal(refused(made, t('auth.signUpFailed', 'That sign-up did not work.')))
+    // An account that proves its address first has no session yet, invited or not, so it is told to open its mail.
+    if (verifies) return setSent(email)
     await navigate({ to: wanted({ asked: search.redirect, home: (await authGate()).home.path }) })
   }
 
@@ -109,7 +85,7 @@ function SignUp() {
     </p>
   )
   // By invitation, nobody without one is offered a form the server would refuse.
-  if (!founds && signUp === 'invite' && !invitationId) {
+  if (organizations === 'one' && signUp === 'invite' && !invitationId) {
     return (
       <AuthFrame title={t('auth.signUp', 'Sign up')} description={t('auth.inviteOnly', 'Accounts here are made by invitation. Open the link of the invitation sent to you, or sign in.')}>
         {toSignIn}
@@ -129,11 +105,10 @@ function SignUp() {
   return (
     <AuthFrame
       title={t('auth.signUp', 'Sign up')}
-      description={invited ? t('auth.signUpInvitedDescription', 'Make an account with the email address the invitation was sent to.') : t('auth.signUpDescription', 'Make an account and its organization.')}
+      description={invited ? t('auth.signUpInvitedDescription', 'Make an account with the email address the invitation was sent to.') : t('auth.signUpDescription', 'Make an account.')}
     >
       <form className="grid gap-4" noValidate onSubmit={submit}>
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}
-        {!founds || invited ? null : box('organization', t('auth.organization', 'Organization'), { autoComplete: 'organization', onChange: (event) => setOrganization(event.target.value), type: 'text', value: organization })}
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), {
           autoComplete: 'new-password',

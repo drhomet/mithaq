@@ -2349,7 +2349,7 @@ test('69. every auth page reads cleanly in both locales: a way home, the languag
     assert.ok(new RegExp(`<a[^>]*href="/auth/forgot-password"[^>]*>([^<]*)</a>`).exec(signIn)?.[1] === scopes.auth!.forgotPasswordQuestion![locale], `sign-in links the forgot page in ${locale}`)
     assert.match(signIn, /autocomplete="current-password"/i, `and its password is the current one in ${locale}`)
     const signUp = await (await fetch(`${origin}/auth/sign-up`, { headers: { cookie: `locale=${locale}` } })).text()
-    assert.match(signUp, /<input[^>]*autocomplete="organization"[^>]*>/i, `the sign-up's organization box completes as one in ${locale}`)
+    assert.doesNotMatch(signUp, /autocomplete="organization"/i, `the sign-up asks no organization in ${locale}: one is made once the address is proved`)
     assert.equal(signUp.match(/autocomplete="new-password"/gi)?.length, 2, `and both its passwords are new ones in ${locale}`)
     assert.ok(signUp.includes(scopes.auth!.passwordRule![locale]!.replace('{count}', String(minimum))), `and it states the provider's minimum of ${minimum} before a submit in ${locale}`)
     const reset = await (await fetch(`${origin}/auth/reset-password?token=t`, { headers: { cookie: `locale=${locale}` } })).text()
