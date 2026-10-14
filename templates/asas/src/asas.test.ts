@@ -100,7 +100,7 @@ import { asas } from './asas.ts'
 import { pushInput } from '../../../packages/mithaq/src/drizzle/index.ts'
 import { storageConfig as templateStorage } from '../../mithaq/src/storage/index.ts'
 import { accessTarget, dashboardScreen, dashboardUi, organization, platformScreen, portalScreen, portalUi, serverTargets as projectTargets, targets as languageTargets } from '../../mithaq/src/mithaq.ts'
-import { asPlatform, authOptions, authSettings, options, platformApp, platformRoles, platformURL, providers, serverFor, type AuthSettings } from '@asas/mithaq/auth'
+import { asPlatform, authOptions, authSettings, backgroundSettled, options, platformApp, platformRoles, platformURL, providers, serverFor, type AuthSettings } from '@asas/mithaq/auth'
 import { secret, superAdminOnly } from '@asas/mithaq/auth/platform-roles'
 import { localUsers } from '../../features/auth/local-users/local-users.ts'
 import { kayan as mediaKayan } from '../../features/media/index.ts'
@@ -890,14 +890,20 @@ const keptMail = () => {
   const sent: { to: string; text: string }[] = []
   return { sent, mailer: { send: async (mail: { to: string; text: string }) => void sent.push(mail) }, linkTo: (to: string) => /https?:\/\/\S+/.exec(sent.filter((one) => one.to === to).at(-1)?.text ?? '')?.[0] }
 }
+/** How many messages `mail` holds once the mail sent in the background is out. */
+const mailCount = async (mail: ReturnType<typeof keptMail>) => {
+  await backgroundSettled()
+  return mail.sent.length
+}
 /** The path and query of a mailed link, asked of `one` at the provider's own base path. */
 const followed = (one: ModeServer, link: string) => {
   const url = new URL(link)
   return one.handler(new Request(`${tenantOrigin}${url.pathname.replace('/api/auth/user/', '/api/auth/')}${url.search}`, { redirect: 'manual' }))
 }
 
-/** The token of the set-password link last mailed to `to`. */
-const tokenMailed = (mail: ReturnType<typeof keptMail>, to: string) => {
+/** The token of the set-password link last mailed to `to`, once the mail sent in the background is out. */
+const tokenMailed = async (mail: ReturnType<typeof keptMail>, to: string) => {
+  await backgroundSettled()
   const link = mail.linkTo(to)
   return link ? new URL(link).searchParams.get('token') ?? undefined : undefined
 }
@@ -914,12 +920,13 @@ test('0d. an open sign-up with verification and allowed domains: an address outs
   assert.equal(made.status, 200, 'an address at an allowed domain signs up')
   assert.equal(cookieOf(made).includes('session_token'), false, 'with no session until the address is proved')
   assert.deepEqual(await modeRows(`select member.id from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`), [], 'and no membership')
-  const mailed = mail.sent.length
+  const mailed = await mailCount(mail)
   assert.deepEqual(await answerOf(await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })), [403, 'EMAIL_NOT_VERIFIED'], 'a sign-in before the proof is refused')
-  assert.equal(mail.sent.length, mailed, 'and mails nothing, so nobody pushes a link on demand')
+  assert.equal(await mailCount(mail), mailed, 'and mails nothing, so nobody pushes a link on demand')
   assert.equal((await askedOf(open, '/send-verification-email', { email: 'pupil@school.example' })).status, 404, 'nor through the provider\'s resend')
+  await backgroundSettled()
   assert.match(mail.linkTo('pupil@school.example') ?? '', /^http:\/\/localhost:5173\/auth\/reset-password\?token=/, 'the mailed link chooses the password on the tenant app\'s own page')
-  const token = tokenMailed(mail, 'pupil@school.example')!
+  const token = (await tokenMailed(mail, 'pupil@school.example'))!
   assert.equal((await askedOf(open, '/reset-password', { token, newPassword: 'the-pupil-chose-this' })).status, 200, 'the link sets the password')
   const [pupil] = await modeRows(`select "user".id, "user".email_verified, member.role from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`)
   assert.deepEqual([pupil?.role, pupil?.email_verified], ['member', true], 'which proves the address and joins the one organization')
@@ -929,7 +936,7 @@ test('0d. an open sign-up with verification and allowed domains: an address outs
   assert.equal(session.session.activeOrganizationId, organization!.id, 'and signs in there')
   await db.execute(`delete from member_roles where user_id = '${pupil!.id}'; delete from member where user_id = '${pupil!.id}'; update "user" set email_verified = false where id = '${pupil!.id}'`)
   await askedOf(open, '/request-password-reset', { email: 'pupil@school.example' })
-  assert.equal((await askedOf(open, '/reset-password', { token: tokenMailed(mail, 'pupil@school.example')!, newPassword: 'the-pupil-chose-again' })).status, 200, 'the removed member, made unverified again, proves the address again')
+  assert.equal((await askedOf(open, '/reset-password', { token: (await tokenMailed(mail, 'pupil@school.example'))!, newPassword: 'the-pupil-chose-again' })).status, 200, 'the removed member, made unverified again, proves the address again')
   assert.equal((await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: 'the-pupil-chose-again' })).status, 200, 'and still signs in')
   assert.deepEqual(await modeRows(`select id from member where user_id = '${pupil!.id}'`), [], 'but never joins again')
 })
@@ -939,13 +946,14 @@ test('0f. a squatted address: whoever signed up first with another\'s address ne
   const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: 'student', verifyEmail: true, allowedDomains: [], mailer: mail.mailer })
   const signUp = (password: string) => askedOf(open, '/sign-up/email', { name: 'Victim', email: 'victim@example.com', password })
   assert.equal((await signUp('the-attacker-password')).status, 200, 'the attacker signs up with the victim\'s address')
-  const squatted = mail.sent.length
+  const squatted = await mailCount(mail)
   assert.equal((await signUp('the-victim-password')).status, 200, 'the victim\'s own sign-up gets the same answer')
-  assert.equal(mail.sent.length, squatted + 1, 'and mails the address a link, since its account is not proved')
-  const pushed = mail.sent.length
+  assert.equal(squatted, 1, 'the squat itself mailed the link to the victim\'s address, never to the attacker')
+  assert.equal(await mailCount(mail), squatted, 'and the victim\'s own sign-up within five minutes mails no second one')
+  const pushed = await mailCount(mail)
   assert.deepEqual(await answerOf(await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-attacker-password' })), [403, 'EMAIL_NOT_VERIFIED'], 'the attacker cannot sign in')
-  assert.equal(mail.sent.length, pushed, 'nor push another link to the victim')
-  assert.equal((await askedOf(open, '/reset-password', { token: tokenMailed(mail, 'victim@example.com')!, newPassword: 'the-victim-chose-this' })).status, 200, 'the victim proves the address by choosing the password')
+  assert.equal(await mailCount(mail), pushed, 'nor push another link to the victim')
+  assert.equal((await askedOf(open, '/reset-password', { token: (await tokenMailed(mail, 'victim@example.com'))!, newPassword: 'the-victim-chose-this' })).status, 200, 'the victim proves the address by choosing the password')
   assert.equal((await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-attacker-password' })).status, 401, 'the attacker\'s password no longer signs in')
   assert.equal((await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-victim-chose-this' })).status, 200, 'the victim\'s does')
   assert.equal((await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'victim@example.com'`))[0]?.role, 'member', 'and the victim joined')
@@ -961,6 +969,31 @@ test('0e. an open sign-up without verification joins at once with no role, and i
   const [joined] = await modeRows(`select member.role, "user".id from member join "user" on "user".id = member.user_id where "user".email = 'walk-in@example.com'`)
   assert.equal(joined?.role, 'member', 'as a member')
   assert.deepEqual(await modeRows(`select role from member_roles where user_id = '${joined!.id}'`), [], 'holding no role until an administrator gives one')
+})
+
+test('0g. links to one address are mailed at most once in five minutes, never waited on, and a reset ends every other link to its account', async () => {
+  const mail = keptMail()
+  const slow = { send: async (one: { to: string; text: string }) => { await setTimeout(800); await mail.mailer.send(one) } }
+  const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: null, verifyEmail: true, allowedDomains: [], mailer: slow })
+  const timed = async (run: () => Promise<Response>) => {
+    const started = performance.now()
+    assert.equal((await run()).status, 200)
+    return performance.now() - started
+  }
+  const signUp = (email: string) => () => askedOf(open, '/sign-up/email', { name: 'Flood', email, password: modePassword })
+  const fresh = await timed(signUp('flood@example.com'))
+  const again = await timed(signUp('flood@example.com'))
+  const reset = () => askedOf(open, '/request-password-reset', { email: 'flood@example.com' })
+  const asked = [await timed(reset), await timed(reset)]
+  for (const took of [fresh, again, ...asked]) assert.ok(took < 600, `no answer waits on the mailer: ${[fresh, again, ...asked].map(Math.round).join(', ')}ms`)
+  assert.equal(await mailCount(mail), 1, 'a second sign-up and two resets within five minutes mail nothing more')
+  const [user] = await modeRows(`select id from "user" where email = 'flood@example.com'`)
+  const links = async () => (await modeRows(`select identifier from verification where value = '${user!.id}' and identifier like 'reset-password:%'`)).length
+  assert.ok((await links()) >= 3, 'though each made a link')
+  assert.equal((await askedOf(open, '/reset-password', { token: (await tokenMailed(mail, 'flood@example.com'))!, newPassword: 'the-flood-chose-this' })).status, 200)
+  assert.equal(await links(), 0, 'a reset ends every other link to the account')
+  assert.equal((await reset()).status, 200)
+  assert.equal(await mailCount(mail), 2, 'and the next request is mailed')
 })
 
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {

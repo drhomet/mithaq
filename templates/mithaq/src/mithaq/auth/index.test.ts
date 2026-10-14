@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { authOptions, authSettings, domainAllowed, options, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
+import { authOptions, authSettings, backgroundSettled, domainAllowed, options, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
 test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
   assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
@@ -200,6 +200,7 @@ test('with a mailer the reset and, with one organization, the invitation are mai
   const log = await printed(async () => {
     await server.api.requestPasswordReset({ body: { email: 'owner@example.com' } })
     await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+    await backgroundSettled()
   })
   assert.deepEqual(sent.map((one) => one.to), ['owner@example.com', 'invitee@example.com'], 'one message to each address')
   assert.equal(typeof tokenIn(sent[0]!.text), 'string', 'the reset carries its link')
@@ -211,6 +212,7 @@ test('with a mailer the reset and, with one organization, the invitation are mai
 test('with many organizations, which anyone founds, no invitation is mailed: a founder never sends their words to any address through the mailer', async () => {
   const { sent, server, headers } = await mailingOwner(authSettings)
   await printed(() => server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers }))
+  await backgroundSettled()
   assert.deepEqual(sent, [])
   assert.equal(authOptions({}, authSettings).options.rateLimit.customRules?.['/organization/invite-member'], undefined, 'and many keeps the provider\'s own limits')
 })
@@ -218,6 +220,7 @@ test('with many organizations, which anyone founds, no invitation is mailed: a f
 test('with one organization an invitation\'s subject is fixed, its body escapes the organization\'s name, invitations are rate limited, and no subject carries a line break', async () => {
   const { sent, server, headers } = await mailingOwner({ ...authSettings, organizations: 'one', signUp: 'invite', joinRole: null, verifyEmail: true }, 'Evil <b>\r\nBcc: x@example.com')
   await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+  await backgroundSettled()
   assert.equal(sent[0]!.subject.includes('Evil'), false, 'the subject names no organization')
   assert.equal(/[\r\n]/.test(sent[0]!.subject), false)
   assert.equal(sent[0]!.html.includes('<b>'), false, 'the name is escaped in the HTML')
@@ -284,6 +287,7 @@ test('an allowed domain matches exactly after lowercasing and punycode, a subdom
     ['a@corp.org', false],
     ['a@evilcorp.org', false],
     ['a@m\u00fcnchen.de', true],
+    ['a@xn--mnchen-3ya.de', true],
     ['a@\uff45xample.com', false],
     ['a@example\uff0ecom', false],
     ['a@example%2ecom', false],
@@ -314,4 +318,20 @@ test('with no organization shown, an invitation invites to the app and never nam
   assert.equal(sent.length, 1)
   assert.doesNotMatch(`${sent[0]!.subject} ${sent[0]!.text}`, /Main/, 'the organization is not named')
   assert.match(sent[0]!.text, /this app/)
+})
+
+test('a mailer is never waited on: a reset is answered as fast for an address with an account as for one without, and the mail follows', async () => {
+  const sent: string[] = []
+  const slow = { send: async ({ to }: { to: string }) => { await new Promise((done) => setTimeout(done, 1000)); sent.push(to) } }
+  const server = betterAuthServer({ ...authOptions({}, { ...authSettings, mailer: slow }).options, database: memoryAdapter(tables()), secret: 'test-secret' })
+  await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
+  const timed = async (email: string) => {
+    const started = performance.now()
+    await server.api.requestPasswordReset({ body: { email } })
+    return performance.now() - started
+  }
+  const [held, missing] = [await timed('held@example.com'), await timed('nobody@example.com')]
+  assert.ok(held < 500 && missing < 500, `neither answer waits on the mailer: ${Math.round(held)}ms and ${Math.round(missing)}ms`)
+  await backgroundSettled()
+  assert.deepEqual(sent, ['held@example.com'], 'and the mail is sent after')
 })

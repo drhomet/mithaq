@@ -231,7 +231,9 @@ export const domainAllowed = (email: string, allowed: readonly string[]) => {
   }
   // A URL also decodes `%2e` and folds a fullwidth `ｅ` or `．` into ASCII, which no mail server
   // does, so the domain must read back as written: an international one does, a disguised one not.
-  if (domainToUnicode(domain) !== written) return false
+  // One written in its `xn--` form, which the provider's address check asks of an international
+  // domain, is its own reading.
+  if (domainToUnicode(domain) !== written && domain !== written) return false
   return allowed.some((entry) => (entry.startsWith('*.') ? domain.endsWith(entry.slice(1)) : domain === entry))
 }
 
@@ -696,6 +698,19 @@ const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: s
  * The hooks that write rows of this project (`StoreHooks`) are a parameter of `authOptions`
  * instead. A hook changes no table, so the schema read here is the schema the runtime builds.
  */
+// Mail goes out after the answer, so how long an answer takes never says whether an address has an
+// account, and a slow mailer holds up no request. Each send is kept until it settles, so a test or a
+// shutdown can wait for what is still going out. The development log is written at once.
+const background = new Set<Promise<unknown>>()
+const inBackground = (promise: Promise<unknown>) => {
+  background.add(promise)
+  void promise.finally(() => background.delete(promise))
+}
+/** Resolves once every mail sent in the background has gone out or failed. */
+export const backgroundSettled = async () => {
+  while (background.size) await Promise.allSettled([...background])
+}
+
 export const optionsFor = (settings: AuthSettings) => ({
   // A reset ends every session of the account, in both apps, since they share one session table.
   emailAndPassword: { enabled: true as const, revokeSessionsOnPasswordReset: true, ...(settings.mailer ? { sendResetPassword: resetMail(settings.mailer) } : {}) },
@@ -712,7 +727,12 @@ export const optionsFor = (settings: AuthSettings) => ({
   // preview` and Next ports, outside production only. Better Auth adds `baseURL` itself. A project
   // that serves a mobile client adds its scheme here.
   trustedOrigins: production ? [] : ['http://localhost:3000', 'http://localhost:4173', 'http://localhost:5173'],
-  ...(ipAddressHeaders ? { advanced: { ipAddress: { ipAddressHeaders } } } : {}),
+  ...((ipAddressHeaders || (settings.mailer && settings.mailer !== logMailer)) && {
+    advanced: {
+      ...(ipAddressHeaders && { ipAddress: { ipAddressHeaders } }),
+      ...(settings.mailer && settings.mailer !== logMailer && { backgroundTasks: { handler: inBackground } }),
+    },
+  }),
   // How an impersonation crosses from the platform app into the tenant app (`handOff`). The plugin
   // adds no table, and no client may mint a token over HTTP.
   plugins: [admin(adminOptions), organization(organizationOptionsFor(settings)), oneTimeToken({ disableClientRequest: true })],
@@ -1053,7 +1073,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     const joined = String(organization.id)
     // ponytail: the record is a verification row that never expires, the one table the provider
     // lets a project write a fact about an account to with no column of its own; a column on the
-    // user, written by `generate auth`, if more such facts come.
+    // user, written by `generate auth`, if more such facts come. Never purge `joined-open:` rows:
+    // without one, a removed member who resets their password joins again.
     await internalAdapter.createVerificationValue({ identifier: joinedOnce(user.id), value: joined, expiresAt: new Date('9999-12-31T00:00:00Z') })
     await tenant.api.addMember({ body: { userId: user.id, organizationId: joined, role: 'member' } })
     // add-on: roles
@@ -1066,10 +1087,17 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     }
     authAudit({ action: 'join', user: user.id, organization: joined, role: settings.joinRole })
   }
+  // Whether the account was mailed a link to choose its password in the last five minutes, other
+  // than `except`: that one still works, so nobody fills a mailbox by asking again and again.
+  const resetLinks = [{ field: 'identifier', operator: 'starts_with' as const, value: 'reset-password:' }]
+  const mailedLately = async (user: string, except?: string) => {
+    const rows = await (await tenant.$context).adapter.findMany<{ identifier: string; createdAt: Date | string }>({ model: 'verification', where: [{ field: 'value', value: user }, ...resetLinks] })
+    return rows.some((row) => row.identifier !== `reset-password:${except}` && Date.now() - new Date(row.createdAt).getTime() < 5 * 60 * 1000)
+  }
   // The set-password link that proves an address, stored as the provider stores a reset's, so the
   // reset page and route answer it. It lasts an hour, as a reset link does.
   const confirmLink = async (user: { id: string; email: string }) => {
-    if (!settings.mailer) return
+    if (!settings.mailer || (await mailedLately(user.id))) return
     const token = randomBytes(24).toString('base64url')
     await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) })
     await confirmMail(settings.mailer)({ email: user.email, token })
@@ -1082,11 +1110,19 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       // A reset proves the mailbox, and an account proved so for the first time joins as a verified
       // one would. The user is read before the reset, so `emailVerified` says whether it was proved.
       onPasswordReset: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean; role?: unknown } }) => {
-        await (await tenant.$context).internalAdapter.updateUser(user.id, { emailVerified: true })
+        const { adapter, internalAdapter } = await tenant.$context
+        await internalAdapter.updateUser(user.id, { emailVerified: true })
+        // The password is chosen, so every other link to choose it is spent.
+        await adapter.deleteMany({ model: 'verification', where: [{ field: 'value', value: user.id }, ...resetLinks] })
         if (!user.emailVerified) await joinOpen(user)
       },
       // A second sign-up with the address of an account nobody proved, such as its owner's after
       // someone squatted it, is answered as any sign-up and mails the address the link that proves it.
+      ...(settings.mailer && {
+        sendResetPassword: async (data: { user: { id: string; email: string }; token: string }) => {
+          if (!(await mailedLately(data.user.id, data.token))) await resetMail(settings.mailer!)(data)
+        },
+      }),
       ...(verifying && { onExistingUserSignUp: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean } }) => (user.emailVerified ? undefined : confirmLink(user)) }),
     },
     // A sign-up mails the link once. A sign-in before the proof mails nothing, and the provider's own
