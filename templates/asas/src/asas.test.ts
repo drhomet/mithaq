@@ -1092,6 +1092,21 @@ test('0k. with many organizations an invited sign-up joins nothing until its add
   assert.equal(session.session.activeOrganizationId, organization, 'and signs in there')
 })
 
+test('0l. each organization invites at most ten people a minute and a hundred a day, whoever invites, so nobody turns the mailer into a flood', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  const founder = await proved({ one: many, mail, email: 'founder-0l@example.com' })
+  const organization = (await many.api.createOrganization({ body: { name: 'Flood 0l', slug: 'flood-0l' }, headers: founder }))!.id
+  const invite = (at: number) => askedOf(many, '/organization/invite-member', { email: `invitee-${at}-0l@example.com`, role: 'member' }, { cookie: founder.get('cookie')! })
+  for (let at = 0; at < 10; at++) assert.equal((await invite(at)).status, 200, `invitation ${at + 1} of the minute`)
+  assert.deepEqual(await answerOf(await invite(10)), [429, 'INVITATIONS_PER_MINUTE'], 'the eleventh in a minute is refused')
+  await db.execute(`update invitation set created_at = now() - interval '2 minutes' where organization_id = '${organization}'`)
+  assert.equal((await invite(10)).status, 200, 'a minute later the organization invites again')
+  // The rest of the day's hundred, written as an hour old.
+  await db.execute(`insert into invitation (id, organization_id, email, role, status, expires_at, created_at, inviter_id) select 'flood-0l-' || n, '${organization}', 'flood-' || n || '-0l@example.com', 'member', 'pending', now() + interval '1 day', now() - interval '1 hour', inviter_id from generate_series(1, 89) as n, (select inviter_id from invitation where organization_id = '${organization}' limit 1) as one`)
+  assert.deepEqual(await answerOf(await invite(11)), [429, 'INVITATIONS_PER_DAY'], 'and past a hundred in a day it is refused until the day has passed')
+})
+
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
   const made = (await modeRows(`select id from organization where id <> 'borrowed-organization'`)).map((one) => `'${one.id}'`)
   if (made.length) {

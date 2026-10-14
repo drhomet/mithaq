@@ -309,7 +309,11 @@ const letter = ({ to, subject, en, ar, link }: { to: string; subject: string; en
 
 // The subject is fixed and only the body names the organization, escaped: its name is words an
 // administrator wrote. With no organization shown, the invitation is to the app, as every page says.
-const invitationMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganization: boolean }) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) => {
+// With many organizations anyone founds one and invites, so only an inviter whose own address is
+// proved has an invitation mailed: nobody sends a stranger the project's mail from an address they
+// do not hold. The inviter still copies the link from the Members page.
+const invitationMail = ({ mailer, organizations, showOrganization }: { mailer: Mailer; organizations: AuthSettings['organizations']; showOrganization: boolean }) => async ({ id, email, organization, inviter }: { id: string; email: string; organization: { name: string }; inviter: { user: { emailVerified?: boolean } } }) => {
+  if (organizations === 'many' && !inviter.user.emailVerified) return
   const [en, ar] = showOrganization ? [organization.name, organization.name] : ['this app', 'هذا التطبيق']
   await mailer.send(letter({
     to: email,
@@ -319,6 +323,12 @@ const invitationMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrga
     link: new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href,
   }))
 }
+
+/**
+ * How many invitations one organization makes, whoever makes them, so no organization turns the
+ * project's mailer into a flood: `perMinute` in any minute and `perDay` in any day.
+ */
+export const invitationLimits = { perMinute: 10, perDay: 100 }
 
 /**
  * The provider's organization limits, each set here so none is a silent default of the provider's:
@@ -357,18 +367,13 @@ const organizationOptionsFor = ({ mailer, organizations, showOrganization }: Aut
   // settings, its last administrator), and every tenant key is `restrict`, so deletion is off over
   // HTTP.
   disableOrganizationDeletion: true,
+  // Every invitation is mailed through the fixed letter, where a mailer exists.
+  ...(mailer ? { sendInvitationEmail: invitationMail({ mailer, organizations, showOrganization }) } : {}),
   // The provider compares the invited address with the signed-in one on every invitation route.
   // `requireEmailVerificationOnInvitation` stays unset rather than `false`, so the provider asks
   // for a verified address only if invitation ids become guessable. An account made by invitation
   // is not verified, since holding the id is its proof, so asking for one would leave every
   // invitation unanswerable.
-  //
-  // With many organizations anyone founds one and may invite, so nothing is mailed: the link goes to
-  // the log in development and is handed over elsewhere, and no founder sends words of their own to
-  // any address through the project's mailer.
-  ...(organizations === 'many'
-    ? (logsLinks ? { sendInvitationEmail: invitationMail({ mailer: logMailer, showOrganization }) } : {})
-    : mailer ? { sendInvitationEmail: invitationMail({ mailer, showOrganization }) } : {}),
   organizationHooks: {
     beforeUpdateOrganization: gate('organization.update'),
     beforeRemoveMember: gate('member.delete'),
@@ -649,6 +654,7 @@ export type StoreHooks = {
   beforeRemoveMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
   beforeAcceptInvitation?: (data: Joining & { invitation: { role: string } & Record<string, unknown>; user: { id: string } & Record<string, unknown> }) => Promise<void>
   beforeAddMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
+  beforeCreateInvitation?: (data: Joining) => Promise<void>
 }
 
 /**
@@ -735,8 +741,9 @@ export const optionsFor = (settings: AuthSettings) => ({
   // answer every sign-in and reset request unlimited. Off a local host it limits whatever
   // `NODE_ENV` says.
   //
-  // With one organization invitations are mailed, so they are limited apart: ten a minute.
-  rateLimit: { enabled: !onLocalHost, ...(settings.organizations !== 'many' && { customRules: { '/organization/invite-member': { window: 60, max: 10 } } }) },
+  // Invitations are mailed, so they are limited apart: ten a minute from one address, beside each
+  // organization's own `invitationLimits`.
+  rateLimit: { enabled: !onLocalHost, customRules: { '/organization/invite-member': { window: 60, max: invitationLimits.perMinute } } },
   // Better Auth reads it for the links it writes into mail and the origin it checks a request
   // against; without it every boot prints `Base URL is not set`.
   baseURL: tenantURL,
@@ -835,6 +842,10 @@ export const authOptions = (hooks: StoreHooks = {}, settings: AuthSettings = aut
               await organizationOptions.organizationHooks.beforeAcceptInvitation(data)
               await hooks.beforeAcceptInvitation?.(data)
             },
+            beforeCreateInvitation: async (data: Parameters<typeof organizationOptions.organizationHooks.beforeCreateInvitation>[0]) => {
+              await organizationOptions.organizationHooks.beforeCreateInvitation(data)
+              await hooks.beforeCreateInvitation?.(data)
+            },
           },
           ac,
           roles,
@@ -917,6 +928,14 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // that holds one makes the organization: a second client would wait on the rows it has not
   // committed.
   const storeHooks = (tx?: unknown): StoreHooks => ({
+    // Counted by the rows, so every process of the deploy keeps one count.
+    // ponytail: two invitations at the same instant may both pass the last place; a lock per
+    // organization if that is ever seen.
+    beforeCreateInvitation: async ({ organization }) => {
+      const since = (ago: number) => store.count!({ kayan: 'invitation', args: { where: { organizationId: { equals: organization.id }, createdAt: { greater_than: new Date(Date.now() - ago) } } } })
+      if ((await since(60_000)) >= invitationLimits.perMinute) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_MINUTE', message: `This organization has sent ${invitationLimits.perMinute} invitations in the last minute. Wait a minute and try again.` })
+      if ((await since(86_400_000)) >= invitationLimits.perDay) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_DAY', message: `This organization has sent ${invitationLimits.perDay} invitations in the last day. Try again tomorrow.` })
+    },
     // add-on: roles
     // The tenant's first assignment: a role holding `memberRoles.create` has to be assigned before
     // it can assign anything, and the caller of `createOrganization` is in no organization until

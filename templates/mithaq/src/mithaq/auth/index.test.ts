@@ -165,7 +165,10 @@ test('an invitation writes its accept link to the log under NODE_ENV=development
   for (const [deploy, env, logs] of deploys) {
     const imported = await importedUnder(env)
     const server = betterAuthServer({ ...imported.authOptions().options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
-    const headers = new Headers({ cookie: (await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+    const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
+    // Proved, as many organizations mail an invitation only for an inviter whose address is.
+    await (await server.$context).internalAdapter.updateUser(user.id, { emailVerified: true })
+    const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
     await server.api.createOrganization({ body: { name: 'Org', slug: 'org' }, headers })
     let made: { id: string } | undefined
     const log = await printed(async () => (made = (await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })) as { id: string }))
@@ -199,12 +202,20 @@ test('with a mailer the reset and, with one organization, the invitation are mai
   assert.equal(log.includes('token='), false, 'and the log holds no link')
 })
 
-test('with many organizations, which anyone founds, no invitation is mailed: a founder never sends their words to any address through the mailer', async () => {
-  const { sent, server, headers } = await mailingOwner(authSettings)
-  await printed(() => server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers }))
+test('with many organizations an invitation is mailed in the fixed letter only for an inviter whose own address is proved, and invitations are rate limited there too', async () => {
+  const { sent, server, headers } = await mailingOwner(authSettings, 'Evil <b>\r\nBcc: x@example.com')
+  await server.api.createInvitation({ body: { email: 'first@example.com', role: 'member' }, headers })
   await backgroundSettled()
-  assert.deepEqual(sent, [])
-  assert.equal(authOptions({}, authSettings).options.rateLimit.customRules?.['/organization/invite-member'], undefined, 'and many keeps the provider\'s own limits')
+  assert.equal(sent.length, 0, 'an inviter nobody proved sends no words of theirs through the mailer; the link is still copied')
+  const { internalAdapter } = await server.$context
+  await internalAdapter.updateUser((await internalAdapter.findUserByEmail('owner@example.com'))!.user.id, { emailVerified: true })
+  const proved = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  await server.api.createInvitation({ body: { email: 'second@example.com', role: 'member' }, headers: proved })
+  await backgroundSettled()
+  assert.deepEqual(sent.map((one) => one.to), ['second@example.com'], 'a proved inviter\'s invitation is mailed')
+  assert.equal(sent[0]!.subject, 'You are invited · لديك دعوة', 'under the fixed subject')
+  assert.equal(sent[0]!.html.includes('<b>'), false, 'with the organization\'s name escaped')
+  assert.ok(authOptions({}, authSettings).options.rateLimit.customRules?.['/organization/invite-member'], 'and invitations have a limit of their own')
 })
 
 test('with one organization an invitation\'s subject is fixed, its body escapes the organization\'s name, invitations are rate limited, and no subject carries a line break', async () => {
