@@ -885,6 +885,59 @@ test('0c. by invitation only, a sign-up without a matching invitation id gets on
   assert.deepEqual(await modeRows(`select id from "user" where email = 'elsewhere@example.com'`), [], 'and not made')
 })
 
+/** A mailer that keeps what it is handed, and the link in the last message to `to`. */
+const keptMail = () => {
+  const sent: { to: string; text: string }[] = []
+  return { sent, mailer: { send: async (mail: { to: string; text: string }) => void sent.push(mail) }, linkTo: (to: string) => /https?:\/\/\S+/.exec(sent.filter((one) => one.to === to).at(-1)?.text ?? '')?.[0] }
+}
+/** The path and query of a mailed link, asked of `one` at the provider's own base path. */
+const followed = (one: ModeServer, link: string) => {
+  const url = new URL(link)
+  return one.handler(new Request(`${tenantOrigin}${url.pathname.replace('/api/auth/user/', '/api/auth/')}${url.search}`, { redirect: 'manual' }))
+}
+
+test('0d. an open sign-up with verification and allowed domains: an address outside the domains is refused, one inside proves its address before it signs in and joins as the join role, and a removed member never joins again', async () => {
+  const mail = keptMail()
+  const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: 'student', verifyEmail: true, allowedDomains: ['school.example', '*.staff.example'], mailer: mail.mailer })
+  const [organization] = await modeRows('select id from organization')
+  const signUp = (email: string) => askedOf(open, '/sign-up/email', { name: 'Pupil', email, password: modePassword })
+  for (const email of ['pupil@other.example', 'pupil@notschool.example', 'pupil@school.example.evil.example', 'pupil@staff.example']) {
+    assert.deepEqual(await answerOf(await signUp(email)), [403, 'SIGN_UP_DOMAIN'], `${email} is outside the domains`)
+  }
+  const made = await signUp('pupil@school.example')
+  assert.equal(made.status, 200, 'an address at an allowed domain signs up')
+  assert.equal(cookieOf(made).includes('session_token'), false, 'with no session until the address is proved')
+  assert.deepEqual(await modeRows(`select member.id from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`), [], 'and no membership')
+  assert.deepEqual(await answerOf(await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })), [403, 'EMAIL_NOT_VERIFIED'], 'a sign-in before the proof is refused')
+  const link = mail.linkTo('pupil@school.example')
+  assert.match(link ?? '', /^http:\/\/localhost:5173\/api\/auth\/user\/verify-email\?token=/, 'the mailed link is the tenant app\'s own')
+  const verified = await followed(open, link!)
+  assert.ok([200, 302].includes(verified.status), `the link verifies: ${verified.status}`)
+  const [pupil] = await modeRows(`select "user".id, member.role from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`)
+  assert.equal(pupil?.role, 'member', 'the proved address joins the one organization')
+  assert.deepEqual(await modeRows(`select role from member_roles where user_id = '${pupil!.id}'`), [{ role: 'student' }], 'as the join role')
+  const signedIn = await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })
+  const session = await (await askedOf(open, '/get-session', undefined, { cookie: cookieOf(signedIn) })).json() as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, organization!.id, 'and signs in there')
+  await db.execute(`delete from member_roles where user_id = '${pupil!.id}'; delete from member where user_id = '${pupil!.id}'`)
+  await followed(open, link!)
+  const resent = await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })
+  assert.equal(resent.status, 200, 'the removed member still signs in')
+  assert.deepEqual(await modeRows(`select id from member where user_id = '${pupil!.id}'`), [], 'and neither the old link nor a sign-in joins them again')
+})
+
+test('0e. an open sign-up without verification joins at once with no role, and its first session opens in the one organization', async () => {
+  const walkIn = modeServer({ organizations: 'one', signUp: 'open', joinRole: null, verifyEmail: false, allowedDomains: [] })
+  const [organization] = await modeRows('select id from organization')
+  const made = await askedOf(walkIn, '/sign-up/email', { name: 'Walk-in', email: 'walk-in@example.com', password: modePassword })
+  assert.equal(made.status, 200)
+  const session = await (await askedOf(walkIn, '/get-session', undefined, { cookie: cookieOf(made) })).json() as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, organization!.id, 'the sign-up\'s own session opens in the one organization')
+  const [joined] = await modeRows(`select member.role, "user".id from member join "user" on "user".id = member.user_id where "user".email = 'walk-in@example.com'`)
+  assert.equal(joined?.role, 'member', 'as a member')
+  assert.deepEqual(await modeRows(`select role from member_roles where user_id = '${joined!.id}'`), [], 'holding no role until an administrator gives one')
+})
+
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
   const made = (await modeRows(`select id from organization where id <> 'borrowed-organization'`)).map((one) => `'${one.id}'`)
   if (made.length) {

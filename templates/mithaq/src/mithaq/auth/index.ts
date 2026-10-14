@@ -640,6 +640,18 @@ const ipAddressHeaders = trustedIpHeaders(process.env.TRUSTED_IP_HEADER)
 // The link is the tenant app's reset page, not the provider's `url`, which names
 // `/api/auth/reset-password` while this project serves the provider under `/api/auth/user`.
 const onLocalHost = !production && isLocalHost(tenantURL)
+// The tenant app's own verification link, not the provider's `url`, which names `/api/auth` while
+// this project serves the provider under `/api/auth/user`. Verifying signs the person in and lands
+// on the sign-in page, which sends a signed-in person on.
+const verificationMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
+  mailer.send(letter({
+    to: user.email,
+    subject: 'Confirm your address · تأكيد عنوانك',
+    en: 'Someone made an account with this address. If it was you, open the link below within an hour to confirm it. If not, ignore this message: an account nobody confirms never signs in.',
+    ar: 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.',
+    link: new URL(`/api/auth/user/verify-email?token=${encodeURIComponent(token)}&callbackURL=${encodeURIComponent('/auth/sign-in')}`, tenantURL).href,
+  }))
+
 const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
   mailer.send(letter({
     to: user.email,
@@ -987,8 +999,62 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       if (!context || !(await invitedAs({ adapter: (await getCurrentAdapter(context.context.adapter as never)) as unknown as Finds, id: invitationId, email: user.email }))) throw inviteOnly()
     } else if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) throw outsideDomains()
   }
+  // Whether a new account proves its address before it signs in and joins.
+  const verifying = oneOrganization && settings.signUp === 'open' && settings.verifyEmail
+  // Who joins the one organization by signing up: in one organization or none with an open sign-up,
+  // when the account is made or, where addresses are verified, when its address is proved. The
+  // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.
+  // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or was
+  // ever invited, is passed over: an invitation is how they join, and an accepted one means they
+  // were a member, perhaps removed since.
+  const joinOpen = async (user: { id: string; email: string; role?: unknown }) => {
+    if (!oneOrganization || settings.signUp !== 'open') return
+    if (holdsRole(user.role, (one) => Object.hasOwn(platformRoles, one))) return
+    if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) return
+    const [organization] = (await store.find({ kayan: 'organization', args: { limit: 1, page: 1, sort: { field: 'createdAt', direction: 'asc' } } })).docs
+    if (!organization) return
+    if (await store.count!({ kayan: 'member', args: { where: { userId: { equals: user.id } } } })) return
+    if (await store.count!({ kayan: 'invitation', args: { where: { email: { equals: user.email.toLowerCase() } } } })) return
+    const joined = String(organization.id)
+    await tenant.api.addMember({ body: { userId: user.id, organizationId: joined, role: 'member' } })
+    // add-on: roles
+    if (settings.joinRole !== null) await store.transaction((tx) => grantRole({ tx, organization: joined, user: user.id, role: settings.joinRole! }))
+    // end add-on: roles
+    // A session made before the join names no organization, and every read would be refused in it.
+    const { internalAdapter } = await tenant.$context
+    for (const one of await internalAdapter.listSessions(user.id)) {
+      // The organization plugin's own column, which the core session type does not name.
+      if (!(one as { activeOrganizationId?: string | null }).activeOrganizationId) await internalAdapter.updateSession(one.token, { activeOrganizationId: joined })
+    }
+    authAudit({ action: 'join', user: user.id, organization: joined, role: settings.joinRole })
+  }
+  // The provider calls `afterEmailVerification` on a first proof and on an address change alike, and
+  // `beforeEmailVerification` on the first alone, so only the first joins.
+  const proving = new Set<string>()
   const tenant = betterAuthServer({
     ...built,
+    emailAndPassword: {
+      ...built.emailAndPassword,
+      requireEmailVerification: verifying,
+      // A reset proves the mailbox as a verification link does.
+      onPasswordReset: async ({ user }: { user: { id: string } }) => {
+        await (await tenant.$context).internalAdapter.updateUser(user.id, { emailVerified: true })
+      },
+    },
+    ...(verifying && settings.mailer && {
+      emailVerification: {
+        sendVerificationEmail: verificationMail(settings.mailer),
+        sendOnSignUp: true,
+        sendOnSignIn: true,
+        autoSignInAfterVerification: true,
+        beforeEmailVerification: async (user: { id: string }) => {
+          proving.add(user.id)
+        },
+        afterEmailVerification: async (user: { id: string; email: string; role?: unknown }) => {
+          if (proving.delete(user.id)) await joinOpen(user)
+        },
+      },
+    }),
     plugins: [
       ...built.plugins,
       // add-on: roles
@@ -1006,7 +1072,10 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           before: async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
             await accountGate(user, context)
           },
-          after: async (user: { id: string }) => authAudit({ action: 'sign-up', user: user.id }),
+          after: async (user: { id: string; email: string; role?: unknown }) => {
+            authAudit({ action: 'sign-up', user: user.id })
+            if (!verifying) await joinOpen(user)
+          },
         },
       },
     },
