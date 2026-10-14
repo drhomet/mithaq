@@ -1,4 +1,5 @@
 // Imports no router, stylesheet or React, so a test can load this under plain `node`.
+import { organizations } from 'asas/organizations'
 import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
 import organization from 'asas/messages/organization.json' with { type: 'json' }
 import tags from 'asas/messages/tags.json' with { type: 'json' }
@@ -52,11 +53,8 @@ export const localeOf = (asked: string | null | undefined): Locale =>
 /** Which way a document in one locale runs. */
 export const dirOf = (locale: Locale): 'rtl' | 'ltr' => (locale === 'ar' ? 'rtl' : 'ltr')
 
-/**
- * Every scope this app's `t` can answer from. Each entry carries a string per declared
- * locale: a key left unanswered here shows an Arabic viewer the English fallback.
- */
-export const scopes: Record<string, Record<string, Record<string, string>>> = {
+/** The copy every organization mode starts from; `scopes` below lays the mode's words over it. */
+const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   // add-on: courses
   courses: {
     ...courses,
@@ -291,6 +289,30 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
       en: 'This platform has its administrator, so this page is closed. Sign in instead.',
       ar: 'لهذه المنصة مسؤولها، لذا أُغلقت هذه الصفحة. سجل الدخول بدلا من ذلك.',
     },
+    firstRun: { en: 'Set up this app', ar: 'إعداد هذا التطبيق' },
+    firstRunDescription: {
+      en: 'Nobody owns this app yet. The account made here becomes its owner and first administrator.',
+      ar: 'لا أحد يملك هذا التطبيق بعد. الحساب الذي يُنشأ هنا يصبح مالكه وأول مسؤول عنه.',
+    },
+    firstRunSubmit: { en: 'Set up the app', ar: 'إعداد التطبيق' },
+    firstRunCodeUnset: {
+      en: 'This app is set up only with a setup code, and this server has none it can use: SETUP_CODE is unset or shorter than 32 characters. Set SETUP_CODE where the app runs to a random value of 32 characters or more, restart it, and open this page again.',
+      ar: 'لا يُعدّ هذا التطبيق إلا برمز إعداد، وليس لدى هذا الخادم رمز يمكنه استعماله: SETUP_CODE غير مضبوط أو أقصر من 32 حرفا. اضبط SETUP_CODE حيث يعمل التطبيق على قيمة عشوائية من 32 حرفا أو أكثر، ثم أعد تشغيله وافتح هذه الصفحة مرة أخرى.',
+    },
+    firstRunPending: { en: 'Setting up…', ar: 'جارٍ الإعداد…' },
+    firstRunFailed: { en: 'That owner could not be made.', ar: 'تعذر إنشاء هذا المالك.' },
+    firstRunClosed: { en: 'This app has its owner, so this page is closed. Sign in instead.', ar: 'لهذا التطبيق مالكه، لذا أُغلقت هذه الصفحة. سجل الدخول بدلا من ذلك.' },
+    setupPending: { en: 'This app is not set up yet. Its administrator sets it up first.', ar: 'لم يُعدّ هذا التطبيق بعد. يُعدّه مسؤوله أولا.' },
+    inviteOnly: {
+      en: 'Accounts here are made by invitation. Open the link of the invitation sent to you, or sign in.',
+      ar: 'تُنشأ الحسابات هنا بدعوة. افتح رابط الدعوة المرسلة إليك، أو سجل الدخول.',
+    },
+    outsideDomains: { en: 'This email address is not at a domain that may sign up here.', ar: 'هذا البريد الإلكتروني ليس من نطاق يُسمح له بإنشاء حساب هنا.' },
+    verifySent: { en: 'Check your email', ar: 'تحقق من بريدك الإلكتروني' },
+    verifySentDescription: {
+      en: 'We sent a link to {email}. Open it to confirm your address and sign in. It lasts an hour.',
+      ar: 'أرسلنا رابطا إلى {email}. افتحه لتأكيد عنوانك وتسجيل الدخول. وهو صالح ساعة.',
+    },
     failed: { en: 'That sign-in did not work.', ar: 'لم ينجح تسجيل الدخول.' },
     signUp: { en: 'Sign up', ar: 'إنشاء حساب' },
     signUpDescription: { en: 'Make an account and its organization.', ar: 'أنشئ حسابا ومؤسسته.' },
@@ -339,7 +361,10 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
     },
     tooManyRequests: { en: 'Too many attempts. Wait a moment and try again.', ar: 'محاولات كثيرة جدا. انتظر قليلا ثم حاول مرة أخرى.' },
     invalidCredentials: { en: 'The email or password provided is incorrect.', ar: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' },
-    emailNotVerified: { en: 'This email address is not verified yet.', ar: 'لم يوثق هذا البريد الإلكتروني بعد.' },
+    emailNotVerified: {
+      en: 'This email address is not confirmed yet. Open the link we sent to it; a new one is on its way.',
+      ar: 'لم يُؤكَّد هذا البريد الإلكتروني بعد. افتح الرابط الذي أرسلناه إليه؛ فرابط جديد في طريقه إليك.',
+    },
     banned: { en: 'This account is banned, so it cannot sign in.', ar: 'هذا الحساب محظور، لذا لا يمكنه تسجيل الدخول.' },
     userExists: { en: 'An account with this email already exists. Use another email.', ar: 'يوجد حساب بهذا البريد الإلكتروني. استخدم بريدا آخر.' },
     requestFailed: { en: 'That request did not work.', ar: 'لم ينجح هذا الطلب.' },
@@ -851,6 +876,93 @@ export const scopes: Record<string, Record<string, Record<string, string>>> = {
   },
 }
 
+type Wording = Record<string, Record<string, { en: string; ar: string }>>
+
+/** With one organization or none, nobody founds one on signing up: an owner sets the app up once. */
+const oneOrNone: Wording = {
+  auth: {
+    signUpDescription: { en: 'Make an account.', ar: 'أنشئ حسابا.' },
+    noOrganization: { en: '{email} has no access here yet. Ask an administrator to invite you.', ar: 'لا يملك {email} وصولا هنا بعد. اطلب من أحد المسؤولين أن يدعوك.' },
+  },
+  marketing: {
+    howStep1Title: { en: 'Set it up once', ar: 'أعدّه مرة واحدة' },
+    howStep1Description: { en: 'Its owner sets the app up, then invites the people who use it.', ar: 'يُعدّ مالكه التطبيق، ثم يدعو من يستعملونه.' },
+    ctaSubtitle: { en: 'Sign in and add your first record in minutes.', ar: 'سجل الدخول وأضف أول سجل لك خلال دقائق.' },
+  },
+}
+
+/** With none, the one organization is the app itself, so no page names an organization. */
+const none: Wording = {
+  auth: {
+    invitationJoin: { en: 'You are invited to join this app.', ar: 'أنت مدعو للانضمام إلى هذا التطبيق.' },
+    invitationInviterGone: {
+      en: 'Whoever sent this invitation no longer uses this app, so it cannot be accepted. Ask someone else to invite you.',
+      ar: 'من أرسل هذه الدعوة لم يعد يستعمل هذا التطبيق، لذا لا يمكن قبولها. اطلب من شخص آخر أن يدعوك.',
+    },
+    noAccessDescription: { en: '{email} holds no role that opens a screen here. Ask an administrator to give you one.', ar: '{email} لا يملك دورا يفتح أي شاشة هنا. اطلب من أحد المسؤولين أن يمنحك دورا.' },
+  },
+  admin: {
+    noColumns: { en: 'Your role can\'t see any column of this list. Ask an administrator for access.', ar: 'لا يستطيع دورك رؤية أي عمود في هذه القائمة. اطلب الوصول من أحد المسؤولين.' },
+  },
+  marketing: {
+    heroTitle: { en: 'Run your work without the busywork', ar: 'أدر عملك دون العمل الروتيني' },
+    heroSubtitle: {
+      en: 'Asas is a dashboard and a portal: keep your records in one place, and keep every role to what it should see.',
+      ar: 'أساس لوحة تحكم وبوابة: احفظ سجلاتك في مكان واحد، واحصر كل دور بما ينبغي أن يراه.',
+    },
+    featuresTitle: { en: 'Everything you need', ar: 'كل ما تحتاجه' },
+    featureRolesDescription: {
+      en: 'Every screen, field and action follows what a role may read or write.',
+      ar: 'تتبع كل شاشة وحقل وإجراء ما يحق للدور قراءته أو تعديله.',
+    },
+    howStep2Description: { en: 'List what you keep and decide what each role may do.', ar: 'أدرج ما تحفظه وحدد ما يحق لكل دور القيام به.' },
+    ctaTitle: { en: 'Start on Asas', ar: 'ابدأ على أساس' },
+    footer: { en: 'Asas — one place for your records.', ar: 'أساس — مكان واحد لسجلاتك.' },
+  },
+  dashboard: {
+    members: { en: 'Users', ar: 'المستخدمون' },
+    membersAbout: { en: 'Who uses this app, and the role each holds.', ar: 'من يستعمل هذا التطبيق، والدور الذي يشغله كل منهم.' },
+    membersNone: { en: 'No one uses this app yet.', ar: 'لا يستعمل أحد هذا التطبيق بعد.' },
+    inviteAbout: { en: 'They join as a user once they accept. Give them roles here after that.', ar: 'ينضم مستخدمًا بعد أن يقبل الدعوة. امنحه الأدوار هنا بعد ذلك.' },
+    inviteAlreadyMember: { en: 'This person already uses this app.', ar: 'هذا الشخص يستعمل هذا التطبيق بالفعل.' },
+    inviteNotAllowed: { en: 'You may not invite people.', ar: 'لا يحق لك دعوة أشخاص.' },
+    removeMember: { en: 'Remove from the app', ar: 'إزالة من التطبيق' },
+    removeAbout: {
+      en: 'They lose access to this app and every role they hold in it. Inviting them again does not give the roles back.',
+      ar: 'يفقد الوصول إلى هذا التطبيق وكل الأدوار التي يشغلها فيه. دعوته مرة أخرى لا تعيد إليه أدواره.',
+    },
+    removeLastOwner: { en: 'The app\'s only owner cannot be removed.', ar: 'لا يمكن إزالة المالك الوحيد للتطبيق.' },
+    removeNotAllowed: { en: 'You may not remove users.', ar: 'لا يحق لك إزالة مستخدمين.' },
+    rolesAbout: { en: 'Fixed roles ship with the project and cannot be changed here. Custom roles are this app\'s own.', ar: 'الأدوار الثابتة تأتي مع المشروع ولا يمكن تغييرها هنا. الأدوار المخصصة خاصة بهذا التطبيق.' },
+    membersOwnerRole: { en: 'The owner of the app always holds this role.', ar: 'مالك التطبيق يشغل هذا الدور دائما.' },
+    dashboardAbout: { en: 'What this app holds, and how many have enrolled lately.', ar: 'ما يضمه هذا التطبيق، وعدد من سجلوا مؤخرا.' },
+    dashboardAboutCatalogue: { en: 'What this app holds.', ar: 'ما يضمه هذا التطبيق.' },
+  },
+  error: {
+    'invalid.tenant_reference': { en: 'That record is not one of this app\'s.', ar: 'هذا السجل ليس من سجلات هذا التطبيق.' },
+    'conflict.last_manager': { en: 'This would leave nobody who may manage roles. Give another user such a role first.', ar: 'سيترك هذا التطبيق دون أي مستخدم يملك إدارة الأدوار. امنح مستخدما آخر دورا كهذا أولا.' },
+    'forbidden.owner_role': { en: 'The owner of the app always holds the administrator role, so it is not taken from them.', ar: 'مالك التطبيق يشغل دور المدير دائما، لذا لا يُسحب منه.' },
+    'invalid.role': { en: 'That role is not one of this app\'s.', ar: 'هذا الدور ليس من أدوار هذا التطبيق.' },
+    'conflict.role_assigned': { en: 'An assignment still names that role, so no role takes the name until it is removed.', ar: 'ما زال إسناد يسمي هذا الدور، لذا لا يأخذ أي دور هذا الاسم حتى يُزال.' },
+    'conflict.member_holds_roles': { en: 'This user still holds a role. Take each role from them first, then remove them.', ar: 'ما زال هذا المستخدم يشغل دورا. اسحب منه كل دور أولا، ثم أزله.' },
+  },
+}
+
+/** The words the organization mode changes, laid over the base copy key by key. */
+export const wordingFor = (mode: 'none' | 'one' | 'many'): Wording =>
+  mode === 'many' ? {} : mode === 'one' ? oneOrNone : Object.fromEntries([...new Set([...Object.keys(oneOrNone), ...Object.keys(none)])].map((scope) => [scope, { ...oneOrNone[scope], ...none[scope] }]))
+
+/** The base copy with `wording` laid over it, so a key the mode changes reads the mode's words. */
+export const withWording = (base: typeof ownScopes, wording: Wording) =>
+  Object.fromEntries(Object.entries(base).map(([scope, keys]) => [scope, { ...keys, ...wording[scope] }])) as typeof ownScopes
+
+/**
+ * Every scope this app's `t` can answer from, in this project's organization mode. Each entry
+ * carries a string per declared locale: a key left unanswered here shows an Arabic viewer the
+ * English fallback.
+ */
+export const scopes = withWording(ownScopes, wordingFor(organizations))
+
 // A `Map`, so a code named for a key of `Object.prototype` answers nothing. A taken organization
 // name has no entry: names may repeat, and sign-up makes the slug unique itself.
 const refusalKeys = new Map([
@@ -873,6 +985,10 @@ const refusalKeys = new Map([
   ['SETUP_CODE_WRONG', 'auth.setupCodeWrong'],
   ['SETUP_CODE_UNSET', 'auth.setupCodeUnset'],
   ['FIRST_REGISTER_CLOSED', 'auth.firstRegisterClosed'],
+  ['FIRST_RUN_CLOSED', 'auth.firstRunClosed'],
+  ['FIRST_RUN_PENDING', 'auth.setupPending'],
+  ['SIGN_UP_INVITE_ONLY', 'auth.inviteOnly'],
+  ['SIGN_UP_DOMAIN', 'auth.outsideDomains'],
 ])
 /** The key of this app's own sentence for a provider refusal, or nothing. The provider's `message` is English on every page and is never shown. */
 export const refusalKey = (status: number, code: unknown): string | undefined =>

@@ -10,6 +10,7 @@
     ".": "./src/asas.ts",
     "./ui-dashboard/*": "./src/ui-dashboard/*",
     "./messages/*": "./src/messages/*",
+    "./organizations": "./src/organizations.ts",
     "./package.json": "./package.json"
   },
   "dependencies": {

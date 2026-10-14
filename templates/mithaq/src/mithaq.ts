@@ -417,7 +417,8 @@ export const dashboardScreen = screenTarget({
     members: {
       path: '/members',
       component: dashboardUi('members.tsx#Members'),
-      nav: { label: { en: 'Members', ar: 'الأعضاء' } },
+      // With no organization shown, its members are the app's users.
+      nav: { label: organizations === 'none' ? { en: 'Users', ar: 'المستخدمون' } : { en: 'Members', ar: 'الأعضاء' } },
       permission: 'member.find',
     },
     // end add-on: roles

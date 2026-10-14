@@ -1,9 +1,11 @@
 import { useState, type ComponentProps } from 'react'
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { organizations, signUp } from 'asas/organizations'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
 import { AuthBox, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
+import { firstRun } from '../first-run.ts'
 import { useCopy } from './__root.tsx'
 import { wanted } from '../redirect.ts'
 
@@ -14,9 +16,16 @@ export const Route = createFileRoute('/auth/sign-in')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.signIn')),
   // The router hands `validateSearch` whatever the URL carried; `wanted` decides what is honoured.
   validateSearch: redirectSearch,
-  beforeLoad: gate,
+  // Nobody signs in to an app of one organization before its owner has set it up.
+  beforeLoad: async ({ search }: { search: { redirect?: string } }) => {
+    if ((await firstRun()).open) throw redirect({ href: '/auth/first-run' })
+    return gate({ search })
+  },
   component: SignIn,
 })
+
+/** Whether a visitor with no invitation may make an account here, so the page offers one. */
+const offersSignUp = organizations === 'many' || signUp === 'open'
 
 function SignIn() {
   const navigate = useNavigate()
@@ -75,12 +84,14 @@ function SignIn() {
           {pending ? t('auth.signInPending', 'Signing in…') : t('auth.signIn', 'Sign in')}
         </Button>
       </form>
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        {t('auth.noAccount', 'No account yet?')}{' '}
-        <Link className="text-primary underline underline-offset-4" to="/auth/sign-up" search={{ redirect: search.redirect }}>
-          {t('auth.signUp', 'Sign up')}
-        </Link>
-      </p>
+      {offersSignUp ? (
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          {t('auth.noAccount', 'No account yet?')}{' '}
+          <Link className="text-primary underline underline-offset-4" to="/auth/sign-up" search={{ redirect: search.redirect }}>
+            {t('auth.signUp', 'Sign up')}
+          </Link>
+        </p>
+      ) : null}
     </AuthFrame>
   )
 }

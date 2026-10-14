@@ -15,6 +15,7 @@ import { Route as screensDashboardRouteImport } from './routes/(screens)/dashboa
 import { Route as screensPortalRouteImport } from './routes/(screens)/portal'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as AuthAcceptInvitationRouteImport } from './routes/auth.accept-invitation'
+import { Route as AuthFirstRunRouteImport } from './routes/auth.first-run'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth.forgot-password'
 import { Route as AuthHandoffRouteImport } from './routes/auth.handoff'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
@@ -53,6 +54,11 @@ const ApiSplatRoute = ApiSplatRouteImport.update({
 const AuthAcceptInvitationRoute = AuthAcceptInvitationRouteImport.update({
   id: '/auth/accept-invitation',
   path: '/auth/accept-invitation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthFirstRunRoute = AuthFirstRunRouteImport.update({
+  id: '/auth/first-run',
+  path: '/auth/first-run',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/portal': typeof screensPortalRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/auth/accept-invitation': typeof AuthAcceptInvitationRoute
+  '/auth/first-run': typeof AuthFirstRunRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/handoff': typeof AuthHandoffRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/unauthorized': typeof UnauthorizedRoute
   '/api/$': typeof ApiSplatRoute
   '/auth/accept-invitation': typeof AuthAcceptInvitationRoute
+  '/auth/first-run': typeof AuthFirstRunRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/handoff': typeof AuthHandoffRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/(screens)/portal': typeof screensPortalRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/auth/accept-invitation': typeof AuthAcceptInvitationRoute
+  '/auth/first-run': typeof AuthFirstRunRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/handoff': typeof AuthHandoffRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/api/$'
     | '/auth/accept-invitation'
+    | '/auth/first-run'
     | '/auth/forgot-password'
     | '/auth/handoff'
     | '/auth/reset-password'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/unauthorized'
     | '/api/$'
     | '/auth/accept-invitation'
+    | '/auth/first-run'
     | '/auth/forgot-password'
     | '/auth/handoff'
     | '/auth/reset-password'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/(screens)/portal'
     | '/api/$'
     | '/auth/accept-invitation'
+    | '/auth/first-run'
     | '/auth/forgot-password'
     | '/auth/handoff'
     | '/auth/reset-password'
@@ -210,6 +222,7 @@ export interface RootRouteChildren {
   screensPortalRoute: typeof screensPortalRouteWithChildren
   ApiSplatRoute: typeof ApiSplatRoute
   AuthAcceptInvitationRoute: typeof AuthAcceptInvitationRoute
+  AuthFirstRunRoute: typeof AuthFirstRunRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthHandoffRoute: typeof AuthHandoffRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/accept-invitation'
       fullPath: '/auth/accept-invitation'
       preLoaderRoute: typeof AuthAcceptInvitationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/first-run': {
+      id: '/auth/first-run'
+      path: '/auth/first-run'
+      fullPath: '/auth/first-run'
+      preLoaderRoute: typeof AuthFirstRunRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/forgot-password': {
@@ -361,6 +381,7 @@ const rootRouteChildren: RootRouteChildren = {
   screensPortalRoute: screensPortalRouteWithChildren,
   ApiSplatRoute: ApiSplatRoute,
   AuthAcceptInvitationRoute: AuthAcceptInvitationRoute,
+  AuthFirstRunRoute: AuthFirstRunRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthHandoffRoute: AuthHandoffRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
