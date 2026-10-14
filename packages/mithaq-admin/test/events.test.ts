@@ -6310,6 +6310,28 @@ test('185k. a stored value nested past the server\'s own bound is drawn read-onl
   }
 })
 
+test('185n. a rich text field with no value yet, absent, null or an empty root, mounts an empty editor that takes words, while a node no class registers still draws the fallback', async () => {
+  const { RichTextEditor } = await import('../registry/rich-text.tsx')
+  const { RichTextNodes } = await import('../../../templates/mithaq/src/ui/rich-text-nodes.tsx')
+  for (const value of [undefined, null, richOf()]) {
+    const changes: unknown[] = []
+    const host = await render(createElement(RichTextNodes, null, createElement(RichTextEditor, { value, onChange: (next: unknown) => void changes.push(next), direction: 'ltr', t, locale: 'en', id: 'courses-details' })))
+    await act(async () => sleep(20))
+    assert.equal(host.querySelector('[role="alert"]'), null, `${JSON.stringify(value)} is not refused: ${host.querySelector('[role="alert"]')?.textContent}`)
+    const editable = host.querySelector('#courses-details')
+    assert.equal(editable?.getAttribute('contenteditable'), 'true', `${JSON.stringify(value)} mounts an editable editor`)
+    const editor = (editable as unknown as { __lexicalEditor: import('lexical').LexicalEditor }).__lexicalEditor
+    const { $getRoot, $createParagraphNode, $createTextNode } = await import('lexical')
+    await act(async () => editor.update(() => void $getRoot().clear().append($createParagraphNode().append($createTextNode('First words')))))
+    await act(async () => sleep(20))
+    assert.equal(JSON.stringify(changes.at(-1)).includes('First words'), true, `and reports what is written into it: ${JSON.stringify(changes.at(-1))}`)
+  }
+  const unknown = await render(createElement(RichTextEditor, { value: richOf(blockOf('mystery', [textOf('Odd')])), onChange: () => {}, direction: 'ltr', t, locale: 'en', id: 'courses-details' }))
+  await act(async () => sleep(20))
+  assert.equal(unknown.querySelector('[role="alert"]') !== null, true, 'a node no class registers is still refused')
+  assert.equal(unknown.querySelectorAll('[contenteditable]').length, 0, 'with no editor mounted')
+})
+
 test('185l. a list cell over a stored value nested past the server\'s own bound draws its words to the bound', () => {
   let deep: Record<string, unknown> = textOf('deep')
   for (let at = 0; at < 200_000; at++) deep = blockOf('list', [deep], { listType: 'bullet' })
