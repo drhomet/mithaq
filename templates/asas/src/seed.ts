@@ -14,6 +14,7 @@
 // Running it twice adds nothing: each row is looked up by a key that does not
 // change between runs and is skipped where it is already there.
 import { createHmac } from 'node:crypto'
+import { organizations as mode } from '@asas/mithaq/auth/organizations'
 // add-on: courses
 import type { RichTextNode, RichTextValue } from 'mithaq'
 // end add-on: courses
@@ -151,7 +152,9 @@ const oldestFirst = { field: 'createdAt', direction: 'asc' } as const
 const owner = SEED_EMAIL
   ? (await auth.internalAdapter.findUserByEmail(SEED_EMAIL))?.user
   : (await auth.adapter.findMany({ model: 'user', limit: 1, sortBy: oldestFirst }))[0]
-if (!owner) refuse(SEED_EMAIL ? `no user signs in as ${SEED_EMAIL}.` : 'the database holds no user yet. Sign up in the tenant app and create an organization first.')
+// Where the first owner comes from: the first sign-up with many organizations, first-run otherwise.
+const makeOne = mode === 'many' ? 'Sign up in the tenant app and create an organization first.' : 'Set the app up on the tenant app\'s /auth/first-run first.'
+if (!owner) refuse(SEED_EMAIL ? `no user signs in as ${SEED_EMAIL}.` : `the database holds no user yet. ${makeOne}`)
 const owned = (await auth.adapter.findMany({ model: 'member', where: [{ field: 'userId', value: owner.id }], sortBy: oldestFirst }))
   .filter((member) => String(member.role).split(',').includes('owner'))
   .map((member) => String(member.organizationId))
@@ -162,7 +165,7 @@ const organizations = (await auth.adapter.findMany({ model: 'organization', wher
 if (organizations.length !== 1) {
   refuse(SEED_ORGANIZATION
     ? `${owner.email} owns ${organizations.length ? 'more than one' : 'no'} organization named "${SEED_ORGANIZATION}".`
-    : `${owner.email} owns no organization. Create one in the tenant app first.`)
+    : `${owner.email} owns no organization. ${makeOne}`)
 }
 const organization = organizations[0]!
 console.log(`Seeding the organization "${organization.name}" that ${owner.email} owns, in ${database}.`)
