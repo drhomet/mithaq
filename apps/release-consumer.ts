@@ -12,6 +12,7 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
+import { createServer as createHttpServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -77,6 +78,29 @@ const vocabularyWithout = (missing: readonly string[]) => {
   return words
 }
 const scratch = mkdtempSync(join(tmpdir(), 'mithaq-release-'))
+/**
+ * Every message a consumer mails, caught on this machine: a production start needs a mailer, and the project's Resend
+ * mailer posts here through `RESEND_BASE_URL`, so nothing reaches Resend.
+ */
+const mailed: { to: string[]; text: string }[] = []
+const mailbox = createHttpServer((request, response) => {
+  let body = ''
+  request.on('data', (chunk: Buffer) => { body += chunk })
+  request.on('end', () => {
+    mailed.push(JSON.parse(body) as (typeof mailed)[number])
+    response.writeHead(200, { 'content-type': 'application/json' }).end('{"id":"caught"}')
+  })
+}).listen(0, '127.0.0.1')
+await once(mailbox, 'listening')
+/** The link last mailed to `email`, waited for briefly: an app mails after it answers. */
+const linkMailed = async (email: string) => {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const link = /https?:\/\/\S+/.exec(mailed.filter((one) => one.to.includes(email)).at(-1)?.text ?? '')?.[0]
+    if (link) return new URL(link)
+    await sleep(50)
+  }
+  assert.fail(`no link was mailed to ${email}`)
+}
 try {
   command(process.execPath, ['apps/pack.ts'], root)
   for (const name of ['mithaq', 'mithaq-admin']) command('npm', ['pack', `.pack/${name}`, '--pack-destination', scratch], root)
@@ -89,15 +113,16 @@ try {
   const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
   withoutRichText(tarball)
   // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
-  // by sign-up; none with an open sign-up, which a production start refuses without a mailer.
+  // by sign-up; one never shown, with an open sign-up, which a production start refuses without a mailer.
   for (const run of [
     { manager: 'bun', addOns: ['--full'], modes: [] },
     { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
-    { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'none', '--sign-up', 'open'] },
+    { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
     { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text,media'], modes: ['--organizations', 'many'] },
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
+  mailbox.close()
   rmSync(scratch, { recursive: true, force: true })
 }
 
@@ -252,12 +277,12 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const origin = `http://127.0.0.1:${port}`
     const platformOrigin = `http://127.0.0.1:${platformPort}`
     const { BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _fallback, PLATFORM_URL: _platform, ...withoutAuthSecret } = process.env
-    // One organization or none is set up with the code alone; many leaves it unset, so the platform says to set it.
+    // One organization is set up with the code alone; many leaves it unset, so the platform says to set it.
     const setupCode = 'mithaq-release-consumer-setup-code-of-40-chars'
     // A production boot needs these settings, PLATFORM_URL only where a platform app is served. `BETTER_AUTH_SECRET` is
     // left out on purpose: each app answering proves it read the `.env` `create-mithaq` wrote, which TanStack Start
-    // loads into `process.env`, a variable already set winning. An open sign-up starts only with a mailer; no message is
-    // sent here, so the key is never asked of Resend.
+    // loads into `process.env`, a variable already set winning. Every production start needs a mailer, which mails into
+    // this check's own catcher.
     const production: NodeJS.ProcessEnv = {
       ...withoutAuthSecret,
       NODE_ENV: 'production',
@@ -268,13 +293,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       STORAGE_ADAPTER: 'local',
       STORAGE_DIR: join(consumer, '.storage'),
       ...(!many && { SETUP_CODE: setupCode }),
-      ...(open && { RESEND_API_KEY: 're_release_consumer_never_sent', MAIL_FROM: 'Release <mail@example.com>' }),
+      RESEND_API_KEY: 're_release_consumer_never_sent',
+      MAIL_FROM: 'Release <mail@example.com>',
+      RESEND_BASE_URL: `http://127.0.0.1:${(mailbox.address() as { port: number }).port}`,
     }
-    if (open) {
+    {
       const { RESEND_API_KEY: _key, MAIL_FROM: _from, ...unmailed } = production
       const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./src/mithaq/auth/index.ts')"], { cwd: language, encoding: 'utf8', env: { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' } })
-      assert.notEqual(refused.status, 0, `${name}: an open sign-up refuses a production start with no mailer`)
-      assert.match(refused.stderr, /signUp = 'open' needs a mailer in production/, refused.stderr)
+      assert.notEqual(refused.status, 0, `${name}: a production start with no mailer is refused`)
+      assert.match(refused.stderr, /needs a mailer in production/, refused.stderr)
     }
     const start = (cwd: string, at: number) => {
       const child = spawn(process.execPath, [join(installed(cwd, 'vite'), 'bin/vite.js'), 'preview', '--port', String(at), '--host', '127.0.0.1', '--strictPort'], {
@@ -319,10 +346,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const codeOf = async (response: Response) => [response.status, ((await response.json().catch(() => null)) as { code?: string } | null)?.code] as const
     const cookieOf = (response: Response) => response.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
     if (!many) {
-      // One organization or none: nothing signs up before its owner is made, and only the setup code makes them.
+      // One organization: nothing signs up before its owner is made, and only the setup code makes them.
       const setUp = await (await fetch(`${origin}/auth/first-run`, { signal: AbortSignal.timeout(10_000) })).text()
       assert.ok(setUp.includes('The SETUP_CODE this server was started with.'), `first-run asks for the setup code:\n${setUp.slice(0, 600)}`)
-      assert.equal(setUp.includes('id="organization"'), !modes.includes('none'), 'and a name for the organization in one alone')
+      assert.equal(setUp.includes('id="organization"'), !modes.includes('no'), 'and a name for the organization only where it is shown')
       assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Early', email: `early-${stamp}@example.com`, password: 'release-test-password' })), [403, 'FIRST_RUN_PENDING'], 'a sign-up before first-run is refused')
       // The takeover race over HTTP: three at once, one owner.
       const runs = await Promise.all([0, 1, 2].map(async (at) => [at, await codeOf(await post('first-run', { name: `Owner ${at}`, email: `owner-${at}-${stamp}@example.com`, password: 'release-test-password', organization: 'Release', code: setupCode }))] as const))
@@ -335,6 +362,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const session = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { origin, cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).json()) as { session?: { activeOrganizationId?: string | null } } | null
       assert.ok(session?.session?.activeOrganizationId, 'into the one organization')
       if (!open) assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Stranger', email: `stranger-${stamp}@example.com`, password: 'release-test-password' })), [403, 'SIGN_UP_INVITE_ONLY'], 'by invitation, a sign-up with none is refused')
+      // The owner adds a person in one request, and the link that chooses the password goes to that person's mailbox.
+      const person = `added-${stamp}@example.com`
+      const added = await post('organization/add-person', { name: 'Added', email: person }, { cookie: cookieOf(signedIn) })
+      assert.equal(added.status, 200, `${await added.text()}\n${output}`)
+      const chosen = await post('reset-password', { token: (await linkMailed(person)).searchParams.get('token'), newPassword: 'release-test-password' })
+      assert.equal(chosen.status, 200, `the added person chooses their password from the mailed link: ${await chosen.text()}`)
+      assert.equal((await post('sign-in/email', { email: person, password: 'release-test-password' })).status, 200, 'and signs in')
+      const membersPage = await (await fetch(`${origin}/dashboard/members`, { headers: { cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).text()
+      assert.ok(membersPage.includes('data-add-person'), `the Members page offers Add person:\n${membersPage.slice(0, 600)}`)
       if (platform) {
         // First-run made the owner the platform's administrator too, since it had none.
         const staff = await post('sign-in/email', { email: owner, password: 'release-test-password' }, {}, platformOrigin)
@@ -343,10 +379,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
         assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s first owner holds every platform key: ${JSON.stringify(report).slice(0, 400)}`)
       }
     } else {
-      const signUp = await post('sign-up/email', { name: 'Release', email: `release-${stamp}@example.com`, password: 'release-test-password' })
+      const email = `release-${stamp}@example.com`
+      const signUp = await post('sign-up/email', { name: 'Release', email, password: 'typed-at-sign-up' })
       assert.equal(signUp.status, 200, `${await signUp.text()}\n${output}`)
-      const cookie = cookieOf(signUp)
-      assert.ok(cookie, 'the sign-up answered with a session cookie')
+      assert.equal(cookieOf(signUp).includes('session_token'), false, 'the sign-up opens no session before its address is proved')
+      const chosen = await post('reset-password', { token: (await linkMailed(email)).searchParams.get('token'), newPassword: 'release-test-password' })
+      assert.equal(chosen.status, 200, `the mailed link proves the address: ${await chosen.text()}\n${output}`)
+      const signedIn = await post('sign-in/email', { email, password: 'release-test-password' })
+      assert.equal(signedIn.status, 200, `${await signedIn.text()}\n${output}`)
+      const cookie = cookieOf(signedIn)
       const organization = await post('organization/create', { name: 'Release', slug: `release-${stamp}` }, { cookie })
       assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
       if (platform) {
@@ -386,7 +427,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       sql("insert into organization (id, name, slug, created_at) values ('release-second', 'Second', 'release-second', now())")
       const restarted = spawnSync(process.execPath, ['--env-file=.env', '--input-type=module', '-e', "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"], { cwd: template, encoding: 'utf8', env: production })
       assert.notEqual(restarted.status, 0, `${name}: a start over two organizations is refused`)
-      assert.match(restarted.stderr, /organizations: '(one|none)', and the "organization" table holds more than one/, restarted.stderr)
+      assert.match(restarted.stderr, /organizations: 'one', and the "organization" table holds more than one/, restarted.stderr)
       sql("delete from organization where id = 'release-second'")
     }
     command(installed(template, '.bin/mithaq'), ['generate', '--check'], template)

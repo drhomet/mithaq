@@ -169,7 +169,7 @@ test('the sign-in page says a refusal in this app\'s own words for the provider\
 test('the sign-up page says an email already taken in this app\'s own words, and flags an empty confirmation as required on submit', async () => {
   const copy = scopes.auth!
   const filled = (host: HTMLElement) => {
-    for (const [id, value] of [['name', 'Someone'], ['organization', 'Org'], ['email', 'someone@example.com'], ['password', 'a-long-enough-password'], ['confirmation', 'a-long-enough-password']]) typeInto(host.querySelector(`#${id}`)!, value!)
+    for (const [id, value] of [['name', 'Someone'], ['email', 'someone@example.com'], ['password', 'a-long-enough-password'], ['confirmation', 'a-long-enough-password']]) typeInto(host.querySelector(`#${id}`)!, value!)
   }
   for (const locale of ['en', 'ar']) {
     assert.equal(await refusedWith('/auth/sign-up', signUp, locale, 422, { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', message: 'User already exists. Use another email.' }, filled), copy.userExists![locale], `in ${locale}`)
@@ -234,9 +234,29 @@ test('sign-up opened from an invitation draws no organization box, says so, and 
     globalThis.fetch = fetched
     await unmount()
   }
-  const plain = await start('/auth/sign-up?redirect=%2Fdashboard', signUp)
-  assert.notEqual(plain.host.querySelector('#organization'), null, 'while any other sign-up still asks for its organization')
-  await plain.unmount()
+})
+
+test('with many organizations a sign-up asks a name, an address and a password, sends the sign-up alone and says to open the mailed link', async () => {
+  const { host, unmount } = await start('/auth/sign-up?redirect=%2Fdashboard', signUp)
+  const sent: string[] = []
+  const fetched = globalThis.fetch
+  globalThis.fetch = (async (url: string) => {
+    sent.push(String(url))
+    return new Response(JSON.stringify({ token: null, user: {} }), { headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  try {
+    assert.equal(host.querySelector('#organization'), null, 'no organization box: an organization is made once the address is proved')
+    assert.deepEqual([...host.querySelectorAll('input')].map((one) => one.id), ['name', 'email', 'password', 'confirmation'])
+    await act(async () => {
+      for (const [id, value] of [['name', 'Founder'], ['email', 'founder@example.com'], ['password', 'a-long-enough-password'], ['confirmation', 'a-long-enough-password']]) typeInto(host.querySelector(`#${id}`)!, value!)
+    })
+    await act(async () => fire(host.querySelector('form')!, 'submit'))
+    assert.deepEqual(sent, ['/api/auth/user/sign-up/email'], 'the sign-up alone, never a second call that could leave an account half made')
+    assert.equal(host.textContent?.includes(scopes.auth!.verifySent!.en!), true, 'and the page says to open the mailed link')
+  } finally {
+    globalThis.fetch = fetched
+    await unmount()
+  }
 })
 
 test('the invitation page offers a visitor with no session sign-in and sign-up that come back to it, and none without an id', async () => {

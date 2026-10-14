@@ -93,9 +93,9 @@ test('the seed fills the organization SEED_EMAIL and SEED_ORGANIZATION name thro
     script(fresh, `
       const server = asas.auth.strategies.find((one) => one.name === 'user').server
       const make = async (email, organizations) => {
-        const signed = await server.api.signUpEmail({ body: { name: email, email, password: '${password}' }, returnHeaders: true })
-        const headers = new Headers({ cookie: signed.headers.get('set-cookie') ?? '' })
-        for (const [name, slug] of organizations) await server.api.createOrganization({ body: { name, slug }, headers })
+        // A sign-up proves its address before it signs in, so each organization is made for the account on the server.
+        const { user } = await server.api.signUpEmail({ body: { name: email, email, password: '${password}' } })
+        for (const [name, slug] of organizations) await server.api.createOrganization({ body: { name, slug, userId: user.id } })
       }
       await make('someone@example.com', [['Admin org', 'someone-admin-org']])
       await make('admin@admin.com', [['Elsewhere', 'elsewhere'], ['Admin org', 'admin-org']])

@@ -1,5 +1,5 @@
 // Imports no router, stylesheet or React, so a test can load this under plain `node`.
-import { organizations } from 'asas/organizations'
+import { organizations, showOrganization } from 'asas/organizations'
 import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
 import organization from 'asas/messages/organization.json' with { type: 'json' }
 import tags from 'asas/messages/tags.json' with { type: 'json' }
@@ -315,7 +315,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     },
     failed: { en: 'That sign-in did not work.', ar: 'لم ينجح تسجيل الدخول.' },
     signUp: { en: 'Sign up', ar: 'إنشاء حساب' },
-    signUpDescription: { en: 'Make an account and its organization.', ar: 'أنشئ حسابا ومؤسسته.' },
+    signUpDescription: { en: 'Make an account.', ar: 'أنشئ حسابا.' },
     signUpPending: { en: 'Signing up…', ar: 'جارٍ إنشاء الحساب…' },
     signUpFailed: { en: 'That sign-up did not work.', ar: 'لم ينجح إنشاء الحساب.' },
     organizationFailed: { en: 'That organization could not be created.', ar: 'تعذر إنشاء هذه المؤسسة.' },
@@ -408,10 +408,13 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     },
     switchTo: { en: 'Switch to {organization}', ar: 'التبديل إلى {organization}' },
     accountStatus: { en: 'See your account status', ar: 'اطّلع على حالة حسابك' },
-    noOrganization: {
-      en: '{email} belongs to no organization yet. Ask an administrator to invite you.',
-      ar: '{email} لا ينتمي إلى أي مؤسسة بعد. اطلب من أحد المسؤولين أن يدعوك.',
-    },
+    noOrganization: { en: '{email} belongs to no organization yet.', ar: '{email} لا ينتمي إلى أي مؤسسة بعد.' },
+    yourInvitations: { en: 'Your invitations', ar: 'دعواتك' },
+    invitationDecline: { en: 'Decline', ar: 'رفض' },
+    createOrganization: { en: 'Create an organization', ar: 'أنشئ مؤسسة' },
+    createOrganizationSubmit: { en: 'Create', ar: 'إنشاء' },
+    workspaceOf: { en: '{name}\'s workspace', ar: 'مساحة عمل {name}' },
+    askToBeInvited: { en: 'Ask an administrator to invite {email}.', ar: 'اطلب من أحد المسؤولين أن يدعو {email}.' },
   },
   marketing: {
     brand: { en: 'Asas', ar: 'أساس' },
@@ -470,6 +473,20 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     membersJoined: { en: 'Joined', ar: 'تاريخ الانضمام' },
     membersNone: { en: 'No one works in this organization yet.', ar: 'لا يعمل أحد في هذه المؤسسة بعد.' },
     invite: { en: 'Invite', ar: 'دعوة' },
+    addPerson: { en: 'Add person', ar: 'إضافة شخص' },
+    addPersonTitle: { en: 'Add a person', ar: 'إضافة شخص' },
+    addPersonAbout: {
+      en: 'They get an account here and a link by email to choose their password. Someone who already has an account is sent an invitation instead.',
+      ar: 'يحصل على حساب هنا ورابط بالبريد لاختيار كلمة مروره. ومن لديه حساب بالفعل تُرسل إليه دعوة بدلا من ذلك.',
+    },
+    addPersonRole: { en: 'Role', ar: 'الدور' },
+    addPersonNoRole: { en: 'No role yet', ar: 'بلا دور بعد' },
+    addPersonSubmit: { en: 'Add', ar: 'إضافة' },
+    addPersonLink: {
+      en: 'No mailer is configured. Hand this link to them alone: it chooses their password and lasts 48 hours.',
+      ar: 'لم يُضبط أي مرسل بريد. سلّم هذا الرابط له وحده: به يختار كلمة مروره، وهو صالح 48 ساعة.',
+    },
+    addPersonRefused: { en: 'The server refused to add that person.', ar: 'رفض الخادم إضافة هذا الشخص.' },
     inviteTitle: { en: 'Invite someone', ar: 'دعوة شخص' },
     inviteAbout: {
       en: 'They join this organization as a member once they accept. Give them roles here after that.',
@@ -481,10 +498,14 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     inviteAlreadyInvited: { en: 'This person already has an invitation that is not yet accepted.', ar: 'لدى هذا الشخص دعوة لم تُقبل بعد.' },
     inviteNotAllowed: { en: 'You may not invite people to this organization.', ar: 'لا يحق لك دعوة أشخاص إلى هذه المؤسسة.' },
     inviteNoMailer: {
-      en: 'No mailer is configured, so no email is sent. In development the link is written to the server log, and each pending invitation has a link to copy.',
-      ar: 'لم يُضبط أي مرسل بريد، لذا لا تُرسل أي رسالة. في بيئة التطوير يُكتب الرابط في سجل الخادم، ولكل دعوة لم تُقبل بعد رابط يمكن نسخه.',
+      en: 'No mailer is configured, so no email is sent. In development the link is written to the server log.',
+      ar: 'لم يُضبط أي مرسل بريد، لذا لا تُرسل أي رسالة. في بيئة التطوير يُكتب الرابط في سجل الخادم.',
     },
     inviteCopy: { en: 'Copy link', ar: 'نسخ الرابط' },
+    inviteLinkOwn: {
+      en: 'A copied link lets whoever holds it join as the invited address: hand it to that person alone.',
+      ar: 'الرابط المنسوخ يتيح لمن يحمله الانضمام بالعنوان المدعو: سلّمه لذلك الشخص وحده.',
+    },
     inviteCopied: { en: 'Link copied', ar: 'تم نسخ الرابط' },
     inviteCancel: { en: 'Cancel invitation', ar: 'إلغاء الدعوة' },
     inviteCancelRefused: { en: 'The server refused to cancel that invitation.', ar: 'رفض الخادم إلغاء هذه الدعوة.' },
@@ -873,16 +894,19 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'ما زال هذا العضو يشغل دورا في هذه المؤسسة. اسحب منه كل دور أولا، ثم أزله.',
     },
     'conflict.referencedBy': { en: '{kind} still use this, so it is not deleted.', ar: 'ما زالت {kind} تستخدم هذا، لذا لا يُحذف.' },
+    'conflict.sole_owner': {
+      en: 'This person is the only owner of an organization, so they are not deleted. Make another member its owner first.',
+      ar: 'هذا الشخص هو المالك الوحيد لمؤسسة، لذا لا يُحذف. اجعل عضوا آخر مالكا لها أولا.',
+    },
   },
 }
 
 type Wording = Record<string, Record<string, { en: string; ar: string }>>
 
-/** With one organization or none, nobody founds one on signing up: an owner sets the app up once. */
-const oneOrNone: Wording = {
+/** With one organization, nobody founds one on signing up: an owner sets the app up once. */
+const one: Wording = {
   auth: {
-    signUpDescription: { en: 'Make an account.', ar: 'أنشئ حسابا.' },
-    noOrganization: { en: '{email} has no access here yet. Ask an administrator to invite you.', ar: 'لا يملك {email} وصولا هنا بعد. اطلب من أحد المسؤولين أن يدعوك.' },
+    noOrganization: { en: '{email} has no access here yet.', ar: 'لا يملك {email} وصولا هنا بعد.' },
   },
   marketing: {
     howStep1Title: { en: 'Set it up once', ar: 'أعدّه مرة واحدة' },
@@ -891,8 +915,8 @@ const oneOrNone: Wording = {
   },
 }
 
-/** With none, the one organization is the app itself, so no page names an organization. */
-const none: Wording = {
+/** With the one organization never shown, it is the app itself, so no page names an organization. */
+const unnamed: Wording = {
   auth: {
     invitationJoin: { en: 'You are invited to join this app.', ar: 'أنت مدعو للانضمام إلى هذا التطبيق.' },
     invitationInviterGone: {
@@ -945,12 +969,13 @@ const none: Wording = {
     'invalid.role': { en: 'That role is not one of this app\'s.', ar: 'هذا الدور ليس من أدوار هذا التطبيق.' },
     'conflict.role_assigned': { en: 'An assignment still names that role, so no role takes the name until it is removed.', ar: 'ما زال إسناد يسمي هذا الدور، لذا لا يأخذ أي دور هذا الاسم حتى يُزال.' },
     'conflict.member_holds_roles': { en: 'This user still holds a role. Take each role from them first, then remove them.', ar: 'ما زال هذا المستخدم يشغل دورا. اسحب منه كل دور أولا، ثم أزله.' },
+    'conflict.sole_owner': { en: 'This person is the app\'s only owner, so they are not deleted. Make another user an owner first.', ar: 'هذا الشخص هو المالك الوحيد للتطبيق، لذا لا يُحذف. اجعل مستخدما آخر مالكا أولا.' },
   },
 }
 
 /** The words the organization mode changes, laid over the base copy key by key. */
-export const wordingFor = (mode: 'none' | 'one' | 'many'): Wording =>
-  mode === 'many' ? {} : mode === 'one' ? oneOrNone : Object.fromEntries([...new Set([...Object.keys(oneOrNone), ...Object.keys(none)])].map((scope) => [scope, { ...oneOrNone[scope], ...none[scope] }]))
+export const wordingFor = (mode: { organizations: 'one' | 'many'; showOrganization: boolean }): Wording =>
+  mode.organizations === 'many' ? {} : mode.showOrganization ? one : Object.fromEntries([...new Set([...Object.keys(one), ...Object.keys(unnamed)])].map((scope) => [scope, { ...one[scope], ...unnamed[scope] }]))
 
 /** The base copy with `wording` laid over it, so a key the mode changes reads the mode's words. */
 export const withWording = (base: typeof ownScopes, wording: Wording) =>
@@ -961,7 +986,7 @@ export const withWording = (base: typeof ownScopes, wording: Wording) =>
  * carries a string per declared locale: a key left unanswered here shows an Arabic viewer the
  * English fallback.
  */
-export const scopes = withWording(ownScopes, wordingFor(organizations))
+export const scopes = withWording(ownScopes, wordingFor({ organizations, showOrganization }))
 
 // A `Map`, so a code named for a key of `Object.prototype` answers nothing. A taken organization
 // name has no entry: names may repeat, and sign-up makes the slug unique itself.

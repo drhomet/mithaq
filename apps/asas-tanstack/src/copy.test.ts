@@ -18,24 +18,24 @@ test('switching the language writes the cookie, drops the form\'s unload guard s
   }
 })
 
-test('each organization mode\'s words replace keys the copy has, in both locales, and with none no page of the app names an organization', async () => {
+test('each organization mode\'s words replace keys the copy has, in both locales, and with one organization never shown no page of the app names an organization', async () => {
   const { scopes, withWording, wordingFor } = await import('./copy.ts')
-  for (const mode of ['one', 'none'] as const) {
-    for (const [scope, keys] of Object.entries(wordingFor(mode))) {
+  for (const showOrganization of [true, false]) {
+    for (const [scope, keys] of Object.entries(wordingFor({ organizations: 'one', showOrganization }))) {
       for (const [key, words] of Object.entries(keys)) {
-        assert.ok(scopes[scope]?.[key], `${mode}: ${scope}.${key} is a key the copy has`)
-        assert.ok(words.en && words.ar, `${mode}: ${scope}.${key} carries both locales`)
+        assert.ok(scopes[scope]?.[key], `${showOrganization}: ${scope}.${key} is a key the copy has`)
+        assert.ok(words.en && words.ar, `${showOrganization}: ${scope}.${key} carries both locales`)
       }
     }
   }
-  // Read only where many organizations are: the sign-up's organization box, the switcher and its
+  // Read only where many organizations are: founding one, the switcher and its
   // switch, and the platform, whose staff work across organizations whatever the mode.
-  const manyOnly = new Set(['auth.organization', 'auth.organizationFailed', 'auth.switchTo', 'admin.organizations', 'admin.organization', 'admin.noOrganization'])
-  const none = withWording(scopes, wordingFor('none'))
+  const manyOnly = new Set(['auth.organization', 'auth.organizationFailed', 'auth.createOrganization', 'auth.switchTo', 'admin.organizations', 'admin.organization', 'admin.noOrganization'])
+  const none = withWording(scopes, wordingFor({ organizations: 'one', showOrganization: false }))
   const named = Object.entries(none)
     .filter(([scope]) => ['auth', 'dashboard', 'marketing', 'admin', 'error'].includes(scope))
     .flatMap(([scope, keys]) => Object.entries(keys).map(([key, words]) => [`${scope}.${key}`, words] as const))
     .filter(([key, words]) => !manyOnly.has(key) && /organization|مؤسس/i.test(`${words.en} ${words.ar}`))
     .map(([key]) => key)
-  assert.deepEqual(named, [], 'with none, these still name an organization')
+  assert.deepEqual(named, [], 'with the organization never shown, these still name one')
 })

@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from 'mithaq-admin/format.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
+import { organizations } from '@asas/mithaq/auth/organizations'
 import { grantable, isOwner, managesRoles, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
 import { tenantRoles } from '@asas/mithaq/roles/tenant-roles.ts'
 import { AppShell } from '@asas/mithaq/ui/app-shell.tsx'
@@ -134,6 +135,99 @@ export const loader = async ({ access, client, request, maxLimit }: LoaderTools)
  */
 const development = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true
 
+/**
+ * "Add person", the Members page's first action with one organization: a name, an address and a role the viewer may
+ * hand over, sent to the server's `add-person`, which makes the account, the membership and the role in one request and
+ * mails the link that chooses the password. Someone who already has a proved account is invited instead.
+ */
+function AddPerson({ roles, onInvited }: { roles: Role[]; onInvited: (invite: Invite) => void }) {
+  const { locale, t } = useLocale()
+  const sheet = useRef<HTMLDialogElement>(null)
+  const nameId = useId()
+  const emailId = useId()
+  const roleId = useId()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [refusal, setRefusal] = useState<string>()
+  // Answered only where no mailer is configured: the administrator hands it over.
+  const [link, setLink] = useState<string>()
+  const add = async () => {
+    if (!name.trim() || !email.trim()) return setRefusal(t('auth.required', 'This field is required.'))
+    setBusy(true)
+    setRefusal(undefined)
+    const answered = await authArm('organization/add-person', { name: name.trim(), email: email.trim(), ...(role && { role }) }).finally(() => setBusy(false))
+    if (!answered.ok) {
+      const code = answered.body?.code
+      const key = refusalKey(answered.status, code) ?? (typeof code === 'string' && code.startsWith('error.') ? code : undefined)
+      return setRefusal((key && t(key)) || t('dashboard.addPersonRefused', 'The server refused to add that person.'))
+    }
+    const body = answered.body as { added?: boolean; link?: string; invited?: boolean; invitation?: { id: string; email: string; expiresAt: string } }
+    if (body.invited && body.invitation) {
+      onInvited({ id: body.invitation.id, email: body.invitation.email, expiresAt: isoOf(body.invitation.expiresAt) })
+      return sheet.current?.close()
+    }
+    if (body.link) return setLink(body.link)
+    // The new member and their role are read again with the page.
+    window.location.reload()
+  }
+  return (
+    <>
+      <Button type="button" size="sm" className="max-sm:h-11" data-add-person="" onClick={() => sheet.current?.showModal()}>
+        {t('dashboard.addPerson', 'Add person')}
+      </Button>
+      <dialog
+        ref={sheet}
+        data-add-person-sheet=""
+        aria-label={t('dashboard.addPersonTitle', 'Add a person')}
+        className="bg-background text-foreground m-auto w-[min(28rem,calc(100%-2rem))] rounded-lg border p-0 shadow-lg backdrop:bg-black/80"
+        onClose={() => {
+          if (link) window.location.reload()
+          setName('')
+          setEmail('')
+          setRole('')
+          setRefusal(undefined)
+        }}
+      >
+        <form noValidate className="grid gap-4 p-6 text-sm" onSubmit={(event) => { event.preventDefault(); void add() }}>
+          <header className="grid gap-1.5">
+            <h2 className="text-base font-medium">{t('dashboard.addPersonTitle', 'Add a person')}</h2>
+            <p className="text-muted-foreground">{t('dashboard.addPersonAbout', 'They get an account here and a link by email to choose their password. Someone who already has an account is sent an invitation instead.')}</p>
+          </header>
+          {link ? (
+            <div className="grid gap-2">
+              <p>{t('dashboard.addPersonLink', 'No mailer is configured. Hand this link to them alone: it chooses their password and lasts 48 hours.')}</p>
+              <Input readOnly dir="ltr" value={link} onFocus={(event) => event.currentTarget.select()} />
+              <Button type="button" variant="outline" onClick={() => void navigator.clipboard.writeText(link)}>{t('dashboard.inviteCopy', 'Copy link')}</Button>
+            </div>
+          ) : (
+            <>
+              <FieldShell id={nameId} label={t('dashboard.membersName', 'Name') ?? 'Name'}>
+                <Input id={nameId} value={name} maxLength={100} autoComplete="off" disabled={busy} onChange={(event) => setName(event.target.value)} />
+              </FieldShell>
+              <FieldShell id={emailId} label={t('dashboard.membersEmail', 'Email') ?? 'Email'}>
+                <Input id={emailId} type="email" dir="ltr" value={email} autoComplete="off" disabled={busy} onChange={(event) => setEmail(event.target.value)} />
+              </FieldShell>
+              <FieldShell id={roleId} label={t('dashboard.addPersonRole', 'Role') ?? 'Role'}>
+                <select id={roleId} value={role} disabled={busy} className="border-input bg-background h-9 rounded-md border px-3" onChange={(event) => setRole(event.target.value)}>
+                  <option value="">{t('dashboard.addPersonNoRole', 'No role yet')}</option>
+                  {roles.map((one) => <option key={one.name} value={one.name}>{one.label?.[locale] ?? one.name}</option>)}
+                </select>
+              </FieldShell>
+            </>
+          )}
+          {refusal ? <p role="alert" className="text-destructive">{refusal}</p> : null}
+          <footer className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => sheet.current?.close()}>{link ? t('admin.close', 'Close') : t('admin.cancel', 'Cancel')}</Button>
+            {link ? null : <Button type="submit" disabled={busy}>{t('dashboard.addPersonSubmit', 'Add')}</Button>}
+          </footer>
+        </form>
+      </dialog>
+    </>
+  )
+}
+
 const sameRoles = (a: ReadonlySet<string>, b: ReadonlySet<string>) => a.size === b.size && [...a].every((name) => b.has(name))
 
 export function Members({ loaderData }: PageProps<MembersData>) {
@@ -162,6 +256,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
   const cancels = holds(access, 'invitation.cancel')
   const opens = edits || removes
   const invites = loaderData?.invites !== undefined
+  const adds = organizations === 'one' && holds(access, 'member.create')
   const [pending, setPending] = useState(loaderData?.invites ?? [])
   const [pendingRefusal, setPendingRefusal] = useState<string>()
   const [copied, setCopied] = useState<string>()
@@ -217,7 +312,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
     if (!answered.ok) return setPendingRefusal(refused(answered, t('dashboard.inviteCancelRefused', 'The server refused to cancel that invitation.')))
     setPending((all) => all.filter((other) => other.id !== one.id))
   }
-  /** The link the invitee opens, which development hands over by hand since no mail goes out. */
+  /** The link the invitee opens, for the inviter to hand over where the mail does not reach, in every environment. */
   const copyLink = async (one: Invite) => {
     await navigator.clipboard.writeText(new URL(`/auth/accept-invitation?id=${encodeURIComponent(one.id)}`, window.location.origin).href)
     setCopied(one.id)
@@ -387,11 +482,15 @@ export function Members({ loaderData }: PageProps<MembersData>) {
         header: (
           <div className="flex w-full min-w-0 items-center justify-between gap-2">
             <h1>{t('dashboard.members', 'Members')}</h1>
-            {invites ? (
-              <Button type="button" size="sm" className="max-sm:h-11" data-invite="" onClick={() => inviteSheet.current?.showModal()}>
-                {t('dashboard.invite', 'Invite')}
-              </Button>
-            ) : null}
+            <div className="flex gap-2">
+              {/* With one organization an administrator adds people directly; an invitation stays beside it. */}
+              {adds ? <AddPerson roles={roles.filter((role) => assignments?.create === true && grantable(access, role.permissions))} onInvited={(made) => setPending((all) => [...all.filter((one) => one.id !== made.id), made])} /> : null}
+              {invites ? (
+                <Button type="button" size="sm" variant={adds ? 'outline' : 'default'} className="max-sm:h-11" data-invite="" onClick={() => inviteSheet.current?.showModal()}>
+                  {t('dashboard.invite', 'Invite')}
+                </Button>
+              ) : null}
+            </div>
           </div>
         ),
         main: (
@@ -480,17 +579,16 @@ export function Members({ loaderData }: PageProps<MembersData>) {
               <section data-pending="" className="grid gap-2">
                 <h2 className="text-base font-medium">{t('dashboard.invitesPending', 'Invitations not yet accepted')}</h2>
                 {noMailer}
+                <p className="text-muted-foreground">{t('dashboard.inviteLinkOwn', 'A copied link lets whoever holds it join as the invited address: hand it to that person alone.')}</p>
                 <div className="overflow-hidden rounded-lg border">
                   <Table>
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead scope="col">{t('dashboard.membersEmail', 'Email')}</TableHead>
                         <TableHead scope="col">{t('dashboard.inviteExpires', 'Expires')}</TableHead>
-                        {cancels || development ? (
-                          <TableHead scope="col">
-                            <span className="sr-only">{t('dashboard.membersActions', 'Actions')}</span>
-                          </TableHead>
-                        ) : null}
+                        <TableHead scope="col">
+                          <span className="sr-only">{t('dashboard.membersActions', 'Actions')}</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -498,22 +596,18 @@ export function Members({ loaderData }: PageProps<MembersData>) {
                         <TableRow key={one.id} data-invite-row={one.email}>
                           <TableCell className="break-all">{one.email}</TableCell>
                           <TableCell className="whitespace-nowrap">{one.expiresAt ? formatDate({ value: one.expiresAt, locale, day: true }) : null}</TableCell>
-                          {cancels || development ? (
-                            <TableCell>
-                              <div className="flex flex-wrap justify-end gap-2">
-                                {development ? (
-                                  <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-copy-invite={one.id} aria-label={`${t('dashboard.inviteCopy', 'Copy link')}: ${one.email}`} onClick={() => void copyLink(one)}>
-                                    {copied === one.id ? t('dashboard.inviteCopied', 'Link copied') : t('dashboard.inviteCopy', 'Copy link')}
-                                  </Button>
-                                ) : null}
-                                {cancels ? (
-                                  <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-cancel-invite={one.id} aria-label={`${t('dashboard.inviteCancel', 'Cancel invitation')}: ${one.email}`} onClick={() => void cancel(one)}>
-                                    {t('dashboard.inviteCancel', 'Cancel invitation')}
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </TableCell>
-                          ) : null}
+                          <TableCell>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-copy-invite={one.id} aria-label={`${t('dashboard.inviteCopy', 'Copy link')}: ${one.email}`} onClick={() => void copyLink(one)}>
+                                {copied === one.id ? t('dashboard.inviteCopied', 'Link copied') : t('dashboard.inviteCopy', 'Copy link')}
+                              </Button>
+                              {cancels ? (
+                                <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-cancel-invite={one.id} aria-label={`${t('dashboard.inviteCancel', 'Cancel invitation')}: ${one.email}`} onClick={() => void cancel(one)}>
+                                  {t('dashboard.inviteCancel', 'Cancel invitation')}
+                                </Button>
+                              ) : null}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

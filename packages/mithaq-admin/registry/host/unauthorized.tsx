@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { AuthFrame, useRefusal } from '../auth-frame.tsx'
 import { documentHead } from '../copy.ts'
+import { NoOrganization } from '../no-organization.tsx'
 import { ImpersonationBar, loadEnterable } from '../screens.tsx'
 import { useCopy } from './__root.tsx'
 
@@ -49,6 +50,8 @@ function Unauthorized() {
       : part === '{page}' ? <bdi key={at}>{refused?.page}</bdi>
       : part)
   const link = 'text-foreground underline underline-offset-4'
+  // Someone who belongs to no organization is shown the ways into one, which the app draws.
+  const unplaced = !refused && !screens.length && !organizations.length && !others.length && !impersonating
   const screenName = (name: string) => t(`screens.${name}`, name) ?? name
   return (
     <AuthFrame
@@ -61,7 +64,7 @@ function Unauthorized() {
               ? t('auth.unauthorizedDescription', 'Your role does not open that screen. These are the screens it opens:')
               : organizations.length
                 ? said(t('auth.noAccessDescription', '{email} is a member of {organization} and holds no role that opens a screen here. Ask an administrator of {organization} to give you one.'))
-                : said(t('auth.noOrganization', '{email} belongs to no organization yet. Ask an administrator to invite you.'))}
+                : said(t('auth.noOrganization', '{email} belongs to no organization yet.'))}
         </span>
       }
     >
@@ -83,6 +86,8 @@ function Unauthorized() {
               </li>
             ))}
           </ul>
+        ) : unplaced ? (
+          <NoOrganization email={email} />
         ) : null}
         {/* So a switch into an organization where the actor holds no role is not a dead end. */}
         {others.map((one) => (

@@ -20,11 +20,11 @@ export const betterAuthTenant = <const RelationTo extends string>({
    */
   platform?: (args: { user: unknown }) => boolean | Promise<boolean>
   /**
-   * How many organizations the project holds: `'many'`, or one, shown (`'one'`) or hidden
-   * (`'none'`). Every mode keeps the field and the scope; in `'one'` and `'none'` a `connect()`
-   * refuses to start over more than one.
+   * How many organizations the project holds: `'one'` or `'many'`. Both keep the field and the
+   * scope; in `'one'` a `connect()` refuses to start over more than one. Whether a project shows its
+   * one organization is the project's own concern.
    */
-  organizations: 'none' | 'one' | 'many'
+  organizations: 'one' | 'many'
 }): TenantTarget<RelationTo> => {
   if (typeof relationTo !== 'string' || !relationTo) {
     throw new Error('betterAuthTenant needs relationTo, the name of the kayan a row\'s tenant is, such as "organization".')
@@ -34,8 +34,8 @@ export const betterAuthTenant = <const RelationTo extends string>({
   if (onDelete !== 'restrict') {
     throw new Error(`betterAuthTenant takes onDelete: 'restrict' alone, and was handed ${JSON.stringify(onDelete)}.`)
   }
-  if (!['none', 'one', 'many'].includes(organizations)) {
-    throw new Error(`betterAuthTenant takes organizations: 'none', 'one' or 'many', and was handed ${JSON.stringify(organizations)}.`)
+  if (!['one', 'many'].includes(organizations)) {
+    throw new Error(`betterAuthTenant takes organizations: 'one' or 'many', and was handed ${JSON.stringify(organizations)}.`)
   }
   return {
     capability: 'tenant',

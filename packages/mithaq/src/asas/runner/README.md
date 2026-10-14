@@ -244,12 +244,11 @@ Where it lives: `templates/mithaq/src/mithaq/auth/index.ts` `asPlatform` and `on
 `organizations` tells core how many organizations the project holds:
 
 - `'many'`: any number.
-- `'one'`: one, which the project names and shows.
-- `'none'`: one, which the project never shows.
+- `'one'`: one. Whether the project shows it by name is the project's own setting, which core never reads.
 
-Tenancy is the same in all three: every per-organization kayan places the field, and the scope above is ANDed onto every managed operation. So switching between them moves no row.
+Tenancy is the same in both: every per-organization kayan places the field, and the scope above is ANDed onto every managed operation. So switching between them moves no row.
 
-What core does with the value: in `'one'` and `'none'`, `connect()` reads the tenant kayan after the stores connect, and refuses to start when it holds more than one row. The message names the mode. A `connect({ readOnly: true })` does not check.
+What core does with the value: in `'one'`, `connect()` reads the tenant kayan after the stores connect, and refuses to start when it holds more than one row. The message names the mode. A `connect({ readOnly: true })` does not check.
 
 Two organizations in a one-organization project would split its people and rows without a word. Leaving `'many'` therefore needs a merge first: re-key the field on every per-organization table and resolve what each organization held once (a `within` unique, a global's row, roles). That merge is a migration of the project's own.
 

@@ -58,6 +58,10 @@ before(async () => {
     STORAGE_PREFIX: 'mithaq/asas',
     STORAGE_ADAPTER: 'local',
     STORAGE_DIR: mkdtempSync(join(tmpdir(), 'mithaq-next-storage-')),
+    // A production start needs a mailer. Nothing here mails, and the discard port refuses what would.
+    RESEND_API_KEY: 're_next_boot_never_sent',
+    MAIL_FROM: 'Next <mail@example.com>',
+    RESEND_BASE_URL: 'http://127.0.0.1:9',
   }
   const buildStarted = performance.now()
   const built = spawnSync(next, ['build'], { cwd: app, encoding: 'utf8', env })

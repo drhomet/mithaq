@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { logMailer, resendMailer } from './mailers.ts'
+import { defaultResendBaseURL, logMailer, resendMailer } from './mailers.ts'
 import { mailerFromEnv } from './index.ts'
 
 const mail = { to: 'reader@example.com', subject: 'Hello', text: 'Plain words', html: '<p>Plain words</p>' }
@@ -11,7 +11,7 @@ test('the Resend mailer posts one message to Resend\'s API, authorized by the ke
     sent.push({ url, init })
     return new Response('{"id":"1"}', { status: 200 })
   })
-  await resendMailer({ apiKey: 're_test', from: 'Asas <mail@example.com>' }).send(mail)
+  await resendMailer({ apiKey: 're_test', from: 'Asas <mail@example.com>', baseURL: defaultResendBaseURL }).send(mail)
   assert.equal(sent.length, 1)
   assert.equal(sent[0]!.url, 'https://api.resend.com/emails')
   assert.equal(sent[0]!.init.method, 'POST')
@@ -19,9 +19,30 @@ test('the Resend mailer posts one message to Resend\'s API, authorized by the ke
   assert.deepEqual(JSON.parse(String(sent[0]!.init.body)), { from: 'Asas <mail@example.com>', to: ['reader@example.com'], subject: 'Hello', text: 'Plain words', html: '<p>Plain words</p>' })
 })
 
+test('the Resend mailer posts to the base URL it is given, so a test run catches its mail on this machine', async (t) => {
+  const sent: string[] = []
+  t.mock.method(globalThis, 'fetch', async (url: string) => {
+    sent.push(url)
+    return new Response('{"id":"1"}', { status: 200 })
+  })
+  await resendMailer({ apiKey: 're_test', from: 'mail@example.com', baseURL: 'http://127.0.0.1:9/resend' }).send(mail)
+  await mailerFromEnv({ RESEND_API_KEY: 're_x', MAIL_FROM: 'mail@example.com', RESEND_BASE_URL: 'http://127.0.0.1:9/from-env' })!.send(mail)
+  await mailerFromEnv({ RESEND_API_KEY: 're_x', MAIL_FROM: 'mail@example.com' })!.send(mail)
+  assert.deepEqual(sent, ['http://127.0.0.1:9/resend/emails', 'http://127.0.0.1:9/from-env/emails', 'https://api.resend.com/emails'])
+})
+
+test('a RESEND_BASE_URL that is not https is refused unless it is this machine, so no key or letter crosses the network in the clear', () => {
+  const env = { RESEND_API_KEY: 're_x', MAIL_FROM: 'mail@example.com' }
+  assert.throws(() => mailerFromEnv({ ...env, RESEND_BASE_URL: 'http://mail.example.com' }), /RESEND_BASE_URL/)
+  assert.throws(() => mailerFromEnv({ ...env, RESEND_BASE_URL: 'not a url' }), /RESEND_BASE_URL/)
+  assert.ok(mailerFromEnv({ ...env, RESEND_BASE_URL: 'https://mail.example.com' }))
+  assert.ok(mailerFromEnv({ ...env, RESEND_BASE_URL: 'http://127.0.0.1:9' }))
+  assert.ok(mailerFromEnv({ ...env, RESEND_BASE_URL: 'http://localhost:4000' }))
+})
+
 test('a message Resend refuses throws, naming the status and not the address', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => new Response('{"message":"bad key"}', { status: 401 }))
-  await assert.rejects(resendMailer({ apiKey: 're_bad', from: 'mail@example.com' }).send(mail), (error: Error) => error.message.includes('401') && !error.message.includes('reader@example.com'))
+  await assert.rejects(resendMailer({ apiKey: 're_bad', from: 'mail@example.com', baseURL: defaultResendBaseURL }).send(mail), (error: Error) => error.message.includes('401') && !error.message.includes('reader@example.com'))
 })
 
 test('the log mailer writes the message to the server log and sends nothing', async (t) => {

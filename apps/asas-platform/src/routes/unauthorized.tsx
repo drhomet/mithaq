@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { AuthFrame, useRefusal } from '../auth-frame.tsx'
 import { documentHead } from '../copy.ts'
+import { NoOrganization } from '../no-organization.tsx'
 import { ImpersonationBar, loadEnterable } from '../screens.tsx'
 import { useCopy } from './__root.tsx'
 
@@ -49,6 +50,8 @@ function Unauthorized() {
       : part === '{page}' ? <bdi key={at}>{refused?.page}</bdi>
       : part)
   const link = 'text-foreground underline underline-offset-4'
+  // Someone who belongs to no organization is shown the ways into one, which the app draws.
+  const unplaced = !refused && !screens.length && !organizations.length && !others.length && !impersonating
   const screenName = (name: string) => t(`screens.${name}`, name) ?? name
   return (
     <AuthFrame
@@ -61,7 +64,7 @@ function Unauthorized() {
               ? t('auth.unauthorizedDescription', 'Your role does not open that screen. These are the screens it opens:')
               : organizations.length
                 ? said(t('auth.noAccessDescription', '{email} is a member of {organization} and holds no role that opens a screen here. Ask an administrator of {organization} to give you one.'))
-                : said(t('auth.noOrganization', '{email} belongs to no organization yet. Ask an administrator to invite you.'))}
+                : said(t('auth.noOrganization', '{email} belongs to no organization yet.'))}
         </span>
       }
     >
@@ -83,6 +86,8 @@ function Unauthorized() {
               </li>
             ))}
           </ul>
+        ) : unplaced ? (
+          <NoOrganization email={email} />
         ) : null}
         {/* So a switch into an organization where the actor holds no role is not a dead end. */}
         {others.map((one) => (
@@ -119,4 +124,4 @@ function Unauthorized() {
     </AuthFrame>
   )
 }
-// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 3c5c304b3892c56759bf780f155ef3aa154ce3cc954e3d240b3537cdd97da735
+// mithaq-admin 0.0.0 be7b573bcde302ab06c37bcf06cc0a47bddf11df602cfec0ea0acc8714f11fe2
