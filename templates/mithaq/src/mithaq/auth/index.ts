@@ -660,7 +660,6 @@ export type StoreHooks = {
   beforeRemoveMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
   beforeAcceptInvitation?: (data: Joining & { invitation: { role: string } & Record<string, unknown>; user: { id: string } & Record<string, unknown> }) => Promise<void>
   beforeAddMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
-  beforeCreateInvitation?: (data: Joining) => Promise<void>
 }
 
 /**
@@ -865,10 +864,6 @@ export const authOptions = (hooks: StoreHooks = {}, settings: AuthSettings = aut
               await organizationOptions.organizationHooks.beforeAcceptInvitation(data)
               await hooks.beforeAcceptInvitation?.(data)
             },
-            beforeCreateInvitation: async (data: Parameters<typeof organizationOptions.organizationHooks.beforeCreateInvitation>[0]) => {
-              await organizationOptions.organizationHooks.beforeCreateInvitation(data)
-              await hooks.beforeCreateInvitation?.(data)
-            },
           },
           ac,
           roles,
@@ -951,14 +946,6 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // that holds one makes the organization: a second client would wait on the rows it has not
   // committed.
   const storeHooks = (tx?: unknown): StoreHooks => ({
-    // Counted by the rows, so every process of the deploy keeps one count.
-    // ponytail: two invitations at the same instant may both pass the last place; a lock per
-    // organization if that is ever seen.
-    beforeCreateInvitation: async ({ organization }) => {
-      const since = (ago: number) => store.count!({ kayan: 'invitation', args: { where: { organizationId: { equals: organization.id }, createdAt: { greater_than: new Date(Date.now() - ago) } } } })
-      if ((await since(60_000)) >= invitationLimits.perMinute) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_MINUTE', message: `This organization has sent ${invitationLimits.perMinute} invitations in the last minute. Wait a minute and try again.` })
-      if ((await since(86_400_000)) >= invitationLimits.perDay) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_DAY', message: `This organization has sent ${invitationLimits.perDay} invitations in the last day. Try again tomorrow.` })
-    },
     // add-on: roles
     // The tenant's first assignment: a role holding `memberRoles.create` has to be assigned before
     // it can assign anything, and the caller of `createOrganization` is in no organization until
@@ -1214,6 +1201,33 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     }
     await confirmMail(settings.mailer)({ email: user.email, token, ...(joining !== undefined && { joining }) })
   }
+  // Every invitation an organization mails, new or sent again, and every person it adds, is one
+  // `mailed:<organization>` row, counted against `invitationLimits` before it goes, so every process
+  // of the deploy keeps one count. A row is written for each mail the limits let through.
+  // ponytail: two at the same instant may both pass the last place; a lock per organization if that
+  // is ever seen.
+  const mailedFor = async (organization: string) => {
+    const since = (ago: number) => store.count!({ kayan: 'verification', args: { where: { value: { equals: `mailed:${organization}` }, createdAt: { greater_than: new Date(Date.now() - ago) } } } })
+    if ((await since(60_000)) >= invitationLimits.perMinute) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_MINUTE', message: `This organization has sent ${invitationLimits.perMinute} invitations in the last minute. Wait a minute and try again.` })
+    if ((await since(86_400_000)) >= invitationLimits.perDay) throw new APIError('TOO_MANY_REQUESTS', { code: 'INVITATIONS_PER_DAY', message: `This organization has sent ${invitationLimits.perDay} invitations in the last day. Try again tomorrow.` })
+    await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `mailed:${randomBytes(16).toString('base64url')}`, value: `mailed:${organization}`, expiresAt: new Date(Date.now() + 86_400_000) })
+  }
+  // The provider's invite route sends an invitation again on `resend` with no hook of its own, so
+  // the limits are asked of the route. Only a caller who may invite in that organization is counted:
+  // anyone else is refused by the route, and must not spend another organization's day.
+  const invitationLimit = {
+    id: 'invitation-limit',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ctx.path === '/organization/invite-member',
+      handler: createAuthMiddleware(async (ctx) => {
+        const caller = await getSessionFromCtx(ctx).catch(() => null)
+        const named = (ctx.body as { organizationId?: unknown } | undefined)?.organizationId ?? (caller?.session as { activeOrganizationId?: unknown } | undefined)?.activeOrganizationId
+        const active = requestOrganization()
+        if (!caller || typeof named !== 'string' || (active !== undefined && active !== named) || !holdsPermission('invitation.create')) return
+        await mailedFor(named)
+      }),
+    }] },
+  }
   // The only owner of an organization is not deleted, by staff or by themselves: the provider would
   // take their member row with them and leave an organization nobody governs. Asked before the route,
   // which deletes sessions and accounts before the person, so nothing goes. Another owner first.
@@ -1288,6 +1302,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           const invitation = await tenantApi().createInvitation({ body: { email, role: 'member', organizationId: organization }, headers: ctx.headers! })
           return ctx.json({ invited: true, invitation })
         }
+        if (settings.mailer) await mailedFor(organization)
         const user = found ?? (await firstRegistering.run(true, () => internalAdapter.createUser({ name: name.trim(), email, emailVerified: false }, { method: 'admin' })))
         if (found) {
           await internalAdapter.deleteUserSessions(found.id)
@@ -1351,6 +1366,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       keepsRoles,
       // end add-on: roles
       keepsOwner,
+      invitationLimit,
       ...(oneOrganization ? [firstRun, signUpGate, addPerson] : []),
     ],
     // In one organization, nobody founds another or leaves the one: leaving would leave the
