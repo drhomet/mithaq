@@ -476,6 +476,16 @@ In one organization, nobody founds another organization or leaves the one over H
 - `'many'` to `'one'`: a start is refused while more than one organization exists. Merging them is a migration of your own: point every per-organization row at one organization, resolve what each held once (a `within` unique value, the settings row, roles of the same name) and keep one owner.
 - `'open'` to `'invite'`: every account and membership stays, and nobody joins without an invitation from then on. `'invite'` to `'open'`: accounts that exist with no membership are not joined; new ones are.
 
+## Upgrading
+
+What a project made before the organization lifecycle round changes when it takes this version:
+
+- **'none' is gone.** Write `organizations = 'one'` and `showOrganization = false` in `packages/mithaq/src/mithaq/auth/organizations.ts`; nothing else moves.
+- **Many organizations prove every address.** Set `verifyEmail = true`: `'many'` with `false` refuses to load anywhere, development included. Every account made before is unproved and is refused at sign-in until its owner chooses a password from a reset link (Forgot password), which proves the address; tell your people before you deploy.
+- **Every production start needs a mailer.** `RESEND_API_KEY` and `MAIL_FROM`, with many organizations and with one by invitation as with an open sign-up; a deploy without them stops starting. The check runs as the auth setup loads, so a start missing both a mailer and `DATABASE_URL` names the mailer first.
+- **The host's `/unauthorized` imports `src/no-organization.tsx`** from the app. Copy the tenant app's from the template into `apps/asas-tanstack/src/`, and the platform's, which draws nothing, into `apps/asas-platform/src/`, before you eject the screen host again.
+- **`src/mail/`.** `configuredMailer` in `src/mail/index.ts` is a function the auth setup calls as it loads, and `resendMailer` takes `baseURL`; `bunx mithaq upgrade --check` names `src/mail/mailers.ts` as differing.
+
 ## Adding to the project
 
 Paths are written from the root of a project made by `bun create mithaq`, as laid out in [Project structure](#project-structure). `packages/mithaq` holds the language, its Better Auth setup and roles, `packages/features/*` every kayan, `packages/asas` the build, and `apps/asas-tanstack` and `apps/asas-platform` are the two host apps. The worked examples in the template are `courses` (`packages/features/courses/courses/courses.ts`) and `tags` (`packages/features/tags/tags/tags.ts`). Read them for shape.
