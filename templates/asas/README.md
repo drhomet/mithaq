@@ -29,6 +29,8 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | `courses` | The worked example: courses, sessions and enrollments, each course with a cover from the media, and the business roles that work them. Needs `media`, `roles`, `audit-log` and `rich-text`. |
 | `platform` | The platform console, `apps/asas-platform`. A single package cannot hold it. |
 
+It also asks how the project holds its people, or takes `--organizations` and `--sign-up`: one organization made by its owner on first run and joined by invitation (the default, and the worked example's: a school), the same one never shown (`none`), or many, each sign-up founding its own. [Organization modes](#organization-modes) has the whole story.
+
 `rich-text` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
 
 What you get is a Bun workspace:
@@ -92,9 +94,13 @@ bun run --cwd apps/asas-platform dev   # in a second terminal: the platform cons
 
 Each `dev` script first runs `mithaq lock --check`. The template has no `mithaq.lock`, so this prints a notice and carries on.
 
-### 5. Sign up and seed
+### 5. Set up and seed
 
-Open `http://localhost:5173/auth/sign-up` and sign up as `admin@admin.com` with the organization "Admin org". Signing up creates the organization and makes you its owner, which holds every permission in that organization: through the `administrator` role the roles add-on gives an owner, or through `owner` itself without it.
+With one organization or none, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization (with one, you name it there) and, with the platform console, is its first `super_admin` too. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
+
+With many organizations, open `http://localhost:5173/auth/sign-up` and sign up with the name of an organization: signing up creates it and makes you its owner. The platform console's first administrator is made on its own `/auth/create-first-user`.
+
+Either way the owner holds every permission in the organization: through the `administrator` role the roles add-on gives an owner, or through `owner` itself without it.
 
 Then fill the organization with sample rows of what the project holds: tags, and with the add-ons courses, sessions, enrollments, roles and settings:
 
@@ -103,15 +109,9 @@ cd packages/asas
 bun run seed
 ```
 
-The seed looks for exactly one organization named "Admin org" owned by `admin@admin.com`, and writes every row through the asas's own operations, as that owner. Running it twice adds nothing.
+The seed takes the first user and that user's first organization, or the ones `SEED_EMAIL` and `SEED_ORGANIZATION` name, and writes every row through the asas's own operations, as that owner. Running it twice adds nothing.
 
-The platform console admits platform staff only, and only a `super_admin` can grant a platform role. Make yourself the first one directly in the database:
-
-```sh
-docker exec mithaq-dev psql -U postgres mithaq -c "update \"user\" set role = 'super_admin' where email = 'admin@admin.com'"
-```
-
-Then sign in at `http://localhost:5174`.
+The platform console admits platform staff only. Sign in at `http://localhost:5174` as the owner first-run made, or, with many organizations, as the administrator made on its first-administrator page.
 
 ### 6. Add your first kayan
 
@@ -437,6 +437,35 @@ The app owns its copy, its routes, its providers and its styling. It says nothin
 
 A file a generator writes starts with a line saying which command wrote it, such as `// Written by \`mithaq generate screens\`. Do not edit.`, and changes only by rerunning that command. A file ejected from `mithaq-admin` ends with a marker line, `// mithaq-admin <version> <hash>`, and is the project's own to edit; `mithaq upgrade --check` reports which were edited or differ from the installed package.
 
+## Organization modes
+
+How the project holds its people is five values in `packages/mithaq/src/mithaq/auth/organizations.ts`, which `create-mithaq` writes and you change by hand. In every mode a per-organization kayan places `organization` and core scopes it, so changing the mode moves no row.
+
+| Value | What it says |
+| --- | --- |
+| `organizations` | `'one'`: one organization, named, made on `/auth/first-run`. `'none'`: the same, never shown; the Members page is Users, and no page names an organization. `'many'`: each sign-up founds its own. The tenant target reads it too: in one or none, a start over more than one organization is refused. |
+| `signUp` | With one or none, who makes an account: `'invite'`, only someone holding an invitation, or `'open'`, anyone. `'many'` takes `'open'` alone. |
+| `joinRole` | The role an open joiner is given, from `roles/tenant-roles.ts`, or `null`: they join with none, read nothing, and an administrator gives them a role on the Members page. That is how a project approves each joiner. A role that holds every key is refused. Without the roles add-on it is `null`. |
+| `verifyEmail` | With an open sign-up, whether an account proves its address by a mailed link before it signs in and joins. |
+| `allowedDomains` | With an open sign-up and `verifyEmail`, the only address domains that may sign up: `example.com` is that domain exactly, `*.example.com` every domain under it. An international domain is written as its `xn--` form. |
+
+A combination that means nothing or opens a door refuses to load, naming the line to change: `'many'` with `'invite'`, a join role or domains; domains without verification or by invitation; a join role that is no role.
+
+**First run.** In one organization or none, nothing signs up until the owner is made. `/auth/first-run` takes a name, an address, a password, the organization's name (with one) and the setup code, and makes the owner, the organization and the owner's `administrator` role in one transaction. While the platform console has no administrator it makes the owner one, under the lock its own first-register takes, so the two never both make one. The account is verified, since the code is the proof. Once an organization exists it answers every caller the same refusal. Set `SETUP_CODE` to a random value of 32 characters or more where the app runs (`openssl rand -hex 32`), and remove it once the app is set up: it opens nothing after that, but it need not linger.
+
+**By invitation.** A sign-up carries the id of a pending invitation sent to that address; the invitation link's sign-up page sends it. Anything else is refused with one answer, before the provider looks the address up, so the refusal tells nobody whether an address has an account. The same rule holds wherever an account is made, so a sign-in method added later cannot open a way past it.
+
+**Open.** With `verifyEmail`, the sign-up answers with no session and mails a link. Opening it proves the address, signs the person in and joins them to the one organization as `joinRole`; a sign-in before then is refused and mails a fresh link. Without it, the account joins at once. The join reads the settings when it happens, never joins someone who was ever invited (their invitation is how they join), and never joins a member who was removed: removing someone keeps them out. A production start refuses an open sign-up without a mailer ([Environment variables](#environment-variables): `RESEND_API_KEY` and `MAIL_FROM`).
+
+In one organization or none, nobody founds another organization or leaves the one over HTTP. Each sign-up, join, first-run and role the setup gives writes one JSON line to the server log (`"audit":"auth"`), beside the platform's own; keep that output.
+
+**Changing the mode.**
+
+- `'none'` to `'one'` or back: change the value and run `bunx mithaq generate screens`, which renames the Members page. No row moves.
+- `'one'` to `'many'`: set `organizations = 'many'`, `signUp = 'open'`, `joinRole = null`, `verifyEmail = false` and `allowedDomains = []`. Organization creation and the sign-up's organization box come back, and the switcher appears once someone belongs to two. Review every kayan without `organization`, which every organization will share.
+- `'many'` to `'one'` or `'none'`: a start is refused while more than one organization exists. Merging them is a migration of your own: point every per-organization row at one organization, resolve what each held once (a `within` unique value, the settings row, roles of the same name) and keep one owner.
+- `'open'` to `'invite'`: every account and membership stays, and nobody joins without an invitation from then on. `'invite'` to `'open'`: accounts that exist with no membership are not joined; new ones are.
+
 ## Adding to the project
 
 Paths are written from the root of a project made by `bun create mithaq`, as laid out in [Project structure](#project-structure). `packages/mithaq` holds the language, its Better Auth setup and roles, `packages/features/*` every kayan, `packages/asas` the build, and `apps/asas-tanstack` and `apps/asas-platform` are the two host apps. The worked examples in the template are `courses` (`packages/features/courses/courses/courses.ts`) and `tags` (`packages/features/tags/tags/tags.ts`). Read them for shape.
@@ -748,6 +777,7 @@ In production, set these in the host's environment rather than in a file.
 | `PLATFORM_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The platform console's public URL. | `http://localhost:5174` |
 | `LOCAL_AUTH_SECRET` | `packages/features/auth/local-users/local-users.ts` | 32 characters at least. If it is unset, local accounts are off: every `POST` under `/api/auth/local` answers 503 and the public sign-up answers 403. | Same. |
 | `TRUSTED_IP_HEADER` | `packages/mithaq/src/mithaq/auth/index.ts`, `local-users.ts` | The header names your proxy overwrites with the client address, comma-separated, such as `cf-connecting-ip`. Both rate limiters key on it. Trust it only behind exactly one proxy that overwrites it on every request. | Defaults to `x-forwarded-for`. |
+| `SETUP_CODE` | `packages/mithaq/src/mithaq/auth/index.ts` | 32 characters or more, random. The platform console's first administrator, and with one organization or none the first owner on `/auth/first-run`, are made only with it. Shorter counts as unset, and then neither is made. Remove it once the app is set up. | Not asked under `vite dev` on `localhost`. |
 | `RESEND_API_KEY`, `MAIL_FROM` | `packages/mithaq/src/mail/index.ts` | Both or neither; one alone refuses to start. With both, password resets, invitations and email verification are mailed through Resend from `MAIL_FROM`, an address at a domain the Resend account verified. Without them no reset is offered, invitation links are handed over by hand, and an open sign-up refuses to start. Another service is a mailer of your own beside `src/mail/mailers.ts`, named in `src/mail/index.ts`. | Unset: every message is written to the server log, when `NODE_ENV` is `development` and the tenant URL is `localhost`. |
 | `STORAGE_SECRET` | `packages/mithaq/src/storage/index.ts` | Required. Signs every upload reference and local upload token. Every instance must share it. | A fresh random secret per process, with a warning. |
 | `STORAGE_PREFIX` | `storage/index.ts` | Required. The bucket folder this project owns, such as `mithaq/asas`. Every key starts with it, and the sweep lists only inside it. | `mithaq/asas` |

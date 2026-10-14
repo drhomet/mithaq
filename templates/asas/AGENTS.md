@@ -42,6 +42,8 @@ A kayan that places `organization` is per-organization, and mithaq core enforces
 
 On a per-organization kayan, `rules: { unique: true }` means unique within each organization, and `{ within: 'organization', unique: [...], index: [...] }` in `indexes` builds indexes led by the organization. A plain `{ fields, unique: true }` entry is unique across every organization.
 
+How many organizations the project holds, and who may sign up and join, is `packages/mithaq/src/mithaq/auth/organizations.ts` (`organizations`, `signUp`, `joinRole`, `verifyEmail`, `allowedDomains`). In one organization or none the field and the scope are the same, so keep placing `organization` on every per-organization kayan: leaving it off makes the kayan shared by every organization the day the project holds many. README.md, "Organization modes", says what each value does and how to change it.
+
 Reads that reach further (`tenant: 'mine' | 'all'`), what is refused, and the index rules are in [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md).
 
 ## Migrations
