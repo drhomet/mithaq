@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { domainToUnicode } from 'node:url'
-import { runWithAdapter } from '@better-auth/core/context'
+import { runWithAdapter, tryGetCurrentAuthEndpointContext } from '@better-auth/core/context'
 import { BASE_ERROR_CODES, betterAuth as betterAuthServer, getCurrentAdapter } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getSessionFromCtx, sessionMiddleware } from 'better-auth/api'
@@ -694,12 +694,17 @@ const onLocalHost = !production && isLocalHost(tenantURL)
 // page's link, which ends every session and marks the address verified. Proving it never keeps a
 // password somebody else typed at sign-up, so whoever signed up first with another's address never
 // signs in once its owner proves it.
-const confirmMail = (mailer: Mailer) => async ({ email, token }: { email: string; token: string }) =>
+// A link that also accepts an invitation names the organization, so opening it is the word to join.
+const confirmMail = (mailer: Mailer) => async ({ email, token, joining }: { email: string; token: string; joining?: string }) =>
   mailer.send(letter({
     to: email,
     subject: 'Confirm your address · تأكيد عنوانك',
-    en: 'Someone made an account with this address. If it was you, open the link below within an hour to confirm it and choose your password. If not, ignore this message: an account nobody confirms never signs in.',
-    ar: 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.',
+    en: joining === undefined
+      ? 'Someone made an account with this address. If it was you, open the link below within an hour to confirm it and choose your password. If not, ignore this message: an account nobody confirms never signs in.'
+      : `Someone made an account with this address to join ${joining}. If it was you, open the link below within an hour to confirm it, choose your password and join. If not, ignore this message: an account nobody confirms never signs in.`,
+    ar: joining === undefined
+      ? 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.'
+      : `أنشأ أحدهم حسابا بهذا العنوان للانضمام إلى ${joining}. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور والانضمام. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.`,
     link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
   }))
 
@@ -1148,9 +1153,12 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     authAudit({ action: 'join', user: user.id, organization: joined, role: settings.joinRole })
   }
   // The invitation a sign-up carried is accepted for the account it made: at once where holding the id
-  // is the proof, or once the address is proved, the id kept beside the account until then. It is
-  // read again when accepted, so one cancelled, expired or sent to another address joins nobody.
-  const kept = (user: string) => `invited:${user}`
+  // is the proof, or, where the address is proved, by the one link mailed for that sign-up alone. The
+  // binding is `invited:<that link's token>` and names the account, so anyone who signs up with an
+  // address they invited, before its owner, never joins the owner to their organization: the owner's
+  // own sign-up or reset takes every binding off, and their own link carries none. It is read again
+  // when accepted, so one cancelled, expired or sent to another address joins nobody.
+  const bound = (token: string) => `invited:${token}`
   const acceptCarried = async ({ user, invitationId }: { user: { id: string; email: string }; invitationId: unknown }) => {
     const { adapter, internalAdapter } = await tenant.$context
     if (!(await holdsInvitation({ adapter: adapter as unknown as Finds, id: invitationId, email: user.email }))) return
@@ -1170,12 +1178,15 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     }
     authAudit({ action: 'accept', user: user.id, organization: accepted.organizationId, invitation: id })
   }
-  const acceptKept = async (user: { id: string; email: string }) => {
+  const bindings = (user: string) => [{ field: 'identifier', operator: 'starts_with' as const, value: 'invited:' }, { field: 'value', operator: 'starts_with' as const, value: `${user} ` }]
+  const unbind = async (user: string) => (await tenant.$context).adapter.deleteMany({ model: 'verification', where: bindings(user) })
+  // `token` is the link the address was proved with: only its own binding is accepted.
+  const acceptBound = async ({ user, token }: { user: { id: string; email: string }; token: unknown }) => {
     const { internalAdapter } = await tenant.$context
-    const held = await internalAdapter.findVerificationValue(kept(user.id))
-    if (!held) return
-    await internalAdapter.deleteVerificationByIdentifier(kept(user.id))
-    await acceptCarried({ user, invitationId: held.value })
+    const held = typeof token === 'string' ? await internalAdapter.findVerificationValue(bound(token)) : null
+    await unbind(user.id)
+    const [owner, invitationId] = held?.value.split(' ') ?? []
+    if (owner === user.id) await acceptCarried({ user, invitationId })
   }
   // Whether the account was mailed a link to choose its password in the last five minutes, other
   // than `except`: that one still works, so nobody fills a mailbox by asking again and again.
@@ -1188,9 +1199,20 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // reset page and route answer it. It lasts an hour, as a reset link does.
   const confirmLink = async (user: { id: string; email: string }) => {
     if (!settings.mailer || (await mailedLately(user.id))) return
+    const { adapter, internalAdapter } = await tenant.$context
     const token = randomBytes(24).toString('base64url')
-    await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) })
-    await confirmMail(settings.mailer)({ email: user.email, token })
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
+    await internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt })
+    // The invitation this sign-up carried rides on this link alone.
+    const asked = tryGetCurrentAuthEndpointContext()
+    const invitationId = asked?.path === '/sign-up/email' ? (asked.body as { invitationId?: unknown } | undefined)?.invitationId : undefined
+    let joining: string | undefined
+    if (await holdsInvitation({ adapter: adapter as unknown as Finds, id: invitationId, email: user.email })) {
+      await internalAdapter.createVerificationValue({ identifier: bound(token), value: `${user.id} ${invitationId as string}`, expiresAt })
+      const invitation = await adapter.findOne<{ organizationId: string }>({ model: 'invitation', where: [{ field: 'id', value: invitationId as string }] })
+      joining = (await adapter.findOne<{ name: string }>({ model: 'organization', where: [{ field: 'id', value: invitation!.organizationId }] }))?.name
+    }
+    await confirmMail(settings.mailer)({ email: user.email, token, ...(joining !== undefined && { joining }) })
   }
   // The only owner of an organization is not deleted, by staff or by themselves: the provider would
   // take their member row with them and leave an organization nobody governs. Asked before the route,
@@ -1298,7 +1320,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
         // The password is chosen, so every other link to choose it is spent.
         await adapter.deleteMany({ model: 'verification', where: [{ field: 'value', value: user.id }, ...resetLinks] })
         if (!user.emailVerified) {
-          await acceptKept(user)
+          await acceptBound({ user, token: (tryGetCurrentAuthEndpointContext()?.body as { token?: unknown } | undefined)?.token })
           await joinOpen(user)
         }
       },
@@ -1306,10 +1328,19 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       // someone squatted it, is answered as any sign-up and mails the address the link that proves it.
       ...(settings.mailer && {
         sendResetPassword: async (data: { user: { id: string; email: string }; token: string }) => {
+          // Whoever asks for a reset proves the address afresh, carrying no invitation.
+          await unbind(data.user.id)
           if (!(await mailedLately(data.user.id, data.token))) await resetMail(settings.mailer!)(data)
         },
       }),
-      ...(verifying && { onExistingUserSignUp: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean } }) => (user.emailVerified ? undefined : confirmLink(user)) }),
+      // An owner who signs up after someone else did takes off whatever that first sign-up carried.
+      ...(verifying && {
+        onExistingUserSignUp: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean } }) => {
+          if (user.emailVerified) return
+          await unbind(user.id)
+          await confirmLink(user)
+        },
+      }),
     },
     // A sign-up mails the link once. A sign-in before the proof mails nothing, and the provider's own
     // resend and verify routes are off, so nobody pushes a link to an address on demand.
@@ -1339,10 +1370,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
           after: async (user: { id: string; email: string; role?: unknown }, context: { body?: unknown } | null) => {
             authAudit({ action: 'sign-up', user: user.id })
             const invitationId = (context?.body as { invitationId?: unknown } | undefined)?.invitationId
-            if (typeof invitationId === 'string' && !firstRegistering.getStore()) {
-              if (!verifying) await acceptCarried({ user, invitationId })
-              else await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: kept(user.id), value: invitationId, expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) })
-            }
+            // Where the address is proved, the invitation rides on the link `confirmLink` mails.
+            if (typeof invitationId === 'string' && !firstRegistering.getStore() && !verifying) await acceptCarried({ user, invitationId })
             if (!verifying) await joinOpen(user)
           },
         },

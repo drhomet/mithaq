@@ -1084,6 +1084,8 @@ test('0k. with many organizations an invited sign-up joins nothing until its add
   assert.deepEqual(await memberOf('elsewhere-0k@example.com'), [], 'an invitation id carried by another address joins nobody')
   assert.equal((await askedOf(many, '/sign-up/email', { name: 'Invitee', email: 'invitee-0k@example.com', password: 'typed-at-sign-up', invitationId })).status, 200)
   assert.deepEqual(await memberOf('invitee-0k@example.com'), [], 'no membership before the address is proved')
+  await backgroundSettled()
+  assert.match(mail.sent.filter((one) => one.to === 'invitee-0k@example.com').at(-1)!.text, /to join Invites 0k/, 'and the link that accepts it says which organization it joins')
   assert.equal((await askedOf(many, '/reset-password', { token: (await tokenMailed(mail, 'invitee-0k@example.com'))!, newPassword: modePassword })).status, 200)
   assert.deepEqual(await memberOf('invitee-0k@example.com'), [organization], 'once proved, the person is a member of the organization that invited them')
   assert.deepEqual(await modeRows(`select status from invitation where id = '${invitationId}'`), [{ status: 'accepted' }])
@@ -1194,6 +1196,32 @@ test('0n. an open sign-up joins past an invitation that was cancelled or has exp
   assert.equal(await joined('cancelled-0n@example.com'), true, 'a cancelled invitation is no invitation: the address joins like anyone')
   assert.equal(await joined('expired-0n@example.com'), true, 'nor is one expired')
   assert.equal(await joined('pending-0n@example.com'), false, 'while one still pending is how its address joins')
+})
+
+test('0o. a planted invitation joins nobody: an administrator who signs up with an address they invited carries the invitation on that one link alone, and the owner\'s own sign-up or reset takes it off before any proof', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  const admin = await proved({ one: many, mail, email: 'planter-0o@example.com' })
+  const organization = (await many.api.createOrganization({ body: { name: 'Planted 0o', slug: 'planted-0o' }, headers: admin }))!.id
+  const memberOf = async (email: string) => (await modeRows(`select member.organization_id from member join "user" on "user".id = member.user_id where "user".email = '${email}'`)).map((one) => one.organization_id)
+  // A link mailed five minutes ago no longer holds the next one back.
+  const aged = (email: string) => db.execute(`update verification set created_at = now() - interval '6 minutes' where value = (select id from "user" where email = '${email}')`)
+  for (const [victim, claims] of [['victim-0o@example.com', 'signs up'], ['forgetful-0o@example.com', 'asks for a reset']] as const) {
+    const { id: invitationId } = (await many.api.createInvitation({ body: { email: victim, role: 'member', organizationId: organization }, headers: admin })) as { id: string }
+    // The administrator signs up as the person invited, carrying the invitation, before its owner does.
+    assert.equal((await askedOf(many, '/sign-up/email', { name: 'Planted', email: victim, password: 'the-planter-password', invitationId })).status, 200)
+    const planted = (await tokenMailed(mail, victim))!
+    await aged(victim)
+    if (claims === 'signs up') assert.equal((await askedOf(many, '/sign-up/email', { name: 'Victim', email: victim, password: 'the-victim-password' })).status, 200)
+    else assert.equal((await askedOf(many, '/request-password-reset', { email: victim })).status, 200)
+    const own = (await tokenMailed(mail, victim))!
+    assert.notEqual(own, planted, `the owner who ${claims} is mailed a link of their own`)
+    // The planted link itself, or the owner's own: neither joins them anywhere.
+    const token = claims === 'signs up' ? planted : own
+    assert.equal((await askedOf(many, '/reset-password', { token, newPassword: 'the-victim-chose-this' })).status, 200)
+    assert.deepEqual(await memberOf(victim), [], `once the owner who ${claims} proves the address, they joined nobody`)
+    assert.deepEqual(await modeRows(`select status from invitation where id = '${invitationId}'`), [{ status: 'pending' }], 'and the invitation is still theirs to answer')
+  }
 })
 
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
