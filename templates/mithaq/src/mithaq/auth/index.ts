@@ -4,7 +4,7 @@ import { domainToUnicode } from 'node:url'
 import { runWithAdapter } from '@better-auth/core/context'
 import { BASE_ERROR_CODES, betterAuth as betterAuthServer, getCurrentAdapter } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getSessionFromCtx } from 'better-auth/api'
+import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getSessionFromCtx, sessionMiddleware } from 'better-auth/api'
 import { admin, oneTimeToken, organization } from 'better-auth/plugins'
 import { createAccessControl } from 'better-auth/plugins/access'
 import { adminAc, defaultStatements as adminStatements, userAc } from 'better-auth/plugins/admin/access'
@@ -98,7 +98,8 @@ const refusedSetup = ({ url, code, app }: { url: string; code: unknown; app: str
   return undefined
 }
 // Set only around the calls first-register and first-run make once they found nobody under their
-// lock: the only calls with no caller that may write a role or make an account no sign-up would.
+// lock, and around the account add-person makes: the only calls that may write a role or make an
+// account no sign-up would.
 const firstRegistering = new AsyncLocalStorage<true>()
 // Without TRUSTED_IP_HEADER, Better Auth keys its limit on an `x-forwarded-for` the caller writes,
 // so each setup route also keeps one window that every caller shares.
@@ -211,6 +212,9 @@ export type AuthSettings = {
   allowedDomains: readonly string[]
 }
 export const authSettings: AuthSettings = { mailer: configuredMailer() ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains }
+
+/** An address as the provider takes one: something, one `@`, and a host with a dot, with no space. */
+const anAddress = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** A lowercase ASCII host of two labels or more, which an `xn--` international one is. */
 const host = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
@@ -697,6 +701,18 @@ const confirmMail = (mailer: Mailer) => async ({ email, token }: { email: string
     link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
   }))
 
+// The set-password link of a person an administrator added, which they open to choose their password.
+const addedMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganization: boolean }) => async ({ email, organization, token }: { email: string; organization: { name: string }; token: string }) => {
+  const [en, ar] = showOrganization ? [organization.name, organization.name] : ['this app', 'هذا التطبيق']
+  await mailer.send(letter({
+    to: email,
+    subject: 'Your account · حسابك',
+    en: `An administrator added you to ${en}. Open the link below to choose your password; it lasts 48 hours.`,
+    ar: `أضافك أحد المسؤولين إلى ${ar}. افتح الرابط أدناه لاختيار كلمة المرور؛ وهو صالح 48 ساعة.`,
+    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+  }))
+}
+
 const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
   mailer.send(letter({
     to: user.email,
@@ -743,7 +759,7 @@ export const optionsFor = (settings: AuthSettings) => ({
   //
   // Invitations are mailed, so they are limited apart: ten a minute from one address, beside each
   // organization's own `invitationLimits`.
-  rateLimit: { enabled: !onLocalHost, customRules: { '/organization/invite-member': { window: 60, max: invitationLimits.perMinute } } },
+  rateLimit: { enabled: !onLocalHost, customRules: { '/organization/invite-member': { window: 60, max: invitationLimits.perMinute }, '/organization/add-person': { window: 60, max: invitationLimits.perMinute } } },
   // Better Auth reads it for the links it writes into mail and the origin it checks a request
   // against; without it every boot prints `Base URL is not set`.
   baseURL: tenantURL,
@@ -1098,7 +1114,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // a removed member whose address is made unverified and proved again stays out.
   const joinedOnce = (user: string) => `joined-open:${user}`
   const joinOpen = async (user: { id: string; email: string; role?: unknown }) => {
-    if (!oneOrganization || settings.signUp !== 'open') return
+    // An account first-run or add-person makes is placed by them.
+    if (!oneOrganization || settings.signUp !== 'open' || firstRegistering.getStore()) return
     if (holdsRole(user.role, (one) => Object.hasOwn(platformRoles, one))) return
     if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) return
     const [organization] = (await store.find({ kayan: 'organization', args: { limit: 1, page: 1, sort: { field: 'createdAt', direction: 'asc' } } })).docs
@@ -1164,6 +1181,74 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) })
     await confirmMail(settings.mailer)({ email: user.email, token })
   }
+  // add-on: roles
+  // Whether the caller may hand over `role` in `organization`, measured as `assignableRole` measures
+  // an assignment: a root granter any role, anyone else one whose every key they hold.
+  const assignable = async ({ organization, role }: { organization: string; role: string }) => {
+    const custom = async () => (await store.find({ kayan: 'roles', args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: organization }, name: { equals: role } } } })).docs[0]?.permissions as readonly string[] | undefined
+    const keys = Object.hasOwn(tenantRoles, role) ? (tenantRoles[role as keyof typeof tenantRoles] as { permissions: '*' | readonly string[] }).permissions : await custom()
+    if (keys === undefined) throw new APIError('BAD_REQUEST', { code: 'error.invalid.role', message: `Role "${role}" is none of this organization's.` })
+    if (holdsPermission('memberRoles.create') && (holdsPermission('*') || (keys !== '*' && keys.every((key) => key !== '*' && holdsPermission(key))))) return
+    throw new APIError('FORBIDDEN', { code: 'error.forbidden.assign', message: `You may not give role "${role}": it holds keys you do not hold.` })
+  }
+  // end add-on: roles
+  // without add-on: roles
+  // const assignable = async (_: { organization: string; role: string }) => {
+  //   throw new APIError('BAD_REQUEST', { message: 'A role is given on adding a person with the roles add-on alone.' })
+  // }
+  // end without add-on: roles
+  // Adds a person to the one organization in one request: their account, their membership, a role
+  // the caller may hand over, and a link to choose their password, mailed, or with no mailer answered
+  // for the caller to hand over. Never a password anyone knows. An account nobody proved, which may
+  // be a squat, is handed to the mailbox: its password and sessions end before it is added. A proved
+  // account is never added without its word: it is invited instead. The organization is the caller's
+  // verified active one; a body naming another is not read.
+  // The tenant instance's own routes, typed here so the route below, which the instance holds, does
+  // not make the instance's type depend on itself.
+  type Invites = { createInvitation(args: { body: Record<string, unknown>; headers: Headers }): Promise<unknown>; addMember(args: { body: { userId: string; organizationId: string; role: 'member' } }): Promise<unknown> }
+  const tenantApi = (): Invites => tenant.api as unknown as Invites
+  const addPerson = {
+    id: 'add-person',
+    endpoints: {
+      addPerson: createAuthEndpoint('/organization/add-person', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
+        const organization = requestOrganization()
+        // Outside `asas.handler` no key is resolved, so the route answers nothing there.
+        if (typeof organization !== 'string' || !holdsPermission('member.create')) throw new APIError('FORBIDDEN', { message: 'Adding a person needs the permission "member.create" in your active organization.' })
+        const { name, email: written, role } = (ctx.body ?? {}) as Record<string, unknown>
+        if (typeof name !== 'string' || !name.trim() || name.length > 100 || typeof written !== 'string' || !anAddress.test(written) || (role !== undefined && (typeof role !== 'string' || !role))) {
+          throw new APIError('BAD_REQUEST', { message: 'A name of 1 to 100 characters and an email are required, and a role, where given, is a role\'s name.' })
+        }
+        if (typeof role === 'string') await assignable({ organization, role })
+        const email = written.toLowerCase()
+        const { adapter, internalAdapter } = ctx.context
+        const found = (await internalAdapter.findUserByEmail(email))?.user as ({ id: string; emailVerified: boolean; role?: unknown } | undefined)
+        if (found && (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: found.id } } } }))) {
+          throw new APIError('CONFLICT', { code: 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION', message: 'This person is already a member.' })
+        }
+        // Staff hold the platform, so a tenant never touches their sign-in.
+        if (found && (found.emailVerified || holdsRole(found.role, (one) => Object.hasOwn(platformRoles, one)))) {
+          const invitation = await tenantApi().createInvitation({ body: { email, role: 'member', organizationId: organization }, headers: ctx.headers! })
+          return ctx.json({ invited: true, invitation })
+        }
+        const user = found ?? (await firstRegistering.run(true, () => internalAdapter.createUser({ name: name.trim(), email, emailVerified: false }, { method: 'admin' })))
+        if (found) {
+          await internalAdapter.deleteUserSessions(found.id)
+          await adapter.deleteMany({ model: 'account', where: [{ field: 'userId', value: found.id }, { field: 'providerId', value: 'credential' }] })
+        }
+        await tenantApi().addMember({ body: { userId: user.id, organizationId: organization, role: 'member' } })
+        // add-on: roles
+        if (typeof role === 'string') await store.transaction((tx) => grantRole({ tx, organization, user: user.id, role }))
+        // end add-on: roles
+        const token = randomBytes(24).toString('base64url')
+        await internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) })
+        authAudit({ action: 'add-person', actor: ctx.context.session?.user.id ?? null, user: user.id, organization, role: role ?? null })
+        if (!settings.mailer) return ctx.json({ added: true, user: { id: user.id }, link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href })
+        const named = (await adapter.findOne<{ name: string }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
+        await ctx.context.runInBackgroundOrAwait(addedMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email, organization: named, token }))
+        return ctx.json({ added: true, user: { id: user.id } })
+      }),
+    },
+  }
   const tenant = betterAuthServer({
     ...built,
     emailAndPassword: {
@@ -1198,7 +1283,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       // add-on: roles
       keepsRoles,
       // end add-on: roles
-      ...(oneOrganization ? [firstRun, signUpGate] : []),
+      ...(oneOrganization ? [firstRun, signUpGate, addPerson] : []),
     ],
     // In one organization, nobody founds another or leaves the one: leaving would leave the
     // person in no organization at all, where every read is refused.

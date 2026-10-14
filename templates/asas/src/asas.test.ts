@@ -1107,10 +1107,84 @@ test('0l. each organization invites at most ten people a minute and a hundred a 
   assert.deepEqual(await answerOf(await invite(11)), [429, 'INVITATIONS_PER_DAY'], 'and past a hundred in a day it is refused until the day has passed')
 })
 
+test('0m. with one organization an administrator adds a person: account, membership and role in one request and a set-password link mailed, never a known password; a proved account is invited instead, a squatted one handed to its mailbox, and a caller without the key or the role is refused', async () => {
+  const mail = keptMail()
+  const school = modeServer({ ...schoolSettings, mailer: mail.mailer })
+  // Served as `asas.handler` serves it, so the project's keys gate the route.
+  const gated = betterAuthStrategy({ server: school, collection: 'user', assigned: accessResolve as never, onError: console.error })
+  const owner = await ownerOf(school)
+  const add = (body: Record<string, unknown>, cookie = owner.headers.get('cookie')!) =>
+    gated.handler(new Request('http://test/api/auth/user/organization/add-person', { method: 'POST', headers: { cookie, 'content-type': 'application/json', origin: tenantOrigin }, body: JSON.stringify(body) }))
+  const membership = async (email: string) => (await modeRows(`select member.organization_id, member.role, "user".email_verified from member join "user" on "user".id = member.user_id where "user".email = '${email}'`))[0]
+  const rolesOf = async (email: string) => (await modeRows(`select member_roles.role from member_roles join "user" on "user".id = member_roles.user_id where "user".email = '${email}'`)).map((one) => one.role)
+
+  // An organization the body names is not the one the person joins: the route takes none.
+  await db.execute(`insert into organization (id, name, slug, created_at) values ('elsewhere-0m', 'Elsewhere', 'elsewhere-0m', now())`)
+  const added = await add({ name: 'New Pupil', email: 'New-Pupil-0m@example.com', role: 'student', organizationId: 'elsewhere-0m' })
+  assert.equal(added.status, 200, await added.clone().text())
+  const answer = (await added.json()) as { added?: boolean; link?: string }
+  assert.equal(answer.added, true)
+  assert.equal(answer.link, undefined, 'with a mailer the link is mailed, never answered')
+  assert.deepEqual(await membership('new-pupil-0m@example.com'), { organization_id: owner.organization, role: 'member', email_verified: false }, 'a new account, a member of the caller\'s organization alone, not yet proved')
+  assert.deepEqual(await rolesOf('new-pupil-0m@example.com'), ['student'], 'holding the role given in the same request')
+  assert.deepEqual(await modeRows(`select provider_id from account join "user" on "user".id = account.user_id where "user".email = 'new-pupil-0m@example.com'`), [], 'with no password anyone knows')
+  const token = (await tokenMailed(mail, 'new-pupil-0m@example.com'))!
+  assert.ok(token, 'and a set-password link mailed to the address')
+  assert.equal((await askedOf(school, '/reset-password', { token, newPassword: 'the-pupil-chose-this' })).status, 200, 'which chooses the password')
+  assert.equal((await askedOf(school, '/sign-in/email', { email: 'new-pupil-0m@example.com', password: 'the-pupil-chose-this' })).status, 200, 'and the person signs in')
+  assert.equal((await membership('new-pupil-0m@example.com'))!.email_verified, true, 'proved by the link')
+
+  // An account written as an open sign-up with no proof would leave it, past the invitation-only gate.
+  const context = await school.$context
+  const madeAccount = async ({ email, verified, password }: { email: string; verified: boolean; password: string }) => {
+    const id = `${email.split('@')[0]}-id`
+    await db.execute(`insert into "user" (id, name, email, email_verified, created_at, updated_at) values ('${id}', '${email}', '${email}', ${verified}, now(), now())`)
+    await db.execute(`insert into account (id, account_id, provider_id, user_id, password, created_at, updated_at) values ('${id}-account', '${id}', 'credential', '${id}', '${await context.password.hash(password)}', now(), now())`)
+    return id
+  }
+  // Someone squatted the address before the administrator added its owner.
+  await madeAccount({ email: 'squatted-0m@example.com', verified: false, password: 'the-squatter-password' })
+  assert.equal((await add({ name: 'Owner Of It', email: 'squatted-0m@example.com' })).status, 200)
+  assert.equal((await askedOf(school, '/sign-in/email', { email: 'squatted-0m@example.com', password: 'the-squatter-password' })).status, 401, 'the squatter\'s password no longer signs in')
+  assert.equal((await membership('squatted-0m@example.com'))?.role, 'member', 'the account is a member')
+  assert.ok(await tokenMailed(mail, 'squatted-0m@example.com'), 'and its mailbox, not the squatter, chooses the password')
+
+  // A proved account is never added without its word: it gets an invitation.
+  assert.equal((await add({ name: 'Proved', email: owner.email })).status, 409, 'an existing member is refused')
+  await madeAccount({ email: 'proved-0m@example.com', verified: true, password: modePassword })
+  const proved = await add({ name: 'Proved', email: 'proved-0m@example.com', role: 'student' })
+  assert.equal(proved.status, 200)
+  assert.equal(((await proved.json()) as { invited?: boolean }).invited, true, 'a proved account is invited')
+  assert.equal(await membership('proved-0m@example.com'), undefined, 'and not added')
+  assert.deepEqual(await modeRows(`select status from invitation where email = 'proved-0m@example.com'`), [{ status: 'pending' }])
+
+  // A member who may not add people, and one who may but not hand over the role asked.
+  const member = async ({ email, role }: { email: string; role?: string }) => {
+    const made = await madeAccount({ email, verified: true, password: modePassword })
+    await school.api.addMember({ body: { userId: made, organizationId: owner.organization, role: 'member' } })
+    if (role) await assignRole(owner.organization, made, role)
+    return cookieOf(await askedOf(school, '/sign-in/email', { email, password: modePassword }))
+  }
+  const plain = await member({ email: 'plain-0m@example.com' })
+  assert.equal((await add({ name: 'Refused', email: 'refused-0m@example.com' }, plain)).status, 403, 'a member without member.create adds nobody')
+  await seedRoleRow(owner.organization, 'adder-0m', ['screen.dashboard', 'member.create', 'memberRoles.create', 'courses.find'])
+  const adder = await member({ email: 'adder-0m@example.com', role: 'adder-0m' })
+  assert.equal((await add({ name: 'Refused', email: 'refused-0m@example.com', role: 'administrator' }, adder)).status, 403, 'nor hands over a role holding keys it does not hold')
+  assert.deepEqual(await modeRows(`select id from "user" where email = 'refused-0m@example.com'`), [], 'and no account was made for either')
+  assert.equal((await add({ name: 'Allowed', email: 'allowed-0m@example.com' }, adder)).status, 200, 'while it adds a person with no role')
+
+  // Without a mailer the link is the administrator's to hand over.
+  const unmailed = betterAuthStrategy({ server: modeServer({ ...schoolSettings, mailer: undefined }), collection: 'user', assigned: accessResolve as never, onError: console.error })
+  const handed = await unmailed.handler(new Request('http://test/api/auth/user/organization/add-person', { method: 'POST', headers: { cookie: owner.headers.get('cookie')!, 'content-type': 'application/json', origin: tenantOrigin }, body: JSON.stringify({ name: 'Handed', email: 'handed-0m@example.com' }) }))
+  assert.match(((await handed.json()) as { link?: string }).link ?? '', /^http:\/\/localhost:5173\/auth\/reset-password\?token=/, 'without a mailer the set-password link is answered to copy')
+  await db.execute(`delete from organization where id = 'elsewhere-0m'`)
+})
+
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
   const made = (await modeRows(`select id from organization where id <> 'borrowed-organization'`)).map((one) => `'${one.id}'`)
   if (made.length) {
     await db.execute(`delete from member_roles where organization_id in (${made.join(', ')})`)
+    await db.execute(`delete from roles where organization_id in (${made.join(', ')})`)
     await db.execute(`delete from organization where id in (${made.join(', ')})`)
   }
   await db.execute(`delete from "user" where email like '%@example.com' and id not in (select user_id from member)`)

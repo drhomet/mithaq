@@ -362,6 +362,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const session = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { origin, cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).json()) as { session?: { activeOrganizationId?: string | null } } | null
       assert.ok(session?.session?.activeOrganizationId, 'into the one organization')
       if (!open) assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Stranger', email: `stranger-${stamp}@example.com`, password: 'release-test-password' })), [403, 'SIGN_UP_INVITE_ONLY'], 'by invitation, a sign-up with none is refused')
+      // The owner adds a person in one request, and the link that chooses the password goes to that person's mailbox.
+      const person = `added-${stamp}@example.com`
+      const added = await post('organization/add-person', { name: 'Added', email: person }, { cookie: cookieOf(signedIn) })
+      assert.equal(added.status, 200, `${await added.text()}\n${output}`)
+      const chosen = await post('reset-password', { token: (await linkMailed(person)).searchParams.get('token'), newPassword: 'release-test-password' })
+      assert.equal(chosen.status, 200, `the added person chooses their password from the mailed link: ${await chosen.text()}`)
+      assert.equal((await post('sign-in/email', { email: person, password: 'release-test-password' })).status, 200, 'and signs in')
+      const membersPage = await (await fetch(`${origin}/dashboard/members`, { headers: { cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).text()
+      assert.ok(membersPage.includes('data-add-person'), `the Members page offers Add person:\n${membersPage.slice(0, 600)}`)
       if (platform) {
         // First-run made the owner the platform's administrator too, since it had none.
         const staff = await post('sign-in/email', { email: owner, password: 'release-test-password' }, {}, platformOrigin)

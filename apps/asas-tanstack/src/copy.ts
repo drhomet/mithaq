@@ -473,6 +473,20 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     membersJoined: { en: 'Joined', ar: 'تاريخ الانضمام' },
     membersNone: { en: 'No one works in this organization yet.', ar: 'لا يعمل أحد في هذه المؤسسة بعد.' },
     invite: { en: 'Invite', ar: 'دعوة' },
+    addPerson: { en: 'Add person', ar: 'إضافة شخص' },
+    addPersonTitle: { en: 'Add a person', ar: 'إضافة شخص' },
+    addPersonAbout: {
+      en: 'They get an account here and a link by email to choose their password. Someone who already has an account is sent an invitation instead.',
+      ar: 'يحصل على حساب هنا ورابط بالبريد لاختيار كلمة مروره. ومن لديه حساب بالفعل تُرسل إليه دعوة بدلا من ذلك.',
+    },
+    addPersonRole: { en: 'Role', ar: 'الدور' },
+    addPersonNoRole: { en: 'No role yet', ar: 'بلا دور بعد' },
+    addPersonSubmit: { en: 'Add', ar: 'إضافة' },
+    addPersonLink: {
+      en: 'No mailer is configured. Hand this link to them alone: it chooses their password and lasts 48 hours.',
+      ar: 'لم يُضبط أي مرسل بريد. سلّم هذا الرابط له وحده: به يختار كلمة مروره، وهو صالح 48 ساعة.',
+    },
+    addPersonRefused: { en: 'The server refused to add that person.', ar: 'رفض الخادم إضافة هذا الشخص.' },
     inviteTitle: { en: 'Invite someone', ar: 'دعوة شخص' },
     inviteAbout: {
       en: 'They join this organization as a member once they accept. Give them roles here after that.',
