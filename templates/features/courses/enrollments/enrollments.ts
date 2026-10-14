@@ -1,8 +1,9 @@
-import { defaultOperations, folderOf, type FilterOptions } from 'mithaq'
+import { defaultOperations, folderOf, invalid, type Ctx, type FilterOptions, type WriteTools } from 'mithaq'
 import { defineKayan, organization, serverTargets } from '@asas/mithaq'
 import { currentOrganization, readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
 import { activity, appPage, danger, platformList, platformRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
 import { sessions } from '../sessions/sessions.ts'
+import { courses } from '../courses/courses.ts'
 
 const ui = folderOf(new URL('./ui/', import.meta.url))
 const sessionCell = ui('session-cell.tsx#SessionCell')
@@ -54,6 +55,33 @@ const students: FilterOptions = async ({ user }) => {
   return ids.length ? { id: { in: ids } } : false
 }
 
+/** Not archived, the column read by its name, or across a session's course. */
+const open = (path: string) => ({ or: [{ [path]: { exists: false } }, { [path]: { equals: false } }] })
+
+/** What a seat's session picker offers, and a save is held to: a session open for seats, of a course open too. */
+const openSessions: FilterOptions = () => ({ and: [open('archived'), open('course.archived')] })
+
+/**
+ * Refuses a seat in an archived session, or in a session of an archived
+ * course, in words of its own. A session the actor may not read is left to the
+ * reference check, which refuses it in the words a missing one gets.
+ */
+const sessionTakesSeats = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Promise<Ctx> => {
+  const id = ctx.data.session
+  if (typeof id !== 'string') return ctx
+  const session = await tools.of(sessions).findByID({ id }).catch(() => null)
+  if (!session) return ctx
+  const course = session.archived ? undefined : await tools.of(courses).findByID({ id: session.course }).catch(() => null)
+  if (session.archived || course?.archived) {
+    throw invalid({
+      message: 'This session is archived, or its course is, so it takes no new seat.',
+      key: 'error.invalid.archived_session',
+      params: { kayan: 'enrollments', field: 'session' },
+    })
+  }
+  return ctx
+}
+
 export const enrollments = defineKayan({
   name: 'enrollments',
   access: {
@@ -83,6 +111,7 @@ export const enrollments = defineKayan({
     // relationship restricts.
     session: {
       kind: 'relationship', label: { en: 'Session', ar: 'الحصة' }, relationTo: () => sessions,
+      filterOptions: openSessions,
       rules: { required: true },
       targets: { dashboard: { cell: sessionCell }, portal: { cell: sessionCell }, platform: { cell: sessionCell } },
     },
@@ -129,7 +158,13 @@ export const enrollments = defineKayan({
         }),
       },
     },
-    service: { operations: defaultOperations },
+    service: {
+      operations: {
+        ...defaultOperations,
+        create: { ...defaultOperations.create, steps: ({ steps }) => [sessionTakesSeats, steps.insert] },
+        update: { ...defaultOperations.update, steps: ({ steps }) => [sessionTakesSeats, steps.update] },
+      },
+    },
     // Both screens list enrollments; the portal's create opens as a drawer over
     // its list. Titled by the student on the dashboard, as on the platform, so a
     // tab and a heading tell one seat from another; on the portal, where the

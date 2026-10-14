@@ -109,11 +109,12 @@ test('the seed fills the organization SEED_EMAIL and SEED_ORGANIZATION name thro
     const elsewhere = Object.assign(new URL(fresh), { search: '?host=127.1' }).href
     const first = seed(elsewhere, { ...admin, SEED_ALLOW_REMOTE: '1' })
     assert.equal(first.said, `Seeding the organization "Admin org" that admin@admin.com owns, in 127.1:${new URL(fresh).port}/${name}.`)
-    assert.deepEqual(first.created, { tags: 6, courses: 20, sessions: first.totals.sessions, enrollments: 60, roles: 3, memberRoles: 3, settings: 1 })
+    assert.deepEqual(first.created, { tags: 6, courses: 20, sessions: first.totals.sessions, enrollments: 60, roles: 3, memberRoles: 9, settings: 1 })
     const sessions = first.totals.sessions!
     assert.ok(sessions >= 40 && sessions <= 120, `two to six sessions for each of twenty courses: ${sessions}`)
-    // The owner's `administrator` row, written when the organization was made, beside the three the seed gave.
-    assert.deepEqual({ ...first.totals, sessions: 0 }, { tags: 6, courses: 20, sessions: 0, enrollments: 60, roles: 3, memberRoles: 4, settings: 1 })
+    // The owner's `administrator` row, written when the organization was made, beside the three the seed gave and
+    // the student role of each of the six students it seats.
+    assert.deepEqual({ ...first.totals, sessions: 0 }, { tags: 6, courses: 20, sessions: 0, enrollments: 60, roles: 3, memberRoles: 10, settings: 1 })
 
     // Every seeded course is published, since the seed writes through the
     // owner's own operations and none of them saves a draft.

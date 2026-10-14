@@ -74,8 +74,9 @@ test('dev:setup pushes the schema, makes a verified super admin who owns an orga
       const body = { email: '${admin.DEV_ADMIN_EMAIL}', password: '${admin.DEV_ADMIN_PASSWORD}' }
       const tenant = await server.api.signInEmail({ body, asResponse: true })
       const platform = await asPlatform(() => server.api.signInEmail({ body, asResponse: true }))
-      const { rows: [user] } = await ${client}.query("select role, email_verified from \\"user\\"")
-      const { rows: owned } = await ${client}.query("select organization.name, member.role from member join organization on organization.id = member.organization_id")
+      // The seed's students are users and members too, so the admin is read by its address.
+      const { rows: [user] } = await ${client}.query("select role, email_verified from \\"user\\" where email = lower($1)", [body.email])
+      const { rows: owned } = await ${client}.query("select organization.name, member.role from member join organization on organization.id = member.organization_id join \\"user\\" on \\"user\\".id = member.user_id where \\"user\\".email = lower($1)", [body.email])
       console.log(JSON.stringify({ tenant: tenant.status, platform: platform.status, user, owned }))
     `).trim().split('\n').at(-1)!)
     assert.deepEqual(held, { tenant: 200, platform: 200, user: { role: 'super_admin', email_verified: true }, owned: [{ name: "Dev admin's workspace", role: 'owner' }] })

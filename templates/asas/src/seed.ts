@@ -138,7 +138,10 @@ type Row = Record<string, unknown> & { id: string }
 type AuthContext = {
   secret: string
   authCookies: { sessionToken: { name: string } }
-  adapter: { findMany(query: { model: string; where?: { field: string; value: string }[]; limit?: number; sortBy?: { field: string; direction: 'asc' } }): Promise<Row[]> }
+  adapter: {
+    findMany(query: { model: string; where?: { field: string; value: string }[]; limit?: number; sortBy?: { field: string; direction: 'asc' } }): Promise<Row[]>
+    create(query: { model: string; data: Record<string, unknown> }): Promise<Row>
+  }
   internalAdapter: {
     findUserByEmail(email: string): Promise<{ user: Row } | null>
     createSession(userId: string, dontRememberMe?: boolean, override?: Record<string, unknown>): Promise<{ token: string }>
@@ -261,7 +264,7 @@ try {
   // What this run made and when each is said to have been made, for the one
   // write below that goes around the operations.
   const backdate: { table: 'courses' | 'enrollments'; id: string; at: Date }[] = []
-  const planned: { course: string; age: number; sessions: string[] }[] = []
+  const planned: { course: string; age: number; sessions: string[]; archived: boolean }[] = []
   for (const [index, [title, summary, topics]] of catalogue.entries()) {
     // Drawn whether or not the course is there, so every run draws the same plan.
     const age = 89 - index
@@ -282,13 +285,14 @@ try {
       tags: tagIds.filter(() => random() < 0.35),
     }
     const sessionCount = 2 + Math.floor(random() * 5)
+    // Two of the twenty are archived, with the reason the archive form asks for.
+    const archived = index % 9 === 8
     const found = (await courses.operations.find({ where: { title: { equals: title } }, limit: 1 }, options)).docs[0]
     const course = found ?? (await courses.operations.create(input, options))
     if (!found) {
       created.courses++
       backdate.push({ table: 'courses', id: course.id, at: new Date(now - age * DAY) })
-      // Two of the twenty are archived, with the reason the archive form asks for.
-      if (index % 9 === 8) await courses.operations.archive({ id: course.id, reason: 'Replaced by a newer course.' }, options)
+      if (archived) await courses.operations.archive({ id: course.id, reason: 'Replaced by a newer course.' }, options)
     } else if (!found.details) {
       // A course seeded without details is given them, once.
       await courses.operations.update({ id: found.id, details: input.details }, options)
@@ -309,20 +313,40 @@ try {
       held.push((await sessions.operations.create({ ...session, details: sessionDetails(session.format) }, options)).id)
       created.sessions++
     }
-    planned.push({ course: course.id, age, sessions: held })
+    planned.push({ course: course.id, age, sessions: held, archived })
+  }
+
+  // Six students, made once by address, since a seat is held by someone holding
+  // the student role and an organization the seed starts from may hold none.
+  // They have no password, so nobody signs in as one, and are written past the
+  // sign-up hooks, since nobody signed up.
+  const students: string[] = []
+  for (let at = 1; at <= 6; at++) {
+    const email = `seed-student-${at}@example.invalid`
+    const user = (await auth.internalAdapter.findUserByEmail(email))?.user ?? await auth.adapter.create({ model: 'user', data: { email, name: `Student ${at}`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() } })
+    const id = String(user.id)
+    if (!(await auth.adapter.findMany({ model: 'member', where: [{ field: 'organizationId', value: organization.id }, { field: 'userId', value: id }] })).length) {
+      await auth.adapter.create({ model: 'member', data: { organizationId: organization.id, userId: id, role: 'member', createdAt: new Date() } })
+    }
+    if (!(await memberRoles.operations.find({ where: { user: { equals: id }, role: { equals: 'student' } }, limit: 1 }, options)).docs.length) {
+      await memberRoles.operations.create({ user: id, role: 'student' }, options)
+      created.memberRoles++
+    }
+    students.push(id)
   }
 
   // Sixty enrollments, each on a session of its own drawn from every course's
-  // list and taken by the organization's members in turn, so one session and
-  // one student are the pair a later run finds it by. Each is said to have
-  // been made after its course was, more of them lately than long ago.
-  const pairs = planned.flatMap((one) => one.sessions.map((session) => ({ session, age: one.age })))
+  // list and taken by the students in turn, so one session and one student are
+  // the pair a later run finds it by. Each is said to have been made after its
+  // course was, more of them lately than long ago.
+  // An archived course's sessions take no new seat, so seats are drawn from the open courses alone.
+  const pairs = planned.filter((one) => !one.archived).flatMap((one) => one.sessions.map((session) => ({ session, age: one.age })))
   for (let at = pairs.length - 1; at > 0; at--) {
     const other = Math.floor(random() * (at + 1))
     ;[pairs[at], pairs[other]] = [pairs[other]!, pairs[at]!]
   }
   for (const [index, { session, age }] of pairs.slice(0, 60).entries()) {
-    const student = String(members[index % members.length]!.userId)
+    const student = students[index % students.length]!
     const at = new Date(now - Math.floor(random() ** 2 * age) * DAY - random() * DAY)
     const found = (await enrollments.operations.find({ where: { session: { equals: session }, student: { equals: student } }, limit: 1 }, options)).docs[0]
     if (found) continue
@@ -360,8 +384,13 @@ try {
   }
   // Each custom role given to a member in turn, the owner included: the
   // owner's own `administrator` already holds every key, so this widens nothing.
+  // A student takes none, so the students a run makes leave a later run's turns
+  // where the first run's were.
+  const studying = new Set((await memberRoles.operations.find({ where: { role: { equals: 'student' } }, limit: 0 }, options)).docs.map((one) => String(one.user)))
+  const staff = members.filter((one) => !studying.has(String(one.userId)))
+  const turns = staff.length ? staff : members
   for (const [index, role] of Object.keys(customRoles).entries()) {
-    const user = String(members[index % members.length]!.userId)
+    const user = String(turns[index % turns.length]!.userId)
     if ((await memberRoles.operations.find({ where: { user: { equals: user }, role: { equals: role } }, limit: 1 }, options)).docs.length) continue
     await memberRoles.operations.create({ user, role }, options)
     created.memberRoles++

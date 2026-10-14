@@ -182,8 +182,8 @@ From `base` (`packages/mithaq/src/base/kinds.ts` `defaultKinds`):
   names the ones the caller reads. `filterOptions: ({ user }) => Where | boolean`
   narrows what its picker offers, as Payload's does: the picker reads `for`
   the field and the server ANDs the answer beside the target's own read, so it
-  never widens it. It narrows the picker only; a write is held to the target's
-  read access as any is.
+  never widens it. A create or an update is held to the same answer, refused
+  in the words a missing row gets.
 - `join`: the rows of another kayan whose `on` relationship points back at
   this row. It builds no column; a read populates it through the child kayan's
   own access.

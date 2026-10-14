@@ -2321,6 +2321,7 @@
             "onDelete": "restrict"
           },
           "relationTo": "sessions",
+          "filterOptions": true,
           "component": "relationship",
           "cell": "@asas/courses:./enrollments/ui/session-cell.tsx#SessionCell"
         },

@@ -447,6 +447,11 @@ const validateTenantRelationships = async <Actor>(
     tenant: own ? (data[own] ?? existing?.[own]) : undefined,
     // Asked with no operation, so no permission key is asked for.
     access: (target) => authorize({ admin, actor, data: {}, effect: 'read', kayan: target }),
+    // A field's `filterOptions` holds a save to what its picker offers, as Payload's does.
+    offered: async (field) => {
+      const answer = await field.filterOptions?.({ user: actor })
+      return answer === undefined || answer === true ? undefined : answer === false ? { id: { in: [] } } : assertWhere(field.target!, answer)
+    },
     tx,
   })
 }
@@ -456,7 +461,7 @@ const validateTenantRelationships = async <Actor>(
  * organization than the written row's, or one `access` leaves out. A step's own raw write
  * passes no `access`, so it is held to the organization alone.
  */
-export const assertReferences = async ({ kayan, store, data, tenant, access, tx }: {
+export const assertReferences = async ({ kayan, store, data, tenant, access, offered, tx }: {
   kayan: ResolvedKayan
   store: Pick<Store, 'find'>
   data: Record<string, unknown>
@@ -464,22 +469,28 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, tx 
   tenant: unknown
   /** What else the target's row must meet: its read access for this actor. */
   access?: (target: ResolvedKayan) => Promise<Where | undefined>
+  /** What one field's `filterOptions` offers this actor, which a managed write is held to. */
+  offered?: (field: ResolvedField) => Promise<Where | undefined>
   tx?: unknown
 }) => {
   const own = kayan.tenant
-  // Gathered per target, so two fields at one kayan and a whole `hasMany` set are one read.
-  const targets = new Map<ResolvedKayan, { field: string; value: unknown }[]>()
+  // Gathered per target, so two fields at one kayan and a whole `hasMany` set are one read; a
+  // field whose options are its own is read apart.
+  const targets = new Map<ResolvedKayan | ResolvedField, { target: ResolvedKayan; sets: { field: string; value: unknown }[] }>()
   for (const field of Object.values(kayan.fields)) {
     // The ownership column is the runner's, or was judged above. A join takes no write.
     if (!field.target || field.name === own || field.kind === 'join') continue
     const given = data[field.name]
     if (given === undefined || given === null) continue
+    const key = offered && field.filterOptions ? field : field.target
     for (const value of field.hasMany ? (given as readonly unknown[]) : [given]) {
       if (value === undefined || value === null) continue
-      targets.set(field.target, [...(targets.get(field.target) ?? []), { field: field.name, value }])
+      const held = targets.get(key) ?? { target: field.target, sets: [] }
+      held.sets.push({ field: field.name, value })
+      targets.set(key, held)
     }
   }
-  for (const [target, sets] of targets) {
+  for (const [key, { target, sets }] of targets) {
     const far = target.tenant
     // A raw write to a shared row names it as it likes; the foreign key holds it.
     if (!access && !far) continue
@@ -526,7 +537,7 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, tx 
           tenanted,
         ),
         // Nothing a plain read shows may point at a row no plain read shows; a step's own write may.
-        access ? publishedWhere(target) : undefined,
+        combineWhere(access ? publishedWhere(target) : undefined, key === target ? undefined : await offered!(key as ResolvedField)),
       ),
     }, tx })
     const admitted = new Set(found.docs.map((row) => keyOf(row.id)))

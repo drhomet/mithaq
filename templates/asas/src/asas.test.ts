@@ -1488,6 +1488,8 @@ const tenantOptions = async () => {
     // write. Without it this member is assigned no role, takes no row, the
     // `'*'` tenancy row included, and is denied every operation.
     await assignRole(organizationId, signUp.response.user.id, 'administrator')
+    // A student too, as this file's own seats name it and a seat's student holds the role.
+    await assignRole(organizationId, signUp.response.user.id, 'student')
     actor = await asas.auth.actor(signedIn)
   }
   assert.ok(actor)
@@ -1545,6 +1547,13 @@ const memberOf = async (organization: string, name: string, email: string) => {
   return signUp.response.user.id as string
 }
 
+/** A member holding the student role, which a seat's student holds. */
+const studentOf = async (organization: string, name: string, email: string) => {
+  const id = await memberOf(organization, name, email)
+  await assignRole(organization, id, 'student')
+  return id
+}
+
 test('4. Better Auth runs on the tables mithaq built, and the three writes land', async () => {
   const signUp = await server.api.signUpEmail({
     body: { name: 'Layla', email: 'layla@example.com', password: 'a-long-enough-password' },
@@ -1559,6 +1568,8 @@ test('4. Better Auth runs on the tables mithaq built, and the three writes land'
   })
   organizationId = organization!.id
   await assignRole(organizationId, studentId, 'administrator')
+  // A student too, as the seats this file makes name Layla and a seat's student holds the role.
+  await assignRole(organizationId, studentId, 'student')
 
   assert.equal(((await asas.auth.actor(signedIn)) as { id?: string } | null)?.id, studentId)
   assert.equal(await asas.auth.actor(new Headers()), null)
@@ -10073,7 +10084,7 @@ test('101. updateMany and deleteMany change exactly the rows their where matched
   ) as { id: string }
   const studentIds: string[] = []
   for (const name of ['Bulk A', 'Bulk B']) {
-    studentIds.push(await memberOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
+    studentIds.push(await studentOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
   }
   for (const student of studentIds) await enrollmentsKayan.operations.create({ session: session.id, student }, options)
   const removed = await enrollmentsKayan.operations.deleteMany({ where: { session: { equals: session.id } } }, options)
@@ -13535,7 +13546,7 @@ test('135. a join is the rows of another kayan, read through that kayan\'s own a
   ) as { id: string }
   const students: string[] = []
   for (const name of ['Join A', 'Join B']) {
-    students.push(await memberOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
+    students.push(await studentOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
   }
   const made: string[] = []
   for (const student of students) {
@@ -13563,7 +13574,7 @@ test('135. a join is the rows of another kayan, read through that kayan\'s own a
   ) as { id: string }
   // Twelve students, since a student holds one seat in a session.
   for (let at = 0; at < 12; at += 1) {
-    const student = await memberOf(organizationId, `Crowd ${at}`, `crowd-${at}-135@example.com`)
+    const student = await studentOf(organizationId, `Crowd ${at}`, `crowd-${at}-135@example.com`)
     await asas.kayan.enrollments.operations.create({ session: crowded.id, student }, options)
   }
   const bounded = await asas.kayan.sessions.operations.find(
@@ -15437,7 +15448,7 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   const owner = await signUp('Hind Owner', 'hind-149@example.com')
   const school = await server.api.createOrganization({ body: { name: 'Hind School', slug: 'hind-school-149' }, headers: owner.headers })
   await assignRole(school!.id, owner.id, 'administrator')
-  const member = await memberOf(school!.id, 'Huda Member', 'huda-149@example.com')
+  const member = await studentOf(school!.id, 'Huda Member', 'huda-149@example.com')
   const stranger = await signUp('Zaid Owner', 'zaid-149@example.com')
   await server.api.createOrganization({ body: { name: 'Zaid School', slug: 'zaid-school-149' }, headers: stranger.headers })
   const actor = await asas.auth.actor(owner.headers)
@@ -15461,7 +15472,8 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   // still the row that is there.
   const shouted = await enrollments.operations.create({ session: second.id.toUpperCase(), student: member }, options)
   assert.equal(shouted.session, second.id, 'a uuid named in uppercase is admitted and stored as the row it names')
-  assert.equal((await enrollments.operations.create({ session: second.id, student: owner.id }, options)).student, owner.id, 'and so is the owner, who is a member too')
+  await assignRole(school!.id, owner.id, 'student')
+  assert.equal((await enrollments.operations.create({ session: second.id, student: owner.id }, options)).student, owner.id, 'and so is the owner, who is a member and a student too')
   await refused(enrollments.operations.update({ id: made.id, student: stranger.id }, options), 'an update to another tenant\'s user is refused')
   await refused(
     enrollments.operations.updateMany({ where: { id: { equals: made.id } }, data: { student: stranger.id } }, options),
@@ -16170,7 +16182,7 @@ const versionsTenant = async (slug: string) => {
     assert.ok(member)
     return { actor: member as never, headers: one.headers }
   }
-  return { options: { actor: actor as never }, headers: owner.headers, joined }
+  return { options: { actor: actor as never }, headers: owner.headers, joined, organization: organization!.id }
 }
 const courseVersions = async (id: string) =>
   (await db.execute(`select id, version, latest, autosave from _courses_versions where parent_id = '${id}' order by updated_at, created_at`)).rows as { id: string; version: Record<string, unknown>; latest: boolean; autosave: boolean }[]
@@ -16686,7 +16698,7 @@ test('132p. a filter across a relationship into a kayan that keeps drafts matche
 })
 
 test('218f. the sessions list searches by its course\'s title and the enrollments list by its student\'s name, as the list\'s own search box sends them, and each filters by its columns', async () => {
-  const { options, headers } = await versionsTenant('218f')
+  const { options, headers, organization } = await versionsTenant('218f')
   const searched = (paths: readonly string[], term: string) => ({ or: paths.map((field) => ({ and: [{ [field]: { like: term } }] })) })
   const dashboard = asas.targets.dashboard.client.kayan
   const listNode = (pages: unknown) => JSON.parse(JSON.stringify(pages)).list.page.main[0].main[0].list as { search: string[]; filters: string[] }
@@ -16704,6 +16716,7 @@ test('218f. the sessions list searches by its course\'s title and the enrollment
   assert.equal((await sessions.operations.find({ where: { venue: { equals: 'campus' }, course: { in: [tajweed.id, tafsir.id] } } }, options)).totalDocs, 1, 'and narrowed by where they meet')
 
   const owner = (await server.api.getSession({ headers }))!.user
+  await assignRole(organization, owner.id, 'student')
   await enrollments.operations.create({ session: first.id, student: owner.id }, options)
   assert.equal((await enrollments.operations.find({ where: searched(enrollmentList.search, 'owner-218f') }, options)).totalDocs, 1, 'the enrollment is found by its student\'s name')
   assert.equal((await enrollments.operations.find({ where: searched(enrollmentList.search, 'nobody-218f') }, options)).totalDocs, 0, 'and no other term finds it')
@@ -17815,8 +17828,36 @@ test('227k. the enrollment\'s student picker lists the people holding the studen
   assert.deepEqual(await names('instructor', { for: 'enrollments.student', where: { name: { like: 'both' } } }), ['picker-227k-both'], 'and a search narrows them further')
   const student = await tenant.as('student', 'user/find', { for: 'enrollments.student' })
   assert.equal(student.status, 403, 'a student, who reads no one, is offered no one')
+
+  // A save is held to the same answer, as Payload's is, refused in the words a missing row is.
+  const course = await courses.operations.create({ title: 'Picker 227k' }, tenant.options)
+  const session = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-05-01T09:00:00Z') }, tenant.options)
+  const refusals = await Promise.all([tenant.people.registrar.id, 'nobody-227k'].map((id) => tenant.as('admin', 'enrollments/create', { session: session.id, student: id })))
+  for (const refused of refusals) {
+    assert.equal(refused.status, 400, `a seat for someone holding no student role is refused: ${JSON.stringify(refused.body)}`)
+    assert.deepEqual((refused.body.data as { key?: string; params?: unknown }), { key: 'error.invalid.reference', params: { kayan: 'enrollments', field: 'student', target: 'user' } })
+  }
+  assert.equal(refusals[0]!.body.message, refusals[1]!.body.message, 'alike for a staff member and for nobody at all')
+  assert.equal((await tenant.as('admin', 'enrollments/create', { session: session.id, student: both.id })).status, 200, 'and one for a student who also teaches is made')
   const refused = await tenant.as('admin', 'user/find', { for: 'enrollments.nothing' })
   assert.equal(refused.status, 400, 'a picker for no relationship to people is refused')
+})
+
+test('227m. an archived session, or one of an archived course, takes no new seat, says so, and is not offered to the session picker', async () => {
+  const tenant = await roleTenant('closed-227m')
+  const [kept, shut] = await Promise.all(['Kept 227m', 'Shut 227m'].map((title) => courses.operations.create({ title }, tenant.options)))
+  const at = new Date('2027-08-01T09:00:00Z')
+  const [open, archived, ofShut] = await Promise.all([kept, kept, shut].map((course) => sessions.operations.create({ course: course!.id, startsAt: at }, tenant.options)))
+  await sessions.operations.archive({ id: archived!.id, reason: 'Moved' }, tenant.options)
+  await courses.operations.archive({ id: shut!.id, reason: 'Retired' }, tenant.options)
+  for (const [said, session] of [['an archived session', archived], ['a session of an archived course', ofShut]] as const) {
+    const refused = await tenant.as('admin', 'enrollments/create', { session: session!.id, student: tenant.people.student.id })
+    assert.equal(refused.status, 400, `${said} takes no seat: ${JSON.stringify(refused.body)}`)
+    assert.equal((refused.body.data as { key?: string }).key, 'error.invalid.archived_session', 'and says why')
+  }
+  const offered = await tenant.as('admin', 'sessions/find', { for: 'enrollments.session', where: { course: { in: [kept!.id, shut!.id] } }, limit: 10 })
+  assert.deepEqual((offered.body.docs as { id: string }[]).map((one) => one.id), [open!.id], 'the picker offers the open session alone')
+  assert.equal((await tenant.as('admin', 'enrollments/create', { session: open!.id, student: tenant.people.student.id })).status, 200, 'which takes a seat')
 })
 
 test('227j. a student holds one seat in a session: a second enrollment of the same student there is refused 409, one in another session is not, and one who withdrew may enroll again', async () => {
@@ -17874,6 +17915,7 @@ test('222a. a student reads its own enrollments alone, in its own tenant, over H
   // member of and does not have active.
   const elsewhere = await roleTenant('own-222a-elsewhere')
   await server.api.addMember({ body: { userId: tenant.people.student.id, organizationId: elsewhere.organization, role: 'member' } })
+  await assignRole(elsewhere.organization, tenant.people.student.id, 'student')
   const away = await courses.operations.create({ title: 'Away 222a' }, elsewhere.options)
   const awaySession = await sessions.operations.create({ course: away.id, startsAt: new Date('2027-05-02T09:00:00Z') }, elsewhere.options)
   const remote = await enrollments.operations.create({ session: awaySession.id, student: tenant.people.student.id }, elsewhere.options)

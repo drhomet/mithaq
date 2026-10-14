@@ -892,6 +892,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     'forbidden.owner_role': { en: 'The owner of the organization always holds the administrator role, so it is not taken from them.', ar: 'مالك المؤسسة يشغل دور المدير دائما، لذا لا يُسحب منه.' },
     'invalid.member_role': { en: 'A role is named exactly, with no spaces around it.', ar: 'يُسمّى الدور بدقة، دون مسافات حوله.' },
     'conflict.last_manager': { en: 'This would leave the organization with nobody who may manage roles. Give another member such a role first.', ar: 'سيترك هذا المؤسسة دون أي عضو يملك إدارة الأدوار. امنح عضوا آخر دورا كهذا أولا.' },
+    'invalid.archived_session': { en: 'This session is archived, or its course is, so it takes no new seat. Pick an open session.', ar: 'هذه الحصة مؤرشفة، أو دورتها مؤرشفة، فلا تقبل مقعدا جديدا. اختر حصة مفتوحة.' },
     'invalid.draft_sessions': { en: 'A course saved as a draft makes no sessions. Publish the course, then add its sessions.', ar: 'الدورة المحفوظة كمسودة لا تُنشئ جلسات. انشر الدورة أولًا، ثم أضف جلساتها.' },
     'invalid.upload_request': { en: 'The file has no name, or no size, that can be uploaded.', ar: 'ليس للملف اسم أو حجم يمكن رفعه.' },
     'invalid.upload_type': { en: 'Files of this type are not taken here.', ar: 'لا تُقبل هنا ملفات من هذا النوع.' },
