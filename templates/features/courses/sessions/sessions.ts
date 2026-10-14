@@ -8,7 +8,7 @@ import { archivedRow, marks, reason, reasonInput, unarchived } from '../domain/a
  * Writes every matched session `archived: true` and nothing else, whatever the call sent as `data`,
  * so the course page's bulk Archive can only archive, never un-archive.
  */
-const archiveAll = (ctx: Ctx): Ctx => ({ ...ctx, data: { ...ctx.data, data: { archived: true } } })
+const archiveAll = (ctx: Ctx): Ctx => ({ ...ctx, data: { ...ctx.data, data: { archived: true, archiveReason: null } } })
 
 /**
  * What a session's create and edit pages both draw, written once so the two cannot drift. The edit
@@ -165,7 +165,8 @@ export const sessions = defineKayan({
       ],
       targets: { dashboard: { component: 'combobox' } },
     },
-    // Written by `archive`, `unarchive` and `archiveMany` after the session is made, never by its create.
+    // Never by a create. `archive`, `unarchive` and `archiveMany` write it, and so does a plain update by a
+    // role holding its key, since the bulk archive runs one plain update per row.
     archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشفة' }, rules: { providedBy: { create: 'never' } } },
     details: { kind: 'richText', label: { en: 'Details', ar: 'التفاصيل' } },
     /**

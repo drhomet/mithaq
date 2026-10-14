@@ -17997,6 +17997,10 @@ test('233a. a course is archived and brought back, each with its reason and an a
   const entries = (await log.find({ where: { record: { equals: course.id } }, sort: '-createdAt' }, owner)).docs
   assert.deepEqual(entries.map((entry) => entry.operation), ['unarchive', 'archive', 'create'], 'each is a line of its own in the activity')
   assert.deepEqual(JSON.parse(entries[0]!.changes).archived, { from: true, to: false })
+  for (const data of [{ archived: true }, { archiveReason: 'Quietly' }]) {
+    const plain = await courses.operations.update({ id: course.id, ...data } as never, owner).then(() => 200, (error: { status?: number }) => error.status)
+    assert.equal(plain, 400, `a plain update writes no ${Object.keys(data)[0]}: a course is archived and brought back through its own operations alone`)
+  }
 
   const unpublished = await courses.operations.unpublish({ id: course.id, _status: 'draft' }, owner)
   assert.equal(unpublished._status, 'draft', 'unpublishing puts the course back to a draft')

@@ -568,8 +568,9 @@ export const courses = defineKayan({
       kind: 'text', label: { en: 'Access code', ar: 'رمز الدخول' }, rules: { maxLength: 6 },
       targets: { dashboard: { component: 'otp' } },
     },
-    // Written by `archive` and `unarchive` alone after the row is made, which record why.
-    archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشف' }, rules: { providedBy: { create: 'never' } }, targets: { dashboard: { filter: true } } },
+    // Written by `archive` and `unarchive` alone, which record why: no create or
+    // plain update names it, so no key past theirs archives a course.
+    archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشف' }, rules: { providedBy: { create: 'never', update: 'application' } }, targets: { dashboard: { filter: true } } },
     // What a course covers, several at once out of a closed list. A course names
     // at most two, so a third box ticked is refused before the save. No floor: an
     // optional list left empty passes any `minRows`, and a list that is there
@@ -590,7 +591,7 @@ export const courses = defineKayan({
     archiveReason: {
       kind: 'text',
       label: { en: 'Archive reason', ar: 'سبب الأرشفة' },
-      rules: { maxLength: 200 },
+      rules: { maxLength: 200, providedBy: { create: 'never', update: 'application' } },
     },
     // The many-to-many: no column on this table at all, and a join table
     // `courses_tags` the store writes in the same transaction the course is

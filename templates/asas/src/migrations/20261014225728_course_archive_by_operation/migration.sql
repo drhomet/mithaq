@@ -1,0 +1,1 @@
+ALTER TABLE "courses" ALTER COLUMN "archive_reason" SET DATA TYPE varchar(200) USING "archive_reason"::varchar(200);

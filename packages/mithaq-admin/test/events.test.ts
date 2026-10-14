@@ -3212,7 +3212,7 @@ test('80. a rule the projection carries refuses a value before any request, in t
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3222,21 +3222,21 @@ test('80. a rule the projection carries refuses a value before any request, in t
   )
   const errorOf = (name: string) => host.querySelector(`#courses-${name}-error`)?.textContent
   // Something other than the title, so Save is offered and the title is left empty.
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'Moved'))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Moved'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(written.length, 0, 'an empty required field sends nothing')
   assert.equal(errorOf('title'), 'This field is required.', 'and its box says the sentence the server seeds for `courses.title.required`')
 
   await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'x'.repeat(201)))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'x'.repeat(201)))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(written.length, 0, 'a value longer than maxLength sends nothing either')
-  assert.equal(errorOf('archiveReason'), 'The value is too long.', 'and says `courses.archiveReason.maxLength`')
+  assert.equal(errorOf('summary'), 'The value is too long.', 'and says `courses.summary.maxLength`')
   assert.equal(errorOf('title'), undefined, 'while the title, now filled, says nothing')
 
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'Moved'))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Moved'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
-  assert.deepEqual(written, [{ title: 'Tajweed', archiveReason: 'Moved' }], 'a value every rule holds is sent, once')
+  assert.deepEqual(written, [{ title: 'Tajweed', summary: 'Moved' }], 'a value every rule holds is sent, once')
 })
 
 test('215e. Save on a fresh create form is offered before anything is typed, and pressing it says which required box is empty and sends nothing', async () => {
@@ -3244,7 +3244,7 @@ test('215e. Save on a fresh create form is offered before anything is typed, and
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3299,7 +3299,7 @@ test('80b. a box is checked when the person leaves it, in the sentence the serve
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3312,17 +3312,17 @@ test('80b. a box is checked when the person leaves it, in the sentence the serve
 
   await act(async () => fire(host.querySelector('#courses-title')!, 'focusout'))
   assert.equal(errorOf('title'), 'This field is required.', 'a required box left empty says the server\'s sentence under it')
-  assert.equal(errorOf('archiveReason'), undefined, 'and the box nobody entered says nothing')
+  assert.equal(errorOf('summary'), undefined, 'and the box nobody entered says nothing')
 
   // Typed into and not yet left: the sentence goes at once, because the value holds.
   await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
   assert.equal(errorOf('title'), undefined, 'filling the box clears its sentence without a second blur')
 
   // Too long while typing says nothing until the box is left.
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'x'.repeat(201)))
-  assert.equal(errorOf('archiveReason'), undefined, 'a box still being typed into is not told it is wrong')
-  await act(async () => fire(host.querySelector('#courses-archiveReason')!, 'focusout'))
-  assert.equal(errorOf('archiveReason'), 'The value is too long.', 'and leaving it says `courses.archiveReason.maxLength`')
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'x'.repeat(201)))
+  assert.equal(errorOf('summary'), undefined, 'a box still being typed into is not told it is wrong')
+  await act(async () => fire(host.querySelector('#courses-summary')!, 'focusout'))
+  assert.equal(errorOf('summary'), 'The value is too long.', 'and leaving it says `courses.summary.maxLength`')
   assert.equal(written.length, 0, 'none of it sent anything')
 })
 
@@ -3331,7 +3331,7 @@ test('80c. a refusal a save drew goes from under its box the moment the value ho
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3340,7 +3340,7 @@ test('80c. a refusal a save drew goes from under its box the moment the value ho
     }),
   )
   const errorOf = (name: string) => host.querySelector(`#courses-${name}-error`)?.textContent
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'Moved'))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Moved'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(errorOf('title'), 'This field is required.', 'the save refused the empty title under its box')
   await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
@@ -3349,7 +3349,7 @@ test('80c. a refusal a save drew goes from under its box the moment the value ho
 
 test('81. two people edit different fields of one course, and both changes survive, because an update sends only what changed', async () => {
   // The server's own update writes the keys it is sent and leaves the rest of the row as it was.
-  const row: Record<string, unknown> = { id: 'a-row', title: 'Tajweed', archiveReason: 'None' }
+  const row: Record<string, unknown> = { id: 'a-row', title: 'Tajweed', summary: 'None' }
   const sent: Record<string, unknown>[] = []
   const update = async (input: Record<string, unknown>) => {
     sent.push(input)
@@ -3365,9 +3365,9 @@ test('81. two people edit different fields of one course, and both changes survi
   }
   // Both opened the row before either saved.
   await edit('title', 'Tajweed II')
-  await edit('archiveReason', 'Replaced')
-  assert.deepEqual(sent, [{ id: 'a-row', title: 'Tajweed II' }, { id: 'a-row', archiveReason: 'Replaced' }], 'each save names the one field its person changed')
-  assert.deepEqual(row, { id: 'a-row', title: 'Tajweed II', archiveReason: 'Replaced' }, 'so the second save leaves the first one\'s title in place')
+  await edit('summary', 'Replaced')
+  assert.deepEqual(sent, [{ id: 'a-row', title: 'Tajweed II' }, { id: 'a-row', summary: 'Replaced' }], 'each save names the one field its person changed')
+  assert.deepEqual(row, { id: 'a-row', title: 'Tajweed II', summary: 'Replaced' }, 'so the second save leaves the first one\'s title in place')
 })
 
 test('82. a leaf its when hides, and nobody changed, is not in an update', async () => {
@@ -3790,7 +3790,7 @@ test('146a. an enrollment\'s student reads as the person\'s name and its organiz
 test('146b. a box in a side region, outside the page\'s form node, belongs to the page\'s form, so Enter in it saves the page', async () => {
   // The form node draws the page's one `<form>`, so a leaf in another region names it by id with the `form` attribute, and the browser's implicit submission on Enter reaches it.
   const saved: Record<string, unknown>[] = []
-  const page = plus(recordPage([{ form: ['title'] }], '/courses/:id'), 'side', { field: 'archiveReason' })
+  const page = plus(recordPage([{ form: ['title'] }], '/courses/:id'), 'side', { field: 'summary' })
   const host = await render(createElement(Form, {
     kayan: courses,
     screen: screenOf(page),
@@ -3801,14 +3801,14 @@ test('146b. a box in a side region, outside the page\'s form node, belongs to th
     onDone: () => {},
   }))
   const pageForm = host.querySelector('[data-node="form"] form') as unknown as HTMLFormElement
-  const side = host.querySelector('#courses-archiveReason') as unknown as HTMLInputElement
+  const side = host.querySelector('#courses-summary') as unknown as HTMLInputElement
   assert.ok(pageForm && side)
   assert.equal(pageForm.contains(side as unknown as Node), false, 'the side box is outside the form element')
   assert.ok(side.form === pageForm, 'and the form is its owner all the same')
   await act(async () => typeInto(side as unknown as Element, 'Moved'))
   // Implicit submission as the browser makes it: the form owner of the box Enter was pressed in is submitted.
   await act(async () => side.form?.requestSubmit())
-  assert.deepEqual(saved, [{ id: 'c1', archiveReason: 'Moved' }], 'Enter in the side box saves the page, with the side box\'s value')
+  assert.deepEqual(saved, [{ id: 'c1', summary: 'Moved' }], 'Enter in the side box saves the page, with the side box\'s value')
 })
 
 /** Links are caught on the document before happy-dom acts on them, as the screen host's frame routes every link. */

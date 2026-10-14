@@ -344,7 +344,8 @@ const whereOf = (
     // reference check asks it, and a caller's read of versions refuses every path before here.
     // Lowered, since a draft keeps a uuid as its writer sent it.
     if (!relationField && ownField === 'version' && relatedField && table.version) {
-      const { equals } = rules as { equals?: unknown }
+      const { equals, ...other } = rules as { equals?: unknown }
+      if (equals === undefined || Object.keys(other).length) throw new Error(`Kayan "${name}" path "${field}" takes equals alone.`)
       parts.push(sql`lower((${table.version} -> ${relatedField})::text)::jsonb @> ${JSON.stringify(typeof equals === 'string' ? equals.toLowerCase() : equals)}::jsonb`)
       continue
     }
