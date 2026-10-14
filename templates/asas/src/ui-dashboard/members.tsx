@@ -217,7 +217,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
     if (!answered.ok) return setPendingRefusal(refused(answered, t('dashboard.inviteCancelRefused', 'The server refused to cancel that invitation.')))
     setPending((all) => all.filter((other) => other.id !== one.id))
   }
-  /** The link the invitee opens, which development hands over by hand since no mail goes out. */
+  /** The link the invitee opens, for the inviter to hand over where the mail does not reach, in every environment. */
   const copyLink = async (one: Invite) => {
     await navigator.clipboard.writeText(new URL(`/auth/accept-invitation?id=${encodeURIComponent(one.id)}`, window.location.origin).href)
     setCopied(one.id)
@@ -480,17 +480,16 @@ export function Members({ loaderData }: PageProps<MembersData>) {
               <section data-pending="" className="grid gap-2">
                 <h2 className="text-base font-medium">{t('dashboard.invitesPending', 'Invitations not yet accepted')}</h2>
                 {noMailer}
+                <p className="text-muted-foreground">{t('dashboard.inviteLinkOwn', 'A copied link lets whoever holds it join as the invited address: hand it to that person alone.')}</p>
                 <div className="overflow-hidden rounded-lg border">
                   <Table>
                     <TableHeader className="bg-muted/50">
                       <TableRow>
                         <TableHead scope="col">{t('dashboard.membersEmail', 'Email')}</TableHead>
                         <TableHead scope="col">{t('dashboard.inviteExpires', 'Expires')}</TableHead>
-                        {cancels || development ? (
-                          <TableHead scope="col">
-                            <span className="sr-only">{t('dashboard.membersActions', 'Actions')}</span>
-                          </TableHead>
-                        ) : null}
+                        <TableHead scope="col">
+                          <span className="sr-only">{t('dashboard.membersActions', 'Actions')}</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -498,22 +497,18 @@ export function Members({ loaderData }: PageProps<MembersData>) {
                         <TableRow key={one.id} data-invite-row={one.email}>
                           <TableCell className="break-all">{one.email}</TableCell>
                           <TableCell className="whitespace-nowrap">{one.expiresAt ? formatDate({ value: one.expiresAt, locale, day: true }) : null}</TableCell>
-                          {cancels || development ? (
-                            <TableCell>
-                              <div className="flex flex-wrap justify-end gap-2">
-                                {development ? (
-                                  <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-copy-invite={one.id} aria-label={`${t('dashboard.inviteCopy', 'Copy link')}: ${one.email}`} onClick={() => void copyLink(one)}>
-                                    {copied === one.id ? t('dashboard.inviteCopied', 'Link copied') : t('dashboard.inviteCopy', 'Copy link')}
-                                  </Button>
-                                ) : null}
-                                {cancels ? (
-                                  <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-cancel-invite={one.id} aria-label={`${t('dashboard.inviteCancel', 'Cancel invitation')}: ${one.email}`} onClick={() => void cancel(one)}>
-                                    {t('dashboard.inviteCancel', 'Cancel invitation')}
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </TableCell>
-                          ) : null}
+                          <TableCell>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-copy-invite={one.id} aria-label={`${t('dashboard.inviteCopy', 'Copy link')}: ${one.email}`} onClick={() => void copyLink(one)}>
+                                {copied === one.id ? t('dashboard.inviteCopied', 'Link copied') : t('dashboard.inviteCopy', 'Copy link')}
+                              </Button>
+                              {cancels ? (
+                                <Button type="button" size="sm" variant="outline" className="max-sm:h-11" data-cancel-invite={one.id} aria-label={`${t('dashboard.inviteCancel', 'Cancel invitation')}: ${one.email}`} onClick={() => void cancel(one)}>
+                                  {t('dashboard.inviteCancel', 'Cancel invitation')}
+                                </Button>
+                              ) : null}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

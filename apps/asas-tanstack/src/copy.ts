@@ -484,10 +484,14 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     inviteAlreadyInvited: { en: 'This person already has an invitation that is not yet accepted.', ar: 'لدى هذا الشخص دعوة لم تُقبل بعد.' },
     inviteNotAllowed: { en: 'You may not invite people to this organization.', ar: 'لا يحق لك دعوة أشخاص إلى هذه المؤسسة.' },
     inviteNoMailer: {
-      en: 'No mailer is configured, so no email is sent. In development the link is written to the server log, and each pending invitation has a link to copy.',
-      ar: 'لم يُضبط أي مرسل بريد، لذا لا تُرسل أي رسالة. في بيئة التطوير يُكتب الرابط في سجل الخادم، ولكل دعوة لم تُقبل بعد رابط يمكن نسخه.',
+      en: 'No mailer is configured, so no email is sent. In development the link is written to the server log.',
+      ar: 'لم يُضبط أي مرسل بريد، لذا لا تُرسل أي رسالة. في بيئة التطوير يُكتب الرابط في سجل الخادم.',
     },
     inviteCopy: { en: 'Copy link', ar: 'نسخ الرابط' },
+    inviteLinkOwn: {
+      en: 'A copied link lets whoever holds it join as the invited address: hand it to that person alone.',
+      ar: 'الرابط المنسوخ يتيح لمن يحمله الانضمام بالعنوان المدعو: سلّمه لذلك الشخص وحده.',
+    },
     inviteCopied: { en: 'Link copied', ar: 'تم نسخ الرابط' },
     inviteCancel: { en: 'Cancel invitation', ar: 'إلغاء الدعوة' },
     inviteCancelRefused: { en: 'The server refused to cancel that invitation.', ar: 'رفض الخادم إلغاء هذه الدعوة.' },

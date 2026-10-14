@@ -1184,6 +1184,12 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
     `the members page draws one row per member of the active organization:\n${drawn.slice(drawn.indexOf('data-members'), drawn.indexOf('data-members') + 600)}`,
   )
   for (const member of members.members) assert.ok(drawn.includes(member.user.email), `and names ${member.user.email}`)
+  // A production build hands an invitation over too: its link is copied from the pending row by whoever may invite.
+  const invited = await post('/api/auth/user/organization/invite-member', { email: `copied-${Date.now()}@example.com`, role: 'member' }, { cookie, origin })
+  assert.equal(invited.response.status, 200, JSON.stringify(invited.body))
+  const pendingPage = await (await fetch(`${origin}/dashboard/members`, { headers: { cookie } })).text()
+  assert.ok(pendingPage.includes(`data-copy-invite="${String(invited.body.id)}"`), `the pending invitation offers its link to copy in production:\n${pendingPage.slice(pendingPage.indexOf('data-pending'), pendingPage.indexOf('data-pending') + 600)}`)
+  assert.equal((await post('/api/auth/user/organization/cancel-invitation', { invitationId: String(invited.body.id) }, { cookie, origin })).response.status, 200)
   await holding('registrar', async () => {
     assert.equal(await sentTo('/dashboard/members', cookie), '/unauthorized', 'the registrar is sent from it to /unauthorized')
     // A page of a kayan the registrar may not read is the same denial and not a 404, while a path naming no page is still none.
