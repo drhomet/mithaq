@@ -179,7 +179,11 @@ From `base` (`packages/mithaq/src/base/kinds.ts` `defaultKinds`):
 - `relationship`: the id of one row of another kayan, or a set of ids with
   `hasMany: true`. Without `onDelete` it restricts: a row a live row or a row's
   latest draft still names is not deleted, and the refusal counts those rows and
-  names the ones the caller reads.
+  names the ones the caller reads. `filterOptions: ({ user }) => Where | boolean`
+  narrows what its picker offers, as Payload's does: the picker reads `for`
+  the field and the server ANDs the answer beside the target's own read, so it
+  never widens it. It narrows the picker only; a write is held to the target's
+  read access as any is.
 - `join`: the rows of another kayan whose `on` relationship points back at
   this row. It builds no column; a read populates it through the child kayan's
   own access.

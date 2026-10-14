@@ -256,6 +256,8 @@ type FieldData = {
   on?: string
   /** Relationship only: whether this field holds a set of rows rather than one. */
   hasMany?: true
+  /** Relationship only: whether its picker reads `for` this field, so the server holds the rows to its `filterOptions`. */
+  filterOptions?: true
 }
 
 /** One field as a screen draws it: the data a browser needs, and this screen's drawing facts decided. */
@@ -395,6 +397,7 @@ export const clientFieldOf = (name: string, field: RuntimeField & { target?: { n
         ? { relationTo: field.relationTo().name }
         : {}),
   ...(field.hasMany === true && { hasMany: true as const }),
+  ...(typeof field.filterOptions === 'function' && { filterOptions: true as const }),
   ...(typeof field.on === 'string' && { on: field.on }),
 })
 

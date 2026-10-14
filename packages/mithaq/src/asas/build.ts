@@ -856,6 +856,9 @@ export const buildAsas = <
         of: boundOf('read'),
         audit: service.audit as AuditHandler<Actor> | undefined,
         catalog,
+        pickers: Object.fromEntries(resolved.flatMap((other) => Object.values(other.fields)
+          .filter((field) => field.kind !== 'join' && field.target?.name === one.name)
+          .map((field) => [`${other.name}.${field.name}`, field]))),
       })
       const { methods, table } = operations(
         one,

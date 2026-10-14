@@ -895,6 +895,18 @@ test('8. a field the page does not name is submitted by nothing, on an edit and 
   assert.deepEqual(written[1], { title: 'New course' }, 'and a create writes no checkbox its page never drew')
 })
 
+test('28a. a picker whose field narrows its options reads for that field, so the server holds the page to them, and one whose field does not reads as before', async () => {
+  for (const [filterOptions, expected] of [[true, 'sessions.course'], [undefined, undefined]] as const) {
+    const { api, calls } = fakeApi({ courses: [{ id: 'c1', title: 'Tajweed' }] })
+    const course = { ...sessions.fields.find((one) => one.name === 'course')!, ...(filterOptions && { filterOptions }) }
+    const host = await render(createElement(RelationshipControl, { values: {}, setValue: () => {}, field: course, kayan: sessions, client: kayans, api, id: 'sessions-course', t, value: null, readOnly: false, onChange: () => {} }))
+    await act(async () => {
+      click(host.querySelector('#sessions-course') as unknown as Element)
+    })
+    assert.equal(calls.at(-1)?.input.for, expected, `a field ${filterOptions ? 'that narrows' : 'that does not'} reads ${expected ?? 'for nothing'}`)
+  }
+})
+
 test('28. the picker loads page one on open with the limit, the sort and the not_in, and adds a like on the term 300 ms later', async () => {
   const { api, calls } = fakeApi({ courses: [{ id: 'c1', title: 'Tajweed' }] })
   const course = sessions.fields.find((one) => one.name === 'course')!

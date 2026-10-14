@@ -17779,6 +17779,28 @@ test('227e. a person who holds a seat, a withdrawn one included, is not removed 
   assert.equal((await adminRoute('remove-user', platform.headers, { userId: removable.id })).status, 200, 'a person holding no seat is removed')
 })
 
+test('227k. the enrollment\'s student picker lists the people holding the student role, a teacher who also studies among them, for the administrator and the instructor alike, and never widens what either reads', async () => {
+  const tenant = await roleTenant('picker-227k')
+  const both = await signedUp('picker-227k-both')
+  await server.api.addMember({ body: { userId: both.id, organizationId: tenant.organization, role: 'member' } })
+  await server.api.setActiveOrganization({ body: { organizationId: tenant.organization }, headers: both.headers })
+  for (const role of ['instructor', 'student']) await assignRole(tenant.organization, both.id, role)
+  const names = async (who: keyof typeof tenant.people, input: Record<string, unknown>) => {
+    const answer = await tenant.as(who, 'user/find', { limit: 100, sort: 'name', ...input })
+    assert.equal(answer.status, 200, JSON.stringify(answer.body))
+    return (answer.body.docs as { name: string }[]).map((one) => one.name)
+  }
+  assert.deepEqual(await names('instructor', {}), ['picker-227k-both', 'picker-227k-instructor', 'picker-227k-student'], 'the instructor reads itself and every student, one who also teaches included')
+  for (const who of ['admin', 'instructor'] as const) {
+    assert.deepEqual(await names(who, { for: 'enrollments.student' }), ['picker-227k-both', 'picker-227k-student'], `picking a seat's student, ${who} is offered the students alone`)
+  }
+  assert.deepEqual(await names('instructor', { for: 'enrollments.student', where: { name: { like: 'both' } } }), ['picker-227k-both'], 'and a search narrows them further')
+  const student = await tenant.as('student', 'user/find', { for: 'enrollments.student' })
+  assert.equal(student.status, 403, 'a student, who reads no one, is offered no one')
+  const refused = await tenant.as('admin', 'user/find', { for: 'enrollments.nothing' })
+  assert.equal(refused.status, 400, 'a picker for no relationship to people is refused')
+})
+
 test('227j. a student holds one seat in a session: a second enrollment of the same student there is refused 409, one in another session is not, and one who withdrew may enroll again', async () => {
   const tenant = await roleTenant('seat-227j')
   const course = await courses.operations.create({ title: 'Seat 227j' }, tenant.options)

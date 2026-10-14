@@ -1,8 +1,8 @@
-import { aliveWhere, assertSingleConstrained, assertWhereGrammar, publicResult, publishedWhere, type Authorize, type ManagedAdmin, type ReadOptions, type Row } from './write.ts'
+import { aliveWhere, assertSingleConstrained, assertWhere, assertWhereGrammar, publicResult, publishedWhere, type Authorize, type ManagedAdmin, type ReadOptions, type Row } from './write.ts'
 import { combineWhere, type Scalar, type Where } from '../../mithaq/where.ts'
 import { atEffect, issueRefusal, parse, type AuditHandler, type Ctx, type ReadStep, type ReadTools, type ResolvedOperation } from './steps.ts'
 import type { StandardSchemaIssue, StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
-import { sortableFields, unsortable, type FieldAccess, type ResolvedKayan } from '../../mithaq/types.ts'
+import { sortableFields, unsortable, type FieldAccess, type ResolvedField, type ResolvedKayan } from '../../mithaq/types.ts'
 import { defaultKinds } from '../../base/kinds.ts'
 import type { Store } from '../../mithaq/language.ts'
 import { AsasError, denied, invalid, localizedQuery, missing } from './errors.ts'
@@ -354,6 +354,7 @@ export const readers = <Actor>({
   catalog = [],
   openTenant,
   tenantOf,
+  pickers = {},
 }: {
   kayan: ResolvedKayan
   store: Store
@@ -372,6 +373,8 @@ export const readers = <Actor>({
   openTenant: (args: { actor: unknown; reach: unknown; kayan: ResolvedKayan }) => Promise<TenantScope | undefined>
   /** The organization the actor's session names, which a step reads as `ctx.tenant`. */
   tenantOf: (actor: unknown) => string | undefined
+  /** Every relationship field pointing at this kayan, by `<kayan>.<field>`, which a picker's read names as `for`. */
+  pickers?: Readonly<Record<string, ResolvedField>>
 }): ReaderMap<Actor> => {
   // Every managed read reaches the store here, so the soft-delete filter is put on once.
   const alive = aliveWhere(kayan)
@@ -473,10 +476,20 @@ export const readers = <Actor>({
     }
     return judged
   }
+  // A picker's read for one relationship field holds to what that field's `filterOptions` offers the
+  // actor, ANDed beside the read's own access, so it narrows and never widens.
+  const offeredFor = async (named: unknown, actor: Actor | null): Promise<Where | undefined> => {
+    if (named === undefined) return undefined
+    const field = typeof named === 'string' && Object.hasOwn(pickers, named) ? pickers[named] : undefined
+    if (!field) throw invalid({ message: `Managed read option "for" names ${JSON.stringify(named)}, which is no relationship field pointing at kayan "${kayan.name}".`, key: 'error.invalid.read_option', params: { option: 'for' } })
+    const offered = await field.filterOptions?.({ user: actor })
+    if (offered === undefined || offered === true) return undefined
+    return offered === false ? { id: { in: [] } } : assertWhere(kayan, offered)
+  }
   const fetchList = async (input: Record<string, unknown>, actor: Actor | null, granted?: Granted, drafts?: Granted) => {
     const accessWhere = granted ? granted.where : await readAccess(kayan, actor, authorize, admin)
     const callerWhere = await judgedWhere(input.where as Where | undefined, actor, accessWhere)
-    const where = combineWhere(callerWhere, accessWhere)
+    const where = combineWhere(combineWhere(callerWhere, accessWhere), await offeredFor(input.for, actor))
     const limit = integerOption('limit', input.limit, defaultLimit, 0)
     const page = integerOption('page', input.page, 1, 1)
     const [first, ...rest] = judges(actor, accessWhere)

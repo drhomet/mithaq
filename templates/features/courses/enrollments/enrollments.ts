@@ -1,6 +1,6 @@
-import { defaultOperations, folderOf } from 'mithaq'
-import { defineKayan, organization } from '@asas/mithaq'
-import { readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
+import { defaultOperations, folderOf, type FilterOptions } from 'mithaq'
+import { defineKayan, organization, serverTargets } from '@asas/mithaq'
+import { currentOrganization, readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
 import { activity, appPage, danger, platformList, platformRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
 import { sessions } from '../sessions/sessions.ts'
 
@@ -25,6 +25,20 @@ const ownSeats = ({ user }: { user: unknown }) => {
   const actor = user && typeof user === 'object' ? (user as Record<string, unknown>) : undefined
   const id = actor && Object.hasOwn(actor, 'id') ? actor.id : undefined
   return typeof id === 'string' && id ? { student: { equals: id } } : false
+}
+
+/**
+ * Whom a seat's student picker offers: the people holding the student role in
+ * the active organization, a teacher who also studies among them. It narrows
+ * what the actor's own read of people answers and never widens it, so an
+ * instructor is offered the students it already reads and not itself.
+ */
+const students: FilterOptions = async ({ user }) => {
+  const active = currentOrganization(user)
+  if (!active) return false
+  const held = await serverTargets.drizzle.find({ kayan: 'memberRoles', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: active }, role: { equals: 'student' } } } })
+  const ids = held.docs.map((row) => row.user).filter((id): id is string => typeof id === 'string')
+  return ids.length ? { id: { in: ids } } : false
 }
 
 export const enrollments = defineKayan({
@@ -62,6 +76,7 @@ export const enrollments = defineKayan({
     // creates none.
     student: {
       kind: 'relationship', label: { en: 'Student', ar: 'الطالب' }, relationTo: 'user',
+      filterOptions: students,
       rules: { required: true, defaultValue: actor.id },
     },
     /**

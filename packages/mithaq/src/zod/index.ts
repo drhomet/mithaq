@@ -123,6 +123,7 @@ type ZodShapes<F extends Record<string, RuntimeField>> = {
 const listShape = z.strictObject({
   data: z.unknown().optional(),
   depth: z.unknown().optional(),
+  for: z.unknown().optional(),
   limit: z.unknown().optional(),
   page: z.unknown().optional(),
   sort: z.unknown().optional(),

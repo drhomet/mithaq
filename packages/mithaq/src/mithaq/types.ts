@@ -103,11 +103,12 @@ type FieldKind<KindName extends string> = KindName extends 'join'
         relationTo: string | (() => Kayan)
         /** Whether this field holds a set of rows rather than one, kept in a join table and read back as an array of ids. */
         hasMany?: true
+        filterOptions?: FilterOptions
         on?: never
         defaultLimit?: never
         defaultSort?: never
       }
-  : { kind: KindName; relationTo?: never; hasMany?: never; on?: never; defaultLimit?: never; defaultSort?: never }
+  : { kind: KindName; relationTo?: never; hasMany?: never; filterOptions?: never; on?: never; defaultLimit?: never; defaultSort?: never }
 
 /** A field, open over locales: a project's own declaration goes through `FieldOf<L>`, which narrows them. */
 export type Field<KindName extends string = string, RuleValues = Rules> = KindName extends unknown
@@ -120,6 +121,7 @@ export type RuntimeField = Named & {
   rules?: Record<string, unknown>
   relationTo?: string | (() => Kayan)
   hasMany?: true
+  filterOptions?: FilterOptions
   /** A `join` field only: the child's relationship that points back at this kayan. */
   on?: string
   /** A `join` field only: how many of the child's rows one populated read carries. */
@@ -158,8 +160,15 @@ type BoundField<L extends LanguageShape, K extends keyof L['kinds'] & string> = 
     ? { relationTo: string | (() => Kayan); on: string; defaultLimit?: number; defaultSort?: string; hasMany?: never }
     : // A kind that points at a row says so, and a field of it names the kayan it points at.
       L['kinds'][K] extends { pointsAtRow: true }
-      ? { relationTo: string | (() => Kayan); hasMany?: true; on?: never; defaultLimit?: never; defaultSort?: never }
+      ? { relationTo: string | (() => Kayan); hasMany?: true; filterOptions?: FilterOptions; on?: never; defaultLimit?: never; defaultSort?: never }
       : { relationTo?: never; hasMany?: never; on?: never; defaultLimit?: never; defaultSort?: never })
+
+/**
+ * Which rows of its target a relationship's picker offers this actor, as Payload's field of the same
+ * name: a `Where`, `true` for every row the actor reads, `false` for none. A picker's read is ANDed
+ * with it, so it narrows what the target's own read answers and never widens it.
+ */
+export type FilterOptions = (args: { user: unknown }) => Where | boolean | Promise<Where | boolean>
 
 /** Field union derived once from a concrete language's kind and rule registries. */
 export type FieldOf<L extends LanguageShape> = {

@@ -2295,6 +2295,7 @@
             "onDelete": "restrict"
           },
           "relationTo": "user",
+          "filterOptions": true,
           "component": "relationship",
           "cell": "relationship"
         },

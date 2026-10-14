@@ -99,7 +99,7 @@ type Option = { value: string; label: string }
  * than the title, such as the upload control's thumbnail.
  */
 export function RelationshipControl(props: ControlProps & { drawRow?: (row: Record<string, unknown>, label: string) => ReactNode }): ReactElement {
-  const { api, client, describedBy, drawRow, error, field, id, locale, placeholder, readOnly, t, value } = props
+  const { api, client, describedBy, drawRow, error, field, id, kayan, locale, placeholder, readOnly, t, value } = props
   const change = changeOf(props)
   const target = client?.find((one) => one.name === field.relationTo)
   const title = titleFieldOf(target)
@@ -177,6 +177,8 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
   const queryFor = (page: number, search: string) => ({
     limit: Math.min(perPage, most),
     page,
+    // The server holds the page to what the field's `filterOptions` offers this viewer.
+    ...(field.filterOptions && kayan && { for: `${kayan.name}.${field.name}` }),
     ...(!localized && { sort: title }),
     where: {
       id: { not_in: held },

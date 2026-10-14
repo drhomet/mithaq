@@ -181,7 +181,7 @@ const sealed = (
 }
 
 // `onDelete` is a rule too, so on a relationship it is still checked against every target.
-const relationshipKeys = new Set(['hasMany', 'mode', 'relationTo'])
+const relationshipKeys = new Set(['filterOptions', 'hasMany', 'mode', 'relationTo'])
 const joinKeys = new Set(['defaultLimit', 'defaultSort', 'on', 'relationTo'])
 /** Names that reach the prototype rather than a key an actor carries. */
 const unsafeKeys = new Set(['__proto__', 'constructor', 'prototype'])
