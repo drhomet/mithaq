@@ -89,8 +89,8 @@ function SignUp() {
     }
     // A refusal here leaves an account that reads nothing, so the sentence names the organization;
     // `signedUpAs` holds a retry to this call.
-    // An account that proves its address first has no session yet, so it is told to open its mail.
-    if (verifies && !invited) {
+    // An account that proves its address first has no session yet, invited or not, so it is told to open its mail.
+    if (verifies) {
       setPending(false)
       return setSent(email)
     }
