@@ -1112,8 +1112,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.
   // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or holds
   // an invitation still to answer, is passed over: the invitation is how they join; and so is someone
-  // who accepted one, who was a member, perhaps removed since. An account joins once in its life, recorded beside it, so
-  // a removed member whose address is made unverified and proved again stays out.
+  // who accepted one, who was a member, perhaps removed since. An account joins once in its life,
+  // recorded beside it, so a removed member whose address is made unverified and proved again stays
+  // out.
   const joinedOnce = (user: string) => `joined-open:${user}`
   const joinOpen = async (user: { id: string; email: string; role?: unknown }) => {
     // An account first-run or add-person makes is placed by them.
@@ -1157,7 +1158,12 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     // Pending to accepted once, so a second proof never adds the person twice.
     const accepted = await adapter.update<{ organizationId: string; role: string }>({ model: 'invitation', where: [{ field: 'id', value: id }, { field: 'status', value: 'pending' }], update: { status: 'accepted' } })
     if (!accepted) return
-    await tenant.api.addMember({ body: { userId: user.id, organizationId: accepted.organizationId, role: accepted.role as 'member' } })
+    // Put back as the provider's own accept puts it back, so a refused membership leaves the
+    // invitation to answer.
+    await tenant.api.addMember({ body: { userId: user.id, organizationId: accepted.organizationId, role: accepted.role as 'member' } }).catch(async (error: unknown) => {
+      await adapter.update({ model: 'invitation', where: [{ field: 'id', value: id }], update: { status: 'pending' } })
+      throw error
+    })
     // A session made before the acceptance names no organization, and every read would be refused in it.
     for (const one of await internalAdapter.listSessions(user.id)) {
       if (!(one as { activeOrganizationId?: string | null }).activeOrganizationId) await internalAdapter.updateSession(one.token, { activeOrganizationId: accepted.organizationId })
