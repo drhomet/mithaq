@@ -1108,9 +1108,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
   // Who joins the one organization by signing up: in one organization with an open sign-up,
   // when the account is made or, where addresses are verified, when its address is proved. The
   // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.
-  // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or was
-  // ever invited, is passed over: an invitation is how they join, and an accepted one means they
-  // were a member, perhaps removed since. An account joins once in its life, recorded beside it, so
+  // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or holds
+  // an invitation still to answer, is passed over: the invitation is how they join; and so is someone
+  // who accepted one, who was a member, perhaps removed since. An account joins once in its life, recorded beside it, so
   // a removed member whose address is made unverified and proved again stays out.
   const joinedOnce = (user: string) => `joined-open:${user}`
   const joinOpen = async (user: { id: string; email: string; role?: unknown }) => {
@@ -1123,7 +1123,10 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     const { internalAdapter } = await tenant.$context
     if (await internalAdapter.findVerificationValue(joinedOnce(user.id))) return
     if (await store.count!({ kayan: 'member', args: { where: { userId: { equals: user.id } } } })) return
-    if (await store.count!({ kayan: 'invitation', args: { where: { email: { equals: user.email.toLowerCase() } } } })) return
+    // An invitation still to answer, or one accepted, is how this address joins; one cancelled,
+    // declined or expired is none.
+    const answering: Where = { or: [{ status: { equals: 'accepted' } }, { and: [{ status: { equals: 'pending' } }, { expiresAt: { greater_than: new Date() } }] }] }
+    if (await store.count!({ kayan: 'invitation', args: { where: { and: [{ email: { equals: user.email.toLowerCase() } }, answering] } } })) return
     const joined = String(organization.id)
     // ponytail: the record is a verification row that never expires, the one table the provider
     // lets a project write a fact about an account to with no column of its own; a column on the

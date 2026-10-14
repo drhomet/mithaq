@@ -1180,6 +1180,22 @@ test('0m. with one organization an administrator adds a person: account, members
   await db.execute(`delete from organization where id = 'elsewhere-0m'`)
 })
 
+test('0n. an open sign-up joins past an invitation that was cancelled or has expired, and only one still pending, or accepted, is how its address joins instead', async () => {
+  const walkIn = modeServer({ organizations: 'one', signUp: 'open', joinRole: null, verifyEmail: false, allowedDomains: [] })
+  const [one] = (await modeRows(`select organization.id, member.user_id as owner from organization join member on member.organization_id = organization.id where member.role = 'owner'`)) as { id: string; owner: string }[]
+  const { id: organization, owner } = one!
+  for (const [email, status, expires] of [['cancelled-0n@example.com', 'canceled', '1 day'], ['expired-0n@example.com', 'pending', '-1 day'], ['pending-0n@example.com', 'pending', '1 day']] as const) {
+    await db.execute(`insert into invitation (id, organization_id, email, role, status, expires_at, created_at, inviter_id) values ('${email}', '${organization}', '${email}', 'member', '${status}', now() + interval '${expires}', now(), '${owner}')`)
+  }
+  const joined = async (email: string) => {
+    assert.equal((await askedOf(walkIn, '/sign-up/email', { name: 'Walk-in', email, password: modePassword })).status, 200)
+    return (await modeRows(`select member.id from member join "user" on "user".id = member.user_id where "user".email = '${email}'`)).length === 1
+  }
+  assert.equal(await joined('cancelled-0n@example.com'), true, 'a cancelled invitation is no invitation: the address joins like anyone')
+  assert.equal(await joined('expired-0n@example.com'), true, 'nor is one expired')
+  assert.equal(await joined('pending-0n@example.com'), false, 'while one still pending is how its address joins')
+})
+
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
   const made = (await modeRows(`select id from organization where id <> 'borrowed-organization'`)).map((one) => `'${one.id}'`)
   if (made.length) {
