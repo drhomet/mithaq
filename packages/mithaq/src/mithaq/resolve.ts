@@ -238,7 +238,7 @@ const tenantField = ({ where, field, language }: { where: string; field: Runtime
   const target = language.targets.tenant
   if (!isTenant(target)) {
     throw new Error(
-      `${where} is bound through targets.tenant, and this language lays down no tenant target. Add tenant: betterAuthTenant({ relationTo, onDelete: 'restrict' }) to its targets, or drop targets.tenant from the field.`,
+      `${where} is bound through targets.tenant, and this language lays down no tenant target. Add tenant: betterAuthTenant({ relationTo, onDelete: 'restrict', organizations }) to its targets, or drop targets.tenant from the field.`,
     )
   }
   const bound = tenantDefaults(language, field)

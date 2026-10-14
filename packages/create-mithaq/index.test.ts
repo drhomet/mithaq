@@ -161,7 +161,7 @@ test('a single package holds the language, its features, the asas and the tenant
 test('--help prints each question\'s flag', () => {
   const done = spawnSync(process.execPath, [fileURLToPath(new URL('./index.js', import.meta.url)), '--help'], { encoding: 'utf8' })
   assert.equal(done.status, 0, done.stderr)
-  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', 'courses (needs media, roles, audit-log, rich-text)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
+  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', '--organizations none|one|many', '--sign-up invite|open', 'courses (needs media, roles, audit-log, rich-text)', 'platform']) assert.ok(done.stdout.includes(flag), flag)
   assert.match(done.stdout, /npm, pnpm 10\.6 or later, Yarn 1 or Bun 1\.3\. Yarn 2 and later/, 'and which package managers a project installs with')
 })
 
@@ -252,4 +252,30 @@ test('a full project holds every add-on and the template\'s migrations, none of 
   assert.ok(readdirSync(join(at, 'packages/asas/src/migrations')).length > 2)
   const sources = filesUnder(at).filter((file) => /\.tsx?$/.test(file))
   assert.deepEqual(sources.filter((file) => /add-on: /.test(readFileSync(file, 'utf8'))).map((file) => file.slice(at.length)), [], 'no marker is left')
+})
+
+test('organizations.ts says the mode and who may sign up: one organization by invitation unless asked, the courses example as a school whose open joiners are students, and many founding by open sign-up', () => {
+  const settingsOf = (name: string) => {
+    const text = read(name, 'packages/mithaq/src/mithaq/auth/organizations.ts')
+    const value = (key: string) => new RegExp(`^export const ${key}: [^=]+ = (.+)$`, 'm').exec(text)?.[1]
+    return Object.fromEntries(['organizations', 'signUp', 'joinRole', 'verifyEmail', 'allowedDomains'].map((key) => [key, value(key)]))
+  }
+  create({ name: 'school', cwd: scratch, template, version: '1.2.3', addOns: every })
+  assert.deepEqual(settingsOf('school'), { organizations: "'one'", signUp: "'invite'", joinRole: "'student'", verifyEmail: 'true', allowedDomains: '[]' })
+  create({ name: 'plain', cwd: scratch, template, version: '1.2.3' })
+  assert.deepEqual(settingsOf('plain'), { organizations: "'one'", signUp: "'invite'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' }, 'without the roles add-on nobody is given a role on joining')
+  create({ name: 'hidden', cwd: scratch, template, version: '1.2.3', organizations: 'none', signUp: 'open' })
+  assert.deepEqual(settingsOf('hidden'), { organizations: "'none'", signUp: "'open'", joinRole: 'null', verifyEmail: 'true', allowedDomains: '[]' })
+  create({ name: 'many', cwd: scratch, template, version: '1.2.3', addOns: every, organizations: 'many' })
+  assert.deepEqual(settingsOf('many'), { organizations: "'many'", signUp: "'open'", joinRole: 'null', verifyEmail: 'false', allowedDomains: '[]' }, 'many founds an organization by every sign-up and verifies no address yet')
+  assert.throws(() => create({ name: 'invited-many', cwd: scratch, template, version: '1.2.3', organizations: 'many', signUp: 'invite' }), /many organizations take --sign-up open/)
+  assert.throws(() => create({ name: 'some', cwd: scratch, template, version: '1.2.3', organizations: 'some' }), /--organizations is none, one or many, not "some"/)
+  assert.throws(() => create({ name: 'closed', cwd: scratch, template, version: '1.2.3', signUp: 'closed' }), /--sign-up is invite or open, not "closed"/)
+  for (const name of ['school', 'plain', 'hidden', 'many']) assert.equal(existsSync(join(scratch, name, 'packages/asas/src/organizations.ts')), true, `${name}: the apps read the mode through the asas`)
+})
+
+test('a single package reaches the organization mode by path', () => {
+  create({ name: 'single-modes', cwd: scratch, template, version: '1.2.3', layout: 'single', organizations: 'none' })
+  assert.match(read('single-modes/src/organizations.ts'), /from '\.\/mithaq\/auth\/organizations\.ts'/)
+  assert.match(read('single-modes/src/mithaq/auth/organizations.ts'), /^export const organizations: [^=]+ = 'none'$/m)
 })

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { domainToUnicode } from 'node:url'
 import { runWithAdapter } from '@better-auth/core/context'
 import { BASE_ERROR_CODES, betterAuth as betterAuthServer, getCurrentAdapter } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
@@ -10,8 +11,13 @@ import { adminAc, defaultStatements as adminStatements, userAc } from 'better-au
 import { defaultStatements } from 'better-auth/plugins/organization/access'
 import { holdsPermission, requestOrganization, type Where } from 'mithaq'
 import { sql } from 'mithaq/drizzle'
+import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
 // A module of its own so a screen can list the roles without loading the provider.
 import { platformRoles } from './platform-roles.ts'
+import { allowedDomains, joinRole, organizations, signUp, verifyEmail } from './organizations.ts'
+// add-on: roles
+import { tenantRoles } from '../../roles/tenant-roles.ts'
+// end add-on: roles
 
 export { platformRoles }
 
@@ -70,32 +76,53 @@ if (remoteWithNoSecret) {
  */
 export const platformURL = process.env.PLATFORM_URL ?? 'http://localhost:5174'
 
-// The platform's first administrator is made by first-register, which asks for the `SETUP_CODE`
-// the deploy set, so nobody who merely reaches a new deploy first becomes its administrator. Only
-// `vite dev` on this machine skips it: a deploy run with plain `node` sets no `NODE_ENV`, and an
-// unset `PLATFORM_URL` falls back to localhost. The code is the one bar, so a value short enough to
-// guess is no code at all.
+// The platform's first administrator is made by first-register, and the first owner of a project
+// of one organization by first-run, and both ask for the `SETUP_CODE` the deploy set, so nobody who
+// merely reaches a new deploy first takes it. Only `vite dev` on this machine skips it: a deploy
+// run with plain `node` sets no `NODE_ENV`, and an unset URL falls back to localhost. The code is
+// the one bar, so a value short enough to guess is no code at all.
 const setupCode = (process.env.SETUP_CODE?.length ?? 0) >= 32 ? process.env.SETUP_CODE : undefined
-const setupCodeState: 'none' | 'required' | 'unset' = process.env.NODE_ENV === 'development' && isLocalHost(platformURL) ? 'none' : setupCode ? 'required' : 'unset'
+const developing = process.env.NODE_ENV === 'development'
+const setupCodeState = (url: string): 'none' | 'required' | 'unset' => (developing && isLocalHost(url) ? 'none' : setupCode ? 'required' : 'unset')
 // Mirrors the tenant's `rateLimit.enabled`, read off the platform's own address.
 const platformLimited = production || !isLocalHost(platformURL)
 // Digests, so both sides are always 32 bytes and `timingSafeEqual` neither throws on nor answers
 // sooner for a code of another length.
 const digest = (text: string) => createHash('sha256').update(text).digest()
 const isSetupCode = (given: unknown) => typeof given === 'string' && setupCode !== undefined && timingSafeEqual(digest(given), digest(setupCode))
-// Set only around the one `create-user` call first-register makes once it found no platform
-// administrator under its lock, which is the only call with no caller that may write a role.
+/** Why a setup route served at `url` refuses `code`, or nothing; `app` names where SETUP_CODE is set. */
+const refusedSetup = ({ url, code, app }: { url: string; code: unknown; app: string }) => {
+  const state = setupCodeState(url)
+  if (state === 'unset') return new APIError('FORBIDDEN', { code: 'SETUP_CODE_UNSET', message: `Set SETUP_CODE where the ${app} runs, to a random value of 32 characters or more: the first administrator is made only with it.` })
+  if (state === 'required' && !isSetupCode(code)) return new APIError('FORBIDDEN', { code: 'SETUP_CODE_WRONG', message: 'That is not the setup code.' })
+  return undefined
+}
+// Set only around the calls first-register and first-run make once they found nobody under their
+// lock: the only calls with no caller that may write a role or make an account no sign-up would.
 const firstRegistering = new AsyncLocalStorage<true>()
 // Without TRUSTED_IP_HEADER, Better Auth keys its limit on an `x-forwarded-for` the caller writes,
-// so first-register also keeps one window that every caller shares.
+// so each setup route also keeps one window that every caller shares.
 // ponytail: process-local, and a flood holds setup off for everyone until it stops; set
 // TRUSTED_IP_HEADER for per-address limits alone.
-const sharedTries: number[] = []
-const overSharedLimit = () => {
-  const now = Date.now()
-  while (sharedTries.length && now - sharedTries[0]! >= 60_000) sharedTries.shift()
-  return sharedTries.length >= 10 || (sharedTries.push(now), false)
+const sharedWindow = () => {
+  const tries: number[] = []
+  return () => {
+    const now = Date.now()
+    while (tries.length && now - tries[0]! >= 60_000) tries.shift()
+    return tries.length >= 10 || (tries.push(now), false)
+  }
 }
+const overSharedLimit = sharedWindow()
+const overFirstRunLimit = sharedWindow()
+// First-register and first-run take one lock, so neither reads "nobody yet" while the other is
+// making the first administrator.
+const setupLock = sql`select pg_advisory_xact_lock(hashtext('mithaq.setup'))`
+
+/**
+ * One JSON line, in the shape of the platform's audit, for what the provider does where no kayan
+ * logs it: a sign-up, a join, a first-run and a role given. Operators keep this output.
+ */
+const authAudit = (line: Record<string, unknown>) => console.log(JSON.stringify({ audit: 'auth', ...line, at: new Date().toISOString() }))
 
 /**
  * Where the tenant app is served, the tenant instance's `baseURL` and the target of an
@@ -167,10 +194,121 @@ const exactRoles = (role: unknown) => {
 // sets `NODE_ENV`, and an unset `BETTER_AUTH_URL` falls back to `localhost`.
 const logsLinks = process.env.NODE_ENV === 'development' && isLocalHost(tenantURL)
 
-// Development only: the link goes to the server's log. Anywhere else nothing is sent and nothing is
-// logged, so the inviter hands the link over themselves.
-const sendInvitationEmail = async ({ id, email }: { id: string; email: string }) => {
-  console.log(`[asas auth] Invitation link for "${email}": ${new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href}`)
+/**
+ * What the auth setup reads beyond the provider's own options: the organization mode and who may
+ * join (`organizations.ts`), and the mailer that sends the password reset, the invitation and the
+ * verification. The mailer is the deploy's configured one (`src/mail/index.ts`), else in
+ * development on this machine the log, else none, and then no reset is offered and the inviter
+ * hands the link over.
+ */
+export type AuthSettings = {
+  mailer: Mailer | undefined
+  organizations: typeof organizations
+  signUp: typeof signUp
+  joinRole: string | null
+  verifyEmail: boolean
+  allowedDomains: readonly string[]
+}
+export const authSettings: AuthSettings = { mailer: configuredMailer ?? (logsLinks ? logMailer : undefined), organizations, signUp, joinRole, verifyEmail, allowedDomains }
+
+/** A lowercase ASCII host of two labels or more, which an `xn--` international one is. */
+const host = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
+
+/**
+ * Whether `email`'s domain, taken after its last `@`, lowercased and turned into punycode as a URL
+ * does, is one `allowed` names: equal to an entry, or under a `*.` entry's domain. Never a suffix
+ * match, which lets `notexample.com` pass for `example.com`.
+ */
+export const domainAllowed = (email: string, allowed: readonly string[]) => {
+  const at = email.lastIndexOf('@')
+  if (at < 0 || at === email.length - 1) return false
+  const written = email.slice(at + 1).toLowerCase()
+  let domain: string
+  try {
+    domain = new URL(`http://${written}`).hostname
+  } catch {
+    return false
+  }
+  // A URL also decodes `%2e` and folds a fullwidth `ｅ` or `．` into ASCII, which no mail server
+  // does, so the domain must read back as written: an international one does, a disguised one not.
+  // One written in its `xn--` form, which the provider's address check asks of an international
+  // domain, is its own reading.
+  if (domainToUnicode(domain) !== written && domain !== written) return false
+  return allowed.some((entry) => (entry.startsWith('*.') ? domain.endsWith(entry.slice(1)) : domain === entry))
+}
+
+/**
+ * A key no stranger who signs up is given: one that gives a role, writes a role, invites, or changes
+ * the people or the organization. Reading them is not one.
+ */
+const grantsPower = (key: string) => /^(roles|member(Roles)?|invitation|ac|organization)\.(?!(find|findByID|count|read)$|fields\.)/.test(key)
+
+/**
+ * Every way `settings` means nothing or opens a door, one sentence each naming the line of
+ * `organizations.ts` to change. `joinRoles` is the roles a joiner may be given, each with what it
+ * holds (`null` without the roles add-on). `deployed` is a start anywhere but development on this
+ * machine.
+ */
+export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: AuthSettings; deployed: boolean; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
+  const { organizations, signUp, joinRole, verifyEmail, allowedDomains, mailer } = settings
+  const problems: string[] = []
+  if (organizations === 'many') {
+    if (signUp !== 'open') problems.push("organizations = 'many' takes signUp = 'open': each sign-up founds its own organization, and nobody joins one but by invitation.")
+    if (joinRole !== null) problems.push("organizations = 'many' takes joinRole = null: nobody joins an organization there but by invitation.")
+    if (verifyEmail) problems.push("organizations = 'many' verifies no address yet: set verifyEmail = false.")
+    if (allowedDomains.length) problems.push("organizations = 'many' takes no allowedDomains: nobody joins an organization there but by invitation.")
+    return problems
+  }
+  if (allowedDomains.length && signUp !== 'open') problems.push("allowedDomains is read only with signUp = 'open': empty it, or open the sign-up.")
+  if (allowedDomains.length && !verifyEmail) problems.push('allowedDomains needs verifyEmail = true: an address nobody proved is any domain its writer wants.')
+  for (const entry of allowedDomains) {
+    if (!host.test(entry.startsWith('*.') ? entry.slice(2) : entry)) problems.push(`allowedDomains holds ${JSON.stringify(entry)}, which is no lowercase ASCII domain, or *. and one: write an international domain as its xn-- form.`)
+  }
+  const held = joinRole === null || joinRoles === null || !Object.hasOwn(joinRoles, joinRole) ? undefined : joinRoles[joinRole]!
+  const powers = held === '*' ? ['every key'] : (held ?? []).filter(grantsPower)
+  if (joinRole !== null && joinRoles === null) problems.push('joinRole is a role of the roles add-on, which this project does not hold: set joinRole = null, and a joiner holds the provider\'s member.')
+  else if (joinRole !== null && held === undefined) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which is none of roles/tenant-roles.ts: ${Object.keys(joinRoles!).join(', ')}.`)
+  else if (powers.length) problems.push(`joinRole names ${JSON.stringify(joinRole)}, which holds ${powers.join(', ')}, and a stranger who signs up is never given a role that gives roles or invites.`)
+  if (deployed && signUp === 'open' && !mailer) problems.push("signUp = 'open' needs a mailer in production, which verifies each address and sends each reset: set RESEND_API_KEY and MAIL_FROM.")
+  return problems
+}
+
+// add-on: roles
+const joinRoles: Record<string, '*' | readonly string[]> | null = Object.fromEntries(Object.entries(tenantRoles).map(([slug, role]) => [slug, (role as { permissions: '*' | readonly string[] }).permissions]))
+// end add-on: roles
+// without add-on: roles
+// const joinRoles: Record<string, '*' | readonly string[]> | null = null
+// end without add-on: roles
+// Refused wherever the other start checks refuse: in production, or off this machine whatever
+// `NODE_ENV` says.
+const settingsRefused = settingsProblems({ settings: authSettings, deployed: production || !isLocalHost(tenantURL), joinRoles })
+if (settingsRefused.length) throw new Error(`src/mithaq/auth/organizations.ts: ${settingsRefused.join(' ')}`)
+
+const escaped = (text: string) => text.replace(/[&<>"']/g, (one) => `&#${one.charCodeAt(0)};`)
+/** A subject on one line: a line break in it would start a header of the writer's own. */
+export const subjectLine = (subject: string) => subject.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/ {2,}/g, ' ').trim()
+/**
+ * One message in both of the project's locales, English then Arabic, since a mail is sent before
+ * anyone says which they read. The link sits on a line of its own in each.
+ */
+const letter = ({ to, subject, en, ar, link }: { to: string; subject: string; en: string; ar: string; link: string }): Mail => ({
+  to,
+  subject: subjectLine(subject),
+  text: `${en}\n\n${link}\n\n${ar}\n\n${link}\n`,
+  html: `<p>${escaped(en)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p><div dir="rtl" lang="ar"><p>${escaped(ar)}</p><p><a href="${escaped(link)}">${escaped(link)}</a></p></div>`,
+})
+
+// The subject is fixed and only the body names the organization, escaped: its name is words an
+// administrator wrote. With no organization shown, the invitation is to the app, as every page says.
+const invitationMail = ({ mailer, organizations }: { mailer: Mailer; organizations: AuthSettings['organizations'] }) => async ({ id, email, organization }: { id: string; email: string; organization: { name: string } }) => {
+  const [en, ar] = organizations === 'none' ? ['this app', 'هذا التطبيق'] : [organization.name, organization.name]
+  await mailer.send(letter({
+    to: email,
+    subject: 'You are invited · لديك دعوة',
+    en: `You are invited to join ${en}. Open the link below with this address to accept; it lasts 48 hours.`,
+    ar: `أنت مدعو للانضمام إلى ${ar}. افتح الرابط أدناه بهذا العنوان لقبول الدعوة؛ وهو صالح 48 ساعة.`,
+    link: new URL(`/auth/accept-invitation?id=${encodeURIComponent(id)}`, tenantURL).href,
+  }))
 }
 
 /**
@@ -178,7 +316,8 @@ const sendInvitationEmail = async ({ id, email }: { id: string; email: string })
  * left unset, anyone signed in founds organizations without end, and an organization stops taking
  * members and listing them at 100.
  *
- * - `allowUserToCreateOrganization`: sign-up founds each person's own organization.
+ * - `allowUserToCreateOrganization`: in `'many'`, sign-up founds each person's own organization. In
+ *   `'one'` and `'none'` nobody founds one over HTTP; first-run makes the one on the server.
  * - `organizationLimit`: a person who belongs to this many organizations, however they joined, founds
  *   no more, so one account cannot fill the database with organizations. An invitation still adds
  *   them to more.
@@ -186,12 +325,14 @@ const sendInvitationEmail = async ({ id, email }: { id: string; email: string })
  *   unasked; the Members page pages past it.
  * - `invitationLimit`: the pending invitations one organization holds.
  */
-export const organizationLimits = {
-  allowUserToCreateOrganization: true,
+export const organizationLimitsFor = (mode: AuthSettings['organizations']) => ({
+  allowUserToCreateOrganization: mode === 'many',
   organizationLimit: 5,
-  membershipLimit: 10_000,
+  // In `'none'` the one organization is every person of the app, so it takes members without
+  // end. A function, so the provider's unasked member lists keep their own 100 rather than this.
+  membershipLimit: mode === 'none' ? async () => Number.MAX_SAFE_INTEGER : 10_000,
   invitationLimit: 1_000,
-}
+})
 
 // These options do not depend on this project's vocabulary, so `mithaq generate auth` reads the
 // same schema the runtime builds.
@@ -200,8 +341,8 @@ export const organizationLimits = {
 // is inside `createOrganization`, where the creator is in no organization yet and holds no key, so
 // gating it would make creating an organization impossible. `member.create` is left to the
 // provider's static roles.
-const organizationOptions = {
-  ...organizationLimits,
+const organizationOptionsFor = ({ mailer, organizations }: AuthSettings) => ({
+  ...organizationLimitsFor(organizations),
   dynamicAccessControl: { enabled: true as const },
   // An organization that was ever used holds rows that cannot all be removed (an audit log,
   // settings, its last administrator), and every tenant key is `restrict`, so deletion is off over
@@ -209,9 +350,16 @@ const organizationOptions = {
   disableOrganizationDeletion: true,
   // The provider compares the invited address with the signed-in one on every invitation route.
   // `requireEmailVerificationOnInvitation` stays unset rather than `false`, so the provider asks
-  // for a verified address only if invitation ids become guessable. The template sends no mail that
-  // would verify an address, so asking for one would leave every invitation unanswerable.
-  ...(logsLinks ? { sendInvitationEmail } : {}),
+  // for a verified address only if invitation ids become guessable. An account made by invitation
+  // is not verified, since holding the id is its proof, so asking for one would leave every
+  // invitation unanswerable.
+  //
+  // With many organizations anyone founds one and may invite, so nothing is mailed: the link goes to
+  // the log in development and is handed over elsewhere, and no founder sends words of their own to
+  // any address through the project's mailer.
+  ...(organizations === 'many'
+    ? (logsLinks ? { sendInvitationEmail: invitationMail({ mailer: logMailer, organizations }) } : {})
+    : mailer ? { sendInvitationEmail: invitationMail({ mailer, organizations }) } : {}),
   organizationHooks: {
     beforeUpdateOrganization: gate('organization.update'),
     beforeRemoveMember: gate('member.delete'),
@@ -227,7 +375,7 @@ const organizationOptions = {
     beforeAcceptInvitation: async ({ invitation }: { invitation: { role: string } }) => exactRoles(invitation.role),
     beforeCancelInvitation: gate('invitation.cancel'),
   },
-}
+})
 
 // `'*'` is the plugin's `adminAc`, every action but `impersonate-admins`, so no platform
 // administrator mimics another.
@@ -514,16 +662,34 @@ export const trustedIpHeaders = (value: string | undefined): string[] | undefine
 
 const ipAddressHeaders = trustedIpHeaders(process.env.TRUSTED_IP_HEADER)
 
-// Where a password reset link goes. No mail sender is configured, so the link is written to the
-// server's log in development (see `logsLinks`). Anywhere else the provider refuses every address
-// alike before it looks one up, so no token or address is written anywhere.
+// Where a password reset link goes: through the mailer, which in development may be the server's
+// log. With no mailer the provider refuses every address alike before it looks one up, so no token
+// or address is written anywhere.
 //
 // The link is the tenant app's reset page, not the provider's `url`, which names
 // `/api/auth/reset-password` while this project serves the provider under `/api/auth/user`.
 const onLocalHost = !production && isLocalHost(tenantURL)
-const sendResetPassword = async ({ user, token }: { user: { email: string }; token: string }) => {
-  console.log(`[asas auth] Password reset link for "${user.email}": ${new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href}`)
-}
+// An address is proved by choosing the account's password from a link mailed to it: the reset
+// page's link, which ends every session and marks the address verified. Proving it never keeps a
+// password somebody else typed at sign-up, so whoever signed up first with another's address never
+// signs in once its owner proves it.
+const confirmMail = (mailer: Mailer) => async ({ email, token }: { email: string; token: string }) =>
+  mailer.send(letter({
+    to: email,
+    subject: 'Confirm your address · تأكيد عنوانك',
+    en: 'Someone made an account with this address. If it was you, open the link below within an hour to confirm it and choose your password. If not, ignore this message: an account nobody confirms never signs in.',
+    ar: 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.',
+    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+  }))
+
+const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
+  mailer.send(letter({
+    to: user.email,
+    subject: 'Reset your password · إعادة تعيين كلمة المرور',
+    en: 'Someone asked to reset the password of the account at this address. If it was you, open the link below within an hour. If not, ignore this message: nothing changes.',
+    ar: 'طلب أحدهم إعادة تعيين كلمة مرور الحساب بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة. وإلا فتجاهل هذه الرسالة: لن يتغير شيء.',
+    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+  }))
 
 /**
  * The Better Auth options, with no `database`: the strategy supplies the tables mithaq built.
@@ -532,13 +698,28 @@ const sendResetPassword = async ({ user, token }: { user: { email: string }; tok
  * The hooks that write rows of this project (`StoreHooks`) are a parameter of `authOptions`
  * instead. A hook changes no table, so the schema read here is the schema the runtime builds.
  */
-export const options = {
+// Mail goes out after the answer, so how long an answer takes never says whether an address has an
+// account, and a slow mailer holds up no request. Each send is kept until it settles, so a test or a
+// shutdown can wait for what is still going out. The development log is written at once.
+const background = new Set<Promise<unknown>>()
+const inBackground = (promise: Promise<unknown>) => {
+  background.add(promise)
+  void promise.finally(() => background.delete(promise))
+}
+/** Resolves once every mail sent in the background has gone out or failed. */
+export const backgroundSettled = async () => {
+  while (background.size) await Promise.allSettled([...background])
+}
+
+export const optionsFor = (settings: AuthSettings) => ({
   // A reset ends every session of the account, in both apps, since they share one session table.
-  emailAndPassword: { enabled: true as const, revokeSessionsOnPasswordReset: true, ...(logsLinks ? { sendResetPassword } : {}) },
+  emailAndPassword: { enabled: true as const, revokeSessionsOnPasswordReset: true, ...(settings.mailer ? { sendResetPassword: resetMail(settings.mailer) } : {}) },
   // The provider rate limits only when `NODE_ENV` is `production`, so a deploy that sets none would
   // answer every sign-in and reset request unlimited. Off a local host it limits whatever
   // `NODE_ENV` says.
-  rateLimit: { enabled: !onLocalHost },
+  //
+  // With one organization or none invitations are mailed, so they are limited apart: ten a minute.
+  rateLimit: { enabled: !onLocalHost, ...(settings.organizations !== 'many' && { customRules: { '/organization/invite-member': { window: 60, max: 10 } } }) },
   // Better Auth reads it for the links it writes into mail and the origin it checks a request
   // against; without it every boot prints `Base URL is not set`.
   baseURL: tenantURL,
@@ -546,10 +727,15 @@ export const options = {
   // preview` and Next ports, outside production only. Better Auth adds `baseURL` itself. A project
   // that serves a mobile client adds its scheme here.
   trustedOrigins: production ? [] : ['http://localhost:3000', 'http://localhost:4173', 'http://localhost:5173'],
-  ...(ipAddressHeaders ? { advanced: { ipAddress: { ipAddressHeaders } } } : {}),
+  ...((ipAddressHeaders || (settings.mailer && settings.mailer !== logMailer)) && {
+    advanced: {
+      ...(ipAddressHeaders && { ipAddress: { ipAddressHeaders } }),
+      ...(settings.mailer && settings.mailer !== logMailer && { backgroundTasks: { handler: inBackground } }),
+    },
+  }),
   // How an impersonation crosses from the platform app into the tenant app (`handOff`). The plugin
   // adds no table, and no client may mint a token over HTTP.
-  plugins: [admin(adminOptions), organization(organizationOptions), oneTimeToken({ disableClientRequest: true })],
+  plugins: [admin(adminOptions), organization(organizationOptionsFor(settings)), oneTimeToken({ disableClientRequest: true })],
   hooks: platformAudit,
   // The active organization, set where the session is made. Every row this project reads is keyed
   // on it and the provider sets it only when an organization is created, so a user who signed in
@@ -573,7 +759,9 @@ export const options = {
       },
     },
   },
-}
+})
+/** This project's options, which `mithaq generate auth` reads. */
+export const options = optionsFor(authSettings)
 
 /**
  * The same options with the provider's own access control built, which is what the template builds
@@ -584,7 +772,9 @@ export const options = {
  * nothing of this project: what a member may do is the access target's answer, which reads the
  * project's own keys. A project narrows these where its own governance differs.
  */
-export const authOptions = (hooks: StoreHooks = {}) => {
+export const authOptions = (hooks: StoreHooks = {}, settings: AuthSettings = authSettings) => {
+  const options = optionsFor(settings)
+  const organizationOptions = organizationOptionsFor(settings)
   // Only the provider's own vocabulary. Merging this project's catalog in would make the provider's
   // `owner` hold every project key before any role row was read, and a `roles` row could then widen
   // and never narrow. The provider gates its own actions; this project's keys are the access
@@ -653,231 +843,422 @@ export const providers = {
      * Built from the targets the language carries and the vocabulary the build derived. Neither
      * exists where a kayan is written, so this is a factory the kayan names.
      */
-    server: (targets: {
-      drizzle: {
-        db: Parameters<typeof drizzleAdapter>[0]
-        tables: Record<string, unknown>
-        insert(args: { tx: unknown; kayan: string; data: Record<string, unknown> }): Promise<unknown>
-        remove(args: { tx: unknown; kayan: string; id: unknown }): Promise<unknown>
-        find(args: { tx?: unknown; kayan: string; args: { limit: number; page: number; sort: { field: string; direction: 'asc' | 'desc' }; where?: Where } }): Promise<{ docs: Record<string, unknown>[] }>
-        transaction<Result>(run: (tx: unknown) => Promise<Result>): Promise<Result>
-        count?(args: { kayan: string; args: { where?: Where } }): Promise<number>
-      }
-    }) => {
-      const store = targets.drizzle
-      // add-on: roles
-      // The drizzle store always counts; `Store` types it optional for stores that cannot.
-      const heldRoles = (organization: string, user: string) => store.count!({ kayan: 'memberRoles', args: { where: { organization: { equals: organization }, user: { equals: user } } } })
-      const holdsRoles = () => new APIError('CONFLICT', { code: 'error.conflict.member_holds_roles', message: 'This member still holds a role in this organization. Take each role from them first.' })
-      // The roles a person holds in an organization they are not a member of, taken as they come
-      // back in by an accepted invitation or an added membership: nobody gave them anew, and the
-      // assignment guards never ran for whoever invited them back. Taken rather than refused,
-      // because no screen reaches the roles of a non-member and a refusal would shut the person out
-      // for good.
-      const clearsLeftRoles = async ({ organization, user }: { organization: string; user: string }) => {
-        // A current member left no organization: the provider runs this hook before it notices that
-        // an old invitation or an added membership names a member already, and their roles are
-        // theirs.
-        if (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: user } } } })) return
-        if (!(await heldRoles(organization, user))) return
-        await store.transaction(async (tx) => {
-          const left = await store.find({ tx, kayan: 'memberRoles', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: organization }, user: { equals: user } } } })
-          for (const row of left.docs) await store.remove({ tx, kayan: 'memberRoles', id: row.id })
-        })
-      }
-      // end add-on: roles
-      const built = authOptions({
-        // add-on: roles
-        // The tenant's first assignment, which nothing inside the project can make: a role holding
-        // `memberRoles.create` has to be assigned before it can assign anything, and the caller of
-        // `createOrganization` is in no organization until that route puts it in one. So it goes
-        // straight through the store rather than through `asas.kayan.memberRoles.operations.create`,
-        // which is graded against the actor making it. The row is `administrator`, which holds
-        // `'*'`, so the organization has a root granter from its first moment and every later
-        // assignment is the gated one.
-        afterCreateOrganization: async ({ organization, user: creator }) => {
-          const written = new Date()
-          await store.transaction((tx) =>
-            store.insert({
-              tx,
-              kayan: 'memberRoles',
-              data: {
-                createdAt: written,
-                role: 'administrator',
-                organization: organization.id,
-                updatedAt: written,
-                user: creator.id,
-              },
-            }),
-          )
-        },
-        // A member who still holds a role of this project in the organization is not removed. The
-        // provider deletes the member row alone and leaves this project's rows behind, which are
-        // read again the moment the person is a member again. Their roles are taken first, each
-        // through the assignment kayan's own delete, whose guards decide whether this caller may
-        // take that role. The Members page does that before removing, so a person sees this refusal
-        // only where a role was given in between or the route was called by hand.
-        //
-        // Counted outside any transaction, so a role assigned between the count and the delete is
-        // left behind; it is dormant while the person is no member and taken as they come back in
-        // (`clearsLeftRoles`).
-        beforeRemoveMember: async ({ member, organization }) => {
-          if (await heldRoles(organization.id, member.userId)) throw holdsRoles()
-        },
-        beforeAcceptInvitation: ({ user, organization }) => clearsLeftRoles({ organization: organization.id, user: user.id }),
-        beforeAddMember: ({ member, organization }) => clearsLeftRoles({ organization: organization.id, user: member.userId }),
-        // end add-on: roles
-      }).options
-      // `transaction: true` makes the provider's own transaction helper open a real transaction
-      // wherever it asks for one: a sign-up writes its user, account and session in one, and an
-      // accepted invitation its member and the session's organization. Without it each statement
-      // runs on its own.
-      const database = drizzleAdapter(store.db, { provider: 'pg', schema: store.tables, transaction: true })
-      // Two instances over one database and one user table, one per app, so a person is one row and
-      // one password in both. The tenant app's refuses every route of the admin plugin, and its
-      // stop route, which would put a staff member's session back under the tenant app's cookie.
-      // The plugin stays in it because it refuses a banned user a session and carries
-      // `impersonatedBy` onto the session it reads.
-      const tenantOnly = Object.values(admin(adminOptions).endpoints).map((endpoint) => endpoint.path)
-      // add-on: roles
-      // Leaving is refused while a role is held, as a removal is above. The provider's leave route
-      // runs no hook, so it is matched by path, on both instances. A member who holds a
-      // role-managing role takes it from nobody else, so leaves only once another member has taken
-      // it from them. An owner who holds an `administrator` row never leaves and is never removed,
-      // because that row cannot be taken (`error.forbidden.owner_role`); that is stricter than the
-      // provider, which lets an owner go while another remains, and intended.
-      const keepsRoles = {
-        id: 'keeps-roles',
-        hooks: { before: [{
-          matcher: (ctx: { path?: string }) => ctx.path === '/organization/leave',
-          handler: createAuthMiddleware(async (ctx) => {
-            const organization = (ctx.body as { organizationId?: unknown } | undefined)?.organizationId
-            const caller = await getSessionFromCtx(ctx).catch(() => null)
-            if (typeof organization !== 'string' || !caller) return
-            if (await heldRoles(organization, caller.user.id)) throw holdsRoles()
-          }),
-        }] },
-      }
-      // end add-on: roles
-      const tenant = betterAuthServer({
-        ...built,
-        plugins: [
-          ...built.plugins,
-          // add-on: roles
-          keepsRoles,
-          // end add-on: roles
-        ],
-        disabledPaths: tenantOnly,
-        database,
-      })
-      // add-on: courses
-      // A person who holds a seat, a withdrawn one included, is not removed: the enrollment records
-      // that they attended, and its `student` key restricts. The provider's `deleteUser` runs in no
-      // transaction, so the key alone would fail after the person's sessions and accounts were
-      // gone, leaving someone who can never sign in again. So it is refused before anything goes.
-      // The store's count reads every row, marked ones included. The id is read the way the route
-      // reads it, after its own `z.coerce.string()`, so an id sent as a list or a number is the
-      // same person here as there.
-      const seated = {
-        id: 'seated',
-        hooks: { before: [{
-          matcher: (ctx: { path?: string }) => ctx.path === '/admin/remove-user',
-          handler: createAuthMiddleware(async (ctx) => {
-            const raw = (ctx.body as { userId?: unknown } | undefined)?.userId
-            if (raw === undefined || raw === null || !(await getSessionFromCtx(ctx).catch(() => null))) return
-            // The drizzle store always counts; `Store` types it optional for stores that cannot.
-            if (await store.count!({ kayan: 'enrollments', args: { where: { student: { equals: String(raw) } } } })) {
-              throw new APIError('CONFLICT', { code: 'error.conflict.referenced', message: 'This person holds a seat in a session, a withdrawn one included, so they are not removed while an enrollment records them.' })
-            }
-          }),
-        }] },
-      }
-      // end add-on: courses
-      // Whether anyone holds a platform role, read as `holdsRole` reads `user.role`: comma-separated,
-      // each name trimmed of the whitespace `.trim()` takes. Every tenant user's `user` is passed
-      // over before the split, and the scan stops at the first holder.
-      type Executes = { execute(query: unknown): Promise<{ rows: unknown[] }> }
-      const users = store.tables.user as { role: unknown }
-      const administered = async (db: Executes) =>
-        (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(platformRoles)}) limit 1`)).rows.length > 0
-      // One answer however often and by whomever it is asked, naming nobody.
-      const closed = () => new APIError('FORBIDDEN', { code: 'FIRST_REGISTER_CLOSED', message: 'This platform has its administrator, so first-register is closed. Sign in instead.' })
-      // The platform's first `super_admin`, which nothing else can make: the provider's own
-      // `create-user`, run on an instance bound to a transaction that holds an advisory lock and
-      // read no administrator under it, so two concurrent calls never both make one.
-      const firstRegister = {
-        id: 'first-register',
-        endpoints: {
-          init: createAuthEndpoint('/init', { method: 'GET' }, async (ctx) =>
-            ctx.json((await administered(store.db as Executes)) ? { initialized: true } : { initialized: false, code: setupCodeState })),
-          // `formCsrfMiddleware`, as sign-up has: no session guards this route, so another site's
-          // form must not post to it.
-          firstRegister: createAuthEndpoint('/first-register', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
-            if (platformLimited && !ipAddressHeaders && overSharedLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
-            if (await administered(store.db as Executes)) throw closed()
-            const { name, email, password, code } = (ctx.body ?? {}) as Record<string, unknown>
-            if (setupCodeState === 'unset') throw new APIError('FORBIDDEN', { code: 'SETUP_CODE_UNSET', message: 'Set SETUP_CODE where the platform app runs, to a random value of 32 characters or more: the first administrator is made only with it.' })
-            if (setupCodeState === 'required' && !isSetupCode(code)) throw new APIError('FORBIDDEN', { code: 'SETUP_CODE_WRONG', message: 'That is not the setup code.' })
-            // `create-user` checks the address but not the password's length, which sign-up does.
-            const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
-            if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
-              throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
-            }
-            return ctx.json(await store.transaction(async (tx) => {
-              // Read committed whatever the database's default, so the read below sees an
-              // administrator another call committed while this one waited on the lock.
-              await (tx as Executes).execute(sql`set transaction isolation level read committed`)
-              await (tx as Executes).execute(sql`select pg_advisory_xact_lock(hashtext('mithaq.first-register'))`)
-              if (await administered(tx as Executes)) throw closed()
-              // ponytail: an instance per call, built over this transaction; it runs once in a
-              // project's life. `built` carries the admin plugin and the audit hooks, which is all
-              // `create-user` reads.
-              const bound = betterAuthServer({ ...built, secret: platformSecret, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
-              // The provider writes through the adapter its request stored, which is the platform's
-              // pool here, so the user and account rows are pointed at this transaction instead:
-              // both commit with the check or neither does, and no second client is taken.
-              const adapter = (await bound.$context).adapter
-              // The plugin types a role from `adminOptions.roles`, whose platform roles are built at
-              // runtime, so it names `user` alone.
-              return runWithAdapter(adapter, () => firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never } })))
-            }))
-          }),
-        },
-        // Production limits every route; this one to three tries a minute from one address, as the
-        // provider limits a password reset.
-        rateLimit: [{ pathMatcher: (path: string) => path === '/first-register', window: 60, max: 3 }],
-      }
-      // The platform app's own instance: its own cookie name, so on `localhost`, where ports do not
-      // keep cookies apart, the two apps never read each other's session; its own secret, so
-      // neither signs a cookie the other accepts; its own origin alone trusted, so a tenant page
-      // cannot post to it with the platform's cookie; no verify of a one-time token, which would
-      // turn an impersonation into a platform session; and no sign-up, since staff are people the
-      // platform already has. A project with no platform console has no first-register either.
-      const platform = betterAuthServer({
-        ...built,
-        plugins: [
-          ...built.plugins,
-          // add-on: courses
-          seated,
-          // end add-on: courses
-          // add-on: roles
-          keepsRoles,
-          // end add-on: roles
-          ...(platformApp ? [firstRegister] : []),
-        ],
-        baseURL: platformURL,
-        trustedOrigins: platformOrigins,
-        rateLimit: { ...built.rateLimit, enabled: platformLimited },
-        secret: platformSecret,
-        advanced: { ...built.advanced, cookiePrefix: platformCookiePrefix },
-        // Nor a password reset of its own: staff reset through the tenant app's page like anyone,
-        // and the reset ends their sessions here too.
-        disabledPaths: ['/one-time-token/verify', '/sign-up/email', '/request-password-reset', '/reset-password'],
-        databaseHooks: { session: { create: { before: staffSession(built.databaseHooks.session.create.before) } } },
-        database,
-      })
-      // One object for the kayan, which answers from whichever instance serves the request.
-      return new Proxy(tenant, { get: (_target, key) => Reflect.get(onPlatform() ? platform : tenant, key) })
-    },
+    server: (targets: ServerTargets) => serverFor(authSettings)(targets),
   },
+}
+
+type ServerTargets = {
+  drizzle: {
+    db: Parameters<typeof drizzleAdapter>[0]
+    tables: Record<string, unknown>
+    insert(args: { tx: unknown; kayan: string; data: Record<string, unknown> }): Promise<unknown>
+    remove(args: { tx: unknown; kayan: string; id: unknown }): Promise<unknown>
+    find(args: { tx?: unknown; kayan: string; args: { limit: number; page: number; sort: { field: string; direction: 'asc' | 'desc' }; where?: Where } }): Promise<{ docs: Record<string, unknown>[] }>
+    transaction<Result>(run: (tx: unknown) => Promise<Result>): Promise<Result>
+    count?(args: { kayan: string; args: { where?: Where } }): Promise<number>
+  }
+}
+
+/**
+ * The provider for `settings`, which is this project's own in `providers.user.server`. A test builds
+ * one for another organization mode over the same tables.
+ */
+export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) => {
+  const store = targets.drizzle
+  // add-on: roles
+  // The drizzle store always counts; `Store` types it optional for stores that cannot.
+  const heldRoles = (organization: string, user: string) => store.count!({ kayan: 'memberRoles', args: { where: { organization: { equals: organization }, user: { equals: user } } } })
+  const holdsRoles = () => new APIError('CONFLICT', { code: 'error.conflict.member_holds_roles', message: 'This member still holds a role in this organization. Take each role from them first.' })
+  // The roles a person holds in an organization they are not a member of, taken as they come
+  // back in by an accepted invitation or an added membership: nobody gave them anew, and the
+  // assignment guards never ran for whoever invited them back. Taken rather than refused,
+  // because no screen reaches the roles of a non-member and a refusal would shut the person out
+  // for good.
+  const clearsLeftRoles = async ({ organization, user }: { organization: string; user: string }) => {
+    // A current member left no organization: the provider runs this hook before it notices that
+    // an old invitation or an added membership names a member already, and their roles are
+    // theirs.
+    if (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: user } } } })) return
+    if (!(await heldRoles(organization, user))) return
+    await store.transaction(async (tx) => {
+      const left = await store.find({ tx, kayan: 'memberRoles', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: organization }, user: { equals: user } } } })
+      for (const row of left.docs) await store.remove({ tx, kayan: 'memberRoles', id: row.id })
+    })
+  }
+  // end add-on: roles
+  // add-on: roles
+  // A role given by the auth setup itself, which nothing inside the project can give: straight
+  // through the store rather than through `asas.kayan.memberRoles.operations.create`, which is
+  // graded against the actor making it.
+  const grantRole = async ({ tx, organization, user, role }: { tx: unknown; organization: string; user: string; role: string }) => {
+    const written = new Date()
+    await store.insert({ tx, kayan: 'memberRoles', data: { createdAt: written, role, organization, updatedAt: written, user } })
+    authAudit({ action: 'role', user, organization, role })
+  }
+  // end add-on: roles
+  // The hooks that write this project's rows, in their own transaction, or in `tx` where a route
+  // that holds one makes the organization: a second client would wait on the rows it has not
+  // committed.
+  const storeHooks = (tx?: unknown): StoreHooks => ({
+    // add-on: roles
+    // The tenant's first assignment: a role holding `memberRoles.create` has to be assigned before
+    // it can assign anything, and the caller of `createOrganization` is in no organization until
+    // that route puts it in one. The row is `administrator`, which holds `'*'`, so the
+    // organization has a root granter from its first moment and every later assignment is the
+    // gated one.
+    afterCreateOrganization: async ({ organization, user: creator }) => {
+      const granted = { organization: organization.id, user: creator.id, role: 'administrator' }
+      await (tx === undefined ? store.transaction((own) => grantRole({ tx: own, ...granted })) : grantRole({ tx, ...granted }))
+    },
+    // A member who still holds a role of this project in the organization is not removed. The
+    // provider deletes the member row alone and leaves this project's rows behind, which are
+    // read again the moment the person is a member again. Their roles are taken first, each
+    // through the assignment kayan's own delete, whose guards decide whether this caller may
+    // take that role. The Members page does that before removing, so a person sees this refusal
+    // only where a role was given in between or the route was called by hand.
+    //
+    // Counted outside any transaction, so a role assigned between the count and the delete is
+    // left behind; it is dormant while the person is no member and taken as they come back in
+    // (`clearsLeftRoles`).
+    beforeRemoveMember: async ({ member, organization }) => {
+      if (await heldRoles(organization.id, member.userId)) throw holdsRoles()
+    },
+    beforeAcceptInvitation: ({ user, organization }) => clearsLeftRoles({ organization: organization.id, user: user.id }),
+    beforeAddMember: ({ member, organization }) => clearsLeftRoles({ organization: organization.id, user: member.userId }),
+    // end add-on: roles
+  })
+  const built = authOptions(storeHooks(), settings).options
+  // `transaction: true` makes the provider's own transaction helper open a real transaction
+  // wherever it asks for one: a sign-up writes its user, account and session in one, and an
+  // accepted invitation its member and the session's organization. Without it each statement
+  // runs on its own.
+  const database = drizzleAdapter(store.db, { provider: 'pg', schema: store.tables, transaction: true })
+  // Two instances over one database and one user table, one per app, so a person is one row and
+  // one password in both. The tenant app's refuses every route of the admin plugin, and its
+  // stop route, which would put a staff member's session back under the tenant app's cookie.
+  // The plugin stays in it because it refuses a banned user a session and carries
+  // `impersonatedBy` onto the session it reads.
+  const tenantOnly = Object.values(admin(adminOptions).endpoints).map((endpoint) => endpoint.path)
+  // add-on: roles
+  // Leaving is refused while a role is held, as a removal is above. The provider's leave route
+  // runs no hook, so it is matched by path, on both instances. A member who holds a
+  // role-managing role takes it from nobody else, so leaves only once another member has taken
+  // it from them. An owner who holds an `administrator` row never leaves and is never removed,
+  // because that row cannot be taken (`error.forbidden.owner_role`); that is stricter than the
+  // provider, which lets an owner go while another remains, and intended.
+  const keepsRoles = {
+    id: 'keeps-roles',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ctx.path === '/organization/leave',
+      handler: createAuthMiddleware(async (ctx) => {
+        const organization = (ctx.body as { organizationId?: unknown } | undefined)?.organizationId
+        const caller = await getSessionFromCtx(ctx).catch(() => null)
+        if (typeof organization !== 'string' || !caller) return
+        if (await heldRoles(organization, caller.user.id)) throw holdsRoles()
+      }),
+    }] },
+  }
+  // end add-on: roles
+  // Whether anyone holds a platform role, read as `holdsRole` reads `user.role`: comma-separated,
+  // each name trimmed of the whitespace `.trim()` takes. Every tenant user's `user` is passed
+  // over before the split, and the scan stops at the first holder.
+  type Executes = { execute(query: unknown): Promise<{ rows: unknown[] }> }
+  const users = store.tables.user as { role: unknown }
+  const administered = async (db: Executes) =>
+    (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(platformRoles)}) limit 1`)).rows.length > 0
+  const organizationTable = store.tables.organization
+  const organized = async (db: Executes) => (await db.execute(sql`select 1 from ${organizationTable} limit 1`)).rows.length > 0
+  const oneOrganization = settings.organizations !== 'many'
+  // The tenant's first-run, in one organization or none: the first owner and the one organization,
+  // which nothing else makes, under the lock first-register takes and the setup code. It makes
+  // the owner platform staff too while the platform app is served and has none, so one person
+  // sets up both. The account is verified: the setup code is the proof.
+  const firstRunClosed = () => new APIError('FORBIDDEN', { code: 'FIRST_RUN_CLOSED', message: 'This app has its organization, so first-run is closed. Sign in instead.' })
+  const firstRun = {
+    id: 'first-run',
+    endpoints: {
+      firstRunState: createAuthEndpoint('/first-run/state', { method: 'GET' }, async (ctx) =>
+        ctx.json((await organized(store.db as Executes)) ? { open: false } : { open: true, code: setupCodeState(tenantURL), name: settings.organizations === 'one' })),
+      // `formCsrfMiddleware`, as sign-up has: no session guards this route.
+      firstRun: createAuthEndpoint('/first-run', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
+        if (!onLocalHost && !ipAddressHeaders && overFirstRunLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
+        if (await organized(store.db as Executes)) throw firstRunClosed()
+        const { name, email, password, code, organization } = (ctx.body ?? {}) as Record<string, unknown>
+        const refused = refusedSetup({ url: tenantURL, code, app: 'tenant app' })
+        if (refused) throw refused
+        const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
+        if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
+          throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
+        }
+        const named = settings.organizations === 'none' ? 'Main' : typeof organization === 'string' ? organization.trim() : ''
+        if (!named || named.length > 100) throw new APIError('BAD_REQUEST', { message: 'The organization has a name of 1 to 100 characters.' })
+        return ctx.json(await store.transaction(async (tx) => {
+          await (tx as Executes).execute(sql`set transaction isolation level read committed`)
+          await (tx as Executes).execute(setupLock)
+          if (await organized(tx as Executes)) throw firstRunClosed()
+          const staff = platformApp && !(await administered(tx as Executes))
+          // ponytail: an instance per call over this transaction, as first-register's; it runs
+          // once in a project's life.
+          const bound = betterAuthServer({ ...authOptions(storeHooks(tx), settings).options, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
+          const adapter = (await bound.$context).adapter
+          return runWithAdapter(adapter, () => firstRegistering.run(true, async () => {
+            const { user } = await bound.api.createUser({ body: { name, email, password, role: (staff ? 'super_admin' : 'user') as never, data: { emailVerified: true } } })
+            const slug = settings.organizations === 'none' ? 'main' : `${named.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${randomBytes(3).toString('hex')}`
+            const made = (await bound.api.createOrganization({ body: { name: named, slug, userId: user.id } }))!
+            authAudit({ action: 'first-run', user: user.id, organization: made.id, platform: staff })
+            return { user: { id: user.id }, organization: { id: made.id } }
+          }))
+        }))
+      }),
+    },
+    rateLimit: [{ pathMatcher: (path: string) => path === '/first-run', window: 60, max: 3 }],
+  }
+  // Whether `id` names a pending invitation, unexpired, sent to `email` as the provider compares
+  // addresses, lowercased. The id is ~190 random bits, so holding it is the proof.
+  type Finds = { findOne<Row>(query: { model: string; where: { field: string; value: string }[] }): Promise<Row | null> }
+  const holdsInvitation = async ({ adapter, id, email }: { adapter: Finds; id: unknown; email: unknown }) => {
+    if (typeof id !== 'string' || typeof email !== 'string') return false
+    const invitation = await adapter.findOne<{ email: string; status: string; expiresAt: Date | string }>({ model: 'invitation', where: [{ field: 'id', value: id }] })
+    return !!invitation && invitation.status === 'pending' && new Date(invitation.expiresAt) > new Date() && invitation.email.toLowerCase() === email.toLowerCase()
+  }
+  // One answer for every refused sign-up by invitation, so it tells nobody whether an address has
+  // an account or an invitation.
+  const inviteOnly = () => new APIError('FORBIDDEN', { code: 'SIGN_UP_INVITE_ONLY', message: 'Sign-up here is by invitation: open the link of the invitation sent to you.' })
+  const outsideDomains = () => new APIError('FORBIDDEN', { code: 'SIGN_UP_DOMAIN', message: 'This address is not at a domain that may sign up here.' })
+  // Who may make an account in one organization or none, asked before the provider's route, which
+  // would answer an address that has an account differently from one that has none.
+  const signUpGate = {
+    id: 'sign-up-gate',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ctx.path === '/sign-up/email',
+      handler: createAuthMiddleware(async (ctx) => {
+        if (!(await organized(store.db as Executes))) throw new APIError('FORBIDDEN', { code: 'FIRST_RUN_PENDING', message: 'This app is not set up yet: its administrator opens /auth/first-run first.' })
+        const { email, invitationId } = (ctx.body ?? {}) as { email?: unknown; invitationId?: unknown }
+        if (settings.signUp === 'invite' && !(await holdsInvitation({ adapter: ctx.context.adapter as unknown as Finds, id: invitationId, email }))) throw inviteOnly()
+        if (settings.signUp === 'open' && settings.allowedDomains.length && !(typeof email === 'string' && domainAllowed(email, settings.allowedDomains))) throw outsideDomains()
+      }),
+    }] },
+  }
+  // The same rule wherever the tenant app makes an account, so a sign-in method added later
+  // (social, a magic link, a one-time code) never opens a way past it. First-run holds
+  // `firstRegistering`. The platform console's `/admin/create-user`, which only staff reach, makes
+  // accounts on its own instance and is not asked: staff add whom they choose.
+  const accountGate = async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
+    if (!oneOrganization || firstRegistering.getStore()) return
+    if (settings.signUp === 'invite') {
+      const invitationId = (context?.body as { invitationId?: unknown } | undefined)?.invitationId
+      if (!context || !(await holdsInvitation({ adapter: (await getCurrentAdapter(context.context.adapter as never)) as unknown as Finds, id: invitationId, email: user.email }))) throw inviteOnly()
+    } else if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) throw outsideDomains()
+  }
+  // Whether a new account proves its address before it signs in and joins.
+  const verifying = oneOrganization && settings.signUp === 'open' && settings.verifyEmail
+  // Who joins the one organization by signing up: in one organization or none with an open sign-up,
+  // when the account is made or, where addresses are verified, when its address is proved. The
+  // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.
+  // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or was
+  // ever invited, is passed over: an invitation is how they join, and an accepted one means they
+  // were a member, perhaps removed since. An account joins once in its life, recorded beside it, so
+  // a removed member whose address is made unverified and proved again stays out.
+  const joinedOnce = (user: string) => `joined-open:${user}`
+  const joinOpen = async (user: { id: string; email: string; role?: unknown }) => {
+    if (!oneOrganization || settings.signUp !== 'open') return
+    if (holdsRole(user.role, (one) => Object.hasOwn(platformRoles, one))) return
+    if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) return
+    const [organization] = (await store.find({ kayan: 'organization', args: { limit: 1, page: 1, sort: { field: 'createdAt', direction: 'asc' } } })).docs
+    if (!organization) return
+    const { internalAdapter } = await tenant.$context
+    if (await internalAdapter.findVerificationValue(joinedOnce(user.id))) return
+    if (await store.count!({ kayan: 'member', args: { where: { userId: { equals: user.id } } } })) return
+    if (await store.count!({ kayan: 'invitation', args: { where: { email: { equals: user.email.toLowerCase() } } } })) return
+    const joined = String(organization.id)
+    // ponytail: the record is a verification row that never expires, the one table the provider
+    // lets a project write a fact about an account to with no column of its own; a column on the
+    // user, written by `generate auth`, if more such facts come. Never purge `joined-open:` rows:
+    // without one, a removed member who resets their password joins again.
+    await internalAdapter.createVerificationValue({ identifier: joinedOnce(user.id), value: joined, expiresAt: new Date('9999-12-31T00:00:00Z') })
+    await tenant.api.addMember({ body: { userId: user.id, organizationId: joined, role: 'member' } })
+    // add-on: roles
+    if (settings.joinRole !== null) await store.transaction((tx) => grantRole({ tx, organization: joined, user: user.id, role: settings.joinRole! }))
+    // end add-on: roles
+    // A session made before the join names no organization, and every read would be refused in it.
+    for (const one of await internalAdapter.listSessions(user.id)) {
+      // The organization plugin's own column, which the core session type does not name.
+      if (!(one as { activeOrganizationId?: string | null }).activeOrganizationId) await internalAdapter.updateSession(one.token, { activeOrganizationId: joined })
+    }
+    authAudit({ action: 'join', user: user.id, organization: joined, role: settings.joinRole })
+  }
+  // Whether the account was mailed a link to choose its password in the last five minutes, other
+  // than `except`: that one still works, so nobody fills a mailbox by asking again and again.
+  const resetLinks = [{ field: 'identifier', operator: 'starts_with' as const, value: 'reset-password:' }]
+  const mailedLately = async (user: string, except?: string) => {
+    const rows = await (await tenant.$context).adapter.findMany<{ identifier: string; createdAt: Date | string }>({ model: 'verification', where: [{ field: 'value', value: user }, ...resetLinks] })
+    return rows.some((row) => row.identifier !== `reset-password:${except}` && Date.now() - new Date(row.createdAt).getTime() < 5 * 60 * 1000)
+  }
+  // The set-password link that proves an address, stored as the provider stores a reset's, so the
+  // reset page and route answer it. It lasts an hour, as a reset link does.
+  const confirmLink = async (user: { id: string; email: string }) => {
+    if (!settings.mailer || (await mailedLately(user.id))) return
+    const token = randomBytes(24).toString('base64url')
+    await (await tenant.$context).internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 60 * 60 * 1000) })
+    await confirmMail(settings.mailer)({ email: user.email, token })
+  }
+  const tenant = betterAuthServer({
+    ...built,
+    emailAndPassword: {
+      ...built.emailAndPassword,
+      requireEmailVerification: verifying,
+      // A reset proves the mailbox, and an account proved so for the first time joins as a verified
+      // one would. The user is read before the reset, so `emailVerified` says whether it was proved.
+      onPasswordReset: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean; role?: unknown } }) => {
+        const { adapter, internalAdapter } = await tenant.$context
+        await internalAdapter.updateUser(user.id, { emailVerified: true })
+        // The password is chosen, so every other link to choose it is spent.
+        await adapter.deleteMany({ model: 'verification', where: [{ field: 'value', value: user.id }, ...resetLinks] })
+        if (!user.emailVerified) await joinOpen(user)
+      },
+      // A second sign-up with the address of an account nobody proved, such as its owner's after
+      // someone squatted it, is answered as any sign-up and mails the address the link that proves it.
+      ...(settings.mailer && {
+        sendResetPassword: async (data: { user: { id: string; email: string }; token: string }) => {
+          if (!(await mailedLately(data.user.id, data.token))) await resetMail(settings.mailer!)(data)
+        },
+      }),
+      ...(verifying && { onExistingUserSignUp: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean } }) => (user.emailVerified ? undefined : confirmLink(user)) }),
+    },
+    // A sign-up mails the link once. A sign-in before the proof mails nothing, and the provider's own
+    // resend and verify routes are off, so nobody pushes a link to an address on demand.
+    ...(verifying && { emailVerification: { sendVerificationEmail: ({ user }: { user: { id: string; email: string } }) => confirmLink(user), sendOnSignUp: true } }),
+    plugins: [
+      ...built.plugins,
+      // add-on: roles
+      keepsRoles,
+      // end add-on: roles
+      ...(oneOrganization ? [firstRun, signUpGate] : []),
+    ],
+    // In one organization or none, nobody founds another or leaves the one: leaving would leave the
+    // person in no organization at all, where every read is refused.
+    disabledPaths: [
+      ...tenantOnly,
+      ...(oneOrganization ? ['/organization/create', '/organization/leave'] : []),
+      ...(verifying ? ['/send-verification-email', '/verify-email'] : []),
+    ],
+    databaseHooks: {
+      ...built.databaseHooks,
+      user: {
+        create: {
+          before: async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
+            await accountGate(user, context)
+          },
+          after: async (user: { id: string; email: string; role?: unknown }) => {
+            authAudit({ action: 'sign-up', user: user.id })
+            if (!verifying) await joinOpen(user)
+          },
+        },
+      },
+    },
+    database,
+  })
+  // add-on: courses
+  // A person who holds a seat, a withdrawn one included, is not removed: the enrollment records
+  // that they attended, and its `student` key restricts. The provider's `deleteUser` runs in no
+  // transaction, so the key alone would fail after the person's sessions and accounts were
+  // gone, leaving someone who can never sign in again. So it is refused before anything goes.
+  // The store's count reads every row, marked ones included. The id is read the way the route
+  // reads it, after its own `z.coerce.string()`, so an id sent as a list or a number is the
+  // same person here as there.
+  const seated = {
+    id: 'seated',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ctx.path === '/admin/remove-user',
+      handler: createAuthMiddleware(async (ctx) => {
+        const raw = (ctx.body as { userId?: unknown } | undefined)?.userId
+        if (raw === undefined || raw === null || !(await getSessionFromCtx(ctx).catch(() => null))) return
+        // The drizzle store always counts; `Store` types it optional for stores that cannot.
+        if (await store.count!({ kayan: 'enrollments', args: { where: { student: { equals: String(raw) } } } })) {
+          throw new APIError('CONFLICT', { code: 'error.conflict.referenced', message: 'This person holds a seat in a session, a withdrawn one included, so they are not removed while an enrollment records them.' })
+        }
+      }),
+    }] },
+  }
+  // end add-on: courses
+  // One answer however often and by whomever it is asked, naming nobody.
+  const closed = () => new APIError('FORBIDDEN', { code: 'FIRST_REGISTER_CLOSED', message: 'This platform has its administrator, so first-register is closed. Sign in instead.' })
+  // The platform's first `super_admin`, which nothing else can make: the provider's own
+  // `create-user`, run on an instance bound to a transaction that holds an advisory lock and
+  // read no administrator under it, so two concurrent calls never both make one.
+  const firstRegister = {
+    id: 'first-register',
+    endpoints: {
+      init: createAuthEndpoint('/init', { method: 'GET' }, async (ctx) =>
+        ctx.json((await administered(store.db as Executes)) ? { initialized: true } : { initialized: false, code: setupCodeState(platformURL) })),
+      // `formCsrfMiddleware`, as sign-up has: no session guards this route, so another site's
+      // form must not post to it.
+      firstRegister: createAuthEndpoint('/first-register', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
+        if (platformLimited && !ipAddressHeaders && overSharedLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
+        if (await administered(store.db as Executes)) throw closed()
+        const { name, email, password, code } = (ctx.body ?? {}) as Record<string, unknown>
+        const refused = refusedSetup({ url: platformURL, code, app: 'platform app' })
+        if (refused) throw refused
+        // `create-user` checks the address but not the password's length, which sign-up does.
+        const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
+        if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
+          throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
+        }
+        return ctx.json(await store.transaction(async (tx) => {
+          // Read committed whatever the database's default, so the read below sees an
+          // administrator another call committed while this one waited on the lock.
+          await (tx as Executes).execute(sql`set transaction isolation level read committed`)
+          await (tx as Executes).execute(setupLock)
+          if (await administered(tx as Executes)) throw closed()
+          // ponytail: an instance per call, built over this transaction; it runs once in a
+          // project's life. `built` carries the admin plugin and the audit hooks, which is all
+          // `create-user` reads.
+          const bound = betterAuthServer({ ...built, secret: platformSecret, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
+          // The provider writes through the adapter its request stored, which is the platform's
+          // pool here, so the user and account rows are pointed at this transaction instead:
+          // both commit with the check or neither does, and no second client is taken.
+          const adapter = (await bound.$context).adapter
+          // The plugin types a role from `adminOptions.roles`, whose platform roles are built at
+          // runtime, so it names `user` alone.
+          // Verified, as first-run's owner is: the setup code is the proof, and staff are never
+          // asked to verify an address.
+          return runWithAdapter(adapter, () => firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never, data: { emailVerified: true } } })))
+        }))
+      }),
+    },
+    // Production limits every route; this one to three tries a minute from one address, as the
+    // provider limits a password reset.
+    rateLimit: [{ pathMatcher: (path: string) => path === '/first-register', window: 60, max: 3 }],
+  }
+  // The platform app's own instance: its own cookie name, so on `localhost`, where ports do not
+  // keep cookies apart, the two apps never read each other's session; its own secret, so
+  // neither signs a cookie the other accepts; its own origin alone trusted, so a tenant page
+  // cannot post to it with the platform's cookie; no verify of a one-time token, which would
+  // turn an impersonation into a platform session; and no sign-up, since staff are people the
+  // platform already has. A project with no platform console has no first-register either.
+  const platform = betterAuthServer({
+    ...built,
+    plugins: [
+      ...built.plugins,
+      // add-on: courses
+      seated,
+      // end add-on: courses
+      // add-on: roles
+      keepsRoles,
+      // end add-on: roles
+      ...(platformApp ? [firstRegister] : []),
+    ],
+    baseURL: platformURL,
+    trustedOrigins: platformOrigins,
+    rateLimit: { ...built.rateLimit, enabled: platformLimited },
+    secret: platformSecret,
+    advanced: { ...built.advanced, cookiePrefix: platformCookiePrefix },
+    // Nor a password reset of its own: staff reset through the tenant app's page like anyone,
+    // and the reset ends their sessions here too.
+    disabledPaths: ['/one-time-token/verify', '/sign-up/email', '/request-password-reset', '/reset-password'],
+    databaseHooks: { session: { create: { before: staffSession(built.databaseHooks.session.create.before) } } },
+    database,
+  })
+  // One object for the kayan, which answers from whichever instance serves the request.
+  return new Proxy(tenant, { get: (_target, key) => Reflect.get(onPlatform() ? platform : tenant, key) })
 }

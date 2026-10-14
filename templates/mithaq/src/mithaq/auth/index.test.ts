@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { authOptions, options, trustedIpHeaders } from './index.ts'
+import { authOptions, authSettings, backgroundSettled, domainAllowed, options, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
 test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
   assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
@@ -182,4 +182,156 @@ test('an invitation writes its accept link to the log under NODE_ENV=development
     assert.equal(log.includes(`http://localhost:5173/auth/accept-invitation?id=${made!.id}`), logs, `${deploy}: the link is ${logs ? '' : 'not '}logged`)
     assert.equal(log.includes('invitee@example.com'), logs, `${deploy}: nor the address unless the link is`)
   }
+})
+
+/** A server of `settings` with a mailer that keeps what it sends, whose owner founded `Org` and is signed in. */
+const mailingOwner = async (settings: AuthSettings, organizationName = 'Org') => {
+  const sent: { to: string; subject: string; text: string; html: string }[] = []
+  const mailer = { send: async (mail: (typeof sent)[number]) => void sent.push(mail) }
+  const server = betterAuthServer({ ...authOptions({}, { ...settings, mailer }).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+  const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
+  await server.api.createOrganization({ body: { name: organizationName, slug: 'org', userId: user.id } })
+  const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  return { sent, server, headers }
+}
+
+test('with a mailer the reset and, with one organization, the invitation are mailed through it, each in both locales with its link, and nothing is logged', async () => {
+  const { sent, server, headers } = await mailingOwner({ ...authSettings, organizations: 'one', signUp: 'invite', joinRole: null, verifyEmail: true })
+  const log = await printed(async () => {
+    await server.api.requestPasswordReset({ body: { email: 'owner@example.com' } })
+    await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+    await backgroundSettled()
+  })
+  assert.deepEqual(sent.map((one) => one.to), ['owner@example.com', 'invitee@example.com'], 'one message to each address')
+  assert.equal(typeof tokenIn(sent[0]!.text), 'string', 'the reset carries its link')
+  assert.match(sent[1]!.text, /http:\/\/localhost:5173\/auth\/accept-invitation\?id=\w+/, 'the invitation carries its accept link')
+  for (const one of sent) assert.match(one.html, /dir="rtl"[\s\S]*[؀-ۿ]/, 'with an Arabic part')
+  assert.equal(log.includes('token='), false, 'and the log holds no link')
+})
+
+test('with many organizations, which anyone founds, no invitation is mailed: a founder never sends their words to any address through the mailer', async () => {
+  const { sent, server, headers } = await mailingOwner(authSettings)
+  await printed(() => server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers }))
+  await backgroundSettled()
+  assert.deepEqual(sent, [])
+  assert.equal(authOptions({}, authSettings).options.rateLimit.customRules?.['/organization/invite-member'], undefined, 'and many keeps the provider\'s own limits')
+})
+
+test('with one organization an invitation\'s subject is fixed, its body escapes the organization\'s name, invitations are rate limited, and no subject carries a line break', async () => {
+  const { sent, server, headers } = await mailingOwner({ ...authSettings, organizations: 'one', signUp: 'invite', joinRole: null, verifyEmail: true }, 'Evil <b>\r\nBcc: x@example.com')
+  await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+  await backgroundSettled()
+  assert.equal(sent[0]!.subject.includes('Evil'), false, 'the subject names no organization')
+  assert.equal(/[\r\n]/.test(sent[0]!.subject), false)
+  assert.equal(sent[0]!.html.includes('<b>'), false, 'the name is escaped in the HTML')
+  assert.ok(authOptions({}, { ...authSettings, organizations: 'one', signUp: 'invite', joinRole: null, verifyEmail: true }).options.rateLimit.customRules?.['/organization/invite-member'], 'invitations have a limit of their own')
+  assert.equal(subjectLine('Reset\r\nBcc: x@example.com\u0007'), 'Reset Bcc: x@example.com')
+})
+
+/** The repository's own settings with the changes given. */
+const settingsWith = (changes: Partial<AuthSettings>): AuthSettings => ({ ...authSettings, ...changes })
+const school = settingsWith({ organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true, allowedDomains: [] })
+const mailer = { send: async () => {} }
+/** What `settingsProblems` says of `settings`, as one string per problem, read in development unless said. */
+const schoolRoles = { administrator: '*', registrar: ['courses.find', 'memberRoles.create'], instructor: ['courses.find', 'invitation.create'], student: ['courses.find', 'courses.fields.title', 'memberRoles.find', 'screen.portal'] } as const
+const problems = (settings: AuthSettings, deployed = false) => settingsProblems({ settings, deployed, joinRoles: schoolRoles })
+
+test('the organization settings refuse every combination that would mean nothing or open a door, each naming what to change', () => {
+  assert.deepEqual(problems(authSettings), [], 'the repository\'s own settings, many organizations, are sound')
+  assert.deepEqual(problems(school), [], 'and so is a school: one organization, invitations only')
+  assert.deepEqual(problems(settingsWith({ organizations: 'none', signUp: 'open', joinRole: null, verifyEmail: false, allowedDomains: [] })), [])
+  const refused: [string, Partial<AuthSettings>, RegExp][] = [
+    ['many by invitation', { signUp: 'invite' }, /'many'[\s\S]*signUp = 'open'/],
+    ['many with a join role', { joinRole: 'student' }, /'many'[\s\S]*joinRole = null/],
+    ['many verifying addresses', { verifyEmail: true }, /'many'[\s\S]*verifyEmail = false/],
+    ['many with domains', { allowedDomains: ['example.com'] }, /'many'[\s\S]*allowedDomains/],
+  ]
+  for (const [name, changes, said] of refused) assert.match(problems(settingsWith(changes)).join('\n'), said, name)
+  const ofSchool: [string, Partial<AuthSettings>, RegExp][] = [
+    ['domains by invitation', { allowedDomains: ['example.com'] }, /allowedDomains[\s\S]*signUp = 'open'/],
+    ['domains with no verification', { signUp: 'open', verifyEmail: false, allowedDomains: ['example.com'] }, /allowedDomains[\s\S]*verifyEmail = true/],
+    ['an unknown join role', { joinRole: 'janitor' }, /joinRole[\s\S]*"janitor"/],
+    ['a join role holding every key', { joinRole: 'administrator' }, /joinRole[\s\S]*"administrator"[\s\S]*gives roles or invites/],
+    ['a join role that gives roles', { joinRole: 'registrar' }, /joinRole[\s\S]*"registrar"[\s\S]*memberRoles\.create/],
+    ['a join role that invites', { joinRole: 'instructor' }, /joinRole[\s\S]*"instructor"[\s\S]*invitation\.create/],
+  ]
+  for (const [name, changes, said] of ofSchool) assert.match(problems({ ...school, ...changes }).join('\n'), said, name)
+  for (const entry of ['Example.com', 'example.com.', '*example.com', 'exa mple.com', 'ex\u0430mple.com', '@example.com', '*.*.example.com', 'com']) {
+    assert.match(problems({ ...school, signUp: 'open', allowedDomains: [entry] }).join('\n'), /allowedDomains/, `"${entry}" is no domain entry`)
+  }
+  assert.deepEqual(problems({ ...school, signUp: 'open', allowedDomains: ['example.com', '*.example.org', 'xn--mnchen-3ya.de'] }), [], 'lowercase ASCII hosts and one leading *. are')
+  assert.equal(settingsProblems({ settings: { ...school, joinRole: 'student' }, deployed: false, joinRoles: null }).length, 1, 'without the roles add-on a join role is refused')
+})
+
+test('in production an open sign-up of one organization needs a mailer, and invitations alone or many organizations do not', () => {
+  const open = { ...school, signUp: 'open' as const }
+  assert.match(problems({ ...open, mailer: undefined }, true).join('\n'), /signUp = 'open'[\s\S]*RESEND_API_KEY/)
+  assert.deepEqual(problems({ ...open, mailer }, true), [])
+  assert.deepEqual(problems({ ...open, mailer: undefined }, false), [], 'development logs its mail instead')
+  assert.deepEqual(problems({ ...school, mailer: undefined }, true), [])
+  assert.deepEqual(problems(settingsWith({ mailer: undefined }), true), [])
+})
+
+test('an allowed domain matches exactly after lowercasing and punycode, a subdomain only through *., and never by suffix', () => {
+  const allowed = ['example.com', '*.corp.org', 'xn--mnchen-3ya.de']
+  const cases: [string, boolean][] = [
+    ['a@example.com', true],
+    ['A@EXAMPLE.COM', true],
+    ['a@sub.example.com', false],
+    ['a@notexample.com', false],
+    ['a@example.com.evil.net', false],
+    ['a@evil.net@example.com', true],
+    ['a@ex\u0430mple.com', false],
+    ['a@team.corp.org', true],
+    ['a@deep.team.corp.org', true],
+    ['a@corp.org', false],
+    ['a@evilcorp.org', false],
+    ['a@m\u00fcnchen.de', true],
+    ['a@xn--mnchen-3ya.de', true],
+    ['a@\uff45xample.com', false],
+    ['a@example\uff0ecom', false],
+    ['a@example%2ecom', false],
+    ['a@EXAMPLE.COM.', false],
+    ['no-at-sign', false],
+    ['a@', false],
+  ]
+  for (const [email, expected] of cases) assert.equal(domainAllowed(email, allowed), expected, email)
+})
+
+test('in one organization or none, nobody founds an organization over the provider\'s routes, and many founds as before', async () => {
+  for (const [settings, founds] of [[school, false], [{ ...school, organizations: 'none' as const }, false], [authSettings, true]] as const) {
+    const server = betterAuthServer({ ...authOptions({}, settings).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+    const headers = new Headers({ cookie: (await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+    const made = await server.api.createOrganization({ body: { name: 'Org', slug: 'org' }, headers }).then(() => true, (error: { body?: { code?: string } }) => error.body?.code)
+    assert.equal(made, founds || 'YOU_ARE_NOT_ALLOWED_TO_CREATE_A_NEW_ORGANIZATION', `${settings.organizations}: an organization is ${founds ? '' : 'not '}founded`)
+  }
+})
+
+test('with no organization shown, an invitation invites to the app and never names the organization', async () => {
+  const sent: { subject: string; text: string }[] = []
+  const settings = { ...authSettings, organizations: 'none' as const, signUp: 'invite' as const, mailer: { send: async (mail: (typeof sent)[number]) => void sent.push(mail) } }
+  const server = betterAuthServer({ ...authOptions({}, settings).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+  const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
+  await server.api.createOrganization({ body: { name: 'Main', slug: 'main', userId: user.id } })
+  const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
+  await server.api.createInvitation({ body: { email: 'invitee@example.com', role: 'member' }, headers })
+  assert.equal(sent.length, 1)
+  assert.doesNotMatch(`${sent[0]!.subject} ${sent[0]!.text}`, /Main/, 'the organization is not named')
+  assert.match(sent[0]!.text, /this app/)
+})
+
+test('a mailer is never waited on: a reset is answered as fast for an address with an account as for one without, and the mail follows', async () => {
+  const sent: string[] = []
+  const slow = { send: async ({ to }: { to: string }) => { await new Promise((done) => setTimeout(done, 1000)); sent.push(to) } }
+  const server = betterAuthServer({ ...authOptions({}, { ...authSettings, mailer: slow }).options, database: memoryAdapter(tables()), secret: 'test-secret' })
+  await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
+  const timed = async (email: string) => {
+    const started = performance.now()
+    await server.api.requestPasswordReset({ body: { email } })
+    return performance.now() - started
+  }
+  const [held, missing] = [await timed('held@example.com'), await timed('nobody@example.com')]
+  assert.ok(held < 500 && missing < 500, `neither answer waits on the mailer: ${Math.round(held)}ms and ${Math.round(missing)}ms`)
+  await backgroundSettled()
+  assert.deepEqual(sent, ['held@example.com'], 'and the mail is sent after')
 })

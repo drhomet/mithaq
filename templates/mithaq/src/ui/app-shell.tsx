@@ -41,6 +41,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { navLabel } from './screen-nav.tsx'
+import { organizations } from '../mithaq/auth/organizations.ts'
 
 export const regions = ['header', 'main'] as const
 
@@ -213,7 +214,8 @@ export function AppShell({ regions, brand, home }: ShellProps<readonly ['header'
             the sidebar, whose props reach no element on a phone, where it is a
             sheet. */}
         <nav aria-label={t('admin.navigation', 'Navigation')} className="flex min-h-0 flex-1 flex-col">
-          <SidebarHeader>{brand ?? <Organizations />}</SidebarHeader>
+          {/* With no organization shown, the app's own name sits where the switcher would. */}
+          <SidebarHeader>{brand ?? (organizations === 'none' ? <span data-brand="" className="truncate px-2 py-1.5 text-base font-semibold">{t('marketing.brand', 'Asas')}</span> : <Organizations />)}</SidebarHeader>
           <SidebarContent>
             <NavMain home={home} />
           </SidebarContent>

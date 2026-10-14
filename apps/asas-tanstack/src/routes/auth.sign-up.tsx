@@ -1,18 +1,29 @@
 import { useState, type ComponentProps } from 'react'
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { organizations, signUp, verifyEmail } from 'asas/organizations'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
 import { AuthBox, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
+import { firstRun } from '../first-run.ts'
 import { wanted } from '../redirect.ts'
 import { useCopy } from './__root.tsx'
 
 export const Route = createFileRoute('/auth/sign-up')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.signUp')),
   validateSearch: redirectSearch,
-  beforeLoad: gate,
+  // An app of one organization that has none yet takes no account before its owner's.
+  beforeLoad: async ({ search }: { search: { redirect?: string } }) => {
+    if ((await firstRun()).open) throw redirect({ href: '/auth/first-run' })
+    return gate({ search })
+  },
   component: SignUp,
 })
+
+/** With many organizations each sign-up founds its own; with one or none, it joins the one or waits for an invitation. */
+const founds = organizations === 'many'
+/** Whether a new account proves its address before it signs in, so the sign-up answers with no session. */
+const verifies = !founds && signUp === 'open' && verifyEmail
 
 /**
  * Better Auth requires a unique slug, so a random tail keeps same-named organizations apart.
@@ -29,7 +40,10 @@ function SignUp() {
   const { password: bounds } = Route.useRouteContext()
   // The redirect is a link anyone can write; a crafted one only makes an account with no organization,
   // which reads nothing until an organization invites it.
-  const invited = wanted({ asked: search.redirect, home: '/' }).startsWith('/auth/accept-invitation?')
+  const asked = wanted({ asked: search.redirect, home: '/' })
+  const invited = asked.startsWith('/auth/accept-invitation?')
+  // The invitation's id, which a sign-up by invitation carries: holding it is what lets it through.
+  const invitationId = invited ? new URLSearchParams(asked.slice(asked.indexOf('?'))).get('id') ?? undefined : undefined
   const [name, setName] = useState('')
   const [organization, setOrganization] = useState('')
   const [email, setEmail] = useState('')
@@ -41,10 +55,11 @@ function SignUp() {
   // retry after the organization call failed must skip it. An address and not a flag: a corrected typo signs up again.
   const [signedUpAs, setSignedUpAs] = useState<string | null>(null)
   const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set())
+  const [sent, setSent] = useState<string | null>(null)
   const required = t('auth.required', 'This field is required.')
   const wrong = {
     name: () => (name ? undefined : required),
-    organization: () => (invited || organization ? undefined : required),
+    organization: () => (!founds || invited || organization ? undefined : required),
     email: () => (!email ? required : notAnEmail(email) ? t('auth.invalidEmail', 'Invalid email') : undefined),
     password: () =>
       !password ? required
@@ -65,7 +80,7 @@ function SignUp() {
     setPending(true)
     setRefusal(null)
     if (signedUpAs !== email) {
-      const made = await authArm('sign-up/email', { name, email, password })
+      const made = await authArm('sign-up/email', { name, email, password, ...(invitationId && { invitationId }) })
       if (!made.ok) {
         setPending(false)
         return setRefusal(refused(made, t('auth.signUpFailed', 'That sign-up did not work.')))
@@ -74,12 +89,43 @@ function SignUp() {
     }
     // A refusal here leaves an account that reads nothing, so the sentence names the organization;
     // `signedUpAs` holds a retry to this call.
-    const created = invited ? undefined : await authArm('organization/create', { name: organization, slug: slugOf(organization) })
+    // An account that proves its address first has no session yet, invited or not, so it is told to open its mail.
+    if (verifies) {
+      setPending(false)
+      return setSent(email)
+    }
+    const created = !founds || invited ? undefined : await authArm('organization/create', { name: organization, slug: slugOf(organization) })
     setPending(false)
     if (created && !created.ok) return setRefusal(refused(created, t('auth.organizationFailed', 'That organization could not be created.')))
     await navigate({ to: wanted({ asked: search.redirect, home: (await authGate()).home.path }) })
   }
 
+  const toSignIn = (
+    <p className="mt-4 text-center text-sm text-muted-foreground">
+      {t('auth.haveAccount', 'Already have an account?')}{' '}
+      <Link className="text-primary underline underline-offset-4" to="/auth/sign-in" search={{ redirect: search.redirect }}>
+        {t('auth.signIn', 'Sign in')}
+      </Link>
+    </p>
+  )
+  // By invitation, nobody without one is offered a form the server would refuse.
+  if (!founds && signUp === 'invite' && !invitationId) {
+    return (
+      <AuthFrame title={t('auth.signUp', 'Sign up')} description={t('auth.inviteOnly', 'Accounts here are made by invitation. Open the link of the invitation sent to you, or sign in.')}>
+        {toSignIn}
+      </AuthFrame>
+    )
+  }
+  if (sent) {
+    return (
+      <AuthFrame
+        title={t('auth.verifySent', 'Check your email')}
+        description={<span className="[overflow-wrap:anywhere]">{t('auth.verifySentDescription', 'We sent a link to {email}. Open it to confirm your address and choose your password, then sign in. It lasts an hour.')!.split(/(\{email\})/).map((part, at) => (part === '{email}' ? <bdi key={at}>{sent}</bdi> : part))}</span>}
+      >
+        {toSignIn}
+      </AuthFrame>
+    )
+  }
   return (
     <AuthFrame
       title={t('auth.signUp', 'Sign up')}
@@ -87,7 +133,7 @@ function SignUp() {
     >
       <form className="grid gap-4" noValidate onSubmit={submit}>
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}
-        {invited ? null : box('organization', t('auth.organization', 'Organization'), { autoComplete: 'organization', onChange: (event) => setOrganization(event.target.value), type: 'text', value: organization })}
+        {!founds || invited ? null : box('organization', t('auth.organization', 'Organization'), { autoComplete: 'organization', onChange: (event) => setOrganization(event.target.value), type: 'text', value: organization })}
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), {
           autoComplete: 'new-password',
@@ -111,12 +157,7 @@ function SignUp() {
           {pending ? t('auth.signUpPending', 'Signing up…') : t('auth.signUp', 'Sign up')}
         </Button>
       </form>
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        {t('auth.haveAccount', 'Already have an account?')}{' '}
-        <Link className="text-primary underline underline-offset-4" to="/auth/sign-in" search={{ redirect: search.redirect }}>
-          {t('auth.signIn', 'Sign in')}
-        </Link>
-      </p>
+      {toSignIn}
     </AuthFrame>
   )
 }

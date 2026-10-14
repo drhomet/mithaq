@@ -209,7 +209,7 @@ const foldIntoOnePackage = (project) => {
   })
   // A feature is reached through its index, or its browser-safe `domain/`, as its `exports` say.
   const targetOf = (name, sub) => {
-    if (name === 'mithaq') return sub === '' ? 'src/mithaq.ts' : sub === '/auth' ? 'src/mithaq/auth/index.ts' : sub === '/auth/platform-roles' ? 'src/mithaq/auth/platform-roles.ts' : `src${sub}`
+    if (name === 'mithaq') return sub === '' ? 'src/mithaq.ts' : sub === '/auth' ? 'src/mithaq/auth/index.ts' : ['/auth/platform-roles', '/auth/organizations'].includes(sub) ? `src/mithaq${sub}.ts` : `src${sub}`
     if (sub === '') return `src/features/${name}/index.ts`
     if (sub.startsWith('/domain/')) return `src/features/${name}${sub}`
     throw new Error(`@asas/${name}${sub} reaches past the feature's exports.`)
@@ -270,6 +270,30 @@ const keepOnly = ({ project, chosen }) => {
 }
 
 /**
+ * The organization mode and who may sign up, as `organizations.ts` writes them: one organization by
+ * invitation unless asked, and many founding one by every sign-up. Open joiners of the courses
+ * example are students; without the roles add-on nobody is given a role on joining. Only one or
+ * none verifies addresses, which many does not yet.
+ */
+export function organizationSettings({ organizations = 'one', signUp, chosen }) {
+  if (!['none', 'one', 'many'].includes(organizations)) throw new Error(`--organizations is none, one or many, not "${organizations}".`)
+  if (signUp !== undefined && !['invite', 'open'].includes(signUp)) throw new Error(`--sign-up is invite or open, not "${signUp}".`)
+  const many = organizations === 'many'
+  if (many && signUp === 'invite') throw new Error('many organizations take --sign-up open: each sign-up founds its own.')
+  return {
+    organizations,
+    signUp: signUp ?? (many ? 'open' : 'invite'),
+    joinRole: !many && chosen.includes('courses') ? 'student' : null,
+    verifyEmail: !many,
+    allowedDomains: [],
+  }
+}
+
+/** Writes `settings` over the values `organizations.ts` holds, each line the template holds once. */
+const writeOrganizations = (file, settings) =>
+  edit(file, (text) => Object.entries(settings).reduce((one, [key, value]) => once(one, new RegExp(`(?<=^export const ${key}: [^=]+ = ).+$`, 'm'), JSON.stringify(value).replaceAll('"', "'")), text))
+
+/**
  * Writes the project `name` under `cwd` from `template`, and answers its
  * folder. `version` is the `@drhomet/mithaq` and `@drhomet/mithaq-admin` the
  * project installs, pinned exactly so the two cannot drift apart and an
@@ -279,13 +303,14 @@ const keepOnly = ({ project, chosen }) => {
  * platform console. `addOns` names the add-ons the project holds beside auth and the tags example, with
  * every one they need; none is the minimal project.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [] }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], organizations, signUp }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`, and a scope.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
   }
   if (!['monorepo', 'single'].includes(layout)) throw new Error(`The layout is monorepo or single, not "${layout}".`)
   const { chosen } = resolveAddOns(asked)
+  const settings = organizationSettings({ organizations, signUp, chosen })
   const platform = chosen.includes('platform')
   if (layout === 'single' && platform) throw new Error('A single package serves the tenant app alone. Choose the monorepo layout to include the platform console.')
   const project = join(cwd, name)
@@ -309,6 +334,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
     writeJson(join(project, file), file === 'package.json' ? { name, ...packageJson } : packageJson)
   }
   keepOnly({ project, chosen })
+  writeOrganizations(join(project, 'packages/mithaq/src/mithaq/auth/organizations.ts'), settings)
   // One `.env` for the asas's commands and one for each app's dev server,
   // the same secrets in each: the tenant app and the platform console sign
   // and read each other's sessions under one `BETTER_AUTH_SECRET`.
@@ -350,6 +376,12 @@ const help = `Usage: create-mithaq [name] [options]
   --layout single     one package holding the language, the features, the asas and the tenant app
   --with <a,b>        the add-ons to hold beside auth and the tags example, with every one they need
   --full              every add-on: the whole worked example (a single package leaves out platform)
+  --organizations none|one|many
+                      one organization, made on /auth/first-run (the default); none, the same one never
+                      shown; or many, each sign-up founding its own
+  --sign-up invite|open
+                      with one organization or none: by invitation alone (the default), or anyone, who
+                      joins once their address is proved (production needs a mailer); many takes open
   --help              print this
 
 With neither --with nor --full the project is minimal: auth and the tags example. The add-ons:
@@ -370,13 +402,14 @@ const binAbove = (folder) => {
 const main = async () => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, help: { type: 'boolean' } },
+    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, organizations: { type: 'string' }, 'sign-up': { type: 'string' }, help: { type: 'boolean' } },
   })
   if (values.help) return console.log(help)
   if (values.full && values.with !== undefined) throw new Error('Pass --full or --with, not both: --full is every add-on.')
   let [name] = positionals
   let { layout } = values
   let picked = values.with?.split(',').map((one) => one.trim()).filter(Boolean)
+  let { organizations, 'sign-up': signUp } = values
   const prompt = process.stdin.isTTY ? createInterface({ input: process.stdin, output: process.stdout }) : undefined
   try {
     if (!name) name = (await prompt?.question('Project name: '))?.trim() ?? ''
@@ -387,6 +420,8 @@ const main = async () => {
       else if (answer === 'pick') picked = (await prompt.question(`Add-ons, comma-separated (${Object.keys(addOns).join(', ')}): `)).split(',').map((one) => one.trim()).filter(Boolean)
       else if (answer !== 'minimal') throw new Error(`The answer is minimal, full or pick, not "${answer}".`)
     }
+    if (!organizations && prompt) organizations = (await prompt.question('One organization, none shown, or many? (one/none/many) [one]: ')).trim().toLowerCase() || 'one'
+    if (!signUp && prompt && organizations !== 'many') signUp = (await prompt.question('Who signs up: the invited, or anyone? (invite/open) [invite]: ')).trim().toLowerCase() || 'invite'
   } finally {
     prompt?.close()
   }
@@ -395,7 +430,8 @@ const main = async () => {
   const { chosen, added } = resolveAddOns(asked)
   if (added.length) console.log(`Added ${added.join(', ')}, which ${asked.filter((one) => addOns[one].needs.length).join(', ')} need${added.length === 1 ? 's' : ''}.`)
   const { version } = readJson(new URL('package.json', import.meta.url))
-  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen })
+  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, organizations, signUp })
+  const settings = organizationSettings({ organizations, signUp, chosen })
   console.log(`Created ${project}${chosen.length ? `, with ${chosen.join(', ')}` : ', minimal'}.`)
   const manager = managerOf(process.env.npm_config_user_agent)
   const installed = manager !== undefined && spawnSync(manager, ['install'], { cwd: project, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0
@@ -406,10 +442,12 @@ const main = async () => {
   const platform = chosen.includes('platform')
   // Each screen's files were generated for every kayan of the template, so a project short of an add-on with tables
   // writes its own once the install has laid the bin down.
-  const regenerate = Object.entries(addOns).some(([one, { tables }]) => tables && !chosen.includes(one))
+  const short = Object.entries(addOns).some(([one, { tables }]) => tables && !chosen.includes(one))
+  // With no organization shown, the Members page is named Users, which the template's screens do not say.
+  const regenerate = short || settings.organizations === 'none'
   const bin = installed && regenerate ? binAbove(asas) : undefined
   const generated = bin !== undefined && spawnSync(bin, ['generate', 'screens'], { cwd: asas, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0
-  if (regenerate && !generated) console.warn(`\nThe screens are not written for these add-ons yet. Run mithaq generate screens in ${asas}, after the install.`)
+  if (regenerate && !generated) console.warn(`\nThe screens are not written for this project yet. Run mithaq generate screens in ${asas}, after the install.`)
   const language = single ? '' : 'packages/asas/'
   const push = `node --env-file=.env --input-type=module -e "const { asas } = await import('./src/asas.ts'); await asas.connect(); await asas.destroy()"`
   if (single) console.log(`\nThe package is named asas, not ${name}: the screen host imports the language as asas, and a package reaches itself by its own name.`)
@@ -421,7 +459,7 @@ Next, with PostgreSQL 15 or later serving the database DATABASE_URL names in ${l
   ${push}${single ? '' : '\n  cd ../../apps/asas-tanstack'}
   ${run} run dev   # the tenant app, http://localhost:5173${platform ? `\n  # in a second terminal, from apps/asas-platform: ${run} run dev   # the platform console, http://localhost:5174` : ''}
 
-Sign up in the tenant app and create an organization. Then ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills it with sample rows: it takes the first user and that user's first organization, or the ones SEED_EMAIL and SEED_ORGANIZATION name.${regenerate ? `
+${settings.organizations === 'many' ? 'Sign up in the tenant app and create an organization.' : `Open http://localhost:5173/auth/first-run and make the app's owner${settings.organizations === 'one' ? ' and its organization' : ''}; vite dev on this machine asks no setup code, and a deploy asks the SETUP_CODE it was started with.${settings.signUp === 'open' ? ' An open sign-up needs a mailer in production: RESEND_API_KEY and MAIL_FROM.' : ''}`} Then ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills it with sample rows: it takes the first user and that user's first organization, or the ones SEED_EMAIL and SEED_ORGANIZATION name.${short ? `
 
 The project holds no migration yet. Before it runs in production, write its first against an empty database with mithaq migrate --name init in ${single ? 'the project' : 'packages/asas'} (README.md, "Running in production").` : ''}`)
 }

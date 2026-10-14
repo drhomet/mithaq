@@ -27,6 +27,7 @@ import {
   zodTarget,
   type Kayan,
 } from 'mithaq'
+import { memoryStore } from './memory-store.ts'
 
 /** The targets of a build that makes tables and never connects. */
 const offline = () => ({
@@ -37,7 +38,7 @@ const offline = () => ({
 
 const tenanted = defineMithaq({
   arkan: [base],
-  targets: { ...offline(), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict' }) },
+  targets: { ...offline(), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }) },
 })
 const { targets: { tenant } } = tenanted
 const untenanted = defineMithaq({ arkan: [base], targets: offline() })
@@ -67,7 +68,7 @@ test('betterAuthTenant is the tenant target, and its field is one required, inde
 test('betterAuthTenant takes onDelete restrict alone', () => {
   for (const onDelete of ['cascade', 'set null', undefined]) {
     assert.throws(
-      () => betterAuthTenant({ relationTo: 'organization', onDelete: onDelete as never }),
+      () => betterAuthTenant({ relationTo: 'organization', onDelete: onDelete as never, organizations: 'many' }),
       /betterAuthTenant takes onDelete: 'restrict' alone/,
     )
   }
@@ -272,4 +273,37 @@ test('buildAsas refuses a group within anything but the tenant field, a group na
     terms([{ fields: ['organization', 'startsAt'] }, { within: 'organization', index: ['startsAt'] }]),
     'Kayan "terms" indexes[0] and indexes[1]\'s index over "organization", "startsAt" are over the same fields in the same order, so they would be one index built twice. Keep one; a unique index serves every read the other would.',
   )
+})
+
+test('betterAuthTenant takes the organization mode, none, one or many, and nothing else', () => {
+  for (const organizations of ['none', 'one', 'many'] as const) assert.equal(betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations }).organizations, organizations)
+  for (const organizations of ['some', undefined]) {
+    assert.throws(() => betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: organizations as never }), /organizations: 'none', 'one' or 'many'/)
+  }
+})
+
+test('connect() refuses a store holding more than one organization where the tenant target says none or one, and starts otherwise', async () => {
+  /** A build over the memory store holding `count` organizations, connected under the mode given. */
+  const connected = async (organizations: 'none' | 'one' | 'many', count: number, readOnly = false) => {
+    const store = memoryStore()
+    const language = defineMithaq({
+      arkan: [base],
+      targets: {
+        store,
+        zod: zodTarget,
+        tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations }),
+        service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }),
+      } as {},
+    })
+    const built = (language as unknown as { buildAsas: (args: unknown) => { connect(args?: { readOnly?: boolean }): Promise<void> } }).buildAsas({ http: [fetchHttp()], kayan: [organization] })
+    for (let at = 0; at < count; at++) await store.insert({ tx: undefined, kayan: 'organization', data: { id: `org-${at}`, name: `Org ${at}` } })
+    return built.connect({ readOnly })
+  }
+  for (const organizations of ['none', 'one'] as const) {
+    await assert.rejects(connected(organizations, 2), new RegExp(`organizations: '${organizations}'[\\s\\S]*more than one[\\s\\S]*'many'`), `${organizations}: two organizations refuse the start, naming the mode and the way out`)
+    await connected(organizations, 1)
+    await connected(organizations, 0)
+    await connected(organizations, 2, true)
+  }
+  await connected('many', 3)
 })

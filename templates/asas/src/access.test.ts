@@ -62,7 +62,7 @@ const language = (store: ReturnType<typeof memoryStore>, access?: RowTable) =>
 const tenantLanguage = (store: ReturnType<typeof memoryStore>, access?: RowTable) =>
   defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, rbac: rbacTarget({ roles: fourRoles, access: (access ?? {}) as never, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict' }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget, rbac: rbacTarget({ roles: fourRoles, access: (access ?? {}) as never, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
 
 // The target may answer `'*'`, which the snapshot keeps as `true`; every case here that reads a key back reads a list.

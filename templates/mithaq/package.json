@@ -7,6 +7,7 @@
     ".": "./src/mithaq.ts",
     "./auth": "./src/mithaq/auth/index.ts",
     "./auth/platform-roles": "./src/mithaq/auth/platform-roles.ts",
+    "./auth/organizations": "./src/mithaq/auth/organizations.ts",
     "./*": "./src/*"
   },
   "dependencies": {

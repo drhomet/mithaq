@@ -100,7 +100,7 @@ import { asas } from './asas.ts'
 import { pushInput } from '../../../packages/mithaq/src/drizzle/index.ts'
 import { storageConfig as templateStorage } from '../../mithaq/src/storage/index.ts'
 import { accessTarget, dashboardScreen, dashboardUi, organization, platformScreen, portalScreen, portalUi, serverTargets as projectTargets, targets as languageTargets } from '../../mithaq/src/mithaq.ts'
-import { asPlatform, authOptions, options, platformRoles, platformURL, providers } from '@asas/mithaq/auth'
+import { asPlatform, authOptions, authSettings, backgroundSettled, options, platformApp, platformRoles, platformURL, providers, serverFor, type AuthSettings } from '@asas/mithaq/auth'
 import { secret, superAdminOnly } from '@asas/mithaq/auth/platform-roles'
 import { localUsers } from '../../features/auth/local-users/local-users.ts'
 import { kayan as mediaKayan } from '../../features/media/index.ts'
@@ -782,6 +782,230 @@ before(async () => {
 })
 
 after(() => asas.destroy())
+
+// The organization modes, over this build's own tables and a tenant provider built for each mode.
+// They run first, while the organization table holds nothing but the borrowed row they set aside,
+// and `0z` puts the table back as every later test expects it.
+/** The provider as a deploy that set SETUP_CODE imports it, which reads its environment once, at import. */
+const codedProvider = async () => {
+  process.env.SETUP_CODE = setupCode
+  try {
+    return (await import(`${new URL('../../mithaq/src/mithaq/auth/index.ts', import.meta.url).href}?modes`)) as typeof import('@asas/mithaq/auth')
+  } finally {
+    delete process.env.SETUP_CODE
+  }
+}
+const modeServer = (changes: Partial<AuthSettings>, provider: { serverFor: typeof serverFor } = { serverFor }) => provider.serverFor({ ...authSettings, ...changes })({ drizzle: asas.targets.drizzle as never })
+type ModeServer = ReturnType<typeof modeServer>
+const tenantOrigin = 'http://localhost:5173'
+const askedOf = (one: ModeServer, path: string, body?: unknown, headers: Record<string, string> = {}) =>
+  one.handler(new Request(`${tenantOrigin}/api/auth${path}`, body === undefined ? { headers } : { method: 'POST', headers: { 'content-type': 'application/json', origin: tenantOrigin, ...headers }, body: JSON.stringify(body) }))
+const answerOf = async (response: Response) => [response.status, ((await response.json().catch(() => null)) as { code?: string } | null)?.code] as const
+const modePassword = 'a-long-enough-password'
+const setupCode = 'asas-test-setup-code-of-thirty-two-characters'
+const modeRows = async (sql: string) => (await db.execute(sql)).rows as Record<string, unknown>[]
+
+test('0a. with one organization or none and none made yet, every sign-up is refused, and first-run is open but refuses without SETUP_CODE and with a wrong one', async () => {
+  await db.execute(`delete from organization where id = 'borrowed-organization'`)
+  const coded = await codedProvider()
+  for (const organizations of ['none', 'one'] as const) {
+    const settings = { organizations, signUp: 'open', joinRole: null, verifyEmail: false } as const
+    const one = modeServer(settings)
+    assert.deepEqual(await (await askedOf(one, '/first-run/state')).json(), { open: true, code: 'unset', name: organizations === 'one' }, `${organizations}: first-run is open, asks a name in one alone, and says the code is unset`)
+    assert.deepEqual(await answerOf(await askedOf(one, '/sign-up/email', { name: 'Early', email: 'early@example.com', password: modePassword })), [403, 'FIRST_RUN_PENDING'], `${organizations}: a sign-up before first-run is refused`)
+    assert.deepEqual(await answerOf(await askedOf(one, '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early' })), [403, 'SETUP_CODE_UNSET'], `${organizations}: first-run refuses while SETUP_CODE is unset`)
+    assert.deepEqual(await answerOf(await askedOf(modeServer(settings, coded), '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early', code: 'not-the-code-not-the-code-not-the-code' })), [403, 'SETUP_CODE_WRONG'], `${organizations}: and where it is set, a wrong code`)
+  }
+  assert.deepEqual(await modeRows(`select id from "user" where email = 'early@example.com'`), [], 'and no account was made')
+})
+
+test('0b. the takeover race: five first-runs at once with the setup code make one owner of one organization, and the other four are refused alike', async () => {
+  const coded = await codedProvider()
+  const school = modeServer({ organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true }, coded)
+  const runs = await Promise.all([0, 1, 2, 3, 4].map(async (at) => [at, await answerOf(await askedOf(school, '/first-run', { name: `Racer ${at}`, email: `racer-${at}@example.com`, password: modePassword, organization: `School ${at}`, code: setupCode }))] as const))
+  const won = runs.filter(([, [status]]) => status === 200)
+  assert.equal(won.length, 1, 'exactly one first-run wins')
+  assert.deepEqual(runs.filter(([, [status]]) => status !== 200).map(([, answer]) => answer), Array(4).fill([403, 'FIRST_RUN_CLOSED']), 'and the other four get the one answer for a closed first-run')
+  const winner = won[0]![0]
+  const [organization] = await modeRows('select id, name from organization')
+  assert.equal((await modeRows('select id from organization')).length, 1, 'one organization exists')
+  assert.equal(organization!.name, `School ${winner}`, 'named by the winner')
+  const [user] = await modeRows(`select id, role, email_verified from "user" where email = 'racer-${winner}@example.com'`)
+  assert.deepEqual([user!.role, user!.email_verified], [platformApp ? 'super_admin' : 'user', true], 'the winner is verified, and platform staff only where the platform app is served')
+  assert.deepEqual(await modeRows(`select user_id, role from member where organization_id = '${organization!.id}'`), [{ user_id: user!.id, role: 'owner' }], 'and the organization\'s one member, its owner')
+  assert.deepEqual(await modeRows(`select role from member_roles where organization_id = '${organization!.id}' and user_id = '${user!.id}'`), [{ role: 'administrator' }], 'who holds administrator')
+  assert.equal((await modeRows(`select id from "user" where email like 'racer-%'`)).length, 1, 'and no loser has an account')
+  assert.deepEqual(await (await askedOf(school, '/first-run/state')).json(), { open: false }, 'first-run is closed')
+  assert.deepEqual(await answerOf(await askedOf(school, '/first-run', { name: 'Late', email: 'late@example.com', password: modePassword, organization: 'Late', code: setupCode })), [403, 'FIRST_RUN_CLOSED'], 'and stays closed to the code')
+  if (platformApp) assert.deepEqual(await (await coded.asPlatform(() => askedOf(school, '/init'))).json(), { initialized: true }, 'and so is the platform\'s first-register, whose administrator first-run made')
+  const signedIn = await askedOf(school, '/sign-in/email', { email: `racer-${winner}@example.com`, password: modePassword })
+  assert.equal(signedIn.status, 200, 'the owner signs in')
+  const session = await (await askedOf(school, '/get-session', undefined, { cookie: signedIn.headers.getSetCookie().map((one) => one.split(';')[0]).join('; ') })).json() as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, organization!.id, 'into the one organization')
+})
+
+const schoolSettings = { organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true } as const
+const cookieOf = (response: Response) => response.headers.getSetCookie().map((one) => one.split(';')[0]).join('; ')
+/** The one organization's owner, signed in on `one`, as first-run made them. */
+const ownerOf = async (one: ModeServer) => {
+  const [owner] = await modeRows(`select "user".email, member.organization_id from "user" join member on member.user_id = "user".id where member.role = 'owner'`)
+  const signedIn = await askedOf(one, '/sign-in/email', { email: owner!.email, password: modePassword })
+  assert.equal(signedIn.status, 200, 'the owner signs in')
+  return { headers: new Headers({ cookie: cookieOf(signedIn) }), organization: String(owner!.organization_id), email: String(owner!.email) }
+}
+
+test('0c. by invitation only, a sign-up without a matching invitation id gets one answer, whether or not the address has an account, and the invited address with its id signs up', async () => {
+  const school = modeServer(schoolSettings)
+  const owner = await ownerOf(school)
+  const { id: invitationId } = (await school.api.createInvitation({ body: { email: 'invited@example.com', role: 'member' }, headers: owner.headers })) as { id: string }
+  const signUp = (body: Record<string, unknown>) => askedOf(school, '/sign-up/email', { name: 'Someone', password: modePassword, ...body })
+  const refusals = {
+    'no invitation, a new address': { email: 'stranger@example.com' },
+    'no invitation, an address with an account': { email: owner.email },
+    'the invitation, another address': { email: 'stranger@example.com', invitationId },
+    'the invitation, an address with an account': { email: owner.email, invitationId },
+    'a made-up id, the invited address': { email: 'invited@example.com', invitationId: 'not-an-invitation' },
+  }
+  const answers = await Promise.all(Object.entries(refusals).map(async ([name, body]) => {
+    const answered = await signUp(body)
+    return [name, answered.status, await answered.text()] as const
+  }))
+  for (const [name, status, body] of answers) {
+    assert.equal(status, 403, `${name}: refused`)
+    assert.equal(body, answers[0]![2], `${name}: with the one answer, which names no account`)
+  }
+  assert.equal(JSON.parse(answers[0]![2]).code, 'SIGN_UP_INVITE_ONLY')
+  assert.deepEqual(await modeRows(`select id from "user" where email = 'stranger@example.com'`), [], 'and nobody was made')
+  const invited = await signUp({ email: 'Invited@Example.com', invitationId })
+  assert.equal(invited.status, 200, 'the invited address, in any case, signs up with its invitation id')
+  await school.api.acceptInvitation({ body: { invitationId }, headers: new Headers({ cookie: cookieOf(invited) }) })
+  assert.equal((await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'invited@example.com'`))[0]?.role, 'member', 'and joins by accepting it')
+  const internal = (await school.$context).internalAdapter
+  await assert.rejects(internal.createUser({ name: 'Elsewhere', email: 'elsewhere@example.com' }, {} as never), /invitation/i, 'an account made past the sign-up route, as another sign-in method would, is refused as well')
+  assert.deepEqual(await modeRows(`select id from "user" where email = 'elsewhere@example.com'`), [], 'and not made')
+})
+
+/** A mailer that keeps what it is handed, and the link in the last message to `to`. */
+const keptMail = () => {
+  const sent: { to: string; text: string }[] = []
+  return { sent, mailer: { send: async (mail: { to: string; text: string }) => void sent.push(mail) }, linkTo: (to: string) => /https?:\/\/\S+/.exec(sent.filter((one) => one.to === to).at(-1)?.text ?? '')?.[0] }
+}
+/** How many messages `mail` holds once the mail sent in the background is out. */
+const mailCount = async (mail: ReturnType<typeof keptMail>) => {
+  await backgroundSettled()
+  return mail.sent.length
+}
+/** The path and query of a mailed link, asked of `one` at the provider's own base path. */
+const followed = (one: ModeServer, link: string) => {
+  const url = new URL(link)
+  return one.handler(new Request(`${tenantOrigin}${url.pathname.replace('/api/auth/user/', '/api/auth/')}${url.search}`, { redirect: 'manual' }))
+}
+
+/** The token of the set-password link last mailed to `to`, once the mail sent in the background is out. */
+const tokenMailed = async (mail: ReturnType<typeof keptMail>, to: string) => {
+  await backgroundSettled()
+  const link = mail.linkTo(to)
+  return link ? new URL(link).searchParams.get('token') ?? undefined : undefined
+}
+
+test('0d. an open sign-up with verification and allowed domains: an address outside the domains is refused, one inside proves its address by choosing its password from the mailed link and joins as the join role, and a removed member never joins again, even unverified again', async () => {
+  const mail = keptMail()
+  const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: 'student', verifyEmail: true, allowedDomains: ['school.example', '*.staff.example'], mailer: mail.mailer })
+  const [organization] = await modeRows('select id from organization')
+  const signUp = (email: string) => askedOf(open, '/sign-up/email', { name: 'Pupil', email, password: modePassword })
+  for (const email of ['pupil@other.example', 'pupil@notschool.example', 'pupil@school.example.evil.example', 'pupil@staff.example', 'pupil@\uff53chool.example', 'pupil@school%2eexample', 'pupil@school\uff0eexample']) {
+    assert.deepEqual(await answerOf(await signUp(email)), [403, 'SIGN_UP_DOMAIN'], `${email} is outside the domains`)
+  }
+  const made = await signUp('pupil@school.example')
+  assert.equal(made.status, 200, 'an address at an allowed domain signs up')
+  assert.equal(cookieOf(made).includes('session_token'), false, 'with no session until the address is proved')
+  assert.deepEqual(await modeRows(`select member.id from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`), [], 'and no membership')
+  const mailed = await mailCount(mail)
+  assert.deepEqual(await answerOf(await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: modePassword })), [403, 'EMAIL_NOT_VERIFIED'], 'a sign-in before the proof is refused')
+  assert.equal(await mailCount(mail), mailed, 'and mails nothing, so nobody pushes a link on demand')
+  assert.equal((await askedOf(open, '/send-verification-email', { email: 'pupil@school.example' })).status, 404, 'nor through the provider\'s resend')
+  await backgroundSettled()
+  assert.match(mail.linkTo('pupil@school.example') ?? '', /^http:\/\/localhost:5173\/auth\/reset-password\?token=/, 'the mailed link chooses the password on the tenant app\'s own page')
+  const token = (await tokenMailed(mail, 'pupil@school.example'))!
+  assert.equal((await askedOf(open, '/reset-password', { token, newPassword: 'the-pupil-chose-this' })).status, 200, 'the link sets the password')
+  const [pupil] = await modeRows(`select "user".id, "user".email_verified, member.role from member join "user" on "user".id = member.user_id where "user".email = 'pupil@school.example'`)
+  assert.deepEqual([pupil?.role, pupil?.email_verified], ['member', true], 'which proves the address and joins the one organization')
+  assert.deepEqual(await modeRows(`select role from member_roles where user_id = '${pupil!.id}'`), [{ role: 'student' }], 'as the join role')
+  const signedIn = await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: 'the-pupil-chose-this' })
+  const session = await (await askedOf(open, '/get-session', undefined, { cookie: cookieOf(signedIn) })).json() as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, organization!.id, 'and signs in there')
+  await db.execute(`delete from member_roles where user_id = '${pupil!.id}'; delete from member where user_id = '${pupil!.id}'; update "user" set email_verified = false where id = '${pupil!.id}'`)
+  await askedOf(open, '/request-password-reset', { email: 'pupil@school.example' })
+  assert.equal((await askedOf(open, '/reset-password', { token: (await tokenMailed(mail, 'pupil@school.example'))!, newPassword: 'the-pupil-chose-again' })).status, 200, 'the removed member, made unverified again, proves the address again')
+  assert.equal((await askedOf(open, '/sign-in/email', { email: 'pupil@school.example', password: 'the-pupil-chose-again' })).status, 200, 'and still signs in')
+  assert.deepEqual(await modeRows(`select id from member where user_id = '${pupil!.id}'`), [], 'but never joins again')
+})
+
+test('0f. a squatted address: whoever signed up first with another\'s address never signs in with their own password once its owner proves it', async () => {
+  const mail = keptMail()
+  const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: 'student', verifyEmail: true, allowedDomains: [], mailer: mail.mailer })
+  const signUp = (password: string) => askedOf(open, '/sign-up/email', { name: 'Victim', email: 'victim@example.com', password })
+  assert.equal((await signUp('the-attacker-password')).status, 200, 'the attacker signs up with the victim\'s address')
+  const squatted = await mailCount(mail)
+  assert.equal((await signUp('the-victim-password')).status, 200, 'the victim\'s own sign-up gets the same answer')
+  assert.equal(squatted, 1, 'the squat itself mailed the link to the victim\'s address, never to the attacker')
+  assert.equal(await mailCount(mail), squatted, 'and the victim\'s own sign-up within five minutes mails no second one')
+  const pushed = await mailCount(mail)
+  assert.deepEqual(await answerOf(await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-attacker-password' })), [403, 'EMAIL_NOT_VERIFIED'], 'the attacker cannot sign in')
+  assert.equal(await mailCount(mail), pushed, 'nor push another link to the victim')
+  assert.equal((await askedOf(open, '/reset-password', { token: (await tokenMailed(mail, 'victim@example.com'))!, newPassword: 'the-victim-chose-this' })).status, 200, 'the victim proves the address by choosing the password')
+  assert.equal((await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-attacker-password' })).status, 401, 'the attacker\'s password no longer signs in')
+  assert.equal((await askedOf(open, '/sign-in/email', { email: 'victim@example.com', password: 'the-victim-chose-this' })).status, 200, 'the victim\'s does')
+  assert.equal((await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'victim@example.com'`))[0]?.role, 'member', 'and the victim joined')
+})
+
+test('0e. an open sign-up without verification joins at once with no role, and its first session opens in the one organization', async () => {
+  const walkIn = modeServer({ organizations: 'one', signUp: 'open', joinRole: null, verifyEmail: false, allowedDomains: [] })
+  const [organization] = await modeRows('select id from organization')
+  const made = await askedOf(walkIn, '/sign-up/email', { name: 'Walk-in', email: 'walk-in@example.com', password: modePassword })
+  assert.equal(made.status, 200)
+  const session = await (await askedOf(walkIn, '/get-session', undefined, { cookie: cookieOf(made) })).json() as { session: { activeOrganizationId: string } }
+  assert.equal(session.session.activeOrganizationId, organization!.id, 'the sign-up\'s own session opens in the one organization')
+  const [joined] = await modeRows(`select member.role, "user".id from member join "user" on "user".id = member.user_id where "user".email = 'walk-in@example.com'`)
+  assert.equal(joined?.role, 'member', 'as a member')
+  assert.deepEqual(await modeRows(`select role from member_roles where user_id = '${joined!.id}'`), [], 'holding no role until an administrator gives one')
+})
+
+test('0g. links to one address are mailed at most once in five minutes, never waited on, and a reset ends every other link to its account', async () => {
+  const mail = keptMail()
+  const slow = { send: async (one: { to: string; text: string }) => { await setTimeout(800); await mail.mailer.send(one) } }
+  const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: null, verifyEmail: true, allowedDomains: [], mailer: slow })
+  const timed = async (run: () => Promise<Response>) => {
+    const started = performance.now()
+    assert.equal((await run()).status, 200)
+    return performance.now() - started
+  }
+  const signUp = (email: string) => () => askedOf(open, '/sign-up/email', { name: 'Flood', email, password: modePassword })
+  const fresh = await timed(signUp('flood@example.com'))
+  const again = await timed(signUp('flood@example.com'))
+  const reset = () => askedOf(open, '/request-password-reset', { email: 'flood@example.com' })
+  const asked = [await timed(reset), await timed(reset)]
+  for (const took of [fresh, again, ...asked]) assert.ok(took < 600, `no answer waits on the mailer: ${[fresh, again, ...asked].map(Math.round).join(', ')}ms`)
+  assert.equal(await mailCount(mail), 1, 'a second sign-up and two resets within five minutes mail nothing more')
+  const [user] = await modeRows(`select id from "user" where email = 'flood@example.com'`)
+  const links = async () => (await modeRows(`select identifier from verification where value = '${user!.id}' and identifier like 'reset-password:%'`)).length
+  assert.ok((await links()) >= 3, 'though each made a link')
+  assert.equal((await askedOf(open, '/reset-password', { token: (await tokenMailed(mail, 'flood@example.com'))!, newPassword: 'the-flood-chose-this' })).status, 200)
+  assert.equal(await links(), 0, 'a reset ends every other link to the account')
+  assert.equal((await reset()).status, 200)
+  assert.equal(await mailCount(mail), 2, 'and the next request is mailed')
+})
+
+test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
+  const made = (await modeRows(`select id from organization where id <> 'borrowed-organization'`)).map((one) => `'${one.id}'`)
+  if (made.length) {
+    await db.execute(`delete from member_roles where organization_id in (${made.join(', ')})`)
+    await db.execute(`delete from organization where id in (${made.join(', ')})`)
+  }
+  await db.execute(`delete from "user" where email like '%@example.com' and id not in (select user_id from member)`)
+  await db.execute(`insert into organization (id, name, slug, created_at) values ('borrowed-organization', 'Borrowed', 'borrowed', now())`)
+  assert.deepEqual(await modeRows('select id from organization'), [{ id: 'borrowed-organization' }])
+})
 
 test('1. the committed auth kayan are what the generator writes', async () => {
   assert.deepEqual(await generateAuth({ language: '@asas/mithaq', options, directory: authDirectory, check: true, provider: 'user', providers: '@asas/mithaq/auth', screens: authScreens }), [])
@@ -12418,8 +12642,9 @@ test('142k. a project that serves no platform console boots in production with B
   t.after(() => rm(copy, { recursive: true, force: true }))
   const provider = await readFile(new URL('index.ts', source), 'utf8')
   assert.ok(provider.includes('export const platformApp: boolean = true'), 'the provider says whether a platform app is served')
-  await writeFile(new URL('index.ts', copy), provider.replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false'))
-  await writeFile(new URL('platform-roles.ts', copy), await readFile(new URL('platform-roles.ts', source), 'utf8'))
+  // One folder deeper, so the copy reaches the mailer and the roles as the original does.
+  await writeFile(new URL('index.ts', copy), provider.replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false').replaceAll("from '../../", "from '../../../"))
+  for (const file of ['platform-roles.ts', 'organizations.ts']) await writeFile(new URL(file, copy), await readFile(new URL(file, source), 'utf8'))
   const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const { PLATFORM_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
     execFile(process.execPath, ['--input-type=module', '-e', `const { platformApp } = await import(${JSON.stringify(new URL('index.ts', copy).href)}); console.log(platformApp)`], {
@@ -12606,8 +12831,9 @@ test('142o. a project with no platform console has no first-register and no init
   const copy = new URL(`.no-platform-first-${process.pid}/`, source)
   await mkdir(copy)
   t.after(() => rm(copy, { recursive: true, force: true }))
-  await writeFile(new URL('index.ts', copy), (await readFile(new URL('index.ts', source), 'utf8')).replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false'))
-  await writeFile(new URL('platform-roles.ts', copy), await readFile(new URL('platform-roles.ts', source), 'utf8'))
+  // One folder deeper, so the copy reaches the mailer and the roles as the original does.
+  await writeFile(new URL('index.ts', copy), (await readFile(new URL('index.ts', source), 'utf8')).replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false').replaceAll("from '../../", "from '../../../"))
+  for (const file of ['platform-roles.ts', 'organizations.ts']) await writeFile(new URL(file, copy), await readFile(new URL(file, source), 'utf8'))
   const provider = (await import(new URL('index.ts', copy).href)) as typeof import('@asas/mithaq/auth')
   assert.equal(provider.platformApp, false)
   const routes = firstRegisterOf(provider)
