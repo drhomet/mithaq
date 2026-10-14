@@ -1,4 +1,8 @@
 {
+  "conflict.unique": {
+    "ar": "لهذا الطالب مقعد في هذه الحصة بالفعل.",
+    "en": "This student already holds a seat in this session."
+  },
   "deletedAt": {
     "ar": "تاريخ الحذف",
     "en": "Deleted at"

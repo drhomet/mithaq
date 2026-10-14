@@ -5342,6 +5342,25 @@ test('228g. a delete refused because rows still use it says how many, names the 
   assert.equal(await refusalFor([{ by: 'courses', count: 1, titles: [] }, { by: 'sessions', count: 4, titles: [] }]), 'Used by 1 Course. Used by 4 Sessions. Take it out of them first.', 'rows the viewer does not read are counted, never named')
 })
 
+test('228h. a refusal a kayan words itself, a unique pair taken, is said in the kayan\'s words, and in the shared ones where the kayan words none', async () => {
+  const words: Record<string, string> = { 'courses.conflict.unique': 'Another course already holds this.', 'error.conflict.unique': 'Another row already holds that value.' }
+  const said = async (kayan: string) => {
+    const host = await render(createElement(Form, {
+      kayan: courses,
+      client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+      value: { id: 'a-row', title: 'Tajweed' },
+      error: Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.unique', params: { kayan } } }),
+      t: (key: string, fallback?: string) => words[key] ?? fallback,
+      locale: 'en',
+      onDone: () => {},
+    }))
+    return [...host.querySelectorAll('[role="alert"]')].map((one) => one.textContent).join(' ')
+  }
+  assert.ok((await said('courses')).includes('Another course already holds this.'), 'the kayan\'s own words')
+  delete words['courses.conflict.unique']
+  assert.ok((await said('courses')).includes('Another row already holds that value.'), 'and the shared words where it words none')
+})
+
 test('172l. the status in a form with no header is coloured like the header\'s pill and keeps its word', async () => {
   for (const [status, words, colour] of [['draft', 'Draft', 'bg-muted'], ['published', 'Published', 'bg-emerald-500/15'], ['changed', 'Changed', 'bg-amber-500/15']] as const) {
     const host = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status } }))

@@ -1,0 +1,1 @@
+ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_session_id_student_id_deleted_at_unique" UNIQUE NULLS NOT DISTINCT("session_id","student_id","deleted_at");

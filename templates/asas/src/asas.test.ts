@@ -13543,8 +13543,10 @@ test('135. a join is the rows of another kayan, read through that kayan\'s own a
     { course: course.id, startsAt: new Date('2027-03-02T09:00:00.000Z'), capacity: 20 },
     options,
   ) as { id: string }
+  // Twelve students, since a student holds one seat in a session.
   for (let at = 0; at < 12; at += 1) {
-    await asas.kayan.enrollments.operations.create({ session: crowded.id, student: students[0] }, options)
+    const student = await memberOf(organizationId, `Crowd ${at}`, `crowd-${at}-135@example.com`)
+    await asas.kayan.enrollments.operations.create({ session: crowded.id, student }, options)
   }
   const bounded = await asas.kayan.sessions.operations.find(
     { where: { id: { equals: crowded.id } }, depth: 1 },
@@ -15425,6 +15427,8 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   const options = { actor }
   const course = await courses.operations.create({ title: 'Enrolled across tenants' }, options)
   const session = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-05-01T09:00:00.000Z'), capacity: 4 }, options)
+  // A second session, as a student holds one seat in each.
+  const second = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-05-08T09:00:00.000Z'), capacity: 4 }, options)
   const refused = async (write: Promise<unknown>, message: string) => {
     const thrown = await write.catch((error: unknown) => error)
     assert.ok(thrown instanceof AsasError && thrown.status === 400, message)
@@ -15437,9 +15441,9 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   assert.equal(made.student, member, 'the tenant\'s own member is admitted')
   // Postgres answers a uuid in lowercase, so a session named in uppercase is
   // still the row that is there.
-  const shouted = await enrollments.operations.create({ session: session.id.toUpperCase(), student: member }, options)
-  assert.equal(shouted.session, session.id, 'a uuid named in uppercase is admitted and stored as the row it names')
-  assert.equal((await enrollments.operations.create({ session: session.id, student: owner.id }, options)).student, owner.id, 'and so is the owner, who is a member too')
+  const shouted = await enrollments.operations.create({ session: second.id.toUpperCase(), student: member }, options)
+  assert.equal(shouted.session, second.id, 'a uuid named in uppercase is admitted and stored as the row it names')
+  assert.equal((await enrollments.operations.create({ session: second.id, student: owner.id }, options)).student, owner.id, 'and so is the owner, who is a member too')
   await refused(enrollments.operations.update({ id: made.id, student: stranger.id }, options), 'an update to another tenant\'s user is refused')
   await refused(
     enrollments.operations.updateMany({ where: { id: { equals: made.id } }, data: { student: stranger.id } }, options),
@@ -17773,6 +17777,29 @@ test('227e. a person who holds a seat, a withdrawn one included, is not removed 
   assert.ok(before!.accounts && before!.sessions, 'and there were some to lose')
   const removable = await signedUp('removable-227e')
   assert.equal((await adminRoute('remove-user', platform.headers, { userId: removable.id })).status, 200, 'a person holding no seat is removed')
+})
+
+test('227j. a student holds one seat in a session: a second enrollment of the same student there is refused 409, one in another session is not, and one who withdrew may enroll again', async () => {
+  const tenant = await roleTenant('seat-227j')
+  const course = await courses.operations.create({ title: 'Seat 227j' }, tenant.options)
+  const [first, second] = await Promise.all(['2027-03-01T09:00:00Z', '2027-03-08T09:00:00Z'].map((at) => sessions.operations.create({ course: course.id, startsAt: new Date(at) }, tenant.options)))
+  const seat = await enrollments.operations.create({ session: first!.id, student: tenant.people.student.id }, tenant.options)
+  for (const [who, write] of [
+    ['the operation', () => enrollments.operations.create({ session: first!.id, student: tenant.people.student.id }, tenant.options)],
+    ['the instructor over HTTP', async () => {
+      const answer = await tenant.as('instructor', 'enrollments/create', { session: first!.id, student: tenant.people.student.id })
+      throw Object.assign(new Error(String(answer.status)), { status: answer.status, key: (answer.body as { data?: { key?: string } }).data?.key })
+    }],
+  ] as const) {
+    const twice = await write().then(() => undefined, (error: { status?: number; key?: string }) => error)
+    assert.equal(twice?.status, 409, `${who} is refused a second seat`)
+    assert.equal(twice?.key, 'error.conflict.unique', 'as a unique pair taken')
+  }
+  assert.equal((await enrollments.operations.count({ where: { session: { equals: first!.id } } }, tenant.options)).totalDocs, 1, 'and one seat stands')
+  await enrollments.operations.create({ session: second!.id, student: tenant.people.student.id }, tenant.options)
+  await enrollments.operations.delete({ id: seat.id }, tenant.options)
+  const again = await enrollments.operations.create({ session: first!.id, student: tenant.people.student.id }, tenant.options)
+  assert.equal(again.student, tenant.people.student.id, 'a student who withdrew takes a seat again')
 })
 
 test('227h. the only owner of an organization is not removed on the platform, nor by a delete of their own: the organization would be left with nobody who governs it; with a second owner they are', async () => {

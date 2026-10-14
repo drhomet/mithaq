@@ -30,6 +30,16 @@ const ownSeats = ({ user }: { user: unknown }) => {
 export const enrollments = defineKayan({
   name: 'enrollments',
   access: { read: ownSeats, update: ownSeats, delete: ownSeats },
+  // What a form says where a second seat of one student in one session is
+  // refused, over the shared words for a unique value taken.
+  messages: {
+    conflict: { unique: { en: 'This student already holds a seat in this session.', ar: 'لهذا الطالب مقعد في هذه الحصة بالفعل.' } },
+  },
+  // A student holds one seat in a session, which is one organization's, so the
+  // organization needs no column in the key. The mark is in it with its nulls
+  // not distinct, so a withdrawn seat makes room for a new one while two
+  // standing seats collide.
+  indexes: [{ fields: ['session', 'student', 'deletedAt'], unique: true, nullsNotDistinct: true }],
   fields: ({ defaults }) => ({
     ...defaults,
     organization,
