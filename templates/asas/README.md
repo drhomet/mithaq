@@ -467,7 +467,7 @@ A combination that means nothing or opens a door refuses to load, naming the lin
 
 The only owner of an organization is never deleted, by the platform's remove-user or by a delete of their own should one be turned on: the organization would be left with nobody who governs it. Make another member an owner first.
 
-In one organization, nobody founds another organization or leaves the one over HTTP. Each sign-up, join, first-run and role the setup gives writes one JSON line to the server log (`"audit":"auth"`), beside the platform's own; keep that output.
+In one organization, nobody founds another organization or leaves the one over HTTP. Each sign-up, join, invitation accepted on the server, person added, first-run and role the setup gives writes one JSON line to the server log (`"audit":"auth"`), beside the platform's own; keep that output.
 
 **Changing the mode.**
 
