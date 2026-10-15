@@ -160,6 +160,13 @@ const textsUnder = (folder) =>
     .map((file) => join(folder, file))
 
 /**
+ * Whether a package's `exports` names `sub` (`''` for the package itself): a key equal to it, or a `*` pattern it lies
+ * under, as Node resolves one.
+ */
+export const exportsPath = (exports, sub) =>
+  Object.keys(exports ?? {}).some((key) => (key.endsWith('*') ? `.${sub}`.startsWith(key.slice(0, -1)) : key === (sub === '' ? '.' : `.${sub}`)))
+
+/**
  * Folds the monorepo into one package at `project`: the language's and the asas's `src/` side by side, each feature
  * under `src/features/`, and the tenant app, whose `src/` holds no file of the same name as theirs. The package keeps
  * the name `asas`, because the screen host imports it by that name and a package reaches itself through its own
@@ -208,12 +215,13 @@ const foldIntoOnePackage = (project) => {
     dependencies: own(Object.assign({}, language.dependencies, ...ofFeatures.map((one) => one.dependencies), asas.dependencies, app.dependencies)),
     devDependencies: own(Object.assign({}, language.devDependencies, ...ofFeatures.map((one) => one.devDependencies), asas.devDependencies, app.devDependencies, root.devDependencies)),
   })
-  // A feature is reached through its index, its browser-safe `domain/` or a kayan's `ui/`, as its `exports` say.
+  const exportsOf = Object.fromEntries(ofFeatures.map((one) => [one.name.slice('@asas/'.length), one.exports]))
+  // A feature is reached through what its `exports` say, as it was while it was a package.
   const targetOf = (name, sub) => {
     if (name === 'mithaq') return sub === '' ? 'src/mithaq.ts' : sub === '/auth' ? 'src/mithaq/auth/index.ts' : ['/auth/backoffice-roles', '/auth/organizations'].includes(sub) ? `src/mithaq${sub}.ts` : `src${sub}`
     if (sub === '') return `src/features/${name}/index.ts`
-    if (sub.startsWith('/domain/') || /^\/[^/]+\/ui\//.test(sub)) return `src/features/${name}${sub}`
-    throw new Error(`@asas/${name}${sub} reaches past the feature's exports.`)
+    if (!exportsPath(exportsOf[name], sub)) throw new Error(`@asas/${name}${sub} reaches past the feature's exports.`)
+    return `src/features/${name}${sub}`
   }
   for (const file of textsUnder(at('src')).filter((one) => /\.tsx?$/.test(one))) {
     edit(file, (text) =>

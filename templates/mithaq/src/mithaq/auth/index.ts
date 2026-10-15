@@ -588,10 +588,11 @@ const namesById = async (ctx: HookContext, id: unknown) => {
   const found = typeof id === 'string' ? await ctx.context.adapter.findOne<{ name: string; names?: unknown }>({ model: 'organization', where: [{ field: 'id', value: id }] }) : null
   return found ? Object.fromEntries(nameLocales.map((locale) => [locale, nameIn(found, locale)])) : undefined
 }
-// When a member was last seen is a column with a key of its own, so a caller who may list members reads it only
-// holding that key as well, as a managed read hides a column its key does not open.
-const unseen = (members: unknown) =>
-  Array.isArray(members) && !holdsPermission('member.fields.lastSeenAt') ? members.map(({ lastSeenAt: _, ...rest }: { lastSeenAt?: unknown }) => rest) : members
+// When a member was last seen is a column with a key of its own, so a caller who may list, change or remove members
+// reads it only holding that key as well, as a managed read hides a column its key does not open. Every member row an
+// answer carries, at any depth, loses it.
+const unseen = <Answer,>(answer: Answer): Answer =>
+  holdsPermission('member.fields.lastSeenAt') ? answer : JSON.parse(JSON.stringify(answer), (key, value) => (key === 'lastSeenAt' ? undefined : value))
 const auditBefore = async (ctx: HookContext) => {
   // The provider hands any member every member's name, address, image, role and join date, and
   // anyone's role by `userId`, and these routes have no hook to gate. Only a caller who may read
@@ -687,10 +688,8 @@ export const backofficeAudit = {
     if (ctx.path === '/organization/get-full-organization' && full && typeof full === 'object' && 'id' in full) {
       const holds = (key: string) => gate(key)({ organization: full }).then(() => true, () => false)
       const [mayInvite, mayList] = [await holds('invitation.create'), await holds('member.find')]
-      return ctx.json({ ...full, ...(mayInvite ? {} : { invitations: [] }), members: mayList ? unseen(full.members) : [] })
+      return ctx.json(unseen({ ...full, ...(mayInvite ? {} : { invitations: [] }), members: mayList ? full.members : [] }))
     }
-    const listed = ctx.context.returned as { members?: unknown } | null | undefined
-    if (ctx.path === '/organization/list-members' && listed && typeof listed === 'object' && 'members' in listed) return ctx.json({ ...listed, members: unseen(listed.members) })
     // The provider hands the invitee the inviter's address, which the accept page never shows, and
     // an invitation is no reason to learn a member's address.
     const invitation = ctx.context.returned as { inviterEmail?: unknown; organizationId?: unknown } | null | undefined
@@ -705,6 +704,8 @@ export const backofficeAudit = {
       const next = await oldestMembership({ adapter: ctx.context.adapter as unknown as Members, user: leaving.user.id })
       if (next) await ctx.context.internalAdapter.updateSession(leaving.session.token, { activeOrganizationId: next })
     }
+    const answered = ctx.context.returned
+    if (ctx.path.startsWith('/organization/') && answered && typeof answered === 'object' && !(answered instanceof Error) && !(answered instanceof Response) && JSON.stringify(answered).includes('"lastSeenAt"')) return ctx.json(unseen(answered))
     if (!audited(ctx.path) || ctx.context.returned instanceof Error) return
     const caller = callers.get(ctx.context)
     // A sign-out is audited only where it ends an impersonation, which is how the tenant app stops
@@ -1553,10 +1554,12 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       }),
     },
   }
-  // A new link to choose a password, for a member of the one organization who lost theirs or never opened Add person's:
-  // asked by whoever may add a person, and mailed to the member, never to the caller, so it opens nothing the caller
-  // could not already reach by Add person. Anyone outside the organization answers as nobody, and staff hold the
-  // backoffice, whose sign-in a tenant never touches. The member's password and sessions stand until they choose.
+  // A new link to choose a password, for a member of the one organization who lost theirs or never opened Add person's,
+  // asked by whoever may add a person. It is mailed to the member. With no mailer it is answered to the caller, on this
+  // machine alone, and only for an account nobody proved, as Add person answers one: a proved account's link would hand
+  // it to whoever asked, an administrator's to a delegate holding member.create. Anyone outside the organization answers
+  // as nobody, and staff hold the backoffice, whose sign-in a tenant never touches. The member's password and sessions
+  // stand until they choose.
   const sendPasswordLink = {
     id: 'send-password-link',
     endpoints: {
@@ -1565,10 +1568,10 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         if (typeof organization !== 'string' || !holdsPermission('member.create')) throw new APIError('FORBIDDEN', { message: 'Sending a password link needs the permission "member.create" in your active organization.' })
         const { userId } = (ctx.body ?? {}) as Record<string, unknown>
         const member = typeof userId === 'string' && (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: userId } } } }))
-        const user = member ? ((await ctx.context.internalAdapter.findUserById(userId as string)) as ({ id: string; email: string; role?: unknown } | null)) : null
+        const user = member ? ((await ctx.context.internalAdapter.findUserById(userId as string)) as ({ id: string; email: string; emailVerified: boolean; role?: unknown } | null)) : null
         if (!user) throw new APIError('NOT_FOUND', { code: 'error.missing.member', message: 'No member of this organization has that id.' })
         if (holdsRole(user.role, (one) => Object.hasOwn(backofficeRoles, one))) throw new APIError('FORBIDDEN', { message: 'A staff member\'s sign-in is the backoffice\'s, never a tenant\'s.' })
-        if (!settings.mailer && !isLocalHost(ctx.headers?.get('origin') ?? '')) throw new APIError('FORBIDDEN', { message: 'A password link is mailed, and no mailer is configured.' })
+        if (!settings.mailer && (user.emailVerified || !isLocalHost(ctx.headers?.get('origin') ?? ''))) throw new APIError('FORBIDDEN', { message: 'A password link is mailed, and no mailer is configured.' })
         if (settings.mailer && (await mailedLately(user.id))) return ctx.json({ sent: true })
         if (settings.mailer) await withinLimits(organization)
         const token = randomBytes(24).toString('base64url')
@@ -1610,11 +1613,17 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   }
   // A member is seen in the organization a session of theirs opens or refreshes in, and only there: their activity
   // in another organization is that organization's business. An impersonation is staff, not the person. The provider
-  // refreshes a session once a day, so this is a day's resolution and one write a day per person.
-  const lastSeen = async (session: { userId: string; activeOrganizationId?: string | null; impersonatedBy?: string | null }) => {
-    if (!session.activeOrganizationId || session.impersonatedBy) return
-    const adapter = await getCurrentAdapter((await tenant.$context).adapter as never)
-    await adapter.updateMany({ model: 'member', where: [{ field: 'userId', value: session.userId }, { field: 'organizationId', value: session.activeOrganizationId }], update: { lastSeenAt: new Date() } })
+  // refreshes a session once a day, so this is a day's resolution and one write a day per person. The stamp is
+  // best-effort: the provider rethrows what an after hook throws, so a failed stamp would fail the sign-in or the
+  // session read it rode on, and a refresh racing a sign-out hands it no session at all.
+  const lastSeen = async (session: { userId: string; activeOrganizationId?: string | null; impersonatedBy?: string | null } | null) => {
+    if (!session?.activeOrganizationId || session.impersonatedBy) return
+    try {
+      const adapter = await getCurrentAdapter((await tenant.$context).adapter as never)
+      await adapter.updateMany({ model: 'member', where: [{ field: 'userId', value: session.userId }, { field: 'organizationId', value: session.activeOrganizationId }], update: { lastSeenAt: new Date() } })
+    } catch (error) {
+      console.error('A member\'s last seen was not written:', error)
+    }
   }
   const tenant = betterAuthServer({
     ...built,
