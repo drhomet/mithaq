@@ -35,3 +35,5 @@ The config reads `DATABASE_URL` through the project's own `asas`, so the migrati
 > **Warning:** `drizzle-kit migrate` takes no lock. Do not run it while an app is starting, and never while an instance configured with `pending: 'run'` may start, or both can apply the same migration. Run it, wait for it to finish, then start the apps.
 
 If a migration's SQL was already run by hand, record it instead of applying it again. `mithaq migrate` prints the exact `insert` line for each unapplied folder. Record only a migration whose SQL really ran.
+
+> ponytail: a migration builds an index with a plain `CREATE INDEX`, which blocks writes to its table while it runs, such as the indexes Better Auth asks for on `session`, `account`, `verification`, `member` and `invitation`. On a table of millions of rows, build each one by hand first with `CREATE INDEX CONCURRENTLY`, under the exact name the migration gives it, then record that migration as above instead of applying it.

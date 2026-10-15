@@ -7,6 +7,7 @@
 - `mithaq migrate` writes a migration folder through drizzle-kit, plus `drizzle.config.ts` and `schema.ts` with the header ``// Written by `mithaq migrate`. Commit it.``. It refuses to overwrite a `schema.ts` that lacks the header.
 - `--name <slug>` names the folder: lowercase letters, digits and underscores, 1 to 64 characters. It is refused with `--baseline`. `--check` writes nothing and answers 1 when a migration is pending. `--baseline` adopts an existing database whose history is empty or holds only the dev-push marker.
 - A statement that would lose data or drop a guard is refused until the project answers it in `mithaq.hints.json`. Keep it that way: a new drizzle-kit statement type that drops anything goes through `droppedBy` or `guardDroppedBy`.
+- drizzle-kit imports drizzle-orm without declaring it, so every drizzle-kit mithaq starts (the `mithaq migrate` child and the dev push) runs under `holdKitOrm`, which resolves its drizzle-orm from mithaq. A new way of starting drizzle-kit takes it too.
 - `refuseStrangers` refuses a push or a baseline when another schema holds a table with one of the language's names, because drizzle-kit filters by name across schemas and would drop it.
 
 ## History and its lock

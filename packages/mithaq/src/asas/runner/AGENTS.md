@@ -9,7 +9,7 @@ Every managed read and write runs here. Tenant isolation is enforced here, and n
 - `scoped` wraps the build's `authorize`. On a kayan that places the tenant field it asks for the active organization first, then ANDs `{ [field]: { equals: org } }` onto whatever the project's access answers. Reads, updates and deletes all go through it. A create takes no `where` from it, because `writeTenant` already set the field from the session.
 - `active` is the organization of the trusted Better Auth session from the build's one Better Auth kayan, and only when the session lists the actor as a member of it. Anything else answers nothing, and a tenant-owned kayan refuses that actor. It fails closed.
 - `writeTenant` and `refuseTenantOption` run before any step. The first refuses a caller's own value for the field, the second a `tenant` option on a write.
-- `sealWrites` wraps the `tools.store` a step is handed. A raw `insert` must carry the active organization, and `update` and `remove` are ANDed with it and may never name the field. References are checked to stay in the same organization.
+- `sealWrites` wraps the `tools.store` a step is handed. A raw `insert` must carry the active organization, and `update` and `remove` are ANDed with it and may never name the field. References are checked to stay in the same organization. A raw write names a kayan; a versions or join table is core's and is refused.
 - `open` reads a read's `tenant: 'mine' | 'all'` option. `'mine'` covers every verified membership, each judged under that organization's roles. `'all'` is only for the tenant target's `backoffice` check, and only for reads.
 
 Keep it that way:

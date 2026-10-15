@@ -1055,7 +1055,8 @@ const storeOf = <
       if (!tablesFilter.length) return
       await refuseStrangers({ db, tables, by: 'push' })
       // `drizzle-kit/api-postgres` imports every driver drizzle speaks, so webpack and Turbopack
-      // are told to leave the import to the runtime.
+      // are told to leave the import to the runtime, and its drizzle-orm is this mithaq's.
+      ;(await import('./migrate.ts')).holdOwnKit()
       const { pushSchema } = await import(/* webpackIgnore: true */ 'drizzle-kit/api-postgres')
       // `owned`: a column of a table of the language has the type, which makes it the language's own.
       const listed = (values: string[]) => sql.join(values.map((value) => sql`${value}`), sql`, `)

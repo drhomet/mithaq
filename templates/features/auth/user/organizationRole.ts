@@ -16,8 +16,8 @@ export const organizationRole = defineKayan({
   fields: {
     ...defaultFields,
     id: { kind: 'text' },
-    organizationId: { kind: 'relationship', relationTo: () => organization, dbName: 'organization_id', rules: { required: true, onDelete: 'cascade' } },
-    role: { kind: 'text', rules: { required: true } },
+    organizationId: { kind: 'relationship', relationTo: () => organization, dbName: 'organization_id', rules: { required: true, index: true, onDelete: 'cascade' } },
+    role: { kind: 'text', rules: { required: true, index: true } },
     permission: { kind: 'text', rules: { required: true } },
     createdAt: { kind: 'datetime', rules: { required: true } },
     updatedAt: { kind: 'datetime', rules: { nowOnUpdate: true, providedBy: { update: 'application' } } },

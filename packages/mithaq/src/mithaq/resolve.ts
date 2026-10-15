@@ -7,6 +7,7 @@ import {
   readSeals,
   resolveOperations,
   sealOf,
+  foreignCopyOf,
   storeSeals,
   versionSeals,
   type LanguageSlots,
@@ -147,6 +148,13 @@ const sealed = (
   if (!Array.isArray(list)) throw new Error(`${where} needs a list of steps, or a function that returns one.`)
   if (list.some((step) => typeof step !== 'function')) {
     throw new Error(`${where} has a step that is not a function.`)
+  }
+  // Its errors, actors and secret columns are unknown here too, so two copies are refused, never bridged.
+  const foreign = list.filter((step) => !sealOf(step)).map(foreignCopyOf).find(Boolean)
+  if (foreign) {
+    throw new Error(
+      `${where} holds a step another copy of mithaq sealed, loaded from ${foreign}, beside this one at ${import.meta.url}. Install one copy: name mithaq by the same spec, with the same peers, in every package that imports it, so the package manager links it once.`,
+    )
   }
   const held = list.map(sealOf)
   for (const seal of held) {
