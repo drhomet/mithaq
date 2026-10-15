@@ -3,9 +3,9 @@
 // changes of columns it reads. The page holds only the fields this viewer reads
 // as well, so a change the server let through for a column the page left out is
 // not drawn either.
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan, ComponentProps, Row } from 'mithaq/admin'
-import { useAccess, useClient, useKayan, useLocale, useRecord, useScreen, useUser } from 'mithaq/admin/react'
+import { FormContext, useAccess, useClient, useKayan, useLocale, useRecord, useScreen, useUser } from 'mithaq/admin/react'
 import { empty } from '../mithaq/audit-sink.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -170,9 +170,13 @@ export function Activity(_: ComponentProps) {
   const viewer = useUser().id
   const people = useAccess().collections?.user?.read === true
   const id = record?.id === undefined ? undefined : String(record.id)
-  // The row as this page last drew it: a save moves its `updatedAt`, and the
-  // panel reads its entries again from the first page, the new one on top.
-  const seen = `${id}@${String(record?.updatedAt ?? '')}`
+  // The row as this page last drew it, and every save the form beside it
+  // landed: a save, a draft, a publish or an autosave writes an entry, and the
+  // panel reads its entries again from the first page, the new one on top. A
+  // draft save moves no `updatedAt` of the row the page holds, so the count is
+  // what says it landed.
+  const saves = useContext(FormContext)?.saves ?? 0
+  const seen = `${id}@${String(record?.updatedAt ?? '')}@${saves}`
   // What has been read, and how many pages were asked for, each held with the
   // row it is for, so a page that moves to another row, or the same row
   // saved, starts at its first page rather than drawing the last one's.

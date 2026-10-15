@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { act, createElement } from 'react'
 import { asas } from 'asas'
-import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
+import { FormContext, ScreenContext, type ScreenState } from 'mithaq/admin/react'
 import '../../../packages/mithaq-admin/test/tsx.ts'
 import { click, mount } from '../../../packages/mithaq-admin/test/dom.ts'
 import { dirOf, translator, type Locale } from './copy.ts'
@@ -50,8 +50,10 @@ const draw = async (locale: Locale, viewer?: string) => {
   }
   const host = mount()
   const root = createRoot(host)
-  const redraw = async (record: Record<string, unknown>) => {
-    await act(async () => root.render(createElement(ScreenContext, { value: { ...state, record } }, createElement(ComponentsProvider, { components: defaultComponents }, createElement(Activity, { page: courses.pages.edit! })))))
+  // The form the panel sits beside, whose `saves` counts every save that landed, a draft's among them.
+  const redraw = async (record: Record<string, unknown>, saves = 0) => {
+    const form = { getData: () => record, setValue: () => {}, disabled: false, saves }
+    await act(async () => root.render(createElement(ScreenContext, { value: { ...state, record } }, createElement(FormContext, { value: form }, createElement(ComponentsProvider, { components: defaultComponents }, createElement(Activity, { page: courses.pages.edit! }))))))
     await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
   }
   await redraw(state.record!)
@@ -123,5 +125,16 @@ test('an entry the viewer wrote names the viewer "You", and in Arabic joins it t
   }
   const { host, unmount } = await draw('en', 'u9')
   assert.equal(text(host.querySelectorAll('[data-entry] [data-event]')[1]), 'Updated by Someone')
+  await unmount()
+})
+
+test('the panel reads its entries again after every save the form lands, a draft or an autosave that moves no updatedAt among them', async () => {
+  const { asked, redraw, unmount } = await draw('en')
+  const reads = () => asked.filter((one) => one.kayan === 'auditLog').length
+  const before = reads()
+  await redraw({ id: 'c1', title: 'Tajweed' }, 1)
+  assert.equal(reads(), before + 1, 'a save the form counted is read again, though the row it holds is the same')
+  await redraw({ id: 'c1', title: 'Tajweed' }, 1)
+  assert.equal(reads(), before + 1, 'and a render that saved nothing reads nothing')
   await unmount()
 })
