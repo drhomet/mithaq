@@ -531,6 +531,13 @@ What a project made before the portal round changes:
 - **The site has no title of its own.** The settings global drops `siteTitle`: the organization's name, in each locale, is the site's name. Its migration drops the `site_title` column and what it holds; copy a title you want to keep into the organization's name first.
 - **A course says whether its students enroll themselves**, in `selfEnroll`, off until staff turn it on. A student now holds `enrollments.create` and `enrollments.delete` for its own seats alone, and a session takes no seat past its capacity. Run `bunx mithaq migrate --name portal` for the column the course adds and the one settings drops.
 
+What a project made before the json kind changes, in every project:
+
+- **Every body limit is the project's.** `fetchHttp`, `orpcHttp`, the storage config and `auth` each require `maxBodyBytes`, the largest request body they read, and refuse to build without it by name; a body past it is answered 413 before it is read whole. Name `defaultMaxBodyBytes` from `mithaq` (4 MiB) on each, as the template's `packages/asas/src/asas.ts` and `packages/mithaq/src/storage/index.ts` do, or a number of your own.
+- **Every plug names its `onError`.** `fetchHttp` no longer falls back to `console.error`: each plug requires the function it hands a fault it answers 500, as `auth.onError` and `storage.onError` already were. The template hands one `report` to both plugs and to `auth`.
+- **A json field's `maxBytes` counts bytes.** It held a value's JSON to that many characters, and now to that many UTF-8 bytes, so a value written in a script past ASCII may be refused where it was taken. Raise a field's `maxBytes` where its values need the room.
+- **A `like` holds at most 1000 words.** A caller's `like` with more words than an `in` lists values is refused as a 400.
+
 What a project made before the json kind changes, with the audit-log add-on:
 
 - **An audit entry's `changes` is json.** The log held each entry's changes as JSON in a text column, and the column of the names they changed, `changed`, beside it. Copy `audit-log.ts`, `audit-sink.ts` and `activity.tsx` from the template, drop `auditLog.fields.changed` from the roles in `tenant-roles.ts` and the `changed` keys from `src/messages/auditLog.json`, then run `bunx mithaq migrate --name audit_changes_json`. It asks you to answer the drop of `changed` in `mithaq.hints.json`: the names it held are the keys of `changes`, so nothing is lost. Before you commit the migration, put the guard of the template's `audit_changes_json` migration above its `ALTER`, which stops it and changes nothing while an entry holds text that is no JSON. A search by `changed` is now one by a path, `{ 'changes.<column>': { exists: true } }`.
