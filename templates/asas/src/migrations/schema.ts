@@ -23,6 +23,7 @@ export const {
   sessions,
   enrollments,
   auditLog,
+  backofficeLog,
   settings,
   courses_tags,
   _courses_versions,
