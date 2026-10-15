@@ -150,6 +150,16 @@ test('the forgot and reset pages say a refusal the provider gives a code or a st
   }
 })
 
+test('the tenant sign-in page names no one screen, since a portal user signs in on it as a dashboard user does, in either locale', async () => {
+  for (const locale of ['en', 'ar']) {
+    const { host, unmount } = await start('/auth/sign-in', signIn, { locale })
+    const said = host.querySelector('[data-slot=card-description]')?.textContent ?? ''
+    assert.ok(said, `the page says what it is for in ${locale}`)
+    assert.doesNotMatch(said, /dashboard|portal|لوحة|البوابة/i, `in ${locale}, it names no screen: ${said}`)
+    await unmount()
+  }
+})
+
 test('the sign-in page says a refusal in this app\'s own words for the provider\'s code, never the provider\'s English, in either locale', async () => {
   const copy = scopes.auth!
   const filled = (host: HTMLElement) => {

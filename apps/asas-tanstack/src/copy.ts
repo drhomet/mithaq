@@ -292,7 +292,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   },
   auth: {
     signIn: { en: 'Sign in', ar: 'تسجيل الدخول' },
-    signInDescription: { en: 'Sign in to reach the dashboard.', ar: 'سجل الدخول للوصول إلى لوحة التحكم.' },
+    signInDescription: { en: 'Welcome back. Sign in with your email and password.', ar: 'مرحبا بعودتك. سجّل الدخول ببريدك الإلكتروني وكلمة المرور.' },
     signInBackofficeDescription: { en: 'Sign in to reach the backoffice.', ar: 'سجل الدخول للوصول إلى لوحة الإدارة الخلفية.' },
     signInPending: { en: 'Signing in…', ar: 'جارٍ تسجيل الدخول…' },
     createFirstUser: { en: 'Create the first administrator', ar: 'إنشاء أول مسؤول' },

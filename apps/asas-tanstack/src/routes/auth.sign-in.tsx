@@ -67,7 +67,7 @@ function SignIn() {
   }
 
   return (
-    <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInDescription', 'Sign in to reach the dashboard.')}>
+    <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInDescription', 'Welcome back. Sign in with your email and password.')}>
       <form className="grid gap-4" noValidate onSubmit={submit}>
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), { autoComplete: 'current-password', onChange: (event) => setPassword(event.target.value), type: 'password', value: password })}
