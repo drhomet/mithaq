@@ -3,8 +3,11 @@ import { defineKayan, organization, serverTargets } from '@asas/mithaq'
 import { currentOrganization, readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
 import { activity, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { sessions } from '../sessions/sessions.ts'
-import { courses } from '../courses/courses.ts'
-import { seatsTaken } from '../domain/seats.ts'
+import { holdSeats, seatsTaken, sessionHeld } from '../sessions/seats.ts'
+// add-on: settings
+import { sql } from 'mithaq/drizzle'
+import type { NodePgDatabase } from 'mithaq/drizzle/node-postgres'
+// end add-on: settings
 
 const ui = folderOf(new URL('./ui/', import.meta.url))
 const portalUi = folderOf(new URL('../portal/ui/', import.meta.url))
@@ -72,33 +75,22 @@ const ownSeatsOnly = (user: unknown) => !readsPast(user, 'enrollments.others')
 const yetToStart = (startsAt: unknown) => new Date(startsAt as string | Date).getTime() > Date.now()
 
 /**
- * Serializes every write that takes a seat in one session, until its
- * transaction ends: the second write waits here and counts after the first
- * commits, so two students never both take the last seat. The key is digits
- * read off the session's uuid, so nothing a caller sent is written into the
- * statement; two sessions that share it only wait for each other.
- */
-const holdSeats = async (tx: unknown, session: string) => {
-  const key = BigInt.asIntN(64, BigInt(`0x${session.replaceAll('-', '').slice(0, 16)}`))
-  await (tx as { execute(query: string): Promise<unknown> }).execute(`select pg_advisory_xact_lock(${key})`)
-}
-
-/**
- * Whether a session takes this seat. An archived session, or one of an archived
- * course, takes none, in words of its own; a session the actor may not read is
- * left to the reference check, which refuses it in the words a missing one
- * gets. A student takes a seat only where its course lets students enroll
- * themselves, and only before the session starts. A session with a capacity
- * takes no seat past it, whoever writes, counted under a lock on the session.
- * A seat kept in the session it already holds takes no new one.
+ * Whether a session takes this seat. A session the actor may not read is left
+ * to the reference check, which refuses it in the words a missing one gets.
+ * The rest is judged on the session's own columns, whatever the actor is shown:
+ * an archived session, or one of an archived course, takes none; a student
+ * takes a seat only where its course lets students enroll themselves, and only
+ * before the session starts; and a session with a capacity takes no seat past
+ * it, whoever writes, counted under a lock on the session. A seat kept in the
+ * session it already holds takes no new one.
  */
 const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Promise<Ctx> => {
   const id = ctx.data.session
   if (typeof id !== 'string') return ctx
-  const session = await tools.of(sessions).findByID({ id }).catch(() => null)
+  if (!(await tools.of(sessions).findByID({ id }).catch(() => null))) return ctx
+  const session = await sessionHeld({ tx: ctx.tx, session: id })
   if (!session) return ctx
-  const course = session.archived ? undefined : await tools.of(courses).findByID({ id: session.course }).catch(() => null)
-  if (session.archived || course?.archived) {
+  if (session.archived || session.courseArchived) {
     throw invalid({
       message: 'This session is archived, or its course is, so it takes no new seat.',
       key: 'error.invalid.archived_session',
@@ -107,7 +99,7 @@ const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Pr
   }
   if (id === ctx.dataBefore?.session) return ctx
   if (ownSeatsOnly(ctx.user)) {
-    if (course?.selfEnroll !== true) {
+    if (session.selfEnroll !== true) {
       throw invalid({
         message: 'Students of this course do not enroll themselves: the school enrolls them.',
         key: 'error.invalid.enrollment_closed',
@@ -118,8 +110,8 @@ const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Pr
       throw invalid({ message: 'This session has started, so it takes no new seat.', key: 'error.invalid.session_started', params: { kayan: 'enrollments', field: 'session' } })
     }
   }
-  if (typeof session.capacity === 'number') {
-    await holdSeats(ctx.tx, id)
+  if (session.capacity !== null) {
+    await holdSeats({ tx: ctx.tx, session: id })
     if ((await seatsTaken({ session: id, tx: ctx.tx })) >= session.capacity) {
       throw conflict({ message: 'Every seat of this session is taken.', key: 'error.conflict.session_full', params: { kayan: 'enrollments', field: 'session' } })
     }
@@ -130,16 +122,36 @@ const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Pr
 /**
  * A student leaves a session only before it starts: the seat it held stays the
  * record that it was there. Whoever reads every seat withdraws one at any time.
+ * A seat the actor may not reach loaded no row, and answers the 404 a missing
+ * one does. The start is the session's column, so a seat whose course has since
+ * left the actor's sight is not said to have started.
  */
-const leavesBeforeStart = async (ctx: Ctx, tools: WriteTools): Promise<Ctx> => {
-  if (!ownSeatsOnly(ctx.user)) return ctx
-  const id = ctx.dataBefore?.session
-  const session = typeof id === 'string' ? await tools.of(sessions).findByID({ id }).catch(() => null) : null
+const leavesBeforeStart = async (ctx: Ctx): Promise<Ctx> => {
+  if (!ownSeatsOnly(ctx.user) || !ctx.dataBefore) return ctx
+  const id = ctx.dataBefore.session
+  const session = typeof id === 'string' ? await sessionHeld({ tx: ctx.tx, session: id }) : undefined
   if (!session || !yetToStart(session.startsAt)) {
     throw invalid({ message: 'This session has started, so its seat stays.', key: 'error.invalid.session_started', params: { kayan: 'enrollments' } })
   }
   return ctx
 }
+
+// add-on: settings
+/**
+ * While the portal is closed for maintenance a student takes and gives back no
+ * seat, whatever calls the server; staff keep working. The organization's
+ * settings are read in the write's own transaction, since a student reads them
+ * as itself and a role might not.
+ */
+const portalOpen = async (ctx: Ctx): Promise<Ctx> => {
+  if (!ownSeatsOnly(ctx.user) || !ctx.tenant) return ctx
+  const [held] = (await (ctx.tx as NodePgDatabase).execute<{ maintenance: boolean | null }>(sql`select maintenance from settings where organization_id = ${ctx.tenant}`)).rows
+  if (held?.maintenance === true) {
+    throw invalid({ message: 'The portal is closed for maintenance, so no seat changes from it.', key: 'error.invalid.portal_closed', params: { kayan: 'enrollments' } })
+  }
+  return ctx
+}
+// end add-on: settings
 
 export const enrollments = defineKayan({
   name: 'enrollments',
@@ -219,9 +231,27 @@ export const enrollments = defineKayan({
     service: {
       operations: {
         ...defaultOperations,
-        create: { ...defaultOperations.create, steps: ({ steps }) => [takesSeat, steps.insert] },
-        update: { ...defaultOperations.update, steps: ({ steps }) => [takesSeat, steps.update] },
-        delete: { ...defaultOperations.delete, steps: ({ steps }) => [leavesBeforeStart, steps.remove] },
+        create: { ...defaultOperations.create, steps: ({ steps }) => [
+          // add-on: settings
+          portalOpen,
+          // end add-on: settings
+          takesSeat,
+          steps.insert,
+        ] },
+        update: { ...defaultOperations.update, steps: ({ steps }) => [
+          // add-on: settings
+          portalOpen,
+          // end add-on: settings
+          takesSeat,
+          steps.update,
+        ] },
+        delete: { ...defaultOperations.delete, steps: ({ steps }) => [
+          // add-on: settings
+          portalOpen,
+          // end add-on: settings
+          leavesBeforeStart,
+          steps.remove,
+        ] },
       },
     },
     // Titled by the student on the dashboard, as on the backoffice, so a tab and a
@@ -262,10 +292,11 @@ export const enrollments = defineKayan({
       pages: {
         // The viewer's seats, upcoming first, drawn whole by the courses feature's portal.
         list: { path: '/enrollments', component: portalUi('enrollments.tsx#Enrollments') },
-        // The student too, as the dashboard draws it, so an instructor picks
-        // whom it enrolls. A role without `enrollments.fields.student` is not
-        // projected the field and is drawn the session alone.
-        create: { path: '/enrollments/new', page: portalPage([{ form: ['session', 'student'] }]) },
+        // The list's New enrollment, which only staff are offered. The student is
+        // drawn for whoever may change a seat, which staff may and a student may
+        // not, so an instructor picks whom it enrolls; a student who opens the
+        // page by its address is drawn the session alone, and its create names itself.
+        create: { path: '/enrollments/new', page: portalPage([{ form: ['session', { field: 'student', when: { '$user.collections.enrollments.operations.update': { equals: true } } }] }]) },
         edit: { path: '/enrollments/:id', page: portalPage([{ form: ['session'] }]) },
       },
     },

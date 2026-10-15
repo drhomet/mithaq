@@ -817,7 +817,12 @@
                       {
                         "field": "student",
                         "component": "relationship",
-                        "decided": "table"
+                        "decided": "table",
+                        "when": {
+                          "$user.collections.enrollments.operations.update": {
+                            "equals": true
+                          }
+                        }
                       }
                     ]
                   }

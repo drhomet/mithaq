@@ -4,7 +4,7 @@ import { defineKayan, organization } from '@asas/mithaq'
 import { activity, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { sessions } from '../sessions/sessions.ts'
-import { seatsTaken } from '../domain/seats.ts'
+import { seatsTaken } from '../sessions/seats.ts'
 import { expectedUpdatedAt } from '@asas/mithaq/steps/expected-updated-at.ts'
 import { archivedRow, marks, notArchived, reason, reasonInput, unarchived } from '../domain/archive.ts'
 

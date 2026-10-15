@@ -985,6 +985,9 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     'invalid.session_started': { en: 'This session has started, so its seats no longer change.', ar: 'بدأت هذه الجلسة، فلم تعد مقاعدها تتغير.' },
     'conflict.session_full': { en: 'Every seat of this session is taken. Pick another session.', ar: 'كل مقاعد هذه الجلسة محجوزة. اختر جلسة أخرى.' },
     // end add-on: courses
+    // add-on: courses, settings
+    'invalid.portal_closed': { en: 'The portal is closed for maintenance, so no enrollment changes from it just now.', ar: 'البوابة مغلقة للصيانة، فلا يتغير منها أي تسجيل الآن.' },
+    // end add-on: courses, settings
     'invalid.draft_sessions': { en: 'A course saved as a draft makes no sessions. Publish the course, then add its sessions.', ar: 'الدورة المحفوظة كمسودة لا تُنشئ جلسات. انشر الدورة أولًا، ثم أضف جلساتها.' },
     'invalid.upload_request': { en: 'The file has no name, or no size, that can be uploaded.', ar: 'ليس للملف اسم أو حجم يمكن رفعه.' },
     'invalid.upload_type': { en: 'Files of this type are not taken here.', ar: 'لا تُقبل هنا ملفات من هذا النوع.' },
