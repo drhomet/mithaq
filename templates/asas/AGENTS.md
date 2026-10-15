@@ -46,7 +46,7 @@ On a per-organization kayan, `rules: { unique: true }` means unique within each 
 
 How many organizations the project holds, and who may sign up and join, is `packages/mithaq/src/mithaq/auth/organizations.ts` (`organizations`, `showOrganization`, `signUp`, `joinRole`, `verifyEmail`, `allowedDomains`). In one organization the field and the scope are the same, so keep placing `organization` on every per-organization kayan: leaving it off makes the kayan shared by every organization the day the project holds many. README.md, "Organization modes", says what each value does and how to change it.
 
-Reads that reach further (`tenant: 'mine' | 'all'`), what is refused, and the index rules are in [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md).
+Reads that reach further (`tenant: 'mine' | 'all'`), what is refused, and the index rules are in the tenancy guide, `docs/packages/mithaq/src/asas/runner/README.md` in the installed mithaq.
 
 ## Migrations
 
@@ -59,7 +59,7 @@ Reads that reach further (`tenant: 'mine' | 'all'`), what is refused, and the in
   node "$DRIZZLE_KIT" migrate --config src/migrations/drizzle.config.ts
   ```
 - When a change would lose data, `mithaq migrate` stops and asks for an answer in `mithaq.hints.json`. A drop deletes rows: ask the developer before you write one.
-- In production `connect()` checks for pending migrations, as `prodMigrations` in `packages/mithaq/src/mithaq.ts` says: `pending: 'refuse'` refuses to start, `pending: 'run'` applies them under a lock. `drizzle-kit migrate` run by hand takes no lock, so never run it while an app is starting. See `README.md`, "Running in production", and [Migrations in production](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/drizzle/README.md).
+- In production `connect()` checks for pending migrations, as `prodMigrations` in `packages/mithaq/src/mithaq.ts` says: `pending: 'refuse'` refuses to start, `pending: 'run'` applies them under a lock. `drizzle-kit migrate` run by hand takes no lock, so never run it while an app is starting. See `README.md`, "Running in production", and the guide to migrations in production, `docs/packages/mithaq/src/drizzle/README.md` in the installed mithaq.
 
 ## Rules
 
@@ -88,14 +88,14 @@ bun run dev:setup --seed        # a fresh dev database: the schema, the dev admi
 bun run seed
 ```
 
-From the project root:
+From the project root, where an isolated install puts no `typescript` and a bare `bunx tsc` would fetch the unrelated `tsc` package:
 
 ```sh
-bunx tsc -p .
-bunx tsc -p apps/asas-tanstack
-bunx tsc -p apps/asas-backoffice
+bunx --package typescript tsc -p .
+bunx --package typescript tsc -p apps/asas-tanstack
+bunx --package typescript tsc -p apps/asas-backoffice
 bun run --cwd apps/asas-tanstack dev    # http://localhost:5173
 bun run --cwd apps/asas-backoffice dev    # http://localhost:5174
 ```
 
-`README.md` beside this file is the guide to this project. The language reference is [packages/mithaq/README.md](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/README.md).
+`README.md` beside this file is the guide to this project. The language reference is `docs/packages/mithaq/README.md` in the installed mithaq.

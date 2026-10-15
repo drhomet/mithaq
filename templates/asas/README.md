@@ -33,7 +33,7 @@ It also asks how the project holds its people, or takes `--organizations`, `--sh
 
 `rich-text` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
 
-What you get is a Bun workspace:
+What you get is a workspace:
 
 | Folder | What it is |
 | --- | --- |
@@ -43,7 +43,7 @@ What you get is a Bun workspace:
 | `apps/asas-tanstack` | The tenant app, built on TanStack Start. It serves the dashboard at `/dashboard` and the portal at `/portal`, on `http://localhost:5173`. |
 | `apps/asas-backoffice` | With the backoffice add-on, the backoffice console, for staff who work across every organization, on `http://localhost:5174`. |
 
-At the root it also writes `bunfig.toml`, which turns on the isolated linker, a `.gitignore`, and a `tsconfig.json`.
+At the root it also writes `AGENTS.md`, `CLAUDE.md` and this guide, `README.md`, for you and a coding agent, the agent's workflow skills in `.claude/`, a `.gitignore`, a `tsconfig.json`, and the settings pnpm and Yarn read (`pnpm-workspace.yaml`, `.yarnrc.yml`).
 
 It writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-backoffice`, readable only by you:
 
@@ -764,7 +764,6 @@ No command adds an add-on yet. Make two throwaway projects at your mithaq versio
 ### Tests
 
 - Give tests a throwaway database, named by `DATABASE_URL`, and never the development database. Under `node --test` the template's `packages/mithaq/src/mithaq.ts` refuses to load without `DATABASE_URL`. The mithaq repository's own tests need more; see [CONTRIBUTING.md](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md#set-up).
-- Run with Bun and its isolated linker, which `bun create mithaq` sets in `bunfig.toml`.
 - Put a test beside the code it tests as `<name>.test.ts`, and run it with `node --test`.
 - Write security cases first: the read of another organization's row, the write without the key, the refused input.
 - See each test fail before it passes. Break the property, watch the failure, then restore it.

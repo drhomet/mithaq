@@ -137,7 +137,7 @@ organization: tenant.field,
 
 ## Requirements
 
-- [Bun](https://bun.sh) 1.3 with the isolated linker. `bun create mithaq` writes the `bunfig.toml` that turns it on; npm, pnpm and yarn lay `node_modules` out where the screens cannot find their files.
+- npm, pnpm 10.6 or later, Yarn 1 or [Bun](https://bun.sh) 1.3, whichever runs `create mithaq`. Yarn 2 and later install a copy of mithaq for each workspace of a monorepo, which the build refuses, so a monorepo does not take them yet.
 - Node.js 24 or later.
 - PostgreSQL 15 or later.
 - TypeScript, installed by the project.

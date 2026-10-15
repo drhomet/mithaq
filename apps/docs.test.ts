@@ -52,7 +52,7 @@ test('every relative link, anchor and link to this repository on GitHub in a tra
 
 // A name the project retired, which a guide should no longer teach. The commit that renames something adds the old
 // name here. An "Upgrading" section names them on purpose, to say what each became.
-const retired = [/admin@admin\.com/, /\bmithaqjs\b/, /\bBun only\b/i, /asas-platform/, /PLATFORM_URL/, /\bscreen\.platform\b/, /platform-roles|platformRoles|platformApp|ui-platform/, /\bplatform (console|app|screen)\b/i, /(^|[\s(`'"])\/?r\/[\w-]+\.json/, /registry\/r\//]
+const retired = [/admin@admin\.com/, /\bmithaqjs\b/, /\bBun only\b/i, /asas-platform/, /PLATFORM_URL/, /\bscreen\.platform\b/, /platform-roles|platformRoles|platformApp|ui-platform/, /\bplatform (console|app|screen)\b/i, /(^|[\s(`'"])\/?r\/[\w-]+\.json/, /registry\/r\//, /bunfig\.toml/]
 
 /** Each line naming a retired name, as `<line> <name>`, outside an "Upgrading" section; a fenced line opens or closes none. */
 const staleIn = (lines: string[]) => {
