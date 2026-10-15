@@ -6,7 +6,7 @@ import { AuthBox, AuthFrame, authGate, notAnEmail, redirectSearch, useRefusal } 
 import { documentHead } from '../copy.ts'
 import { firstUser } from '../first-user.ts'
 import { useCopy } from './__root.tsx'
-import { wanted } from '../redirect.ts'
+import { landing } from '../redirect.ts'
 
 export const Route = createFileRoute('/auth/sign-in')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.signIn')),
@@ -54,7 +54,7 @@ function SignIn() {
     setPending(false)
 
     // A navigation, not a reload, so the screen's loader runs with the cookie just set.
-    await navigate({ to: wanted({ asked: search.redirect, home: (await authGate()).home.path }) })
+    await navigate({ href: landing({ asked: search.redirect, screens: (await authGate()).screens }) })
   }
 
   return (

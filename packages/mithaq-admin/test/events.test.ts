@@ -1231,6 +1231,8 @@ test('216c. Edit roles opens the full-page drawer listing every role with what i
   assert.equal(drawer.getAttribute('data-mithaq-inline-edit'), 'u1', 'the full-page drawer, on that member')
   const role = (name: string) => drawer.querySelector(`[data-role="${name}"]`)!
   assert.equal(role('teacher').querySelector('[data-permissions] [data-group="courses"]') !== null, true, 'a role lists what it grants, grouped by kayan')
+  assert.equal(role('teacher').querySelector('[data-slot="collapsible-trigger"]')?.getAttribute('aria-expanded'), 'false', 'closed at first, behind a row that counts it, as the Roles page draws it')
+  assert.match(role('teacher').querySelector('[data-slot="collapsible-trigger"]')?.getAttribute('aria-label') ?? '', /^Teacher/, 'and named for its role, so each row says whose permissions it opens')
   assert.equal(role('administrator').textContent!.includes('Every permission'), true, 'and the administrator, every permission')
   assert.equal(role('administrator').getAttribute('data-disabled'), 'true', 'a role holding keys the viewer lacks is disabled')
   assert.ok(role('administrator').querySelector('[data-locked]'), 'and says why')
@@ -1366,6 +1368,38 @@ test('229d. a role\'s delete names a holder it may not read as a member, never b
   assert.equal(holders[0]?.getAttribute('href')?.endsWith('?member=u-unread'), true, 'and the link still opens their roles')
 })
 
+test('229h. the Roles page lists each role closed, its row naming it and counting what it grants, and opens it to its permissions, each group closed in turn', async () => {
+  const { RolesTable } = await import('../../../templates/features/roles/roles/ui/roles.tsx')
+  const { tenantRoles } = await import('../../../templates/mithaq/src/roles/tenant-roles.ts')
+  const teacher = { id: 'r1', name: 'teacher', label: { en: 'Teacher', ar: 'معلم' }, permissions: ['screen.dashboard', 'courses.find', 'courses.fields.title'] }
+  // A role whose keys the viewer may not read comes without them.
+  const aide = { id: 'r2', name: 'aide', label: { en: 'Aide', ar: 'مساعد' } }
+  const list = { page: { docs: [teacher, aide], totalDocs: 2 }, creates: true, href: (id: string) => `/dashboard/roles/${id}`, newHref: '/dashboard/roles/new' }
+  const host = await render(createElement(ListContext, { value: list as never }, createElement(RolesTable)), { t: english as never, kayan: screen.kayan.roles!, access: { screens: ['dashboard'], permissions: '*' } as never })
+  const row = (name: string) => host.querySelector(`[data-row="${name}"]`)!
+  const trigger = (within: Element) => within.querySelector('[data-slot="collapsible-trigger"]')!
+  const shown = (element: Element | null) => element !== null && element.closest('[hidden]') === null
+  const registrar = tenantRoles.registrar.permissions as readonly string[]
+  assert.deepEqual(
+    [trigger(row('registrar')).textContent, trigger(row('r1')).textContent],
+    [`Registrar${registrar.length} permissions`, 'Teacher3 permissions'],
+    'each role\'s row names it by its label and counts what it grants',
+  )
+  assert.deepEqual([row('administrator').querySelector('[data-fixed-role]')?.textContent, trigger(row('administrator'))], ['AdministratorEvery permission', null], 'and the administrator, every permission, with nothing to open')
+  assert.deepEqual([...host.querySelectorAll('[data-row] > td > [data-slot="collapsible"] > [data-slot="collapsible-trigger"]')].map((one) => one.getAttribute('aria-expanded')), [...Object.keys(tenantRoles).filter((one) => one !== 'administrator'), 'r1'].map(() => 'false'), 'every other role is closed at first')
+  assert.equal(shown(row('r1').querySelector('[data-key="courses.find"]')), false, 'so its keys are not shown')
+  assert.equal(row('r1').querySelector('[data-slot="collapsible-content"]')?.getAttribute('hidden'), 'until-found', 'though a find on the page reaches them')
+  assert.deepEqual([trigger(row('r2')), row('r2').querySelector('a')?.getAttribute('href'), row('r2').textContent?.includes('permissions')], [null, '/dashboard/roles/r2', false], 'a role whose keys the viewer may not read counts none, and links its page')
+  await act(async () => click(trigger(row('r1'))))
+  const courses = row('r1').querySelector('[data-group="courses"]')!
+  assert.deepEqual([trigger(courses).getAttribute('aria-expanded'), trigger(courses).textContent], ['false', 'Courses2 permissions'], 'opened, each group is a closed row naming it and counting its keys')
+  assert.equal(shown(row('r1').querySelector('a[href="/dashboard/roles/r1"]')), true, 'and a custom role links its page')
+  assert.equal(row('r1').querySelector('a[href="/dashboard/roles/r1"]')?.textContent, 'Open Teacher', 'by its own name, so no two links on the page read alike')
+  assert.equal(shown(courses.querySelector('[data-key="courses.find"]')), false)
+  await act(async () => click(trigger(courses)))
+  assert.equal(shown(courses.querySelector('[data-key="courses.find"]')), true, 'a group opened shows its keys')
+})
+
 test('229f. a role\'s form refused on save marks its name and both labels required and refused, each with its sentence under it, and its permissions group refused where the server names it', async () => {
   // The form by the package's name, as the role form binds its fields through it.
   const { Form: AppForm } = await import('mithaq-admin/form.tsx')
@@ -1389,6 +1423,8 @@ test('229f. a role\'s form refused on save marks its name and both labels requir
   const ids = ['roles-name', 'roles-label-en', 'roles-label-ar']
   const marks = () => ids.map((id) => [host.querySelector(`#${id}`)?.getAttribute('aria-required'), host.querySelector(`#${id}`)?.getAttribute('aria-invalid') ?? null, host.querySelector(`#${id}-error`)?.textContent ?? null])
   const group = () => host.querySelector('[role="group"][aria-label="Permissions, required"]')
+  const groups = [...host.querySelectorAll('[data-group] > [data-slot="collapsible-trigger"], [data-group] > h3 > [data-slot="collapsible-trigger"]')]
+  assert.ok(groups.length > 0 && groups.every((one) => one.getAttribute('aria-expanded') === 'true'), 'the editor starts with every group of keys open')
   assert.deepEqual(marks(), ids.map(() => ['true', null, null]), 'every box says it is required before anything is typed, and nothing is refused')
   assert.equal(group()?.hasAttribute('aria-required'), false, 'the permissions group says it is required in its name, since a group takes no aria-required')
   await act(async () => fire(host.querySelector('form')!, 'submit'))

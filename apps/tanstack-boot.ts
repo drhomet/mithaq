@@ -1253,6 +1253,18 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
   assert.equal(signInLocation.searchParams.get('redirect'), '/unauthorized', 'and carries /unauthorized itself as the redirect')
 })
 
+test('49b. a student who signs in lands on /portal, whatever screen the sign-in page was asked to return to, and the landing page offers them the portal', async () => {
+  await holding('student', async () => {
+    assert.equal(await sentTo('/auth/sign-in', cookie), '/portal', 'sign-in sends a signed-in student to the portal')
+    assert.equal(await sentTo('/auth/sign-in?redirect=%2Fdashboard', cookie), '/portal', 'and so does a sign-in asked to return to the dashboard, which the student does not open')
+    assert.equal(await sentTo('/auth/sign-in?redirect=%2Fportal%2Fcourses', cookie), '/portal/courses', 'while a page of the portal is honoured')
+    const landingPage = await (await fetch(`${origin}/`, { headers: { cookie } })).text()
+    assert.ok(landingPage.includes('href="/portal"') && !landingPage.includes('href="/auth/sign-in"'), 'the landing page offers the portal, and no sign-in')
+  })
+  assert.equal(await sentTo('/auth/sign-in', cookie), '/unauthorized', 'the administrator, who opens both screens, is asked which')
+  assert.equal(await sentTo('/auth/sign-in?redirect=%2Fdashboard%2Fcourses', cookie), '/dashboard/courses', 'unless the sign-in names a page of one')
+})
+
 /**
  * Seats the signed-in administrator while it also holds the student role, since a seat's student
  * holds it; the role goes again after, so a test that swaps the administrator's role finds one row.
@@ -2433,7 +2445,8 @@ test('69. every auth page reads cleanly in both locales: a way home, the languag
   // A signed-in visitor is sent on from sign-in and sign-up, where signing in sends anyone, and told so on the two
   // password pages, with that same way on.
   for (const path of pages) {
-    for (const [asked, landing] of [['', '/dashboard'], ['/dashboard/courses', '/dashboard/courses'], ['https://elsewhere.example', '/dashboard']] as const) {
+    // The boot actor opens both screens, so with no page of one asked it is sent to choose.
+    for (const [asked, landing] of [['', '/unauthorized'], ['/dashboard/courses', '/dashboard/courses'], ['https://elsewhere.example', '/unauthorized']] as const) {
       const url = `${origin}${path}${asked ? `${path.includes('?') ? '&' : '?'}redirect=${encodeURIComponent(asked)}` : ''}`
       if (path.startsWith('/auth/sign-')) {
         const response = await fetch(url, { headers: { cookie }, redirect: 'manual' })
@@ -2446,8 +2459,8 @@ test('69. every auth page reads cleanly in both locales: a way home, the languag
         const html = await response.text()
         assert.equal(response.status, 200, `${path} keeps a signed-in visitor in ${locale}`)
         assert.ok(html.includes(scopes.auth!.alreadySignedIn![locale]!), `${path} says they are already signed in, in ${locale}`)
-        // Named for the screen where it opens the first one, and plainly where the visitor asked for a page of their own.
-        const said = landing === '/dashboard' ? scopes.auth!.backTo![locale]!.replace('{screen}', scopes.screens!.dashboard![locale]!) : scopes.auth!.continue![locale]!
+        // Named plainly, since the way on is the chooser or a page the visitor asked for, never one screen's home.
+        const said = scopes.auth!.continue![locale]!
         assert.match(html, new RegExp(`<a[^>]*href="${landing}"[^>]*>${said}</a>`), `${path} with ${asked || 'no redirect'} links on to ${landing} as "${said}" in ${locale}`)
         assert.ok(html.includes(`>${scopes.admin!.signOut![locale]}</button>`), `${path} offers a sign-out in ${locale}`)
       }
@@ -2682,7 +2695,7 @@ test('73. the backoffice reads by name in both locales: its sign-in is the tenan
   }
 })
 
-test('74. every template role signs in to the first screen it enters, the landing page names it, and its lists draw rows; an actor who enters none is told whose account it is and whom to ask', async () => {
+test('74. every template role signs in to the one screen it enters, or to the choice of several, the landing page names the first, and its lists draw rows; an actor who enters none is told whose account it is and whom to ask', async () => {
   const { scopes } = await import('./asas-tanstack/src/copy.ts')
   const tag = await post('/api/tags/create', { name: { en: `Tag ${Date.now()}`, ar: 'وسم' } }, { cookie })
   assert.equal(tag.response.status, 200, JSON.stringify(tag.body))
@@ -2718,7 +2731,9 @@ test('74. every template role signs in to the first screen it enters, the landin
     ['student', '/portal', 'portal', ['/portal/courses', '/portal/enrollments']],
   ] as const) {
     await holding(role, async () => {
-      assert.equal(await landsOn(), landing, `a ${role} lands on ${landing}`)
+      // The administrator opens both screens, so it is asked which; every other role opens one and lands on it.
+      const chosen = role === 'administrator' ? '/unauthorized' : landing
+      assert.equal(await landsOn(), chosen, `a ${role} lands on ${chosen}`)
       const home = await page(landing)
       if (screen === 'dashboard') assert.match(home, /data-kpi="courses"[\s\S]*?data-slot="card-title"[^>]*>[1-9][0-9,]*</, `which counts the courses a ${role} reads`)
       else assert.match(home, /data-dashboard="portal"/, `which is the portal's own home to a ${role}`)

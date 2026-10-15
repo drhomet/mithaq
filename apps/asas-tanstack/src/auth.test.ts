@@ -29,7 +29,7 @@ const start = async (path: string, component: typeof signUp, { locale = 'en', si
   const root = createRootRoute({ beforeLoad: () => ({ dir: locale === 'ar' ? 'rtl' : 'ltr', locale, app: 'marketing.brand' }), component: () => createElement(Outlet) })
   const router = createRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
-    routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: path.split('?')[0]!, beforeLoad: () => ({ signedIn, home, password: { min: 8, max: 128 }, ...context }), component })]),
+    routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: path.split('?')[0]!, beforeLoad: () => ({ signedIn, home, screens: home.name ? [home.path] : [], password: { min: 8, max: 128 }, ...context }), component })]),
   })
   const host = mount()
   const mounted = createRoot(host)

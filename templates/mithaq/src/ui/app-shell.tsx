@@ -192,13 +192,14 @@ const measureHeader = (header: HTMLElement | null) => {
  * The one way from a tenant screen to the backoffice app, in the header, for an actor whose own `user.role` holds a backoffice role that enters it.
  * The link grants nothing here: the backoffice app's own server decides entry.
  * Below xl it is its icon alone, a 44 pixel square on a phone, its words kept for a screen reader, so the page's title keeps the header's width.
+ * A quiet ghost button at the row's end, so the page's own actions beside the title lead.
  */
 export function BackofficeLink() {
   const { t } = useLocale()
   const backoffice = useUser().screens?.find((one) => one.name === 'backoffice')
   if (!backoffice) return null
   return (
-    <a href={backoffice.path} data-backoffice-link="" className={buttonVariants({ variant: 'outline', size: 'sm', className: 'ms-auto max-sm:size-11 max-xl:px-2.5 max-sm:px-0 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
+    <a href={backoffice.path} data-backoffice-link="" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'text-muted-foreground ms-auto max-sm:size-11 max-xl:px-2.5 max-sm:px-0 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
       <span className="max-xl:sr-only">{t('dashboard.openBackoffice', 'Open the backoffice')}</span>
       <ArrowUpRight data-icon="inline-end" className="rtl:-scale-x-100" />
     </a>
@@ -240,7 +241,7 @@ export function AppShell({ regions, brand, home }: ShellProps<readonly ['header'
             <BackofficeLink />
           </div>
         </header>
-        <div className="flex min-w-0 flex-1 flex-col px-4 py-4 lg:px-6 lg:py-6">
+        <div className="flex min-w-0 flex-1 flex-col px-4 py-4 lg:px-6">
           {/* `min-w-0` so a table wider than the page scrolls rather than
               pushing the sidebar off it. A div and not a `main`, because the
               inset around it is already the page's one main landmark. */}

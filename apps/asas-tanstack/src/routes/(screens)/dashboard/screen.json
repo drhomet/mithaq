@@ -3361,6 +3361,11 @@
                           "field": "name",
                           "cell": "text",
                           "decided": "table"
+                        },
+                        {
+                          "field": "permissions",
+                          "cell": "textArray",
+                          "decided": "table"
                         }
                       ],
                       "limit": 100

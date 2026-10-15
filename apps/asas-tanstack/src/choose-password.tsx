@@ -36,6 +36,8 @@ type Props = {
   redirect?: string
   signedIn: boolean
   home: { path: string; name?: string }
+  /** The paths of the screens a signed-in person opens. */
+  screens: readonly string[]
   password: { min: number; max: number }
   /** The account the link is for; `null` for a link that names none, `undefined` while unread. */
   email?: string | null
@@ -46,7 +48,7 @@ type Props = {
  * it is for and signs the person in with the password just chosen, through the ordinary sign-in, as Payload's reset
  * does: every rule a sign-in keeps still holds, and nothing is known that the person did not just type.
  */
-export function ChoosePassword({ first, token, redirect, signedIn, home, password: bounds, email }: Props) {
+export function ChoosePassword({ first, token, redirect, signedIn, home, screens, password: bounds, email }: Props) {
   const { t } = useCopy()
   const navigate = useNavigate()
   const refused = useRefusal()
@@ -96,7 +98,7 @@ export function ChoosePassword({ first, token, redirect, signedIn, home, passwor
     setDone(true)
   }
 
-  if (signedIn) return <AlreadySignedIn redirect={redirect} home={home} />
+  if (signedIn) return <AlreadySignedIn redirect={redirect} home={home} screens={screens} />
   if (!token || email === null) {
     return (
       <AuthFrame title={title} description={t('auth.tokenInvalid', 'Token is either invalid or has expired.')}>

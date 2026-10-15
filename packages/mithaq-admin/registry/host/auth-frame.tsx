@@ -10,7 +10,7 @@ import { authArm } from './api.ts'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { refusalKey } from './copy.ts'
 import { LocaleSwitch } from './locale-switch.tsx'
-import { wanted } from './redirect.ts'
+import { landing } from './redirect.ts'
 import { useCopy } from './routes/__root.tsx'
 
 /** The one search key the auth pages read, off the raw search. */
@@ -21,8 +21,8 @@ export const redirectSearch = (search: Record<string, unknown>): { redirect?: st
 export const signedInAs = async (actor: Promise<unknown>) => Boolean(((await actor.catch(() => null)) as { email?: unknown } | null)?.email)
 
 /**
- * Whether this request carries a session, where signing in lands for it, and the provider's password bounds.
- * No auth page sends a referrer, since the reset page's address carries its token.
+ * Whether this request carries a session, the screens it opens, the first of them as `home`, which a link back names,
+ * and the provider's password bounds. No auth page sends a referrer, since the reset page's address carries its token.
  */
 export const authGate = createServerFn({ method: 'GET' }).handler(async () => {
   // Imported inside the server half so no auth page ships the screen host to the browser.
@@ -31,9 +31,9 @@ export const authGate = createServerFn({ method: 'GET' }).handler(async () => {
   type Provider = { name: string; server: { $context: Promise<{ password: { config: { minPasswordLength: number; maxPasswordLength: number } } }> } }
   const provider = (asas.auth.strategies as unknown as Provider[]).find((one) => one.name === 'user')!
   const [signedIn, { password }] = await Promise.all([signedInAs(asas.auth.actor(getRequest().headers)), provider.server.$context])
-  const first = signedIn ? (await loadEnterable())?.screens[0] : undefined
-  const home: { path: string; name?: string } = first ?? { path: '/unauthorized' }
-  return { signedIn, home, password: { min: password.config.minPasswordLength, max: password.config.maxPasswordLength } }
+  const entered = signedIn ? ((await loadEnterable())?.screens ?? []) : []
+  const home: { path: string; name?: string } = entered[0] ?? { path: '/unauthorized' }
+  return { signedIn, home, screens: entered.map((one) => one.path), password: { min: password.config.minPasswordLength, max: password.config.maxPasswordLength } }
 })
 
 /**
@@ -42,8 +42,8 @@ export const authGate = createServerFn({ method: 'GET' }).handler(async () => {
  * route context.
  */
 export const gate = async ({ search }: { search: { redirect?: string } }) => {
-  const { signedIn, home, password } = await authGate()
-  if (signedIn) throw redirect({ href: wanted({ asked: search.redirect, home: home.path }) })
+  const { signedIn, screens, password } = await authGate()
+  if (signedIn) throw redirect({ href: landing({ asked: search.redirect, screens }) })
   return { password }
 }
 
@@ -57,10 +57,10 @@ export const useHomeLabel = () => {
 }
 
 /** What the forgot and reset pages draw for someone already signed in: the way on, and a sign-out. */
-export function AlreadySignedIn({ redirect: asked, home }: { redirect?: string; home: { path: string; name?: string } }) {
+export function AlreadySignedIn({ redirect: asked, home, screens }: { redirect?: string; home: { path: string; name?: string }; screens: readonly string[] }) {
   const { t } = useCopy()
   const label = useHomeLabel()
-  const to = wanted({ asked, home: home.path })
+  const to = landing({ asked, screens })
   return (
     <AuthFrame title={t('auth.alreadySignedIn', 'You are already signed in')}>
       <div className="grid gap-4">
