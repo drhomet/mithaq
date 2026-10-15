@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
+import { organizationName } from './organizations.ts'
+import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, organizationNameProblem, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
 test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
   assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
@@ -265,14 +266,29 @@ test('the organization settings refuse every combination that would mean nothing
   assert.equal(settingsProblems({ settings: { ...school, joinRole: 'student' }, deployed: false, joinRoles: null }).length, 1, 'without the roles add-on a join role is refused')
 })
 
-test('with one organization its name in code holds the default locale\'s name, one line of at most 100 characters each, in the project\'s locales alone', () => {
-  for (const [name, organizationName] of [
+test('in every mode the organization\'s name in code names each locale the language reads and no other, the first one written, each one line of at most 100 characters', () => {
+  const locales = ['ar', 'en']
+  for (const [name, names] of [
+    ['a locale left out', { en: 'School' }],
     ['no default', { ar: 'مدرسة' }],
     ['an empty default', { en: '  ', ar: 'مدرسة' }],
-    ['a stray locale', { en: 'School', fr: 'École' }],
+    ['a stray locale', { en: 'School', ar: 'مدرسة', fr: 'École' }],
     ['one past 100', { en: 'School', ar: 'x'.repeat(101) }],
-  ] as const) assert.match(problems({ ...school, organizationName }).join('\n'), /organizationName/, name)
-  assert.deepEqual(problems({ ...school, organizationName: { en: 'School' } }), [], 'the default alone is enough: the others fall back to it')
+  ] as const) assert.match(organizationNameProblem({ names, locales }) ?? '', /organizationName/, name)
+  assert.equal(organizationNameProblem({ names: { en: 'School', ar: '' }, locales }), undefined, 'another locale\'s may be empty, to fall back to the first')
+  assert.equal(organizationNameProblem({ names: organizationName, locales }), undefined, 'and the template\'s own is sound')
+})
+
+test('the language refuses to load, in any mode, while the organization\'s name in code leaves out a locale it reads', async () => {
+  const { spawnSync } = await import('node:child_process')
+  const englishOnly = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'
+registerHooks({ load: (url, context, next) => {
+  const loaded = next(url, context)
+  return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace("ar: 'مؤسستي' }", '}') } : loaded
+} })`)}`
+  const loaded = spawnSync(process.execPath, ['--import', englishOnly, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('../../mithaq.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, NODE_ENV: 'development' } })
+  assert.notEqual(loaded.status, 0, 'it does not load')
+  assert.match(loaded.stderr, /organizationName names en, and the language reads ar, en/)
 })
 
 test('the auth setup loads with one organization, whose settings it checks as it loads', async () => {

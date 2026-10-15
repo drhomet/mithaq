@@ -306,6 +306,17 @@ const named = (data: { name?: unknown; names?: unknown }) => {
   const name = oneLineName(data.name)
   return { name, names: JSON.stringify({ [defaultLocale]: name }) }
 }
+/**
+ * Why `names`, the organization's name in code, does not name it in each of `locales`, the language's and no other,
+ * the first required, or nothing. Every mode holds a founder's names to its locales and falls back to its first, so
+ * the language checks it as it loads (`src/mithaq.ts`).
+ */
+export const organizationNameProblem = ({ names, locales }: { names: Readonly<Record<string, string>>; locales: readonly string[] }) => {
+  const held = Object.keys(names)
+  if (held.length !== locales.length || locales.some((one) => !held.includes(one))) return `organizationName names ${held.join(', ') || 'no locale'}, and the language reads ${locales.join(', ')}: name the organization in each, the first the one every other falls back to.`
+  const problem = namesProblem(names)
+  return problem && `organizationName ${problem}`
+}
 const nameInCode = () => new APIError('FORBIDDEN', { code: 'ORGANIZATION_NAME_IN_CODE', message: 'With one organization its name lives in code: organizationName in src/mithaq/auth/organizations.ts.' })
 
 /**
@@ -321,9 +332,8 @@ const grantsPower = (key: string) => /^(roles|member(Roles)?|invitation|ac|organ
  * machine.
  */
 export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: AuthSettings; deployed: boolean; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
-  const { organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains, mailer, organizationName } = settings
+  const { organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains, mailer } = settings
   const problems: string[] = []
-  if (organizations === 'one' && namesProblem(organizationName)) problems.push(`organizationName ${namesProblem(organizationName)}`)
   if (organizations === 'many') {
     if (!showOrganization) problems.push("organizations = 'many' takes showOrganization = true: a person who belongs to several switches between them by name.")
     if (signUp !== 'open') problems.push("organizations = 'many' takes signUp = 'open': each sign-up founds its own organization, and nobody joins one but by invitation.")

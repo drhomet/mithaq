@@ -42,8 +42,8 @@ import { systemRoles } from './roles/system-roles.ts'
 // add-on: uploads
 import { storageConfig } from './storage/index.ts'
 // end add-on: uploads
-import { onBackoffice } from './mithaq/auth/index.ts'
-import { organizations, showOrganization } from './mithaq/auth/organizations.ts'
+import { onBackoffice, organizationNameProblem } from './mithaq/auth/index.ts'
+import { organizationName, organizations, showOrganization } from './mithaq/auth/organizations.ts'
 import { assignedRoles, backofficeRolesOf, tenantAccess } from './roles/tenant-access.ts'
 // without add-on: roles
 // import { accessTarget } from './roles/member-access.ts'
@@ -532,6 +532,11 @@ const language = defineMithaq({
 export const { defineKayan, defineGlobal, buildAsas, rows, user, generate, locales, targets, targets: { tenant } } = language
 /** The language's type, which the apps check their admin components map against: a kind of this project's own needs a control there. */
 export type Language = typeof language
+
+// Every mode holds an organization's names to `organizationName`'s locales and falls back to its first, so a locale it
+// leaves out would be one no organization could be named in.
+const unnamed = organizationNameProblem({ names: organizationName, locales })
+if (unnamed) throw new Error(`src/mithaq/auth/organizations.ts: ${unnamed}`)
 
 /**
  * The field every tenant-owned kayan places, as `organization`: the tenant target's own, under the

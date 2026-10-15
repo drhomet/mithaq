@@ -55,9 +55,10 @@ export const verifyEmail: boolean = true
 export const allowedDomains: readonly string[] = []
 
 /**
- * In `'one'`, the organization's name in each locale of the project, the first the one the app falls back to. It
- * lives here, not on the row: start-up writes it onto the row, first-run asks none, and nobody renames it elsewhere.
- * With `'many'`, each organization names itself, and this is unread.
+ * The organization's name in each locale the language reads and no other, the first the one every other falls back to;
+ * the language refuses to load otherwise. In `'one'` it is the organization's name, which lives here, not on the row:
+ * start-up writes it onto the row, first-run asks none, and nobody renames it elsewhere. With `'many'` each organization
+ * names itself, and only its locales are read: the ones a founder's names are held to.
  */
 export const organizationName: Readonly<Record<string, string>> = { en: 'My organization', ar: 'مؤسستي' }
 
