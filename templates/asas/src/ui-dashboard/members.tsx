@@ -592,7 +592,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
     <AppShell
       regions={{
         header: (
-          <div className="flex w-full min-w-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
             <h1 className="truncate">
               {t('dashboard.members', 'Members')} <span className="text-muted-foreground">· {new Intl.NumberFormat(locale).format(members.length)}</span>
             </h1>
