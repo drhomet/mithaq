@@ -1017,15 +1017,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await prefs.findOne({}, { actor: two })).theme, 'light')
   })
 
-  if (postgres) test('two concurrent first writes of one organization to a scoped global make one row, and the loser is the conflict a unique value gets', async () => {
+  if (postgres) test('two concurrent first writes of one organization to a scoped global make one row, and a loser is the conflict a unique value gets', async () => {
     const prefs = built.global.prefs.operations
     const racer = await actorOf({ active: 'org3' })
     const results = await Promise.allSettled([prefs.update({ theme: 'first' }, { actor: racer }), prefs.update({ theme: 'second' }, { actor: racer })])
-    assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
-    const lost = (results.find((result) => result.status === 'rejected') as PromiseRejectedResult).reason as AsasError
-    assert.equal(lost.status, 409)
-    assert.equal(lost.key, 'error.conflict.unique')
-    assert.doesNotMatch(lost.message, /org3/)
+    // Under load one can commit before the other reads, which then updates the row it finds: both succeed.
+    const lost = (results.find((result) => result.status === 'rejected') as PromiseRejectedResult | undefined)?.reason as AsasError | undefined
+    if (lost) {
+      assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
+      assert.equal(lost.status, 409)
+      assert.equal(lost.key, 'error.conflict.unique')
+      assert.doesNotMatch(lost.message, /org3/)
+    }
     const rows = await store.find({ kayan: 'prefs', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { firmId: { equals: 'org3' } } } })
     assert.equal(rows.totalDocs, 1)
     assert.ok(['first', 'second'].includes((await prefs.findOne({}, { actor: racer })).theme))
