@@ -18456,7 +18456,7 @@ test('222a. a student reads its own enrollments alone, in its own tenant, over H
   // the create fills from the actor, as the field's write key decides, in a course that
   // lets its students enroll themselves, so the seat's own rules pass.
   await courses.operations.update({ id: course.id, selfEnroll: true }, tenant.options)
-  const made = await tenant.as('admin', 'roles/create', { name: 'enroller-222a', label: { en: 'Enroller', ar: 'مسجل' }, permissions: ['enrollments.create', 'enrollments.fields.id', 'enrollments.fields.session', 'enrollments.fields.organization'] })
+  const made = await tenant.as('admin', 'roles/create', { name: 'enroller-222a', label: { en: 'Enroller', ar: 'مسجل' }, permissions: ['enrollments.create', 'enrollments.fields.id', 'enrollments.fields.session', 'enrollments.fields.organization', 'enrollments.fields.createdAt', 'enrollments.fields.updatedAt'] })
   assert.equal(made.status, 200, JSON.stringify(made.body))
   // Someone holding this role alone: a student's own keys would name the student for it.
   const enroller = await signedUp('own-222a-enroller')
