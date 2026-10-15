@@ -278,6 +278,7 @@ describe('postgres', () => {
       b: { color: 'blue', size: 4, tags: [], dims: { w: 10 }, items: [{ sku: 'z3' }], note: null },
       c: 'just text',
       d: null,
+      e: { a: [[{ b: 1 }]], deep: [[['x']]] },
     }
     for (const [label, data] of Object.entries(rows)) await operations.create({ label, data })
     const cases: [unknown, string[]][] = [
@@ -290,9 +291,9 @@ describe('postgres', () => {
       [{ 'data.size': { not_in: [3] } }, ['b']],
       [{ 'data.dims.w': { equals: 10 } }, ['a', 'b']],
       [{ 'data.dims.h': { exists: true } }, ['a']],
-      [{ 'data.dims.h': { exists: false } }, ['b', 'c', 'd']],
-      [{ 'data.note': { exists: false } }, ['a', 'b', 'c', 'd']],
-      [{ 'data.note': { equals: null } }, ['a', 'b', 'c', 'd']],
+      [{ 'data.dims.h': { exists: false } }, ['b', 'c', 'd', 'e']],
+      [{ 'data.note': { exists: false } }, ['a', 'b', 'c', 'd', 'e']],
+      [{ 'data.note': { equals: null } }, ['a', 'b', 'c', 'd', 'e']],
       [{ 'data.tags': { equals: 'sale' } }, ['a']],
       [{ 'data.tags': { exists: true } }, ['a']],
       [{ 'data.items.sku': { equals: 'z3' } }, ['b']],
@@ -303,7 +304,9 @@ describe('postgres', () => {
       [{ data: { contains: 'JUST' } }, ['c']],
       [{ data: { equals: 'just text' } }, ['c']],
       [{ data: { exists: false } }, ['d']],
-      [{ data: { exists: true } }, ['a', 'b', 'c']],
+      [{ data: { exists: true } }, ['a', 'b', 'c', 'e']],
+      // A list inside a list, read through the way Payload's `$.a[*].b[*]` reads it.
+      [{ 'data.a.b': { equals: 1 } }, ['e']],
       [{ data: { in: ['just text', 'other'] } }, ['c']],
       [{ or: [{ 'data.color': { equals: 'Red' } }, { data: { equals: 'just text' } }] }, ['a', 'c']],
     ]

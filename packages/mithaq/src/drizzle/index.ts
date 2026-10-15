@@ -325,11 +325,11 @@ const conditionsOf = (column: SQLWrapper, rules: Record<string, unknown>): SQL |
   return checks.length === 1 ? checks[0] : and(...checks)
 }
 
-// Payload's own path: each segment a key, read in jsonpath's lax mode with `[*]` last, so a list
-// on the way or at the end is matched by any of its entries, as Payload's `$.a[*].b[*]` matches.
-// The path and every value are bound parameters, never SQL or jsonpath text a caller wrote.
+// Payload's own path, `$[*].a[*].b[*]`: a list at any segment, a list inside a list included, is
+// matched by any of its entries. The path and every value are bound parameters, and each key a
+// quoted jsonpath string, so nothing a caller wrote is read as SQL or jsonpath.
 const jsonConditionsOf = (column: SQLWrapper, path: readonly string[], rules: Record<string, unknown>): SQL | undefined => {
-  const at = `$${path.map((key) => `.${JSON.stringify(key)}`).join('')}[*]`
+  const at = `$[*]${path.map((key) => `.${JSON.stringify(key)}[*]`).join('')}`
   const some = (test: SQL) => sql`exists (select 1 from jsonb_path_query(${column}, ${at}::jsonpath) as item(value) where ${test})`
   // A JSON `null` is no value, as a SQL `NULL` is: `exists` and `equals: null` read both alike.
   const present = some(sql`item.value <> 'null'::jsonb`)
