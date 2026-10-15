@@ -384,7 +384,7 @@ const drive = async (host: HTMLElement, kind: string) => {
     await act(async () => click(host.querySelector('button')!))
     const today = window.document.querySelector('[data-today] button')
     if (today) await act(async () => click(today as unknown as Element))
-    if (kind === 'datetime') await act(async () => typeInto(host.querySelector('input[type="time"]')!, '03:04'))
+    if (kind === 'datetime') await typeTime(host, '03:04')
     return
   }
   const field = host.querySelector('textarea') ?? host.querySelector('input')!
@@ -395,6 +395,21 @@ const drive = async (host: HTMLElement, kind: string) => {
 
 const now = new Date()
 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+/** A moment's time of day as its field holds it, `HH:MM` on the 24-hour clock, or `''` while half typed. */
+const timeOf = (root: ParentNode) => root.querySelector('[data-time-field]')?.getAttribute('data-value') ?? undefined
+/** A segment of a moment's time of day: `hours`, `minutes` or `period`. */
+const timeSegment = (root: ParentNode, name: string) => root.querySelector(`[data-time-field] [data-segment="${name}"]`) as unknown as HTMLInputElement
+/** Types `HH:MM` on the 24-hour clock into a moment's field as a person would, hours then minutes then AM or PM; `''` clears it. */
+const typeTime = async (root: ParentNode, text: string) => {
+  const segment = (name: string) => timeSegment(root, name) as unknown as Element
+  if (text === '') return void (await act(async () => void press(segment('minutes'), 'Backspace')))
+  const [hours = 0, minutes = 0] = text.split(':').map(Number)
+  const twelve = segment('period') !== null
+  await act(async () => typeInto(segment('hours'), String(twelve ? hours % 12 || 12 : hours).padStart(2, '0')))
+  await act(async () => typeInto(segment('minutes'), String(minutes).padStart(2, '0')))
+  if (twelve && segment('period').getAttribute('data-period') !== (hours >= 12 ? 'PM' : 'AM')) await act(async () => click(segment('period')))
+}
 
 /** What each kind's control reports for the edit above, as `update` takes it: a number as a number, a moment as a `Date`, a day as its ISO string; nothing on the wire coerces them. The relationship's clear reports `null`. */
 const reportedFor: Record<string, unknown> = {
@@ -463,13 +478,12 @@ test('178d. a date picks off the calendar in the viewer\'s locale and writes the
   assert.equal(window.document.querySelector('[data-slot="calendar"]'), null, 'and the calendar closes')
 
   const moment = await picker('datetime', new Date(2026, 0, 2, 3, 4))
-  const time = moment.host.querySelector('input[type="time"]') as HTMLInputElement
-  assert.equal(time.value, '03:04', 'the time box holds the time of day on the reader\'s clock')
+  assert.equal(timeOf(moment.host), '03:04', 'the time box holds the time of day on the reader\'s clock')
   await act(async () => click(moment.host.querySelector('button#at') as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-day="2026-01-05"] button') as unknown as Element))
   assert.equal((moment.reported[0] as Date).getTime(), new Date(2026, 0, 5, 3, 4).getTime(), 'a new day keeps the time held')
-  await act(async () => typeInto(time, '10:30'))
-  assert.equal((moment.reported[1] as Date).getTime(), new Date(2026, 0, 2, 10, 30).getTime(), 'and a new time keeps the day held')
+  await typeTime(moment.host, '10:30')
+  assert.equal((moment.reported.at(-1) as Date).getTime(), new Date(2026, 0, 2, 10, 30).getTime(), 'and a new time keeps the day held')
 })
 
 test('178e. a moment holds a value only when both its day and its time are set, and clearing either clears it', async () => {
@@ -483,7 +497,7 @@ test('178e. a moment holds a value only when both its day and its time are set, 
     })
   }
   const host = await render(createElement(Held))
-  const time = () => host.querySelector('input[type="time"]') as HTMLInputElement
+  const time = () => timeSegment(host, 'hours')
   const button = () => host.querySelector('button#at')!
   const pickToday = async () => {
     await act(async () => click(button() as unknown as Element))
@@ -497,14 +511,14 @@ test('178e. a moment holds a value only when both its day and its time are set, 
   assert.equal(time().disabled, false, 'and opens the time box')
   assert.ok(button().textContent!.includes(String(now.getFullYear())), 'while the button keeps the day picked')
   assert.equal(button().getAttribute('aria-labelledby')?.split(' ').map((one) => host.querySelector(`[id="${one}"]`)?.textContent).join(' '), `at ${button().textContent}`, 'and its name is the label and the day')
-  assert.equal(time().getAttribute('aria-label'), 'at Time', 'the time box has a name of its own')
-  await act(async () => typeInto(time(), '10:30'))
+  assert.equal(host.querySelector('[data-time-field]')?.getAttribute('aria-label'), 'at Time', 'the time box has a name of its own')
+  await typeTime(host, '10:30')
   assert.equal(moments()[0]!.getTime(), at(10, 30), 'a day and a time write the local moment')
-  await act(async () => typeInto(time(), ''))
+  await typeTime(host, '')
   assert.equal(reported[1], null, 'clearing the time clears the value, never midnight')
   assert.equal(reported.length, 2)
   assert.ok(button().textContent!.includes(String(now.getFullYear())), 'and the day stays on the button')
-  await act(async () => typeInto(time(), '08:15'))
+  await typeTime(host, '08:15')
   assert.equal(moments()[2]!.getTime(), at(8, 15), 'a time typed again writes on the day kept')
   await pickToday()
   assert.equal(reported[3], null, 'picking the held day again clears the value')
@@ -550,7 +564,7 @@ test('178g. a filter on a date or a moment picks its value off the same calendar
     assert.equal(host.querySelector('input[type="date"], input[type="datetime-local"]'), null, `a ${kind} filter draws no browser box`)
     await act(async () => click(host.querySelector('button#filter-0-0') as unknown as Element))
     await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
-    if (kind === 'datetime') await act(async () => typeInto(host.querySelector('input[type="time"]')!, '09:30'))
+    if (kind === 'datetime') await typeTime(host, '09:30')
     await act(async () => sleep(400))
     assert.deepEqual(reported.map((one) => JSON.stringify(one)), [JSON.stringify({ or: [{ and: [{ at: { equals: kind === 'date' ? today : new Date(`${today}T09:30`).toISOString() } }] }] })], `a ${kind} filter sends ${kind === 'date' ? 'the day' : 'the local moment as an instant'}`)
   }
@@ -571,7 +585,7 @@ test('180. a moment filter picked at 09:30 in a UTC+3 browser asks for 06:30Z, i
       const filter = await filtering(kind)
       await act(async () => click(filter.host.querySelector('button#filter-0-0') as unknown as Element))
       await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
-      if (kind === 'datetime') await act(async () => typeInto(filter.host.querySelector('input[type="time"]')!, '09:30'))
+      if (kind === 'datetime') await typeTime(filter.host, '09:30')
       await act(async () => sleep(400))
       return filter
     }
@@ -586,13 +600,13 @@ test('180. a moment filter picked at 09:30 in a UTC+3 browser asks for 06:30Z, i
     assert.equal(asked(moment.rules as never, link), JSON.stringify({ or: [{ and: [{ at: { equals: instant } }] }] }), 'which is what the list asks for')
 
     const restored = await filtering('datetime', readQuery(link, moment.rules as never).where)
-    assert.equal(restored.host.querySelector<HTMLInputElement>('input[type="time"]')?.value, '09:30', 'the link read back draws 09:30 in the time box')
+    assert.equal(timeOf(restored.host), '09:30', 'the link read back draws 09:30 in the time box')
     assert.ok(restored.host.querySelector('button#filter-0-0')?.textContent?.includes(String(here.getFullYear())), 'on the day it was picked')
 
     const old = new URLSearchParams(`where[or][0][and][0][at][equals]=${day}T09:30`)
     assert.equal(asked(moment.rules as never, old), JSON.stringify({ or: [{ and: [{ at: { equals: instant } }] }] }), 'a link written before the fix, with no zone, asks for the same instant, read on the reader\'s own clock')
     const reopened = await filtering('datetime', readQuery(old, moment.rules as never).where)
-    assert.equal(reopened.host.querySelector<HTMLInputElement>('input[type="time"]')?.value, '09:30', 'and draws the same 09:30')
+    assert.equal(timeOf(reopened.host), '09:30', 'and draws the same 09:30')
 
     const calendar = await picked('date')
     assert.deepEqual(calendar.reported, [{ or: [{ and: [{ at: { equals: day } }] }] }], 'a day filter still sends the calendar day')
@@ -655,12 +669,12 @@ const Resettable = ({ initial, reported = [], locale = 'en', translate = t }: { 
 test('178h. a seeded moment clears with its time and returns when the time is typed again, and a reset from outside clears the day too', async () => {
   const reported: unknown[] = []
   const host = await render(createElement(Resettable, { initial: new Date(2026, 0, 2, 3, 4), reported }))
-  const time = () => host.querySelector('input[type="time"]') as HTMLInputElement
+  const time = () => timeSegment(host, 'hours')
   const button = () => host.querySelector('button#at')!
-  await act(async () => typeInto(time(), ''))
+  await typeTime(host, '')
   assert.deepEqual(reported, [null], 'clearing the time clears the value')
   assert.ok(button().textContent!.includes('January 2, 2026'), 'and the day stays')
-  await act(async () => typeInto(time(), '03:04'))
+  await typeTime(host, '03:04')
   assert.equal((reported as unknown as Date[])[1]!.getTime(), new Date(2026, 0, 2, 3, 4).getTime(), 'a time typed again returns the value on that day')
   await act(async () => click(host.querySelector('#reset') as unknown as Element))
   assert.equal(button().textContent, 'Pick a date', 'a value reset from outside leaves no day behind')
@@ -681,7 +695,7 @@ test('178i. a required moment with a day and no time is refused as required and 
   assert.equal(written.length, 0, 'a day alone sends nothing')
   assert.ok(host.querySelector('#sessions-startsAt-error'), 'and the moment is refused under its box')
   assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'as required')
-  const time = host.querySelector('input[type="time"]')!
+  const time = timeSegment(host, 'hours')
   assert.deepEqual([time.getAttribute('aria-required'), time.getAttribute('aria-invalid')], ['true', 'true'], 'and the time box is marked required and refused')
 })
 
@@ -691,7 +705,7 @@ test('178m. a session\'s start picked as a day and typed as a time saves as that
   const host = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/new'), client: created.client, value: null, t, locale: 'en', onDone: () => {} }))
   await act(async () => click(host.querySelector('button#sessions-startsAt') as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
-  await act(async () => typeInto(host.querySelector('input[type="time"]')!, '12:30'))
+  await typeTime(host, '12:30')
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(host.querySelector('#sessions-startsAt-error'), null, 'the start is not refused')
   assert.equal(created.written.length, 1, 'the create is sent')
@@ -700,13 +714,12 @@ test('178m. a session\'s start picked as a day and typed as a time saves as that
   const edited = recording()
   const stored = new Date(2026, 9, 15, 12, 30).toISOString()
   const edit = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/:id'), client: edited.client, value: { id: 's1', course: 'c1', capacity: 5, startsAt: stored }, t, locale: 'en', onDone: () => {} }))
-  const time = () => edit.querySelector('input[type="time"]') as unknown as HTMLInputElement
-  assert.equal(time().value, '12:30', 'the edit draws the stored time')
-  await act(async () => typeInto(time() as unknown as Element, '14:45'))
+  assert.equal(timeOf(edit), '12:30', 'the edit draws the stored time')
+  await typeTime(edit, '14:45')
   await act(async () => fire(edit.querySelector('form')!, 'submit'))
   assert.equal(new Date(edited.written[0]!.startsAt as string).getTime(), new Date(2026, 9, 15, 14, 45).getTime(), `the edit saves the new time on the same day: ${JSON.stringify(edited.written[0])}`)
 
-  await act(async () => typeInto(time() as unknown as Element, ''))
+  await typeTime(edit, '')
   await act(async () => fire(edit.querySelector('form')!, 'submit'))
   assert.equal(edited.written.length, 1, 'a cleared required start sends nothing')
   assert.equal(edit.querySelector('#sessions-startsAt-error')?.textContent, 'sessions.startsAt.required', 'and is refused as required')
@@ -721,12 +734,12 @@ test('178j. a moment in a side region belongs to the page\'s form, so a submit f
     value: { id: 's1', course: 'c1', capacity: 5, startsAt: new Date(2026, 0, 2, 3, 4).toISOString() }, t, locale: 'en', onDone: () => {},
   }))
   const pageForm = host.querySelector('[data-node="form"] form') as unknown as HTMLFormElement
-  const time = host.querySelector('#sessions-startsAt ~ input[type="time"]') as unknown as HTMLInputElement
+  const time = timeSegment(host, 'hours')
   assert.ok(pageForm && time)
   assert.equal(pageForm.contains(time as unknown as Node), false, 'the time box is outside the form element')
   assert.ok(time.form === pageForm, 'and the form owns it all the same')
   assert.equal(time.hasAttribute('name'), false, 'though it posts nothing of its own')
-  await act(async () => typeInto(time as unknown as Element, '10:30'))
+  await typeTime(host, '10:30')
   // happy-dom makes no implicit submission on Enter, so the box's form owner is submitted as a browser would.
   await act(async () => time.form?.requestSubmit())
   assert.equal(saved.length, 1, 'a submit from it saves the page')
@@ -760,7 +773,7 @@ test('178l. the picker names its day and its time in the viewer\'s locale and dr
   const arabic: typeof t = (key, fallback) => ({ 'admin.time': 'الوقت', 'courses.at': 'وقت البداية' })[key] ?? fallback
   const draw = (translate = t, locale = 'en') => createElement(Resettable, { initial: '2026-08-09T23:30:00.000Z', translate, locale })
   const ar = await render(draw(arabic, 'ar'))
-  assert.equal(ar.querySelector('input[type="time"]')?.getAttribute('aria-label'), 'وقت البداية الوقت', 'the time box is named in Arabic, after its field')
+  assert.equal(ar.querySelector('[data-time-field]')?.getAttribute('aria-label'), 'وقت البداية الوقت', 'the time box is named in Arabic, after its field')
   const names = (host: HTMLElement) => (host.querySelector('button#at')!.getAttribute('aria-labelledby') ?? '').split(' ').map((one) => host.querySelector(`[id="${one}"]`)?.textContent).join(' ')
   assert.ok(names(ar).startsWith('وقت البداية '), 'and the button is named by the field and its day')
   const zone = process.env.TZ
@@ -781,7 +794,7 @@ test('178l. the picker names its day and its time in the viewer\'s locale and dr
     assert.equal(problems.length, 0, `no mismatch to report: ${problems.map(String).join(' | ')}`)
     assert.equal(host.querySelector('button#at')!.hasAttribute('aria-label'), false, 'no attribute carries the day')
     assert.equal(names(host), 'at August 10, 2026', 'and the button\'s name is the viewer\'s own day once it has mounted')
-    assert.equal((host.querySelector('input[type="time"]') as unknown as HTMLInputElement).value, '13:30', 'and the time box shows the viewer\'s clock')
+    assert.equal(timeOf(host), '13:30', 'and the time box shows the viewer\'s clock')
     await act(async () => root!.unmount())
   } finally {
     console.error = logged
@@ -1680,7 +1693,7 @@ test('38. a reseed is keyed on the kayan and the id together, and clears a stale
 })
 
 test('39. a non-numeric number and an uncalendared moment are reported as undefined rather than as a value that would clear the column', async () => {
-  // `type="number"` and `type="time"` refuse a value no number or clock reads, so the DOM property is overwritten directly, as a bad `event.target.value` from elsewhere would be.
+  // `type="number"` refuses a value no number reads, so the DOM property is overwritten directly, as a bad `event.target.value` from elsewhere would be.
   const forceValue = (node: Element, text: string) => {
     Object.defineProperty(node, 'value', { value: text, configurable: true })
     fire(node, 'input')
@@ -1702,8 +1715,13 @@ test('39. a non-numeric number and an uncalendared moment are reported as undefi
     await act(async () => {
       forceValue(host.querySelector('input')!, garbage)
     })
+    // A moment's time boxes take digits alone, so letters forced into one report nothing at all.
+    if (kind === 'datetime') {
+      assert.deepEqual(reported, [], 'the moment control reported nothing that would clear the column')
+      continue
+    }
     assert.equal(reported.length, 1, `the ${kind} control reported the edit`)
-    assert.equal(reported[0], undefined, `and reported it as undefined rather than ${kind === 'number' ? 'NaN' : 'an Invalid Date'}`)
+    assert.equal(reported[0], undefined, 'and reported it as undefined rather than NaN')
   }
 })
 
@@ -3750,7 +3768,7 @@ test('145a. a list of another kayan edits one row in a drawer over the page, add
   assert.equal(inline().getAttribute('data-mithaq-inline-edit'), 'new')
   await act(async () => click(inline().querySelector('button#sessions-startsAt')! as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-today] button')! as unknown as Element))
-  await act(async () => typeInto(inline().querySelector('input[type="time"]')!, '09:30'))
+  await typeTime(inline(), '09:30')
   await act(async () => fire(inline().querySelector('form')!, 'submit'))
   assert.equal(writes[1]?.write, 'create')
   assert.equal(writes[1]?.input.course, 'c1', 'the new session holds this course, which the form never drew')
@@ -7609,7 +7627,7 @@ test('240g. a child made from its parent\'s tab opens in a full-page drawer over
   assert.ok(drawer!.querySelector('[data-slot="sheet-close"]'), 'and it has a close button')
   await act(async () => click(drawer!.querySelector('button#sessions-startsAt')!))
   await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
-  await act(async () => typeInto(drawer!.querySelector('input[type="time"]')!, '09:30'))
+  await typeTime(drawer!, '09:30')
   await act(async () => fire(drawer!.querySelector('form')!, 'submit'))
   assert.deepEqual(writes.map((one) => [one.write, one.input.course]), [['create', 'c1']], 'the drawer\'s save is the session\'s own create, holding this course')
   assert.equal(documentDrawer(), null, 'and the drawer closes once it lands')
@@ -7666,4 +7684,38 @@ test('240k. a yes-or-no field on a record page reads Yes or No under its label, 
   assert.equal(await words(true), 'ArchivedYes', 'set')
   assert.equal(await words(false), 'ArchivedNo', 'cleared')
   assert.equal(await words(null), 'ArchivedNo', 'and a row from before the column, which holds nothing, reads the same as cleared')
+})
+
+test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the same in every browser: digits fill hours then minutes, arrows step them, the moment is written once day and time are set and cleared with a complete time, and Arabic draws its own numerals and words', async () => {
+  const { client, written } = recording()
+  const page = (path: string) => screenOf(recordPage([{ form: [{ field: 'startsAt' }, { field: 'capacity' }] }], path), sessions)
+  const host = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/new'), client, value: null, t: english, locale: 'en', onDone: () => {} }))
+  assert.equal(host.querySelector('input[type="time"]') === null, true, 'no native time box, which Safari hands back empty')
+  const segment = (name: string) => host.querySelector(`[data-time-field] [data-segment="${name}"]`) as HTMLInputElement
+  assert.deepEqual(['hours', 'minutes'].map((name) => segment(name)?.getAttribute('type')), ['tel', 'tel'], 'each segment is a box of its own, as openstatus\'s')
+  assert.equal(segment('hours').disabled, true, 'and takes nothing until a day is picked')
+  await act(async () => click(host.querySelector('button#sessions-startsAt') as unknown as Element))
+  await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
+  await act(async () => press(segment('hours') as unknown as Element, '9'))
+  assert.equal(segment('hours').value, '09', 'one digit reads as the hour, waiting for a second')
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(written.length, 0, 'half a time writes no moment')
+  assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'and a required one says so')
+  await act(async () => typeInto(segment('minutes') as unknown as Element, '30'))
+  await act(async () => press(segment('minutes') as unknown as Element, 'ArrowUp'))
+  assert.equal(segment('minutes').value, '31', 'an arrow steps the minutes')
+  await act(async () => click(segment('period') as unknown as Element))
+  assert.equal(segment('period').textContent, 'PM', 'and the button turns the morning to the evening')
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(new Date(written[0]!.startsAt as string).toISOString(), new Date(`${today}T21:31`).toISOString(), 'the moment is the day at that time, on the 24-hour clock')
+  await act(async () => press(segment('minutes') as unknown as Element, 'Backspace'))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(written.length, 1, 'clearing a complete time clears the moment, which a required start refuses')
+
+  const arabic = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/:id'), client, value: { id: 's1', course: 'c1', startsAt: new Date(2026, 9, 15, 13, 5).toISOString() }, t: appCopy('ar'), locale: 'ar', onDone: () => {} }))
+  const arabicSegment = (name: string) => arabic.querySelector(`[data-time-field] [data-segment="${name}"]`) as HTMLInputElement
+  assert.deepEqual([arabicSegment('hours').value, arabicSegment('minutes').value, arabicSegment('period').textContent], ['٠١', '٠٥', 'م'], 'Arabic numerals and its own word for the evening')
+  assert.equal(arabicSegment('hours').closest('[dir]')?.getAttribute('dir'), 'ltr', 'the clock reads hours then minutes, as a clock does, on a page right to left')
+  await act(async () => typeInto(arabicSegment('hours') as unknown as Element, '٠٢'))
+  assert.equal(arabic.querySelector('[data-time-field]')?.getAttribute('data-value'), '14:05', 'and Arabic digits typed are read')
 })

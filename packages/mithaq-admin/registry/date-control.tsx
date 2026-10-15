@@ -4,11 +4,11 @@ import { ar, enUS } from 'react-day-picker/locale'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { useDirection } from '@/components/ui/direction'
-import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ariaRequired, changeOf, type ControlProps } from 'mithaq-admin/control-props.ts'
 import { labelFor } from 'mithaq-admin/copy.ts'
 import { asMoment, formatDate } from 'mithaq-admin/format.tsx'
+import { TimeField } from 'mithaq-admin/time-field.tsx'
 
 const dayPickerLocales: Record<string, typeof enUS> = { ar, en: enUS }
 
@@ -76,22 +76,18 @@ export function DatePicker(props: ControlProps): ReactElement {
         </PopoverContent>
       </Popover>
       {moment ? (
-        <Input
-          type="time"
+        <TimeField
+          id={`${id}-time`}
           form={form}
-          dir="ltr"
-          className="w-28 shrink-0 max-sm:h-11"
           value={time}
+          label={label}
+          locale={locale}
+          t={t}
           disabled={readOnly || !held}
-          readOnly={readOnly}
-          aria-label={`${label} ${t('admin.time', 'Time')}`}
-          aria-describedby={describedBy}
-          aria-invalid={error ? true : undefined}
-          aria-required={ariaRequired(field)}
-          onChange={(event) => {
-            const text = event.target.value
-            // A time no clock reads is reported as nothing to write, not as a value that would clear the column.
-            if (text !== '' && !/^\d{2}:\d{2}/.test(text)) return change(undefined)
+          describedBy={describedBy}
+          error={!!error}
+          required={ariaRequired(field)}
+          onChange={(text) => {
             // Clearing the time clears the value and never writes midnight; the day stays on the button.
             if (text === '' || !held) return (setPicked(held), change(null))
             setPicked(undefined)

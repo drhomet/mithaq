@@ -132,6 +132,23 @@
       ]
     },
     {
+      "name": "mithaq-time-field",
+      "type": "registry:component",
+      "title": "Mithaq time field",
+      "description": "A moment's time of day as two boxes and an AM or PM, after openstatus's time picker, the same in every browser and in the locale's numerals.",
+      "registryDependencies": [
+        "button",
+        "input"
+      ],
+      "files": [
+        {
+          "path": "registry/time-field.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/time-field.tsx"
+        }
+      ]
+    },
+    {
       "name": "mithaq-date-control",
       "type": "registry:component",
       "title": "Mithaq date control",
@@ -140,7 +157,6 @@
         "button",
         "calendar",
         "direction",
-        "input",
         "popover"
       ],
       "files": [

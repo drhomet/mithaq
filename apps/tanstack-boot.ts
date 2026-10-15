@@ -934,7 +934,7 @@ test('41. a custom page by inline path draws the same file the registered name d
 
 test('42. the dashboard draws the session, tag and settings controls, a role\'s keys as badges, a localized name as one box per locale, and no id no page names', async () => {
   const sessions = await screenHtml('/dashboard/sessions/new')
-  assert.match(sessions, /<button[^>]*id="sessions-startsAt"[\s\S]*?type="time"/, 'datetime, a date picker and its time of day')
+  assert.match(sessions, /<button[^>]*id="sessions-startsAt"[\s\S]*?data-time-field/, 'datetime, a date picker and its time of day')
   assert.match(sessions, /id="sessions-course"/, 'relationship')
   assert.match(sessions, /data-slot="select-trigger"[^>]*id="sessions-venue"|id="sessions-venue"[^>]*data-slot="select-trigger"/, 'nativeSelect is the select')
   assert.ok(!sessions.includes('data-slot="native-select"'), 'and no native box is drawn')

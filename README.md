@@ -158,4 +158,4 @@ Each guide is the `README.md` of the folder it describes.
 
 mithaq is pre-1.0. The template that `bun create mithaq` creates is the worked example, and every file there is commented.
 
-MIT licensed; see [LICENSE](https://github.com/drhomet/mithaq/blob/main/LICENSE). mithaq includes code adapted from Payload, also MIT licensed; Payload's notice is in [LICENSES/payload.txt](https://github.com/drhomet/mithaq/blob/main/LICENSES/payload.txt).
+MIT licensed; see [LICENSE](https://github.com/drhomet/mithaq/blob/main/LICENSE). mithaq includes code adapted from Payload and from openstatus's time picker, both MIT licensed; their notices are in [LICENSES/payload.txt](https://github.com/drhomet/mithaq/blob/main/LICENSES/payload.txt) and [LICENSES/openstatus-time-picker.txt](https://github.com/drhomet/mithaq/blob/main/LICENSES/openstatus-time-picker.txt).

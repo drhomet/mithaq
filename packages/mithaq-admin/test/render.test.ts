@@ -439,6 +439,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-text-control',
       'mithaq-number-control',
       'mithaq-textarea-control',
+      'mithaq-time-field',
       'mithaq-date-control',
       'mithaq-choice-control',
       'mithaq-checkbox-control',
@@ -525,7 +526,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the ninety-four items this file knows about',
+    'the registry declares the ninety-five items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`
@@ -1632,11 +1633,11 @@ test('69. the two temporal kinds draw the registry\'s date picker, in the viewer
   const moment = drawn('datetime', new Date('2026-01-02T03:04:00'))
   assert.equal(/type="(?:datetime-local|date)"/.test(moment), false, 'a datetime draws no native box')
   assert.match(moment, /<button[^>]*id="at"[^>]*>[\s\S]*January 2, 2026/, 'it draws a button naming the day in the viewer\'s words, which the label points at')
-  assert.match(moment, /type="time"[^>]*value="03:04"|value="03:04"[^>]*type="time"/, 'and the time of day on the reader\'s own clock')
+  assert.ok(moment.includes('data-time-field=""') && !moment.includes('type="time"'), 'and the time of day as its own boxes, never the native one, drawn on the reader\'s own clock once mounted')
   const day = drawn('date', '2026-09-21', 'ar')
   assert.equal(/type="date"/.test(day), false, 'a date draws no native box')
   assert.ok(day.includes('سبتمبر'), `and names the day in Arabic on an Arabic page: ${day}`)
-  assert.equal(day.includes('type="time"'), false, 'with no time of day')
+  assert.equal(day.includes('data-time-field'), false, 'with no time of day')
 })
 
 test('178. a text box and a text area follow their own text\'s direction, and an email or a number reads left to right', () => {
