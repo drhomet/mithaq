@@ -17,6 +17,9 @@ export default defineConfig({
     tanstackStart({ router: { routeFileIgnorePattern: '^(files|types)\\.ts$' } }),
     viteReact(),
   ],
+  // Behind the proxy that routes by Host: bound to the loopback address it targets, and answering
+  // the public name in BACKOFFICE_URL, which Vite refuses in a Host header unless named here.
+  preview: { host: '127.0.0.1', allowedHosts: process.env.BACKOFFICE_URL ? [new URL(process.env.BACKOFFICE_URL).hostname] : [] },
   environments: {
     ssr: {
       // `asas` and `mithaq` stay external: Vite bundles linked workspace packages by default, and bundling

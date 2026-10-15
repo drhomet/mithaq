@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
-import { createServer as createHttpServer } from 'node:http'
+import { createServer as createHttpServer, request as httpRequest } from 'node:http'
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -2983,5 +2983,50 @@ test('77. a production start against a database that has not applied a migration
       await exited
     }
     await db.execute(`drop database ${name} with (force)`)
+  }
+})
+
+test('78. behind a TLS proxy that routes by Host, each app answers its own public name over plain HTTP and refuses any other, and a backoffice write is checked against BACKOFFICE_URL\'s origin rather than the URL it was served on', async () => {
+  const names = { tenant: 'app.example.test', backoffice: 'backoffice.example.test' }
+  const proxied = { ...env, BETTER_AUTH_URL: `https://${names.tenant}`, BACKOFFICE_URL: `https://${names.backoffice}` }
+  const children: ReturnType<typeof spawn>[] = []
+  /** A request as the proxy forwards it: plain HTTP to the loopback port, under the public name. */
+  const forwarded = ({ port, host, method = 'GET', path = '/api/not-ours', headers = {} }: { port: number; host: string; method?: string; path?: string; headers?: Record<string, string> }) =>
+    new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const sent = httpRequest({ host: '127.0.0.1', port, method, path, headers: { host, ...headers } }, (response) => {
+        let body = ''
+        response.setEncoding('utf8')
+        response.on('data', (chunk: string) => { body += chunk })
+        response.on('end', () => resolve({ status: response.statusCode ?? 0, body }))
+      })
+      sent.on('error', reject)
+      sent.end(method === 'GET' ? undefined : '{}')
+    })
+  try {
+    const ports = { tenant: await freePort(), backoffice: await freePort() }
+    for (const [which, cwd] of [['tenant', app], ['backoffice', backofficeApp]] as const) {
+      // No `--host`: the app's own `preview.host` binds the loopback address the proxy targets.
+      const child = spawn(vite, ['preview', '--port', String(ports[which]), '--strictPort'], { cwd, stdio: 'ignore', env: proxied })
+      children.push(child)
+      for (let attempt = 0; !(await forwarded({ port: ports[which], host: names[which] }).catch(() => undefined)); attempt += 1) {
+        assert.ok(attempt < 300 && child.exitCode === null, `the ${which} preview never answered on 127.0.0.1:${ports[which]}`)
+        await sleep(100)
+      }
+      assert.equal((await forwarded({ port: ports[which], host: names[which] })).status, 404, `the ${which} app answers ${names[which]}`)
+      const other = await forwarded({ port: ports[which], host: 'elsewhere.example.test' })
+      assert.equal(other.status, 403, `and refuses a name it is not served under`)
+      assert.match(other.body, /Blocked request/)
+    }
+    const posted = (path: string, origin: string) =>
+      forwarded({ port: ports.backoffice, host: names.backoffice, method: 'POST', path, headers: { origin, 'content-type': 'application/json' } })
+    assert.notEqual((await posted('/api/tags/create', `https://${names.backoffice}`)).status, 403, 'a write from the public origin reaches the handler')
+    assert.equal((await posted('/api/tags/create', `http://${names.backoffice}`)).status, 403, 'and one from the URL the proxy forwarded to is refused')
+    assert.notEqual((await posted('/api/auth/user/sign-in/email', `https://${names.backoffice}`)).status, 403, 'and a sign-in from the public origin is not refused for its origin')
+  } finally {
+    for (const child of children) {
+      if (child.exitCode !== null || child.signalCode !== null) continue
+      child.kill()
+      await once(child, 'exit')
+    }
   }
 })

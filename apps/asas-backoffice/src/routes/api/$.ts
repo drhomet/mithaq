@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 // Loads the types of the `server` route option; erased at build.
 import type {} from '@tanstack/start-client-core'
-import { asas } from 'asas'
+import { asas, backofficeURL } from 'asas'
 
 // The backoffice reads every organization: a read of a kayan asks `tenant: 'all'`, which the runner
 // grants backoffice staff in this app alone and refuses anyone else. A global is one organization's row
@@ -16,13 +16,17 @@ const acrossTenants = async (request: Request) => {
   return new Request(url, { method: request.method, headers: request.headers, body })
 }
 
-// A write whose `Origin` is not this app's own is refused: the data plug checks no origin and leans on
-// the session cookie's `SameSite=Lax`, which a sibling origin of the same site passes.
+// A write whose `Origin` is not BACKOFFICE_URL's is refused: the data plug checks no origin and leans on
+// the session cookie's `SameSite=Lax`, which the customer app's sibling subdomain passes, so this check
+// is the barrier between the two. Never the URL the request arrived on: behind a TLS proxy it is
+// http://, and its host is whatever the Host header said.
+const origin = new URL(backofficeURL).origin
+
 export const Route = createFileRoute('/api/$')({
   server: {
     handlers: {
       ANY: async ({ request }) =>
-        request.method === 'GET' || request.method === 'HEAD' || request.headers.get('origin') === new URL(request.url).origin
+        request.method === 'GET' || request.method === 'HEAD' || request.headers.get('origin') === origin
           ? asas.handler(await acrossTenants(request))
           : new Response('Forbidden', { status: 403 }),
     },
