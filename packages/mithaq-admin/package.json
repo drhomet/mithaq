@@ -33,6 +33,7 @@
     "@lexical/utils": "0.52.0",
     "@tanstack/react-form": "^1.33.5",
     "@types/react": "^19.3.0",
+    "better-auth": "^1.7.4",
     "input-otp": "^1.5.0",
     "lexical": "0.52.0",
     "lucide-react": "^1.16.0",
@@ -42,6 +43,9 @@
     "react-dom": "^19.3.0"
   },
   "peerDependenciesMeta": {
+    "better-auth": {
+      "optional": true
+    },
     "@lexical/link": {
       "optional": true
     },
@@ -79,10 +83,12 @@
     "@lexical/selection": "0.52.0",
     "@lexical/utils": "0.52.0",
     "@tanstack/react-form": "^1.33.5",
+    "@types/pg": "^8.15.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "asas": "*",
     "aws4fetch": "1.0.20",
+    "better-auth": "1.7.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "esbuild": "^0.28.2",
@@ -93,6 +99,7 @@
     "lexical": "0.52.0",
     "lucide-react": "^1.16.0",
     "mithaq": "*",
+    "pg": "^8.16.3",
     "react": "^19.3.0",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.3.0",

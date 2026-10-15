@@ -1591,6 +1591,19 @@
       ]
     },
     {
+      "name": "mithaq-payload-password",
+      "type": "registry:lib",
+      "title": "Mithaq Payload password",
+      "description": "For moving users off Payload: Better Auth's password option, which verifies a hash Payload wrote and Better Auth's own, a plugin that replaces each Payload hash with Better Auth's after its user signs in, and the helper a cutover imports each Payload user's salt and hash with. A project deletes it once its users have moved.",
+      "files": [
+        {
+          "path": "registry/auth/payload-password.ts",
+          "type": "registry:lib",
+          "target": "~/src/mithaq/auth/payload-password.ts"
+        }
+      ]
+    },
+    {
       "name": "mithaq-directional-icon",
       "type": "registry:ui",
       "title": "Mithaq directional icon",

@@ -524,9 +524,10 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-storage',
       'mithaq-mail',
       'mithaq-expected-updated-at',
+      'mithaq-payload-password',
       'mithaq-directional-icon',
     ],
-    'the registry declares the ninety-five items this file knows about',
+    'the registry declares the ninety-six items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`

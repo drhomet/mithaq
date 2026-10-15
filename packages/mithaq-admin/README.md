@@ -207,6 +207,96 @@ Draw your own thing with a `component` node instead. `checkComponents` stops
 the start when a page holds a kind the map does not carry, naming the screen,
 the kayan and the page, and drawing one is an error on the page.
 
+## Moving users off Payload
+
+A project that moves its users off Payload keeps their passwords with the
+`mithaq-payload-password` item, and deletes it once they have moved. Payload
+hashes with pbkdf2-sha256, and Better Auth with scrypt; the item lets Better
+Auth verify both, and replaces each Payload hash with Better Auth's the first
+time its user signs in.
+
+1. Eject it into the language, where the Better Auth setup lives. In
+   `packages/mithaq` (the project's root in a single package):
+
+   ```sh
+   bunx mithaq eject payload-password   # writes src/mithaq/auth/payload-password.ts
+   ```
+
+2. Wire it into `optionsFor` in `src/mithaq/auth/index.ts`, which both apps'
+   instances build on:
+
+   ```ts
+   import { payloadPassword, payloadRehash } from './payload-password.ts'
+
+   emailAndPassword: { enabled: true, password: payloadPassword() /* , ... */ },
+   plugins: [payloadRehash() /* , ... */],
+   ```
+
+   - `payloadPassword()` hashes every new password with Better Auth's own
+     scrypt. Its `verify` checks a `payload-pbkdf2$<salt>$<hash>` value as
+     Payload 3.89 and older wrote it (25000 iterations, a 512-byte key) and a
+     `payload-pbkdf2-v1$<salt>$<hash>` one as Payload 3.90 does (600000
+     iterations, a 32-byte key), and hands anything else to Better Auth's.
+     A malformed value refuses the password; it never throws.
+   - `payloadRehash()` runs after `/sign-in/email` and `/sign-in/username`.
+     When the sign-in succeeded on a Payload hash, it verifies the password
+     against the hash it reads again, then writes Better Auth's hash of it only
+     over that hash, so neither a cutover run meanwhile nor a password set
+     meanwhile is overwritten. A failed write is logged and never fails the
+     sign-in; the next sign-in tries again. The prefix is the only flag: no
+     column says who has moved. A project that signs in with the phone-number
+     plugin adds `/sign-in/phone-number` to its matcher, `signIns`.
+   - No password length is capped on sign-in. Payload let a password of up to
+     40000 characters be set, past Better Auth's `maxPasswordLength` of 128,
+     which caps only a password being set.
+   - A known limit while users move: sign-in timing tells the address of a user
+     still on a Payload 3.90 hash from an unknown one, about 105 to 130 ms of
+     pbkdf2 against about 60 ms of scrypt. It ends as each user is rehashed.
+
+3. At cutover, give each account its user's Payload hash. Payload stores `salt`
+   and `hash` in two columns of its `users` table, and
+   `payloadHashToAccountPassword({ salt, hash })` makes the one string
+   `account.password` holds, throwing on a pair Payload never wrote. Where users
+   were mirrored into Better Auth under a shared temporary password, only the
+   accounts still on it take their Payload hash, which retires the temporary
+   password; a user who chose a password in Better Auth keeps it. A script run
+   once, with Payload's `users` table in the same database:
+
+   <!-- from: packages/mithaq-admin/test/payload-password.test.ts -->
+   ```ts
+   const cutover = async ({ db, temporary }: { db: pg.Pool; temporary: string }) => {
+     const { verify } = payloadPassword()
+     const { rows } = await db.query<{ id: string; password: string; salt: string; hash: string }>(`
+       select account.id, account.password, users.salt, users.hash
+       from account
+       join "user" on "user".id = account.user_id
+       join users on lower(users.email) = lower("user".email)
+       where account.provider_id = 'credential' and account.password is not null and users.hash is not null`)
+     let moved = 0
+     for (const row of rows) {
+       if (!(await verify({ hash: row.password, password: temporary }))) continue
+       const { rowCount } = await db.query('update account set password = $1 where id = $2 and password = $3', [payloadHashToAccountPassword(row), row.id, row.password])
+       moved += rowCount ?? 0
+     }
+     return moved
+   }
+   ```
+
+   Read the temporary password from the environment and print the count, never
+   a password or a hash. A rerun moves nobody, so the script runs in the
+   rehearsal and again on the day. It stops at the first pair Payload never
+   wrote; the accounts before it have moved, and a rerun after the fix skips
+   them. A Payload user with no Better Auth account needs one made first, with
+   its credential account's `password` set the same way.
+
+4. Delete the file once every imported user has signed in, which is when
+   `select count(*) from account where password like 'payload-pbkdf2%'` answers
+   0, or once the window you give them closes. Clear what is left first:
+   Better Auth's own `verify` throws on a Payload hash, so a sign-in on one
+   would fail with a server error. `update account set password = null where
+   password like 'payload-pbkdf2%'` leaves those users the password reset.
+   Then remove `password` and `payloadRehash()` from `optionsFor`.
+
 ## Add a registry item
 
 A registry item is a piece mithaq ships for every project. Its source lives in `packages/mithaq-admin/registry/`:
