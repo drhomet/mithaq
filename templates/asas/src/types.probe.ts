@@ -309,6 +309,7 @@ type Names = Expect<
     keyof typeof asas.kayan,
     | 'account'
     | 'auditLog'
+    | 'backofficeLog'
     | 'courses'
     | 'enrollments'
     | 'invitation'

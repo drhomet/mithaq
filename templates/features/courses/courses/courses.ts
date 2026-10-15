@@ -1,7 +1,7 @@
 import { defaultFields, draftFields, folderOf, invalid, type Ctx, type ReadTools, type WriteTools } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '@asas/mithaq'
-import { activity, appPage, danger, backofficeList, backofficeRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, activityTab, appPage, danger, backofficeList, backofficeRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { sessions } from '../sessions/sessions.ts'
 import { onOffer } from '../domain/on-offer.ts'
@@ -396,6 +396,8 @@ export const courses = defineKayan({
             { tab: 'versions', label: { en: 'Versions', ar: 'الإصدارات' }, fields: [
               { component: 'versions', when: { '$user.collections.courses.operations.findVersions': { equals: true } } },
             ] },
+            // Beside them, the row's whole activity, searched and filtered; the side column keeps the last few.
+            activityTab,
           ] }]), header: [{ title: {} }, archivedBadge, { controls: {} }] },
         },
         board: {

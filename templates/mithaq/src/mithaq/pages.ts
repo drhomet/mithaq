@@ -73,4 +73,11 @@ export const backofficeRecord = <const Main extends readonly unknown[], const Si
  * server still refuses the read whatever the page drew.
  */
 export const activity = { component: 'activity', when: { '$user.collections.auditLog.operations.find': { equals: true } } } as const
+
+/** The record's whole activity, searched, filtered and paged, in a tab of the edit page beside Versions, for the same actor. */
+export const activityTab = {
+  tab: 'activity',
+  label: { en: 'Activity', ar: 'النشاط' },
+  fields: [{ component: 'activityLog', when: activity.when }],
+} as const
 // end add-on: audit-log

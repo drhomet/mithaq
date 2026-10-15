@@ -63,12 +63,22 @@ const visibleChanges = (ctx: Ctx): Ctx => {
 }
 
 /**
- * The columns the log is read by. Nothing else filters or orders it, `changes`
- * above all: a `contains` over its text would read a value out of a column the
- * reader holds no key for, before `visibleChanges` trims the page. The
- * organization is core's own filter and `impersonatedBy` names staff.
+ * The columns the log is filtered and ordered by. The organization is core's
+ * own filter and `impersonatedBy` names staff.
  */
 const queryable = new Set(['kayan', 'record', 'createdAt', 'operation', 'actor'])
+
+/**
+ * What a change is searched by besides those, never ordered by: its text,
+ * `changes`, and the names of the columns it changed, `changed`. Each takes one
+ * `contains` alone and reaches only the kayan whose columns it may tell of
+ * (`reachOf`), because a match in a column the reader holds no key for would say
+ * what that column held before `visibleChanges` trims the page.
+ */
+const searched = new Set(['changes', 'changed'])
+
+/** One column's name between the spaces `changed` holds each in, which is all a search of it may ask. */
+const oneColumn = /^ ([A-Za-z_][A-Za-z0-9_]*) $/
 
 const namedIn = (where: unknown): string[] => {
   if (!where || typeof where !== 'object') return []
@@ -76,27 +86,75 @@ const namedIn = (where: unknown): string[] => {
     (key === 'and' || key === 'or') && Array.isArray(value) ? value.flatMap(namedIn) : [key])
 }
 
-/**
- * The step before the read: a `where` or a `sort` naming any column but those
- * is refused 400, before the store is asked, on every read the log declares.
- * The runner's own checks still run after it on what it lets through.
- */
-const queriedByQueryable = (ctx: Ctx): Ctx => {
-  const { where, sort } = ctx.data as { where?: unknown; sort?: unknown }
-  const field = namedIn(where).find((name) => !queryable.has(name))
-  if (field !== undefined) {
-    throw invalid({ message: `Kayan "auditLog" is filtered by ${[...queryable].join(', ')} alone, and not by "${field}".`, key: 'error.invalid.where', params: { kayan: 'auditLog', field } })
+/** Every column key the catalog holds, by the kayan it belongs to. */
+const columnsOf = (catalog: readonly string[]) => {
+  const columns = new Map<string, string[]>()
+  for (const key of catalog) {
+    const at = key.indexOf('.fields.')
+    if (at > 0) columns.set(key.slice(0, at), [...(columns.get(key.slice(0, at)) ?? []), key])
   }
+  return columns
+}
+
+/**
+ * The kayan one search of a change reaches for this actor, or `true` for every
+ * one. The text reaches a kayan whose every column the actor reads; a column's
+ * name reaches a kayan whose column of that name it reads, since `changed` holds
+ * names alone. Anything but one `contains`, and a `changed` naming anything but
+ * one column, is refused.
+ */
+const reachOf = ({ held, catalog }: { held: Held; catalog: readonly string[] }) => (column: string, rules: unknown): true | string[] => {
+  const asked = rules && typeof rules === 'object' ? Object.entries(rules) : []
+  const [operator, value] = asked[0] ?? []
+  const name = column === 'changed' && typeof value === 'string' ? oneColumn.exec(value)?.[1] : undefined
+  if (asked.length !== 1 || operator !== 'contains' || typeof value !== 'string' || (column === 'changed' && name === undefined)) {
+    throw invalid({ message: `Kayan "auditLog" is searched by "${column}" with one "contains" alone${column === 'changed' ? ', of one column\'s name between two spaces' : ''}.`, key: 'error.invalid.where', params: { kayan: 'auditLog', field: column } })
+  }
+  if (held === true) return true
+  return [...columnsOf(catalog)]
+    .filter(([kayan, keys]) => held?.has(`${kayan}.find`) && (name === undefined ? keys.every((key) => held.has(key)) : held.has(`${kayan}.fields.${name}`)))
+    .map(([kayan]) => kayan)
+}
+
+/**
+ * The `where` with each search of a change ANDed, where it stands, with the kayan
+ * it reaches, so an `or` around it still means what it said.
+ */
+const narrowed = (where: unknown, reach: (column: string, rules: unknown) => true | string[]): unknown => {
+  if (!where || typeof where !== 'object') return where
+  const parts = Object.entries(where).map(([key, value]) => {
+    if ((key === 'and' || key === 'or') && Array.isArray(value)) return { [key]: value.map((one) => narrowed(one, reach)) }
+    if (!searched.has(key)) return { [key]: value }
+    const kayans = reach(key, value)
+    return kayans === true ? { [key]: value } : { and: [{ [key]: value }, { kayan: { in: kayans } }] }
+  })
+  return parts.length === 1 ? parts[0] : { and: parts }
+}
+
+/**
+ * The step before the read: a `where` naming any column but those above, or a
+ * `sort` by any but the queryable ones, is refused 400 before the store is
+ * asked, on every read the log declares, and each search of a change is narrowed
+ * to the kayan it reaches. The runner's own checks still run after it on what it
+ * lets through.
+ */
+const queriedByQueryable = (ctx: Ctx, tools: { catalog: readonly string[] }): Ctx => {
+  const { where, sort } = ctx.data as { where?: unknown; sort?: unknown }
+  const field = namedIn(where).find((name) => !queryable.has(name) && !searched.has(name))
+  if (field !== undefined) {
+    throw invalid({ message: `Kayan "auditLog" is filtered by ${[...queryable, ...searched].join(', ')} alone, and not by "${field}".`, key: 'error.invalid.where', params: { kayan: 'auditLog', field } })
+  }
+  const held = actorPermissions(ctx.actor)
   // A reader of no people names an actor in no filter and no sort: a pattern, a range, an order or
   // even an equality over the string would let it confirm a guessed operating-system user of a
   // command's actor.
-  if (!readsPeople(actorPermissions(ctx.actor)) && (namedIn(where).includes('actor') || (typeof sort === 'string' && sort.replace(/^-/, '') === 'actor'))) {
+  if (!readsPeople(held) && (namedIn(where).includes('actor') || (typeof sort === 'string' && sort.replace(/^-/, '') === 'actor'))) {
     throw invalid({ message: 'Kayan "auditLog" is neither filtered nor sorted by "actor" for a reader of no people.', key: 'error.invalid.where', params: { kayan: 'auditLog', field: 'actor' } })
   }
   if (sort !== undefined && !(typeof sort === 'string' && queryable.has(sort.replace(/^-/, '')))) {
     throw invalid({ message: `Kayan "auditLog" is sorted by ${[...queryable].join(', ')} alone.`, key: 'error.invalid.sort_field', params: { kayan: 'auditLog', field: String(sort) } })
   }
-  return ctx
+  return where === undefined ? ctx : { ...ctx, data: { ...ctx.data, where: narrowed(where, reachOf({ held, catalog: tools.catalog })) } }
 }
 
 /**
@@ -117,10 +175,11 @@ const auditLogAccess = rows({
  * It declares no operation that writes, so no caller creates, edits or deletes
  * an entry, and each of its rows answers `false` for every write besides.
  *
- * It is its organization's own, and a record's entries are read on that record's edit
- * page. The dashboard lists it for its access report alone, which is what the
- * edit pages' panel is drawn by, and draws no page of it. The backoffice lists
- * none of it and reads none of it.
+ * It is its organization's own. A record's last entries are read in its edit
+ * page's side column, all of them in its Activity tab, and the organization's on
+ * the dashboard's Activity page, a page of the screen's own rather than of this
+ * kayan, which draws none. The backoffice lists none of it and reads none of
+ * it: staff's own actions are its staff history, `backofficeLog`.
  */
 export const auditLog = defineKayan({
   name: auditLogName,
@@ -150,6 +209,8 @@ export const auditLog = defineKayan({
       archiveMany: { en: 'Archived', ar: 'أُرشف' },
       unarchive: { en: 'Unarchived', ar: 'أُلغيت أرشفته' },
       unpublish: { en: 'Unpublished', ar: 'أُلغي نشره' },
+      // An update that published a draft, which the sink names apart from a plain update.
+      publish: { en: 'Published', ar: 'نُشر' },
     },
     someone: { en: 'Someone', ar: 'شخص ما' },
     // A command line write, named for a reader of the people: the command and
@@ -161,6 +222,29 @@ export const auditLog = defineKayan({
     you: { en: 'You', ar: 'أنت' },
     eventYou: { en: '{action} by You', ar: '{action} بواسطتك' },
     none: { en: 'No field you may read changed.', ar: 'لم يتغير حقل يمكنك قراءته.' },
+    // The panel's link to the rest of a record's entries, and the Activity page and tab.
+    all: { en: 'All activity', ar: 'كل النشاط' },
+    about: { en: 'Every change in this organization, newest first.', ar: 'كل تغيير في هذه المؤسسة، الأحدث أولا.' },
+    filters: { en: 'Filter the activity', ar: 'تصفية النشاط' },
+    // What the search box names as what it searches, in the sentence "Search changed values".
+    searchChanges: { en: 'changed values', ar: 'القيم المتغيرة' },
+    person: { en: 'Person', ar: 'الشخص' },
+    type: { en: 'Record type', ar: 'نوع السجل' },
+    field: { en: 'Field', ar: 'الحقل' },
+    actionFilter: { en: 'Action', ar: 'الإجراء' },
+    from: { en: 'From', ar: 'من' },
+    to: { en: 'To', ar: 'إلى' },
+    any: { en: 'Any', ar: 'الكل' },
+    filter: {
+      created: { en: 'Created', ar: 'أُنشئ' },
+      updated: { en: 'Updated', ar: 'حُدِّث' },
+      deleted: { en: 'Deleted', ar: 'حُذف' },
+      published: { en: 'Published', ar: 'نُشر' },
+      restored: { en: 'Restored', ar: 'استُعيد' },
+    },
+    clear: { en: 'Clear filters', ar: 'مسح عوامل التصفية' },
+    nothing: { en: 'No activity matches these filters.', ar: 'لا نشاط يطابق عوامل التصفية هذه.' },
+    oneRecord: { en: 'One record\'s activity.', ar: 'نشاط سجل واحد.' },
   },
   access: { ...auditLogAccess, read: readableKayans },
   targets: {
@@ -182,8 +266,11 @@ export const auditLog = defineKayan({
     operation: { kind: 'text', label: { en: 'Operation', ar: 'العملية' }, rules: { required: true, maxLength: 60 } },
     actor: { kind: 'text', label: { en: 'Actor', ar: 'المنفذ' } },
     impersonatedBy: { kind: 'text', label: { en: 'Impersonated by', ar: 'انتحل الصفة' } },
-    // Never an order, which the runner refuses by name for every read, and never
-    // a filter or a search, which the dashboard offers only where a field opts in.
+    // Never an order, and searched by `queriedByQueryable`'s rules alone.
     changes: { kind: 'text', label: { en: 'Changes', ar: 'التغييرات' }, rules: { required: true }, targets: { dashboard: { sortable: false } } },
+    // The names of the columns `changes` holds, each between two spaces, so the
+    // Activity's column filter finds a change of one column without searching a
+    // value. Empty on an entry written before it was.
+    changed: { kind: 'text', label: { en: 'Changed columns', ar: 'الحقول المتغيرة' }, targets: { dashboard: { sortable: false } } },
   },
 })

@@ -850,7 +850,7 @@ test('36. each screen answers at its own path inside its providers and shell, an
   assert.match(screen.slice(screen.indexOf('data-slot="sidebar"')), /^[\s\S]*?<nav aria-label="Navigation"[^>]*><div[^>]*data-slot="sidebar-header"/, 'the one named navigation landmark opens the sidebar around its header')
   assert.deepEqual(
     [...sidebar.matchAll(/href="([^"]+)"/g)].map((hit) => hit[1]),
-    ['/dashboard', '/dashboard/members', '/dashboard/courses', '/dashboard/sessions', '/dashboard/enrollments', '/dashboard/tags', '/dashboard/media', '/dashboard/roles', '/dashboard/settings'],
+    ['/dashboard', '/dashboard/members', '/dashboard/activity', '/dashboard/courses', '/dashboard/sessions', '/dashboard/enrollments', '/dashboard/tags', '/dashboard/media', '/dashboard/roles', '/dashboard/settings'],
     `the dashboard sidebar links the dashboard and every entry this administrator may open, and no Member roles:\n${sidebar.slice(0, 600)}`,
   )
   assert.match(screen, /data-slot="sidebar-footer"[\s\S]*data-slot="dropdown-menu-trigger"/, 'with the user menu at the sidebar\'s foot')
@@ -1381,7 +1381,7 @@ test('50b. the backoffice app: support lists people and organizations, opens eac
       assert.ok(!record.includes('<form') && !record.includes('data-control=') && !record.includes('type="submit"'), `${href} draws no box and nothing that submits`)
     }
   }
-  const navOf = (html: string) => ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles', 'local-users'].filter((one) => html.includes(`href="/backoffice/${one}"`))
+  const navOf = (html: string) => ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles', 'local-users', 'history'].filter((one) => html.includes(`href="/backoffice/${one}"`))
 
   for (const path of ['/backoffice', '/backoffice/users']) {
     assert.equal((await fetch(`${origin}${path}`, { headers: { cookie }, redirect: 'manual' })).status, 404, `the tenant app answers ${path} 404`)
@@ -1422,7 +1422,7 @@ test('50b. the backoffice app: support lists people and organizations, opens eac
     assert.ok(organizations.includes(`data-organization="${organization}"`), 'and every organization')
     assert.deepEqual(organizationActions(organizations), ['members', 'rename'], 'with its rename and its members')
     assert.ok(organizations.includes(`/backoffice/members?where%5Bor%5D%5B0%5D%5Band%5D%5B0%5D%5BorganizationId%5D%5Bequals%5D=${organization}`), 'whose members link is the members list filtered to it')
-    assert.deepEqual(navOf(home), ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles', 'local-users'], 'the nav lists every list, the local accounts last')
+    assert.deepEqual(navOf(home), ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles', 'local-users', 'history'], 'the nav lists every list, the local accounts and the staff history last')
     const courses = await backofficePage(`/backoffice/courses?where[organization][equals]=${organization}&search=${encodeURIComponent(title)}`)
     assert.ok(courses.includes(title), 'the backoffice lists a tenant\'s course, filtered to its organization')
     assert.ok(!courses.includes('href="/backoffice/courses/new"'), 'and offers no create')
@@ -1528,6 +1528,7 @@ test('50b. the backoffice app: support lists people and organizations, opens eac
     assert.deepEqual(organizationActions(organizations), ['members'], 'renames none')
     assert.ok(navOf(await backofficePage('/backoffice')).includes('roles'), 'and reads the tenants\' roles too')
     assert.ok(!navOf(await backofficePage('/backoffice')).includes('local-users'), 'and no local account, which a super admin alone reads')
+    assert.ok(navOf(await backofficePage('/backoffice')).includes('history'), 'and the staff history, which support, who impersonates, does not')
     await opensRecords(['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles'])
   })
 })
