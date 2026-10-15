@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { PermissionBadges } from './role-form.tsx'
+import { Grants, PermissionBadges } from './role-form.tsx'
 
 /** A role's label in the viewer's locale, and its slug only where a row carries none. */
 export const labelOf = (row: Row | null | undefined, locale: string) => {
@@ -27,9 +27,9 @@ export const labelOf = (row: Row | null | undefined, locale: string) => {
 }
 
 /**
- * The list node's component: the fixed roles first, from their code, each with a lock and its keys
- * one click away, then the organization's own, each opening its page. It draws no row menu; a custom
- * role's delete is its page's.
+ * The list node's component: the fixed roles first, from their code, each with a lock, then the
+ * organization's own. Each row names a role and counts what it grants, and opens to its keys and,
+ * for a custom role, a link to its page. It draws no row menu; a custom role's delete is its page's.
  */
 export function RolesTable() {
   const { page, creates, href, newHref } = useList()
@@ -55,33 +55,44 @@ export function RolesTable() {
           <TableBody>
             {Object.entries(tenantRoles).map(([name, role]) => (
               <TableRow key={name} data-row={name} data-fixed="true">
-                <TableCell>
-                  <details data-fixed-role="">
-                    <summary className="flex cursor-pointer items-center gap-1.5 font-medium max-sm:min-h-11">
-                      <Lock data-lock="" className="text-muted-foreground size-3.5" aria-hidden="true" />
-                      <span>{(role.label as Readonly<Record<string, string>>)[locale] ?? name}</span>
-                    </summary>
-                    <div className="grid gap-2 pt-2">
+                <TableCell className="whitespace-normal">
+                  <Grants
+                    data-fixed-role=""
+                    label={
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Lock data-lock="" className="text-muted-foreground size-3.5" aria-hidden="true" />
+                        <span>{(role.label as Readonly<Record<string, string>>)[locale] ?? name}</span>
+                      </span>
+                    }
+                    held={role.permissions === '*' ? ['*'] : role.permissions}
+                  >
+                    <div className="grid gap-2">
                       <p className="text-muted-foreground text-sm">{t('dashboard.rolesFixedAbout', 'This role ships with the project. What it holds is code, so it cannot be edited or deleted here.')}</p>
                       <PermissionBadges held={role.permissions === '*' ? ['*'] : role.permissions} />
                     </div>
-                  </details>
+                  </Grants>
                 </TableCell>
-                <TableCell>
+                <TableCell className="align-top">
                   <Badge variant="secondary">{t('dashboard.rolesFixed', 'Fixed')}</Badge>
                 </TableCell>
               </TableRow>
             ))}
             {page.docs.map((row) => {
               const id = String(row.id)
+              const held = Array.isArray(row.permissions) ? (row.permissions as string[]) : []
               return (
                 <TableRow key={id} data-row={id} data-fixed="false">
-                  <TableCell>
-                    <a href={href(id)} className="flex items-center gap-1.5 font-medium underline-offset-4 hover:underline max-sm:min-h-11">
-                      <span>{labelOf(row, locale)}</span>
-                    </a>
+                  <TableCell className="whitespace-normal">
+                    <Grants label={<span className="font-medium">{labelOf(row, locale)}</span>} held={held}>
+                      <div className="grid gap-2">
+                        <a href={href(id)} className="text-primary justify-self-start text-sm underline underline-offset-4 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
+                          {t('dashboard.rolesOpen', 'Open this role')}
+                        </a>
+                        <PermissionBadges held={held} />
+                      </div>
+                    </Grants>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="align-top">
                     <Badge variant="outline">{t('dashboard.rolesCustom', 'Custom')}</Badge>
                   </TableCell>
                 </TableRow>

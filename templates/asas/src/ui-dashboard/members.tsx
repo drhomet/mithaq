@@ -34,7 +34,7 @@ import { toast } from 'mithaq-admin/toast.tsx'
 import { organizations } from '@asas/mithaq/auth/organizations'
 import { grantable, managesRoles, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
 import { AppShell } from '@asas/mithaq/ui/app-shell.tsx'
-import { PermissionBadges } from '@asas/roles/roles/ui/role-form.tsx'
+import { Grants, PermissionBadges } from '@asas/roles/roles/ui/role-form.tsx'
 import { isoOf, readMembers, type Member, type Role } from './members-card.tsx'
 
 /** One invitation not yet accepted: its governance role, who sent it where they are still a member, and whether it ran out. */
@@ -224,7 +224,7 @@ const lockOf = ({ access, me, member, role }: { access: AccessReport; me: string
 
 /**
  * Edit roles: Payload's document drawer over the page, listing every role with what it grants, grouped by screen and
- * kayan, each with a box that gives or takes it. A box the viewer may not change is disabled, with the reason where
+ * kayan and closed behind its count as the Roles page draws it, each with a box that gives or takes it. A box the viewer may not change is disabled, with the reason where
  * there is one. Saving writes `memberRoles` rows through that kayan's own operations, so its guards judge each one:
  * removals first, then additions, stopping at the first refusal, and whatever landed before it stays shown.
  */
@@ -289,7 +289,7 @@ function RolesDrawer({ member, roles, onClose, onHeld }: { member: Member; roles
             )}
           </span>
         </label>
-        {role.permissions ? <div className="ps-7"><PermissionBadges held={role.permissions} /></div> : null}
+        {role.permissions ? <div className="ps-7"><Grants held={role.permissions}><PermissionBadges held={role.permissions} /></Grants></div> : null}
       </div>
     )
   }

@@ -640,7 +640,6 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     membersEdit: { en: 'Edit roles', ar: 'تعديل الأدوار' },
     membersFixed: { en: 'Fixed roles', ar: 'الأدوار الثابتة' },
     membersCustom: { en: 'Custom roles', ar: 'الأدوار المخصصة' },
-    membersPermissions: { en: '{count} permissions', ar: 'الصلاحيات: {count}' },
     membersNoRoles: { en: 'There is no role you may read to assign.', ar: 'لا يوجد دور يمكنك قراءته لإسناده.' },
     membersRefused: { en: 'The server refused that change.', ar: 'رفض الخادم هذا التغيير.' },
     everyPermission: { en: 'Every permission', ar: 'كل الصلاحيات' },
@@ -652,6 +651,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     rolesKind: { en: 'Kind', ar: 'النوع' },
     rolesFixed: { en: 'Fixed', ar: 'ثابت' },
     rolesCustom: { en: 'Custom', ar: 'مخصص' },
+    rolesOpen: { en: 'Open this role', ar: 'فتح هذا الدور' },
     rolesFixedAbout: {
       en: 'This role ships with the project. What it holds is code, so it cannot be edited or deleted here.',
       ar: 'يأتي هذا الدور مع المشروع. ما يمنحه مكتوب في الشيفرة، لذا لا يمكن تعديله أو حذفه هنا.',
@@ -664,6 +664,8 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     },
     permissionsScreens: { en: 'Screens', ar: 'الشاشات' },
     permissionsFields: { en: 'Fields', ar: 'الحقول' },
+    permissionsCount: { en: '{count} permissions', ar: 'الصلاحيات: {count}' },
+    permissionsCountOne: { en: '1 permission', ar: 'صلاحية واحدة' },
     permissionsOther: { en: 'Other', ar: 'أخرى' },
     permissionsRequired: { en: 'Permissions, required', ar: 'الصلاحيات، مطلوبة' },
     membersOwnRole: {

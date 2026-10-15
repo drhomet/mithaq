@@ -142,7 +142,7 @@ export const roles = defineKayan({
         ar: 'ما يمكن لكل دور في هذه المؤسسة أن يراه ويفعله.',
       },
       pages: {
-        list: { path: '/roles', page: appPage([{ layout: 'table', main: [{ list: { columns: ['label', 'name'], limit: 100 }, component: rolesUi('roles.tsx#RolesTable') }] }]) },
+        list: { path: '/roles', page: appPage([{ layout: 'table', main: [{ list: { columns: ['label', 'name', 'permissions'], limit: 100 }, component: rolesUi('roles.tsx#RolesTable') }] }]) },
         create: { path: '/roles/new', page: appPage([{ layout: 'record', main: [{ form: ['name', 'label', 'permissions'], component: rolesUi('role-form.tsx#RoleForm') }] }]) },
         edit: {
           path: '/roles/:id',

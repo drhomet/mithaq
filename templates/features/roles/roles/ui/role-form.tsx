@@ -3,11 +3,13 @@
 // values; this reads and writes them through `useForm()`, and reads each box's
 // refusal through `useKayanField`, so a box says it is required, says what is
 // wrong under itself once left or refused, and marks itself invalid.
-import type { ReactNode } from 'react'
+import type { ComponentProps as ElementProps, ReactNode } from 'react'
+import { ChevronDown } from 'lucide-react'
 import type { ComponentProps } from 'mithaq/admin'
 import { useAccess, useForm, useKayan, useLocale, useScreen } from 'mithaq/admin/react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { ariaRequired } from 'mithaq-admin/control-props.ts'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
@@ -54,7 +56,43 @@ const useGroups = (): Group[] => {
 }
 
 /**
- * The keys a role holds as badges, grouped by screen and kayan. With `onChange`
+ * A role's or a group's keys behind a row that names them and counts what they grant, closed at
+ * first so a page of roles reads as a list of names. The panel stays mounted, so every key is in
+ * the first paint and in a find on the page. Every permission has nothing to open, so it is said.
+ */
+export function Grants({ label, held, heading, children, ...root }: { label?: ReactNode; held: readonly string[]; heading?: boolean; children: ReactNode } & ElementProps<'div'>) {
+  const { locale, t } = useLocale()
+  if (held.includes('*')) {
+    return (
+      <div {...root} className="flex items-center gap-2">
+        {/* Where a chevron stands on every other row, so the names line up. */}
+        <span aria-hidden="true" className="size-4 shrink-0" />
+        {label}
+        <span className="text-muted-foreground text-xs">{t('dashboard.everyPermission', 'Every permission')}</span>
+      </div>
+    )
+  }
+  const trigger = (
+    <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-2 text-start max-sm:min-h-11">
+      <ChevronDown aria-hidden="true" className="text-muted-foreground size-4 shrink-0 transition-transform group-data-[panel-open]:rotate-180" />
+      {label}
+      <span className="text-muted-foreground text-xs font-normal">
+        {held.length === 1
+          ? t('dashboard.permissionsCountOne', '1 permission')
+          : (t('dashboard.permissionsCount', '{count} permissions') ?? '{count} permissions').replace('{count}', () => new Intl.NumberFormat(locale).format(held.length))}
+      </span>
+    </CollapsibleTrigger>
+  )
+  return (
+    <Collapsible {...root}>
+      {heading ? <h3 className="text-sm font-medium">{trigger}</h3> : trigger}
+      <CollapsibleContent keepMounted className="ps-6 pt-2">{children}</CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+/**
+ * The keys a role holds as badges, grouped by screen and kayan, each group closed behind its count. With `onChange`
  * each badge is a toggle, a key the viewer may not hand over disabled; without it
  * only the keys held are drawn. A key no group names stays, under "Other", so a
  * save never drops one.
@@ -111,28 +149,29 @@ export function PermissionBadges({ held, onChange, busy }: { held: readonly stri
   }
   if (held.includes('*')) return <Badge variant="outline">{t('dashboard.everyPermission', 'Every permission')}</Badge>
   return (
-    <div data-permissions="" className="grid gap-4">
+    <div data-permissions="" className="grid gap-2">
       {groups.map((group) => {
         const operations = badges(group.operations)
         const fields = badges(group.fields)
+        const keys = [...group.operations, ...group.fields].map((one) => one.key)
         return operations || fields ? (
-          <section key={group.name} data-group={group.name} className="grid gap-1.5">
-            <h3 className="text-muted-foreground text-xs font-medium">{group.label}</h3>
-            {operations}
-            {fields ? (
-              <>
-                <p className="text-muted-foreground text-xs">{t('dashboard.permissionsFields', 'Fields')}</p>
-                {fields}
-              </>
-            ) : null}
-          </section>
+          <Grants key={group.name} data-group={group.name} heading label={<span>{group.label}</span>} held={held.filter((key) => keys.includes(key))}>
+            <div className="grid gap-1.5">
+              {operations}
+              {fields ? (
+                <>
+                  <p className="text-muted-foreground text-xs">{t('dashboard.permissionsFields', 'Fields')}</p>
+                  {fields}
+                </>
+              ) : null}
+            </div>
+          </Grants>
         ) : null
       })}
       {other.length ? (
-        <section data-group="" className="grid gap-1.5">
-          <h3 className="text-muted-foreground text-xs font-medium">{t('dashboard.permissionsOther', 'Other')}</h3>
+        <Grants data-group="" heading label={<span>{t('dashboard.permissionsOther', 'Other')}</span>} held={other}>
           {badges(other.map((key) => ({ key, label: otherLabel(key) })))}
-        </section>
+        </Grants>
       ) : null}
     </div>
   )
