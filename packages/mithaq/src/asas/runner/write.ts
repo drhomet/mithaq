@@ -977,7 +977,7 @@ export const write = <Actor = unknown>({
           kind !== 'insert' && name === kayan.name && (keyOf(id) === keyOf(targetId) || (existing !== undefined && id === existing.id))
         // And a raw write of this kayan never reaches the authorized row, however its id is spelled.
         const elsewhere = <Args extends { kayan: string; where?: Where }>(args: Args): Args =>
-          args.kayan === kayan.name && targetId !== undefined ? { ...args, where: combineWhere(args.where, { id: { not_equals: targetId as Scalar } }) } : args
+          kind !== 'insert' && args.kayan === kayan.name && targetId !== undefined ? { ...args, where: combineWhere(args.where, { id: { not_equals: targetId as Scalar } }) } : args
         const protectedStore: WriteTools<unknown, Actor>['store'] = Object.freeze({
           insert: async ({ tx: heldTx, kayan: name, data: values }) => {
             const row = await tools.store.insert({ tx: heldTx, kayan: name, data: values })

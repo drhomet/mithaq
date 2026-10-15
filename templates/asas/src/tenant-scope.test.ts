@@ -187,6 +187,14 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           },
           // A raw write to the row `aimed` names, beside the operation's own.
           poke: { steps: ({ steps }: { steps: { insert: unknown } }) => [aimAt('insert'), steps.insert] },
+          // A create whose step changes the row it just made, through the raw store.
+          restamp: {
+            steps: ({ steps }: { steps: { insert: unknown } }) => [
+              steps.insert,
+              async (ctx: { tx: unknown; data: Record<string, unknown> }, tools: { store: { update: (args: object) => Promise<Record<string, unknown>> } }) =>
+                ({ ...ctx, data: { ...ctx.data, ...(await tools.store.update({ tx: ctx.tx, kayan: 'memos', id: ctx.data.id, data: { title: 'restamped' } })) } }),
+            ],
+          },
           touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] },
           prune: { steps: ({ steps }: { steps: { remove: unknown } }) => [aimAt('remove'), steps.remove] },
           // A raw insert into another tenant-owned kayan, under another organization.
@@ -354,7 +362,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp()], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -622,6 +630,13 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     await memos().prune({ id: last.id }, { actor: one })
     assert.equal(await titleOf('opens', other.id), undefined, 'a row of another kayan is gone')
     assert.equal(await titleOf('memos', own.id), ownTitle, 'and the row the operation updated before stands')
+  })
+
+  test('a create\'s step changes the row it just made through the raw store, whether or not the caller sent its id', async () => {
+    for (const sent of [{}, { id: crypto.randomUUID() }]) {
+      const made = await memos().restamp({ title: 'stamp', ...sent }, { actor: one })
+      assert.equal((await memos().findByID({ id: made.id }, { actor: one })).title, 'restamped', JSON.stringify(sent))
+    }
   })
 
   test('a raw write in a step naming a versions table or a join table is refused, so another organization\'s snapshots and join rows stay out of reach', async () => {
