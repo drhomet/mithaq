@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
+import { organizationName } from './organizations.ts'
+import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, organizationNameProblem, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
 test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
   assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
@@ -265,6 +266,43 @@ test('the organization settings refuse every combination that would mean nothing
   assert.equal(settingsProblems({ settings: { ...school, joinRole: 'student' }, deployed: false, joinRoles: null }).length, 1, 'without the roles add-on a join role is refused')
 })
 
+test('in every mode the organization\'s name in code names each locale the language reads and no other, the first one written, each one line of at most 100 characters', () => {
+  const locales = ['ar', 'en']
+  for (const [name, names] of [
+    ['a locale left out', { en: 'School' }],
+    ['no default', { ar: 'مدرسة' }],
+    ['an empty default', { en: '  ', ar: 'مدرسة' }],
+    ['a stray locale', { en: 'School', ar: 'مدرسة', fr: 'École' }],
+    ['one past 100', { en: 'School', ar: 'x'.repeat(101) }],
+  ] as const) assert.match(organizationNameProblem({ names, locales }) ?? '', /organizationName/, name)
+  assert.equal(organizationNameProblem({ names: { en: 'School', ar: '' }, locales }), undefined, 'another locale\'s may be empty, to fall back to the first')
+  assert.equal(organizationNameProblem({ names: organizationName, locales }), undefined, 'and the template\'s own is sound')
+})
+
+test('the language refuses to load, in any mode, while the organization\'s name in code leaves out a locale it reads', async () => {
+  const { spawnSync } = await import('node:child_process')
+  const englishOnly = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'
+registerHooks({ load: (url, context, next) => {
+  const loaded = next(url, context)
+  return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace("ar: 'مؤسستي' }", '}') } : loaded
+} })`)}`
+  const loaded = spawnSync(process.execPath, ['--import', englishOnly, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('../../mithaq.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, NODE_ENV: 'development' } })
+  assert.notEqual(loaded.status, 0, 'it does not load')
+  assert.match(loaded.stderr, /organizationName names en, and the language reads ar, en/)
+})
+
+test('the auth setup loads with one organization, whose settings it checks as it loads', async () => {
+  const { spawnSync } = await import('node:child_process')
+  // The project's own `organizations.ts`, read as one organization, open to anyone.
+  const asOne = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'
+registerHooks({ load: (url, context, next) => {
+  const loaded = next(url, context)
+  return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace("= 'many'", "= 'one'") } : loaded
+} })`)}`
+  const loaded = spawnSync(process.execPath, ['--import', asOne, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./index.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, NODE_ENV: 'development' } })
+  assert.equal(loaded.status, 0, loaded.stderr)
+})
+
 test('in production every mode needs a mailer: an open sign-up proves addresses by mail, invitations and resets are mailed, and many proves every address', () => {
   const open = { ...school, signUp: 'open' as const }
   for (const [name, settings] of [['one, open', open], ['one, by invitation', school], ['many', authSettings]] as const) {
@@ -337,8 +375,10 @@ test('an organization\'s name, which founders write and mail bodies carry, is on
     await assert.rejects(server.api.createOrganization({ body: { name: 'x'.repeat(101), slug: 'long', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: a name past 100 characters is refused`)
     await assert.rejects(server.api.createOrganization({ body: { name: '\r\n', slug: 'blank', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: and one of nothing but breaks`)
     const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
-    const renamed = await server.api.updateOrganization({ body: { organizationId: made.id, data: { name: 'Line\none' } }, headers })
-    assert.equal(renamed?.name, 'Line one', `${settings.organizations}: a rename is one line too`)
+    const renaming = server.api.updateOrganization({ body: { organizationId: made.id, data: { name: 'Line\none' } }, headers })
+    // With one organization its name lives in code, so nothing renames it over HTTP.
+    if (settings.organizations === 'one') await assert.rejects(renaming, /lives in code/, 'one: a rename is refused')
+    else assert.equal((await renaming)?.name, 'Line one', `${settings.organizations}: a rename is one line too`)
   }
 })
 

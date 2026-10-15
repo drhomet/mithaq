@@ -1,10 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 
-type FirstRun = { open: false } | { open: true; code: 'none' | 'required' | 'unset'; name: boolean }
+type FirstRun = { open: false } | { open: true; code: 'none' | 'required' | 'unset' }
 
 /**
  * Whether this app of one organization still waits for its first owner, and while it does,
- * whether first-run asks the setup code and a name: the provider's own state, read in process. With
+ * whether first-run asks the setup code: the provider's own state, read in process. With
  * many organizations nobody waits: each sign-up founds one.
  */
 export const firstRun = createServerFn({ method: 'GET' }).handler(async (): Promise<FirstRun> => {

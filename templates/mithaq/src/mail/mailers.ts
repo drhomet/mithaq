@@ -10,7 +10,8 @@ export type Mailer = { send(mail: Mail): Promise<void> }
  */
 export const logMailer: Mailer = {
   send: async ({ to, subject, text }) => {
-    console.log(`[asas mail] To ${to}: ${subject}\n${text}`)
+    // The log reads as an inbox, so nobody waits for a message that never left.
+    console.log(`[asas mail] Development: emails print here instead of being sent.\nTo ${to}: ${subject}\n${text}`)
   },
 }
 
@@ -32,4 +33,4 @@ export const resendMailer = ({ apiKey, from, baseURL }: { apiKey: string; from: 
     if (!response.ok) throw new Error(`Resend refused a message: ${response.status} ${response.statusText}`)
   },
 })
-// mithaq-admin 0.0.0 af49cff802636f724b56e53fe1391a0d46af0c92ef95e2bba0e7da98c5548c88
+// mithaq-admin 0.0.0 37f2bedf34183fb350814b0e9f4a1453fb4f5491d359794f443461f04bf81e9e

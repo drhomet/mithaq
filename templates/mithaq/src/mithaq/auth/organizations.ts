@@ -53,3 +53,28 @@ export const verifyEmail: boolean = true
  * `*.example.com` every domain under it, never itself. Empty, any domain may.
  */
 export const allowedDomains: readonly string[] = []
+
+/**
+ * The organization's name in each locale the language reads and no other, the first the one every other falls back to;
+ * the language refuses to load otherwise. In `'one'` it is the organization's name, which lives here, not on the row:
+ * start-up writes it onto the row, first-run asks none, and nobody renames it elsewhere. With `'many'` each organization
+ * names itself, and only its locales are read: the ones a founder's names are held to.
+ */
+export const organizationName: Readonly<Record<string, string>> = { en: 'My organization', ar: 'مؤسستي' }
+
+/** The locale an organization's `name` is in, which every other falls back to. */
+export const defaultLocale = Object.keys(organizationName)[0]!
+
+/**
+ * An organization's name in `locale`: `name` in the default locale, and elsewhere its `names` entry, the JSON the
+ * auth setup writes, where it holds one.
+ */
+export const nameIn = ({ name, names }: { name: string; names?: unknown }, locale: string): string => {
+  if (locale === defaultLocale || typeof names !== 'string') return name
+  try {
+    const own = (JSON.parse(names) as Record<string, unknown> | null)?.[locale]
+    return typeof own === 'string' && own ? own : name
+  } catch {
+    return name
+  }
+}

@@ -8,14 +8,15 @@ import { firstRun } from '../first-run.ts'
 import { useCopy } from './__root.tsx'
 
 // The first owner of an app of one organization, and the organization itself: open once,
-// to the holder of the setup code, and closed for good once the organization exists.
+// to the holder of the setup code, and closed for good once the organization exists. The
+// organization's name lives in code (`organizationName` in `organizations.ts`), so none is asked.
 export const Route = createFileRoute('/auth/first-run')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.firstRun')),
   beforeLoad: async () => {
     const state = await firstRun()
     // `href`, not `to`: sign-in redirects here too, and two routes typed by each other's paths infer nothing.
     if (!state.open) throw redirect({ href: '/auth/sign-in' })
-    return { code: state.code, name: state.name, password: (await authGate()).password }
+    return { code: state.code, password: (await authGate()).password }
   },
   component: FirstRun,
 })
@@ -24,9 +25,8 @@ function FirstRun() {
   const navigate = useNavigate()
   const { t } = useCopy()
   const refused = useRefusal()
-  const { code: asked, name: named, password: bounds } = Route.useRouteContext()
+  const { code: asked, password: bounds } = Route.useRouteContext()
   const [name, setName] = useState('')
-  const [organization, setOrganization] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -37,7 +37,6 @@ function FirstRun() {
   const required = t('auth.required', 'This field is required.')
   const wrong = {
     name: () => (name.trim() ? undefined : required),
-    organization: () => (!named || organization.trim() ? undefined : required),
     email: () => (!email ? required : notAnEmail(email) ? t('auth.invalidEmail', 'Invalid email') : undefined),
     password: () =>
       !password ? required
@@ -58,7 +57,7 @@ function FirstRun() {
     if (Object.values(wrong).some((check) => check())) return
     setPending(true)
     setRefusal(null)
-    const made = await authArm('first-run', { name, email, password, ...(named && { organization }), ...(asked === 'required' && { code }) })
+    const made = await authArm('first-run', { name, email, password, ...(asked === 'required' && { code }) })
     setPending(false)
     if (!made.ok) return setRefusal(refused(made, t('auth.firstRunFailed', 'That owner could not be made.')))
     await navigate({ to: '/auth/sign-in' })
@@ -76,7 +75,6 @@ function FirstRun() {
   return (
     <AuthFrame title={t('auth.firstRun', 'Set up this app')} description={t('auth.firstRunDescription', 'Nobody owns this app yet. The account made here becomes its owner and first administrator.')}>
       <form className="grid gap-4" noValidate onSubmit={submit}>
-        {named ? box('organization', t('auth.organization', 'Organization'), { autoComplete: 'organization', onChange: (event) => setOrganization(event.target.value), type: 'text', value: organization }) : null}
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), {

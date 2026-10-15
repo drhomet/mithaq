@@ -115,7 +115,7 @@ try {
   // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
   // by sign-up; one never shown, with an open sign-up, which a production start refuses without a mailer.
   for (const run of [
-    { manager: 'bun', addOns: ['--full'], modes: [] },
+    { manager: 'bun', addOns: ['--full'], modes: ['--organization-name', "Noor's School", '--organization-name-ar', 'مدرسة النور'] },
     { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
     { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
     { manager: 'bun', addOns: ['--with', 'settings,backoffice,rich-text,media'], modes: ['--organizations', 'many'] },
@@ -350,10 +350,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       // One organization: nothing signs up before its owner is made, and only the setup code makes them.
       const setUp = await (await fetch(`${origin}/auth/first-run`, { signal: AbortSignal.timeout(10_000) })).text()
       assert.ok(setUp.includes('The SETUP_CODE this server was started with.'), `first-run asks for the setup code:\n${setUp.slice(0, 600)}`)
-      assert.equal(setUp.includes('id="organization"'), !modes.includes('no'), 'and a name for the organization only where it is shown')
+      assert.equal(setUp.includes('id="organization"'), false, 'and no name for the organization, which lives in code')
       assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Early', email: `early-${stamp}@example.com`, password: 'release-test-password' })), [403, 'FIRST_RUN_PENDING'], 'a sign-up before first-run is refused')
       // The takeover race over HTTP: three at once, one owner.
-      const runs = await Promise.all([0, 1, 2].map(async (at) => [at, await codeOf(await post('first-run', { name: `Owner ${at}`, email: `owner-${at}-${stamp}@example.com`, password: 'release-test-password', organization: 'Release', code: setupCode }))] as const))
+      const runs = await Promise.all([0, 1, 2].map(async (at) => [at, await codeOf(await post('first-run', { name: `Owner ${at}`, email: `owner-${at}-${stamp}@example.com`, password: 'release-test-password', code: setupCode }))] as const))
       const won = runs.filter(([, [status]]) => status === 200)
       assert.equal(won.length, 1, `one first-run wins: ${JSON.stringify(runs)}\n${output}`)
       assert.deepEqual(runs.filter(([, [status]]) => status !== 200).map(([, answer]) => answer), [[403, 'FIRST_RUN_CLOSED'], [403, 'FIRST_RUN_CLOSED']])
@@ -362,6 +362,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       assert.equal(signedIn.status, 200, `the owner signs in\n${output}`)
       const session = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { origin, cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).json()) as { session?: { activeOrganizationId?: string | null } } | null
       assert.ok(session?.session?.activeOrganizationId, 'into the one organization')
+      // Named by --organization-name in each locale, or the template's own name: it lives in code.
+      const held = (await (await fetch(`${origin}/api/auth/user/organization/get-full-organization`, { headers: { origin, cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).json()) as { name?: string; names?: string }
+      const named = modes.includes('--organization-name') ? { en: "Noor's School", ar: 'مدرسة النور' } : { en: 'My organization', ar: 'مؤسستي' }
+      assert.deepEqual([held.name, JSON.parse(held.names ?? 'null')], [named.en, named], `the organization is named from code: ${JSON.stringify(held).slice(0, 300)}`)
       if (!open) assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Stranger', email: `stranger-${stamp}@example.com`, password: 'release-test-password' })), [403, 'SIGN_UP_INVITE_ONLY'], 'by invitation, a sign-up with none is refused')
       // The owner adds a person in one request, and the link that chooses the password goes to that person's mailbox.
       const person = `added-${stamp}@example.com`
@@ -381,7 +385,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       }
     } else {
       const email = `release-${stamp}@example.com`
-      const signUp = await post('sign-up/email', { name: 'Release', email, password: 'typed-at-sign-up' })
+      const signUp = await post('sign-up/email', { name: 'Release', email })
       assert.equal(signUp.status, 200, `${await signUp.text()}\n${output}`)
       assert.equal(cookieOf(signUp).includes('session_token'), false, 'the sign-up opens no session before its address is proved')
       const chosen = await post('reset-password', { token: (await linkMailed(email)).searchParams.get('token'), newPassword: 'release-test-password' })
@@ -399,10 +403,12 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
         const joined = await fetch(`${origin}/api/auth/user/sign-up/email`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', origin },
-          body: JSON.stringify({ name: 'Staff', email, password: 'release-test-password' }),
+          body: JSON.stringify({ name: 'Staff', email }),
           signal: AbortSignal.timeout(10_000),
         })
         assert.equal(joined.status, 200, `${await joined.text()}\n${output}`)
+        // No password is typed at sign-up: the staff member chooses theirs from the mailed link, as anyone does.
+        assert.equal((await post('reset-password', { token: (await linkMailed(email)).searchParams.get('token'), newPassword: 'release-test-password' })).status, 200)
         command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = '${email}'"); await asas.destroy()`], template)
         const staff = await fetch(`${backofficeOrigin}/api/auth/user/sign-in/email`, {
           method: 'POST',

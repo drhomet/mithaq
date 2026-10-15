@@ -15,7 +15,7 @@ import { sql } from 'mithaq/drizzle'
 import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
 // A module of its own so a screen can list the roles without loading the provider.
 import { backofficeRoles } from './backoffice-roles.ts'
-import { allowedDomains, joinRole, organizations, showOrganization, signUp, verifyEmail } from './organizations.ts'
+import { allowedDomains, defaultLocale, joinRole, nameIn, organizationName, organizations, showOrganization, signUp, verifyEmail } from './organizations.ts'
 // add-on: roles
 import { tenantRoles } from '../../roles/tenant-roles.ts'
 // end add-on: roles
@@ -221,8 +221,10 @@ export type AuthSettings = {
   joinRole: string | null
   verifyEmail: boolean
   allowedDomains: readonly string[]
+  /** In `'one'`, the organization's name in each locale, which lives in code. */
+  organizationName: Readonly<Record<string, string>>
 }
-export const authSettings: AuthSettings = { mailer: configuredMailer() ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains }
+export const authSettings: AuthSettings = { mailer: configuredMailer() ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains, organizationName }
 
 /** An address as the provider's own sign-up takes one. */
 const anAddress = z.email()
@@ -252,6 +254,70 @@ export const domainAllowed = (email: string, allowed: readonly string[]) => {
   if (domainToUnicode(domain) !== written && domain !== written) return false
   return allowed.some((entry) => (entry.startsWith('*.') ? domain.endsWith(entry.slice(1)) : domain === entry))
 }
+
+/**
+ * An organization's name as it is kept: one line of 1 to 100 characters. Anyone founds one with many
+ * organizations, and its name goes into the plain text of every mail that names it, where a line
+ * break would be the founder's own line.
+ */
+// Control characters (NEL among them), the line and paragraph separators, and the direction
+// overrides and isolates, which would make a name read as other words than it holds.
+export const oneLine = /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]+/gu
+const asLine = (name: unknown) => (typeof name === 'string' ? name.replace(oneLine, ' ').replace(/ {2,}/g, ' ').trim() : '')
+const badName = (message: string) => new APIError('BAD_REQUEST', { code: 'ORGANIZATION_NAME', message })
+const oneLineName = (name: unknown) => {
+  const line = asLine(name)
+  if (!line || line.length > 100) throw badName('An organization has a name of 1 to 100 characters on one line.')
+  return line
+}
+/** The locales an organization is named in: the project's own, as `organizationName` lists them. */
+const nameLocales = Object.keys(organizationName)
+/** Why `names` is no organization's names in every locale, the default's required, or nothing. */
+const namesProblem = (names: Readonly<Record<string, unknown>>) => {
+  const stray = Object.keys(names).filter((locale) => !nameLocales.includes(locale))
+  if (stray.length) return `names ${stray.join(', ')}, which is none of the project's locales: ${nameLocales.join(', ')}.`
+  if (!asLine(names[defaultLocale])) return `holds no name in ${defaultLocale}, the locale every other falls back to.`
+  const long = Object.entries(names).find(([, one]) => asLine(one).length > 100)
+  return long ? `holds a name in ${long[0]} past 100 characters.` : undefined
+}
+/**
+ * An organization's names as they are kept: the JSON of one line of 1 to 100 characters per locale it is named in,
+ * the default locale's required and the others left out where empty, and `name`, the default locale's. `written` is
+ * the JSON a client sends, or the names themselves.
+ */
+export const namesOf = (written: unknown) => {
+  let names: unknown = written
+  if (typeof written === 'string') {
+    try {
+      names = JSON.parse(written)
+    } catch {
+      throw badName('An organization\'s names are a JSON object, one name per locale.')
+    }
+  }
+  if (!names || typeof names !== 'object' || Array.isArray(names)) throw badName('An organization\'s names are a JSON object, one name per locale.')
+  const problem = namesProblem(names as Record<string, unknown>)
+  if (problem) throw badName(`An organization's names ${problem}`)
+  const kept = Object.fromEntries(Object.entries(names).map(([locale, one]) => [locale, asLine(one)]).filter(([, one]) => one))
+  return { name: kept[defaultLocale]!, names: JSON.stringify(kept) }
+}
+/** The names a create or a rename writes: from `names` where it carries them, else `name` as the default locale's. */
+const named = (data: { name?: unknown; names?: unknown }) => {
+  if (data.names !== undefined && data.names !== null) return namesOf(data.names)
+  const name = oneLineName(data.name)
+  return { name, names: JSON.stringify({ [defaultLocale]: name }) }
+}
+/**
+ * Why `names`, the organization's name in code, does not name it in each of `locales`, the language's and no other,
+ * the first required, or nothing. Every mode holds a founder's names to its locales and falls back to its first, so
+ * the language checks it as it loads (`src/mithaq.ts`).
+ */
+export const organizationNameProblem = ({ names, locales }: { names: Readonly<Record<string, string>>; locales: readonly string[] }) => {
+  const held = Object.keys(names)
+  if (held.length !== locales.length || locales.some((one) => !held.includes(one))) return `organizationName names ${held.join(', ') || 'no locale'}, and the language reads ${locales.join(', ')}: name the organization in each, the first the one every other falls back to.`
+  const problem = namesProblem(names)
+  return problem && `organizationName ${problem}`
+}
+const nameInCode = () => new APIError('FORBIDDEN', { code: 'ORGANIZATION_NAME_IN_CODE', message: 'With one organization its name lives in code: organizationName in src/mithaq/auth/organizations.ts.' })
 
 /**
  * A key no stranger who signs up is given: one that gives a role, writes a role, invites, or changes
@@ -284,7 +350,7 @@ export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: 
   return problems
 }
 /** `settingsProblems` of one organization. */
-const problemsOfOne = ({ problems, signUp, verifyEmail, allowedDomains, joinRole, joinRoles }: Omit<AuthSettings, 'mailer' | 'organizations' | 'showOrganization'> & { problems: string[]; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
+const problemsOfOne = ({ problems, signUp, verifyEmail, allowedDomains, joinRole, joinRoles }: Omit<AuthSettings, 'mailer' | 'organizations' | 'showOrganization' | 'organizationName'> & { problems: string[]; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
   if (allowedDomains.length && signUp !== 'open') problems.push("allowedDomains is read only with signUp = 'open': empty it, or open the sign-up.")
   if (allowedDomains.length && !verifyEmail) problems.push('allowedDomains needs verifyEmail = true: an address nobody proved is any domain its writer wants.')
   for (const entry of allowedDomains) {
@@ -327,9 +393,9 @@ const letter = ({ to, subject, en, ar, link }: { to: string; subject: string; en
 // With many organizations anyone founds one and invites, so only an inviter whose own address is
 // proved has an invitation mailed: nobody sends a stranger the project's mail from an address they
 // do not hold. The inviter still copies the link from the Members page.
-const invitationMail = ({ mailer, organizations, showOrganization }: { mailer: Mailer; organizations: AuthSettings['organizations']; showOrganization: boolean }) => async ({ id, email, organization, inviter }: { id: string; email: string; organization: { name: string }; inviter: { user: { emailVerified?: boolean } } }) => {
+const invitationMail = ({ mailer, organizations, showOrganization }: { mailer: Mailer; organizations: AuthSettings['organizations']; showOrganization: boolean }) => async ({ id, email, organization, inviter }: { id: string; email: string; organization: { name: string; names?: unknown }; inviter: { user: { emailVerified?: boolean } } }) => {
   if (organizations === 'many' && !inviter.user.emailVerified) return
-  const [en, ar] = showOrganization ? [organization.name, organization.name] : ['this app', 'هذا التطبيق']
+  const [en, ar] = showOrganization ? [nameIn(organization, 'en'), nameIn(organization, 'ar')] : ['this app', 'هذا التطبيق']
   await mailer.send(letter({
     to: email,
     subject: 'You are invited · لديك دعوة',
@@ -339,19 +405,6 @@ const invitationMail = ({ mailer, organizations, showOrganization }: { mailer: M
   }))
 }
 
-/**
- * An organization's name as it is kept: one line of 1 to 100 characters. Anyone founds one with many
- * organizations, and its name goes into the plain text of every mail that names it, where a line
- * break would be the founder's own line.
- */
-// Control characters (NEL among them), the line and paragraph separators, and the direction
-// overrides and isolates, which would make a name read as other words than it holds.
-export const oneLine = /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]+/gu
-const organizationName = (name: unknown) => {
-  const line = typeof name === 'string' ? name.replace(oneLine, ' ').replace(/ {2,}/g, ' ').trim() : ''
-  if (!line || line.length > 100) throw new APIError('BAD_REQUEST', { code: 'ORGANIZATION_NAME', message: 'An organization has a name of 1 to 100 characters on one line.' })
-  return line
-}
 
 /**
  * How many invitations one organization makes, whoever makes them, so no organization turns the
@@ -391,6 +444,9 @@ export const organizationLimitsFor = (mode: AuthSettings['organizations']) => ({
 // provider's static roles.
 const organizationOptionsFor = ({ mailer, organizations, showOrganization }: AuthSettings) => ({
   ...organizationLimitsFor(organizations),
+  // An organization's name in each locale of the project, the JSON `namesOf` writes; `name` is the default
+  // locale's. `mithaq generate auth` writes it onto the organization kayan.
+  schema: { organization: { additionalFields: { names: { type: 'string', required: false } } } } as const,
   dynamicAccessControl: { enabled: true as const },
   // An organization that was ever used holds rows that cannot all be removed (an audit log,
   // settings, its last administrator), and every tenant key is `restrict`, so deletion is off over
@@ -404,10 +460,13 @@ const organizationOptionsFor = ({ mailer, organizations, showOrganization }: Aut
   // is not verified, since holding the id is its proof, so asking for one would leave every
   // invitation unanswerable.
   organizationHooks: {
-    beforeCreateOrganization: async ({ organization }: { organization: { name?: unknown } & Record<string, unknown> }) => ({ data: { ...organization, name: organizationName(organization.name) } }),
-    beforeUpdateOrganization: async ({ organization }: { organization: { name?: unknown } & Record<string, unknown> }) => {
+    beforeCreateOrganization: async ({ organization }: { organization: { name?: unknown; names?: unknown } & Record<string, unknown> }) => ({ data: { ...organization, ...named(organization) } }),
+    beforeUpdateOrganization: async ({ organization }: { organization: { name?: unknown; names?: unknown } & Record<string, unknown> }) => {
       await gate('organization.update')({ organization })
-      return organization.name === undefined ? undefined : { data: { ...organization, name: organizationName(organization.name) } }
+      if (organization.name === undefined && organization.names === undefined) return undefined
+      if (organizations === 'one') throw nameInCode()
+      // A name alone renames the default locale's, and each other locale keeps its own.
+      return { data: { ...organization, ...(organization.names === undefined ? { name: oneLineName(organization.name) } : namesOf(organization.names)) } }
     },
     beforeRemoveMember: gate('member.delete'),
     beforeUpdateMemberRole: async ({ newRole, organization }: { newRole: string; organization: { id: string } }) => {
@@ -523,6 +582,11 @@ const sameOrganizationNamed = async (ctx: HookContext) => {
   const named = await ctx.context.adapter.findOne<{ id: string }>({ model: 'organization', where: [{ field: 'slug', value: organizationSlug }] })
   sameOrganization({ id: named?.id })
 }
+/** The names of the organization `id`, one per locale, as a reader of an invitation sees them. */
+const namesById = async (ctx: HookContext, id: unknown) => {
+  const found = typeof id === 'string' ? await ctx.context.adapter.findOne<{ name: string; names?: unknown }>({ model: 'organization', where: [{ field: 'id', value: id }] }) : null
+  return found ? Object.fromEntries(nameLocales.map((locale) => [locale, nameIn(found, locale)])) : undefined
+}
 const auditBefore = async (ctx: HookContext) => {
   // The provider hands any member every member's name, address, image, role and join date, and
   // anyone's role by `userId`, and these routes have no hook to gate. Only a caller who may read
@@ -622,8 +686,11 @@ export const backofficeAudit = {
     }
     // The provider hands the invitee the inviter's address, which the accept page never shows, and
     // an invitation is no reason to learn a member's address.
-    const invitation = ctx.context.returned as { inviterEmail?: unknown } | null | undefined
-    if (ctx.path === '/organization/get-invitation' && invitation && typeof invitation === 'object' && 'inviterEmail' in invitation) return ctx.json({ ...invitation, inviterEmail: '' })
+    const invitation = ctx.context.returned as { inviterEmail?: unknown; organizationId?: unknown } | null | undefined
+    if (ctx.path === '/organization/get-invitation' && invitation && typeof invitation === 'object' && 'inviterEmail' in invitation) return ctx.json({ ...invitation, inviterEmail: '', organizationNames: await namesById(ctx, invitation.organizationId) })
+    // The provider names an invitation's organization in the default locale alone, so each locale's is added.
+    const invitations = ctx.context.returned as { organizationId?: unknown }[] | null | undefined
+    if (ctx.path === '/organization/list-user-invitations' && Array.isArray(invitations)) return ctx.json(await Promise.all(invitations.map(async (one) => ({ ...one, organizationNames: await namesById(ctx, one.organizationId) }))))
     // Leaving the active organization leaves the session in none, where every read is refused,
     // so it opens the person's oldest remaining membership, as a new session would.
     const leaving = ctx.context.session
@@ -750,31 +817,45 @@ const onLocalHost = !production && isLocalHost(tenantURL)
 // page's link, which ends every session and marks the address verified. Proving it never keeps a
 // password somebody else typed at sign-up, so whoever signed up first with another's address never
 // signs in once its owner proves it.
+// A first password is chosen on a page of its own, which names the account it is for; a forgotten one on the reset
+// page. Both send the same token to the same route.
+const setPasswordLink = (token: string) => new URL(`/auth/set-password?token=${encodeURIComponent(token)}`, tenantURL).href
 // A link that also accepts an invitation names the organization, so opening it is the word to join.
-const confirmMail = (mailer: Mailer) => async ({ email, token, joining }: { email: string; token: string; joining?: string }) =>
+const confirmMail = (mailer: Mailer) => async ({ email, token, joining }: { email: string; token: string; joining?: { name: string; names?: unknown } }) =>
   mailer.send(letter({
     to: email,
     subject: 'Confirm your address · تأكيد عنوانك',
     en: joining === undefined
       ? 'Someone made an account with this address. If it was you, open the link below within an hour to confirm it and choose your password. If not, ignore this message: an account nobody confirms never signs in.'
-      : `Someone made an account with this address to join ${joining}. If it was you, open the link below within an hour to confirm it, choose your password and join. If not, ignore this message: an account nobody confirms never signs in.`,
+      : `Someone made an account with this address to join ${nameIn(joining, 'en')}. If it was you, open the link below within an hour to confirm it, choose your password and join. If not, ignore this message: an account nobody confirms never signs in.`,
     ar: joining === undefined
       ? 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.'
-      : `أنشأ أحدهم حسابا بهذا العنوان للانضمام إلى ${joining}. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور والانضمام. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.`,
-    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+      : `أنشأ أحدهم حسابا بهذا العنوان للانضمام إلى ${nameIn(joining, 'ar')}. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور والانضمام. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.`,
+    link: setPasswordLink(token),
   }))
 
 // The set-password link of a person an administrator added, which they open to choose their password.
-const addedMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganization: boolean }) => async ({ email, organization, token }: { email: string; organization: { name: string }; token: string }) => {
-  const [en, ar] = showOrganization ? [organization.name, organization.name] : ['this app', 'هذا التطبيق']
+const addedMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganization: boolean }) => async ({ email, organization, token }: { email: string; organization: { name: string; names?: unknown }; token: string }) => {
+  const [en, ar] = showOrganization ? [nameIn(organization, 'en'), nameIn(organization, 'ar')] : ['this app', 'هذا التطبيق']
   await mailer.send(letter({
     to: email,
     subject: 'Your account · حسابك',
     en: `An administrator added you to ${en}. Open the link below to choose your password; it lasts 48 hours.`,
     ar: `أضافك أحد المسؤولين إلى ${ar}. افتح الرابط أدناه لاختيار كلمة المرور؛ وهو صالح 48 ساعة.`,
-    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+    link: setPasswordLink(token),
   }))
 }
+
+// The first administrator is made with no proof of the address, the setup code standing in for it, so the address
+// is told once: whoever set the app up and typed it wrong notices the mail that never came.
+const adminMadeMail = ({ mailer, email, at }: { mailer: Mailer; email: string; at: string }) =>
+  mailer.send(letter({
+    to: email,
+    subject: 'Your administrator account · حساب المسؤول',
+    en: 'An administrator account was made with this address. Sign in at the link below. If you did not expect this, ignore this message and tell whoever set up this app.',
+    ar: 'أُنشئ حساب مسؤول بهذا العنوان. سجّل الدخول من الرابط أدناه. إن لم تكن تتوقع هذا، فتجاهل هذه الرسالة وأخبر من أعدّ هذا التطبيق.',
+    link: new URL('/auth/sign-in', at).href,
+  }))
 
 const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
   mailer.send(letter({
@@ -1069,9 +1150,36 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   const users = store.tables.user as { role: unknown }
   const administered = async (db: Executes) =>
     (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(backofficeRoles)}) limit 1`)).rows.length > 0
-  const organizationTable = store.tables.organization
+  const organizationTable = store.tables.organization as { id: unknown; createdAt: unknown; name: unknown; names: unknown }
   const organized = async (db: Executes) => (await db.execute(sql`select 1 from ${organizationTable} limit 1`)).rows.length > 0
   const oneOrganization = settings.organizations !== 'many'
+  // With one organization its name lives in code, and the row takes it on the first request this process serves,
+  // after the tables exist: a deploy that changed `organizationName` renames it, and nothing else does.
+  let synced: Promise<void> | undefined
+  const syncName = async () => {
+    const { name, names } = namesOf(settings.organizationName)
+    // The oldest row alone, the one `joinOpen` joins: a project that held many keeps every other's own name.
+    const one = sql`(select ${organizationTable.id} from ${organizationTable} order by ${organizationTable.createdAt}, ${organizationTable.id} limit 1)`
+    await (store.db as Executes).execute(sql`update ${organizationTable} set ${sql.identifier('name')} = ${name}, ${sql.identifier('names')} = ${names} where ${organizationTable.id} = ${one} and (${organizationTable.name} is distinct from ${name} or ${organizationTable.names} is distinct from ${names})`)
+  }
+  const namedInCode = {
+    id: 'named-in-code',
+    hooks: { before: [{
+      matcher: () => oneOrganization,
+      handler: createAuthMiddleware(async () => {
+        await (synced ??= syncName().catch((error: unknown) => {
+          // Asked again on the next request, so a database that was not ready yet is not left unnamed.
+          synced = undefined
+          console.error('The organization\'s name in code was not written onto its row:', error)
+        }))
+      }),
+    }] },
+  }
+  // After the answer, and never failing it: the account is made and committed whatever the mailer says.
+  const toldAdmin = async ({ ctx, email, at }: { ctx: HookContext; email: string; at: string }) => {
+    if (!settings.mailer) return
+    await ctx.context.runInBackgroundOrAwait(adminMadeMail({ mailer: settings.mailer, email, at }).catch((error: unknown) => console.error('The first administrator\'s mail was not sent:', error)))
+  }
   // The tenant's first-run, in one organization: the first owner and the one organization,
   // which nothing else makes, under the lock first-register takes and the setup code. It makes
   // the owner backoffice staff too while the backoffice app is served and has none, so one person
@@ -1081,21 +1189,21 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     id: 'first-run',
     endpoints: {
       firstRunState: createAuthEndpoint('/first-run/state', { method: 'GET' }, async (ctx) =>
-        ctx.json((await organized(store.db as Executes)) ? { open: false } : { open: true, code: setupCodeState(tenantURL), name: settings.showOrganization })),
+        ctx.json((await organized(store.db as Executes)) ? { open: false } : { open: true, code: setupCodeState(tenantURL) })),
       // `formCsrfMiddleware`, as sign-up has: no session guards this route.
       firstRun: createAuthEndpoint('/first-run', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
         if (!onLocalHost && !ipAddressHeaders && overFirstRunLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
         if (await organized(store.db as Executes)) throw firstRunClosed()
-        const { name, email, password, code, organization } = (ctx.body ?? {}) as Record<string, unknown>
+        const { name, email, password, code } = (ctx.body ?? {}) as Record<string, unknown>
         const refused = refusedSetup({ url: tenantURL, code, app: 'tenant app' })
         if (refused) throw refused
         const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
         if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
           throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
         }
-        const named = settings.showOrganization ? (typeof organization === 'string' ? organization.trim() : '') : 'Main'
-        if (!named || named.length > 100) throw new APIError('BAD_REQUEST', { message: 'The organization has a name of 1 to 100 characters.' })
-        return ctx.json(await store.transaction(async (tx) => {
+        // The organization's name lives in code, so nobody who reaches a new deploy first names it.
+        const inCode = namesOf(settings.organizationName)
+        const made = await store.transaction(async (tx) => {
           await (tx as Executes).execute(sql`set transaction isolation level read committed`)
           await (tx as Executes).execute(setupLock)
           if (await organized(tx as Executes)) throw firstRunClosed()
@@ -1106,12 +1214,14 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
           const adapter = (await bound.$context).adapter
           return runWithAdapter(adapter, () => firstRegistering.run(true, async () => {
             const { user } = await bound.api.createUser({ body: { name, email, password, role: (staff ? 'super_admin' : 'user') as never, data: { emailVerified: true } } })
-            const slug = !settings.showOrganization ? 'main' : `${named.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${randomBytes(3).toString('hex')}`
-            const made = (await bound.api.createOrganization({ body: { name: named, slug, userId: user.id } }))!
+            const slug = !settings.showOrganization ? 'main' : `${inCode.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${randomBytes(3).toString('hex')}`
+            const made = (await bound.api.createOrganization({ body: { name: inCode.name, names: inCode.names, slug, userId: user.id } as never }))!
             authAudit({ action: 'first-run', user: user.id, organization: made.id, backoffice: staff })
             return { user: { id: user.id }, organization: { id: made.id } }
           }))
-        }))
+        })
+        await toldAdmin({ ctx, email, at: tenantURL })
+        return ctx.json(made)
       }),
     },
     rateLimit: [{ pathMatcher: (path: string) => path === '/first-run', window: 60, max: 3 }],
@@ -1257,11 +1367,11 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     // The invitation this sign-up carried rides on this link alone.
     const asked = tryGetCurrentAuthEndpointContext()
     const invitationId = asked?.path === '/sign-up/email' ? (asked.body as { invitationId?: unknown } | undefined)?.invitationId : undefined
-    let joining: string | undefined
+    let joining: { name: string; names?: unknown } | undefined
     if (await holdsInvitation({ adapter: adapter as unknown as Finds, id: invitationId, email: user.email })) {
       await internalAdapter.createVerificationValue({ identifier: bound(token), value: `${user.id} ${invitationId as string}`, expiresAt })
       const invitation = await adapter.findOne<{ organizationId: string }>({ model: 'invitation', where: [{ field: 'id', value: invitationId as string }] })
-      joining = (await adapter.findOne<{ name: string }>({ model: 'organization', where: [{ field: 'id', value: invitation!.organizationId }] }))?.name
+      joining = (await adapter.findOne<{ name: string; names?: unknown }>({ model: 'organization', where: [{ field: 'id', value: invitation!.organizationId }] })) ?? undefined
     }
     await confirmMail(settings.mailer)({ email: user.email, token, ...(joining !== undefined && { joining }) })
   }
@@ -1416,11 +1526,37 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         const token = randomBytes(24).toString('base64url')
         await internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) })
         authAudit({ action: 'add-person', actor: ctx.context.session?.user.id ?? null, user: user.id, organization, role: role ?? null })
-        if (!settings.mailer) return ctx.json({ added: true, user: { id: user.id }, link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href })
-        const named = (await adapter.findOne<{ name: string }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
-        await ctx.context.runInBackgroundOrAwait(addedMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email, organization: named, token }))
+        if (!settings.mailer) return ctx.json({ added: true, user: { id: user.id }, link: setPasswordLink(token) })
+        const held = (await adapter.findOne<{ name: string; names?: unknown }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
+        await ctx.context.runInBackgroundOrAwait(addedMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email, organization: held, token }))
         await mailedFor(organization)
         return ctx.json({ added: true, user: { id: user.id } })
+      }),
+    },
+  }
+  // Where a sign-up proves its address, the password is chosen once, from the mailed link, so the sign-up asks none:
+  // whatever one carries is replaced by one nobody knows, and whoever signs up with another's address never holds a
+  // password to it.
+  const chosenLater = {
+    id: 'chosen-later',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ctx.path === '/sign-up/email',
+      handler: createAuthMiddleware(async (ctx) => ({ context: { body: { ...(ctx.body as object | undefined), password: randomBytes(32).toString('base64url') } } })),
+    }] },
+  }
+  // The address a live set-password link is for, which the page shows as the account it chooses a password of. The
+  // token is the proof, as it is for choosing the password itself; anything else is one refusal. The page reads it in
+  // process alone: over HTTP the token would sit in a query string, which access logs keep.
+  const setPasswordState = {
+    id: 'set-password-state',
+    endpoints: {
+      setPasswordState: createAuthEndpoint('/set-password/state', { method: 'GET', metadata: { SERVER_ONLY: true } }, async (ctx) => {
+        const { token } = (ctx.query ?? {}) as { token?: unknown }
+        const { internalAdapter } = ctx.context
+        const link = typeof token === 'string' && token ? await internalAdapter.findVerificationValue(`reset-password:${token}`) : null
+        const user = link && new Date(link.expiresAt) > new Date() ? await internalAdapter.findUserById(link.value) : null
+        if (!user) throw APIError.from('BAD_REQUEST', BASE_ERROR_CODES.INVALID_TOKEN)
+        return ctx.json({ email: user.email })
       }),
     },
   }
@@ -1469,6 +1605,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       // end add-on: roles
       keepsPerson,
       invitationLimit,
+      setPasswordState,
+      namedInCode,
+      ...(verifying ? [chosenLater] : []),
       ...(oneOrganization ? [firstRun, signUpGate, addPerson] : []),
     ],
     // In one organization, nobody founds another or leaves the one: leaving would leave the
@@ -1520,7 +1659,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
           throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
         }
-        return ctx.json(await store.transaction(async (tx) => {
+        const made = await store.transaction(async (tx) => {
           // Read committed whatever the database's default, so the read below sees an
           // administrator another call committed while this one waited on the lock.
           await (tx as Executes).execute(sql`set transaction isolation level read committed`)
@@ -1539,7 +1678,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
           // Verified, as first-run's owner is: the setup code is the proof, and staff are never
           // asked to verify an address.
           return runWithAdapter(adapter, () => firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never, data: { emailVerified: true } } })))
-        }))
+        })
+        await toldAdmin({ ctx, email, at: backofficeURL })
+        return ctx.json(made)
       }),
     },
     // Production limits every route; this one to three tries a minute from one address, as the
@@ -1560,6 +1701,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       // add-on: roles
       keepsRoles,
       // end add-on: roles
+      namedInCode,
       ...(backofficeApp ? [firstRegister] : []),
     ],
     baseURL: backofficeURL,

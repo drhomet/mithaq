@@ -52,6 +52,7 @@ test('the log mailer writes the message to the server log and sends nothing', as
   await logMailer.send(mail)
   assert.equal(fetched.mock.callCount(), 0)
   assert.match(logged.join('\n'), /reader@example\.com[\s\S]*Hello[\s\S]*Plain words/)
+  assert.match(logged.join('\n'), /^\[asas mail\] Development: emails print here instead of being sent\./, 'and says first that the log is the inbox, so nobody waits for a message that never leaves')
 })
 
 test('the project\'s mailer is Resend with both settings, none with neither, and half the settings is refused', () => {

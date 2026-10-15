@@ -35,7 +35,8 @@ function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pending, setPending] = useState(false)
-  const [refusal, setRefusal] = useState<string | null>(null)
+  // The answer, not its sentence, so a language switch says it again in the language chosen.
+  const [refusal, setRefusal] = useState<Parameters<typeof refused>[0] | null>(null)
   const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set())
   const required = t('auth.required', 'This field is required.')
   const wrong = {
@@ -57,7 +58,7 @@ function SignIn() {
     // The project's own sentence for the provider's code, never its English `message`, since copy carries every locale.
     if (!answered.ok) {
       setPending(false)
-      return setRefusal(refused(answered, t('auth.failed', 'That sign-in did not work.')))
+      return setRefusal(answered)
     }
 
     setPending(false)
@@ -67,7 +68,7 @@ function SignIn() {
   }
 
   return (
-    <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInDescription', 'Sign in to reach the dashboard.')}>
+    <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInDescription', 'Welcome back. Sign in with your email and password.')}>
       <form className="grid gap-4" noValidate onSubmit={submit}>
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), { autoComplete: 'current-password', onChange: (event) => setPassword(event.target.value), type: 'password', value: password })}
@@ -77,7 +78,7 @@ function SignIn() {
         {/* `role="alert"` so a refusal is spoken when it appears: nothing moves the focus to it. */}
         {refusal && (
           <p className="text-destructive text-sm" role="alert">
-            {refusal}
+            {refused(refusal, t('auth.failed', 'That sign-in did not work.'))}
           </p>
         )}
         <Button disabled={pending} type="submit">

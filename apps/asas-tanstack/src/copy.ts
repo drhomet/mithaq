@@ -292,7 +292,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   },
   auth: {
     signIn: { en: 'Sign in', ar: 'تسجيل الدخول' },
-    signInDescription: { en: 'Sign in to reach the dashboard.', ar: 'سجل الدخول للوصول إلى لوحة التحكم.' },
+    signInDescription: { en: 'Welcome back. Sign in with your email and password.', ar: 'مرحبا بعودتك. سجّل الدخول ببريدك الإلكتروني وكلمة المرور.' },
     signInBackofficeDescription: { en: 'Sign in to reach the backoffice.', ar: 'سجل الدخول للوصول إلى لوحة الإدارة الخلفية.' },
     signInPending: { en: 'Signing in…', ar: 'جارٍ تسجيل الدخول…' },
     createFirstUser: { en: 'Create the first administrator', ar: 'إنشاء أول مسؤول' },
@@ -335,8 +335,8 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     outsideDomains: { en: 'This email address is not at a domain that may sign up here.', ar: 'هذا البريد الإلكتروني ليس من نطاق يُسمح له بإنشاء حساب هنا.' },
     verifySent: { en: 'Check your email', ar: 'تحقق من بريدك الإلكتروني' },
     verifySentDescription: {
-      en: 'We sent a link to {email}. Open it to confirm your address and choose your password, then sign in. It lasts an hour.',
-      ar: 'أرسلنا رابطا إلى {email}. افتحه لتأكيد عنوانك واختيار كلمة المرور، ثم سجل الدخول. وهو صالح ساعة.',
+      en: 'We sent a link to {email}. Open it to confirm your address and choose your password; it signs you in. It lasts an hour.',
+      ar: 'أرسلنا رابطا إلى {email}. افتحه لتأكيد عنوانك واختيار كلمة المرور، فتدخل به مباشرة. وهو صالح ساعة.',
     },
     failed: { en: 'That sign-in did not work.', ar: 'لم ينجح تسجيل الدخول.' },
     signUp: { en: 'Sign up', ar: 'إنشاء حساب' },
@@ -374,6 +374,10 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     },
     backToSignIn: { en: 'Back to login', ar: 'العودة إلى تسجيل الدخول' },
     resetPassword: { en: 'Reset password', ar: 'إعادة تعيين كلمة المرور' },
+    setPassword: { en: 'Choose your password', ar: 'اختر كلمة المرور' },
+    organizationNameIn: { en: 'Its name in {language}, if it has one', ar: 'اسمها بـ{language}، إن كان لها اسم بها' },
+    setPasswordSubmit: { en: 'Confirm and set password', ar: 'أكّد واحفظ كلمة المرور' },
+    passwordChosen: { en: 'Your address is confirmed and your password is set. Sign in with it.', ar: 'تأكّد عنوانك وحُفظت كلمة المرور. سجّل الدخول بها.' },
     newPassword: { en: 'New password', ar: 'كلمة مرور جديدة' },
     passwordReset: { en: 'Password reset successfully.', ar: 'تمت إعادة تعيين كلمة المرور بنجاح.' },
     tokenInvalid: { en: 'Token is either invalid or has expired.', ar: 'الرمز غير صالح أو انتهت صلاحيته.' },
@@ -423,8 +427,8 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'أنشئ حسابا بالبريد الإلكتروني الذي أُرسلت إليه الدعوة.',
     },
     haveAccount: { en: 'Already have an account?', ar: 'لديك حساب بالفعل؟' },
-    unauthorized: { en: 'Not for your role', ar: 'ليست لدورك' },
-    unauthorizedDescription: { en: 'Your role does not open that screen. These are the screens it opens:', ar: 'دورك لا يفتح تلك الشاشة. هذه هي الشاشات التي يفتحها:' },
+    unauthorized: { en: 'Choose where to go', ar: 'اختر وجهتك' },
+    unauthorizedDescription: { en: 'This page isn\'t part of your account. Where would you like to go?', ar: 'هذه الصفحة ليست ضمن حسابك. إلى أين تريد الذهاب؟' },
     unauthorizedPage: { en: 'Your role does not open that page: {page}.', ar: 'دورك لا يفتح تلك الصفحة: {page}.' },
     noAccess: { en: 'Your account has no access yet', ar: 'لا يملك حسابك أي وصول بعد' },
     noAccessDescription: {
@@ -669,6 +673,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     banWeek: { en: 'Seven days', ar: 'سبعة أيام' },
     banMonth: { en: 'Thirty days', ar: 'ثلاثون يومًا' },
     rename: { en: 'Rename', ar: 'إعادة التسمية' },
+    nameIn: { en: 'Name in {language}, if it has one', ar: 'الاسم بـ{language}، إن كان لها اسم بها' },
     slugPattern: {
       en: 'A slug is lowercase letters and digits joined by single dashes, such as admin-org.',
       ar: 'المعرف النصي أحرف إنجليزية صغيرة وأرقام تفصل بينها شرطات مفردة، مثل admin-org.',
@@ -1081,8 +1086,21 @@ export const documentHead = ({ locale, app }: { locale: Locale; app?: string }, 
 }
 
 /**
+ * Sets the cookie the request middleware reads and redraws the page in `to` where it stands, as Payload's language
+ * switch refreshes its router: nothing typed into a form is lost. The root route reads the locale off the document.
+ */
+export const showLocale = async ({ to, router }: { to: string; router: { invalidate(): Promise<unknown> } }) => {
+  const locale = localeOf(to)
+  document.cookie = localeCookieValue(locale)
+  document.documentElement.lang = locale
+  document.documentElement.dir = dirOf(locale)
+  await router.invalidate()
+}
+
+/**
  * Sets the cookie the request middleware reads, then reloads so the server draws the document
- * in it. The unsaved-changes guard is dropped because the shell already asked in its own dialog.
+ * in it: a screen's form is seeded again from whatever row the host hands, so the shell asks before it
+ * drops a change nobody saved, and its own unsaved-changes guard is dropped because the shell already asked.
  */
 export const switchLocale = ({ to }: { to: string }): void => {
   window.onbeforeunload = null

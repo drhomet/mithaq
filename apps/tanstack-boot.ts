@@ -1233,14 +1233,15 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
     assert.ok(refusal.includes('unauthorized'), `the instructor's call answers the refusal: ${refusal.slice(0, 300)}`)
     assert.ok(!refusal.includes('courses') && !refusal.includes('"kayan"'), 'and carries no kayan of the screen it refused')
 
-    const page = await fetch(`${origin}/unauthorized`, { headers: { cookie } })
-    assert.equal(page.status, 200, '/unauthorized is served to a signed-in member')
-    const html = await page.text()
-    assert.ok(html.includes('href="/portal"'), 'it links the portal the instructor enters')
-    assert.ok(!html.includes('href="/dashboard"'), 'and not the dashboard it does not')
-    assert.ok(html.includes('>Sign out<'), 'and offers sign-out')
-    assert.ok(!/name:"[^"]+",single:/.test(html), 'and crosses no kayan of any screen')
+    assert.equal(await sentTo('/unauthorized', cookie), '/portal', 'an instructor, whose role opens the portal alone, is sent straight there with no page to read')
   })
+  // The tenant administrator opens both screens, so is asked where to go.
+  const page = await fetch(`${origin}/unauthorized`, { headers: { cookie } })
+  assert.equal(page.status, 200, '/unauthorized is served to a signed-in member who opens several screens')
+  const html = await page.text()
+  assert.ok(html.includes('href="/portal"') && html.includes('href="/dashboard"'), 'it offers each screen the role opens')
+  assert.ok(html.includes('>Sign out<'), 'and offers sign-out')
+  assert.ok(!/name:"[^"]+",single:/.test(html), 'and crosses no kayan of any screen')
   // A visitor with no session is sent to sign-in, and the redirect names /unauthorized so signing in lands back there.
   const toSignIn = await fetch(`${origin}/unauthorized`, { redirect: 'manual' })
   assert.equal(toSignIn.status, 307)
@@ -1269,10 +1270,12 @@ const asStudent = async <T>(body: () => Promise<T>): Promise<T> => {
  * first few, and proved here as the mailed link proves it.
  */
 const signedUpHere = async (slug: string) => {
-  const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { signUpEmail(args: unknown): Promise<{ user: { id: string } }> } } }).server
+  const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { signUpEmail(args: unknown): Promise<{ user: { id: string } }> }; $context: Promise<{ password: { hash(password: string): Promise<string> } }> } }).server
   const email = `${slug}-${Date.now()}@example.com`
-  const made = await server.api.signUpEmail({ body: { name: slug, email, password } })
-  await (asas.targets.drizzle as unknown as { db: { execute(query: string): Promise<unknown> } }).db.execute(`update "user" set email_verified = true where id = '${made.user.id}'`)
+  const made = await server.api.signUpEmail({ body: { name: slug, email } })
+  // A sign-up keeps no password, so the one the mailed link would choose is written as that link writes it.
+  const hashed = await (await server.$context).password.hash(password)
+  await (asas.targets.drizzle as unknown as { db: { execute(query: string): Promise<unknown> } }).db.execute(`update "user" set email_verified = true where id = '${made.user.id}'; update account set password = '${hashed}' where user_id = '${made.user.id}' and provider_id = 'credential'`)
   return { id: made.user.id, email }
 }
 
@@ -2362,7 +2365,13 @@ test('69. every auth page reads cleanly in both locales: a way home, the languag
   // The provider's own minimum, read off the instance that refuses a short password.
   const provider = (asas.auth.strategies as unknown as { name: string; server: { $context: Promise<{ password: { config: { minPasswordLength: number } } }> } }[]).find((one) => one.name === 'user')!
   const minimum = (await provider.server.$context).password.config.minPasswordLength
-  const pages = ['/auth/sign-in', '/auth/sign-up', '/auth/forgot-password', '/auth/reset-password?token=not-a-real-one']
+  const pages = ['/auth/sign-in', '/auth/sign-up', '/auth/forgot-password', '/auth/reset-password?token=not-a-real-one', '/auth/set-password?token=not-a-real-one']
+  // A live link, so the page it opens draws its form: a sign-up's, which chooses the first password.
+  const chooser = `chooser-${Date.now()}@example.com`
+  assert.equal((await fetch(`${origin}/api/auth/user/sign-up/email`, { method: 'POST', headers: { 'content-type': 'application/json', origin }, body: JSON.stringify({ name: 'Chooser', email: chooser }) })).status, 200, 'a sign-up asks a name and an address alone')
+  const chosen = await linkMailed(chooser)
+  assert.equal(chosen.pathname, '/auth/set-password', 'and its link opens the page that chooses a first password')
+  pages.push(`${chosen.pathname}${chosen.search}`)
   for (const locale of ['en', 'ar'] as const) {
     const english = Object.values(scopes.auth!).map((one) => one.en!).filter((one) => one.length > 3)
     for (const path of pages) {
@@ -2384,16 +2393,22 @@ test('69. every auth page reads cleanly in both locales: a way home, the languag
     assert.match(signIn, /autocomplete="current-password"/i, `and its password is the current one in ${locale}`)
     const signUp = await (await fetch(`${origin}/auth/sign-up`, { headers: { cookie: `locale=${locale}` } })).text()
     assert.doesNotMatch(signUp, /autocomplete="organization"/i, `the sign-up asks no organization in ${locale}: one is made once the address is proved`)
-    assert.equal(signUp.match(/autocomplete="new-password"/gi)?.length, 2, `and both its passwords are new ones in ${locale}`)
-    assert.ok(signUp.includes(scopes.auth!.passwordRule![locale]!.replace('{count}', String(minimum))), `and it states the provider's minimum of ${minimum} before a submit in ${locale}`)
-    const reset = await (await fetch(`${origin}/auth/reset-password?token=t`, { headers: { cookie: `locale=${locale}` } })).text()
-    assert.ok(reset.includes(scopes.auth!.passwordRule![locale]!.replace('{count}', String(minimum))), `the reset page states the same rule in ${locale}`)
-    const invalid = await (await fetch(`${origin}/auth/reset-password`, { headers: { cookie: `locale=${locale}` } })).text()
-    assert.ok(invalid.includes(scopes.auth!.tokenInvalid![locale]!), `a reset page with no token says the link is no good in ${locale}`)
+    assert.doesNotMatch(signUp, /type="password"/, `and no password in ${locale}: it is chosen from the mailed link`)
+    for (const path of [`${chosen.pathname}${chosen.search}`, `/auth/reset-password${chosen.search}`]) {
+      const page = (await (await fetch(`${origin}${path}`, { headers: { cookie: `locale=${locale}` } })).text()).replace(/&#x27;|&#39;/g, "'")
+      assert.equal(page.match(/autocomplete="new-password"/gi)?.length, 2, `${path} asks a new password twice in ${locale}`)
+      assert.ok(page.includes(scopes.auth!.passwordRule![locale]!.replace('{count}', String(minimum))), `and states the provider's minimum of ${minimum} before a submit in ${locale}`)
+      assert.match(page, new RegExp(`<input(?=[^>]*value="${chooser}")(?=[^>]*readonly)[^>]*>`, 'i'), `and shows the account it is for, read-only, in ${locale}`)
+    }
+    for (const path of ['/auth/reset-password', '/auth/set-password?token=not-a-real-one']) {
+      const invalid = await (await fetch(`${origin}${path}`, { headers: { cookie: `locale=${locale}` } })).text()
+      assert.ok(invalid.includes(scopes.auth!.tokenInvalid![locale]!), `${path} says the link is no good in ${locale}`)
+    }
   }
 
   // The reset page's address carries its token, so it is sent on as no referrer.
   assert.equal((await fetch(`${origin}/auth/reset-password?token=t`)).headers.get('referrer-policy'), 'no-referrer', 'the reset page sends no referrer')
+  assert.equal((await fetch(`${origin}/auth/set-password?token=t`)).headers.get('referrer-policy'), 'no-referrer', 'nor the page that chooses a first password')
 
   const { refusalKey } = await import('./asas-tanstack/src/copy.ts')
   const refused = async (path: string, body: unknown) => {
@@ -2463,6 +2478,7 @@ test('70. every page names itself and its app in the browser tab in both locales
         [origin, '/auth/sign-up', '', word('auth', 'signUp')],
         [origin, '/auth/forgot-password', '', word('auth', 'forgotPassword')],
         [origin, '/auth/reset-password?token=not-a-real-one', '', word('auth', 'resetPassword')],
+        [origin, '/auth/set-password?token=not-a-real-one', '', word('auth', 'setPassword')],
         [backofficeOrigin, '/auth/sign-in', '', word('auth', 'signIn')],
         [backofficeOrigin, '/backoffice', backoffice, word('screens', 'backoffice')],
         [backofficeOrigin, '/backoffice/courses', backoffice, word('courses', 'plural')],
@@ -2886,8 +2902,8 @@ test('76. the not-found page is a page with a way home, inside the screen\'s she
     assert.ok(card.includes('aria-label="العربية"'), 'NF-22: the card has the language switch')
     const created = plain(await (await fetch(`${origin}/unauthorized?from=${encodeURIComponent('/dashboard/tags/new')}`, { headers: { cookie } })).text()).replace(/<\/?bdi[^>]*>/g, '')
     assert.ok(created.includes(en('auth', 'unauthorizedPage').replace('{page}', en('tags', 'new'))), 'a create page is named as new')
-    const outside = plain(await (await fetch(`${origin}/unauthorized?from=${encodeURIComponent('/portal')}`, { headers: { cookie } })).text())
-    assert.ok(outside.includes(en('auth', 'unauthorizedDescription')), 'a screen the role does not enter is still said to be closed')
+    const outside = await fetch(`${origin}/unauthorized?from=${encodeURIComponent('/portal')}`, { headers: { cookie }, redirect: 'manual' })
+    assert.equal(new URL(outside.headers.get('location') ?? '', origin).pathname, '/dashboard', 'a screen the role does not enter sends it on to the one screen it does')
   })
 
   // A switch into an organization where the actor holds no role names that organization alone and offers the others.

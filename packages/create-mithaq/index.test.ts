@@ -163,7 +163,7 @@ test('a single package holds the language, its features, the asas and the tenant
 test('--help prints each question\'s flag', () => {
   const done = spawnSync(process.execPath, [fileURLToPath(new URL('./index.js', import.meta.url)), '--help'], { encoding: 'utf8' })
   assert.equal(done.status, 0, done.stderr)
-  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', '--organizations one|many', '--show-organization yes|no', '--sign-up invite|open', 'courses (needs media, roles, audit-log, rich-text)', 'backoffice']) assert.ok(done.stdout.includes(flag), flag)
+  for (const flag of ['--layout monorepo', '--layout single', '--with <a,b>', '--full', '--organizations one|many', '--show-organization yes|no', '--sign-up invite|open', '--organization-name <name>', '--organization-name-ar <name>', 'courses (needs media, roles, audit-log, rich-text)', 'backoffice']) assert.ok(done.stdout.includes(flag), flag)
   assert.match(done.stdout, /npm, pnpm 10\.6 or later, Yarn 1 or Bun 1\.3\. Yarn 2 and later/, 'and which package managers a project installs with')
 })
 
@@ -276,6 +276,21 @@ test('organizations.ts says the mode and who may sign up: one organization by in
   assert.throws(() => create({ name: 'some', cwd: scratch, template, version: '1.2.3', organizations: 'some' }), /--organizations is one or many, not "some"/)
   assert.throws(() => create({ name: 'closed', cwd: scratch, template, version: '1.2.3', signUp: 'closed' }), /--sign-up is invite or open, not "closed"/)
   for (const name of ['school', 'plain', 'hidden', 'many']) assert.equal(existsSync(join(scratch, name, 'packages/asas/src/organizations.ts')), true, `${name}: the apps read the mode through the asas`)
+})
+
+test('with one organization its name in each locale is written into organizations.ts, the Arabic falling back to the English, and a name of more than one line or past 100 characters is refused', () => {
+  // The literal as the file holds it, read as the language reads it.
+  const named = (name: string) => new Function(`return ${new RegExp('^export const organizationName: [^=]+ = (.+)$', 'm').exec(read(name, 'packages/mithaq/src/mithaq/auth/organizations.ts'))?.[1]}`)()
+  create({ name: 'noor', cwd: scratch, template, version: '1.2.3', organizationName: { en: "Noor's School", ar: 'مدرسة النور' } })
+  assert.deepEqual(named('noor'), { en: "Noor's School", ar: 'مدرسة النور' }, 'each locale\'s name as written, quotes and all')
+  create({ name: 'dollars', cwd: scratch, template, version: '1.2.3', organizationName: { en: "Price$'s $& $` Shop" } })
+  assert.deepEqual(named('dollars'), { en: "Price$'s $& $` Shop", ar: "Price$'s $& $` Shop" }, 'and a name holding a replacement pattern as written')
+  create({ name: 'english', cwd: scratch, template, version: '1.2.3', organizationName: { en: 'Light House' } })
+  assert.deepEqual(named('english'), { en: 'Light House', ar: 'Light House' }, 'the Arabic falls back to the English')
+  create({ name: 'unnamed', cwd: scratch, template, version: '1.2.3' })
+  assert.deepEqual(named('unnamed'), { en: 'My organization', ar: 'مؤسستي' }, 'and with none given the template\'s own stands')
+  assert.throws(() => create({ name: 'broken', cwd: scratch, template, version: '1.2.3', organizationName: { en: 'Two\nlines' } }), /--organization-name is one line of 1 to 100 characters/)
+  assert.throws(() => create({ name: 'long', cwd: scratch, template, version: '1.2.3', organizationName: { en: 'x'.repeat(101) } }), /--organization-name is one line of 1 to 100 characters/)
 })
 
 test('a single package reaches the organization mode by path', () => {

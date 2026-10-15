@@ -118,6 +118,7 @@ export type OrganizationValues = {
   slug: string
   logo: string | null
   metadata: string | null
+  names: string | null
 }
 export type AuditLogValues = {
   id: string

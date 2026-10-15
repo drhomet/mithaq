@@ -7,6 +7,7 @@ import { ScreenContext, useScreen, type ScreenState } from 'mithaq/admin/react'
 import { actingAs, arm, authArm, caused, clientOf, readsOf, takesKey } from './api.ts'
 import { clampedHref, routedHref } from './links.ts'
 import { mergedHeaders } from './request-headers.ts'
+import { nameIn } from 'asas/organizations'
 import { documentHead, localeOf, locales, translator, type Locale } from './copy.ts'
 import { FieldValue } from 'mithaq-admin/field-value.tsx'
 import type { FormClient, FormProps } from 'mithaq-admin/form-types.tsx'
@@ -126,7 +127,7 @@ type Actor = {
   readonly email?: string | null
   readonly impersonatedBy?: unknown
   readonly activeOrganizationId?: string | null
-  readonly organizations?: readonly { readonly id: string; readonly name: string; readonly slug?: string }[]
+  readonly organizations?: readonly { readonly id: string; readonly name: string; readonly slug?: string; readonly names?: unknown }[]
 }
 
 // `'unauthorized'` is answered before the projection is read, so a refused screen sends no kayan, field, row or page;
@@ -173,7 +174,8 @@ const resolveScreen = async (asked: unknown) => {
       ...(actor.impersonatedBy ? { impersonating: true } : {}),
       ...(others.length ? { screens: others } : {}),
       ...(actor.organizations && {
-        organizations: actor.organizations.map(({ id, name, slug }) => ({ id, name, slug })),
+        // Every locale's, because the frame is read before the viewer's locale is known here; the shell picks one.
+        organizations: actor.organizations.map(({ id, name, slug, names }) => ({ id, name, slug, ...(typeof names === 'string' && { names }) })),
         activeOrganizationId: actor.activeOrganizationId ?? null,
       }),
     },
@@ -235,11 +237,14 @@ export const loadEnterable = createServerFn({ method: 'GET' })
     }
     const memberships = actor.organizations ?? []
     const active = memberships.find((one) => one.id === actor.activeOrganizationId)
+    // Named here, where the locale is known: the page draws what it is handed, and a name the viewer cannot read
+    // in the default locale would be no name to them.
+    const named = ({ id, name, slug, names }: NonNullable<Actor['organizations']>[number]) => ({ id, name: nameIn({ name, names }, data.locale), slug })
     return {
       screens: entered,
       email: actor.email,
-      organizations: (active ? [active] : memberships).map(({ id, name, slug }) => ({ id, name, slug })),
-      others: onBackoffice() ? [] : memberships.filter((one) => one !== active).map(({ id, name, slug }) => ({ id, name, slug })),
+      organizations: (active ? [active] : memberships).map(named),
+      others: onBackoffice() ? [] : memberships.filter((one) => one !== active).map(named),
       ...impersonating,
     }
   })
@@ -879,4 +884,4 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   }
   return form
 }
-// mithaq-admin 0.0.0 3bf47053f22395780fc29b3586de59f0bc756adfe6cd161dfeb1efb88ae3b12b
+// mithaq-admin 0.0.0 873520076b556e7bcd16b31398876bed5f3ba83d080dbe3df31078e72b8108c5

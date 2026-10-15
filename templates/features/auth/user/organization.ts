@@ -20,5 +20,6 @@ export const organization = defineKayan({
     logo: { kind: 'text' },
     createdAt: { kind: 'datetime', rules: { required: true } },
     metadata: { kind: 'text' },
+    names: { kind: 'text' },
   },
 })

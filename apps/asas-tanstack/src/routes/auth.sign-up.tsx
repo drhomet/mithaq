@@ -22,7 +22,8 @@ export const Route = createFileRoute('/auth/sign-up')({
 
 /**
  * Whether a new account proves its address before it signs in, so the sign-up answers with no session: with many
- * organizations always, where the person then founds or joins one, and with one where an open sign-up says so.
+ * organizations always, where the person then founds or joins one, and with one where an open sign-up says so. Such a
+ * sign-up asks no password: it is chosen once, on the page the mailed link opens, and the server keeps none typed here.
  */
 const verifies = signUp === 'open' && verifyEmail
 
@@ -47,9 +48,11 @@ function SignUp() {
   const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set())
   const [sent, setSent] = useState<string | null>(null)
   const required = t('auth.required', 'This field is required.')
-  const wrong = {
+  const named = {
     name: () => (name ? undefined : required),
     email: () => (!email ? required : notAnEmail(email) ? t('auth.invalidEmail', 'Invalid email') : undefined),
+  }
+  const chosen = {
     password: () =>
       !password ? required
       : password.length < bounds.min ? t('auth.passwordTooShort', 'Password too short')
@@ -57,7 +60,8 @@ function SignUp() {
       : undefined,
     confirmation: () => (!confirmation ? required : confirmation === password ? undefined : t('auth.passwordsDiffer', 'The two passwords are not the same.')),
   }
-  const errorOf = (box: keyof typeof wrong) => (left.has(box) ? wrong[box]() : undefined)
+  const wrong: Partial<Record<'name' | 'email' | 'password' | 'confirmation', () => string | undefined>> = verifies ? named : { ...named, ...chosen }
+  const errorOf = (box: keyof typeof wrong) => (left.has(box) ? wrong[box]?.() : undefined)
   const box = (id: keyof typeof wrong, label: string | undefined, props: ComponentProps<'input'> & { description?: string }) => (
     <AuthBox id={id} label={label} error={errorOf(id)} onLeave={() => setLeft((already) => new Set(already).add(id))} {...props} />
   )
@@ -68,7 +72,7 @@ function SignUp() {
     if (Object.values(wrong).some((check) => check())) return
     setPending(true)
     setRefusal(null)
-    const made = await authArm('sign-up/email', { name, email, password, ...(invitationId && { invitationId }) })
+    const made = await authArm('sign-up/email', { name, email, ...(!verifies && { password }), ...(invitationId && { invitationId }) })
     setPending(false)
     if (!made.ok) return setRefusal(refused(made, t('auth.signUpFailed', 'That sign-up did not work.')))
     // An account that proves its address first has no session yet, invited or not, so it is told to open its mail.
@@ -111,14 +115,14 @@ function SignUp() {
       <form className="grid gap-4" noValidate onSubmit={submit}>
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
-        {box('password', t('auth.password', 'Password'), {
+        {verifies ? null : box('password', t('auth.password', 'Password'), {
           autoComplete: 'new-password',
           description: t('auth.passwordRule', 'At least {count} characters.')!.replace('{count}', String(bounds.min)),
           onChange: (event) => setPassword(event.target.value),
           type: 'password',
           value: password,
         })}
-        {box('confirmation', t('auth.confirmPassword', 'Confirm the password'), {
+        {verifies ? null : box('confirmation', t('auth.confirmPassword', 'Confirm the password'), {
           autoComplete: 'new-password',
           onChange: (event) => setConfirmation(event.target.value),
           type: 'password',

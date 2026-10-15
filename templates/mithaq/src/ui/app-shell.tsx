@@ -41,7 +41,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { navLabel } from './screen-nav.tsx'
-import { showOrganization } from '../mithaq/auth/organizations.ts'
+import { nameIn, showOrganization } from '../mithaq/auth/organizations.ts'
 
 export const regions = ['header', 'main'] as const
 
@@ -101,11 +101,11 @@ export function UserMenu() {
  * Switching reloads the page, because every loader reads its rows under the active organization on the server.
  */
 function Organizations() {
-  const { t } = useLocale()
+  const { locale, t } = useLocale()
   const { organizations = [], activeOrganizationId } = useUser()
   return (
     <OrganizationSwitcher
-      organizations={organizations}
+      organizations={organizations.map((one) => ({ ...one, name: nameIn(one, locale) }))}
       activeOrganizationId={activeOrganizationId}
       t={t}
       onSwitch={(organizationId) => void authArm('organization/set-active', { organizationId }).then((answer) => answer.ok && window.location.reload())}

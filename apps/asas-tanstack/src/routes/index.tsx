@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { organizations, signUp } from 'asas/organizations'
 import { LayoutDashboard, Languages, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,17 +14,22 @@ export const Route = createFileRoute('/')({
   component: Landing,
 })
 
+/** Whether a visitor with no invitation may make an account, so the page offers one, as sign-in does. */
+const offersSignUp = organizations === 'many' || signUp === 'open'
+
 function EntryActions({ screens, size }: { screens: readonly { name: string; path: string }[] | null; size: 'sm' | 'lg' }) {
   const { t } = useCopy()
   const label = useHomeLabel()
   if (screens === null) {
     return (
       <>
-        <Link to="/auth/sign-up">
-          <Button size={size}>{t('marketing.getStarted', 'Get started')}</Button>
-        </Link>
+        {offersSignUp ? (
+          <Link to="/auth/sign-up">
+            <Button size={size}>{t('marketing.getStarted', 'Get started')}</Button>
+          </Link>
+        ) : null}
         <Link to="/auth/sign-in">
-          <Button size={size} variant="outline">
+          <Button size={size} variant={offersSignUp ? 'outline' : 'default'}>
             {t('auth.signIn', 'Sign in')}
           </Button>
         </Link>
@@ -137,4 +143,4 @@ function Landing() {
     </div>
   )
 }
-// mithaq-admin 0.0.0 39255ad7b5ea7b82a2654c5b026c50bca1b72de2c3a38ce9f574b01eb383bb8a
+// mithaq-admin 0.0.0 4ea8d722cd59ec1a91778142281c6f7db6ab9abe005dfc5f8c0192ee4e1095aa

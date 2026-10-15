@@ -1851,3 +1851,33 @@ test('220f. the archive dialog\'s reason, and every required control, is marked 
     assert.equal(markup({}).includes('aria-required'), false, `and a ${control} control that is not required says nothing`)
   }
 })
+
+/**
+ * The accessible name a screen reader says for `node`, as far as these pieces draw one: `aria-labelledby`, `aria-label`,
+ * the label of a box that can carry one, or the words of a button.
+ */
+const nameOf = (node: Element): string => {
+  const words = (one: Element | null) => one?.textContent?.trim() ?? ''
+  const labelledBy = node.getAttribute('aria-labelledby')
+  if (labelledBy) return labelledBy.split(/\s+/).map((id) => words(node.ownerDocument.getElementById(id))).join(' ').trim()
+  const label = node.getAttribute('aria-label')?.trim()
+  if (label) return label
+  if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(node.tagName)) {
+    const id = node.getAttribute('id')
+    const own = (id && node.ownerDocument.querySelector(`label[for="${id}"]`)) || node.closest('label')
+    if (own && words(own)) return words(own)
+  }
+  return node.tagName === 'BUTTON' || node.getAttribute('role') === 'button' ? words(node) : ''
+}
+
+test('56. every control a form draws has a name a screen reader says: a radio group, its options and a switch as much as a box', async () => {
+  const { window } = await import('./dom.ts')
+  const named = courses.fields.filter((one) => !['id', 'createdAt', 'updatedAt', 'organization', 'deletedAt'].includes(one.name) && one.kind !== 'join').map((one) => ({ field: one.name }))
+  const html = formMarkup({ value: { id: 'x', delivery: 'live', notifications: true }, screen: screenOf(recordPage([{ form: named }])) })
+  const page = new window.DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+  const controls = [...page.querySelectorAll('input, textarea, select, button, [role=switch], [role=radiogroup], [role=radio], [role=checkbox], [role=combobox], [role=slider], [role=spinbutton]')]
+    .filter((one) => one.getAttribute('type') !== 'hidden' && !one.closest('[aria-hidden=true]')) as unknown as Element[]
+  assert.ok(page.querySelector('[role=radiogroup]') && page.querySelector('[role=switch]'), 'the form draws the delivery radio group and the notifications switch')
+  const nameless = controls.filter((one) => !nameOf(one)).map((one) => one.outerHTML.slice(0, 160))
+  assert.deepEqual(nameless, [], 'and no control is left without a name')
+})

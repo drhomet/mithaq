@@ -39,6 +39,14 @@
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
   },
+  "names.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "names.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
   "slug.invalid": {
     "ar": "هذا ليس نصا.",
     "en": "This is not text."
