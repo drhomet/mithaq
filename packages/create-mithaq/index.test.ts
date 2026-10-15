@@ -283,6 +283,8 @@ test('with one organization its name in each locale is written into organization
   const named = (name: string) => new Function(`return ${new RegExp('^export const organizationName: [^=]+ = (.+)$', 'm').exec(read(name, 'packages/mithaq/src/mithaq/auth/organizations.ts'))?.[1]}`)()
   create({ name: 'noor', cwd: scratch, template, version: '1.2.3', organizationName: { en: "Noor's School", ar: 'مدرسة النور' } })
   assert.deepEqual(named('noor'), { en: "Noor's School", ar: 'مدرسة النور' }, 'each locale\'s name as written, quotes and all')
+  create({ name: 'dollars', cwd: scratch, template, version: '1.2.3', organizationName: { en: "Price$'s $& $` Shop" } })
+  assert.deepEqual(named('dollars'), { en: "Price$'s $& $` Shop", ar: "Price$'s $& $` Shop" }, 'and a name holding a replacement pattern as written')
   create({ name: 'english', cwd: scratch, template, version: '1.2.3', organizationName: { en: 'Light House' } })
   assert.deepEqual(named('english'), { en: 'Light House', ar: 'Light House' }, 'the Arabic falls back to the English')
   create({ name: 'unnamed', cwd: scratch, template, version: '1.2.3' })

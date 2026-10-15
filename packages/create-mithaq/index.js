@@ -47,7 +47,8 @@ export function updatePackageJSONDependencies({ mithaq, mithaqAdmin, packageJson
  */
 const once = (text, from, to, count = 1) => {
   if (text.split(from).length !== count + 1) throw new Error(`The template no longer holds ${from} ${count === 1 ? 'exactly once' : `${count} times`}.`)
-  return typeof from === 'string' ? text.replaceAll(from, to) : text.replace(from, to)
+  // A function, so a replacement pattern such as `$'` or `$&` in what a person typed, an organization's name among it, is written as typed.
+  return typeof from === 'string' ? text.replaceAll(from, () => to) : text.replace(from, () => to)
 }
 /**
  * What a project may hold beyond the language, the asas, the `auth` feature and the `tags` example. Each add-on names the
