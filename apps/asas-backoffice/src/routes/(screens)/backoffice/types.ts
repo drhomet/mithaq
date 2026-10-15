@@ -122,6 +122,18 @@ export type LocalUsersValues = {
   _verified: boolean | null
   _verificationToken: string | null
 }
+export type BackofficeLogValues = {
+  id: string
+  createdAt: Date
+  action: 'impersonate' | 'stopImpersonating' | 'setRole' | 'ban' | 'unban'
+  actor: string | null
+  actorEmail: string | null
+  target: string | null
+  targetEmail: string | null
+  previousRole: string | null
+  role: string | null
+  banReason: string | null
+}
 export type Values = {
   user: UserValues
   organization: OrganizationValues
@@ -133,6 +145,7 @@ export type Values = {
   roles: RolesValues
   memberRoles: MemberRolesValues
   localUsers: LocalUsersValues
+  backofficeLog: BackofficeLogValues
 }
 export type Pages = {
   user: 'list' | 'view'
@@ -145,5 +158,6 @@ export type Pages = {
   roles: 'list' | 'view'
   memberRoles: 'list' | 'view'
   localUsers: 'list' | 'edit'
+  backofficeLog: 'list'
 }
 export type ScreenClient = Client<Pages>

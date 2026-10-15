@@ -1,0 +1,114 @@
+{
+  "action": {
+    "ar": "الإجراء",
+    "en": "Action"
+  },
+  "action.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "action.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "actor": {
+    "ar": "عضو الطاقم",
+    "en": "Staff member"
+  },
+  "actor.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "actor.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "actorEmail": {
+    "ar": "بريد عضو الطاقم",
+    "en": "Staff member's email"
+  },
+  "actorEmail.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "actorEmail.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "banReason": {
+    "ar": "سبب الحظر",
+    "en": "Ban reason"
+  },
+  "banReason.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "banReason.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "id.invalid": {
+    "ar": "هذا ليس معرفا فريدا.",
+    "en": "This is not a unique identifier."
+  },
+  "id.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "plural": {
+    "ar": "سجل الطاقم",
+    "en": "Staff history"
+  },
+  "previousRole": {
+    "ar": "الدور السابق",
+    "en": "Role before"
+  },
+  "previousRole.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "previousRole.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "role": {
+    "ar": "الدور الجديد",
+    "en": "Role after"
+  },
+  "role.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "role.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "singular": {
+    "ar": "إجراء طاقم",
+    "en": "Staff action"
+  },
+  "target": {
+    "ar": "الشخص",
+    "en": "Person"
+  },
+  "target.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "target.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
+  "targetEmail": {
+    "ar": "بريد الشخص",
+    "en": "Person's email"
+  },
+  "targetEmail.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "targetEmail.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  }
+}

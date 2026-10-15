@@ -21,6 +21,17 @@
         }
       },
       "permission": "member.find"
+    },
+    "activity": {
+      "path": "/activity",
+      "component": "@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage",
+      "nav": {
+        "label": {
+          "en": "Activity",
+          "ar": "النشاط"
+        }
+      },
+      "permission": "auditLog.find"
     }
   },
   "nav": [
@@ -74,6 +85,15 @@
         "ar": "الأعضاء"
       },
       "permission": "member.find"
+    },
+    {
+      "path": "/activity",
+      "page": "activity",
+      "label": {
+        "en": "Activity",
+        "ar": "النشاط"
+      },
+      "permission": "auditLog.find"
     }
   ],
   "layouts": {
@@ -84,6 +104,7 @@
   },
   "components": {
     "activity": "@asas/mithaq:./src/ui/activity.tsx#Activity",
+    "activityLog": "@asas/mithaq:./src/ui/activity.tsx#ActivityTab",
     "versions": "./src/ui-dashboard/versions.tsx#Versions"
   },
   "controls": {
@@ -1379,6 +1400,23 @@
                         "component": "./src/ui-dashboard/versions.tsx#Versions",
                         "when": {
                           "$user.collections.courses.operations.findVersions": {
+                            "equals": true
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "tab": "activity",
+                    "label": {
+                      "en": "Activity",
+                      "ar": "النشاط"
+                    },
+                    "fields": [
+                      {
+                        "component": "@asas/mithaq:./src/ui/activity.tsx#ActivityTab",
+                        "when": {
+                          "$user.collections.auditLog.operations.find": {
                             "equals": true
                           }
                         }
@@ -4168,6 +4206,20 @@
           },
           "rules": {
             "required": true
+          },
+          "component": "text",
+          "cell": "text",
+          "sortable": false
+        },
+        {
+          "name": "changed",
+          "kind": "text",
+          "label": {
+            "en": "Changed columns",
+            "ar": "الحقول المتغيرة"
+          },
+          "rules": {
+            "required": false
           },
           "component": "text",
           "cell": "text",

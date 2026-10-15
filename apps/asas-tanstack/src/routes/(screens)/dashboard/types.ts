@@ -130,6 +130,7 @@ export type AuditLogValues = {
   actor: string | null
   impersonatedBy: string | null
   changes: string
+  changed: string | null
 }
 export type Values = {
   courses: CoursesValues

@@ -71,6 +71,12 @@
       "page": "list",
       "kayan": "localUsers",
       "permission": "localUsers.find"
+    },
+    {
+      "path": "/history",
+      "page": "list",
+      "kayan": "backofficeLog",
+      "permission": "backofficeLog.find"
     }
   ],
   "layouts": {
@@ -3681,6 +3687,271 @@
                         ]
                       }
                     ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "backofficeLog": {
+      "name": "backofficeLog",
+      "single": false,
+      "fields": [
+        {
+          "name": "id",
+          "kind": "uuid",
+          "label": {
+            "en": "ID",
+            "ar": "المعرف"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "uuid",
+          "cell": "uuid"
+        },
+        {
+          "name": "createdAt",
+          "kind": "datetime",
+          "label": {
+            "en": "Created at",
+            "ar": "تاريخ الإنشاء"
+          },
+          "rules": {
+            "required": true,
+            "defaultNow": true,
+            "index": true,
+            "providedBy": {
+              "create": "application",
+              "update": "application"
+            }
+          },
+          "component": "datetime",
+          "cell": "datetime"
+        },
+        {
+          "name": "action",
+          "kind": "text",
+          "label": {
+            "en": "Action",
+            "ar": "الإجراء"
+          },
+          "rules": {
+            "required": true
+          },
+          "options": [
+            {
+              "value": "impersonate",
+              "label": {
+                "en": "Started impersonating",
+                "ar": "بدأ انتحال الصفة"
+              }
+            },
+            {
+              "value": "stopImpersonating",
+              "label": {
+                "en": "Stopped impersonating",
+                "ar": "أنهى انتحال الصفة"
+              }
+            },
+            {
+              "value": "setRole",
+              "label": {
+                "en": "Set the backoffice role",
+                "ar": "عيّن دور الإدارة الخلفية"
+              }
+            },
+            {
+              "value": "ban",
+              "label": {
+                "en": "Banned",
+                "ar": "حظر"
+              }
+            },
+            {
+              "value": "unban",
+              "label": {
+                "en": "Lifted the ban",
+                "ar": "رفع الحظر"
+              }
+            }
+          ],
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "actor",
+          "kind": "text",
+          "label": {
+            "en": "Staff member",
+            "ar": "عضو الطاقم"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "actorEmail",
+          "kind": "text",
+          "label": {
+            "en": "Staff member's email",
+            "ar": "بريد عضو الطاقم"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "target",
+          "kind": "text",
+          "label": {
+            "en": "Person",
+            "ar": "الشخص"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "targetEmail",
+          "kind": "text",
+          "label": {
+            "en": "Person's email",
+            "ar": "بريد الشخص"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "previousRole",
+          "kind": "text",
+          "label": {
+            "en": "Role before",
+            "ar": "الدور السابق"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "role",
+          "kind": "text",
+          "label": {
+            "en": "Role after",
+            "ar": "الدور الجديد"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        },
+        {
+          "name": "banReason",
+          "kind": "text",
+          "label": {
+            "en": "Ban reason",
+            "ar": "سبب الحظر"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
+        }
+      ],
+      "operations": [
+        {
+          "name": "find",
+          "effect": "read"
+        },
+        {
+          "name": "findByID",
+          "effect": "read"
+        },
+        {
+          "name": "count",
+          "effect": "read"
+        }
+      ],
+      "pages": {
+        "list": {
+          "path": "/history",
+          "page": {
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
+            "header": [
+              {
+                "title": {}
+              }
+            ],
+            "main": [
+              {
+                "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
+                "main": [
+                  {
+                    "list": {
+                      "columns": [
+                        {
+                          "field": "createdAt",
+                          "cell": "datetime",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "action",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "actorEmail",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "targetEmail",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "previousRole",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "role",
+                          "cell": "text",
+                          "decided": "table"
+                        },
+                        {
+                          "field": "banReason",
+                          "cell": "text",
+                          "decided": "table"
+                        }
+                      ],
+                      "filters": [
+                        "action",
+                        "actorEmail",
+                        "targetEmail",
+                        "createdAt"
+                      ],
+                      "search": [
+                        "actorEmail",
+                        "targetEmail"
+                      ],
+                      "sort": "-createdAt"
+                    }
                   }
                 ]
               }

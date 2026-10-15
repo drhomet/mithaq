@@ -15035,8 +15035,8 @@ test('161. the derived nav lists exactly the entries each actor may open, in dec
   assert.deepEqual(
     navOf(client, await report(ownerHeaders)).map((entry) => entry.path),
     // No '/member-roles': a member's roles are changed on the members page.
-    ['/courses', '/sessions', '/enrollments', '/tags', '/media', '/roles', '/settings', '/members'],
-    "the tenant's administrator holds '*' and sees every entry, in the screen's kayan order, then the screen's own page",
+    ['/courses', '/sessions', '/enrollments', '/tags', '/media', '/roles', '/settings', '/members', '/activity'],
+    "the tenant's administrator holds '*' and sees every entry, in the screen's kayan order, then the screen's own pages, the activity behind the log's key",
   )
 
   await asas.kayan.roles.operations.create({ name: 'browser', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: ['screen.dashboard', 'tags.find', 'tags.fields.id', 'courses.find', 'courses.fields.title'] }, { actor: owner as never })
@@ -15048,7 +15048,7 @@ test('161. the derived nav lists exactly the entries each actor may open, in dec
   assert.deepEqual(
     navOf(client, await report(headers)).map((entry) => entry.path),
     ['/courses', '/tags'],
-    'a member holding courses.find and tags.find sees those two, in declaration order and not in the order the role wrote them',
+    'a member holding courses.find and tags.find sees those two, in declaration order and not in the order the role wrote them, and no activity without the log\'s key',
   )
 })
 
@@ -15470,6 +15470,70 @@ const staffOn = async (slug: string, role: string) => {
   return { ...person, actor: await asBackoffice(async () => asas.auth.actor(await onBackoffice(person.headers))) }
 }
 
+test('142g3. the staff history keeps who impersonated whom, each backoffice role set and each ban, read in the backoffice app by a role holding its keys alone, by nobody in the tenant app, and written through no route', async () => {
+  const administrator = await staffOn('backoffice-142g3', 'super_admin')
+  const explorer = await staffOn('explorer-142g3', 'explorer')
+  const support = await staffOn('support-142g3', 'support')
+  const person = await signedUp('person-142g3')
+  assert.equal((await adminRoute('set-role', administrator.headers, { userId: person.id, role: 'explorer' })).status, 200)
+  assert.equal((await adminRoute('set-role', administrator.headers, { userId: person.id, role: 'user' })).status, 200)
+  assert.equal((await adminRoute('ban-user', administrator.headers, { userId: person.id, banReason: 'Spam 142g3' })).status, 200)
+  assert.equal((await adminRoute('unban-user', administrator.headers, { userId: person.id })).status, 200)
+  const { headers: impersonated } = await impersonate(support.headers, person.id)
+  const signedOut = await asas.handler(new Request('http://test/api/auth/user/sign-out', { method: 'POST', headers: new Headers([...impersonated, ['content-type', 'application/json'], ['origin', 'http://localhost:5173']]), body: '{}' }))
+  assert.equal(signedOut.status, 200)
+
+  const history = asas.kayan.backofficeLog.operations as unknown as Record<'find' | 'count', (input: unknown, options: unknown) => Promise<{ docs: Record<string, unknown>[]; totalDocs: number }>>
+  const read = (actor: unknown) => asBackoffice(() => history.find({ where: { target: { equals: person.id } }, sort: 'createdAt', limit: 100 }, { actor }))
+  const rows = (await read(explorer.actor)).docs.map(({ action, actor, actorEmail, targetEmail, previousRole, role, banReason }) => ({ action, actor, actorEmail, targetEmail, previousRole, role, banReason }))
+  const staff = (one: { id: string }, email: string) => ({ actor: one.id, actorEmail: email, targetEmail: 'person-142g3@example.com' })
+  assert.deepEqual(rows, [
+    { action: 'setRole', ...staff(administrator, 'backoffice-142g3@example.com'), previousRole: 'user', role: 'explorer', banReason: null },
+    { action: 'setRole', ...staff(administrator, 'backoffice-142g3@example.com'), previousRole: 'explorer', role: 'user', banReason: null },
+    { action: 'ban', ...staff(administrator, 'backoffice-142g3@example.com'), previousRole: null, role: null, banReason: 'Spam 142g3' },
+    { action: 'unban', ...staff(administrator, 'backoffice-142g3@example.com'), previousRole: null, role: null, banReason: null },
+    { action: 'impersonate', ...staff(support, 'support-142g3@example.com'), previousRole: null, role: null, banReason: null },
+    { action: 'stopImpersonating', ...staff(support, 'support-142g3@example.com'), previousRole: null, role: null, banReason: null },
+  ], 'a grant, its revoke, a ban, its lifting, and an impersonation from its start to its end, each naming the staff member and the person')
+  assert.equal((await read(administrator.actor)).docs.length, 6, 'the backoffice administrator reads it too')
+  assert.equal(await read(support.actor).then(() => 200, (error: AsasError) => error.status), 403, 'support, which impersonates, reads none of it')
+
+  // In the tenant app no role answers but a membership's, so nobody reads it: neither a tenant's
+  // administrator, who holds every key of the project, nor the backoffice's own.
+  const [a] = await twoTenants('142g3')
+  const owner = await asas.auth.actor(a!.owner.headers)
+  for (const [who, actor] of [['a tenant\'s administrator', owner], ['the backoffice administrator', await asas.auth.actor(administrator.headers)]] as const) {
+    assert.equal(await history.find({}, { actor }).then(() => 200, (error: AsasError) => error.status), 403, `${who} is refused it in the tenant app`)
+  }
+  const served = await asas.handler(new Request('http://test/api/backofficeLog/find', { method: 'POST', headers: new Headers({ cookie: a!.owner.headers.get('cookie')!, 'content-type': 'application/json' }), body: '{}' }))
+  assert.equal(served.status, 403, 'and served there too')
+  for (const operation of ['create', 'update', 'delete', 'updateMany', 'deleteMany']) {
+    assert.equal((history as Record<string, unknown>)[operation], undefined, `no ${operation} operation`)
+    const forged = await asBackoffice(async () => asas.handler(new Request(`http://test/api/backofficeLog/${operation}`, { method: 'POST', headers: new Headers([...(await onBackoffice(administrator.headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]), body: JSON.stringify({ id: 'x', action: 'ban', where: { id: { exists: true } } }) })))
+    assert.equal(forged.status, 404, `served ${operation} answers 404 in the backoffice app`)
+  }
+  assert.equal((await history.count({}, { actor: explorer.actor }).catch(() => ({ totalDocs: -1 }))).totalDocs, -1, 'a count outside the backoffice app is refused even to the explorer')
+})
+
+test('142g4. an impersonation the staff history cannot record answers an error, with no link into the tenant app and no cookie, so nobody uses it', async () => {
+  const support = await staffOn('support-142g4', 'support')
+  const person = await signedUp('person-142g4')
+  // The history's table out of reach, so its row is refused.
+  await db.execute('alter table backoffice_log rename to backoffice_log_142g4')
+  try {
+    const started = await asBackoffice(async () => asas.handler(new Request('http://test/api/auth/user/admin/impersonate-user', {
+      method: 'POST',
+      headers: new Headers([...(await onBackoffice(support.headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
+      body: JSON.stringify({ userId: person.id }),
+    })))
+    assert.equal(started.status, 500, 'the route answers an error')
+    assert.deepEqual(started.headers.getSetCookie(), [], 'and sets no cookie')
+    assert.ok(!(await started.text()).includes('token='), 'and hands off no link')
+  } finally {
+    await db.execute('alter table backoffice_log_142g4 rename to backoffice_log')
+  }
+})
+
 test('151a. on the backoffice every tenant kayan is read across every organization by the keys a backoffice role holds, and every write to one is refused by the server, a super admin\'s included', async () => {
   const [a, b] = await twoTenants('151a')
   const tenants = [a!.organization, b!.organization]
@@ -15876,11 +15940,20 @@ test('177b. the log is read by its kayan, record, time, operation and actor alon
   const reader = { actor: (await asas.auth.actor(registrar.headers)) as never }
   const log = asas.kayan.auditLog.operations as unknown as Record<'find' | 'findByID' | 'count', (input: unknown, options: unknown) => Promise<any>>
   const probe = '"accessCode":{"from":null,"to":"AB12'
+  // A `contains` over the text reaches only the kayan the reader reads whole, and the registrar
+  // reads no access code, so it finds nothing however the search is nested.
+  for (const where of [{ changes: { contains: probe } }, { or: [{ record: { equals: 'none' } }, { changes: { contains: probe } }] }]) {
+    assert.deepEqual((await log.find({ where }, reader)).docs, [], `the registrar's ${JSON.stringify(where)} answers nothing`)
+  }
+  assert.equal((await log.count({ where: { changes: { contains: probe } } }, owner)).totalDocs, 1, 'while the owner, who reads the code, finds its entry')
   const refused = [
-    { where: { changes: { contains: probe } } },
     { where: { changes: { like: 'accessCode AB12' } } },
     { where: { changes: { equals: 'x' } } },
-    { where: { and: [{ kayan: { equals: 'courses' } }, { or: [{ record: { equals: a!.course } }, { changes: { contains: probe } }] }] } },
+    { where: { changes: { contains: probe, equals: 'x' } } },
+    { where: { changed: { contains: 'accessCode' } } },
+    { where: { changed: { contains: ' accessCode fee ' } } },
+    { where: { changed: { equals: ' accessCode ' } } },
+    { sort: 'changed' },
     { where: { impersonatedBy: { exists: true } } },
     { where: { organization: { equals: a!.organization } } },
     { sort: 'changes' },
@@ -15901,11 +15974,69 @@ test('177b. the log is read by its kayan, record, time, operation and actor alon
     assert.equal(served.status, 400, `served, it refuses ${JSON.stringify(input)}`)
   }
   const one = (await log.find({ limit: 1 }, reader)).docs[0] as { id: string }
-  const byId = await log.findByID({ id: one.id, where: { changes: { contains: probe } } }, owner).catch((error: unknown) => error)
+  const byId = await log.findByID({ id: one.id, where: { changes: { like: probe } } }, owner).catch((error: unknown) => error)
   assert.ok(byId instanceof AsasError && byId.status === 400, `findByID refuses a where: ${byId}`)
   const ok = await log.find({ where: { and: [{ kayan: { equals: 'courses' } }, { record: { equals: a!.course } }, { createdAt: { exists: true } }, { or: [{ operation: { equals: 'update' } }, { operation: { equals: 'create' } }] }] }, sort: '-createdAt' }, reader)
   assert.ok(ok.docs.length > 0 && ok.docs.every((entry: { changes: string }) => !('accessCode' in JSON.parse(entry.changes))), 'the panel\'s read is answered, and holds no access code')
   assert.equal((await log.count({ where: { operation: { equals: 'update' } } }, owner)).totalDocs > 0, true, 'and a count by a column the log is read by')
+})
+
+test('177d. the log is searched by a change\'s text and by the columns it changed, each within the kayan the reader may tell of, by its own tenant alone, a publish is an entry of its own, and a reader without the log\'s key is refused before its search is judged', async () => {
+  const [a, b] = await twoTenants('177d')
+  const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
+  const log = asas.kayan.auditLog.operations as unknown as Record<'find' | 'count', (input: unknown, options: unknown) => Promise<any>>
+  await courses.operations.update({ id: a!.course, summary: 'Needle 177d', fee: 9 } as never, owner)
+  await asas.kayan.tags.operations.update({ id: a!.tag, name: { en: 'Needle tag 177d', ar: 'وسم' } } as never, owner)
+  const registrar = await signedUp('registrar-177d')
+  await server.api.addMember({ body: { userId: registrar.id, organizationId: a!.organization, role: 'member' } })
+  await server.api.setActiveOrganization({ body: { organizationId: a!.organization }, headers: registrar.headers })
+  await assignRole(a!.organization, registrar.id, 'registrar')
+  const reader = { actor: (await asas.auth.actor(registrar.headers)) as never }
+  const found = async (where: unknown, options: unknown) =>
+    ((await log.find({ where, sort: '-createdAt', limit: 100 }, options)).docs as { kayan: string; record: string; operation: string }[]).map((entry) => `${entry.kayan}:${entry.operation}`)
+
+  assert.deepEqual(await found({ changes: { contains: 'needle' } }, owner), ['tags:update', 'courses:update'], 'the owner finds each change holding the text, whatever its case')
+  assert.deepEqual(await found({ changes: { contains: 'needle' } }, reader), ['tags:update'], 'the registrar the one in a kayan it reads whole: it reads no course\'s summary')
+  assert.deepEqual(await found({ changed: { contains: ' summary ' } }, owner), ['courses:update'], 'a change of a column is found by its name')
+  assert.deepEqual(await found({ changed: { contains: ' summary ' } }, reader), [], 'by a reader of that column alone')
+  assert.deepEqual(await found({ and: [{ kayan: { equals: 'courses' } }, { changed: { contains: ' fee ' } }] }, reader), ['courses:update', 'courses:create'], 'and a column the registrar reads is found in a kayan it does not read whole')
+  const other = { actor: (await asas.auth.actor(b!.owner.headers)) as never }
+  assert.deepEqual(await found({ changes: { contains: 'needle' } }, other), [], 'another tenant finds none of it')
+
+  // A publish of a drafted row is its own entry, which the Activity filter reads by its operation.
+  await courses.operations.update({ id: a!.course, title: 'Drafted 177d' } as never, { ...owner, draft: true })
+  await courses.operations.update({ id: a!.course, title: 'Published 177d' } as never, owner)
+  assert.deepEqual((await found({ record: { equals: a!.course } }, owner)).slice(0, 2), ['courses:publish', 'courses:update'], 'the draft save is an update, and the publish after it a publish')
+
+  // Someone in the organization who holds no key of the log: refused 403 for the key, before a
+  // search it could not have sent is judged.
+  const stranger = await signedUp('stranger-177d')
+  await server.api.addMember({ body: { userId: stranger.id, organizationId: a!.organization, role: 'member' } })
+  await server.api.setActiveOrganization({ body: { organizationId: a!.organization }, headers: stranger.headers })
+  for (const where of [{ changed: { equals: 1 } }, { changes: { like: 'x' } }, { organization: { equals: a!.organization } }]) {
+    const served = await asas.handler(new Request('http://test/api/auditLog/find', { method: 'POST', headers: new Headers({ cookie: stranger.headers.get('cookie')!, 'content-type': 'application/json' }), body: JSON.stringify({ where }) }))
+    assert.equal(served.status, 403, `${JSON.stringify(where)} is refused for the key first`)
+  }
+})
+
+test('177e. the log is read in the active organization alone: a read widened to every membership is refused, since each change is graded by the active one\'s keys, and a search never reaches another organization', async () => {
+  const [a, b] = await twoTenants('177e')
+  // The administrator of A, who is B's registrar and reads no access code there.
+  await server.api.addMember({ body: { userId: a!.owner.id, organizationId: b!.organization, role: 'member' } })
+  await assignRole(b!.organization, a!.owner.id, 'registrar')
+  const bOwner = { actor: (await asas.auth.actor(b!.owner.headers)) as never }
+  await courses.operations.update({ id: b!.course, delivery: 'live', accessCode: 'ZQ7E01' } as never, bOwner)
+  const actor = (await asas.auth.actor(a!.owner.headers)) as never
+  const log = asas.kayan.auditLog.operations as unknown as Record<'find' | 'findByID' | 'count', (input: unknown, options: unknown) => Promise<any>>
+  const one = (await log.find({ limit: 1 }, { actor })).docs[0] as { id: string }
+  for (const [operation, input] of [['find', { where: { changes: { contains: 'ZQ7E01' } } }], ['findByID', { id: one.id }], ['count', {}]] as const) {
+    const thrown = await log[operation](input, { actor, tenant: 'mine' }).catch((error: unknown) => error)
+    assert.ok(thrown instanceof AsasError && thrown.status === 403, `${operation} under tenant 'mine' is refused: ${thrown}`)
+  }
+  const served = await asas.handler(new Request('http://test/api/auditLog/find?tenant=mine', { method: 'POST', headers: new Headers({ cookie: a!.owner.headers.get('cookie')!, 'content-type': 'application/json' }), body: JSON.stringify({ where: { changes: { contains: 'ZQ7E01' } } }) }))
+  assert.equal(served.status, 403, 'and served')
+  assert.deepEqual((await log.find({ where: { changes: { contains: 'ZQ7E01' } } }, { actor })).docs, [], 'a search in the active organization finds nothing of another')
+  assert.equal((await log.count({ where: { changes: { contains: 'ZQ7E01' } } }, bOwner)).totalDocs, 1, 'while B\'s own administrator finds its entry')
 })
 
 test('276d. a command actor\'s operating-system user is read by a holder of the people alone, and a reader of none is refused every filter and sort by `actor`', async () => {
@@ -17082,7 +17213,7 @@ test('132u. a draft save and a publish each write one version and one audit entr
   await courses.operations.update({ id: course.id, title: 'Audited draft 132u' }, { ...options, draft: true })
   await courses.operations.update({ id: course.id, fee: 4 }, options)
   const entries = (await db.execute(`select operation, changes from audit_log where record = '${course.id}' order by created_at`)).rows as { operation: string; changes: string }[]
-  assert.deepEqual(entries.map((one) => one.operation), ['create', 'update', 'update'], 'one entry per write')
+  assert.deepEqual(entries.map((one) => one.operation), ['create', 'update', 'publish'], 'one entry per write, the publish of the draft named so')
   assert.ok('title' in JSON.parse(entries[1]!.changes), 'the draft save is recorded with the change it drafted')
   assert.equal((await courseVersions(course.id)).length, 3, 'and one version per write')
   const tables = (await db.execute(`select table_name from information_schema.tables where table_name like '%audit_log%versions%'`)).rows

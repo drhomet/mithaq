@@ -187,6 +187,7 @@ export const tenantRoles = {
       'auditLog.fields.actor',
       'auditLog.fields.impersonatedBy',
       'auditLog.fields.changes',
+      'auditLog.fields.changed',
       // end add-on: audit-log
     ],
   },

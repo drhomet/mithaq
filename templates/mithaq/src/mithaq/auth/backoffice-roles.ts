@@ -59,6 +59,16 @@ const grants: string[] = [
 ]
 
 /**
+ * The staff history: who impersonated whom, set whose backoffice role and banned whom. `super_admin`
+ * reads it by its `'*'` and `explorer` by these keys; never support, whose impersonations it records.
+ */
+const history: string[] = [
+  // add-on: audit-log
+  ...reads('backofficeLog', ['id', 'createdAt', 'action', 'actor', 'actorEmail', 'target', 'targetEmail', 'previousRole', 'role', 'banReason']),
+  // end add-on: audit-log
+]
+
+/**
  * The backoffice roles: staff above every tenant, held on Better Auth's own
  * `user.role` rather than on a tenant's assignment. The column may hold several,
  * comma-separated, which is how the admin plugin reads it.
@@ -90,9 +100,9 @@ export const backofficeRoles = {
     label: { ar: 'الدعم', en: 'Support' },
     permissions: ['screen.backoffice', 'user.impersonate', ...people, ...business],
   },
-  /** Reads everything on the backoffice, each tenant's roles included, and changes nothing. */
+  /** Reads everything on the backoffice, each tenant's roles and the staff history included, and changes nothing. */
   explorer: {
     label: { ar: 'مستكشف', en: 'Explorer' },
-    permissions: ['screen.backoffice', ...people, ...business, ...grants],
+    permissions: ['screen.backoffice', ...people, ...business, ...grants, ...history],
   },
 } as const satisfies SystemRoles
