@@ -119,10 +119,10 @@ test('the loader marks the organization\'s owner, matched exactly the way the pr
   for (const role of ['owners', 'owner ', ' owner', 'Owner', 'member, owner', undefined]) assert.equal(isOwner(role), false, String(role))
 })
 
-test('the loader lists the invitations still pending to a viewer who may invite, and asks none of a viewer who may not', async () => {
+test('the loader lists the invitations still pending to a viewer who may invite, one run out marked so, each by who sent it where they are still a member, and asks none of a viewer who may not', async () => {
   const asked: string[] = []
   const invited = [
-    { id: 'i1', email: 'a@example.com', status: 'pending', expiresAt: '2099-10-14T00:00:00.000Z' },
+    { id: 'i1', email: 'a@example.com', status: 'pending', role: 'member', inviterId: 'u1', expiresAt: '2099-10-14T00:00:00.000Z' },
     { id: 'i2', email: 'b@example.com', status: 'accepted', expiresAt: '2099-10-14T00:00:00.000Z' },
     { id: 'i3', email: 'c@example.com', status: 'canceled', expiresAt: '2099-10-14T00:00:00.000Z' },
     { id: 'i4', email: 'd@example.com', status: 'pending', expiresAt: '2000-10-14T00:00:00.000Z' },
@@ -131,13 +131,16 @@ test('the loader lists the invitations still pending to a viewer who may invite,
     client: async () => ({ docs: [] }),
     request: async (path) => {
       asked.push(path)
-      return Response.json(path.includes('list-invitations') ? invited : path.includes('get-active-member-role') ? { role } : { members: [] })
+      return Response.json(path.includes('list-invitations') ? invited : path.includes('get-active-member-role') ? { role } : { members: [{ userId: 'u1', role, createdAt: '2026-01-01T00:00:00.000Z', user: { name: 'Sana', email: 'sana@example.com' } }], total: 1 })
     },
     access,
     maxLimit: 100,
   })
   const { invites } = await loader(given({ permissions: ['invitation.create'] }))
-  assert.deepEqual(invites, [{ id: 'i1', email: 'a@example.com', expiresAt: '2099-10-14T00:00:00.000Z' }], 'the pending one alone, and not one that has expired')
+  assert.deepEqual(invites, [
+    { id: 'i1', email: 'a@example.com', role: 'member', inviter: 'Sana', expiresAt: '2099-10-14T00:00:00.000Z', expired: false },
+    { id: 'i4', email: 'd@example.com', role: 'member', expiresAt: '2000-10-14T00:00:00.000Z', expired: true },
+  ], 'the pending ones alone, one run out marked so, and never an accepted or a cancelled one')
   assert.ok((await loader(given({ permissions: ['invitation.create'] }, 'member,owner'))).invites, 'an owner invites too')
   for (const [said, access, role] of [
     ['a viewer without the key', { permissions: ['memberRoles.find'] }, 'admin'],

@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { counted, formatDate } from 'mithaq-admin/format.tsx'
 import { AppShell } from '@asas/mithaq/ui/app-shell.tsx'
 import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
+import { MembersCard, membersFigures, type MembersFigures } from './members-card.tsx'
 
 const ranges = [7, 30, 90] as const
 type Range = (typeof ranges)[number]
@@ -51,6 +52,8 @@ export type Figures = {
   perDay?: Record<string, number>
   /** The next sessions to start, each beside its course's title, where the actor reads sessions. */
   upcoming?: { id: string; course: string; startsAt: string; venue?: string; capacity?: number }[]
+  /** Who works here and the roles they hold, where the actor may list members. */
+  members?: MembersFigures
 }
 
 /** How many sessions the home's table lists, which is a card's worth. */
@@ -78,7 +81,7 @@ export const loader = async (tools: LoaderTools): Promise<Figures> => {
   // row where the actor holds `findVersions`, so the card and the list count one
   // set, a course nobody has published yet among it.
   const draft = access.collections?.courses?.operations?.findVersions === true
-  const [rows, enrollments, recent, next] = await Promise.all([
+  const [rows, enrollments, recent, next, members] = await Promise.all([
     readAll({ tools, kayan: 'courses', draft }),
     reads ? (client({ kayan: 'enrollments', operation: 'count', input: {} }) as Promise<{ totalDocs: number }>) : undefined,
     reads ? readAll({ tools, kayan: 'enrollments', where: { createdAt: { greater_than_equal: since } } }) : undefined,
@@ -89,6 +92,7 @@ export const loader = async (tools: LoaderTools): Promise<Figures> => {
         input: { where: { startsAt: { greater_than_equal: new Date().toISOString() } }, sort: 'startsAt', limit: Math.min(upcomingLimit, tools.maxLimit), depth: 0 },
       }) as Promise<{ docs: Row[] }>)
       : undefined,
+    membersFigures(tools),
   ])
   const titles = new Map(rows.map((course) => [String(course.id), String(course.title ?? course.id)]))
   const fees: Record<string, number> = {}
@@ -104,6 +108,7 @@ export const loader = async (tools: LoaderTools): Promise<Figures> => {
     perDay[key] = (perDay[key] ?? 0) + 1
   }
   return {
+    ...(members && { members }),
     courses: rows.length,
     open: open.length,
     ...(readsFees && { fees: Object.entries(fees) }),
@@ -210,6 +215,7 @@ export function Dashboard({ loaderData: figures }: PageProps<Figures>) {
                   />
                 </>
               ) : null}
+              {figures?.members ? <MembersCard figures={figures.members} href={`${screen.path}/members`} /> : null}
             </div>
             {reads ? (
               <Card data-chart-card="enrollments">

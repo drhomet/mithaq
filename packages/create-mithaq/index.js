@@ -62,7 +62,7 @@ const once = (text, from, to, count = 1) => {
 export const addOns = {
   roles: {
     needs: [],
-    files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
+    files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/ui-dashboard/members-card.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
     without: ['packages/mithaq/src/roles/default-member-roles.ts', 'packages/mithaq/src/roles/member-access.ts'],
     packages: [],
     copy: [],
@@ -208,11 +208,11 @@ const foldIntoOnePackage = (project) => {
     dependencies: own(Object.assign({}, language.dependencies, ...ofFeatures.map((one) => one.dependencies), asas.dependencies, app.dependencies)),
     devDependencies: own(Object.assign({}, language.devDependencies, ...ofFeatures.map((one) => one.devDependencies), asas.devDependencies, app.devDependencies, root.devDependencies)),
   })
-  // A feature is reached through its index, or its browser-safe `domain/`, as its `exports` say.
+  // A feature is reached through its index, its browser-safe `domain/` or a kayan's `ui/`, as its `exports` say.
   const targetOf = (name, sub) => {
     if (name === 'mithaq') return sub === '' ? 'src/mithaq.ts' : sub === '/auth' ? 'src/mithaq/auth/index.ts' : ['/auth/backoffice-roles', '/auth/organizations'].includes(sub) ? `src/mithaq${sub}.ts` : `src${sub}`
     if (sub === '') return `src/features/${name}/index.ts`
-    if (sub.startsWith('/domain/')) return `src/features/${name}${sub}`
+    if (sub.startsWith('/domain/') || /^\/[^/]+\/ui\//.test(sub)) return `src/features/${name}${sub}`
     throw new Error(`@asas/${name}${sub} reaches past the feature's exports.`)
   }
   for (const file of textsUnder(at('src')).filter((one) => /\.tsx?$/.test(one))) {

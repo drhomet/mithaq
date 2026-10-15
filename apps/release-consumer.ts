@@ -371,11 +371,20 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const person = `added-${stamp}@example.com`
       const added = await post('organization/add-person', { name: 'Added', email: person }, { cookie: cookieOf(signedIn) })
       assert.equal(added.status, 200, `${await added.text()}\n${output}`)
+      const addedId = ((await added.clone().json()) as { user?: { id?: string } }).user?.id
       const chosen = await post('reset-password', { token: (await linkMailed(person)).searchParams.get('token'), newPassword: 'release-test-password' })
       assert.equal(chosen.status, 200, `the added person chooses their password from the mailed link: ${await chosen.text()}`)
       assert.equal((await post('sign-in/email', { email: person, password: 'release-test-password' })).status, 200, 'and signs in')
       const membersPage = await (await fetch(`${origin}/dashboard/members`, { headers: { cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).text()
-      assert.ok(membersPage.includes('data-add-person'), `the Members page offers Add person:\n${membersPage.slice(0, 600)}`)
+      assert.ok(membersPage.includes('data-add-person') && membersPage.includes('data-invite-menu'), `the Members page offers Add person first, and inviting by link beside it:\n${membersPage.slice(0, 600)}`)
+      // A member who lost their password is mailed a new link to choose one, by whoever may add people.
+      const linksTo = () => mailed.filter((one) => one.to.includes(person)).length
+      const before = linksTo()
+      const relinked = await post('organization/send-password-link', { userId: addedId }, { cookie: cookieOf(signedIn) })
+      assert.equal(relinked.status, 200, `${await relinked.text()}\n${output}`)
+      for (let attempt = 0; attempt < 100 && linksTo() === before; attempt++) await sleep(50)
+      assert.equal(linksTo(), before + 1, 'a new link is mailed to the member')
+      assert.equal((await linkMailed(person)).pathname, '/auth/set-password', 'to the page that chooses a password')
       if (backoffice) {
         // First-run made the owner the backoffice's administrator too, since it had none.
         const staff = await post('sign-in/email', { email: owner, password: 'release-test-password' }, {}, backofficeOrigin)
