@@ -337,8 +337,10 @@ test('an organization\'s name, which founders write and mail bodies carry, is on
     await assert.rejects(server.api.createOrganization({ body: { name: 'x'.repeat(101), slug: 'long', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: a name past 100 characters is refused`)
     await assert.rejects(server.api.createOrganization({ body: { name: '\r\n', slug: 'blank', userId: user.id } }), /1 to 100 characters/, `${settings.organizations}: and one of nothing but breaks`)
     const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
-    const renamed = await server.api.updateOrganization({ body: { organizationId: made.id, data: { name: 'Line\none' } }, headers })
-    assert.equal(renamed?.name, 'Line one', `${settings.organizations}: a rename is one line too`)
+    const renaming = server.api.updateOrganization({ body: { organizationId: made.id, data: { name: 'Line\none' } }, headers })
+    // With one organization its name lives in code, so nothing renames it over HTTP.
+    if (settings.organizations === 'one') await assert.rejects(renaming, /lives in code/, 'one: a rename is refused')
+    else assert.equal((await renaming)?.name, 'Line one', `${settings.organizations}: a rename is one line too`)
   }
 })
 

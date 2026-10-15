@@ -375,6 +375,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     backToSignIn: { en: 'Back to login', ar: 'العودة إلى تسجيل الدخول' },
     resetPassword: { en: 'Reset password', ar: 'إعادة تعيين كلمة المرور' },
     setPassword: { en: 'Choose your password', ar: 'اختر كلمة المرور' },
+    organizationNameIn: { en: 'Its name in {language}, if it has one', ar: 'اسمها بـ{language}، إن كان لها اسم بها' },
     setPasswordSubmit: { en: 'Confirm and set password', ar: 'أكّد واحفظ كلمة المرور' },
     passwordChosen: { en: 'Your address is confirmed and your password is set. Sign in with it.', ar: 'تأكّد عنوانك وحُفظت كلمة المرور. سجّل الدخول بها.' },
     newPassword: { en: 'New password', ar: 'كلمة مرور جديدة' },
@@ -672,6 +673,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     banWeek: { en: 'Seven days', ar: 'سبعة أيام' },
     banMonth: { en: 'Thirty days', ar: 'ثلاثون يومًا' },
     rename: { en: 'Rename', ar: 'إعادة التسمية' },
+    nameIn: { en: 'Name in {language}, if it has one', ar: 'الاسم بـ{language}، إن كان لها اسم بها' },
     slugPattern: {
       en: 'A slug is lowercase letters and digits joined by single dashes, such as admin-org.',
       ar: 'المعرف النصي أحرف إنجليزية صغيرة وأرقام تفصل بينها شرطات مفردة، مثل admin-org.',

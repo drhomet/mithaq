@@ -15,7 +15,8 @@ export type ScreenState = LocaleState & {
     name: string
     email: string
     screens?: readonly { name: string; path: string }[]
-    organizations?: readonly { id: string; name: string; slug?: string }[]
+    /** `names` is each locale's name, the JSON the project's auth setup writes; `name` is the default locale's. */
+    organizations?: readonly { id: string; name: string; slug?: string; names?: string }[]
     activeOrganizationId?: string | null
   }
   access: AccessReport

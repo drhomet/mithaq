@@ -7,7 +7,7 @@ import '../../../packages/mithaq-admin/test/tsx.ts'
 import { mount } from '../../../packages/mithaq-admin/test/dom.ts'
 
 // One organization by invitation, which the repository's own `organizations.ts` does not hold.
-const invitationOnly = `data:text/javascript,${encodeURIComponent("export const organizations = 'one', showOrganization = true, signUp = 'invite', verifyEmail = true")}`
+const invitationOnly = `data:text/javascript,${encodeURIComponent("export const organizations = 'one', showOrganization = true, signUp = 'invite', verifyEmail = true, defaultLocale = 'en', nameIn = ({ name }) => name")}`
 registerHooks({
   resolve: (specifier, context, next) =>
     // The root route imports its stylesheet as a URL, which only Vite resolves.

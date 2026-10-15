@@ -2,14 +2,17 @@
 // their address, and with many organizations a way to found one. The screen host imports it from the app, which knows
 // the organization mode the host does not.
 import { useEffect, useState } from 'react'
-import { organizations } from 'asas/organizations'
+import { defaultLocale, organizations } from 'asas/organizations'
+import { endonym } from 'mithaq-admin/locale-menu.ts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { authArm } from './api.ts'
 import { useRefusal } from './auth-frame.tsx'
+import { locales } from './copy.ts'
 import { useCopy } from './routes/__root.tsx'
 
-type Invitation = { id: string; organizationName: string; expiresAt: string }
+/** An invitation as the auth setup answers it: the organization's name in each locale beside the provider's one. */
+type Invitation = { id: string; organizationName: string; organizationNames?: Record<string, string>; expiresAt: string }
 
 /**
  * Better Auth requires a unique slug, so a random tail keeps same-named organizations apart.
@@ -22,10 +25,13 @@ const slugOf = (name: string) =>
 const goIn = () => window.location.assign('/auth/sign-in')
 
 export function NoOrganization({ email, founds = organizations === 'many' }: { email: string | undefined; founds?: boolean }) {
-  const { t } = useCopy()
+  const { t, locale } = useCopy()
   const refusal = useRefusal()
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [name, setName] = useState('')
+  // The organization's name in each other locale, optional: one left empty falls back to `name`.
+  const [names, setNames] = useState<Record<string, string>>({})
+  const others = locales.filter((one) => one !== defaultLocale)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<string>()
   useEffect(() => {
@@ -57,7 +63,7 @@ export function NoOrganization({ email, founds = organizations === 'many' }: { e
           <ul className="grid gap-2">
             {invitations.map((one) => (
               <li key={one.id} data-invitation={one.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
-                <bdi className="[overflow-wrap:anywhere]">{one.organizationName}</bdi>
+                <bdi className="[overflow-wrap:anywhere]">{one.organizationNames?.[locale] || one.organizationName}</bdi>
                 <span className="flex gap-2">
                   <Button type="button" size="sm" data-accept={one.id} disabled={busy} onClick={() => void send({ path: 'organization/accept-invitation', body: { invitationId: one.id }, done: goIn })}>
                     {t('auth.invitationAccept', 'Accept the invitation')}
@@ -78,11 +84,18 @@ export function NoOrganization({ email, founds = organizations === 'many' }: { e
           noValidate
           onSubmit={(event) => {
             event.preventDefault()
-            if (name.trim()) void send({ path: 'organization/create', body: { name: name.trim(), slug: slugOf(name.trim()) }, done: goIn })
+            const named = { [defaultLocale]: name.trim(), ...Object.fromEntries(others.map((one) => [one, names[one]?.trim() ?? '']).filter(([, one]) => one)) }
+            if (name.trim()) void send({ path: 'organization/create', body: { name: name.trim(), names: JSON.stringify(named), slug: slugOf(name.trim()) }, done: goIn })
           }}
         >
           <label htmlFor="new-organization" className="text-sm font-medium">{t('auth.createOrganization', 'Create an organization')}</label>
-          <Input id="new-organization" value={name} maxLength={100} autoComplete="organization" onChange={(event) => setName(event.target.value)} />
+          <Input id="new-organization" value={name} maxLength={100} autoComplete="organization" dir="auto" onChange={(event) => setName(event.target.value)} />
+          {others.map((one) => (
+            <div key={one} className="grid gap-1">
+              <label htmlFor={`new-organization-${one}`} className="text-muted-foreground text-sm">{t('auth.organizationNameIn', 'Its name in {language}, if it has one')!.replace('{language}', () => endonym(one))}</label>
+              <Input id={`new-organization-${one}`} lang={one} dir="auto" value={names[one] ?? ''} maxLength={100} onChange={(event) => setNames((held) => ({ ...held, [one]: event.target.value }))} />
+            </div>
+          ))}
           <Button type="submit" disabled={busy || !name.trim()}>{t('auth.createOrganizationSubmit', 'Create')}</Button>
         </form>
       ) : null}

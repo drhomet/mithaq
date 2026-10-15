@@ -1,11 +1,13 @@
 // The list's cell for the `slug` column. Rename is drawn only where this actor holds
-// `organization.rename`, and members only where this actor reads them; the route refuses a rename
-// without the key. A rename that lands asks the list behind it to be read again through
+// `organization.rename`, with many organizations alone (with one, the name lives in code), and
+// members only where this actor reads them; the route refuses a rename without the key. A rename that lands asks the list behind it to be read again through
 // `mithaq:refresh`, so the list keeps its scroll.
 import { useState, type FormEvent } from 'react'
 import { holds, type CellProps } from 'mithaq/admin'
 import { useAccess, useLocale, useScreen } from 'mithaq/admin/react'
 import { writeQuery } from 'mithaq-admin/list-query.ts'
+import { endonym } from 'mithaq-admin/locale-menu.ts'
+import { defaultLocale, nameIn, organizationName, organizations } from '@asas/mithaq/auth/organizations'
 import { toast } from 'mithaq-admin/toast.tsx'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -18,7 +20,9 @@ export function OrganizationActions({ value, row }: CellProps) {
   const { t } = useLocale()
   const access = useAccess()
   const screen = useScreen()
-  const renames = holds(access, 'organization.rename')
+  const renames = organizations === 'many' && holds(access, 'organization.rename')
+  // Each locale the organization is named in beside the default, whose box is `name`.
+  const others = Object.keys(organizationName).filter((one) => one !== defaultLocale)
   const members = holds(access, 'member.find') && screen.kayan.member?.pages.list !== undefined
   const [open, setOpen] = useState(false)
   const [refusal, setRefusal] = useState<string>()
@@ -30,6 +34,8 @@ export function OrganizationActions({ value, row }: CellProps) {
     const box = (key: string) => (event.currentTarget.elements.namedItem(key) as HTMLInputElement | null)?.value ?? ''
     const name = box('name')
     const slug = box('slug')
+    // An empty one falls back to `name`, so it is left out.
+    const names = { [defaultLocale]: name.trim(), ...Object.fromEntries(others.map((one) => [one, box(`name-${one}`).trim()]).filter(([, one]) => one)) }
     const found = {
       name: name.trim() ? undefined : t('organization.name.required', 'This field is required.'),
       slug: !slug ? t('organization.slug.required', 'This field is required.') : slugShape.test(slug) ? undefined : t('backoffice.slugPattern', 'A slug is lowercase letters and digits joined by single dashes, such as admin-org.'),
@@ -39,7 +45,7 @@ export function OrganizationActions({ value, row }: CellProps) {
     const response = await fetch('/api/backoffice/organizations/update', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id, name, slug }),
+      body: JSON.stringify({ id, names, slug }),
     })
     if (!response.ok) {
       const key = ((await response.json().catch(() => null)) as { data?: { key?: string } } | null)?.data?.key
@@ -86,6 +92,12 @@ export function OrganizationActions({ value, row }: CellProps) {
                 <Input id={`organization-name-${id}`} name="name" required aria-required dir="auto" defaultValue={String(row.name ?? '')} aria-invalid={wrong.name ? true : undefined} aria-describedby={wrong.name ? `organization-name-${id}-error` : undefined} />
                 {wrong.name ? <p id={`organization-name-${id}-error`} role="alert" className="text-sm text-destructive">{wrong.name}</p> : null}
               </div>
+              {others.map((one) => (
+                <div key={one} className="grid gap-2">
+                  <Label htmlFor={`organization-name-${one}-${id}`}>{(t('backoffice.nameIn', 'Name in {language}, if it has one') ?? '').replace('{language}', () => endonym(one))}</Label>
+                  <Input id={`organization-name-${one}-${id}`} name={`name-${one}`} lang={one} dir="auto" defaultValue={nameIn({ name: '', names: row.names }, one)} />
+                </div>
+              ))}
               <div className="grid gap-2">
                 <Label htmlFor={`organization-slug-${id}`}>{t('organization.slug', 'Slug')}</Label>
                 <Input id={`organization-slug-${id}`} name="slug" required aria-required dir="ltr" pattern={slugShape.source.slice(1, -1)} defaultValue={String(value ?? '')} aria-invalid={wrong.slug ? true : undefined} aria-describedby={wrong.slug ? `organization-slug-${id}-error` : undefined} />

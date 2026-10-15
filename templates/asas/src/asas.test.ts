@@ -851,7 +851,7 @@ test('0a. with one organization and none made yet, every sign-up is refused, and
   for (const showOrganization of [false, true]) {
     const settings = { organizations: 'one', showOrganization, signUp: 'open', joinRole: null, verifyEmail: false } as const
     const one = modeServer(settings)
-    assert.deepEqual(await (await askedOf(one, '/first-run/state')).json(), { open: true, code: 'unset', name: showOrganization }, `${showOrganization}: first-run is open, asks a name only where the organization is shown, and says the code is unset`)
+    assert.deepEqual(await (await askedOf(one, '/first-run/state')).json(), { open: true, code: 'unset' }, `${showOrganization}: first-run is open, asks no organization's name, which lives in code, and says the code is unset`)
     assert.deepEqual(await answerOf(await askedOf(one, '/sign-up/email', { name: 'Early', email: 'early@example.com', password: modePassword })), [403, 'FIRST_RUN_PENDING'], `${showOrganization}: a sign-up before first-run is refused`)
     assert.deepEqual(await answerOf(await askedOf(one, '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early' })), [403, 'SETUP_CODE_UNSET'], `${showOrganization}: first-run refuses while SETUP_CODE is unset`)
     assert.deepEqual(await answerOf(await askedOf(modeServer(settings, coded), '/first-run', { name: 'Early', email: 'early@example.com', password: modePassword, organization: 'Early', code: 'not-the-code-not-the-code-not-the-code' })), [403, 'SETUP_CODE_WRONG'], `${showOrganization}: and where it is set, a wrong code`)
@@ -862,15 +862,15 @@ test('0a. with one organization and none made yet, every sign-up is refused, and
 test('0b. the takeover race: five first-runs at once with the setup code make one owner of one organization, and the other four are refused alike', async () => {
   const coded = await codedProvider()
   const mail = keptMail()
-  const school = modeServer({ organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true, mailer: mail.mailer }, coded)
+  const school = modeServer({ organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true, mailer: mail.mailer, organizationName: { en: 'Code School', ar: 'مدرسة الشيفرة' } }, coded)
   const runs = await Promise.all([0, 1, 2, 3, 4].map(async (at) => [at, await answerOf(await askedOf(school, '/first-run', { name: `Racer ${at}`, email: `racer-${at}@example.com`, password: modePassword, organization: `School ${at}`, code: setupCode }))] as const))
   const won = runs.filter(([, [status]]) => status === 200)
   assert.equal(won.length, 1, 'exactly one first-run wins')
   assert.deepEqual(runs.filter(([, [status]]) => status !== 200).map(([, answer]) => answer), Array(4).fill([403, 'FIRST_RUN_CLOSED']), 'and the other four get the one answer for a closed first-run')
   const winner = won[0]![0]
-  const [organization] = await modeRows('select id, name from organization')
+  const [organization] = await modeRows('select id, name, names from organization')
   assert.equal((await modeRows('select id from organization')).length, 1, 'one organization exists')
-  assert.equal(organization!.name, `School ${winner}`, 'named by the winner')
+  assert.deepEqual([organization!.name, JSON.parse(String(organization!.names))], ['Code School', { en: 'Code School', ar: 'مدرسة الشيفرة' }], 'named in every locale by organizationName in code, whatever the winner sent')
   const [user] = await modeRows(`select id, role, email_verified from "user" where email = 'racer-${winner}@example.com'`)
   assert.deepEqual([user!.role, user!.email_verified], [backofficeApp ? 'super_admin' : 'user', true], 'the winner is verified, and backoffice staff only where the backoffice app is served')
   assert.deepEqual(await modeRows(`select user_id, role from member where organization_id = '${organization!.id}'`), [{ user_id: user!.id, role: 'owner' }], 'and the organization\'s one member, its owner')
@@ -1345,6 +1345,48 @@ test('0q. an invitation the server accepts for a sign-up is held to the rule the
   assert.equal((await askedOf(school, '/sign-up/email', { name: 'Spaced', email: 'spaced-0q@example.com', password: modePassword, invitationId: 'spaced-0q' })).status, 200)
   assert.deepEqual(await modeRows(`select member.role from member join "user" on "user".id = member.user_id where "user".email = 'spaced-0q@example.com'`), [], 'the account joins nothing')
   assert.deepEqual(await modeRows(`select status from invitation where id = 'spaced-0q'`), [{ status: 'pending' }])
+})
+
+test('0u. with one organization its name lives in code: the row takes it on the first request a process serves, and nobody renames it over HTTP', async () => {
+  const [one] = await modeRows('select id from organization')
+  await db.execute(`update organization set name = 'Drifted', names = null where id = '${one!.id}'`)
+  const school = modeServer({ ...schoolSettings, organizationName: { en: 'Synced 0u', ar: 'متزامنة 0u' } })
+  const owner = await ownerOf(school)
+  const [synced] = await modeRows(`select name, names from organization where id = '${one!.id}'`)
+  assert.deepEqual([synced!.name, JSON.parse(String(synced!.names))], ['Synced 0u', { en: 'Synced 0u', ar: 'متزامنة 0u' }], 'the row is written from code')
+  assert.deepEqual(await answerOf(await askedOf(school, '/organization/update', { data: { name: 'Renamed' }, organizationId: owner.organization }, { cookie: owner.headers.get('cookie')! })), [403, 'ORGANIZATION_NAME_IN_CODE'], 'a rename is refused, naming where the name lives')
+  assert.deepEqual(await answerOf(await askedOf(school, '/organization/update', { data: { names: JSON.stringify({ en: 'Renamed' }) }, organizationId: owner.organization }, { cookie: owner.headers.get('cookie')! })), [403, 'ORGANIZATION_NAME_IN_CODE'], 'in any locale')
+  assert.equal((await modeRows(`select name from organization where id = '${one!.id}'`))[0]!.name, 'Synced 0u', 'and nothing was renamed')
+})
+
+test('0t. an organization holds its name in every locale: founded or renamed in each, its name is the default locale\'s, another locale\'s is optional, and a mail that names it says it in each language', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, mailer: mail.mailer })
+  const founder = await proved({ one: many, mail, email: 'founder-0t@example.com' })
+  const cookie = founder.get('cookie')!
+  const create = (body: Record<string, unknown>) => askedOf(many, '/organization/create', body, { cookie })
+  const stored = async (slug: string) => {
+    const [row] = await modeRows(`select name, names from organization where slug = '${slug}'`)
+    return row && [row.name, row.names === null ? null : JSON.parse(String(row.names))]
+  }
+  assert.equal((await create({ name: 'Light House', names: JSON.stringify({ en: 'Light House', ar: 'بيت\nالنور' }), slug: 'light-0t' })).status, 200)
+  assert.deepEqual(await stored('light-0t'), ['Light House', { en: 'Light House', ar: 'بيت النور' }], 'each locale\'s name is kept on one line, and the name is the default locale\'s')
+  assert.deepEqual(await answerOf(await create({ name: 'No default', names: JSON.stringify({ ar: 'بلا' }), slug: 'no-default-0t' })), [400, 'ORGANIZATION_NAME'], 'a name in the default locale is required')
+  assert.deepEqual(await answerOf(await create({ name: 'Elsewhere', names: JSON.stringify({ en: 'Elsewhere', fr: 'Ailleurs' }), slug: 'elsewhere-0t' })), [400, 'ORGANIZATION_NAME'], 'and a locale the project does not read is refused')
+  assert.deepEqual(await stored('no-default-0t'), undefined, 'neither was made')
+  assert.equal((await create({ name: 'Plain', slug: 'plain-0t' })).status, 200)
+  assert.deepEqual(await stored('plain-0t'), ['Plain', { en: 'Plain' }], 'a name alone is the default locale\'s, and the others fall back to it')
+  const light = (await modeRows(`select id from organization where slug = 'light-0t'`))[0]!.id as string
+  await askedOf(many, '/organization/set-active', { organizationId: light }, { cookie })
+  assert.equal((await askedOf(many, '/organization/update', { data: { names: JSON.stringify({ en: 'Light', ar: 'نور' }) }, organizationId: light }, { cookie })).status, 200)
+  assert.deepEqual(await stored('light-0t'), ['Light', { en: 'Light', ar: 'نور' }], 'a rename in each locale renames the name too')
+  assert.equal((await askedOf(many, '/organization/invite-member', { email: 'guest-0t@example.com', role: 'member', organizationId: light }, { cookie })).status, 200)
+  await backgroundSettled()
+  const invited = mail.sent.filter((one) => one.to === 'guest-0t@example.com').at(-1)!.text
+  assert.match(invited, /join Light\./, 'the invitation names it in English')
+  assert.match(invited, /إلى نور\./, 'and in Arabic')
+  const read = await (await askedOf(many, `/organization/list-user-invitations`, undefined, { cookie: (await proved({ one: many, mail, email: 'guest-0t@example.com' })).get('cookie')! })).json() as { organizationName: string; organizationNames?: Record<string, string> }[]
+  assert.deepEqual(read.map((one) => [one.organizationName, one.organizationNames]), [['Light', { en: 'Light', ar: 'نور' }]], 'and the invitee reads it in each locale')
 })
 
 test('0z. the organization modes leave the table as the later tests expect it: the borrowed organization alone', async () => {
@@ -15473,6 +15515,11 @@ test('151c. the backoffice renames an organization and its slug through its own 
   assert.deepEqual(await stored(), { name: 'Tenant 151c a', slug: 'tenant-151c-a' }, 'and nothing was written')
   assert.deepEqual(lines, [], 'and no refused call wrote a line')
 
+  assert.equal((await rename(administrator.headers, { id: a!.organization, names: { ar: 'بلا اسم' }, slug: 'no-default' })).status, 400, 'a rename in other locales alone is refused: the default locale\'s name is the name')
+  const inEach = await rename(administrator.headers, { id: a!.organization, names: { en: 'Each 151c', ar: 'كل 151c' }, slug: 'each-151c' })
+  assert.equal(inEach.status, 200, JSON.stringify(inEach.body))
+  assert.deepEqual((await db.execute(`select name, names from "organization" where id = '${a!.organization}'`)).rows.map((row) => [row.name, JSON.parse(String(row.names))]), [['Each 151c', { en: 'Each 151c', ar: 'كل 151c' }]], 'a rename names the organization in each locale')
+  lines.length = 0
   const renamed = await rename(administrator.headers, { id: a!.organization, name: 'Renamed 151c', slug: 'renamed-151c' })
   assert.equal(renamed.status, 200)
   assert.deepEqual(renamed.body, { id: a!.organization, name: 'Renamed 151c', slug: 'renamed-151c' })
@@ -15480,6 +15527,11 @@ test('151c. the backoffice renames an organization and its slug through its own 
   assert.equal(lines.length, 1, 'with one audit line')
   assert.deepEqual(Object.assign({}, lines[0], { at: undefined }), { audit: 'backoffice', action: '/backoffice/organizations/update', actor: administrator.id, impersonatedBy: null, target: a!.organization, at: undefined })
   assert.ok(b, 'the other organization is untouched')
+  const { backofficeHttp } = await import('./backoffice-http.ts')
+  const inCode = backofficeHttp({ organizations: 'one' })()
+  const refusedInOne = await asBackoffice(async () => inCode.handle(new Request('http://test/api/backoffice/organizations/update', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: a!.organization, name: 'In code', slug: 'in-code' }) }), async () => asas.auth.actor(await onBackoffice(administrator.headers))))
+  assert.equal(refusedInOne?.status, 409, 'with one organization the backoffice renames nothing: the name lives in code')
+  assert.equal(((await refusedInOne!.json()) as { data: { key: string } }).data.key, 'error.conflict.organization_name_in_code')
 })
 
 test('151d. the backoffice\'s people, organizations and members lists read their URL the way the host does, and a search, a filter, a sort and a page each narrow the read support makes there', async () => {

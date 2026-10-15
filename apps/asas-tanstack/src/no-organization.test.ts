@@ -21,7 +21,7 @@ const { scopes } = await import('./copy.ts')
 const inFuture = new Date(Date.now() + 86_400_000).toISOString()
 
 /** `NoOrganization` drawn on a page, with every request it makes answered by `answer` and kept in `sent`. */
-const drawn = async ({ founds, answer }: { founds: boolean; answer: (path: string, body: unknown) => unknown }) => {
+const drawn = async ({ founds, answer, locale = 'en' }: { founds: boolean; answer: (path: string, body: unknown) => unknown; locale?: string }) => {
   const sent: { path: string; body?: unknown }[] = []
   const fetched = globalThis.fetch
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -30,7 +30,7 @@ const drawn = async ({ founds, answer }: { founds: boolean; answer: (path: strin
     sent.push({ path, ...(body !== undefined && { body }) })
     return new Response(JSON.stringify(answer(path, body)), { headers: { 'content-type': 'application/json' } })
   }) as typeof fetch
-  const root = createRootRoute({ beforeLoad: () => ({ dir: 'ltr', locale: 'en', app: 'marketing.brand' }), component: () => createElement(Outlet) })
+  const root = createRootRoute({ beforeLoad: () => ({ dir: locale === 'ar' ? 'rtl' : 'ltr', locale, app: 'marketing.brand' }), component: () => createElement(Outlet) })
   const router = createRouter({
     history: createMemoryHistory({ initialEntries: ['/unauthorized'] }),
     routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: '/unauthorized', component: () => createElement(NoOrganization, { email: 'unplaced@example.com', founds }) })]),
@@ -48,7 +48,7 @@ const drawn = async ({ founds, answer }: { founds: boolean; answer: (path: strin
 
 const reads = (path: string) =>
   path.endsWith('/organization/list-user-invitations')
-    ? [{ id: 'inv-a', organizationName: 'Alpha', expiresAt: inFuture }, { id: 'inv-b', organizationName: 'Beta', expiresAt: inFuture }, { id: 'inv-old', organizationName: 'Gone', expiresAt: '2000-01-01T00:00:00.000Z' }]
+    ? [{ id: 'inv-a', organizationName: 'Alpha', organizationNames: { en: 'Alpha', ar: 'ألفا' }, expiresAt: inFuture }, { id: 'inv-b', organizationName: 'Beta', expiresAt: inFuture }, { id: 'inv-old', organizationName: 'Gone', expiresAt: '2000-01-01T00:00:00.000Z' }]
     : path.endsWith('/get-session') ? { user: { name: 'Layla', email: 'unplaced@example.com' } } : {}
 
 test('a person in no organization reads their invitations and declines one, and accepting one or founding one takes them in', async () => {
@@ -68,15 +68,30 @@ test('a person in no organization reads their invitations and declines one, and 
     const box = host.querySelector<HTMLInputElement>('#new-organization')!
     assert.equal(box.value, scopes.auth!.workspaceOf!.en!.replace('{name}', 'Layla'), 'the new organization is named for them unless they change it')
     await act(async () => typeInto(box, 'Layla Tutoring'))
+    const arabic = host.querySelector<HTMLInputElement>('#new-organization-ar')
+    assert.ok(arabic, 'its name in each other locale is asked too')
+    assert.equal(arabic!.required, false, 'and may be left empty, to fall back to the first')
+    await act(async () => typeInto(arabic!, 'دروس ليلى'))
     await act(async () => fire(host.querySelector('[data-create-organization]')!, 'submit'))
-    const made = sent.at(-1) as { path: string; body: { name: string; slug: string } }
+    const made = sent.at(-1) as { path: string; body: { name: string; names: string; slug: string } }
     assert.equal(made.path, '/api/auth/user/organization/create')
     assert.equal(made.body.name, 'Layla Tutoring')
+    assert.deepEqual(JSON.parse(made.body.names), { en: 'Layla Tutoring', ar: 'دروس ليلى' }, 'and sent in each locale')
     assert.match(made.body.slug, /^layla-tutoring-[a-z0-9]{6}$/, 'with a slug of its own')
     assert.equal(assigned.mock.callCount(), 2, 'and founding one takes them into it')
     assert.ok(host.textContent?.includes('unplaced@example.com'), 'the page names the address an administrator would invite')
   } finally {
     assigned.mock.restore()
+    await unmount()
+  }
+})
+
+test('an invitation names its organization in the reader\'s language', async () => {
+  const { host, unmount } = await drawn({ founds: false, answer: reads, locale: 'ar' })
+  try {
+    assert.equal(host.querySelector('[data-invitation="inv-a"] bdi')?.textContent, 'ألفا', 'in Arabic where it has an Arabic name')
+    assert.equal(host.querySelector('[data-invitation="inv-b"] bdi')?.textContent, 'Beta', 'and its one name where it has no other')
+  } finally {
     await unmount()
   }
 })

@@ -86,7 +86,7 @@ try {
   let organization: string
   if (mode === 'one') {
     // First-run's own path: the owner, the one organization and, with the backoffice console, its super_admin.
-    organization = (await server.api.firstRun({ body: { name, email, password, organization: workspace } })).organization.id
+    organization = (await server.api.firstRun({ body: { name, email, password } })).organization.id
   } else {
     // With many, an account proves its address by a mailed link and then founds its organization; the dev admin is
     // made proved, as first-run makes its owner, and its workspace made for it, as the page of someone in none would.
@@ -94,7 +94,7 @@ try {
     await auth.internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password: await auth.password.hash(password) })
     organization = (await server.api.createOrganization({ body: { name: workspace, slug: 'dev-admin-workspace', userId: user.id } })).id
   }
-  // Read back, since first-run names the organization Main where none is shown.
+  // Read back, since first-run names the organization from code (`organizationName`).
   const [made] = (await client.query(`select name from ${named(tables.organization)} where id = $1`, [organization])).rows
   console.log(`Made the dev admin, owner of "${String(made!.name)}"${backofficeApp ? ' and backoffice super_admin' : ''}. ${signIn} with DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD from .env.`)
 } finally {

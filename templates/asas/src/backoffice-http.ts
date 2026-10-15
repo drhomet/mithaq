@@ -12,8 +12,9 @@
 // governance role stay out: each is irreversible or passes the plugin's own
 // owner rules by, and staff do each by impersonating a member, which is
 // audited under the real person's name.
-import { AsasError, actorPermissions, denied, invalid, missing, type HttpPlug } from 'mithaq'
-import { oneLine, backofficeRoles } from '@asas/mithaq/auth'
+import { AsasError, actorPermissions, conflict, denied, invalid, missing, type HttpPlug } from 'mithaq'
+import { namesOf, oneLine, backofficeRoles } from '@asas/mithaq/auth'
+import { organizations as mode } from '@asas/mithaq/auth/organizations'
 import { targets } from '@asas/mithaq'
 import { assignedRoles, type OrganizationActor } from '@asas/mithaq/roles/tenant-access.ts'
 
@@ -34,6 +35,15 @@ const slugShape = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
  */
 const most = { name: 100, slug: 64 }
 
+/** The names `written` holds as the auth setup keeps them, or `null` where it refuses them. */
+const namedOrNull = (written: unknown) => {
+  try {
+    return namesOf(written)
+  } catch {
+    return null
+  }
+}
+
 /** The body the shipped plain plug answers every refusal with. */
 const codes: Record<number, string> = { 400: 'BAD_REQUEST', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'CONFLICT' }
 const refusal = (thrown: AsasError) =>
@@ -43,10 +53,13 @@ const refusal = (thrown: AsasError) =>
  * Answers the route only for an actor the template's reader gave a backoffice
  * role holding `organization.rename`, which it does in the backoffice app alone:
  * `'*'` inside a tenant is a tenant's and renames nothing here. The body is
- * `{ id, name, slug }`, both words trimmed; a slug another organization holds
- * is the store's own 409.
+ * `{ id, names, slug }`, a name per locale with the default locale's required,
+ * or `{ id, name, slug }`, the default locale's alone; a slug another
+ * organization holds is the store's own 409. With one organization its name
+ * lives in code, so the route renames nothing: `organizations` is the project's
+ * mode, which a test sets.
  */
-export const backofficeHttp = () => (): HttpPlug => ({
+export const backofficeHttp = ({ organizations }: { organizations: 'one' | 'many' } = { organizations: mode }) => (): HttpPlug => ({
   name: 'backoffice',
   router: undefined,
   handle: async (request, who) => {
@@ -61,11 +74,16 @@ export const backofficeHttp = () => (): HttpPlug => ({
       // JSON alone, so a form another site posts, which a browser sends with
       // no preflight, is never read as one.
       const body = request.headers.get('content-type')?.startsWith('application/json') ? ((await request.json().catch(() => null)) as Record<string, unknown> | null) : null
+      if (organizations === 'one') {
+        throw conflict({ message: 'With one organization its name lives in code: organizationName in src/mithaq/auth/organizations.ts. Change it there and deploy.', key: 'error.conflict.organization_name_in_code' })
+      }
       const id = body?.id
-      const name = typeof body?.name === 'string' ? body.name.trim() : ''
       const slug = typeof body?.slug === 'string' ? body.slug.trim() : ''
+      // Each locale's name is the auth setup's own rule, so a rename keeps what a founder may write and no more.
+      const names = body?.names === undefined ? undefined : namedOrNull(body.names)
+      const name = names ? names.name : typeof body?.name === 'string' ? body.name.trim() : ''
       // A name is one line: mail bodies carry it, where a break would be a line of the writer's own.
-      if (typeof id !== 'string' || !id || !name || name.length > most.name || new RegExp(oneLine.source, 'u').test(name) || !slugShape.test(slug) || slug.length > most.slug) {
+      if (typeof id !== 'string' || !id || names === null || !name || name.length > most.name || new RegExp(oneLine.source, 'u').test(name) || !slugShape.test(slug) || slug.length > most.slug) {
         throw invalid({
           message: `An organization is renamed with its id, a name of one line and at most ${most.name} characters, and a slug of at most ${most.slug} lowercase letters, digits and hyphens.`,
           key: 'error.invalid.value',
@@ -77,7 +95,7 @@ export const backofficeHttp = () => (): HttpPlug => ({
       await store.transaction(async (tx) => {
         const found = await store.find({ kayan: 'organization', args: { limit: 1, lock: 'update', page: 1, sort: { field: 'id', direction: 'asc' }, where: { id: { equals: id } } }, tx })
         if (!found.docs.length) throw missing({ message: `No organization "${id}".`, key: 'error.not_found.row', params: { kayan: 'organization' } })
-        await store.update({ tx, kayan: 'organization', id, data: { name, slug, updatedAt: new Date() } })
+        await store.update({ tx, kayan: 'organization', id, data: { name, ...(names && { names: names.names }), slug, updatedAt: new Date() } })
       })
       // The line `backofficeAudit` writes for an admin route, under this route's own name.
       console.log(JSON.stringify({

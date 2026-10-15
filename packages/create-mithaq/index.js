@@ -275,13 +275,17 @@ const keepOnly = ({ project, chosen }) => {
  * the courses example are students; without the roles add-on nobody is given a role on joining. Every
  * open sign-up proves its address.
  */
-export function organizationSettings({ organizations = 'one', showOrganization = true, signUp, chosen }) {
+export function organizationSettings({ organizations = 'one', showOrganization = true, signUp, chosen, organizationName }) {
   if (organizations === 'none') throw new Error('--organizations is one or many, not "none": one organization never shown is --organizations one --show-organization no.')
   if (!['one', 'many'].includes(organizations)) throw new Error(`--organizations is one or many, not "${organizations}".`)
   if (signUp !== undefined && !['invite', 'open'].includes(signUp)) throw new Error(`--sign-up is invite or open, not "${signUp}".`)
   const many = organizations === 'many'
   if (many && signUp === 'invite') throw new Error('many organizations take --sign-up open: each sign-up founds its own.')
   if (many && !showOrganization) throw new Error('many organizations are shown by name: a person who belongs to several switches between them.')
+  // One line of 1 to 100 characters, as the auth setup keeps an organization's name, so the project loads.
+  for (const one of Object.values(organizationName ?? {})) {
+    if (typeof one !== 'string' || !one.trim() || one.length > 100 || /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]/u.test(one)) throw new Error('--organization-name is one line of 1 to 100 characters.')
+  }
   return {
     organizations,
     showOrganization,
@@ -289,12 +293,17 @@ export function organizationSettings({ organizations = 'one', showOrganization =
     joinRole: !many && chosen.includes('courses') ? 'student' : null,
     verifyEmail: true,
     allowedDomains: [],
+    // The Arabic falls back to the English, so the language never reads an organization with no name.
+    ...(organizationName?.en && { organizationName: { en: organizationName.en.trim(), ar: organizationName.ar?.trim() || organizationName.en.trim() } }),
   }
 }
 
-/** Writes `settings` over the values `organizations.ts` holds, each line the template holds once. */
+/**
+ * Writes `settings` over the values `organizations.ts` holds, each line the template holds once. A name is written as
+ * JSON, whose double quotes leave an apostrophe in it as written.
+ */
 const writeOrganizations = (file, settings) =>
-  edit(file, (text) => Object.entries(settings).reduce((one, [key, value]) => once(one, new RegExp(`(?<=^export const ${key}: [^=]+ = ).+$`, 'm'), JSON.stringify(value).replaceAll('"', "'")), text))
+  edit(file, (text) => Object.entries(settings).reduce((one, [key, value]) => once(one, new RegExp(`(?<=^export const ${key}: [^=]+ = ).+$`, 'm'), key === 'organizationName' ? JSON.stringify(value) : JSON.stringify(value).replaceAll('"', "'")), text))
 
 /**
  * Writes the project `name` under `cwd` from `template`, and answers its
@@ -306,14 +315,14 @@ const writeOrganizations = (file, settings) =>
  * backoffice console. `addOns` names the add-ons the project holds beside auth and the tags example, with
  * every one they need; none is the minimal project.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], organizations, showOrganization, signUp }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], organizations, showOrganization, signUp, organizationName }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`, and a scope.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
   }
   if (!['monorepo', 'single'].includes(layout)) throw new Error(`The layout is monorepo or single, not "${layout}".`)
   const { chosen } = resolveAddOns(asked)
-  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen })
+  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
   const backoffice = chosen.includes('backoffice')
   if (layout === 'single' && backoffice) throw new Error('A single package serves the tenant app alone. Choose the monorepo layout to include the backoffice console.')
   const project = join(cwd, name)
@@ -388,6 +397,10 @@ const help = `Usage: create-mithaq [name] [options]
   --sign-up invite|open
                       with one organization: by invitation alone (the default), or anyone, who joins
                       once their address is proved (production needs a mailer); many takes open
+  --organization-name <name>
+                      with one organization: its name, which lives in code; first-run asks none
+  --organization-name-ar <name>
+                      its name in Arabic, the English one where not given
   --help              print this
 
 With neither --with nor --full the project is minimal: auth and the tags example. The add-ons:
@@ -408,14 +421,14 @@ const binAbove = (folder) => {
 const main = async () => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, help: { type: 'boolean' } },
+    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, 'organization-name': { type: 'string' }, 'organization-name-ar': { type: 'string' }, help: { type: 'boolean' } },
   })
   if (values.help) return console.log(help)
   if (values.full && values.with !== undefined) throw new Error('Pass --full or --with, not both: --full is every add-on.')
   let [name] = positionals
   let { layout } = values
   let picked = values.with?.split(',').map((one) => one.trim()).filter(Boolean)
-  let { organizations, 'show-organization': shown, 'sign-up': signUp } = values
+  let { organizations, 'show-organization': shown, 'sign-up': signUp, 'organization-name': named, 'organization-name-ar': namedInArabic } = values
   const prompt = process.stdin.isTTY ? createInterface({ input: process.stdin, output: process.stdout }) : undefined
   try {
     if (!name) name = (await prompt?.question('Project name: '))?.trim() ?? ''
@@ -429,6 +442,8 @@ const main = async () => {
     if (!organizations && prompt) organizations = (await prompt.question('One organization, or many? (one/many) [one]: ')).trim().toLowerCase() || 'one'
     if (!shown && prompt && organizations !== 'many') shown = (await prompt.question('Show the organization\'s name on its pages? (yes/no) [yes]: ')).trim().toLowerCase() || 'yes'
     if (!signUp && prompt && organizations !== 'many') signUp = (await prompt.question('Who signs up: the invited, or anyone? (invite/open) [invite]: ')).trim().toLowerCase() || 'invite'
+    if (!named && prompt && organizations !== 'many') named = (await prompt.question('The organization\'s name [My organization]: ')).trim() || undefined
+    if (named && !namedInArabic && prompt) namedInArabic = (await prompt.question('Its name in Arabic [the same]: ')).trim() || undefined
   } finally {
     prompt?.close()
   }
@@ -439,8 +454,9 @@ const main = async () => {
   const { chosen, added } = resolveAddOns(asked)
   if (added.length) console.log(`Added ${added.join(', ')}, which ${asked.filter((one) => addOns[one].needs.length).join(', ')} need${added.length === 1 ? 's' : ''}.`)
   const { version } = readJson(new URL('package.json', import.meta.url))
-  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, organizations, showOrganization, signUp })
-  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen })
+  const organizationName = named ? { en: named, ...(namedInArabic && { ar: namedInArabic }) } : undefined
+  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, organizations, showOrganization, signUp, organizationName })
+  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
   console.log(`Created ${project}${chosen.length ? `, with ${chosen.join(', ')}` : ', minimal'}.`)
   const manager = managerOf(process.env.npm_config_user_agent)
   const installed = manager !== undefined && spawnSync(manager, ['install'], { cwd: project, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0

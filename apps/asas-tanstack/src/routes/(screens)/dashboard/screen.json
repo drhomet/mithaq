@@ -3983,6 +3983,15 @@
           },
           "component": "text",
           "cell": "text"
+        },
+        {
+          "name": "names",
+          "kind": "text",
+          "rules": {
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
         }
       ],
       "operations": [

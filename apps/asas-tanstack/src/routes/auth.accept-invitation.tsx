@@ -17,7 +17,7 @@ export const Route = createFileRoute('/auth/accept-invitation')({
 })
 
 function AcceptInvitation() {
-  const { t } = useCopy()
+  const { t, locale } = useCopy()
   const navigate = useNavigate()
   const refused = useRefusal()
   const { id } = Route.useSearch()
@@ -33,13 +33,13 @@ function AcceptInvitation() {
     if (!signedIn || !id) return
     fetch(`/api/auth/user/organization/get-invitation?id=${encodeURIComponent(id)}`)
       .then(async (response) => {
-        const body = (await response.json().catch(() => null)) as { organizationName?: string; code?: unknown } | null
-        if (response.ok) return setOrganization(body?.organizationName ?? '')
+        const body = (await response.json().catch(() => null)) as { organizationName?: string; organizationNames?: Record<string, string>; code?: unknown } | null
+        if (response.ok) return setOrganization(body?.organizationNames?.[locale] || body?.organizationName || '')
         // Better Auth answers a missing, spent or expired invitation 400 with no code.
         setGone(refused({ status: response.status, body }, t('auth.invitationGone', 'This invitation has expired, was cancelled or was already accepted. Ask whoever invited you to send a new one.')))
       })
       .catch(() => setGone(t('auth.requestFailed', 'That request did not work.')))
-  }, [signedIn, id])
+  }, [signedIn, id, locale])
 
   const accept = async () => {
     setPending(true)

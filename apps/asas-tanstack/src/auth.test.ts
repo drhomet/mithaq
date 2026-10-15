@@ -391,6 +391,7 @@ test('a signed-in person reads the invitation and accepts it with one press, and
     assert.equal((await opened(locale, [403, { code: 'YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION', message: 'You are not the recipient of the invitation' }])).alert, copy.invitationNotYours![locale], `another address's in ${locale}`)
     assert.equal((await opened(locale, [400, { code: 'INVITER_IS_NO_LONGER_A_MEMBER_OF_THE_ORGANIZATION', message: 'Inviter is no longer a member of the organization' }])).alert, copy.invitationInviterGone![locale], `an inviter who left in ${locale}`)
   }
+  assert.ok((await opened('ar', [200, { organizationName: 'Tenant one', organizationNames: { en: 'Tenant one', ar: 'المستأجر الأول' } }])).text.includes('المستأجر الأول'), 'the organization is named in the reader\'s language')
   const pressed = await opened('en', [200, { organizationName: 'Tenant one' }], [400, { code: 'INVITATION_NOT_FOUND', message: 'Invitation not found' }])
   assert.equal(pressed.text.includes('You are invited to join Tenant one.'), true, 'the organization is named')
   assert.deepEqual(pressed.sent.map((one) => [one.url, one.body]), [

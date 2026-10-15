@@ -30,7 +30,7 @@ export const superAdminOnly = ['localUsers'] as const
 /** The people, the organizations and their members, which the provider owns. */
 const people = [
   ...reads('user', [...stamps, 'name', 'email', 'emailVerified', 'image', 'role', 'banned', 'banReason', 'banExpires']),
-  ...reads('organization', [...stamps, 'name', 'slug', 'logo', 'metadata']),
+  ...reads('organization', [...stamps, 'name', 'names', 'slug', 'logo', 'metadata']),
   ...reads('member', [...stamps, 'organizationId', 'userId', 'role']),
 ]
 

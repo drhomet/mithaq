@@ -3443,6 +3443,14 @@ const stubbed = async (step: (calls: string[], assigned: string[]) => Promise<vo
   }
 }
 
+test('the app shell names the organization in the reader\'s language, and in its one name where it has none in that language', async () => {
+  const user = { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'o1', name: 'Acme School', names: JSON.stringify({ en: 'Acme School', ar: 'مدرسة أكمي' }) }], activeOrganizationId: 'o1' }
+  const header = async (locale: string, over = user) => (await render(createElement(AppShell, { regions: { header: null, main: null } }), { kayan: undefined, locale, user: over })).querySelector('[data-slot="sidebar-header"]')!.textContent!
+  assert.match(await header('ar'), /مدرسة أكمي/, 'in Arabic')
+  assert.match(await header('en'), /Acme School/, 'in English')
+  assert.match(await header('ar', { ...user, organizations: [{ id: 'o1', name: 'Acme School', names: JSON.stringify({ en: 'Acme School' }) }] }), /Acme School/, 'and in its one name where it has no Arabic one')
+})
+
 test('the app shell lists the dashboard and every nav entry in the sidebar, names the active organization, and its user menu offers each locale and signs out', async () => {
   await stubbed(async (calls, assigned) => {
     const host = await render(createElement(AppShell, { regions: { header: createElement('h1', null, 'Courses'), main: createElement('p', null, 'rows') } }), { kayan: undefined, user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'o1', name: 'Acme School' }], activeOrganizationId: 'o1' } })
@@ -6236,13 +6244,18 @@ test('234a. a rename that lands says so in a green toast, closes its dialog and 
   const refresh = () => refreshed++
   window.addEventListener('mithaq:refresh', refresh)
   Object.defineProperty(window.location, 'reload', { configurable: true, value: () => reloads++ })
-  globalThis.fetch = (async () => new Response('{}')) as typeof fetch
+  const bodies: unknown[] = []
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => (bodies.push(JSON.parse(String(init?.body))), new Response('{}'))) as typeof fetch
   try {
-    const host = await render(withToaster(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'en' } as never)), { screen: backoffice, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const })
+    const host = await render(withToaster(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org', names: JSON.stringify({ en: 'Admin org', ar: 'منظمة الإدارة' }) }, t, locale: 'en' } as never)), { screen: backoffice, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const })
     await act(async () => click(host.querySelector('[data-action="rename"]')!))
+    const arabic = window.document.querySelector('input[name="name-ar"]') as HTMLInputElement | null
+    assert.equal(arabic?.value, 'منظمة الإدارة', 'the rename asks the name in each other locale too, as it stands')
+    assert.equal(arabic?.required, false, 'and may leave it empty, to fall back to the first')
     await act(async () => typeInto(window.document.querySelector('input[name="name"]') as unknown as Element, 'Hana $& Academy'))
     await act(async () => fire(window.document.querySelector('[role="dialog"] form') as unknown as Element, 'submit'))
     await act(async () => sleep(0))
+    assert.deepEqual(bodies, [{ id: 'o1', names: { en: 'Hana $& Academy', ar: 'منظمة الإدارة' }, slug: 'admin-org' }], 'and sends each locale\'s name')
     assert.deepEqual(await toasted(), ['success: The organization is now named Hana $& Academy.'], 'a toast says it landed, with the name as written')
     assert.deepEqual([window.document.querySelector('[role="dialog"] form') === null, refreshed, reloads], [true, 1, 0], 'the dialog closed, and the page asked to refresh once and not reloaded')
   } finally {
