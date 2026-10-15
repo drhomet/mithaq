@@ -94,8 +94,8 @@ export const addOns = {
   // details are rich text and a course's cover is one of the media.
   courses: {
     needs: ['media', 'roles', 'audit-log', 'rich-text'],
-    files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', ...['courses', 'sessions', 'enrollments'].map((one) => `packages/asas/src/messages/${one}.json`)],
-    without: ['packages/asas/src/ui-dashboard/home.tsx'],
+    files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', 'packages/asas/src/ui-portal/courses-home.tsx', ...['courses', 'sessions', 'enrollments'].map((one) => `packages/asas/src/messages/${one}.json`)],
+    without: ['packages/asas/src/ui-dashboard/home.tsx', 'packages/asas/src/ui-portal/home.tsx'],
     packages: [],
     copy: [],
     tables: true,

@@ -1380,6 +1380,19 @@
           "relationTo": "media",
           "component": "upload",
           "cell": "upload"
+        },
+        {
+          "name": "selfEnroll",
+          "kind": "checkbox",
+          "label": {
+            "en": "Students may enroll themselves",
+            "ar": "يسجّل الطلاب أنفسهم"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "checkbox",
+          "cell": "checkbox"
         }
       ],
       "operations": [
@@ -1615,6 +1628,11 @@
                               {
                                 "field": "opensOn",
                                 "component": "date",
+                                "decided": "table"
+                              },
+                              {
+                                "field": "selfEnroll",
+                                "component": "checkbox",
                                 "decided": "table"
                               }
                             ]

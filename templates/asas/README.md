@@ -361,7 +361,7 @@ Each feature is a package that exports its `index.ts` alone, which lists the fea
 
 ```
 packages/features/courses/
-  package.json        "@my-app/courses", exports "." and "./domain/*"
+  package.json        "@my-app/courses", exports ".", "./domain/*" and "./portal/*"
   index.ts            export const kayan = [courses, sessions, enrollments] as const, and coverReads
   courses/
     courses.ts        export const courses = defineKayan({ name: 'courses', ... })
@@ -369,6 +369,7 @@ packages/features/courses/
   sessions/           a child kayan is a sibling folder, never nested
   enrollments/
   domain/             plain data the asas's pages read too, which imports nothing
+  portal/ui/          the portal's own look: its shell, catalogue, course page and enrollments, drawn whole
 ```
 
 A kayan's `name` is camelCase (`auditLog`, `memberRoles`), and a multi-word table sets `dbName` in snake case (`audit_log`, `member_roles`). `<kayan>.access.ts`, `<kayan>.steps.ts` or `<kayan>.screens.ts` sit beside the kayan file once they outgrow it.
@@ -522,6 +523,11 @@ What a project made before the data round changes:
 
 - **A relationship restricts unless it says otherwise.** A row another row points at, through a single relationship, a set or an upload, or that a row's latest draft names, is not deleted; the refusal counts them and names the ones the caller reads. An optional relationship that relied on being set null writes `rules: { onDelete: 'set null' }`, and a set that should let its rows go writes `onDelete: 'cascade'`. Run `bunx mithaq migrate --name restrict` for the foreign keys that change.
 - **A student holds one seat in a session.** The migration that adds the key stops on a database where one student holds two standing seats in one session; withdraw one of them first. This query lists each pair that holds more than one: `select session_id, student_id, count(*) from enrollments where deleted_at is null group by session_id, student_id having count(*) > 1`.
+
+What a project made before the portal round changes:
+
+- **The site has no title of its own.** The settings global drops `siteTitle`: the organization's name, in each locale, is the site's name. Its migration drops the `site_title` column and what it holds; copy a title you want to keep into the organization's name first.
+- **A course says whether its students enroll themselves**, in `selfEnroll`, off until staff turn it on. A student now holds `enrollments.create` and `enrollments.delete` for its own seats alone, and a session takes no seat past its capacity. Run `bunx mithaq migrate --name portal` for the column the course adds and the one settings drops.
 
 ## Adding to the project
 

@@ -400,7 +400,7 @@ try {
   // add-on: settings
   const { settings } = asas.global
   if (!(await settings.operations.findOne({}, options))) {
-    await settings.operations.update({ siteTitle: `${organization.name} Academy`, contactEmail: String(owner.email), maintenance: false }, options)
+    await settings.operations.update({ contactEmail: String(owner.email), maintenance: false }, options)
     created.settings++
   }
   // end add-on: settings

@@ -1,4 +1,5 @@
-// Node refuses `.tsx` imports: this loader transforms them and resolves the `@/` aliases registry files use.
+// Node refuses `.tsx` imports: this loader transforms them and resolves the `@/` aliases registry files use, and
+// reads a stylesheet as an empty module.
 // `registerHooks` is synchronous, so a test installs it and then imports dynamically in the same tick.
 import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
@@ -28,6 +29,8 @@ registerHooks({
     }
   },
   load(url, context, nextLoad) {
+    // A stylesheet a page imports, such as a font's, is Vite's to bundle and draws nothing under a test.
+    if (url.endsWith('.css')) return { format: 'module', shortCircuit: true, source: '' }
     if (!url.endsWith('.tsx')) return nextLoad(url, context)
     const path = fileURLToPath(url)
     return {

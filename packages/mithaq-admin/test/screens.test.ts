@@ -31,9 +31,6 @@ const { ScreenList, rowReadsDrafts } = (await import(new URL('../registry/host/s
 const { Form } = await import('../registry/form.tsx')
 const { List } = await import('../registry/list.tsx')
 const { RecordFrame, initialFocusIn } = await import('../registry/record-frame.tsx')
-const { listOf } = await import('../registry/node-tree.ts')
-const { searchableFields } = await import('../registry/list-query.ts')
-const { filterPathsOf } = await import('../registry/filter-operators.ts')
 const { withAddOns } = await import('./with-add-ons.ts')
 // The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
 const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
@@ -189,11 +186,7 @@ test('a list node draws its columns, filters and search, and its empty component
   assert.deepEqual(heads, ['Title', 'Fee', 'Opens on', 'Status', 'Details', 'Cover image'], `the node's columns, in its order: ${heads.join(', ')}`)
   assert.ok(host.querySelector('[data-empty="courses/courses"]'), 'the empty component is drawn with the kayan and the page')
   assert.equal(host.querySelector('input[type="search"]')!.getAttribute('placeholder'), 'Title, Summary, or Details', 'the search runs over the node\'s fields')
-  const portal = asas.targets.portal.client.kayan.courses!
-  const node = listOf({ page: portal.pages.list! as TreePage })!
-  assert.deepEqual(searchableFields({ kayan: portal, search: node.search }), ['title'])
-  assert.deepEqual(filterPathsOf(portal, { filters: node.filters }).map((one) => one.path), ['title'])
-  assert.deepEqual(node.columns.map((one) => one.field), ['title', 'fee'])
+  assert.equal('component' in asas.targets.portal.client.kayan.courses!.pages.list!, true, 'the portal draws its catalogue whole, with no list node')
 })
 
 test('a page is read as values where it holds no form, or where the viewer may update no row it draws and no component of the project draws its form', async () => {

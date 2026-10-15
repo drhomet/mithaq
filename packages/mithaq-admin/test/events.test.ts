@@ -873,8 +873,8 @@ test('27. a field cleared to empty is written as empty, and a field nothing touc
   const created = written[1]!
   assert.deepEqual(
     Object.keys(created).sort(),
-    ['notifications', 'title'],
-    'a create carries the typed field and the checkbox value it drew, and nothing else: archived is never a create\'s',
+    ['notifications', 'selfEnroll', 'title'],
+    'a create carries the typed field and the checkbox values it drew, and nothing else: archived is never a create\'s',
   )
   assert.equal(created.title, 'New course')
   // A create still carries an untouched checkbox (drawn unchecked, which is a value) and a required list of text; an optional list stays out.
@@ -7101,6 +7101,13 @@ test('233b. an enrollment with no session reads as a dash, and a session\'s star
   await act(async () => sleep(20))
   assert.equal(some.querySelector('bdi')?.className.includes('whitespace-nowrap'), true, `the start is one unbroken run: ${rendered(some)}`)
   await release(held)
+
+  const placed = new QueryClient()
+  const where = async ({ kayan }: { kayan: string }) => pageOf(kayan === 'sessions' ? [{ id: 's1', course: 'c1', startsAt: '2026-10-01T09:00:00.000Z', venue: 'campus', format: 'workshop' }] : [{ id: 'c1', title: 'Tajweed' }])
+  const both = await render(createElement(QueryClientProvider, { client: placed }, createElement(SessionCell, { field, value: 's1', row: { id: 'e1', session: 's1' } } as never)), { client: where as never, kayan: enrollments })
+  await act(async () => sleep(20))
+  assert.match(both.textContent ?? '', /Tajweed.*Campus · Workshop/, 'the session reads where and how it meets, in the viewer\'s words')
+  await release(placed)
 })
 
 test('233c. a session in the picker holds its start together, so a narrow box breaks between the course and the date and never inside the date', async () => {
@@ -7334,24 +7341,143 @@ test('233m. the Courses card counts the rows the list lists: the draft read, a n
   assert.equal(plain.asked.every((one) => !one.draft), true, 'no draft read for a reader who may not read drafts')
 })
 
-test('233n. the portal home counts a kayan that keeps drafts the way its list reads it, and any other with count', async () => {
-  const { loader: portalLoader } = await import('../../../templates/asas/src/ui-portal/home.tsx')
-  const asked: { kayan: string; operation: string; input: Record<string, unknown>; draft?: boolean }[] = []
-  const client = (async (call: { kayan: string; operation: string; input: Record<string, unknown>; draft?: boolean }) => {
-    asked.push(call)
-    return call.operation === 'count' ? { totalDocs: 5 } : { totalDocs: call.draft ? 24 : 17, docs: [] }
+// The portal as the courses example draws it, over a client answering from rows held here.
+const portalScreen = asas.targets.portal.client
+const soon = (days: number) => new Date(Date.now() + days * 864e5).toISOString()
+const portalRows = (over: { settings?: Record<string, unknown> | null } = {}) => ({
+  courses: [
+    { id: 'c1', title: 'Calligraphy', summary: 'First strokes.', fee: 50, currency: 'USD', tags: ['t1'], selfEnroll: true },
+    { id: 'c2', title: 'Python', summary: 'First programs.', fee: 0, currency: 'USD', tags: [], selfEnroll: true },
+    { id: 'c3', title: 'Rhetoric', summary: 'Staff enroll.', fee: 10, currency: 'USD', tags: [] },
+  ],
+  sessions: [
+    { id: 's1', course: 'c1', startsAt: soon(1), venue: 'campus', format: 'workshop', capacity: 10 },
+    { id: 's2', course: 'c2', startsAt: soon(5) },
+    { id: 's3', course: 'c3', startsAt: soon(6) },
+  ],
+  enrollments: [{ id: 'e1', session: 's1', student: 'u1' }, { id: 'e2', session: 's2', student: 'u9' }],
+  tags: [{ id: 't1', name: { en: 'Arts', ar: 'فنون' } }],
+  user: [{ id: 'u1', name: 'Sara' }],
+  settings: over.settings === undefined ? { maintenance: false, contactEmail: 'office@school.test' } : over.settings,
+})
+const portalClient = (rows: ReturnType<typeof portalRows>, asked: { kayan: string; operation: string; input: Record<string, unknown> }[] = []) =>
+  (async ({ kayan, operation, input }: { kayan: string; operation: string; input: Record<string, unknown> }) => {
+    asked.push({ kayan, operation, input })
+    if (kayan === 'settings') return rows.settings
+    if (operation === 'findWithSessions') return { ...rows.courses.find((one) => one.id === input.id), sessions: rows.sessions.filter((one) => one.course === input.id || one.id === 's2').map((one) => ({ ...one, seatsLeft: one.id === 's2' ? 0 : 2 })) }
+    if (operation !== 'find') return { id: 'new' }
+    const where = input.where as { id?: { in?: string[] }; student?: { equals?: string } } | undefined
+    const docs = ((rows as Record<string, unknown>)[kayan] as Record<string, unknown>[] | undefined ?? [])
+      .filter((one) => !where?.id?.in || where.id.in.includes(String(one.id)))
+      .filter((one) => !where?.student?.equals || one.student === where.student.equals)
+    return { docs, totalDocs: docs.length }
   }) as ScreenState['client']
-  const tools = (courseOperations: Record<string, boolean>) => ({ client, request: fetch, maxLimit: screen.maxLimit, access: { collections: { courses: { operations: courseOperations }, enrollments: { operations: { count: true } } } } })
-  const counts = await portalLoader(tools({ count: true, find: true, findVersions: true }))
-  assert.deepEqual([counts.courses, counts.enrollments], [24, 5], 'the list says 24 over 17 published, so the home says 24')
-  const courseRead = asked.find((one) => one.kayan === 'courses')!
-  assert.deepEqual([courseRead.operation, courseRead.draft, courseRead.input.limit, !!courseRead.input.where], ['find', true, 1, true], 'a page of one row of the draft read, still held to the courses not archived')
-  asked.length = 0
-  assert.equal((await portalLoader(tools({ count: true, find: true }))).courses, 5, 'a reader of no drafts is counted as it was')
-  assert.equal(asked.find((one) => one.kayan === 'courses')!.operation, 'count')
-  asked.length = 0
-  assert.equal((await portalLoader(tools({ find: true }))).courses, undefined, 'and a reader who may not count is asked nothing')
-  assert.equal(asked.some((one) => one.kayan === 'courses'), false)
+const student = { screens: ['portal'], collections: { enrollments: { operations: { find: true, create: true, delete: true } }, courses: { operations: { find: true } } } }
+const instructor = { screens: ['portal'], collections: { enrollments: { operations: { find: true, create: true, others: true }, fields: { student: { read: true } } }, courses: { operations: { find: true } } } }
+const sara = { id: 'u1', name: 'Sara', email: 'sara@example.com', organizations: [{ id: 'o1', name: 'Al-Noor School' }], activeOrganizationId: 'o1' }
+const drawPortal = async (element: ReactElement, over: Partial<ScreenState>) => {
+  const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const host = await render(createElement(QueryClientProvider, { client: queries }, element), { screen: portalScreen, user: sara, kayan: undefined, ...over })
+  // The page's reads settle one after another: the seats, then their sessions, courses and covers.
+  for (let at = 0; at < 6; at++) await act(async () => sleep(5))
+  return host
+}
+
+test('233n. the portal home is the organization\'s, in its own look: its name at the head, the student\'s next session, the courses it can join that it holds no seat in, and where to write at its foot', async () => {
+  const { Home } = await import('../../../templates/asas/src/ui-portal/courses-home.tsx')
+  const host = await drawPortal(createElement(Home), { access: student, client: portalClient(portalRows()), path: portalScreen.path })
+  assert.equal(host.querySelector('header a')?.textContent?.includes('Al-Noor School'), true, 'the organization\'s name is the site\'s')
+  assert.match(host.querySelector('h1')!.textContent!, /Sara/, 'the greeting names the viewer')
+  const next = host.querySelector('section[aria-labelledby="next"]')
+  assert.match(next?.textContent ?? '', /Calligraphy/, 'the next session is its own, of the course it holds a seat in')
+  assert.match(next?.textContent ?? '', /Campus · Workshop/, 'with where and how it meets, in the viewer\'s words')
+  const joinable = [...host.querySelectorAll('section[aria-labelledby="join"] a[href^="/portal/courses/"]')].map((one) => one.getAttribute('href'))
+  assert.deepEqual(joinable, ['/portal/courses/c2'], 'and offers the course it holds no seat in and may enroll itself in, not one its school enrolls')
+  assert.ok(host.querySelector('footer a[href="mailto:office@school.test"]'), 'the contact address is at the foot')
+  assert.deepEqual([...host.querySelectorAll('nav')].map((one) => one.getAttribute('aria-label')), ['Portal', 'Portal'], 'one nav at the top from md up, one at the foot of a phone')
+  assert.equal(host.querySelector('nav a[aria-current="page"]')?.getAttribute('href'), '/portal', 'Home is current on the home')
+  assert.match(host.querySelector('nav')!.textContent!, /My enrollments/, 'and a student\'s seats are its own')
+})
+
+test('233p. while maintenance is on, a student meets the closed page with where to write, and an instructor keeps working', async () => {
+  const { Home } = await import('../../../templates/asas/src/ui-portal/courses-home.tsx')
+  const rows = portalRows({ settings: { maintenance: true, contactEmail: 'office@school.test' } })
+  const closed = await drawPortal(createElement(Home), { access: student, client: portalClient(rows), path: portalScreen.path })
+  assert.ok(closed.querySelector('[data-portal-closed]'), 'the student is shown the closed page')
+  assert.equal(closed.querySelector('h1')?.textContent, 'Closed for maintenance', 'as the page\'s one heading')
+  assert.ok(closed.querySelector('[data-portal-closed] a[href="mailto:office@school.test"]'), 'with the address to write to')
+  const open = await drawPortal(createElement(Home), { access: instructor, client: portalClient(rows), path: portalScreen.path })
+  assert.equal(open.querySelector('[data-portal-closed]'), null, 'an instructor works on')
+  const unread = await drawPortal(createElement(Home), { access: student, client: portalClient(portalRows({ settings: null })), path: portalScreen.path })
+  assert.equal(unread.querySelector('[data-portal-closed]'), null, 'and settings nobody wrote close nothing')
+})
+
+test('233q. the catalogue draws each course on offer as a card with its tag, next session and fee, searched by title and narrowed by tag', async () => {
+  const { Catalogue } = await import('../../../templates/features/courses/portal/ui/catalogue.tsx')
+  const asked: { kayan: string; operation: string; input: Record<string, unknown> }[] = []
+  const host = await drawPortal(createElement(Catalogue), { access: student, client: portalClient(portalRows(), asked), kayan: portalScreen.kayan.courses })
+  const cards = () => [...host.querySelectorAll('a[href^="/portal/courses/"]')].map((one) => one.textContent ?? '')
+  assert.equal(cards().length, 3)
+  assert.match(cards()[0]!, /Arts.*Calligraphy.*First strokes\..*Next session.*\$50\.00/, 'the tag, title, summary, next session and fee')
+  assert.match(cards()[1]!, /Free/, 'a fee of nought reads as free')
+  assert.deepEqual(asked.find((one) => one.kayan === 'courses')?.input.where, { or: [{ archived: { exists: false } }, { archived: { equals: false } }] }, 'only courses not archived are asked for')
+  await act(async () => typeInto(host.querySelector('input[type="search"]')!, 'pyth'))
+  assert.deepEqual(cards().map((one) => /Python/.test(one)), [true], 'the search keeps what it names')
+  await act(async () => typeInto(host.querySelector('input[type="search"]')!, ''))
+  const arts = [...host.querySelectorAll('[role="group"] button')].find((one) => one.textContent === 'Arts')!
+  await act(async () => click(arts))
+  assert.deepEqual(cards().map((one) => /Calligraphy/.test(one)), [true], 'and a tag keeps the courses it labels')
+})
+
+test('233r. a course that lets students enroll themselves offers the sessions with a seat left and takes one for the viewer alone; one that does not says the school enrolls them', async () => {
+  const { Course } = await import('../../../templates/features/courses/portal/ui/course.tsx')
+  const rows = portalRows()
+  rows.enrollments = []
+  const asked: { kayan: string; operation: string; input: Record<string, unknown> }[] = []
+  const host = await drawPortal(createElement(Course), { access: student, client: portalClient(rows, asked), kayan: portalScreen.kayan.courses, record: rows.courses[0]! })
+  const radios = [...host.querySelectorAll('input[type="radio"]')] as unknown as HTMLInputElement[]
+  assert.deepEqual(radios.map((one) => [one.value, one.disabled]), [['s1', false], ['s2', true]], 'a full session is offered and cannot be picked')
+  assert.match(host.textContent ?? '', /2 seats left/)
+  assert.match(host.textContent ?? '', /Full/)
+  const button = () => [...host.querySelectorAll('button')].find((one) => /Enroll on|Pick a session/.test(one.textContent ?? ''))!
+  assert.equal(button().hasAttribute('disabled'), true, 'nothing is taken before a session is picked')
+  await act(async () => click(radios[0] as unknown as Element))
+  await act(async () => click(button()))
+  await act(async () => sleep(5))
+  assert.deepEqual(asked.find((one) => one.operation === 'create'), { kayan: 'enrollments', operation: 'create', input: { session: 's1' } }, 'the seat names its session alone, so the server makes it the viewer\'s')
+  const off = { ...rows.courses[0]!, selfEnroll: false }
+  rows.courses[0] = off
+  const closed = await drawPortal(createElement(Course), { access: student, client: portalClient(rows), kayan: portalScreen.kayan.courses, record: off })
+  assert.equal(closed.querySelectorAll('input[type="radio"]').length, 0, 'a course the school enrolls offers no seat')
+  assert.match(closed.textContent ?? '', /Ask your school to enroll you\./)
+})
+
+test('233t. an instructor\'s new enrollment on the portal draws the student it enrolls beside the session', async () => {
+  const { PortalShell } = await import('../../../templates/features/courses/portal/ui/shell.tsx')
+  const { Page } = await import('../../../templates/asas/src/ui-portal/page.tsx')
+  const kayan = portalScreen.kayan.enrollments!
+  const page = kayan.pages.create! as Extract<PageClient, { page: unknown }>
+  const refs = { [portalScreen.layouts.top!]: PortalShell, [portalScreen.layouts.page!]: Page } as never
+  const form = createElement(Form, { kayan, screen: { refs, kayan, page }, client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })
+  const host = await drawPortal(form, { access: instructor, client: portalClient(portalRows()), kayan })
+  assert.ok(host.querySelector('#enrollments-session'), 'the session')
+  assert.ok(host.querySelector('#enrollments-student'), 'and the student, whom an instructor picks')
+})
+
+test('233s. a student reads its own seats as cards, upcoming first, each giving its seat back; an instructor reads every seat as a table with the student, named only where it may read them', async () => {
+  const { Enrollments } = await import('../../../templates/features/courses/portal/ui/enrollments.tsx')
+  const rows = portalRows()
+  const mine = await drawPortal(createElement(Enrollments), { access: student, client: portalClient(rows), kayan: portalScreen.kayan.enrollments })
+  const cards = [...mine.querySelectorAll('main li')].map((one) => one.textContent ?? '')
+  assert.match(cards[0]!, /^Calligraphy.*Campus · Workshop.*Starts tomorrow.*Cancel enrollment/, 'the soonest first, with its course, place, how soon, and its cancel')
+  assert.match(cards[1]!, /^Python/)
+  assert.equal(mine.querySelector('table'), null, 'no table for a student')
+  const every = await drawPortal(createElement(Enrollments), { access: instructor, client: portalClient(rows), kayan: portalScreen.kayan.enrollments })
+  const heads = [...every.querySelectorAll('th')].map((one) => one.textContent)
+  assert.deepEqual(heads, ['Course', 'Session', 'Venue and format', 'Student'])
+  const students = [...every.querySelectorAll('tbody tr')].map((one) => one.lastElementChild?.textContent)
+  assert.deepEqual(students, ['Sara', 'Not available'], 'a student the server lets it read by name, and one it does not left unnamed')
+  assert.ok(every.querySelector('a[href="/portal/enrollments/new"]'), 'and the instructor enrolls a student from here')
 })
 
 test('233o. a range of days takes the form its language gives that count, so Arabic says "7 أيام" and "30 يومًا", and the viewing label reads naturally', async () => {

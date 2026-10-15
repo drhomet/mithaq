@@ -613,6 +613,19 @@
           "relationTo": "media",
           "component": "upload",
           "cell": "upload"
+        },
+        {
+          "name": "selfEnroll",
+          "kind": "checkbox",
+          "label": {
+            "en": "Students may enroll themselves",
+            "ar": "يسجّل الطلاب أنفسهم"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "checkbox",
+          "cell": "checkbox"
         }
       ],
       "operations": [
@@ -1025,6 +1038,11 @@
                             "field": "notifications",
                             "component": "switch",
                             "decided": "field"
+                          },
+                          {
+                            "field": "selfEnroll",
+                            "component": "switch",
+                            "decided": "leaf"
                           }
                         ]
                       }
@@ -1164,6 +1182,11 @@
                                     "field": "notifications",
                                     "component": "switch",
                                     "decided": "field"
+                                  },
+                                  {
+                                    "field": "selfEnroll",
+                                    "component": "switch",
+                                    "decided": "leaf"
                                   }
                                 ]
                               }
@@ -3664,21 +3687,6 @@
           "cell": "relationship"
         },
         {
-          "name": "siteTitle",
-          "kind": "text",
-          "label": {
-            "en": "Site title",
-            "ar": "عنوان الموقع"
-          },
-          "rules": {
-            "required": true,
-            "trim": true,
-            "maxLength": 120
-          },
-          "component": "text",
-          "cell": "text"
-        },
-        {
           "name": "maintenance",
           "kind": "checkbox",
           "label": {
@@ -3689,8 +3697,8 @@
             "required": false
           },
           "description": {
-            "en": "While this is on, the site tells visitors it is closed for maintenance.",
-            "ar": "ما دام هذا مفعلا، يخبر الموقع زواره بأنه مغلق للصيانة."
+            "en": "While this is on, the portal tells students it is closed for maintenance. Staff keep working.",
+            "ar": "ما دام هذا مفعلا، تخبر البوابة الطلاب بأنها مغلقة للصيانة. ويواصل الموظفون عملهم."
           },
           "component": "checkbox",
           "cell": "checkbox"
@@ -3733,8 +3741,8 @@
         }
       ],
       "description": {
-        "en": "How the site presents itself, and whether it is open to visitors.",
-        "ar": "كيف يظهر الموقع، وهل هو مفتوح للزوار."
+        "en": "Where students reach the school, and whether the portal is open to them.",
+        "ar": "أين يتواصل الطلاب مع المدرسة، وهل البوابة مفتوحة لهم."
       },
       "pages": {
         "settings": {
@@ -3756,17 +3764,12 @@
                   {
                     "form": [
                       {
-                        "section": "site",
+                        "section": "contact",
                         "label": {
-                          "en": "Site",
-                          "ar": "الموقع"
+                          "en": "Contact",
+                          "ar": "التواصل"
                         },
                         "fields": [
-                          {
-                            "field": "siteTitle",
-                            "component": "text",
-                            "decided": "table"
-                          },
                           {
                             "field": "contactEmail",
                             "component": "email",
