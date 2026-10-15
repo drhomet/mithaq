@@ -17269,9 +17269,9 @@ test('132u. a draft save and a publish each write one version and one audit entr
   const course = await courses.operations.create({ title: 'Audited 132u' }, options)
   await courses.operations.update({ id: course.id, title: 'Audited draft 132u' }, { ...options, draft: true })
   await courses.operations.update({ id: course.id, fee: 4 }, options)
-  const entries = (await db.execute(`select operation, changes from audit_log where record = '${course.id}' order by created_at`)).rows as { operation: string; changes: string }[]
+  const entries = (await db.execute(`select operation, changes from audit_log where record = '${course.id}' order by created_at`)).rows as { operation: string; changes: object }[]
   assert.deepEqual(entries.map((one) => one.operation), ['create', 'update', 'publish'], 'one entry per write, the publish of the draft named so')
-  assert.ok('title' in JSON.parse(entries[1]!.changes), 'the draft save is recorded with the change it drafted')
+  assert.ok('title' in entries[1]!.changes, 'the draft save is recorded with the change it drafted')
   assert.equal((await courseVersions(course.id)).length, 3, 'and one version per write')
   const tables = (await db.execute(`select table_name from information_schema.tables where table_name like '%audit_log%versions%'`)).rows
   assert.deepEqual(tables, [], 'the audit log keeps no versions table')
@@ -17707,8 +17707,8 @@ test('185b. a course\'s details is Lexical\'s editor state in a jsonb column, re
   await courses.operations.update({ id: course.id, title: 'Rich details 185b, renamed' }, options)
   const edited = { root: { ...details.root, children: [details.root.children[0]!] } }
   await courses.operations.update({ id: course.id, details: edited }, options)
-  const logged = ((await db.execute(`select changes from audit_log where record = '${course.id}' and operation = 'update' order by created_at`)).rows as { changes: string }[])
-    .map((row) => Object.keys(JSON.parse(row.changes) as object).filter((name) => name !== 'updatedAt').sort())
+  const logged = ((await db.execute(`select changes from audit_log where record = '${course.id}' and operation = 'update' order by created_at`)).rows as { changes: object }[])
+    .map((row) => Object.keys(row.changes).filter((name) => name !== 'updatedAt').sort())
   assert.deepEqual(logged, [['title'], ['details']], 'a rename lists the title alone, and an edit of the details lists them')
 })
 
@@ -17777,7 +17777,7 @@ test('186m. the template\'s media takes an image through its own storage, a cour
 
   const entry = (await db.select().from(tables.auditLog)).find((row) => row.kayan === 'media' && row.record === image.id)
   assert.ok(entry, 'the create is in the audit log')
-  assert.match(String(entry.changes), new RegExp(String(image.key).replaceAll('/', '\\/')), 'with its key among the columns it records')
+  assert.equal((entry.changes as Record<string, { to: unknown }>).key?.to, image.key, 'with its key among the columns it records')
 
   const course = await courses.operations.create({ title: 'Covered', fee: 10, cover: image.id } as never, options)
   assert.equal(course.cover, image.id)
@@ -17920,9 +17920,9 @@ test('208. a tag update carrying the instant its caller read is refused 409 once
     }
     const kept = await db.execute(`select * from tags where id = '${made.id}'`)
     assert.ok(!('expectedUpdatedAt' in kept.rows[0]!) && !('expected_updated_at' in kept.rows[0]!), 'the key is never a column')
-    const logged = (await db.execute(`select changes from audit_log where record = '${made.id}' and operation = 'update'`)).rows as { changes: string }[]
+    const logged = (await db.execute(`select changes from audit_log where record = '${made.id}' and operation = 'update'`)).rows as { changes: object }[]
     assert.ok(logged.length > 0, 'the updates were logged')
-    assert.ok(logged.every((entry) => !entry.changes.includes('expectedUpdatedAt')), 'and no entry records the key as a change')
+    assert.ok(logged.every((entry) => !('expectedUpdatedAt' in entry.changes)), 'and no entry records the key as a change')
   } finally {
     await tags.operations.delete({ id: made.id }, options)
   }
@@ -18637,7 +18637,7 @@ test('222c. a session is read by a role that does not run the catalogue only whe
 test('233a. a course is archived and brought back, each with its reason and an activity entry; it is unpublished back to a draft that no plain read shows; and a session is archived and brought back the same way, never made archived', async () => {
   const [a] = await twoTenants('233a')
   const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
-  const log = asas.kayan.auditLog.operations as unknown as Record<'find', (input: unknown, options: unknown) => Promise<{ docs: { operation: string; changes: string }[] }>>
+  const log = asas.kayan.auditLog.operations as unknown as Record<'find', (input: unknown, options: unknown) => Promise<{ docs: { operation: string; changes: Record<string, unknown> }[] }>>
   const course = await courses.operations.create({ title: 'States 233a' }, owner)
   await courses.operations.archive({ id: course.id, reason: 'Paused' }, owner)
   const back = await courses.operations.unarchive({ id: course.id, reason: 'Running again' }, owner)
@@ -18645,7 +18645,7 @@ test('233a. a course is archived and brought back, each with its reason and an a
   assert.equal(back.archiveReason, 'Running again', 'with the reason it was brought back for')
   const entries = (await log.find({ where: { record: { equals: course.id } }, sort: '-createdAt' }, owner)).docs
   assert.deepEqual(entries.map((entry) => entry.operation), ['unarchive', 'archive', 'create'], 'each is a line of its own in the activity')
-  assert.deepEqual(JSON.parse(entries[0]!.changes).archived, { from: true, to: false })
+  assert.deepEqual(entries[0]!.changes.archived, { from: true, to: false })
   for (const data of [{ archived: true }, { archiveReason: 'Quietly' }]) {
     const plain = await courses.operations.update({ id: course.id, ...data } as never, owner).then(() => 200, (error: { status?: number }) => error.status)
     assert.equal(plain, 400, `a plain update writes no ${Object.keys(data)[0]}: a course is archived and brought back through its own operations alone`)
