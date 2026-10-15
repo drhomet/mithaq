@@ -60,25 +60,33 @@ export const draftOptions = (request: Request) => {
 export const defaultMaxBodyBytes = 4 * 1024 * 1024
 
 /**
- * The body, or `undefined` once it passes `limit` bytes. Counted as it arrives, since a
+ * The body, or the answer that refuses it: 413 once it passes `limit` bytes, and 499 to a client
+ * that went away mid-body, which is no fault of the server's. Counted as it arrives, since a
  * `content-length` may be absent or wrong, and the rest is never read.
  */
-export const boundedBody = async (request: Request, limit: number): Promise<Blob | undefined> => {
-  if (Number(request.headers.get('content-length')) > limit) return undefined
+export const boundedBody = async (request: Request, limit: number): Promise<Blob | Response> => {
+  const reader = request.body?.getReader()
+  const refused = () => {
+    // Not awaited: a clone's cancel settles only once its twin is cancelled too, which the
+    // caller does after this returns.
+    reader?.cancel().catch(() => {})
+    return tooLarge(limit)
+  }
+  if (Number(request.headers.get('content-length')) > limit) return refused()
   const chunks: Uint8Array[] = []
   let size = 0
-  const reader = request.body?.getReader()
   for (;;) {
-    const { done, value } = (await reader?.read()) ?? { done: true }
-    if (done) return new Blob(chunks as BlobPart[])
-    size += value.byteLength
-    if (size > limit) {
-      // Not awaited: a clone's cancel settles only once its twin is cancelled too, which the
-      // caller does after this returns.
-      reader!.cancel().catch(() => {})
-      return undefined
+    let read: ReadableStreamReadResult<Uint8Array>
+    try {
+      read = (await reader?.read()) ?? { done: true, value: undefined }
+    } catch (thrown) {
+      if (request.signal.aborted) return new Response(null, { status: 499 })
+      throw thrown
     }
-    chunks.push(value)
+    if (read.done) return new Blob(chunks as BlobPart[])
+    size += read.value.byteLength
+    if (size > limit) return refused()
+    chunks.push(read.value)
   }
 }
 
@@ -125,7 +133,7 @@ export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: Fe
         const operation = table.get(`${kayan}/${name}`)
         if (!operation) return null
         const read = await boundedBody(request, maxBodyBytes)
-        if (!read) return tooLarge(maxBodyBytes)
+        if (read instanceof Response) return read
         const body = await read.text()
         // Keyless: refused before any operation, and the key names an operation's refusal.
         const undecodable = (message: string) => Response.json({ code: codes[400], message }, { status: 400 })

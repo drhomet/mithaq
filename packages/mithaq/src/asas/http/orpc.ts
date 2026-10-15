@@ -8,7 +8,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import type { OperationTable } from '../build.ts'
 import { AfterCommitError, AsasError, afterCommitHeader, codes } from '../runner/errors.ts'
 import { issueRefusal, withoutPrototype } from '../runner/steps.ts'
-import { assertMaxBodyBytes, boundedBody, decodeJson, draftOptions, tooLarge } from './fetch.ts'
+import { assertMaxBodyBytes, boundedBody, decodeJson, draftOptions } from './fetch.ts'
 import type { StandardSchemaIssue } from '../../mithaq/standard-schema.ts'
 
 /** The context every procedure is handed, which defaults to the actor alone. */
@@ -156,10 +156,10 @@ export const orpcHttp = ({
         // after this one reads the body of a route oRPC does not answer.
         if (request.body) {
           const read = await boundedBody(request.clone(), maxBodyBytes)
-          if (!read) {
+          if (read instanceof Response) {
             // The clone's twin, so the source stream is cancelled rather than left to the server.
             request.body.cancel().catch(() => {})
-            return tooLarge(maxBodyBytes)
+            return read
           }
           request = new Request(request.url, { method: request.method, headers: request.headers, body: read, signal: request.signal })
         }

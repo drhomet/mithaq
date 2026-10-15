@@ -9,7 +9,7 @@ import { AsasError, codes, denied, invalid, missing } from '../asas/runner/error
 import { sealOf, type Ctx } from '../asas/runner/steps.ts'
 import type { Authorize, ManagedAdmin } from '../asas/runner/write.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
-import { assertMaxBodyBytes, boundedBody, tooLarge } from '../asas/http/fetch.ts'
+import { assertMaxBodyBytes, boundedBody } from '../asas/http/fetch.ts'
 import { allowedType } from './allowed-type.ts'
 
 /** Written by the runner when the row is made, from the signed upload, and by nobody after. */
@@ -488,7 +488,7 @@ export const storageRoutes = <Actor>({
       if (verb === 'uploadInstructions' && id === undefined && request.method === 'POST') {
         // Bounded before the actor is asked, so no caller holds the server to a body of any size.
         const read = await boundedBody(request, config.maxBodyBytes)
-        if (!read) return tooLarge(config.maxBodyBytes)
+        if (read instanceof Response) return read
         let input: unknown
         try {
           input = JSON.parse(await read.text())

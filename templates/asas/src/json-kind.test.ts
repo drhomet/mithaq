@@ -121,6 +121,30 @@ test('every plug refuses a request body past its maxBodyBytes as a 413 before re
   assert.equal((await send(orpcHttp({ maxBodyBytes: defaultMaxBodyBytes }), JSON.stringify({ data: 'x'.repeat(defaultMaxBodyBytes) })))!.status, 413)
 })
 
+test('every plug cancels a body whose content-length is past its limit, and answers 499 to a client that went away mid-body', async () => {
+  const plugs = [() => fetchHttp({ maxBodyBytes: 200 }), () => orpcHttp({ maxBodyBytes: 200 })]
+  for (const plug of plugs) {
+    const { defineKayan, buildAsas } = language()
+    const built = buildAsas({ http: [plug() as never], kayan: [settingsKayan(defineKayan)] })
+    let cancelled = false
+    const told = new ReadableStream({ pull: (controller) => controller.enqueue(new Uint8Array(10)), cancel: () => { cancelled = true } })
+    const long = await built.handler(new Request('http://test/api/blobs/create', { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': '201' }, body: told, duplex: 'half' } as RequestInit))
+    assert.equal(long!.status, 413)
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.ok(cancelled, 'the stream a content-length refused is cancelled, not left to the server')
+    const controller = new AbortController()
+    const gone = new ReadableStream({
+      start: (stream) => stream.enqueue(new TextEncoder().encode('{"data":')),
+      pull: () => {
+        controller.abort()
+        throw new Error('aborted')
+      },
+    })
+    const answer = await built.handler(new Request('http://test/api/blobs/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: gone, duplex: 'half', signal: controller.signal } as RequestInit))
+    assert.equal(answer!.status, 499, 'a client that went away is answered 499, not a fault')
+  }
+})
+
 test('a plug after oRPC reads the whole body of a route under /api that oRPC does not answer', async () => {
   const { defineKayan, buildAsas } = language()
   const echo = () => ({ name: 'echo', router: undefined, handle: async (request: Request) => new Response(await request.text()) })
