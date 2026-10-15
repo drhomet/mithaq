@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { Copy } from 'mithaq-admin/copy.ts'
-import { listed } from 'mithaq-admin/format.tsx'
+import { formatDate, listed } from 'mithaq-admin/format.tsx'
 import { rowWarning } from 'mithaq-admin/row-title.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
@@ -98,9 +98,13 @@ const deleteRefusal = ({ refused, copy }: { refused: unknown; copy: Copy }): str
   // Each kayan whose rows still name this one: how many, and the titles of those the viewer reads,
   // a localized one in the viewer's locale.
   if (key === 'error.conflict.referenced' && Array.isArray(params?.uses) && params.uses.length) {
-    const said = (params.uses as { by: string; count: number; titles: unknown[] }[]).map(({ by, count, titles }) => {
+    const said = (params.uses as { by: string; count: number; titles: unknown[]; titleKind?: string }[]).map(({ by, count, titles, titleKind }) => {
       const kind = t(`${by}.${count === 1 ? 'singular' : 'plural'}`, by) ?? by
-      const names = titles.map((title) => String(title !== null && typeof title === 'object' ? (title as Record<string, unknown>)[locale] ?? '' : title)).filter(Boolean)
+      // A moment arrives as its ISO string, drawn in the viewer's locale as a cell draws it.
+      const named = (title: unknown) => titleKind === 'date' || titleKind === 'datetime'
+        ? formatDate({ value: title, locale, day: titleKind === 'date' }) ?? ''
+        : String(title !== null && typeof title === 'object' ? (title as Record<string, unknown>)[locale] ?? '' : title)
+      const names = titles.map(named).filter(Boolean)
       const rest = count - names.length
       const listedNames = listed([...names, ...(names.length && rest > 0 ? [(t('error.conflict.usedMore', '{count} more') ?? '{count} more').replace('{count}', () => rest.toLocaleString(locale || undefined))] : [])], locale)
       const sentence = names.length ? (t('error.conflict.usedBy', 'Used by {count} {kind}: {titles}.') ?? 'Used by {count} {kind}: {titles}.') : (t('error.conflict.usedByUnnamed', 'Used by {count} {kind}.') ?? 'Used by {count} {kind}.')

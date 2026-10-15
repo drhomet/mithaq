@@ -1579,7 +1579,8 @@
           },
           "rules": {
             "providedBy": {
-              "create": "never"
+              "create": "never",
+              "update": "application"
             },
             "required": false
           },
@@ -1628,6 +1629,10 @@
           },
           "rules": {
             "maxLength": 200,
+            "providedBy": {
+              "create": "never",
+              "update": "application"
+            },
             "required": false
           },
           "component": "text",

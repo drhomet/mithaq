@@ -506,7 +506,7 @@ What a project made before the organization lifecycle round changes when it take
 What a project made before the data round changes:
 
 - **A relationship restricts unless it says otherwise.** A row another row points at, through a single relationship, a set or an upload, or that a row's latest draft names, is not deleted; the refusal counts them and names the ones the caller reads. An optional relationship that relied on being set null writes `rules: { onDelete: 'set null' }`, and a set that should let its rows go writes `onDelete: 'cascade'`. Run `bunx mithaq migrate --name restrict` for the foreign keys that change.
-- **A student holds one seat in a session.** The migration that adds the key stops on a database where one student holds two standing seats in one session; withdraw one of them first.
+- **A student holds one seat in a session.** The migration that adds the key stops on a database where one student holds two standing seats in one session; withdraw one of them first. This query lists each pair that holds more than one: `select session_id, student_id, count(*) from enrollments where deleted_at is null group by session_id, student_id having count(*) > 1`.
 
 ## Adding to the project
 

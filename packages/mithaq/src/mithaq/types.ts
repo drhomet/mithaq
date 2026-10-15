@@ -168,7 +168,11 @@ type BoundField<L extends LanguageShape, K extends keyof L['kinds'] & string> = 
  * name: a `Where`, `true` for every row the actor reads, `false` for none. A picker's read is ANDed
  * with it, so it narrows what the target's own read answers and never widens it.
  */
-export type FilterOptions = (args: { user: unknown }) => Where | boolean | Promise<Where | boolean>
+export type FilterOptions = (args: {
+  user: unknown
+  /** The transaction of the write it holds, where there is one, so a read it makes joins it as Payload's `req` carries one. */
+  tx?: unknown
+}) => Where | boolean | Promise<Where | boolean>
 
 /** Field union derived once from a concrete language's kind and rule registries. */
 export type FieldOf<L extends LanguageShape> = {

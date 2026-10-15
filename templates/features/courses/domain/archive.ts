@@ -25,8 +25,9 @@ export const reasonInput = (key: `${string}.operations.${'archive' | 'unarchive'
  * columns the kayan has, so `reason` never has to be a field. `ctx.data` is
  * spread to keep what the runner filled before it, such as `updatedAt`, and
  * `reason` reaches no column: the store step writes the kayan's own fields alone.
+ * An empty reason, which a bulk archive sends, keeps none.
  */
-export const marks = (archived: boolean) => (ctx: Ctx<{ reason: string }>): Ctx => ({ ...ctx, data: { ...ctx.data, archived, archiveReason: ctx.data.reason } })
+export const marks = (archived: boolean) => (ctx: Ctx<{ reason: string }>): Ctx => ({ ...ctx, data: { ...ctx.data, archived, archiveReason: ctx.data.reason || null } })
 
 /** Over a row not archived yet, where an archive button is drawn. Both arms, since a row from before the column holds `null`. */
 export const unarchived = { or: [{ 'record.archived': { exists: false } }, { 'record.archived': { equals: false } }] } as const

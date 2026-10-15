@@ -10,7 +10,7 @@ export * from './targets.ts'
 export { heldPermissions, type Assigned, type CommandActor } from './rbac/index.ts'
 export { holdsPermission, requestOrganization } from './auth/better-auth/index.ts'
 export type { AssignedResolver, AuthStrategy, KayanAuth } from './asas/actor.ts'
-export type { AuthConfig, HttpPlug, Operation, OperationTable } from './asas/build.ts'
+export type { AuthConfig, HttpPlug, Operation, OperationTable, Vocabulary } from './asas/build.ts'
 export { fetchHttp, type FetchHttpOptions } from './asas/http/fetch.ts'
 export { AfterCommitError, AsasError, conflict, denied, invalid, missing, Notice, type MessageKey } from './asas/runner/errors.ts'
 export {

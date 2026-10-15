@@ -47,10 +47,10 @@ const namesAnother = ({ user, data }: { user: unknown; data?: unknown }) =>
  * what the actor's own read of people answers and never widens it, so an
  * instructor is offered the students it already reads and not itself.
  */
-const students: FilterOptions = async ({ user }) => {
+const students: FilterOptions = async ({ user, tx }) => {
   const active = currentOrganization(user)
   if (!active) return false
-  const held = await serverTargets.drizzle.find({ kayan: 'memberRoles', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: active }, role: { equals: 'student' } } } })
+  const held = await serverTargets.drizzle.find({ tx, kayan: 'memberRoles', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: active }, role: { equals: 'student' } } } })
   const ids = held.docs.map((row) => row.user).filter((id): id is string => typeof id === 'string')
   return ids.length ? { id: { in: ids } } : false
 }

@@ -5,10 +5,10 @@ import { courses, runsCatalogue } from '../courses/courses.ts'
 import { archivedRow, marks, reason, reasonInput, unarchived } from '../domain/archive.ts'
 
 /**
- * Writes every matched session `archived: true` and nothing else, whatever the call sent as `data`,
- * so the course page's bulk Archive can only archive, never un-archive.
+ * Hands each matched session's `archive` no reason and nothing else, whatever the call sent as
+ * `data`, so the course page's bulk Archive can only archive, never un-archive.
  */
-const archiveAll = (ctx: Ctx): Ctx => ({ ...ctx, data: { ...ctx.data, data: { archived: true, archiveReason: null } } })
+const archiveAll = (ctx: Ctx): Ctx => ({ ...ctx, data: { ...ctx.data, data: { reason: '' } } })
 
 /**
  * What a session's create and edit pages both draw, written once so the two cannot drift. The edit
@@ -121,9 +121,9 @@ export const sessions = defineKayan({
     service: {
       operations: {
         ...defaultOperations,
-        // Runs as `updateMany` does, one `update` per matched row under the same access, and writes
-        // nothing but the mark.
-        archiveMany: { steps: ({ steps }) => [archiveAll, steps.updateMany] },
+        // One `archive` per matched row under the same access, so the mark is written by an
+        // archive alone.
+        archiveMany: { each: 'archive', steps: ({ steps }) => [archiveAll, steps.updateMany] },
         archive: {
           targets: { dashboard: { fields: { reason } } },
           input: () => reasonInput('sessions.operations.archive'),
@@ -165,9 +165,8 @@ export const sessions = defineKayan({
       ],
       targets: { dashboard: { component: 'combobox' } },
     },
-    // Never by a create. `archive`, `unarchive` and `archiveMany` write it, and so does a plain update by a
-    // role holding its key, since the bulk archive runs one plain update per row.
-    archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشفة' }, rules: { providedBy: { create: 'never' } } },
+    // Written by `archive` and `unarchive` alone, as a course's is, and `archiveMany` runs an archive per row.
+    archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشفة' }, rules: { providedBy: { create: 'never', update: 'application' } } },
     details: { kind: 'richText', label: { en: 'Details', ar: 'التفاصيل' } },
     /**
      * The enrollments that point at this session: the one kind that builds no column. `enrollments.session`
@@ -182,6 +181,6 @@ export const sessions = defineKayan({
     },
     // Why it was last archived or brought back. Declared last, so a pushed table and a migrated one
     // hold the column in the same place.
-    archiveReason: { kind: 'text', label: { en: 'Archive reason', ar: 'سبب الأرشفة' }, rules: { maxLength: 200 } },
+    archiveReason: { kind: 'text', label: { en: 'Archive reason', ar: 'سبب الأرشفة' }, rules: { maxLength: 200, providedBy: { create: 'never', update: 'application' } } },
   },
 })

@@ -217,35 +217,60 @@ const namedUses = 5
 const byId = { field: 'id', direction: 'asc' } as const
 
 /**
- * Refuses the delete while a live row or the latest version of a row names it, in the delete's own
- * transaction. The foreign key holds live rows alone, so a pending draft would otherwise keep an id
- * nothing answers for. The refusal counts every row and names by title only those the actor reads.
+ * The ids of the rows of each kayan that name `id` through `pointers`, a row whose latest version
+ * names it among them, since the foreign key holds live rows alone and a pending draft would
+ * otherwise keep an id nothing answers for. A pointing kayan that is tenant-owned is read within
+ * `tenant` when one is given, so a count never reaches another organization's rows.
  */
-// ponytail: a draft saved by a write that read the row before this delete committed can still name it;
-// lock the referenced row in `assertReferences` if that race is ever seen.
-const refuseReferenced = async <Actor>({ kayan, id, pointers, store, tx, authorize, admin, actor }: {
-  kayan: ResolvedKayan
+export const referencingIds = async ({ id, pointers, store, tenant, tx }: {
   id: unknown
   pointers: readonly Pointer[]
+  store: Pick<Store, 'find'>
+  tenant?: unknown
+  tx?: unknown
+}) => {
+  const uses = new Map<ResolvedKayan, Set<string>>()
+  for (const { kayan, field } of pointers) {
+    const ids = uses.get(kayan) ?? new Set<string>()
+    const within = (path: string) => (kayan.tenant && tenant !== undefined ? { [path]: { equals: tenant as Scalar } } : undefined)
+    const rows = await store.find({ kayan: kayan.name, args: { limit: 0, page: 1, sort: byId, where: combineWhere({ [field.name]: { equals: id as Scalar } }, within(kayan.tenant!)) }, tx })
+    for (const row of rows.docs) ids.add(String(row.id))
+    if (kayan.versions) {
+      // ponytail: `version.<field>` is read with no index, a scan of the versions table per delete;
+      // index it once a delete is measured slow.
+      const versions = await store.find({ kayan: kayan.versions.table, args: { limit: 0, page: 1, sort: byId, where: combineWhere({ and: [{ latest: { equals: true } }, { [`version.${field.name}`]: { equals: id as Scalar } }] }, within(`version.${kayan.tenant}`)) }, tx })
+      for (const version of versions.docs) ids.add(String(version.parent))
+    }
+    if (ids.size) uses.set(kayan, ids)
+  }
+  return uses
+}
+
+/**
+ * Refuses the delete while a live row or the latest version of a row names it, in the delete's own
+ * transaction. The row is held `FOR UPDATE` by the delete, and a write naming it holds it the same
+ * way in `assertReferences`, a draft save included, so no new reference lands between this count
+ * and the delete. The refusal counts every row and names by title only those the actor reads.
+ * A shared row that another organization's rows name passes this count, which reads the actor's
+ * own, and is refused by the foreign key instead, which names their kayan alone.
+ */
+const refuseReferenced = async <Actor>({ kayan, existing, pointers, store, tenant, tx, authorize, admin, actor }: {
+  kayan: ResolvedKayan
+  existing: Record<string, unknown>
+  pointers: readonly Pointer[]
   store: Store
+  tenant: unknown
   tx: unknown
   authorize: Authorize
   admin: ManagedAdmin<Actor> | undefined
   actor: Actor | null
 }) => {
-  const uses: { by: string; count: number; titles: unknown[] }[] = []
-  for (const one of new Set(pointers.map((pointer) => pointer.kayan))) {
-    const ids = new Set<string>()
-    for (const { field } of pointers.filter((pointer) => pointer.kayan === one)) {
-      const rows = await store.find({ kayan: one.name, args: { limit: 0, page: 1, sort: byId, where: { [field.name]: { equals: id as Scalar } } }, tx })
-      for (const row of rows.docs) ids.add(String(row.id))
-      if (!one.versions) continue
-      const versions = await store.find({ kayan: one.versions.table, args: { limit: 0, page: 1, sort: byId, where: { and: [{ latest: { equals: true } }, { [`version.${field.name}`]: { equals: id as Scalar } }] } }, tx })
-      for (const version of versions.docs) ids.add(String(version.parent))
-    }
-    // A row that names itself goes with itself.
-    if (one === kayan) ids.delete(String(id))
-    if (ids.size) uses.push({ by: one.name, count: ids.size, titles: await titlesOf({ kayan: one, ids: [...ids], store, tx, authorize, admin, actor }) })
+  const found = await referencingIds({ id: existing.id, pointers, store, tenant, tx })
+  // A row that names itself goes with itself; read off the stored row, since the caller's id may differ in case.
+  found.get(kayan)?.delete(String(existing.id))
+  const uses: { by: string; count: number; titles: unknown[]; titleKind?: string }[] = []
+  for (const [one, ids] of found) {
+    if (ids.size) uses.push({ by: one.name, count: ids.size, ...(await titlesOf({ kayan: one, ids: [...ids], store, tx, authorize, admin, actor })) })
   }
   if (!uses.length) return
   throw conflict({
@@ -255,7 +280,11 @@ const refuseReferenced = async <Actor>({ kayan, id, pointers, store, tx, authori
   })
 }
 
-/** The titles of the rows among `ids` this actor reads, a draft only where it reads drafts. */
+/**
+ * The titles of the rows among `ids` this actor finds and whose title field it reads, a draft only
+ * where it reads drafts. A title that points at another row is its raw id, so such rows are
+ * counted alone; a moment is sent as a value, marked so the screen formats it.
+ */
 const titlesOf = async <Actor>({ kayan, ids, store, tx, authorize, admin, actor }: {
   kayan: ResolvedKayan
   ids: string[]
@@ -264,22 +293,28 @@ const titlesOf = async <Actor>({ kayan, ids, store, tx, authorize, admin, actor 
   authorize: Authorize
   admin: ManagedAdmin<Actor> | undefined
   actor: Actor | null
-}) => {
+}): Promise<{ titles: unknown[]; titleKind?: string }> => {
   const title = Object.values(kayan.targets ?? {}).map((target) => (target as { useAsTitle?: unknown } | undefined)?.useAsTitle).find((one) => typeof one === 'string') as string | undefined
-  if (!title || !Object.hasOwn(kayan.fields, title)) return []
-  const asked = (operation?: string) => authorize({ admin, actor, data: {}, effect: 'read', kayan, operation }).then((where) => ({ where }), (thrown: unknown) => {
+  const field = title && Object.hasOwn(kayan.fields, title) ? kayan.fields[title]! : undefined
+  if (!field || field.target || field.kind === 'join') return { titles: [] }
+  const asked = (operation: string) => authorize({ admin, actor, data: {}, effect: 'read', kayan, operation }).then((where) => ({ where }), (thrown: unknown) => {
     if (thrown instanceof AsasError && thrown.status === 403) return undefined
     throw thrown
   })
-  const readable = await asked()
-  if (!readable) return []
+  const readable = await asked('find')
+  if (!readable) return { titles: [] }
   const drafts = kayan.versions?.drafts ? await asked('findVersions') : undefined
   const shown = kayan.versions?.drafts && drafts
     ? combineWhere(aliveWhere(kayan), drafts.where && { or: [{ _status: { equals: 'published' } }, drafts.where] })
     : publishedWhere(kayan)
-  const sort = kayan.fields[title]!.rules?.localized ? byId : { field: title, direction: 'asc' as const }
+  const sort = field.rules?.localized ? byId : { field: field.name, direction: 'asc' as const }
   const found = await store.find({ kayan: kayan.name, args: { limit: namedUses, page: 1, sort, where: { and: [{ id: { in: ids } }, readable.where, shown].filter(Boolean) as Where[] } }, tx })
-  return found.docs.map((row) => row[title])
+  const titles: unknown[] = []
+  for (const row of found.docs) {
+    const visible = await projectReadableFields({ kayan, row, actor })
+    if (Object.hasOwn(visible, field.name)) titles.push(visible[field.name])
+  }
+  return { titles, ...(field.kind === 'date' || field.kind === 'datetime' ? { titleKind: field.kind } : {}) }
 }
 
 const fieldAccess = async <Actor>(
@@ -449,7 +484,7 @@ const validateTenantRelationships = async <Actor>(
     access: (target) => authorize({ admin, actor, data: {}, effect: 'read', kayan: target }),
     // A field's `filterOptions` holds a save to what its picker offers, as Payload's does.
     offered: async (field) => {
-      const answer = await field.filterOptions?.({ user: actor })
+      const answer = await field.filterOptions?.({ user: actor, tx })
       return answer === undefined || answer === true ? undefined : answer === false ? { id: { in: [] } } : assertWhere(field.target!, answer)
     },
     tx,
@@ -946,7 +981,7 @@ export const write = <Actor = unknown>({
           remove: async ({ tx: heldTx, kayan: name, id }) => {
             if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
             // A marked row is kept, so only a delete that removes it answers to the rows naming it.
-            if (name === kayan.name && pointers.length) await refuseReferenced({ kayan, id: targetId ?? id, pointers, store, tx: heldTx, authorize, admin, actor })
+            if (name === kayan.name && pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
             return tools.store.remove({ tx: heldTx, kayan: name, id: targetId ?? id, where: writeWhere })
           },
         })
