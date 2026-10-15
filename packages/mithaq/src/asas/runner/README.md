@@ -132,6 +132,12 @@ core does all of this:
 - **Another organization's row answers like a missing one.** A read by id, an
   update and a delete of it are the same 404 (`error.not_found.row`) an absent
   id gets, so the answer never says the id exists.
+- **A delete's refusal counts the organization's own rows.** A row that any
+  organization's rows or latest drafts still name is not deleted. The refusal
+  counts and names those of the deleted row's organization, or of the actor's
+  active one for a shared row; a shared row that another organization's rows
+  name is refused with no count, so the answer never says how much of another
+  organization uses it.
 - **The field never changes.** It is `providedBy: { update: 'never' }`. A
   step that writes it on an update, or writes another organization into it on a
   create, fails, so nothing moves a row to another organization.

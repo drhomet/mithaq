@@ -33,6 +33,8 @@ export const memoryStore = () => {
     const [ownField, relatedField] = field.split('.')
     if (!relatedField) return row[field]
     const own = kayanByName.get(name)!.fields[ownField!]
+    // A versions table's snapshot, which a delete's reference check asks about.
+    if (!own && ownField === 'version') return (row.version as Record<string, unknown> | undefined)?.[relatedField]
     // A second segment the field's own locales name is a locale rather than a hop. This store keeps a
     // localized field as the one object it is written as, so the locale is read off that object, and a
     // field nobody wrote reads as null.

@@ -408,7 +408,8 @@ test('the committed migration keys courses_tags on a database holding its rows, 
       insert into courses_tags (parent_id, target_id, "order") values
         ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 0), ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 1),
         ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000c', 1), ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000a', 0);`), 0)
-    await copied(folders.filter((folder) => folder >= keyed))
+    // Up to the one that makes the target's key restrict, which checks every target id these rows name.
+    await copied(folders.filter((folder) => folder >= keyed && folder < '20261014221355_tags_restrict'))
     const refused = await migrated()
     assert.notEqual(refused.code, 0, 'the migration stops')
     assert.match(refused.output, /courses_tags holds 2 rows whose \(parent_id, order\) another row also holds/)

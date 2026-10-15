@@ -1,0 +1,1 @@
+ALTER TABLE "course_sessions" ADD COLUMN "archive_reason" varchar(200);

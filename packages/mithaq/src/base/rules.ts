@@ -108,7 +108,7 @@ export const defaultRules = {
   uppercase: rule<boolean>({ accepts: isBoolean, excludes: ['lowercase'] }),
   lowercase: rule<boolean>({ accepts: isBoolean, excludes: ['uppercase'] }),
   trim: boolean,
-  /** What happens to this row when the row it points at is deleted. Left out, a required relationship restricts and an optional one is set null. */
+  /** What happens to this row when the row it points at is deleted. Left out, a required field and a set restrict and any other takes its kind's default. */
   onDelete: rule<OnDelete>({
     accepts: (value): value is OnDelete =>
       typeof value === 'string' && ['cascade', 'restrict', 'set null'].includes(value),

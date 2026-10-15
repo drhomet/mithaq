@@ -846,12 +846,11 @@ test('27. a field cleared to empty is written as empty, and a field nothing touc
   const created = written[1]!
   assert.deepEqual(
     Object.keys(created).sort(),
-    ['archived', 'notifications', 'title'],
-    'a create carries the typed field and the two checkbox values it drew, and nothing else',
+    ['notifications', 'title'],
+    'a create carries the typed field and the checkbox value it drew, and nothing else: archived is never a create\'s',
   )
   assert.equal(created.title, 'New course')
   // A create still carries an untouched checkbox (drawn unchecked, which is a value) and a required list of text; an optional list stays out.
-  assert.equal(created.archived, false)
   assert.equal(created.notifications, false)
 })
 
@@ -893,6 +892,18 @@ test('8. a field the page does not name is submitted by nothing, on an edit and 
   await act(async () => typeInto(create.querySelector('#courses-title')!, 'New course'))
   await act(async () => fire(create.querySelector('form')!, 'submit'))
   assert.deepEqual(written[1], { title: 'New course' }, 'and a create writes no checkbox its page never drew')
+})
+
+test('28a. a picker whose field narrows its options reads for that field, so the server holds the page to them, and one whose field does not reads as before', async () => {
+  for (const [filterOptions, expected] of [[true, 'sessions.course'], [undefined, undefined]] as const) {
+    const { api, calls } = fakeApi({ courses: [{ id: 'c1', title: 'Tajweed' }] })
+    const course = { ...sessions.fields.find((one) => one.name === 'course')!, ...(filterOptions && { filterOptions }) }
+    const host = await render(createElement(RelationshipControl, { values: {}, setValue: () => {}, field: course, kayan: sessions, client: kayans, api, id: 'sessions-course', t, value: null, readOnly: false, onChange: () => {} }))
+    await act(async () => {
+      click(host.querySelector('#sessions-course') as unknown as Element)
+    })
+    assert.equal(calls.at(-1)?.input.for, expected, `a field ${filterOptions ? 'that narrows' : 'that does not'} reads ${expected ?? 'for nothing'}`)
+  }
 })
 
 test('28. the picker loads page one on open with the limit, the sort and the not_in, and adds a like on the term 300 ms later', async () => {
@@ -1409,16 +1420,16 @@ test('32. a row the read did not answer for says the viewer cannot see it, never
   const waiting = await render(listWith(fakeApi({ sessions: [], user: [] }, { silent: true }).api))
   assert.ok(waiting.textContent?.includes('Loading…'), `a cell whose read has not answered says so:\n${waiting.textContent?.slice(0, 200)}`)
 
-  // Answered without the row reads as a row the viewer cannot see, not as loading nor as the raw id the column holds.
+  // Answered without the row: the viewer reads the kayan and the row is gone, never loading nor the raw id the column holds.
   const missing = await render(listWith(fakeApi({ sessions: [], user: [] }).api))
   assert.ok(!missing.textContent?.includes('Loading…'), 'a settled read leaves nothing loading')
-  assert.ok(missing.textContent?.includes('You can\'t see this'), `and the row the read did not answer for says the viewer cannot see it:\n${missing.textContent?.slice(0, 300)}`)
+  assert.ok(missing.textContent?.includes('Deleted'), `and the row the read did not answer for reads as deleted:\n${missing.textContent?.slice(0, 300)}`)
   assert.ok(!missing.textContent?.includes('u1') && !missing.textContent?.includes('s1'), 'never an id the column holds')
 
   // Refused outright: the 403 a role with the key and no field of the target meets.
   const refused = await render(listWith({ sessions: { find: async () => { throw Object.assign(new Error('Forbidden.'), { status: 403 }) } }, user: { find: async () => { throw Object.assign(new Error('Forbidden.'), { status: 403 }) } } }))
   await act(async () => sleep(0))
-  assert.ok(refused.textContent?.includes('You can\'t see this') && !refused.textContent?.includes('u1') && !refused.textContent?.includes('s1'), `a refused read says the same: ${refused.textContent?.slice(0, 300)}`)
+  assert.ok(refused.textContent?.split('Not available').length === 3 && !refused.textContent?.includes('u1') && !refused.textContent?.includes('s1'), `a refused read says only that it is not available: ${refused.textContent?.slice(0, 300)}`)
 })
 
 const recording = () => {
@@ -1498,7 +1509,8 @@ test('34. a checkbox on a row that carries no value for it is left out of an upd
   await act(async () => {
     fire(made.querySelector('form')!, 'submit')
   })
-  assert.equal(written[1]!.archived, false, 'a create still carries the box it drew')
+  assert.equal(written[1]!.notifications, false, 'a create still carries the box it drew')
+  assert.ok(!('archived' in written[1]!), 'and none it never draws, archived being no create\'s')
 })
 
 test('35. a form handed another row seeds from that row, so a screen that navigates between two rows without unmounting writes neither row\'s values under the other\'s id', async () => {
@@ -3200,7 +3212,7 @@ test('80. a rule the projection carries refuses a value before any request, in t
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3210,21 +3222,21 @@ test('80. a rule the projection carries refuses a value before any request, in t
   )
   const errorOf = (name: string) => host.querySelector(`#courses-${name}-error`)?.textContent
   // Something other than the title, so Save is offered and the title is left empty.
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'Moved'))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Moved'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(written.length, 0, 'an empty required field sends nothing')
   assert.equal(errorOf('title'), 'This field is required.', 'and its box says the sentence the server seeds for `courses.title.required`')
 
   await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'x'.repeat(201)))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'x'.repeat(201)))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(written.length, 0, 'a value longer than maxLength sends nothing either')
-  assert.equal(errorOf('archiveReason'), 'The value is too long.', 'and says `courses.archiveReason.maxLength`')
+  assert.equal(errorOf('summary'), 'The value is too long.', 'and says `courses.summary.maxLength`')
   assert.equal(errorOf('title'), undefined, 'while the title, now filled, says nothing')
 
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'Moved'))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Moved'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
-  assert.deepEqual(written, [{ title: 'Tajweed', archiveReason: 'Moved' }], 'a value every rule holds is sent, once')
+  assert.deepEqual(written, [{ title: 'Tajweed', summary: 'Moved' }], 'a value every rule holds is sent, once')
 })
 
 test('215e. Save on a fresh create form is offered before anything is typed, and pressing it says which required box is empty and sends nothing', async () => {
@@ -3232,7 +3244,7 @@ test('215e. Save on a fresh create form is offered before anything is typed, and
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3287,7 +3299,7 @@ test('80b. a box is checked when the person leaves it, in the sentence the serve
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3300,17 +3312,17 @@ test('80b. a box is checked when the person leaves it, in the sentence the serve
 
   await act(async () => fire(host.querySelector('#courses-title')!, 'focusout'))
   assert.equal(errorOf('title'), 'This field is required.', 'a required box left empty says the server\'s sentence under it')
-  assert.equal(errorOf('archiveReason'), undefined, 'and the box nobody entered says nothing')
+  assert.equal(errorOf('summary'), undefined, 'and the box nobody entered says nothing')
 
   // Typed into and not yet left: the sentence goes at once, because the value holds.
   await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
   assert.equal(errorOf('title'), undefined, 'filling the box clears its sentence without a second blur')
 
   // Too long while typing says nothing until the box is left.
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'x'.repeat(201)))
-  assert.equal(errorOf('archiveReason'), undefined, 'a box still being typed into is not told it is wrong')
-  await act(async () => fire(host.querySelector('#courses-archiveReason')!, 'focusout'))
-  assert.equal(errorOf('archiveReason'), 'The value is too long.', 'and leaving it says `courses.archiveReason.maxLength`')
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'x'.repeat(201)))
+  assert.equal(errorOf('summary'), undefined, 'a box still being typed into is not told it is wrong')
+  await act(async () => fire(host.querySelector('#courses-summary')!, 'focusout'))
+  assert.equal(errorOf('summary'), 'The value is too long.', 'and leaving it says `courses.summary.maxLength`')
   assert.equal(written.length, 0, 'none of it sent anything')
 })
 
@@ -3319,7 +3331,7 @@ test('80c. a refusal a save drew goes from under its box the moment the value ho
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'archiveReason' }] }], '/courses/new')),
+      screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }], '/courses/new')),
       client,
       value: null,
       t: said,
@@ -3328,7 +3340,7 @@ test('80c. a refusal a save drew goes from under its box the moment the value ho
     }),
   )
   const errorOf = (name: string) => host.querySelector(`#courses-${name}-error`)?.textContent
-  await act(async () => typeInto(host.querySelector('#courses-archiveReason')!, 'Moved'))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Moved'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(errorOf('title'), 'This field is required.', 'the save refused the empty title under its box')
   await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
@@ -3337,7 +3349,7 @@ test('80c. a refusal a save drew goes from under its box the moment the value ho
 
 test('81. two people edit different fields of one course, and both changes survive, because an update sends only what changed', async () => {
   // The server's own update writes the keys it is sent and leaves the rest of the row as it was.
-  const row: Record<string, unknown> = { id: 'a-row', title: 'Tajweed', archiveReason: 'None' }
+  const row: Record<string, unknown> = { id: 'a-row', title: 'Tajweed', summary: 'None' }
   const sent: Record<string, unknown>[] = []
   const update = async (input: Record<string, unknown>) => {
     sent.push(input)
@@ -3353,9 +3365,9 @@ test('81. two people edit different fields of one course, and both changes survi
   }
   // Both opened the row before either saved.
   await edit('title', 'Tajweed II')
-  await edit('archiveReason', 'Replaced')
-  assert.deepEqual(sent, [{ id: 'a-row', title: 'Tajweed II' }, { id: 'a-row', archiveReason: 'Replaced' }], 'each save names the one field its person changed')
-  assert.deepEqual(row, { id: 'a-row', title: 'Tajweed II', archiveReason: 'Replaced' }, 'so the second save leaves the first one\'s title in place')
+  await edit('summary', 'Replaced')
+  assert.deepEqual(sent, [{ id: 'a-row', title: 'Tajweed II' }, { id: 'a-row', summary: 'Replaced' }], 'each save names the one field its person changed')
+  assert.deepEqual(row, { id: 'a-row', title: 'Tajweed II', summary: 'Replaced' }, 'so the second save leaves the first one\'s title in place')
 })
 
 test('82. a leaf its when hides, and nobody changed, is not in an update', async () => {
@@ -3778,7 +3790,7 @@ test('146a. an enrollment\'s student reads as the person\'s name and its organiz
 test('146b. a box in a side region, outside the page\'s form node, belongs to the page\'s form, so Enter in it saves the page', async () => {
   // The form node draws the page's one `<form>`, so a leaf in another region names it by id with the `form` attribute, and the browser's implicit submission on Enter reaches it.
   const saved: Record<string, unknown>[] = []
-  const page = plus(recordPage([{ form: ['title'] }], '/courses/:id'), 'side', { field: 'archiveReason' })
+  const page = plus(recordPage([{ form: ['title'] }], '/courses/:id'), 'side', { field: 'summary' })
   const host = await render(createElement(Form, {
     kayan: courses,
     screen: screenOf(page),
@@ -3789,14 +3801,14 @@ test('146b. a box in a side region, outside the page\'s form node, belongs to th
     onDone: () => {},
   }))
   const pageForm = host.querySelector('[data-node="form"] form') as unknown as HTMLFormElement
-  const side = host.querySelector('#courses-archiveReason') as unknown as HTMLInputElement
+  const side = host.querySelector('#courses-summary') as unknown as HTMLInputElement
   assert.ok(pageForm && side)
   assert.equal(pageForm.contains(side as unknown as Node), false, 'the side box is outside the form element')
   assert.ok(side.form === pageForm, 'and the form is its owner all the same')
   await act(async () => typeInto(side as unknown as Element, 'Moved'))
   // Implicit submission as the browser makes it: the form owner of the box Enter was pressed in is submitted.
   await act(async () => side.form?.requestSubmit())
-  assert.deepEqual(saved, [{ id: 'c1', archiveReason: 'Moved' }], 'Enter in the side box saves the page, with the side box\'s value')
+  assert.deepEqual(saved, [{ id: 'c1', summary: 'Moved' }], 'Enter in the side box saves the page, with the side box\'s value')
 })
 
 /** Links are caught on the document before happy-dom acts on them, as the screen host's frame routes every link. */
@@ -5306,6 +5318,61 @@ test('228c. the delete dialog names the row, confirms in a shipped key, says ins
   assert.equal(dialogText(), undefined, 'and the dialog closes')
 })
 
+test('228g. a delete refused because rows still use it says how many, names the ones the viewer reads in the viewer\'s locale, and counts the rest', async () => {
+  const edit = plus(recordPage([{ form: ['title'] }]), 'danger', { button: 'delete', label: { en: 'Delete', ar: 'حذف' } })
+  let uses: unknown[] = []
+  const words: Record<string, string> = { 'courses.singular': 'Course', 'courses.plural': 'Courses', 'sessions.plural': 'Sessions', 'admin.deleteConfirm': 'Delete for good' }
+  const host = await render(createElement(Form, {
+    kayan: courses,
+    screen: screenOf(edit),
+    client: { create: async () => ({}), update: async () => ({}), run: async () => ({}), delete: async () => {
+      throw Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.referenced', params: { kayan: 'tags', by: 'courses', uses } } })
+    } },
+    value: { id: 'a-row', title: 'Tajweed' },
+    t: (key: string, fallback?: string) => words[key] ?? fallback,
+    locale: 'en',
+    onDone: () => {},
+    onCancel: () => {},
+    operations: { delete: true },
+  }))
+  const refusalFor = async (given: unknown[]) => {
+    uses = given
+    await act(async () => {
+      click(host.querySelector('[data-region="danger"] [data-button="delete"]')!)
+    })
+    await act(async () => {
+      click(dialogButton('Delete for good')!)
+    })
+    const said = window.document.querySelector('[data-slot="alert-dialog-content"] [role="alert"]')?.textContent
+    await act(async () => {
+      click(dialogButton('Cancel')!)
+    })
+    return said
+  }
+  assert.equal(await refusalFor([{ by: 'courses', count: 2, titles: ['Course 2', 'First Course'] }]), 'Used by 2 Courses: Course 2, First Course. Take it out of them first.')
+  assert.equal(await refusalFor([{ by: 'courses', count: 3, titles: [{ en: 'Course 2', ar: 'دورة 2' }] }]), 'Used by 3 Courses: Course 2, 2 more. Take it out of them first.', 'a localized title in the viewer\'s locale, and the rest counted')
+  assert.equal(await refusalFor([{ by: 'courses', count: 1, titles: [] }, { by: 'sessions', count: 4, titles: [] }]), 'Used by 1 Course. Used by 4 Sessions. Take it out of them first.', 'rows the viewer does not read are counted, never named')
+})
+
+test('228h. a refusal a kayan words itself, a unique pair taken, is said in the kayan\'s words, and in the shared ones where the kayan words none', async () => {
+  const words: Record<string, string> = { 'courses.conflict.unique': 'Another course already holds this.', 'error.conflict.unique': 'Another row already holds that value.' }
+  const said = async (kayan: string) => {
+    const host = await render(createElement(Form, {
+      kayan: courses,
+      client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+      value: { id: 'a-row', title: 'Tajweed' },
+      error: Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.unique', params: { kayan } } }),
+      t: (key: string, fallback?: string) => words[key] ?? fallback,
+      locale: 'en',
+      onDone: () => {},
+    }))
+    return [...host.querySelectorAll('[role="alert"]')].map((one) => one.textContent).join(' ')
+  }
+  assert.ok((await said('courses')).includes('Another course already holds this.'), 'the kayan\'s own words')
+  delete words['courses.conflict.unique']
+  assert.ok((await said('courses')).includes('Another row already holds that value.'), 'and the shared words where it words none')
+})
+
 test('172l. the status in a form with no header is coloured like the header\'s pill and keeps its word', async () => {
   for (const [status, words, colour] of [['draft', 'Draft', 'bg-muted'], ['published', 'Published', 'bg-emerald-500/15'], ['changed', 'Changed', 'bg-amber-500/15']] as const) {
     const host = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status } }))
@@ -5548,6 +5615,28 @@ const listOn = (kayan: ClientKayan, docs: Record<string, unknown>[], over: Recor
     ...over,
   })
 
+test('235a. a list with tabs opens on its first, holds the find to each tab\'s where, takes a tab off the URL only where the list names it, and a click goes to that tab\'s first page', async () => {
+  const tabs = [
+    { tab: 'active', label: { en: 'Active', ar: 'النشطة' }, where: { archived: { not_equals: true } } },
+    { tab: 'archived', label: { en: 'Archived', ar: 'المؤرشفة' }, where: { archived: { equals: true } } },
+    { tab: 'all', label: { en: 'All', ar: 'الكل' } },
+  ]
+  const { listOf } = await import('../registry/node-tree.ts')
+  const node = { ...listOf(screenOf(courses.pages.list!, courses))!, tabs }
+  const rules = rulesOf({ kayan: courses, node, maxLimit: screen.maxLimit })
+  assert.deepEqual(findOf({ kayan: courses, query: {}, node }).where, { archived: { not_equals: true } }, 'the first tab holds a list that names none')
+  assert.deepEqual(findOf({ kayan: courses, query: readQuery({ tab: 'archived' }, rules), node }).where, { archived: { equals: true } }, 'and the URL\'s tab its own')
+  assert.equal(findOf({ kayan: courses, query: readQuery({ tab: 'all' }, rules), node }).where, undefined, 'a tab with no where holds nothing')
+  assert.throws(() => readQuery({ tab: 'deleted' }, rules), /This link names tab "deleted", which this list does not offer\./)
+  assert.deepEqual(writeQuery({ tab: 'archived', page: 2 }), { tab: 'archived', page: '2' }, 'and the tab is written back')
+  const asked: unknown[] = []
+  const host = await render(listOn(courses, [{ id: 'c1', title: 'Tajweed' }], { node, query: { page: 3 }, onQuery: (next: unknown) => asked.push(next) }))
+  const drawn = [...host.querySelectorAll('[data-list-tab]')]
+  assert.deepEqual(drawn.map((one) => [one.textContent, one.getAttribute('aria-selected')]), [['Active', 'true'], ['Archived', 'false'], ['All', 'false']], 'each tab, the first selected')
+  await act(async () => click(drawn[1]!))
+  assert.deepEqual(asked.at(-1), { page: 1, tab: 'archived' }, 'a tab opens on its first page')
+})
+
 test('177a. a list page\'s header names the kayan by its plural and an edit page by its singular', async () => {
   const { pageOf: drawPage } = await import('../registry/nodes.tsx')
   // The key itself, so the two words are told apart whatever the copy says.
@@ -5740,7 +5829,7 @@ test('177k. a session whose course and start the viewer may not read says the vi
   await act(async () => sleep(10))
   assert.equal(host.querySelectorAll('tr[data-row="e1"] .grid').length, 0, 'no empty box drawn in its place')
   const said = host.querySelector('tr[data-row="e1"]')?.textContent ?? ''
-  assert.ok(said.includes('You can\'t see this') && !said.includes('s1') && !said.includes('u1'), `no id stands: ${said}`)
+  assert.ok(said.includes('Not available') && !said.includes('s1') && !said.includes('u1'), `no id stands: ${said}`)
   await release(queries)
 })
 
@@ -5895,7 +5984,7 @@ test('177r. a read a refusal answered reads as no rows and is not tried again, a
   }
   const refused = await attempts(refusal)
   assert.equal(refused.calls, 1, 'a refusal is the viewer\'s access answering, so it is asked once')
-  assert.ok(refused.text.includes('You can\'t see this') && !refused.text.includes('s1'), `and says the viewer cannot see it, never the id: ${refused.text}`)
+  assert.ok(refused.text.includes('Not available') && !refused.text.includes('s1'), `and says it is not available, never the id: ${refused.text}`)
   assert.equal((await attempts(new Error('network'))).calls, 2, 'a failure is asked again')
 })
 
@@ -6477,10 +6566,10 @@ test('214a. a relationship field whose held rows the server refuses names each o
   // A set of which the viewer reads nothing says so once, in the one note and no chip each.
   const noted = async (api: FindApi | undefined) => {
     assert.deepEqual(await chips(api), [], 'no chip for a row nobody may see')
-    return window.document.body.textContent?.split('You can\'t see this').length === 2
+    return window.document.body.textContent?.split('Not available').length === 2
   }
   assert.equal(await noted({ tags: { find: forbidden } }), true, 'a 403 on the read names neither id, and says so once')
-  assert.deepEqual(await chips(fakeApi({ tags: [{ id: 't1', name: 'Recitation' }] }).api), ['Recitation', 'You can\'t see this'], 'a row the answer leaves out is one the viewer cannot see, beside the one it named')
+  assert.deepEqual(await chips(fakeApi({ tags: [{ id: 't1', name: 'Recitation' }] }).api), ['Recitation', 'Deleted'], 'a row the answer leaves out is gone, beside the one it named')
   assert.equal(await noted(undefined), true, 'and a target the screen does not cross reads the same')
 })
 
@@ -6518,7 +6607,7 @@ test('214c. a relationship cell never draws its id: loading in the server render
   const root = createRoot(host)
   await act(async () => root.render(createElement(Bare, { api: fakeApi({ tags: [{ id: 't1', name: 'Recitation' }] }).api })))
   await act(async () => sleep(10))
-  assert.equal(host.textContent, 'You can\'t see this', 'with no screen the cell settles')
+  assert.equal(host.textContent, 'Not available', 'with no screen the cell settles')
   await act(async () => root.unmount())
 
   const down = async () => { throw new Error('network') }
@@ -6917,13 +7006,14 @@ test('233e. a record with no title is headed Untitled, muted, whether its title 
   assert.notEqual((await heading({ id: 'x1', title: 'x1' }))?.textContent, 'Untitled', 'a title that happens to equal the row\'s id is a title')
 })
 
-test('233f. a list\'s Status says what the header says: Draft, Published, or Changed for a published course whose newest version is a draft', async () => {
+test('233f. a list\'s Status says what the header says: Draft, Published, Changed for a published course whose newest version is a draft, and Archived over any of them', async () => {
   const { StatusCell } = await import('../../../templates/features/courses/courses/ui/status-cell.tsx')
   const path = courses.fields.find((one) => one.name === '_status')!.cell
   const rows = [
     { ...draftRow, id: 'p', title: 'Published', _status: 'published' },
     { ...draftRow, id: 'c', title: 'Changed', _status: 'draft' },
     { ...draftRow, id: 'd', title: 'Draft', _status: 'draft' },
+    { ...draftRow, id: 'a', title: 'Archived', _status: 'published', archived: true },
   ]
   const reads: Record<string, unknown>[] = []
   // The plain read finds the rows that have a published copy, p and c.
@@ -6936,7 +7026,7 @@ test('233f. a list\'s Status says what the header says: Draft, Published, or Cha
   const host = await render(createElement(QueryClientProvider, { client: queries }, createElement(ListContext, { value: list.props as never }, list)), { client: client as never })
   await act(async () => sleep(20))
   const status = (id: string) => host.querySelector(`tr[data-row="${id}"] [data-status]`)?.textContent
-  assert.deepEqual(['p', 'c', 'd'].map(status), ['Published', 'Changed', 'Draft'])
+  assert.deepEqual(['p', 'c', 'd', 'a'].map(status), ['Published', 'Changed', 'Draft', 'Archived'])
   assert.deepEqual(reads, [{ kayan: 'courses', draft: undefined, ids: ['c', 'd'] }], 'one plain read of the draft rows alone, for the whole page')
   await release(queries)
 })
@@ -6969,14 +7059,14 @@ test('233h. the compare sheet offers no restore on the version the row already h
 test('233i. a set whose every row the viewer may not read says so once, and a set of some keeps a chip for each', async () => {
   const tags = courses.fields.find((field) => field.name === 'tags')!
   const changes: unknown[] = []
-  const draw = async (rows: Record<string, unknown>[]) => {
-    const { api } = fakeApi({ tags: rows })
+  const draw = async (rows: Record<string, unknown>[] | 'forbidden') => {
+    const api = rows === 'forbidden' ? { tags: { find: async () => { throw Object.assign(new Error('Forbidden.'), { status: 403 }) } } } : fakeApi({ tags: rows }).api
     const host = await render(createElement(RelationshipControl, { field: tags, values: {}, setValue: () => {}, kayan: courses, client: kayans, api, id: 'courses-tags', t, value: ['t1', 't2', 't3'], readOnly: false, onChange: (next: unknown) => changes.push(next) }))
     await act(async () => sleep(30))
     return host
   }
-  const refused = await draw([])
-  assert.equal(refused.textContent?.split('You can\'t see this').length, 2, `one note: ${refused.textContent}`)
+  const refused = await draw('forbidden')
+  assert.equal(refused.textContent?.split('Not available').length, 2, `one note: ${refused.textContent}`)
   assert.equal(refused.querySelectorAll('[data-slot="combobox-chip"]').length, 0, 'and no chip for each')
   // Backspace in the empty box takes the last chip off a set, and here the chips are not drawn, so it would drop a tag nobody sees.
   await act(async () => press(refused.querySelector('#courses-tags') as unknown as Element, 'Backspace'))
@@ -6985,7 +7075,7 @@ test('233i. a set whose every row the viewer may not read says so once, and a se
   await act(async () => press(some.querySelector('#courses-tags') as unknown as Element, 'Backspace'))
   assert.deepEqual(changes.at(-1), ['t1', 't2'], 'where each chip is drawn Backspace still takes the last off')
   assert.equal(some.querySelectorAll('[data-slot="combobox-chip"]').length, 3, 'a set of which the viewer reads one keeps a chip for each of the three')
-  assert.equal(some.textContent?.split('You can\'t see this').length, 3, 'two of them said so')
+  assert.equal(some.textContent?.split('Deleted').length, 3, 'two of them said they are gone')
 })
 
 test('233j. the user menu asks before it switches the language over a form holding a change, in the app\'s own dialog, and switches at once over none', async () => {

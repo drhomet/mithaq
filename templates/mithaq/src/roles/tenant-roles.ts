@@ -16,6 +16,7 @@ const sessionColumns = [
   'sessions.fields.venue',
   'sessions.fields.format',
   'sessions.fields.archived',
+  'sessions.fields.archiveReason',
   'sessions.fields.details',
 ] as const
 
@@ -92,6 +93,9 @@ export const tenantRoles = {
       'courses.count',
       'courses.findByID',
       'courses.update',
+      // A course leaves the catalogue and comes back through its own operations, each with its reason.
+      'courses.archive',
+      'courses.unarchive',
       'courses.fields.archived',
       'courses.fields.archiveReason',
       'courses.fields.createdAt',

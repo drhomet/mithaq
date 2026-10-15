@@ -9,7 +9,7 @@ import { admin, oneTimeToken, organization } from 'better-auth/plugins'
 import { createAccessControl } from 'better-auth/plugins/access'
 import { adminAc, defaultStatements as adminStatements, userAc } from 'better-auth/plugins/admin/access'
 import { defaultStatements } from 'better-auth/plugins/organization/access'
-import { holdsPermission, requestOrganization, type Where } from 'mithaq'
+import { holdsPermission, requestOrganization, type Vocabulary, type Where } from 'mithaq'
 import { z } from 'zod'
 import { sql } from 'mithaq/drizzle'
 import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
@@ -464,6 +464,26 @@ const roleOf = (body: { role?: unknown; data?: { role?: unknown } }) => body.rol
 const isOwnerRole = (role: unknown) => typeof role === 'string' && role.split(',').includes('owner')
 /** Whether a `user.role` value names a role `test` admits, read as the plugin reads it, comma-separated. */
 const holdsRole = (role: unknown, test: (one: string) => boolean) => typeof role === 'string' && role.split(',').some((one) => test(one.trim()))
+/**
+ * The plugin's own permission for each admin route that acts on a person, as its routes ask it, so
+ * it is asked before this hook or any plugin's judges the input. `stop-impersonating` and
+ * `has-permission` ask none.
+ */
+const routePermissions: Record<string, Record<string, string[]> | undefined> = {
+  '/admin/set-role': { user: ['set-role'] },
+  '/admin/get-user': { user: ['get'] },
+  '/admin/create-user': { user: ['create'] },
+  '/admin/update-user': { user: ['update'] },
+  '/admin/list-users': { user: ['list'] },
+  '/admin/list-user-sessions': { session: ['list'] },
+  '/admin/unban-user': { user: ['ban'] },
+  '/admin/ban-user': { user: ['ban'] },
+  '/admin/impersonate-user': { user: ['impersonate'] },
+  '/admin/revoke-user-session': { session: ['revoke'] },
+  '/admin/revoke-user-sessions': { session: ['revoke'] },
+  '/admin/remove-user': { user: ['delete'] },
+  '/admin/set-user-password': { user: ['set-password'] },
+}
 /** The key this project asks for each of the provider's role-writing routes. */
 const roleWrites = new Map([
   ['/organization/create-role', 'ac.create'],
@@ -533,22 +553,29 @@ const auditBefore = async (ctx: HookContext) => {
   if (!audited(ctx.path)) return
   const caller: Caller = await getSessionFromCtx(ctx).catch(() => null)
   callers.set(ctx.context, caller)
-  // Only a `super_admin` writes a role, on any route that takes one. The plugin already asks
-  // `user.set-role` of these routes, which only `'*'` holds, but a project's own platform role
-  // granted `user.update` must still write no role through `update-user`.
-  //
   // `/admin/has-permission` is excepted: it carries `role` to ask what that role may do and writes
   // nothing.
   const body = (ctx.body ?? {}) as Parameters<typeof roleOf>[0] & { userId?: unknown; banReason?: unknown; data?: { banned?: unknown; banReason?: unknown } }
   const acts = ctx.path.startsWith('/admin/') && ctx.path !== '/admin/has-permission'
-  const grants = holdsRole(caller?.user.role, (one) => one === 'super_admin')
-  if (acts && roleOf(body) !== undefined && !grants && !firstRegistering.getStore()) throw new APIError('FORBIDDEN', { message: 'Only a platform administrator sets a role.' })
   // Every route that names the person it acts on names them as `userId` in its body. Nobody acts on
   // their own row, and only a super admin acts on a staff member's.
   //
   // A caller with no session is left to the provider's own 401, so the answer never says whether an
   // id names staff.
   if (!acts || !caller) return
+  // The route's own permission, asked as the plugin asks it, before any input is judged: a caller who
+  // may not use the route learns nothing of what it takes.
+  const asks = routePermissions[ctx.path]
+  // The serving instance's own plugin roles, which a project's second instance may hold differently.
+  const roles = (ctx.context.options.plugins?.find((one) => one.id === 'admin') as { options?: { roles?: Record<string, { authorize: (asked: typeof asks) => { success: boolean } } | undefined> } } | undefined)?.options?.roles ?? {}
+  if (asks && !String(caller.user.role ?? 'user').split(',').some((one) => roles[one]?.authorize(asks).success)) {
+    throw new APIError('FORBIDDEN', { message: 'This role may not use this route.' })
+  }
+  // Only a `super_admin` writes a role, on any route that takes one. The plugin already asks
+  // `user.set-role` of these routes, which only `'*'` holds, but a project's own platform role
+  // granted `user.update` must still write no role through `update-user`.
+  const grants = holdsRole(caller.user.role, (one) => one === 'super_admin')
+  if (roleOf(body) !== undefined && !grants && !firstRegistering.getStore()) throw new APIError('FORBIDDEN', { message: 'Only a platform administrator sets a role.' })
   // A ban needs a reason. The provider writes `data.banned` raw unless it is `=== true`, so a
   // non-boolean such as `'true'` would store a ban with no reason and end no session.
   const writes = ctx.path === '/admin/update-user' || ctx.path === '/admin/create-user'
@@ -909,7 +936,7 @@ export const providers = {
      * Built from the targets the language carries and the vocabulary the build derived. Neither
      * exists where a kayan is written, so this is a factory the kayan names.
      */
-    server: (targets: ServerTargets) => serverFor(authSettings)(targets),
+    server: (targets: ServerTargets, vocabulary: Pick<Vocabulary, 'referenced'>) => serverFor(authSettings)(targets, vocabulary),
   },
 }
 
@@ -929,7 +956,7 @@ type ServerTargets = {
  * The provider for `settings`, which is this project's own in `providers.user.server`. A test builds
  * one for another organization mode over the same tables.
  */
-export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) => {
+export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { referenced }: Pick<Vocabulary, 'referenced'>) => {
   const store = targets.drizzle
   // add-on: roles
   // The drizzle store always counts; `Store` types it optional for stores that cannot.
@@ -1286,17 +1313,27 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     }
     return false
   }
-  const keepsOwner = {
-    id: 'keeps-owner',
+  // A person a row still names through a relationship that restricts their delete, a withdrawn seat
+  // among them, is not deleted either. The provider's delete runs in no transaction, so the key alone
+  // would fail after the person's sessions and accounts were gone, leaving someone who can never sign
+  // in again. The count reads every organization's rows, marked ones included.
+  const keepsPerson = {
+    id: 'keeps-person',
     hooks: { before: [{
       matcher: (ctx: { path?: string }) => ['/admin/remove-user', '/delete-user', '/delete-user/callback'].includes(ctx.path ?? ''),
       handler: createAuthMiddleware(async (ctx) => {
         const caller = await getSessionFromCtx(ctx).catch(() => null)
         if (!caller) return
-        // The id read the way the route reads it, after its own `z.coerce.string()`.
+        // The id read the way the route reads it, after its own `z.coerce.string()`, so an id sent
+        // as a list or a number is the same person here as there.
         const raw = ctx.path === '/admin/remove-user' ? (ctx.body as { userId?: unknown } | undefined)?.userId : caller.user.id
-        if (raw === undefined || raw === null || !(await soleOwner(String(raw)))) return
-        throw new APIError('CONFLICT', { code: 'error.conflict.sole_owner', message: 'This person is the only owner of an organization, so they are not deleted. Make another member its owner first.' })
+        if (raw === undefined || raw === null) return
+        if (await soleOwner(String(raw))) {
+          throw new APIError('CONFLICT', { code: 'error.conflict.sole_owner', message: 'This person is the only owner of an organization, so they are not deleted. Make another member its owner first.' })
+        }
+        if (await referenced(String(raw))) {
+          throw new APIError('CONFLICT', { code: 'error.conflict.referenced', message: 'Rows still name this person, a seat among them, so they are not deleted while those rows stand.' })
+        }
       }),
     }] },
   }
@@ -1420,7 +1457,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
       // add-on: roles
       keepsRoles,
       // end add-on: roles
-      keepsOwner,
+      keepsPerson,
       invitationLimit,
       ...(oneOrganization ? [firstRun, signUpGate, addPerson] : []),
     ],
@@ -1450,29 +1487,6 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     },
     database,
   })
-  // add-on: courses
-  // A person who holds a seat, a withdrawn one included, is not removed: the enrollment records
-  // that they attended, and its `student` key restricts. The provider's `deleteUser` runs in no
-  // transaction, so the key alone would fail after the person's sessions and accounts were
-  // gone, leaving someone who can never sign in again. So it is refused before anything goes.
-  // The store's count reads every row, marked ones included. The id is read the way the route
-  // reads it, after its own `z.coerce.string()`, so an id sent as a list or a number is the
-  // same person here as there.
-  const seated = {
-    id: 'seated',
-    hooks: { before: [{
-      matcher: (ctx: { path?: string }) => ctx.path === '/admin/remove-user',
-      handler: createAuthMiddleware(async (ctx) => {
-        const raw = (ctx.body as { userId?: unknown } | undefined)?.userId
-        if (raw === undefined || raw === null || !(await getSessionFromCtx(ctx).catch(() => null))) return
-        // The drizzle store always counts; `Store` types it optional for stores that cannot.
-        if (await store.count!({ kayan: 'enrollments', args: { where: { student: { equals: String(raw) } } } })) {
-          throw new APIError('CONFLICT', { code: 'error.conflict.referenced', message: 'This person holds a seat in a session, a withdrawn one included, so they are not removed while an enrollment records them.' })
-        }
-      }),
-    }] },
-  }
-  // end add-on: courses
   // One answer however often and by whomever it is asked, naming nobody.
   const closed = () => new APIError('FORBIDDEN', { code: 'FIRST_REGISTER_CLOSED', message: 'This platform has its administrator, so first-register is closed. Sign in instead.' })
   // The platform's first `super_admin`, which nothing else can make: the provider's own
@@ -1532,10 +1546,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets) =>
     ...built,
     plugins: [
       ...built.plugins,
-      keepsOwner,
-      // add-on: courses
-      seated,
-      // end add-on: courses
+      keepsPerson,
       // add-on: roles
       keepsRoles,
       // end add-on: roles

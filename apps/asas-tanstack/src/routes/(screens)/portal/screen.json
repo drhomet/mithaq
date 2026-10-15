@@ -360,6 +360,10 @@
             "ar": "مؤرشف"
           },
           "rules": {
+            "providedBy": {
+              "create": "never",
+              "update": "application"
+            },
             "required": false
           },
           "component": "checkbox",
@@ -424,6 +428,10 @@
           },
           "rules": {
             "maxLength": 200,
+            "providedBy": {
+              "create": "never",
+              "update": "application"
+            },
             "required": false
           },
           "component": "text",
@@ -437,7 +445,8 @@
             "ar": "الوسوم"
           },
           "rules": {
-            "required": false
+            "required": false,
+            "onDelete": "restrict"
           },
           "relationTo": "tags",
           "hasMany": true,
@@ -588,6 +597,14 @@
               "cell": "text"
             }
           ]
+        },
+        {
+          "name": "unarchive",
+          "effect": "update"
+        },
+        {
+          "name": "unpublish",
+          "effect": "update"
         },
         {
           "name": "findWithSessions",
@@ -939,6 +956,7 @@
             "onDelete": "restrict"
           },
           "relationTo": "sessions",
+          "filterOptions": true,
           "component": "relationship",
           "cell": "@asas/courses:./enrollments/ui/session-cell.tsx#SessionCell"
         },
@@ -954,6 +972,7 @@
             "onDelete": "restrict"
           },
           "relationTo": "user",
+          "filterOptions": true,
           "component": "relationship",
           "cell": "relationship"
         },
@@ -1306,6 +1325,10 @@
             "ar": "مؤرشفة"
           },
           "rules": {
+            "providedBy": {
+              "create": "never",
+              "update": "application"
+            },
             "required": false
           },
           "component": "checkbox",
@@ -1343,6 +1366,24 @@
           "on": "session",
           "component": "join",
           "cell": "join"
+        },
+        {
+          "name": "archiveReason",
+          "kind": "text",
+          "label": {
+            "en": "Archive reason",
+            "ar": "سبب الأرشفة"
+          },
+          "rules": {
+            "maxLength": 200,
+            "providedBy": {
+              "create": "never",
+              "update": "application"
+            },
+            "required": false
+          },
+          "component": "text",
+          "cell": "text"
         }
       ],
       "operations": [
@@ -1383,6 +1424,14 @@
           "name": "archiveMany",
           "effect": "update",
           "updatesMany": true
+        },
+        {
+          "name": "archive",
+          "effect": "update"
+        },
+        {
+          "name": "unarchive",
+          "effect": "update"
         }
       ],
       "useAsTitle": "startsAt",

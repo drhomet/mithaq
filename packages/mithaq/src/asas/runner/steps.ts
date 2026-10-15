@@ -328,6 +328,8 @@ export type OperationDeclaration<
   afterCommit?: SlotSteps<Given, Extra>
   /** A public output contract, parsed after field masking. */
   output?: RowOutput | ((schemas: Schemas) => RowOutput)
+  /** On a bulk operation, the kayan's single-row operation it runs on each matched row, handed `data` and the row's id. Without it, `update` or `delete`. */
+  each?: string
   /** One entry per target with something to say about this operation, by the target's name: `targets.<screen>` is what that screen's button asks for. */
   targets?: Readonly<Record<string, OperationScreen<Input> | undefined>>
 }
@@ -352,6 +354,7 @@ export type AnyOperation = {
   afterSteps?: OperationSteps<never, never> | ((defaults: never) => OperationSteps<never, never>)
   afterCommit?: OperationSteps<never, never> | ((defaults: never) => OperationSteps<never, never>)
   output?: RowOutput | ((schemas: never) => RowOutput)
+  each?: string
   targets?: Readonly<Record<string, OperationScreen | undefined>>
 }
 
@@ -374,6 +377,8 @@ export type ResolvedOperation = {
   mode?: ReadMode
   /** Always a schema: an `output` written as a function is resolved at build. */
   output?: RowOutput
+  /** On a bulk operation, the single-row operation it runs per row. */
+  each?: string
   /** What each target says about this operation, as the declaration wrote it. */
   targets?: Readonly<Record<string, OperationScreen | undefined>>
 }

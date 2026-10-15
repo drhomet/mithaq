@@ -327,18 +327,19 @@ test('214. the upload cell and control never show a file\'s id: loading until th
   const cell = (titles: Map<string, unknown> | undefined) =>
     renderToStaticMarkup(createElement('div', null, cells.upload!({ kayan: courses, field: cover, value: 'zz9', t, locale: 'en', titles: titles as never }) as ReactElement))
   assert.ok(cell(undefined).includes('Loading…') && !cell(undefined).includes('zz9'), 'the server render reads as loading')
-  assert.ok(cell(new Map([['row:media:zz9', false]])).includes('see this'), 'a row the read left out is one the viewer cannot see')
+  assert.ok(cell(new Map([['row:media:zz9', false]])).includes('Not available'), 'a row the read was refused is not available')
+  assert.ok(cell(new Map([['row:media:zz9', true]])).includes('Deleted'), 'and one it answered without is gone')
   assert.ok(cell(new Map([['row:media:zz9', new Error('network')]])).includes('—'), 'a failed read is a dash')
   for (const titles of [undefined, new Map([['row:media:zz9', false]]), new Map([['row:media:zz9', new Error('network')]])]) assert.ok(!cell(titles).includes('zz9'), 'and none draws the id')
 
   const forbidden = Object.assign(new Error('Forbidden.'), { status: 403 })
   const drawn = async (client: FetchClient) => (await render(controlOf({ value: 'zz9', readOnly: true, client }))).textContent ?? ''
   const missing = await drawn(clientOf([]))
-  assert.ok(missing.includes('You can\'t see this') && !missing.includes('zz9'), `a file the answer left out: ${missing}`)
+  assert.ok(missing.includes('Deleted') && !missing.includes('zz9'), `a file the answer left out: ${missing}`)
   const refused = await drawn(async () => { throw forbidden })
-  assert.ok(refused.includes('You can\'t see this') && !refused.includes('zz9'), `a 403: ${refused}`)
+  assert.ok(refused.includes('Not available') && !refused.includes('zz9'), `a 403: ${refused}`)
   const failed = await drawn(async () => { throw new Error('network') })
-  assert.ok(failed.includes('—') && !failed.includes('You can\'t see this') && !failed.includes('zz9'), `a failure says nothing about access: ${failed}`)
+  assert.ok(failed.includes('—') && !failed.includes('Not available') && !failed.includes('zz9'), `a failure says nothing about access: ${failed}`)
 })
 
 test('214a. Upload new is not offered to an actor who may create a file and set none of its fields but the ones the server fills', async () => {

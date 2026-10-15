@@ -290,7 +290,7 @@ test('3. the list page is server-rendered with the row the create wrote, under t
   assert.equal(response.status, 200, 'the list page answers 200')
   const html = await response.text()
   assert.ok(html.includes(title), `the course this run created is in the served HTML, so the route resolved it on the server:\n${html.slice(0, 1200)}`)
-  for (const label of ['Title', 'Fee', 'Archived']) {
+  for (const label of ['Title', 'Fee', 'Status']) {
     assert.ok(html.includes(`>${label}<`), `the served HTML heads a column with the declared label "${label}"`)
   }
 })
@@ -451,7 +451,7 @@ test('9. the list page serves a filter, a sort and a hidden column off the URL, 
   assert.ok(!secondPage.includes(`${prefix} 00`), 'and not the first, which is on page one')
   assert.ok(secondPage.indexOf(`${prefix} 10`) < secondPage.indexOf(`${prefix} 11`), 'in the ascending order the sort asked for')
 
-  const hidden = await fetch(`${origin}/dashboard/courses?${where}&cols=title,-fee,archived`, { headers: { cookie } })
+  const hidden = await fetch(`${origin}/dashboard/courses?${where}&cols=title,-fee,_status`, { headers: { cookie } })
   assert.equal(hidden.status, 200, 'a column list on the URL is served')
   const hiddenHtml = await hidden.text()
   // Read off the table head: the filter panel also names `Title`, so the whole document would mix two screens.
@@ -459,7 +459,7 @@ test('9. the list page serves a filter, a sort and a hidden column off the URL, 
   assert.ok(head, `the table has a head:\n${hiddenHtml.slice(0, 600)}`)
   assert.ok(head.includes('>Title<'), 'the column the list kept is still headed')
   assert.ok(!head.includes('>Fee<'), `and the one the URL hid is not:\n${head}`)
-  assert.ok(head.includes('>Archived<'), 'while the third is untouched')
+  assert.ok(head.includes('>Status<'), 'while the third is untouched')
 
   // The app's select mounts its items only while open, so a server render carries the chosen field
   // and operator on the triggers, which is where the URL's `where` arrives.
@@ -875,7 +875,7 @@ test('36. each screen answers at its own path inside its providers and shell, an
 test('37. the dashboard list page draws its layout and its list node: the columns, the search and a row link to the edit page', async () => {
   const html = await screenHtml('/dashboard/courses')
   assert.match(html, /data-layout="table" data-page="\/courses"/, 'the registered table layout draws the page')
-  for (const label of ['Title', 'Fee', 'Archived', 'Opens on']) assert.ok(html.includes(`>${label}<`), `the list node's column ${label}`)
+  for (const label of ['Title', 'Fee', 'Status', 'Opens on']) assert.ok(html.includes(`>${label}<`), `the list node's column ${label}`)
   assert.ok(html.includes(`href="/dashboard/courses/${screenCourse}"`), 'a row links to its edit page on this screen')
   assert.ok(html.includes('href="/dashboard/courses/new"'), 'and the create button to the create page')
   assert.match(html, /placeholder="Title, Summary, or Details"/, 'the search runs over the node\'s three fields')
@@ -1012,7 +1012,9 @@ const walkScreen = async (name: 'dashboard' | 'portal') => {
   }
   // A layout's `when` is its condition, not a region.
   const regionsOf = (frame: Record<string, unknown>) => Object.entries(frame).filter(([key]) => !['shell', 'layout', 'when'].includes(key)).map(([, nodes]) => nodes as unknown[])
-  const enrollment = await post('/api/enrollments/create', { session: screenSession }, { cookie })
+  // A student holds one seat in a session, so the second screen's walk reads the seat the first one made.
+  const seated = ((await post('/api/enrollments/find', { where: { session: { equals: screenSession } }, limit: 1 }, { cookie })).body.docs as { id: string }[])[0]
+  const enrollment = seated ? { response: { status: 200 }, body: seated } : await asStudent(() => post('/api/enrollments/create', { session: screenSession }, { cookie }))
   assert.equal(enrollment.response.status, 200, JSON.stringify(enrollment.body))
   const ids: Record<string, string> = { courses: screenCourse, sessions: screenSession, tags: screenTag, enrollments: String(enrollment.body.id) }
   for (const kayan of ['roles', 'memberRoles']) {
@@ -1246,6 +1248,21 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
   assert.equal(signInLocation.pathname, '/auth/sign-in', 'the refusal page sends a visitor with no session to sign-in')
   assert.equal(signInLocation.searchParams.get('redirect'), '/unauthorized', 'and carries /unauthorized itself as the redirect')
 })
+
+/**
+ * Seats the signed-in administrator while it also holds the student role, since a seat's student
+ * holds it; the role goes again after, so a test that swaps the administrator's role finds one row.
+ */
+const asStudent = async <T>(body: () => Promise<T>): Promise<T> => {
+  const me = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { user: { id: string } }).user.id
+  const role = await post('/api/memberRoles/create', { user: me, role: 'student' }, { cookie })
+  assert.equal(role.response.status, 200, JSON.stringify(role.body))
+  try {
+    return await body()
+  } finally {
+    await post('/api/memberRoles/delete', { id: role.body.id }, { cookie })
+  }
+}
 
 /**
  * Signed up in this process, not over the socket, which the provider's sign-up rate limit would refuse after this file's
@@ -1565,8 +1582,8 @@ test('52. a when decides what each screen draws: the access code follows the del
   await holding('registrar', async () => {
     // What a page draws is no permission: the operation behind a button no
     // page draws is still the server's to refuse.
-    const refused = await post('/api/courses/archive', { id, reason: 'Again' }, { cookie })
-    assert.equal(refused.response.status, 403, `the server refuses the registrar the archive: ${JSON.stringify(refused.body)}`)
+    const refused = await post('/api/courses/unpublish', { id, _status: 'draft' }, { cookie })
+    assert.equal(refused.response.status, 403, `the server refuses the registrar the unpublish: ${JSON.stringify(refused.body)}`)
   })
 })
 
@@ -1588,7 +1605,9 @@ test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads
   const rowOf = (html: string, name: string) => [...body(html).matchAll(/<tr[\s\S]*?<\/tr>/g)].map((one) => one[0]).find((one) => one.includes(`>${name}<`)) ?? ''
   const where = `where[title][like]=${encodeURIComponent(prefix)}`
   for (const screen of ['dashboard', 'portal']) {
-    const url = `/${screen}/courses?${where}&sort=-fee&page=2&limit=10`
+    // The dashboard's All tab, since its list opens on Active, which leaves the archived row out.
+    const all = screen === 'dashboard' ? '&tab=all' : ''
+    const url = `/${screen}/courses?${where}&sort=-fee&page=2&limit=10${all}`
     const first = await screenHtml(url)
     // The portal lists the courses on offer alone, so the archived row is not on its page.
     const two = screen === 'portal' ? [`${prefix} 01`] : [`${prefix} 01`, `${prefix} 00`]
@@ -1603,10 +1622,14 @@ test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads
     }
 
     // Each row carries its menu, which offers the archive only where the button's `when` holds over the row once opened in the browser.
-    const page = await screenHtml(`/${screen}/courses?${where}&sort=fee`)
+    const page = await screenHtml(`/${screen}/courses?${where}&sort=fee${all}`)
     assert.ok(rowOf(page, `${prefix} 01`).includes('data-row-menu='), `the ${screen} draws the menu on a row not archived`)
     if (screen === 'dashboard') assert.ok(rowOf(page, `${prefix} 00`).includes('data-row-menu='), `and on the archived row`)
   }
+
+  const active = rows(await screenHtml(`/dashboard/courses?${where}&sort=fee&limit=25`))
+  assert.deepEqual([active.length, active.includes(`${prefix} 00`)], [11, false], 'the dashboard opens on Active, the archived row out of the way')
+  assert.deepEqual(rows(await screenHtml(`/dashboard/courses?${where}&tab=archived`)), [`${prefix} 00`], 'and its Archived tab holds that row alone')
 
   // The portal's list opens by title, 25 to a page, and the URL overrides both; the dashboard names neither, so it opens newest first, ten to a page.
   const portal = await screenHtml(`/portal/courses?${where}`)
@@ -1713,7 +1736,7 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
   const course = (await post('/api/courses/create', { title: `${title} ar`, fee: 10, delivery: 'live', currency: 'SAR' }, { cookie })).body
   // Tomorrow, so the home's table of upcoming sessions has a row to draw in Arabic too.
   const session = (await post('/api/sessions/create', { course: course.id, startsAt: new Date(Date.now() + 86_400_000).toISOString(), capacity: 5, venue: 'campus', format: 'lecture' }, { cookie })).body
-  const enrollment = (await post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie })).body
+  const enrollment = (await asStudent(() => post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie }))).body
   const tag = (await post('/api/tags/create', { name: { en: 'Boot tag', ar: 'وسم الاختبار' } }, { cookie })).body
   // A custom role, whose page is its form and its delete; the fixed ones are code, drawn on the list and walked below.
   const role = (await post('/api/roles/create', { name: `ar-${Date.now()}`, label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: ['tags.find', 'tags.fields.id'] }, { cookie })).body
@@ -1843,7 +1866,7 @@ test('57. the course page lists only its own sessions in a Sessions tab, searche
   assert.notEqual(held.find((one) => one.id === stray)?.archived, true, 'and another course\'s session is untouched')
 
   const me = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { cookie } })).json()) as { user: { id: string } }
-  const enrollment = (await post('/api/enrollments/create', { session: made[0], student: me.user.id }, { cookie })).body
+  const enrollment = (await asStudent(() => post('/api/enrollments/create', { session: made[0], student: me.user.id }, { cookie }))).body
   const session = await screenHtml(`/dashboard/sessions/${made[0]}`)
   assert.match(session, /data-node="tabs"[^]*?>Enrollments</, 'the session page draws an Enrollments tab')
   assert.ok(session.includes(`href="/dashboard/enrollments/${enrollment.id}"`), 'listing its enrollment')
@@ -1869,7 +1892,7 @@ test('58. the platform link is the dashboard\'s alone: a dashboard page in the t
   const course = (await post('/api/courses/create', { title: `${title} portal link`, fee: 10, delivery: 'live', currency: 'SAR' }, { cookie })).body
   const me = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { cookie } })).json()) as { user: { id: string } }
   const session = (await post('/api/sessions/create', { course: course.id, startsAt: new Date().toISOString(), capacity: 5, venue: 'campus', format: 'lecture' }, { cookie })).body
-  const enrollment = (await post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie })).body
+  const enrollment = (await asStudent(() => post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie }))).body
   const rows: Record<string, string> = { courses: String(course.id), enrollments: String(enrollment.id) }
   const portal = asas.targets.portal.client
   const paths = [
@@ -1899,7 +1922,9 @@ test('59. an enrollment served over HTTP names the tenant\'s own member as its s
   const crossed = await post('/api/enrollments/create', { session: screenSession, student: stranger.id }, { cookie })
   assert.equal(crossed.response.status, 400, `another tenant's user is refused as the student: ${JSON.stringify(crossed.body)}`)
   assert.equal((crossed.body.data as { key?: string }).key, 'error.invalid.reference', 'under the reference key')
-  const own = await post('/api/enrollments/create', { session: screenSession, student: me.user.id }, { cookie })
+  // A session of its own, since the actor already holds its one seat in the screen's session.
+  const session = (await post('/api/sessions/create', { course: screenCourse, startsAt: new Date(Date.now() + 86_400_000).toISOString() }, { cookie })).body as { id: string }
+  const own = await asStudent(() => post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie }))
   assert.equal(own.response.status, 200, `the tenant's own member is admitted: ${JSON.stringify(own.body)}`)
 })
 
@@ -1977,9 +2002,11 @@ test('61. each dashboard edit page draws the record\'s activity beside its form 
     assert.equal(refused.response.status, 404, `no ${operation} of an entry is served`)
   }
 
-  const session = (await post('/api/sessions/create', { course: course.id, startsAt: new Date(Date.now() + 86_400_000).toISOString(), capacity: 5, venue: 'campus', format: 'lecture' }, { cookie })).body
+  // Of an open course, as the archived one's sessions take no seat.
+  const open = (await post('/api/courses/create', { title: `${title} audited open`, fee: 10, delivery: 'live', currency: 'SAR' }, { cookie })).body
+  const session = (await post('/api/sessions/create', { course: open.id, startsAt: new Date(Date.now() + 86_400_000).toISOString(), capacity: 5, venue: 'campus', format: 'lecture' }, { cookie })).body
   const me = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { cookie } })).json()) as { user: { id: string } }
-  const enrollment = (await post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie })).body
+  const enrollment = (await asStudent(() => post('/api/enrollments/create', { session: session.id, student: me.user.id }, { cookie }))).body
   for (const locale of ['en', 'ar'] as const) {
     for (const path of [`/courses/${course.id}`, `/sessions/${session.id}`, `/enrollments/${enrollment.id}`]) {
       const page = await fetch(`${origin}/dashboard${path}`, { headers: { cookie: `${cookie}; locale=${locale}` } })
@@ -2488,7 +2515,7 @@ test('72. the portal holds what its viewer may do: its home counts each list, th
   assert.equal(figure(home, 'courses'), String(listed.body.totalDocs), 'the home counts the courses on offer this viewer may read, as the list reads them')
   const searched = `?search=${encodeURIComponent(shelved)}`
   assert.ok(!(await screenHtml(`/portal/courses${searched}`)).includes(`data-row="${shelf}"`), 'the portal does not list the archived course')
-  assert.ok((await screenHtml(`/dashboard/courses${searched}`)).includes(`data-row="${shelf}"`), 'and the dashboard still does')
+  assert.ok((await screenHtml(`/dashboard/courses${searched}&tab=archived`)).includes(`data-row="${shelf}"`), 'and the dashboard still does, under its Archived tab')
   assert.equal(figure(home, 'enrollments'), String((await post('/api/enrollments/count', {}, { cookie })).body.totalDocs), 'and the enrollments')
   const arabic = await (await fetch(`${origin}/portal`, { headers: { cookie: `${cookie}; locale=ar` } })).text()
   assert.match(arabic, new RegExp(`<h1[^>]*>مرحبا، ${actorName}</h1>`), 'the Arabic greeting takes the Arabic comma')
@@ -2669,9 +2696,13 @@ test('74. every template role signs in to the first screen it enters, the landin
   // A seat of the actor's own and one of another member's, so the student's list has a row to draw and one to leave out.
   const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { addMember(args: unknown): Promise<unknown> } } }).server
   const classmate = await signedUpHere('classmate')
-  const organization = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string } }).session.activeOrganizationId
+  const current = (await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string }; user: { id: string } }
+  const organization = current.session.activeOrganizationId
   await server.api.addMember({ body: { userId: classmate.id, organizationId: organization, role: 'member' } })
-  const ownSeat = (await post('/api/enrollments/create', { session: screenSession }, { cookie })).body as { id: string }
+  await post('/api/memberRoles/create', { user: classmate.id, role: 'student' }, { cookie })
+  // The actor's own seat, which the screen walk made already: a student holds one seat in a session.
+  const held = ((await post('/api/enrollments/find', { where: { and: [{ session: { equals: screenSession } }, { student: { equals: current.user.id } }] }, limit: 1 }, { cookie })).body.docs as { id: string }[])[0]
+  const ownSeat = held ?? (await asStudent(() => post('/api/enrollments/create', { session: screenSession }, { cookie }))).body as { id: string }
   const classmateSeat = (await post('/api/enrollments/create', { session: screenSession, student: classmate.id }, { cookie })).body as { id: string }
   assert.equal(typeof ownSeat.id, 'string', JSON.stringify(ownSeat))
   assert.equal(typeof classmateSeat.id, 'string', JSON.stringify(classmateSeat))
@@ -2911,7 +2942,7 @@ test('76. the not-found page is a page with a way home, inside the screen\'s she
   assert.equal(titleOf(await (await fetch(`${origin}/dashboard/courses/${made.body.id}`, { headers: { cookie } })).text()), `${made.body.title} · ${en('marketing', 'brand')}`)
   assert.equal(titleOf(await (await fetch(`${origin}/dashboard/courses/new`, { headers: { cookie } })).text()), `${en('courses', 'new')} · ${en('marketing', 'brand')}`)
   const session = await post('/api/sessions/create', { course: made.body.id, startsAt: new Date().toISOString(), capacity: 2 }, { cookie })
-  const seat = await post('/api/enrollments/create', { session: session.body.id, student: me.user.id }, { cookie })
+  const seat = await asStudent(() => post('/api/enrollments/create', { session: session.body.id, student: me.user.id }, { cookie }))
   assert.equal(seat.response.status, 200, JSON.stringify(seat.body))
   assert.equal(titleOf(await (await fetch(`${origin}/dashboard/enrollments/${seat.body.id}`, { headers: { cookie } })).text()), `${actorName} · ${en('marketing', 'brand')}`, 'an enrollment is named by its student')
 })

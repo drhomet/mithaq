@@ -2,7 +2,7 @@ import { use, useEffect, useRef, useState, type ReactElement } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon, FileIcon, UploadIcon, XIcon } from 'lucide-react'
 import { ScreenContext } from 'mithaq/admin/react'
 import { Button } from '@/components/ui/button'
-import { changeOf, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { changeOf, missingRow, type ControlProps } from 'mithaq-admin/control-props.ts'
 import { createsIn } from 'mithaq-admin/field-values.ts'
 import { FileThumb, urlOf, type sizes } from 'mithaq-admin/file-thumb.tsx'
 import { isForbidden } from 'mithaq-admin/refusal.ts'
@@ -26,7 +26,7 @@ export function UploadControl(props: ControlProps): ReactElement {
   const [uploading, setUploading] = useState(false)
   const [focus, setFocus] = useState<string>()
   const asked = useRef(new Set<string>())
-  const [settled, setSettled] = useState<ReadonlyMap<string, 'unseen' | 'failed'>>(() => new Map())
+  const [settled, setSettled] = useState<ReadonlyMap<string, 'unseen' | 'gone' | 'failed'>>(() => new Map())
 
   const excluded = held.join(',')
   useEffect(() => {
@@ -37,7 +37,7 @@ export function UploadControl(props: ControlProps): ReactElement {
     void findByIds({ reads, ids: missing, maxLimit: screen.screen.maxLimit })
       .then((docs) => {
         const found = new Set(docs.map((row) => String(row.id ?? '')))
-        setSettled((already) => new Map([...already, ...missing.filter((one) => !found.has(one)).map((one) => [one, 'unseen'] as const)]))
+        setSettled((already) => new Map([...already, ...missing.filter((one) => !found.has(one)).map((one) => [one, 'gone'] as const)]))
         setRows((already) => new Map([...already, ...docs.map((row) => [String(row.id ?? ''), row] as const)]))
       })
       .catch((thrown: unknown) => {
@@ -58,7 +58,7 @@ export function UploadControl(props: ControlProps): ReactElement {
     if (row) return <FileThumb row={row} t={t} locale={locale} size={size} />
     const state = reads && screen ? settled.get(one) : 'unseen'
     if (state === 'failed') return <span>—</span>
-    return <span className="text-muted-foreground text-xs">{state === 'unseen' ? (t('admin.cannotSee', 'You can\'t see this') ?? 'You can\'t see this') : (t('admin.loading', 'Loading…') ?? 'Loading…')}</span>
+    return <span className="text-muted-foreground text-xs">{state ? missingRow({ t, gone: state === 'gone' }) : (t('admin.loading', 'Loading…') ?? 'Loading…')}</span>
   }
   // Offered only where the access report lets this actor create a file.
   const creates = target !== undefined && createsIn({ kayan: target, report: screen?.access.collections?.[target.name] })

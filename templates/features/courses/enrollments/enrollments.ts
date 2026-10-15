@@ -1,8 +1,9 @@
-import { defaultOperations, folderOf } from 'mithaq'
-import { defineKayan, organization } from '@asas/mithaq'
-import { readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
+import { defaultOperations, folderOf, invalid, type Ctx, type FilterOptions, type WriteTools } from 'mithaq'
+import { defineKayan, organization, serverTargets } from '@asas/mithaq'
+import { currentOrganization, readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
 import { activity, appPage, danger, platformList, platformRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
 import { sessions } from '../sessions/sessions.ts'
+import { courses } from '../courses/courses.ts'
 
 const ui = folderOf(new URL('./ui/', import.meta.url))
 const sessionCell = ui('session-cell.tsx#SessionCell')
@@ -20,16 +21,85 @@ const enrollment = [{ section: 'enrollment', label: { en: 'Enrollment', ar: 'ا�
  * no seat. Every read answers from it, a session's join of its enrollments
  * included.
  */
-const ownSeats = ({ user }: { user: unknown }) => {
-  if (readsPast(user, 'enrollments.others')) return true
+const ownId = (user: unknown) => {
   const actor = user && typeof user === 'object' ? (user as Record<string, unknown>) : undefined
   const id = actor && Object.hasOwn(actor, 'id') ? actor.id : undefined
-  return typeof id === 'string' && id ? { student: { equals: id } } : false
+  return typeof id === 'string' && id ? id : undefined
+}
+const ownSeats = ({ user }: { user: unknown }) => {
+  if (readsPast(user, 'enrollments.others')) return true
+  const id = ownId(user)
+  return id ? { student: { equals: id } } : false
+}
+
+/**
+ * Whether a write names another person as a seat's student for an actor that
+ * writes its own seats alone. Refused on a create and on an update, so a seat
+ * is never made for, or handed to, someone the actor may not write for.
+ */
+const namesAnother = ({ user, data }: { user: unknown; data?: unknown }) =>
+  !readsPast(user, 'enrollments.others') && !!data && typeof data === 'object' && Object.hasOwn(data, 'student')
+  && (data as { student?: unknown }).student !== ownId(user)
+
+/**
+ * Whom a seat's student picker offers: the people holding the student role in
+ * the active organization, a teacher who also studies among them. It narrows
+ * what the actor's own read of people answers and never widens it, so an
+ * instructor is offered the students it already reads and not itself.
+ */
+const students: FilterOptions = async ({ user, tx }) => {
+  const active = currentOrganization(user)
+  if (!active) return false
+  const held = await serverTargets.drizzle.find({ tx, kayan: 'memberRoles', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: active }, role: { equals: 'student' } } } })
+  const ids = held.docs.map((row) => row.user).filter((id): id is string => typeof id === 'string')
+  return ids.length ? { id: { in: ids } } : false
+}
+
+/** Not archived, the column read by its name, or across a session's course. */
+const open = (path: string) => ({ or: [{ [path]: { exists: false } }, { [path]: { equals: false } }] })
+
+/** What a seat's session picker offers, and a save is held to: a session open for seats, of a course open too. */
+const openSessions: FilterOptions = () => ({ and: [open('archived'), open('course.archived')] })
+
+/**
+ * Refuses a seat in an archived session, or in a session of an archived
+ * course, in words of its own. A session the actor may not read is left to the
+ * reference check, which refuses it in the words a missing one gets.
+ */
+const sessionTakesSeats = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Promise<Ctx> => {
+  const id = ctx.data.session
+  if (typeof id !== 'string') return ctx
+  const session = await tools.of(sessions).findByID({ id }).catch(() => null)
+  if (!session) return ctx
+  const course = session.archived ? undefined : await tools.of(courses).findByID({ id: session.course }).catch(() => null)
+  if (session.archived || course?.archived) {
+    throw invalid({
+      message: 'This session is archived, or its course is, so it takes no new seat.',
+      key: 'error.invalid.archived_session',
+      params: { kayan: 'enrollments', field: 'session' },
+    })
+  }
+  return ctx
 }
 
 export const enrollments = defineKayan({
   name: 'enrollments',
-  access: { read: ownSeats, update: ownSeats, delete: ownSeats },
+  access: {
+    read: ownSeats,
+    create: (args: { user: unknown; data?: unknown }) => !namesAnother(args),
+    update: (args: { user: unknown; data?: unknown }) => (namesAnother(args) ? false : ownSeats(args)),
+    delete: ownSeats,
+  },
+  // What a form says where a second seat of one student in one session is
+  // refused, over the shared words for a unique value taken.
+  messages: {
+    conflict: { unique: { en: 'This student already holds a seat in this session.', ar: 'لهذا الطالب مقعد في هذه الحصة بالفعل.' } },
+  },
+  // A student holds one seat in a session, which is one organization's, so the
+  // organization needs no column in the key. The mark is in it with its nulls
+  // not distinct, so a withdrawn seat makes room for a new one while two
+  // standing seats collide.
+  indexes: [{ fields: ['session', 'student', 'deletedAt'], unique: true, nullsNotDistinct: true }],
   fields: ({ defaults }) => ({
     ...defaults,
     organization,
@@ -41,6 +111,7 @@ export const enrollments = defineKayan({
     // relationship restricts.
     session: {
       kind: 'relationship', label: { en: 'Session', ar: 'الحصة' }, relationTo: () => sessions,
+      filterOptions: openSessions,
       rules: { required: true },
       targets: { dashboard: { cell: sessionCell }, portal: { cell: sessionCell }, platform: { cell: sessionCell } },
     },
@@ -52,6 +123,7 @@ export const enrollments = defineKayan({
     // creates none.
     student: {
       kind: 'relationship', label: { en: 'Student', ar: 'الطالب' }, relationTo: 'user',
+      filterOptions: students,
       rules: { required: true, defaultValue: actor.id },
     },
     /**
@@ -86,7 +158,13 @@ export const enrollments = defineKayan({
         }),
       },
     },
-    service: { operations: defaultOperations },
+    service: {
+      operations: {
+        ...defaultOperations,
+        create: { ...defaultOperations.create, steps: ({ steps }) => [sessionTakesSeats, steps.insert] },
+        update: { ...defaultOperations.update, steps: ({ steps }) => [sessionTakesSeats, steps.update] },
+      },
+    },
     // Both screens list enrollments; the portal's create opens as a drawer over
     // its list. Titled by the student on the dashboard, as on the platform, so a
     // tab and a heading tell one seat from another; on the portal, where the

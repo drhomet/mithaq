@@ -440,7 +440,8 @@
       "title": "Mithaq list",
       "description": "The list screen over a kayan's find, with search, filters, columns, sort, page and limit driven by one callback and every destination a prop, each row opening its record and carrying a menu of Edit, Delete and the list node's row buttons, a row button offered where its when holds over that row, and the toolbar and bulk buttons.",
       "registryDependencies": [
-        "card"
+        "card",
+        "tabs"
       ],
       "files": [
         {

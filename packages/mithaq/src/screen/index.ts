@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { builtInScreenKinds, choiceControls, packageName, registryCells, registryControls } from './client.ts'
 import { unsortable, type Localized, type LocalesOf, type ResolvedField, type ResolvedKayan, type RuntimeField } from '../mithaq/types.ts'
 import { defaultKinds } from '../base/kinds.ts'
-import { assertFieldWhere } from '../asas/runner/write.ts'
+import { assertFieldWhere, assertWhere } from '../asas/runner/write.ts'
 import { type Where } from '../mithaq/where.ts'
 import { bulkSeals, readSeals, sealOf, storeSeals } from '../asas/runner/steps.ts'
 import { kindOf, type NodeKind } from './studio.ts'
@@ -193,6 +193,8 @@ export type ScreenList<Locale extends string = string, Ref extends string | Ui =
   readonly sort?: FieldName | `-${FieldName}`
   /** The page size a list opens with, which the URL's own `limit` overrides. */
   readonly limit?: number
+  /** The list's tabs, each a `where` it holds every page to; the first is the one it opens on. */
+  readonly tabs?: readonly { readonly tab: string; readonly label: Localized<Locale>; readonly where?: Where }[]
 }
 
 /** A declared node of one kind; a leaf may be written as its bare field name. */
@@ -256,6 +258,8 @@ type FieldData = {
   on?: string
   /** Relationship only: whether this field holds a set of rows rather than one. */
   hasMany?: true
+  /** Relationship only: whether its picker reads `for` this field, so the server holds the rows to its `filterOptions`. */
+  filterOptions?: true
 }
 
 /** One field as a screen draws it: the data a browser needs, and this screen's drawing facts decided. */
@@ -309,6 +313,7 @@ export type ListClient = {
   row?: ButtonClient[]
   sort?: string
   limit?: number
+  tabs?: { tab: string; label: Localized; where?: Where }[]
   /** A list of another kayan: its name, and its relationship holding this page's row. */
   of?: string
   where?: string
@@ -395,6 +400,7 @@ export const clientFieldOf = (name: string, field: RuntimeField & { target?: { n
         ? { relationTo: field.relationTo().name }
         : {}),
   ...(field.hasMany === true && { hasMany: true as const }),
+  ...(typeof field.filterOptions === 'function' && { filterOptions: true as const }),
   ...(typeof field.on === 'string' && { on: field.on }),
 })
 
@@ -403,7 +409,7 @@ const word = /^[\p{ID_Start}$_][\p{ID_Continue}$]*$/u
 const targetKeys = ['capability', 'type', 'path', 'kayan', 'controls', 'providers', 'pages', 'layouts', 'components']
 const leafKeys = ['field', 'component', 'cell', 'placeholder', 'description', 'readOnly', 'width', 'when']
 const buttonKeys = ['button', 'label', 'fields', 'reload', 'component', 'confirm', 'when']
-const listKeys = ['columns', 'filters', 'search', 'empty', 'menu', 'toolbar', 'bulk', 'row', 'sort', 'limit', 'of', 'where']
+const listKeys = ['columns', 'filters', 'search', 'empty', 'menu', 'toolbar', 'bulk', 'row', 'sort', 'limit', 'tabs', 'of', 'where']
 const modes = ['dialog', 'sheet', 'drawer']
 /** Every key of `value` is one `known` names, so nothing reaches `screen.json` unnamed. */
 const named = (at: string, value: object, known: readonly string[], what: string) => {
@@ -767,7 +773,7 @@ export const screensOf = (
             return { ...drawn, list: { of, where: where as string, ...drawn.list } }
           }
           held.list++
-          const { columns, filters, search, empty, menu, sort, limit } = one.list
+          const { columns, filters, search, empty, menu, sort, limit, tabs } = one.list
           // Where a button sits decides which operations it may run: bulk over ticked rows,
           // row over its row, toolbar over none.
           const buttons = (region: 'toolbar' | 'bulk' | 'row') => {
@@ -797,6 +803,16 @@ export const screensOf = (
           if (limit !== undefined && !(Number.isInteger(limit) && limit >= 1 && limit <= maxLimit)) {
             throw new Error(`${node} list limit is ${JSON.stringify(limit)}, and a limit is a whole number from 1 to ${maxLimit}.`)
           }
+          if (tabs !== undefined && (!Array.isArray(tabs) || !tabs.length)) throw new Error(`${node} list tabs is no list of tabs.`)
+          const tabbed = tabs?.map((tab, at) => {
+            const said = `${node} list tab ${at}`
+            named(said, tab, ['tab', 'label', 'where'], 'tab')
+            // Written into the URL as itself, so a word, once per list.
+            if (typeof tab.tab !== 'string' || !/^[A-Za-z][A-Za-z0-9]*$/.test(tab.tab) || tabs.findIndex((other) => other.tab === tab.tab) !== at) {
+              throw new Error(`${said} is named ${JSON.stringify(tab.tab)}, and a tab is named once in a list, in letters and digits.`)
+            }
+            return { tab: tab.tab, label: copy(`${said} label`, tab.label), ...(tab.where !== undefined && { where: assertWhere(kayan, tab.where) }) }
+          })
           return {
             list: {
               columns: columns.map((column) => leafOf(`${node} list column`, column, 'cell')),
@@ -809,6 +825,7 @@ export const screensOf = (
               ...(row && { row }),
               ...(sort !== undefined && { sort }),
               ...(limit !== undefined && { limit }),
+              ...(tabbed && { tabs: tabbed }),
             },
             ...drawnBy(node, one),
           }

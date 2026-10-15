@@ -88,7 +88,9 @@ const titles = (host: Element) => [...host.querySelectorAll('tbody tr')].map((ro
 
 test('a filtered, sorted page-2 URL is read into the one find it asks for, and back and forward land on the pages they left from the cache', async () => {
   const { host, router, found, unmount } = await start('/courses?where[title][like]=Taj&sort=-fee&page=2')
-  assert.deepEqual(found, [{ where: { or: [{ and: [{ title: { like: 'Taj' } }] }] }, sort: '-fee', page: 2 }], 'the URL is the whole of what the list asks for, and no page size of the list\'s own, so the server\'s defaultLimit answers')
+  // Under the list's first tab, Active, which the URL names none of.
+  const active = { or: [{ archived: { exists: false } }, { archived: { equals: false } }] }
+  assert.deepEqual(found, [{ where: { and: [active, { or: [{ and: [{ title: { like: 'Taj' } }] }] }] }, sort: '-fee', page: 2 }], 'the URL is the whole of what the list asks for, and no page size of the list\'s own, so the server\'s defaultLimit answers')
   assert.deepEqual(titles(host), ['Tajweed 2', 'Nahw 2'])
 
   await act(async () => void router.navigate({ href: '/courses?where[title][like]=Taj&sort=-fee&page=3' }))

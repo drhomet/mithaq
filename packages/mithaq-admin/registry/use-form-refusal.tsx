@@ -21,6 +21,7 @@ export const useFormRefusal = ({ copy, error, form, kayan }: { copy: Copy; error
   for (const [name, issue] of Object.entries(issues)) sentences[name] = t(issue, issue) ?? issue
   const banner = shown
     ? refusalWords({
+        kayan: kayan.name,
         shown,
         labels: Object.keys(issues).flatMap((name) => {
           const field = kayan.fields.find((one) => one.name === name)

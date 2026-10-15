@@ -340,6 +340,15 @@ const whereOf = (
     if (field === 'and' || field === 'or') continue
     const [ownField, relatedField] = field.split('.')
     const relationField = kayan.fields[ownField!]
+    // Whether a versions table's snapshot holds an id in one field, alone or in a set: the delete's
+    // reference check asks it, and a caller's read of versions refuses every path before here.
+    // Lowered, since a draft keeps a uuid as its writer sent it.
+    if (!relationField && ownField === 'version' && relatedField && table.version) {
+      const { equals, ...other } = rules as { equals?: unknown }
+      if (equals === undefined || Object.keys(other).length) throw new Error(`Kayan "${name}" path "${field}" takes equals alone.`)
+      parts.push(sql`lower((${table.version} -> ${relatedField})::text)::jsonb @> ${JSON.stringify(typeof equals === 'string' ? equals.toLowerCase() : equals)}::jsonb`)
+      continue
+    }
     // A `hasMany` field has no column here, so the join table is filtered and its
     // parent ids filter this table.
     if (relationField?.hasMany) {
@@ -876,10 +885,10 @@ const storeOf = <
               `Kayan "${kayan.name}" field "${field.name}" needs the join table "${name}", which is already the table of kayan "${name}". Rename one of the two, or give the kayan a dbName of its own.`,
             )
           }
-          // Each end takes the type of the id it points at. `cascade` on both: the row belongs to
-          // the pair. An upload's own builder answers `restrict`.
-          const reference = (build: ColumnBuilder, column: string, target: ResolvedKayan) =>
-            modifiable(build({ ...field, name: column, column: `${column}_id`, target, rules: { onDelete: 'cascade' } }, tables)).notNull()
+          // Each end takes the type of the id it points at. The parent's end cascades, since the row
+          // belongs to its parent; the target's is the field's own `onDelete`.
+          const reference = (build: ColumnBuilder, column: string, target: ResolvedKayan, onDelete: unknown) =>
+            modifiable(build({ ...field, name: column, column: `${column}_id`, target, rules: { onDelete } }, tables)).notNull()
           // Named, so the check below holds them to the schema's one namespace.
           const key = `${name}_pkey`
           const targetIndex = `${name}_target_id_index`
@@ -895,8 +904,8 @@ const storeOf = <
           tables[name] = tableIn(schemaOf(tables[kayan.name]))(
             name,
             {
-              parent: reference(kinds.relationship as ColumnBuilder, 'parent', kayan),
-              target: reference(implementationOf<ColumnBuilder>({ table: kinds, shipped: drizzleKinds, name: field.kind, own: field.kindTargets, type: 'drizzle' })!, 'target', field.target!),
+              parent: reference(kinds.relationship as ColumnBuilder, 'parent', kayan, 'cascade'),
+              target: reference(implementationOf<ColumnBuilder>({ table: kinds, shipped: drizzleKinds, name: field.kind, own: field.kindTargets, type: 'drizzle' })!, 'target', field.target!, field.rules?.onDelete),
               // The only order a set of ids has.
               order: pgInteger('order').notNull(),
             },

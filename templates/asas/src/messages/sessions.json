@@ -1,15 +1,11 @@
 {
+  "archiveReason": {
+    "ar": "سبب الأرشفة",
+    "en": "Archive reason"
+  },
   "archived": {
     "ar": "مؤرشفة",
     "en": "Archived"
-  },
-  "archived.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
-  },
-  "archived.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
   },
   "capacity": {
     "ar": "السعة",
@@ -74,6 +70,14 @@
   "id.required": {
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
+  },
+  "operations.archive.reason": {
+    "ar": "السبب",
+    "en": "Reason"
+  },
+  "operations.unarchive.reason": {
+    "ar": "السبب",
+    "en": "Reason"
   },
   "organization": {
     "ar": "المؤسسة",

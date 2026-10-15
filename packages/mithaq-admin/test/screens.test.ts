@@ -186,7 +186,7 @@ test('a list node draws its columns, filters and search, and its empty component
     newHref: '/dashboard/courses/new',
   } as never))
   const heads = [...host.querySelectorAll('th')].filter((one) => !one.querySelector('.sr-only')).map((one) => one.textContent!.trim())
-  assert.deepEqual(heads, ['Title', 'Fee', 'Archived', 'Opens on', 'Status', 'Details', 'Cover image'], `the node's columns, in its order: ${heads.join(', ')}`)
+  assert.deepEqual(heads, ['Title', 'Fee', 'Opens on', 'Status', 'Details', 'Cover image'], `the node's columns, in its order: ${heads.join(', ')}`)
   assert.ok(host.querySelector('[data-empty="courses/courses"]'), 'the empty component is drawn with the kayan and the page')
   assert.equal(host.querySelector('input[type="search"]')!.getAttribute('placeholder'), 'Title, Summary, or Details', 'the search runs over the node\'s fields')
   const portal = asas.targets.portal.client.kayan.courses!

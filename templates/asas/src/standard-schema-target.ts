@@ -58,7 +58,7 @@ const optional = (inner: Shape): Shape =>
   rewrap(inner, (value) => (value === undefined ? { value } : inner['~standard'].validate(value)))
 
 const received = (value: unknown) => (value === null ? 'null' : typeof value)
-const listKeys = ['data', 'depth', 'limit', 'page', 'sort', 'where']
+const listKeys = ['data', 'depth', 'for', 'limit', 'page', 'sort', 'where']
 const notAnObject = (value: unknown) =>
   !value || typeof value !== 'object' || Array.isArray(value)
     ? `Invalid input: expected object, received ${received(value)}`

@@ -124,5 +124,5 @@ export const betterAuthStrategy = <Server extends BetterAuth, Collection extends
  * targets and vocabulary the build derives; two kayan carrying this are two instances.
  */
 export const betterAuth = <Server extends BetterAuth, Targets = unknown>(declaration: {
-  server: (targets: Targets, vocabulary: { catalog: readonly string[]; statements: Readonly<Record<string, readonly string[]>> }) => Server
+  server: (targets: Targets, vocabulary: { catalog: readonly string[]; statements: Readonly<Record<string, readonly string[]>>; referenced: (id: string) => Promise<number> }) => Server
 }) => ({ provider: 'better-auth' as const, server: declaration.server })

@@ -16,7 +16,7 @@ import type { KayanConfigOf } from './rukn.ts'
 type KayanAuthOf<Targets> =
   | AuthStrategy
   | { provider: 'local'; options: unknown }
-  | { provider: 'better-auth'; server: (targets: Targets, vocabulary: { catalog: readonly string[]; statements: Readonly<Record<string, readonly string[]>> }) => unknown }
+  | { provider: 'better-auth'; server: (targets: Targets, vocabulary: { catalog: readonly string[]; statements: Readonly<Record<string, readonly string[]>>; referenced: (id: string) => Promise<number> }) => unknown }
 
 // A generic constraint check does no excess-property checking, so a stray locale
 // would otherwise ride out on the built kayan's type.

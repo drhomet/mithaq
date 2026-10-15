@@ -87,7 +87,8 @@ export const refusalOf = ({
 }
 
 /** The sentence over a refused save: a schema refusal that names fields lists them by label; any other is its own key's sentence, or `fallback`. */
-export const refusalWords = ({ shown, labels, fallback, copy: { t, locale } }: { shown: string; labels: readonly string[]; fallback?: string; copy: Copy }): string =>
+export const refusalWords = ({ shown, labels, fallback, kayan, copy: { t, locale } }: { shown: string; labels: readonly string[]; fallback?: string; kayan?: string; copy: Copy }): string =>
   shown === 'error.invalid.value' && labels.length
     ? counted({ t, locale, key: 'error.invalid.fields', count: labels.length, fallback: 'The following fields are invalid: {fields}' }).replace('{fields}', () => listed(labels, locale))
-    : (t(shown, fallback ?? shown) ?? shown)
+    // A kayan words a refusal of its own under its scope, `enrollments.conflict.unique`, over the shared words.
+    : ((kayan && t(`${kayan}.${shown.replace(/^error\./, '')}`)) || (t(shown, fallback ?? shown) ?? shown))

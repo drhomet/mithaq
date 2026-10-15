@@ -5,7 +5,7 @@ import { holdsVerificationSteps, isLocalAuthTarget, localAuthStrategy, type Loca
 import { bulkSeals, outputOf, sealOf, storeSeals, type AuditHandler, type DerivedShapes, type OperationEffect, type OperationScreen, type WriteStep, type WriteTools } from './runner/steps.ts'
 import { running } from './runner/runtime.ts'
 import { tenancy } from './runner/tenant.ts'
-import { assertWhere, defaultAccess, defaultAuthorize, projectReadableFields, type Authorize, type Globals, type ManagedAdmin, type Options, type Procedures, type Row, type Writes } from './runner/write.ts'
+import { assertWhere, defaultAccess, defaultAuthorize, projectReadableFields, referencingIds, restrictingPointers, type Authorize, type Pointer, type Globals, type ManagedAdmin, type Options, type Procedures, type Row, type Writes } from './runner/write.ts'
 import { combineWhere } from '../mithaq/where.ts'
 import type { ReaderMap } from './runner/read.ts'
 import { bulk, read as readers, write, type ServiceTarget } from '../service/index.ts'
@@ -152,6 +152,12 @@ type AdminAccessShapeMismatch<Auth> = Auth extends { admin?: infer Admin }
 export type Vocabulary = {
   catalog: readonly string[]
   statements: Readonly<Record<string, readonly string[]>>
+  /**
+   * How many rows, across every organization, still name the auth kayan's row `id` through a
+   * relationship that restricts its delete. A provider route that deletes a person outside a
+   * transaction asks it first, since the foreign key would fail only after other rows went.
+   */
+  referenced: (id: string) => Promise<number>
 }
 
 /** The build's auth: the admin kayan whose actor passes default access, and where failures are reported. */
@@ -283,6 +289,8 @@ const operations = <Actor>(
   /** The most rows a served read of many may ask for, and one bulk write may match. */
   { maxLimit, bulkLimit }: Pick<ServiceTarget, 'maxLimit' | 'bulkLimit'>,
   tenant: { active: (actor: unknown) => string | undefined; seal: (writes: WriteTools['store']) => WriteTools['store'] },
+  /** The fields of every kayan that keep a row of this one while they name it. */
+  pointers: readonly Pointer[],
 ) => {
   // Bound, so a step cannot reach `transaction` or the adapter's own client, and sealed, so no
   // step writes a tenant-owned row outside the active organization.
@@ -392,16 +400,18 @@ const operations = <Actor>(
         enumerable: true,
         get: () => kayans(declaration.effect),
       })
+      if (declaration.each && !bulkSeals.includes(kind as never)) throw new Error(`Kayan "${kayan.name}" operation "${operation}" names "each", and only a bulk operation runs another on each row.`)
       // Built in the second pass, where every single-row write it delegates to exists.
       if (bulkSeals.includes(kind as never)) {
         bulkLists.push({ operation, declaration, tools, input })
         continue
       }
-      const run = write<Actor>({ kayan, declaration, tools, store, cap, authorize, admin, tenantOf: tenant.active })
+      const run = write<Actor>({ kayan, declaration, tools, store, cap, authorize, admin, tenantOf: tenant.active, pointers })
       methods[operation] = publish(operation, declaration.effect, input, run)
   }
   for (const { operation, declaration, tools, input } of bulkLists) {
-    const single = declaration.effect === 'update' ? 'update' : 'delete'
+    const single = declaration.each ?? (declaration.effect === 'update' ? 'update' : 'delete')
+    if (!methods[single]) throw new Error(`Kayan "${kayan.name}" operation "${operation}" runs "${single}" on each row it matches, and the kayan has no operation "${single}".`)
     const run = bulk<Actor>({
       kayan,
       declaration,
@@ -854,6 +864,9 @@ export const buildAsas = <
         of: boundOf('read'),
         audit: service.audit as AuditHandler<Actor> | undefined,
         catalog,
+        pickers: Object.fromEntries(resolved.flatMap((other) => Object.values(other.fields)
+          .filter((field) => field.kind !== 'join' && field.target?.name === one.name)
+          .map((field) => [`${other.name}.${field.name}`, field]))),
       })
       const { methods, table } = operations(
         one,
@@ -871,6 +884,7 @@ export const buildAsas = <
         service.context !== undefined,
         service,
         { active: tenant.active, seal: (writes) => tenant.sealWrites({ writes, find: store.find.bind(store), kayanOf: (name) => resolvedByName.get(name) }) },
+        restrictingPointers(resolved, one),
       )
       operationTable.push(...table)
       const bound = Object.freeze(methods)
@@ -936,8 +950,15 @@ export const buildAsas = <
     const list: AuthStrategy[] = []
     // Without this freeze a `roles` function reassigning `v.catalog` would be seen by a
     // `server` factory, and the target and the provider would disagree.
-    const vocabulary: Vocabulary = Object.freeze({ catalog: catalog as readonly string[], statements })
     for (const one of authenticating) {
+      const own = resolvedByName.get(one.name)!
+      const pointers = restrictingPointers(resolved, own)
+      const ownStore = buildTargets[own.store] as unknown as Store
+      const vocabulary: Vocabulary = Object.freeze({
+        catalog: catalog as readonly string[],
+        statements,
+        referenced: async (id: string) => [...(await referencingIds({ id, pointers, store: ownStore })).values()].reduce((sum, ids) => sum + ids.size, 0),
+      })
       const declaration = one.auth
       if (!isAuthDeclaration(declaration)) {
         list.push(declaration)

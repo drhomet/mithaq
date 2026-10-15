@@ -800,7 +800,7 @@ test('a locale the language adds is refused on the mithaq scope first, and once 
     const firstPerField = missing.findIndex((line) => !line.startsWith('mithaq.'))
     assert.ok(missing.indexOf('mithaq.rules.maxLength has no "fr".') >= 0)
     assert.ok(missing.indexOf('mithaq.rules.maxLength has no "fr".') < firstPerField, 'the mithaq scope comes before any per-field line')
-    assert.ok(missing.includes('courses.archiveReason.maxLength has no "fr".'))
+    assert.ok(missing.includes('courses.summary.maxLength has no "fr".'))
 
     await generateMessages({ registry, directory })
     const floor = (await writtenIn(directory)).mithaq!
@@ -809,9 +809,9 @@ test('a locale the language adds is refused on the mithaq scope first, and once 
     await generateMessages({ registry, directory })
 
     const courses = (await writtenIn(directory)).courses!
-    assert.equal(courses['archiveReason.maxLength']!.fr, 'The value is too long. (fr)')
-    assert.equal(courses['archiveReason.required']!.fr, 'This field is required. (fr)')
-    assert.equal(courses['archiveReason.invalid']!.fr, 'This is not text. (fr)')
+    assert.equal(courses['summary.maxLength']!.fr, 'The value is too long. (fr)')
+    assert.equal(courses['summary.required']!.fr, 'This field is required. (fr)')
+    assert.equal(courses['summary.invalid']!.fr, 'This is not text. (fr)')
     assert.equal(courses['createdAt.invalid'], undefined)
     // Every per-field refusal key a rule or kind seeds carries `fr`; what is left is copy the
     // project wrote itself, which no default reaches.

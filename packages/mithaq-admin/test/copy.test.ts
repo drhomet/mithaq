@@ -341,14 +341,14 @@ test('232a. ticking a row on a phone draws the bulk bar fixed to the bottom, the
   const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')!
   assert.ok(dialog.textContent?.includes('Courses you ticked: 2. This applies to each of them.'), dialog.textContent ?? '')
   assert.equal(window.document.activeElement === dialog, true, `a tap reported as a click on a phone focuses the dialog, not the fee box: ${window.document.activeElement?.id}`)
-  const archived = () => window.document.querySelector('#courses-updateMany-archived')!
-  assert.equal(archived().textContent, 'Leave as is', 'the box starts at leaving every row as it is')
-  await act(async () => click(archived() as unknown as Element))
-  await act(async () => click([...window.document.querySelectorAll('[data-slot="select-item"]')].find((one) => one.textContent === 'Active')! as unknown as Element))
-  assert.equal(archived().textContent, 'Active', 'and says the value it will write')
+  const notified = () => window.document.querySelector('#courses-updateMany-notifications')!
+  assert.equal(notified().textContent, 'Leave as is', 'the box starts at leaving every row as it is')
+  await act(async () => click(notified() as unknown as Element))
+  await act(async () => click([...window.document.querySelectorAll('[data-slot="select-item"]')].find((one) => one.textContent === 'No')! as unknown as Element))
+  assert.equal(notified().textContent, 'No', 'and says the value it will write')
   await act(async () => fire(dialog.querySelector('form')! as unknown as Element, 'submit'))
   await act(async () => sleep(20))
-  assert.deepEqual(calls, [{ where: { id: { in: ['c1', 'c2'] } }, data: { archived: false } }], 'clearing it sends false, which an untouched box never did')
+  assert.deepEqual(calls, [{ where: { id: { in: ['c1', 'c2'] } }, data: { notifications: false } }], 'clearing it sends false, which an untouched box never did')
   const said = host.querySelector('[data-mithaq-done]')
   assert.equal(said?.textContent, 'Courses done: 2.', 'a landed bulk says what it did')
   assert.equal(said?.getAttribute('aria-live'), 'polite', 'in the count\'s own live region')

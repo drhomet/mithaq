@@ -31,29 +31,9 @@
     "ar": "سبب الأرشفة",
     "en": "Archive reason"
   },
-  "archiveReason.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "archiveReason.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "archiveReason.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
   "archived": {
     "ar": "مؤرشف",
     "en": "Archived"
-  },
-  "archived.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
-  },
-  "archived.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
   },
   "audience": {
     "ar": "الجمهور",
@@ -180,6 +160,10 @@
     "en": "This field is required."
   },
   "operations.archive.reason": {
+    "ar": "السبب",
+    "en": "Reason"
+  },
+  "operations.unarchive.reason": {
     "ar": "السبب",
     "en": "Reason"
   },

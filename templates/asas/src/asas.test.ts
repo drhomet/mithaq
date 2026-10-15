@@ -124,7 +124,13 @@ const { courses, sessions, enrollments } = asas.kayan
 // The asas's own provider with no address proof, over the same tables and secret: the suite's
 // fixtures sign up and act at once, which a proved address would hold off. The proof itself is
 // the modes series' (0d, 0f, 0h, 0i).
-const server = serverFor({ ...authSettings, verifyEmail: false })({ drizzle: asas.targets.drizzle as never }) as any
+/**
+ * What the build hands a provider beside its targets, for the instances a test builds itself. None of
+ * them serves a delete of a person; the removal tests call `asas.handler`, whose provider the build
+ * handed its own count.
+ */
+const unreferenced = { referenced: async () => 0 }
+const server = serverFor({ ...authSettings, verifyEmail: false })({ drizzle: asas.targets.drizzle as never }, unreferenced) as any
 /** The provider `asas.handler` itself serves. */
 const servedProvider = (asas.auth.strategies.find((strategy) => strategy.name === 'user') as unknown as { server: any }).server
 const allowAccess = { create: () => true, read: () => true, update: () => true, delete: () => true } as const
@@ -465,6 +471,35 @@ const markedChildren = defineTestKayan({
   targets: { service: { operations: defaultOperations } },
 })
 const markedAsas = buildTestAsas({ http: [fetchHttp()], kayan: [markedParents, markedChildren, ...accessKayan] })
+/** A kayan that names a person and itself, which no template kayan beside the seats does. */
+const probeNotes = defineTestKayan({
+  name: 'probeNotes',
+  dbName: 'probe_notes',
+  access: allowAccess,
+  fields: {
+    ...defaultFields,
+    author: { kind: 'relationship', label: { en: 'Author', ar: 'الكاتب' }, relationTo: 'user' },
+    parent: { kind: 'relationship', label: { en: 'Parent', ar: 'الأصل' }, relationTo: 'probeNotes' },
+  },
+  targets: { service: { operations: defaultOperations } },
+})
+const notesAsas = buildTestAsas({ http: [fetchHttp()], kayan: [probeNotes, ...accessKayan] })
+/** A row every organization shares, and a per-organization kayan whose drafts name it. */
+const sharedLabels = defineTestKayan({
+  name: 'sharedLabels',
+  dbName: 'shared_labels',
+  access: allowAccess,
+  fields: { ...defaultFields, title: { kind: 'text', label: { en: 'Title', ar: 'العنوان' } } },
+  targets: { service: { operations: defaultOperations } },
+})
+const labelledDrafts = defineTestKayan({
+  name: 'labelledDrafts',
+  dbName: 'labelled_drafts',
+  access: allowAccess,
+  fields: { ...defaultFields, organization, label: { kind: 'relationship', label: { en: 'Label', ar: 'الوسم' }, relationTo: () => sharedLabels }, ...draftFields },
+  targets: { service: { operations: { ...defaultOperations, ...versionOperations } }, versions: { drafts: true } },
+})
+const labelsAsas = buildTestAsas({ http: [fetchHttp()], kayan: [sharedLabels, labelledDrafts, ...accessKayan] })
 
 const projectWide = defineTestGlobal({
   name: 'projectWide',
@@ -781,7 +816,7 @@ before(async () => {
   await db.execute('create table untouched (id integer)')
   await asas.connect()
   await db.execute(`insert into organization (id, name, slug, created_at) values ('borrowed-organization', 'Borrowed', 'borrowed', now())`)
-  for (const built of [actorDefaultAsas, localizedAsas, calendarAsas, measureAsas, galleryAsas, noticeAsas, memoAsas, markedAsas, projectWideAsas, spreadsNoDefaultsAsas, spreadsNoTimestampAsas, softLocalAsas]) {
+  for (const built of [actorDefaultAsas, localizedAsas, calendarAsas, measureAsas, galleryAsas, noticeAsas, memoAsas, markedAsas, notesAsas, labelsAsas, projectWideAsas, spreadsNoDefaultsAsas, spreadsNoTimestampAsas, softLocalAsas]) {
     await built.connect()
   }
 })
@@ -800,7 +835,7 @@ const codedProvider = async () => {
     delete process.env.SETUP_CODE
   }
 }
-const modeServer = (changes: Partial<AuthSettings>, provider: { serverFor: typeof serverFor } = { serverFor }) => provider.serverFor({ ...authSettings, ...changes })({ drizzle: asas.targets.drizzle as never })
+const modeServer = (changes: Partial<AuthSettings>, provider: { serverFor: typeof serverFor } = { serverFor }) => provider.serverFor({ ...authSettings, ...changes })({ drizzle: asas.targets.drizzle as never }, unreferenced)
 type ModeServer = ReturnType<typeof modeServer>
 const tenantOrigin = 'http://localhost:5173'
 const askedOf = (one: ModeServer, path: string, body?: unknown, headers: Record<string, string> = {}) =>
@@ -1377,6 +1412,7 @@ test('3. the tables carry exactly the columns the kayan describe', async () => {
     'archived',
     // Rich text, the last column of each.
     'details',
+    'archive_reason',
     'updated_at',
     'created_at',
   ])
@@ -1487,6 +1523,8 @@ const tenantOptions = async () => {
     // write. Without it this member is assigned no role, takes no row, the
     // `'*'` tenancy row included, and is denied every operation.
     await assignRole(organizationId, signUp.response.user.id, 'administrator')
+    // A student too, as this file's own seats name it and a seat's student holds the role.
+    await assignRole(organizationId, signUp.response.user.id, 'student')
     actor = await asas.auth.actor(signedIn)
   }
   assert.ok(actor)
@@ -1544,6 +1582,13 @@ const memberOf = async (organization: string, name: string, email: string) => {
   return signUp.response.user.id as string
 }
 
+/** A member holding the student role, which a seat's student holds. */
+const studentOf = async (organization: string, name: string, email: string) => {
+  const id = await memberOf(organization, name, email)
+  await assignRole(organization, id, 'student')
+  return id
+}
+
 test('4. Better Auth runs on the tables mithaq built, and the three writes land', async () => {
   const signUp = await server.api.signUpEmail({
     body: { name: 'Layla', email: 'layla@example.com', password: 'a-long-enough-password' },
@@ -1558,6 +1603,8 @@ test('4. Better Auth runs on the tables mithaq built, and the three writes land'
   })
   organizationId = organization!.id
   await assignRole(organizationId, studentId, 'administrator')
+  // A student too, as the seats this file makes name Layla and a seat's student holds the role.
+  await assignRole(organizationId, studentId, 'student')
 
   assert.equal(((await asas.auth.actor(signedIn)) as { id?: string } | null)?.id, studentId)
   assert.equal(await asas.auth.actor(new Headers()), null)
@@ -2885,7 +2932,22 @@ test('11b. a push that fails part way leaves nothing it ran before the failure, 
   await db.execute('drop table pushed_broken')
 })
 
-test('12. onDelete is a rule, and a required Better Auth foreign key cascades', async () => {
+test('12b. a required relationship declared set null is refused at build by name, rather than failing its delete in the database', () => {
+  const language = offline()
+  assert.throws(
+    () => language.buildAsas({
+      http: [fetchHttp()],
+      kayan: [language.defineKayan({
+        name: 'nodes',
+        fields: { id: { kind: 'text' }, parent: { kind: 'relationship', relationTo: 'nodes', rules: { required: true, onDelete: 'set null' } } },
+        targets: { service: { operations: defaultOperations } },
+      })],
+    }),
+    /Kayan "nodes" field "parent" is required and declares onDelete "set null", and a required column holds no null\. Write "restrict" or "cascade"\./,
+  )
+})
+
+test('12. onDelete is a rule, a relationship that names none restricts, and a required Better Auth foreign key cascades', async () => {
   const language = offline()
   const nodes = language.buildAsas({
     http: [fetchHttp()],
@@ -2896,6 +2958,7 @@ test('12. onDelete is a rule, and a required Better Auth foreign key cascades', 
           id: { kind: 'text' },
           parent: { kind: 'relationship', relationTo: 'nodes', rules: { required: true } },
           child: { kind: 'relationship', relationTo: 'nodes' },
+          loose: { kind: 'relationship', relationTo: 'nodes', rules: { onDelete: 'set null' } },
         },
         targets: { service: { operations: defaultOperations } },
       }),
@@ -2903,7 +2966,8 @@ test('12. onDelete is a rule, and a required Better Auth foreign key cascades', 
   })
   const fields = nodes.kayan.nodes.fields as Record<string, { rules?: { onDelete?: string } }>
   assert.equal(fields.parent?.rules?.onDelete, 'restrict')
-  assert.equal(fields.child?.rules?.onDelete, 'set null')
+  assert.equal(fields.child?.rules?.onDelete, 'restrict', 'an optional one restricts too, the kind\'s default')
+  assert.equal(fields.loose?.rules?.onDelete, 'set null', 'and one that says set null is set null')
   await nodes.destroy()
 
   // And at the database, one field for each action, on the pushed schema: `r` is restrict
@@ -5992,13 +6056,15 @@ test('48. every built operation of every kayan and every global is one entry of 
       'findVersionByID:read',
       'restoreVersion:update',
       'archive:update',
+      'unarchive:update',
+      'unpublish:update',
       'findWithSessions:read',
       // The two bulk operations come last, because `buildAsas` builds them in a second pass
       // over the single-row writes each of them runs per row.
       'updateMany:update',
       'deleteMany:delete',
     ],
-    'a kayan is in the table under its eight shipped operations, the three versions ones and the two it declares, each carrying its effect',
+    'a kayan is in the table under its eight shipped operations, the three versions ones and the four it declares, each carrying its effect',
   )
   assert.deepEqual(
     asas.operations.filter((one) => one.single).map((one) => `${one.kayan}.${one.name}`),
@@ -7171,7 +7237,7 @@ test('226d. a sign-up completes on a pool of one client, because every hook of o
   const { drizzle } = await import('drizzle-orm/node-postgres')
   const one = drizzle({ connection: { connectionString: testDatabase(), max: 1 } })
   const store = asas.targets.drizzle as unknown as Parameters<typeof providers.user.server>[0]['drizzle']
-  const narrow = providers.user.server({ drizzle: { ...store, db: one as never, tables: store.tables } })
+  const narrow = providers.user.server({ drizzle: { ...store, db: one as never, tables: store.tables } }, unreferenced)
   const answer = await Promise.race([
     narrow.api.signUpEmail({ body: { name: 'one-226d', email: 'one-226d@example.com', password: 'a-long-enough-password' } }).then(() => 'signed up'),
     setTimeout(5000, 'hung'),
@@ -9958,15 +10024,19 @@ test('100. a hasMany relationship is refused where a rule would build on a colum
 
   // Every rule that builds something on a column builds nothing for a field the
   // store keeps in a join table, so each is refused by name rather than applied
-  // to nothing.
-  for (const rule of ['defaultValue', 'index', 'onDelete', 'unique'] as const) {
+  // to nothing. `onDelete` builds the join table's own key, where a set has no null.
+  assert.throws(
+    many({ tags: { kind: 'relationship', relationTo: 'manyTargets', hasMany: true, rules: { onDelete: 'set null' } } }),
+    /field "tags" is a relationship with hasMany and onDelete "set null", and a set's join row holds no null\./,
+  )
+  for (const rule of ['defaultValue', 'index', 'unique'] as const) {
     assert.throws(
       many({
         tags: {
           kind: 'relationship',
           relationTo: 'manyTargets',
           hasMany: true,
-          rules: { [rule]: rule === 'onDelete' ? 'cascade' : rule === 'defaultValue' ? 'x' : true },
+          rules: { [rule]: rule === 'defaultValue' ? 'x' : true },
         },
       }),
       new RegExp(`field "tags" is a relationship with hasMany[\\s\\S]*rule "${rule}" would build nothing`),
@@ -10049,7 +10119,7 @@ test('101. updateMany and deleteMany change exactly the rows their where matched
   ) as { id: string }
   const studentIds: string[] = []
   for (const name of ['Bulk A', 'Bulk B']) {
-    studentIds.push(await memberOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
+    studentIds.push(await studentOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
   }
   for (const student of studentIds) await enrollmentsKayan.operations.create({ session: session.id, student }, options)
   const removed = await enrollmentsKayan.operations.deleteMany({ where: { session: { equals: session.id } } }, options)
@@ -12067,9 +12137,9 @@ test('129b. a platform administrator has only the membership keys and rows in th
  * One of the admin plugin's own routes, posted as a browser in the platform app
  * posts it, the only app that serves them.
  */
-const adminRoute = (path: string, headers: Headers, body: Record<string, unknown>) =>
+const adminRoute = (path: string, headers: Headers, body: Record<string, unknown>, served: { handler: (request: Request) => Promise<Response> } = asas) =>
   asPlatform(async () =>
-    asas.handler(
+    served.handler(
       new Request(`http://test/api/auth/user/admin/${path}`, {
         method: 'POST',
         headers: new Headers([...(await onPlatform(headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
@@ -12187,7 +12257,7 @@ test('142c. only a super admin grants a platform role, and a tenant administrato
     const refused = await asas.kayan.memberRoles.operations.create({ role, user: member.id }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
     assert.ok(refused instanceof AsasError && refused.status === 400 && refused.key === 'error.invalid.role', `"${role}" is no role an assignment may name`)
   }
-  assert.equal((await adminRoute('set-role', owner.headers, { userId: member.id, role: 'support' })).status, 403, 'the admin plugin refuses the tenant administrator')
+  assert.equal((await adminRoute('set-role', owner.headers, { userId: member.id, role: 'support' })).status, 401, 'the platform refuses the tenant administrator, who holds no session there')
 
   const platform = await signedUp('platform-142c')
   await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
@@ -12584,6 +12654,26 @@ test('142g. every platform action on a person is audited once it succeeds, and a
   const recorded = await db.execute(`select impersonated_by from session where user_id = '${person.id}' and impersonated_by is not null`)
   assert.equal(recorded.rows.length, 0, 'the impersonated session is gone once it is signed out')
   assert.ok(await asPlatform(async () => asas.auth.actor((await onPlatform(support.headers)))), 'support is still signed in to the platform app')
+})
+
+test('142g2. a platform role without a route\'s permission is answered 403 before its input is judged, whatever it sends, and nothing is written', async () => {
+  const person = await signedUp('person-142g2')
+  const support = await signedUp('support-142g2')
+  await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
+  const before = (await db.execute(`select role, banned, ban_reason from "user" where id = '${person.id}'`)).rows
+  for (const [route, body] of [
+    ['ban-user', { userId: person.id, banReason: 'Spam' }],
+    ['ban-user', { userId: person.id }],
+    ['ban-user', { userId: person.id, banReason: '   ' }],
+    ['update-user', { userId: person.id, data: { banned: true } }],
+    ['update-user', { userId: person.id, data: { banned: 'true', banReason: 'Spam' } }],
+    ['create-user', { email: 'made-142g2@example.com', password: 'a-long-enough-password', name: 'Made', data: { banned: true } }],
+    ['set-role', { userId: person.id, role: 'explorer' }],
+  ] as const) {
+    assert.equal((await adminRoute(route, support.headers, body)).status, 403, `${route} with ${JSON.stringify(body)} is refused for the permission first`)
+  }
+  assert.deepEqual((await db.execute(`select role, banned, ban_reason from "user" where id = '${person.id}'`)).rows, before, 'and the person is as they were')
+  assert.equal((await db.execute(`select 1 from "user" where email = 'made-142g2@example.com'`)).rows.length, 0, 'and no one was made')
 })
 
 test('142h. the two apps keep two session cookies, and a one-time link is spent once and never in the platform app', async () => {
@@ -12996,7 +13086,7 @@ const providerUnder = async (env: Record<string, string>) => {
 }
 /** The platform app's first-register of `provider`, served by an instance built over this file's store. */
 const firstRegisterOf = (provider: typeof import('@asas/mithaq/auth')) => {
-  const built = provider.providers.user.server({ drizzle: asas.targets.drizzle as unknown as Parameters<typeof providers.user.server>[0]['drizzle'] })
+  const built = provider.providers.user.server({ drizzle: asas.targets.drizzle as unknown as Parameters<typeof providers.user.server>[0]['drizzle'] }, unreferenced)
   return firstRegisterAt((request) => provider.asPlatform(() => built.handler(request)), `${provider.platformURL}/api/auth`)
 }
 /** As `vite dev` runs the platform app, the one place no setup code is asked. */
@@ -13491,7 +13581,7 @@ test('135. a join is the rows of another kayan, read through that kayan\'s own a
   ) as { id: string }
   const students: string[] = []
   for (const name of ['Join A', 'Join B']) {
-    students.push(await memberOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
+    students.push(await studentOf(organizationId, name, `${name.toLowerCase().replace(' ', '-')}@example.com`))
   }
   const made: string[] = []
   for (const student of students) {
@@ -13517,8 +13607,10 @@ test('135. a join is the rows of another kayan, read through that kayan\'s own a
     { course: course.id, startsAt: new Date('2027-03-02T09:00:00.000Z'), capacity: 20 },
     options,
   ) as { id: string }
+  // Twelve students, since a student holds one seat in a session.
   for (let at = 0; at < 12; at += 1) {
-    await asas.kayan.enrollments.operations.create({ session: crowded.id, student: students[0] }, options)
+    const student = await studentOf(organizationId, `Crowd ${at}`, `crowd-${at}-135@example.com`)
+    await asas.kayan.enrollments.operations.create({ session: crowded.id, student }, options)
   }
   const bounded = await asas.kayan.sessions.operations.find(
     { where: { id: { equals: crowded.id } }, depth: 1 },
@@ -15391,7 +15483,7 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   const owner = await signUp('Hind Owner', 'hind-149@example.com')
   const school = await server.api.createOrganization({ body: { name: 'Hind School', slug: 'hind-school-149' }, headers: owner.headers })
   await assignRole(school!.id, owner.id, 'administrator')
-  const member = await memberOf(school!.id, 'Huda Member', 'huda-149@example.com')
+  const member = await studentOf(school!.id, 'Huda Member', 'huda-149@example.com')
   const stranger = await signUp('Zaid Owner', 'zaid-149@example.com')
   await server.api.createOrganization({ body: { name: 'Zaid School', slug: 'zaid-school-149' }, headers: stranger.headers })
   const actor = await asas.auth.actor(owner.headers)
@@ -15399,6 +15491,8 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   const options = { actor }
   const course = await courses.operations.create({ title: 'Enrolled across tenants' }, options)
   const session = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-05-01T09:00:00.000Z'), capacity: 4 }, options)
+  // A second session, as a student holds one seat in each.
+  const second = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-05-08T09:00:00.000Z'), capacity: 4 }, options)
   const refused = async (write: Promise<unknown>, message: string) => {
     const thrown = await write.catch((error: unknown) => error)
     assert.ok(thrown instanceof AsasError && thrown.status === 400, message)
@@ -15411,9 +15505,10 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   assert.equal(made.student, member, 'the tenant\'s own member is admitted')
   // Postgres answers a uuid in lowercase, so a session named in uppercase is
   // still the row that is there.
-  const shouted = await enrollments.operations.create({ session: session.id.toUpperCase(), student: member }, options)
-  assert.equal(shouted.session, session.id, 'a uuid named in uppercase is admitted and stored as the row it names')
-  assert.equal((await enrollments.operations.create({ session: session.id, student: owner.id }, options)).student, owner.id, 'and so is the owner, who is a member too')
+  const shouted = await enrollments.operations.create({ session: second.id.toUpperCase(), student: member }, options)
+  assert.equal(shouted.session, second.id, 'a uuid named in uppercase is admitted and stored as the row it names')
+  await assignRole(school!.id, owner.id, 'student')
+  assert.equal((await enrollments.operations.create({ session: second.id, student: owner.id }, options)).student, owner.id, 'and so is the owner, who is a member and a student too')
   await refused(enrollments.operations.update({ id: made.id, student: stranger.id }, options), 'an update to another tenant\'s user is refused')
   await refused(
     enrollments.operations.updateMany({ where: { id: { equals: made.id } }, data: { student: stranger.id } }, options),
@@ -16122,7 +16217,7 @@ const versionsTenant = async (slug: string) => {
     assert.ok(member)
     return { actor: member as never, headers: one.headers }
   }
-  return { options: { actor: actor as never }, headers: owner.headers, joined }
+  return { options: { actor: actor as never }, headers: owner.headers, joined, organization: organization!.id }
 }
 const courseVersions = async (id: string) =>
   (await db.execute(`select id, version, latest, autosave from _courses_versions where parent_id = '${id}' order by updated_at, created_at`)).rows as { id: string; version: Record<string, unknown>; latest: boolean; autosave: boolean }[]
@@ -16638,7 +16733,7 @@ test('132p. a filter across a relationship into a kayan that keeps drafts matche
 })
 
 test('218f. the sessions list searches by its course\'s title and the enrollments list by its student\'s name, as the list\'s own search box sends them, and each filters by its columns', async () => {
-  const { options, headers } = await versionsTenant('218f')
+  const { options, headers, organization } = await versionsTenant('218f')
   const searched = (paths: readonly string[], term: string) => ({ or: paths.map((field) => ({ and: [{ [field]: { like: term } }] })) })
   const dashboard = asas.targets.dashboard.client.kayan
   const listNode = (pages: unknown) => JSON.parse(JSON.stringify(pages)).list.page.main[0].main[0].list as { search: string[]; filters: string[] }
@@ -16656,6 +16751,7 @@ test('218f. the sessions list searches by its course\'s title and the enrollment
   assert.equal((await sessions.operations.find({ where: { venue: { equals: 'campus' }, course: { in: [tajweed.id, tafsir.id] } } }, options)).totalDocs, 1, 'and narrowed by where they meet')
 
   const owner = (await server.api.getSession({ headers }))!.user
+  await assignRole(organization, owner.id, 'student')
   await enrollments.operations.create({ session: first.id, student: owner.id }, options)
   assert.equal((await enrollments.operations.find({ where: searched(enrollmentList.search, 'owner-218f') }, options)).totalDocs, 1, 'the enrollment is found by its student\'s name')
   assert.equal((await enrollments.operations.find({ where: searched(enrollmentList.search, 'nobody-218f') }, options)).totalDocs, 0, 'and no other term finds it')
@@ -17264,7 +17360,7 @@ test('186m. the template\'s media takes an image through its own storage, a cour
   assert.ok(refused instanceof AsasError)
   assert.equal(refused.status, 409)
   assert.equal(refused.key, 'error.conflict.referenced')
-  assert.deepEqual(refused.params, { kayan: 'media', by: 'courses' }, 'naming the kayan whose row still points at it')
+  assert.deepEqual(refused.params, { kayan: 'media', by: 'courses', uses: [{ by: 'courses', count: 1, titles: ['Covered'] }] }, 'naming the kayan whose row still points at it, and the row')
   assert.equal((await courses.operations.findByID({ id: course.id }, options))!.cover, image.id)
 
   await courses.operations.delete({ id: course.id }, options)
@@ -17288,10 +17384,82 @@ test('186o. a file held in a gallery of many is not deleted while the gallery na
   assert.ok(refused instanceof AsasError, 'the delete is refused')
   assert.equal(refused.status, 409)
   assert.equal(refused.key, 'error.conflict.referenced')
-  assert.deepEqual(refused.params, { kayan: 'probeMedia', by: 'galleries' }, 'naming the kayan whose join table still points at it')
+  assert.deepEqual(refused.params, { kayan: 'probeMedia', by: 'galleries', uses: [{ by: 'galleries', count: 1, titles: [] }] }, 'naming the kayan whose join table still points at it, and counting a row it titles none of')
   assert.deepEqual((await galleryAsas.kayan.galleries.operations.findByID({ id: gallery.id }))!.images, [image.id], 'and the gallery keeps the file')
   await galleryAsas.kayan.galleries.operations.delete({ id: gallery.id })
   await galleryAsas.kayan.probeMedia.operations.delete({ id: image.id } as never)
+})
+
+test('186q. a delete refusal names a row by its title only to a caller who may find that kayan and read that field, and counts it alike for anyone else', async () => {
+  const tenant = await roleTenant('titles-186q')
+  const tag = await asas.kayan.tags.operations.create({ name: { en: 'Held 186q', ar: 'Held 186q' } }, tenant.options)
+  const course = await courses.operations.create({ title: 'Titled 186q', tags: [tag.id] }, tenant.options)
+  const tagKeys = asas.catalog.filter((key) => key.startsWith('tags.'))
+  const courseKeys = asas.catalog.filter((key) => key.startsWith('courses.'))
+  const refusalFor = async (slug: string, permissions: readonly string[]) => {
+    const person = await signedUp(`${slug}-186q`)
+    await server.api.addMember({ body: { userId: person.id, organizationId: tenant.organization, role: 'member' } })
+    await server.api.setActiveOrganization({ body: { organizationId: tenant.organization }, headers: person.headers })
+    const role = await tenant.as('admin', 'roles/create', { name: `${slug}-186q`, label: { en: slug, ar: slug }, permissions })
+    assert.equal(role.status, 200, JSON.stringify(role.body))
+    await assignRole(tenant.organization, person.id, `${slug}-186q`)
+    const answer = await apiCall('tags/delete', { id: tag.id }, { cookie: person.headers.get('cookie') ?? '' })
+    assert.equal(answer.status, 409, `${slug} is refused the delete`)
+    return ((await bodyOf(answer)).data as { params: { uses: unknown } }).params.uses
+  }
+  assert.deepEqual(await refusalFor('reader', [...tagKeys, ...courseKeys]), [{ by: 'courses', count: 1, titles: ['Titled 186q'] }], 'a caller who reads courses and their titles is told which')
+  assert.deepEqual(await refusalFor('blind', tagKeys), [{ by: 'courses', count: 1, titles: [] }], 'a caller who may not find courses is told how many alone')
+  assert.deepEqual(await refusalFor('untitled', [...tagKeys, ...courseKeys.filter((key) => key !== 'courses.fields.title')]), [{ by: 'courses', count: 1, titles: [] }], 'and so is one who finds courses but reads no title')
+  await courses.operations.delete({ id: course.id }, tenant.options)
+  await asas.kayan.tags.operations.delete({ id: tag.id }, tenant.options)
+})
+
+test('186r. a delete refusal never names a row by a related row\'s raw id, and marks a moment it names by, so the screen formats it', async () => {
+  const tenant = await roleTenant('raw-186r')
+  const course = await courses.operations.create({ title: 'Raw 186r' }, tenant.options)
+  const startsAt = new Date('2027-07-01T09:00:00Z')
+  const session = await sessions.operations.create({ course: course.id, startsAt }, tenant.options)
+  await enrollments.operations.create({ session: session.id, student: tenant.people.student.id }, tenant.options)
+  const refusalOf = (write: Promise<unknown>) => write.then(() => assert.fail('the delete is refused'), (error: AsasError) => error.params)
+  assert.deepEqual(
+    await refusalOf(sessions.operations.delete({ id: session.id }, tenant.options)),
+    { kayan: 'sessions', by: 'enrollments', uses: [{ by: 'enrollments', count: 1, titles: [] }] },
+    'a seat titled by its student is counted, and the student\'s id is never sent',
+  )
+  assert.deepEqual(
+    await refusalOf(courses.operations.delete({ id: course.id }, tenant.options)),
+    { kayan: 'courses', by: 'sessions', uses: [{ by: 'sessions', count: 1, titles: [startsAt], titleKind: 'datetime' }] },
+    'a session titled by when it starts is named by that moment, marked for the screen to format',
+  )
+})
+
+test('186p. a tag a live course or a course\'s latest draft names is not deleted: the refusal counts every course and names the ones the caller reads, and the course and its drafts keep the tag', async () => {
+  const options = await tenantOptions()
+  const { tags, courses } = asas.kayan
+  const [live, drafted, never, unused] = await Promise.all(['Live 186p', 'Drafted 186p', 'Never 186p', 'Unused 186p'].map((name) => tags.operations.create({ name: { en: name, ar: name } }, options)))
+  const published = await courses.operations.create({ title: 'Published 186p', tags: [live!.id] }, options)
+  const second = await courses.operations.create({ title: 'Second 186p', tags: [live!.id] }, options)
+  await courses.operations.update({ id: second.id, tags: [live!.id, drafted!.id] }, { ...options, draft: true })
+  const draftOnly = await courses.operations.create({ title: 'Draft only 186p', tags: [never!.id] }, { ...options, draft: true })
+  const refusalOf = (id: string) => tags.operations.delete({ id }, options).then(() => undefined, (error: unknown) => error)
+
+  const refused = await refusalOf(live!.id)
+  assert.ok(refused instanceof AsasError, 'the tag two courses carry is not deleted')
+  assert.equal(refused.status, 409)
+  assert.equal(refused.key, 'error.conflict.referenced')
+  assert.deepEqual(refused.params, { kayan: 'tags', by: 'courses', uses: [{ by: 'courses', count: 2, titles: ['Published 186p', 'Second 186p'] }] }, 'naming how many and which')
+  const byDraft = await refusalOf(drafted!.id)
+  assert.ok(byDraft instanceof AsasError && byDraft.status === 409, 'a tag only a pending draft names is not deleted either')
+  assert.deepEqual(byDraft.params, { kayan: 'tags', by: 'courses', uses: [{ by: 'courses', count: 1, titles: ['Second 186p'] }] })
+  const byNever = await refusalOf(never!.id)
+  assert.ok(byNever instanceof AsasError && byNever.status === 409, 'nor one a never-published course names')
+  assert.deepEqual(byNever.params, { kayan: 'tags', by: 'courses', uses: [{ by: 'courses', count: 1, titles: ['Draft only 186p'] }] }, 'which the caller, who reads drafts, sees named')
+  assert.deepEqual((await courses.operations.findByID({ id: second.id }, { ...options, draft: true }))!.tags, [live!.id, drafted!.id], 'and the draft still names both')
+  assert.deepEqual((await courses.operations.findByID({ id: published.id }, options))!.tags, [live!.id], 'and the course keeps its tag')
+
+  await tags.operations.delete({ id: unused!.id }, options)
+  for (const course of [published, second, draftOnly]) await courses.operations.delete({ id: course.id }, options)
+  for (const tag of [live, drafted, never]) await tags.operations.delete({ id: tag!.id }, options)
 })
 
 test('208. a tag update carrying the instant its caller read is refused 409 once the tag has changed, and of two writers holding one read the row lock lets exactly one win, through both plugs', async () => {
@@ -17720,6 +17888,138 @@ test('227e. a person who holds a seat, a withdrawn one included, is not removed 
   assert.equal((await adminRoute('remove-user', platform.headers, { userId: removable.id })).status, 200, 'a person holding no seat is removed')
 })
 
+test('227n. a person any row still names through a restricting relationship is not removed on the platform, whatever kayan names them: the route answers 409 before anything goes', async () => {
+  const notes = notesAsas.kayan.probeNotes.operations as unknown as Record<'create' | 'delete', (input: unknown) => Promise<{ id: string }>>
+  const person = await signedUp('noted-227n')
+  // Written past the operation, which holds a reference to people its actor reads.
+  const note = (await db.execute(`insert into probe_notes (id, author_id, created_at, updated_at) values (gen_random_uuid(), '${person.id}', now(), now()) returning id`)).rows[0] as { id: string }
+  const platform = await signedUp('platform-227n')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const held = async () => (await db.execute(`select (select count(*)::int from account where user_id = '${person.id}') as accounts, (select count(*)::int from session where user_id = '${person.id}') as sessions`)).rows[0]
+  const before = await held()
+  const answer = await adminRoute('remove-user', platform.headers, { userId: person.id }, notesAsas)
+  assert.equal(answer.status, 409, await answer.clone().text())
+  assert.equal(((await answer.json()) as { code?: string }).code, 'error.conflict.referenced')
+  assert.deepEqual(await held(), before, 'their account and sessions are all still there')
+  assert.ok(before!.accounts && before!.sessions, 'and there were some to lose')
+  await notes.delete({ id: note.id })
+  assert.equal((await adminRoute('remove-user', platform.headers, { userId: person.id }, notesAsas)).status, 200, 'once nothing names them, they are removed')
+})
+
+test('227o. a platform role without a route\'s permission is refused it before anything else is judged, so it learns nothing of the person it names', async () => {
+  const owner = await signedUp('sole-owner-227o')
+  await server.api.createOrganization({ body: { name: 'Sole 227o', slug: 'sole-227o' }, headers: owner.headers })
+  const support = await signedUp('support-227o')
+  await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
+  for (const [path, body] of [['remove-user', { userId: owner.id }], ['set-user-password', { userId: owner.id, newPassword: 'another-long-password' }], ['revoke-user-sessions', { userId: owner.id }]] as const) {
+    const answer = await adminRoute(path, support.headers, body)
+    assert.equal(answer.status, 403, `${path}: ${await answer.clone().text()}`)
+  }
+})
+
+test('186t. a shared row another organization\'s draft names is not deleted, and the refusal says nothing of that organization\'s rows', async () => {
+  const [a, b] = await twoTenants('186t')
+  const as = async (side: typeof a) => ({ actor: (await asas.auth.actor(side!.owner.headers)) as never })
+  const labels = labelsAsas.kayan.sharedLabels.operations as unknown as Record<'create' | 'delete', (input: unknown, options?: unknown) => Promise<{ id: string }>>
+  const drafted = labelsAsas.kayan.labelledDrafts.operations as unknown as Record<'create' | 'update', (input: unknown, options?: unknown) => Promise<{ id: string }>>
+  const label = await labels.create({ title: 'Shared 186t' })
+  // Published without it, so only the pending draft names it, which no foreign key holds.
+  const row = await drafted.create({}, await as(a))
+  await drafted.update({ id: row.id, label: label.id }, { ...(await as(a)), draft: true })
+  const refused = await labels.delete({ id: label.id }, await as(b)).then(() => undefined, (error: unknown) => error)
+  assert.ok(refused instanceof AsasError && refused.status === 409, 'a caller in another organization does not delete it')
+  assert.deepEqual([refused.key, refused.params], ['error.conflict.referenced', { kayan: 'sharedLabels' }], 'and is told neither how many rows name it nor which')
+  const own = await labels.delete({ id: label.id }, await as(a)).then(() => undefined, (error: unknown) => error)
+  assert.ok(own instanceof AsasError && own.status === 409, 'the organization whose draft names it is refused too')
+  assert.deepEqual((own.params as { uses: unknown }).uses, [{ by: 'labelledDrafts', count: 1, titles: [] }], 'and is told how many of its own')
+})
+
+test('187. each is a bulk operation\'s alone, and names an operation the kayan has', () => {
+  const kayanWith = (operations: Record<string, unknown>) => defineTestKayan({ name: 'eachProbe', access: allowAccess, fields: { ...defaultFields }, targets: { service: { operations: { ...defaultOperations, ...operations } as never } } })
+  assert.throws(() => buildTestAsas({ http: [fetchHttp()], kayan: [kayanWith({ renamed: { ...defaultOperations.update, each: 'update' } }), ...accessKayan] }), /names "each", and only a bulk operation/)
+  assert.throws(() => buildTestAsas({ http: [fetchHttp()], kayan: [kayanWith({ touchMany: { ...defaultOperations.updateMany, each: 'touch' } }), ...accessKayan] }), /runs "touch" on each row it matches, and the kayan has no operation "touch"/)
+})
+
+test('186s. a row that names itself is deleted whatever case its id is sent in', async () => {
+  const notes = notesAsas.kayan.probeNotes.operations as unknown as Record<'create' | 'update' | 'delete', (input: unknown) => Promise<{ id: string }>>
+  const note = await notes.create({})
+  await notes.update({ id: note.id, parent: note.id })
+  await notes.delete({ id: note.id.toUpperCase() })
+})
+
+test('227k. the enrollment\'s student picker lists the people holding the student role, a teacher who also studies among them, for the administrator and the instructor alike, and never widens what either reads', async () => {
+  const tenant = await roleTenant('picker-227k')
+  const both = await signedUp('picker-227k-both')
+  await server.api.addMember({ body: { userId: both.id, organizationId: tenant.organization, role: 'member' } })
+  await server.api.setActiveOrganization({ body: { organizationId: tenant.organization }, headers: both.headers })
+  for (const role of ['instructor', 'student']) await assignRole(tenant.organization, both.id, role)
+  const names = async (who: keyof typeof tenant.people, input: Record<string, unknown>) => {
+    const answer = await tenant.as(who, 'user/find', { limit: 100, sort: 'name', ...input })
+    assert.equal(answer.status, 200, JSON.stringify(answer.body))
+    return (answer.body.docs as { name: string }[]).map((one) => one.name)
+  }
+  assert.deepEqual(await names('instructor', {}), ['picker-227k-both', 'picker-227k-instructor', 'picker-227k-student'], 'the instructor reads itself and every student, one who also teaches included')
+  for (const who of ['admin', 'instructor'] as const) {
+    assert.deepEqual(await names(who, { for: 'enrollments.student' }), ['picker-227k-both', 'picker-227k-student'], `picking a seat's student, ${who} is offered the students alone`)
+  }
+  assert.deepEqual(await names('instructor', { for: 'enrollments.student', where: { name: { like: 'both' } } }), ['picker-227k-both'], 'and a search narrows them further')
+  const student = await tenant.as('student', 'user/find', { for: 'enrollments.student' })
+  assert.equal(student.status, 403, 'a student, who reads no one, is offered no one')
+
+  // A save is held to the same answer, as Payload's is, refused in the words a missing row is.
+  const course = await courses.operations.create({ title: 'Picker 227k' }, tenant.options)
+  const session = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-05-01T09:00:00Z') }, tenant.options)
+  const refusals = await Promise.all([tenant.people.registrar.id, 'nobody-227k'].map((id) => tenant.as('admin', 'enrollments/create', { session: session.id, student: id })))
+  for (const refused of refusals) {
+    assert.equal(refused.status, 400, `a seat for someone holding no student role is refused: ${JSON.stringify(refused.body)}`)
+    assert.deepEqual((refused.body.data as { key?: string; params?: unknown }), { key: 'error.invalid.reference', params: { kayan: 'enrollments', field: 'student', target: 'user' } })
+  }
+  assert.equal(refusals[0]!.body.message, refusals[1]!.body.message, 'alike for a staff member and for nobody at all')
+  assert.equal((await tenant.as('admin', 'enrollments/create', { session: session.id, student: both.id })).status, 200, 'and one for a student who also teaches is made')
+  const refused = await tenant.as('admin', 'user/find', { for: 'enrollments.nothing' })
+  assert.equal(refused.status, 400, 'a picker for no relationship to people is refused')
+})
+
+test('227m. an archived session, or one of an archived course, takes no new seat, says so, and is not offered to the session picker', async () => {
+  const tenant = await roleTenant('closed-227m')
+  const [kept, shut] = await Promise.all(['Kept 227m', 'Shut 227m'].map((title) => courses.operations.create({ title }, tenant.options)))
+  const at = new Date('2027-08-01T09:00:00Z')
+  const [open, archived, ofShut] = await Promise.all([kept, kept, shut].map((course) => sessions.operations.create({ course: course!.id, startsAt: at }, tenant.options)))
+  await sessions.operations.archive({ id: archived!.id, reason: 'Moved' }, tenant.options)
+  await courses.operations.archive({ id: shut!.id, reason: 'Retired' }, tenant.options)
+  for (const [said, session] of [['an archived session', archived], ['a session of an archived course', ofShut]] as const) {
+    const refused = await tenant.as('admin', 'enrollments/create', { session: session!.id, student: tenant.people.student.id })
+    assert.equal(refused.status, 400, `${said} takes no seat: ${JSON.stringify(refused.body)}`)
+    assert.equal((refused.body.data as { key?: string }).key, 'error.invalid.archived_session', 'and says why')
+  }
+  const offered = await tenant.as('admin', 'sessions/find', { for: 'enrollments.session', where: { course: { in: [kept!.id, shut!.id] } }, limit: 10 })
+  assert.deepEqual((offered.body.docs as { id: string }[]).map((one) => one.id), [open!.id], 'the picker offers the open session alone')
+  assert.equal((await tenant.as('admin', 'enrollments/create', { session: open!.id, student: tenant.people.student.id })).status, 200, 'which takes a seat')
+})
+
+test('227j. a student holds one seat in a session: a second enrollment of the same student there is refused 409, one in another session is not, and one who withdrew may enroll again', async () => {
+  const tenant = await roleTenant('seat-227j')
+  const course = await courses.operations.create({ title: 'Seat 227j' }, tenant.options)
+  const [first, second] = await Promise.all(['2027-03-01T09:00:00Z', '2027-03-08T09:00:00Z'].map((at) => sessions.operations.create({ course: course.id, startsAt: new Date(at) }, tenant.options)))
+  const seat = await enrollments.operations.create({ session: first!.id, student: tenant.people.student.id }, tenant.options)
+  for (const [who, write] of [
+    ['the operation', () => enrollments.operations.create({ session: first!.id, student: tenant.people.student.id }, tenant.options)],
+    ['the instructor over HTTP', async () => {
+      const answer = await tenant.as('instructor', 'enrollments/create', { session: first!.id, student: tenant.people.student.id })
+      throw Object.assign(new Error(String(answer.status)), { status: answer.status, key: (answer.body as { data?: { key?: string } }).data?.key })
+    }],
+  ] as const) {
+    const twice = await write().then(() => undefined, (error: { status?: number; key?: string }) => error)
+    assert.equal(twice?.status, 409, `${who} is refused a second seat`)
+    assert.equal(twice?.key, 'error.conflict.unique', 'as a unique pair taken')
+  }
+  assert.equal((await enrollments.operations.count({ where: { session: { equals: first!.id } } }, tenant.options)).totalDocs, 1, 'and one seat stands')
+  await enrollments.operations.create({ session: second!.id, student: tenant.people.student.id }, tenant.options)
+  await enrollments.operations.delete({ id: seat.id }, tenant.options)
+  const again = await enrollments.operations.create({ session: first!.id, student: tenant.people.student.id }, tenant.options)
+  assert.equal(again.student, tenant.people.student.id, 'a student who withdrew takes a seat again')
+})
+
 test('227h. the only owner of an organization is not removed on the platform, nor by a delete of their own: the organization would be left with nobody who governs it; with a second owner they are', async () => {
   const owner = await signedUp('sole-owner-227h')
   const made = (await server.api.createOrganization({ body: { name: 'Sole 227h', slug: 'sole-227h' }, headers: owner.headers }))!
@@ -17752,6 +18052,7 @@ test('222a. a student reads its own enrollments alone, in its own tenant, over H
   // member of and does not have active.
   const elsewhere = await roleTenant('own-222a-elsewhere')
   await server.api.addMember({ body: { userId: tenant.people.student.id, organizationId: elsewhere.organization, role: 'member' } })
+  await assignRole(elsewhere.organization, tenant.people.student.id, 'student')
   const away = await courses.operations.create({ title: 'Away 222a' }, elsewhere.options)
   const awaySession = await sessions.operations.create({ course: away.id, startsAt: new Date('2027-05-02T09:00:00Z') }, elsewhere.options)
   const remote = await enrollments.operations.create({ session: awaySession.id, student: tenant.people.student.id }, elsewhere.options)
@@ -17807,13 +18108,17 @@ test('222b. a role reads and writes every seat of its organization only while it
   await server.api.addMember({ body: { userId: clerk.id, organizationId: tenant.organization, role: 'member' } })
   await server.api.setActiveOrganization({ body: { organizationId: tenant.organization }, headers: clerk.headers })
   const keys = [
-    'enrollments.find', 'enrollments.count', 'enrollments.findByID', 'enrollments.update', 'enrollments.delete',
-    'enrollments.fields.id', 'enrollments.fields.createdAt', 'enrollments.fields.updatedAt', 'enrollments.fields.organization', 'enrollments.fields.session',
+    'enrollments.find', 'enrollments.count', 'enrollments.findByID', 'enrollments.create', 'enrollments.update', 'enrollments.delete',
+    'enrollments.fields.id', 'enrollments.fields.createdAt', 'enrollments.fields.updatedAt', 'enrollments.fields.organization', 'enrollments.fields.session', 'enrollments.fields.student',
     'sessions.find', 'sessions.findByID', 'sessions.fields.id', 'sessions.fields.organization', 'sessions.fields.course', 'sessions.fields.startsAt', 'sessions.fields.enrollments',
+    // The organization's people, so the reference a seat names is one it reads.
+    'member.find', 'member.fields.id', 'member.fields.userId', 'user.find', 'user.fields.id', 'user.fields.name',
   ]
   const role = await tenant.as('admin', 'roles/create', { name: 'clerk-222b', label: { en: 'Clerk', ar: 'كاتب' }, permissions: keys })
   assert.equal(role.status, 200, JSON.stringify(role.body))
   await assignRole(tenant.organization, clerk.id, 'clerk-222b')
+  // A student too, as every seat's holder is.
+  await assignRole(tenant.organization, clerk.id, 'student')
   const own = await enrollments.operations.create({ session: session.id, student: clerk.id }, tenant.options)
   const theirs = await enrollments.operations.create({ session: session.id, student: tenant.people.student.id }, tenant.options)
   const as = async (path: string, input: unknown) => {
@@ -17835,6 +18140,18 @@ test('222b. a role reads and writes every seat of its organization only while it
   assert.equal((await as('enrollments/delete', { id: theirs.id })).status, 404, 'and so does its delete')
   assert.equal((await enrollments.operations.findByID({ id: theirs.id }, tenant.options))?.id, theirs.id, 'which is still there')
   assert.equal((await as('enrollments/update', { id: own.id, session: session.id })).status, 200, 'its own seat it edits')
+  // Its own seat stays its own, since a seat moved to another person is one it would write without the key.
+  const pupil = await signedUp('others-222b-pupil')
+  await server.api.addMember({ body: { userId: pupil.id, organizationId: tenant.organization, role: 'member' } })
+  await assignRole(tenant.organization, pupil.id, 'student')
+  const moved = await as('enrollments/update', { id: own.id, student: pupil.id })
+  assert.equal(moved.status, 403, `a role without enrollments.others moves no seat to another person: ${JSON.stringify(moved.body)}`)
+  const bulk = await as('enrollments/updateMany', { where: { id: { equals: own.id } }, data: { student: pupil.id } })
+  assert.notEqual((bulk.body as { docs?: unknown[] }).docs?.length, 1, `nor in bulk: ${JSON.stringify(bulk.body)}`)
+  assert.equal((await enrollments.operations.findByID({ id: own.id }, tenant.options))?.student, clerk.id, 'and the seat is still its own')
+  const later = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-06-08T09:00:00Z') }, tenant.options)
+  assert.equal((await as('enrollments/create', { session: later.id, student: pupil.id })).status, 403, 'nor makes one for another person')
+  assert.equal((await as('enrollments/create', { session: later.id, student: clerk.id })).status, 200, 'while it makes its own')
 
   const widened = await tenant.as('admin', 'roles/update', { id: role.body.id, permissions: [...keys, 'enrollments.others'] })
   assert.equal(widened.status, 200, JSON.stringify(widened.body))
@@ -17876,4 +18193,46 @@ test('222c. a session is read by a role that does not run the catalogue only whe
   for (const who of ['admin', 'registrar'] as const) {
     assert.equal((await tenant.as(who, 'sessions/find', { where })).body.totalDocs, 3, `${who}: reads all three`)
   }
+})
+
+test('233a. a course is archived and brought back, each with its reason and an activity entry; it is unpublished back to a draft that no plain read shows; and a session is archived and brought back the same way, never made archived', async () => {
+  const [a] = await twoTenants('233a')
+  const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
+  const log = asas.kayan.auditLog.operations as unknown as Record<'find', (input: unknown, options: unknown) => Promise<{ docs: { operation: string; changes: string }[] }>>
+  const course = await courses.operations.create({ title: 'States 233a' }, owner)
+  await courses.operations.archive({ id: course.id, reason: 'Paused' }, owner)
+  const back = await courses.operations.unarchive({ id: course.id, reason: 'Running again' }, owner)
+  assert.equal(back.archived, false, 'an archived course is brought back')
+  assert.equal(back.archiveReason, 'Running again', 'with the reason it was brought back for')
+  const entries = (await log.find({ where: { record: { equals: course.id } }, sort: '-createdAt' }, owner)).docs
+  assert.deepEqual(entries.map((entry) => entry.operation), ['unarchive', 'archive', 'create'], 'each is a line of its own in the activity')
+  assert.deepEqual(JSON.parse(entries[0]!.changes).archived, { from: true, to: false })
+  for (const data of [{ archived: true }, { archiveReason: 'Quietly' }]) {
+    const plain = await courses.operations.update({ id: course.id, ...data } as never, owner).then(() => 200, (error: { status?: number }) => error.status)
+    assert.equal(plain, 400, `a plain update writes no ${Object.keys(data)[0]}: a course is archived and brought back through its own operations alone`)
+  }
+
+  assert.equal((await courses.operations.findByID({ id: course.id }, owner))?._status, 'published', 'the course brought back is published')
+  const unpublished = await courses.operations.unpublish({ id: course.id, _status: 'draft' }, owner)
+  assert.equal(unpublished._status, 'draft', 'unpublishing puts the course back to a draft')
+  assert.equal(await courses.operations.findByID({ id: course.id }, owner).then(() => 200, (error: { status?: number }) => error.status), 404, 'which no plain read shows')
+  assert.equal((await courses.operations.findByID({ id: course.id }, { ...owner, draft: true }))?.title, 'States 233a', 'and a draft read does')
+
+  const published = await courses.operations.create({ title: 'Sessions 233a' }, owner)
+  const made = await asas.handler(new Request('http://test/api/sessions/create', {
+    method: 'POST',
+    headers: { cookie: a!.owner.headers.get('cookie') ?? '', 'content-type': 'application/json' },
+    body: JSON.stringify({ course: published.id, startsAt: '2027-09-01T09:00:00.000Z', archived: true }),
+  }))
+  assert.equal(made.status, 400, 'a session is not made archived')
+  const session = await sessions.operations.create({ course: published.id, startsAt: new Date('2027-09-01T09:00:00Z') }, owner)
+  assert.equal((await sessions.operations.archive({ id: session.id, reason: 'Moved' }, owner)).archived, true, 'a session is archived with its reason')
+  const reopened = await sessions.operations.unarchive({ id: session.id, reason: 'Back on' }, owner)
+  assert.deepEqual([reopened.archived, reopened.archiveReason], [false, 'Back on'], 'and brought back with one')
+  for (const data of [{ archived: true }, { archiveReason: 'Quietly' }]) {
+    const plain = await sessions.operations.update({ id: session.id, ...data } as never, owner).then(() => 200, (error: { status?: number }) => error.status)
+    assert.equal(plain, 400, `a plain update writes no ${Object.keys(data)[0]} of a session either`)
+  }
+  const many = await sessions.operations.archiveMany({ where: { id: { equals: session.id } } } as never, owner) as { docs: { archived: boolean; archiveReason: string | null }[] }
+  assert.deepEqual(many.docs.map((one) => [one.archived, one.archiveReason]), [[true, null]], 'and a bulk archive archives each row through its own archive')
 })
