@@ -132,12 +132,13 @@ const authAudit = (line: Record<string, unknown>) => console.log(JSON.stringify(
  */
 export const tenantURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:5173'
 
-// A browser isolates scripts and storage by origin and by nothing finer, so the backoffice on a
-// path of the customer app's origin would put every staff session within reach of any script flaw
-// in the customer app. Two subdomains are two origins.
-const sharedOrigin = URL.parse(backofficeURL)?.origin
-if (backofficeApp && sharedOrigin && sharedOrigin === URL.parse(tenantURL)?.origin) {
-  throw new Error(`BACKOFFICE_URL (${backofficeURL}) and BETTER_AUTH_URL (${tenantURL}) share the origin ${sharedOrigin}. Serve the backoffice on its own origin, such as backoffice.example.com beside app.example.com: browsers isolate by origin (scheme, host and port), so on one origin a script flaw (XSS) in the customer app would reach staff sessions in the backoffice.`)
+// A browser isolates scripts by origin and sends cookies by host whatever the port, so the
+// backoffice on a path or another port of the customer app's host would put staff sessions within
+// reach of any script flaw in the customer app. Two subdomains are two hosts. Only this machine's
+// development ports share one.
+const [backofficeAt, tenantAt] = [URL.parse(backofficeURL), URL.parse(tenantURL)]
+if (backofficeApp && backofficeAt && tenantAt && (backofficeAt.origin === tenantAt.origin || (backofficeAt.hostname === tenantAt.hostname && !isLocalHost(backofficeURL)))) {
+  throw new Error(`BACKOFFICE_URL (${backofficeURL}) and BETTER_AUTH_URL (${tenantURL}) are served on one host, ${backofficeAt.hostname}. Serve the backoffice on a host of its own, such as backoffice.example.com beside app.example.com: browsers isolate scripts by origin and send cookies by host, so on one host a script flaw (XSS) in the customer app would reach staff sessions in the backoffice.`)
 }
 
 /**

@@ -13007,15 +13007,17 @@ test('142j. a production boot is refused without BACKOFFICE_URL, BETTER_AUTH_URL
   }
   // Two apps on one origin share what a browser isolates, so a script flaw in
   // the customer app would reach staff sessions; a path or a port spelled out
-  // as the default is still the same origin.
+  // as the default is still the same origin. Cookies follow the host whatever
+  // the port, so another port of a live host is refused too.
   for (const [backoffice, tenant] of [
     ['https://example.com/backoffice', 'https://example.com'],
     ['https://EXAMPLE.com:443/admin', 'https://example.com/'],
+    ['https://example.com:8443', 'https://example.com'],
   ]) {
     for (const env of [{ NODE_ENV: 'production' }, {}] as Record<string, string>[]) {
       const refused = await boot({ ...env, BETTER_AUTH_SECRET: 'a-production-secret', BACKOFFICE_URL: backoffice!, BETTER_AUTH_URL: tenant! })
       assert.notEqual(refused.code, 0, `refused with ${backoffice} beside ${tenant}`)
-      assert.match(refused.stderr, /BACKOFFICE_URL \(.*\) and BETTER_AUTH_URL \(.*\) share the origin https:\/\/example\.com\..*own origin.*backoffice\.example\.com.*script flaw \(XSS\) in the customer app would reach staff sessions/)
+      assert.match(refused.stderr, /BACKOFFICE_URL \(.*\) and BETTER_AUTH_URL \(.*\) are served on one host, example\.com\..*host of its own.*backoffice\.example\.com.*script flaw \(XSS\) in the customer app would reach staff sessions/)
     }
   }
   // The same boot, with the secret set, answers rather than refuses: this
