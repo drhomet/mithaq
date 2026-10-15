@@ -823,7 +823,7 @@ In production, set these in the host's environment rather than in a file.
 | `DATABASE_URL` | `packages/mithaq/src/mithaq.ts`, `seed.ts`, the CLI | Required. Start refuses without it. | Falls back to `postgres://postgres:postgres@localhost:5432/mithaq` for the dev server. `seed`, `migrate`, `rbac assign` and `storage sweep` still refuse without it. Under `node --test` it is required. |
 | `BETTER_AUTH_SECRET` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. Both apps must share the same value: the backoffice app derives its own session secret from it, so a cookie one app signed never verifies in the other. `AUTH_SECRET` is read when it is unset, but a URL below that is not `localhost` still requires `BETTER_AUTH_SECRET` itself. | A public development default. Even outside production, start refuses when either URL below is not `localhost` and this is unset. |
 | `BETTER_AUTH_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The tenant app's public URL. | `http://localhost:5173` |
-| `BACKOFFICE_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The backoffice console's public URL, on an origin of its own: a subdomain beside the tenant app's, never a path of it (see [Deploying both apps on one domain](#deploying-both-apps-on-one-domain)). Start refuses when it shares `BETTER_AUTH_URL`'s origin. | `http://localhost:5174` |
+| `BACKOFFICE_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The backoffice console's public URL, on an origin of its own: a subdomain beside the tenant app's, never a path of it (see [Deploying both apps on one domain](#deploying-both-apps-on-one-domain)). Start refuses when it shares `BETTER_AUTH_URL`'s origin, or its host anywhere but on this machine. | `http://localhost:5174` |
 | `LOCAL_AUTH_SECRET` | `packages/features/auth/local-users/local-users.ts` | 32 characters at least. If it is unset, local accounts are off: every `POST` under `/api/auth/local` answers 503 and the public sign-up answers 403. | Same. |
 | `TRUSTED_IP_HEADER` | `packages/mithaq/src/mithaq/auth/index.ts`, `local-users.ts` | The header names your proxy overwrites with the client address, comma-separated, such as `cf-connecting-ip`. Both rate limiters key on it, the limit on invitations among them. Trust it only behind exactly one proxy that overwrites it on every request. Without it every limit keys on `x-forwarded-for`, which a caller writes, so a caller who changes it on each request passes the limits. | Defaults to `x-forwarded-for`. |
 | `SETUP_CODE` | `packages/mithaq/src/mithaq/auth/index.ts` | 32 characters or more, random. The backoffice console's first administrator, and with one organization the first owner on `/auth/first-run`, are made only with it. Shorter counts as unset, and then neither is made. Remove it once the app is set up. | Not asked under `vite dev` on `localhost`. |
@@ -889,9 +889,9 @@ In CI, after `bun install`, run `mithaq generate --check` in `packages/asas` aga
 
 ### Deploying both apps on one domain
 
-> **Security: the backoffice gets a subdomain of its own, never a path of the customer app.** Serve `app.example.com` and `backoffice.example.com`, never `example.com/` and `example.com/backoffice`. A browser isolates scripts and storage by origin (scheme, host and port) and by nothing finer, so on one origin a script flaw (XSS) in the customer app would run beside the backoffice and reach staff sessions, which can impersonate anyone and read every organization. Start refuses when `BACKOFFICE_URL` and `BETTER_AUTH_URL` share an origin. Keep each session cookie on its own host: never give a cookie the domain `.example.com`, as Better Auth's `crossSubDomainCookies` does.
+> **Security: the backoffice gets a subdomain of its own, never a path of the customer app.** Serve `app.example.com` and `backoffice.example.com`, never `example.com/` and `example.com/backoffice`, nor `example.com:8443`. A browser isolates scripts and storage by origin (scheme, host and port), and sends cookies by host whatever the port or scheme, so on one host a script flaw (XSS) in the customer app would reach staff sessions, which can impersonate anyone and read every organization. Start refuses when `BACKOFFICE_URL` and `BETTER_AUTH_URL` share an origin, or a host anywhere but on this machine. Keep each session cookie on its own host: never give a cookie the domain `.example.com`, as Better Auth's `crossSubDomainCookies` does. Two subdomains are still one site, so `SameSite` cookies pass between them: the `Origin` checks are the barrier, the backoffice's `/api` route checking every write against `BACKOFFICE_URL` and Better Auth checking its own, and every state-changing backoffice route must keep one.
 
-Both apps can still run on one machine behind one certificate. Point `app.example.com` and `backoffice.example.com` at the machine, take a wildcard certificate for `*.example.com`, start both apps as above on `127.0.0.1:4173` and `127.0.0.1:4174`, and let a proxy route each request by its `Host`:
+Both apps can still run on one machine behind one certificate. Point `app.example.com` and `backoffice.example.com` at the machine, take a wildcard certificate for `*.example.com`, start both apps as above on `127.0.0.1:4173` and `127.0.0.1:4174`, and let a proxy route each request by its `Host`. Each app's `vite.config.ts` binds `vite preview` to `127.0.0.1`, the address the proxies below target, and lets it answer the name in its URL (`preview.allowedHosts`): Vite refuses any `Host` but localhost otherwise, so set both URLs where the apps start:
 
 ```sh
 BETTER_AUTH_URL=https://app.example.com
@@ -936,14 +936,24 @@ nginx, with the wildcard certificate certbot's DNS challenge wrote (`certbot cer
 # A name neither app serves is refused before any request is read.
 server {
     listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
     ssl_reject_handshake on;
 }
 
 server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    return 444;
+}
+
+server {
     listen 443 ssl;
+    listen [::]:443 ssl;
     server_name app.example.com;
     ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+    # With the local adapter an upload is a PUT through the app, up to 10 MB unless its field allows more.
+    client_max_body_size 10m;
 
     location / {
         proxy_pass http://127.0.0.1:4173;
@@ -955,9 +965,11 @@ server {
 
 server {
     listen 443 ssl;
+    listen [::]:443 ssl;
     server_name backoffice.example.com;
     ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+    client_max_body_size 10m;
 
     location / {
         proxy_pass http://127.0.0.1:4174;
@@ -969,6 +981,7 @@ server {
 
 server {
     listen 80;
+    listen [::]:80;
     server_name app.example.com backoffice.example.com;
     return 301 https://$host$request_uri;
 }
