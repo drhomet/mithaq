@@ -105,12 +105,12 @@ export const doneWords = ({ kayan, copy, effect, operation, next }: { kayan: Pic
   return effect === 'create' ? said('admin.done.created', '{kind} created') : said('admin.done.saved', '{kind} saved')
 }
 
-/** What a toast says when a write failed: its refusal's own sentence, or, for a request that never answered with one, that nothing changed. */
+/** What a toast says when a write failed: its refusal's own sentence, or, for a request that never answered with one or a key with no words, that nothing changed. */
 export const failedWords = ({ kayan, copy, thrown }: { kayan?: string; copy: Copy; thrown: unknown }): string => {
   const key = (thrown as { data?: { key?: unknown } } | null | undefined)?.data?.key
-  return typeof key === 'string'
-    ? refusalWords({ kayan, shown: key, labels: [], copy })
-    : (copy.t('admin.requestFailed', 'Something went wrong, so nothing was saved. Try again.') ?? 'Something went wrong, so nothing was saved. Try again.')
+  const failed = copy.t('admin.requestFailed', 'Something went wrong, so nothing was saved. Try again.') ?? 'Something went wrong, so nothing was saved. Try again.'
+  // A key the copy does not word is said in the shared sentence, never as the key.
+  return typeof key === 'string' ? refusalWords({ kayan, shown: key, labels: [], fallback: failed, copy }) : failed
 }
 
 /** The sentence over a refused save: a schema refusal that names fields lists them by label; any other is its own key's sentence, or `fallback`. */

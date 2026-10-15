@@ -4,7 +4,8 @@ import { Form } from 'mithaq-admin/form.tsx'
 import type { FormProps } from 'mithaq-admin/form-types.tsx'
 
 /**
- * A kayan's form on a screen's page. A create moves to the new row's edit page, a delete to the list.
+ * A kayan's form on a screen's page. A create moves to where `edit` sends it, the new row's edit page or, for a page
+ * opened over its list, the list; a delete moves to the list.
  * While the form holds a change the router blocks navigation and the form asks its discard question.
  */
 export function ScreenForm({ edit, list, ...props }: Omit<FormProps, 'onDone' | 'onDirty' | 'onCancel' | 'blocked'> & {
@@ -32,4 +33,4 @@ export function ScreenForm({ edit, list, ...props }: Omit<FormProps, 'onDone' | 
     />
   )
 }
-// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 217a28ab185eb9fe5891b248ddb4448404b19d640f52b78bc40c55df2e0bd30e
+// mithaq-admin 0.0.0 508fa95987312292d3a5737dd1fd6aba03fbd5a7dbbbf5bb3bea2812b2adfde4

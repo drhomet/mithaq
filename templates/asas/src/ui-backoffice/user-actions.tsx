@@ -8,6 +8,7 @@ import { holds, type CellProps, type MenuProps, type Row } from 'mithaq/admin'
 import { useAccess, useLocale, useRecord, useUser } from 'mithaq/admin/react'
 import { backofficeRoles } from '@asas/mithaq/auth/backoffice-roles'
 import { authArm } from '@/api.ts'
+import { toast } from 'mithaq-admin/toast.tsx'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -98,7 +99,6 @@ function PersonDialog({ row, action, onClose }: { row: Row; action: Action; onCl
   const [reason, setReason] = useState('')
   const [ends, setEnds] = useState('')
   const [refusal, setRefusal] = useState<string>()
-  const [done, setDone] = useState<string>()
   const [busy, setBusy] = useState(false)
   const userId = String(row.id ?? '')
   const name = String(row.name || row.email || '')
@@ -124,7 +124,8 @@ function PersonDialog({ row, action, onClose }: { row: Row; action: Action; onCl
       return window.location.assign(String(answered.body?.url))
     }
     window.dispatchEvent(new Event('mithaq:refresh'))
-    setDone(landed[action])
+    toast.success(landed[action])
+    onClose()
   }
   // Functions, so a name holding `$&` is put in as written and never read as a pattern.
   const fill = (text: string | undefined) => (text ?? '').replace('{name}', () => name).replace('{role}', () => labelOf(chosen) ?? chosen)
@@ -146,10 +147,9 @@ function PersonDialog({ row, action, onClose }: { row: Row; action: Action; onCl
       <AlertDialogContent data-person={userId}>
         <AlertDialogHeader>
           <AlertDialogTitle>{names[action]}</AlertDialogTitle>
-          {/* Polite, and drawn before and after the action lands, so the sentence it lands with is read out. */}
-          <AlertDialogDescription aria-live="polite">{done ?? said}</AlertDialogDescription>
+          <AlertDialogDescription>{said}</AlertDialogDescription>
         </AlertDialogHeader>
-        {done ? null : action === 'set-role' ? (
+        {action === 'set-role' ? (
           <div className="grid gap-2">
             <Label htmlFor={`role-${userId}`}>{t('backoffice.role', 'Backoffice role')}</Label>
             <select
@@ -167,7 +167,7 @@ function PersonDialog({ row, action, onClose }: { row: Row; action: Action; onCl
             </select>
           </div>
         ) : null}
-        {!done && action === 'ban' ? (
+        {action === 'ban' ? (
           <div className="grid gap-3">
             <div className="grid gap-2">
               <Label htmlFor={`ban-reason-${userId}`}>{t('backoffice.banReason', 'Reason')}</Label>
@@ -197,23 +197,21 @@ function PersonDialog({ row, action, onClose }: { row: Row; action: Action; onCl
             </div>
           </div>
         ) : null}
-        {refusal && !done ? (
+        {refusal ? (
           <p role="alert" className="text-sm text-destructive">
             {refusal}
           </p>
         ) : null}
         <AlertDialogFooter className="max-sm:[&_button]:h-11">
-          <AlertDialogCancel data-button="close">{done ? t('admin.close', 'Close') : t('admin.cancel', 'Cancel')}</AlertDialogCancel>
-          {done ? null : (
-            <AlertDialogAction
-              data-button="confirm"
-              variant={action === 'ban' ? 'destructive' : 'default'}
-              disabled={busy || (action === 'ban' && !reason.trim()) || (action === 'set-role' && chosen === role)}
-              onClick={() => void send()}
-            >
-              {names[action]}
-            </AlertDialogAction>
-          )}
+          <AlertDialogCancel data-button="close">{t('admin.cancel', 'Cancel')}</AlertDialogCancel>
+          <AlertDialogAction
+            data-button="confirm"
+            variant={action === 'ban' ? 'destructive' : 'default'}
+            disabled={busy || (action === 'ban' && !reason.trim()) || (action === 'set-role' && chosen === role)}
+            onClick={() => void send()}
+          >
+            {names[action]}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

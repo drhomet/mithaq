@@ -9,6 +9,8 @@ import { labelFor, type Translate } from 'mithaq-admin/copy.ts'
 import { readOnlyField } from 'mithaq-admin/field-values.ts'
 import { listed } from 'mithaq-admin/format.tsx'
 import { localesOf } from 'mithaq-admin/refusal.ts'
+import { doneWords } from 'mithaq-admin/form-rules.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 import { refusalOf, refusedFile, sizeOf, typeNames, uploadFile, type Row } from 'mithaq-admin/upload-api.ts'
 
 const blank = (value: unknown) => value === undefined || value === null || value === ''
@@ -79,6 +81,7 @@ export function UploadDialog({ open, onOpenChange, target, client, t, locale, lo
       setFile(null)
       setValues({})
       onDone(row)
+      toast.success(doneWords({ kayan: target, copy: { t, locale: '' }, effect: 'create' }))
       onOpenChange(false)
     } catch (thrown) {
       setProgress(null)

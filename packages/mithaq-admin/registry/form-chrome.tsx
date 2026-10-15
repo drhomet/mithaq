@@ -16,6 +16,17 @@ export const reveal = (target: HTMLElement | null) => {
   setTimeout(() => target.focus())
 }
 
+/**
+ * The box of this form a summary line names: inside its <form>, or naming it by the `form` attribute from another
+ * region, and never a box of the same id in another form, such as the one a drawer over this form draws.
+ */
+const boxOf = (line: HTMLElement, id: string): HTMLElement | null => {
+  const form = line.closest('form')
+  const found = line.ownerDocument.getElementById(id)
+  const own = form?.querySelector<HTMLElement>(`#${CSS.escape(id)}`) ?? (form?.id ? form.ownerDocument.querySelector<HTMLElement>(`#${CSS.escape(id)}[form="${CSS.escape(form.id)}"]`) : null)
+  return own ?? (found && (!found.closest('form') || found.closest('form') === form) ? found : null)
+}
+
 /** One field a refusal named: its box's id, its label and what is wrong with it. */
 export type Problem = { id: string; label: string; sentence: string }
 
@@ -43,7 +54,7 @@ export function ErrorSummary({ problems, refused, t }: { problems: readonly Prob
               className="underline underline-offset-4"
               onClick={(event) => {
                 event.preventDefault()
-                reveal(event.currentTarget.ownerDocument.getElementById(one.id))
+                reveal(boxOf(event.currentTarget, one.id))
               }}
             >
               {one.label}: {one.sentence}

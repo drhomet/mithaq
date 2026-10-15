@@ -2,7 +2,7 @@ import { useContext, useEffect, useId, useState, type FormEvent, type ReactEleme
 import type { ClientField, ClientKayan, LeafClient } from 'mithaq/admin'
 import { FormContext, ScreenContext } from 'mithaq/admin/react'
 import { Card, CardContent } from '@/components/ui/card'
-import { descriptionOf, labelFor, newTitleOf, titleOf } from 'mithaq-admin/copy.ts'
+import { descriptionOf, labelFor, newTitleOf, titleOf, type Copy } from 'mithaq-admin/copy.ts'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
 import { BoundField, FieldValue } from 'mithaq-admin/field-value.tsx'
 import { readOnlyField } from 'mithaq-admin/field-values.ts'
@@ -12,11 +12,11 @@ import { FormChrome } from 'mithaq-admin/form-chrome.tsx'
 import { KayanForm } from 'mithaq-admin/form-context.tsx'
 import { FormLayout } from 'mithaq-admin/form-layout.tsx'
 import { brokenRule, doneWords, failedWords, issuesOf } from 'mithaq-admin/form-rules.tsx'
-import type { FormProps } from 'mithaq-admin/form-types.tsx'
+import type { DraftOptions, FormProps } from 'mithaq-admin/form-types.tsx'
 import { LeafControl } from 'mithaq-admin/leaf-control.tsx'
 import { NavLinks } from 'mithaq-admin/nav-links.tsx'
 import { pageButtonOf, type PageButton } from 'mithaq-admin/node-buttons.tsx'
-import { drawsKind, formIn, nodesOf, scopeOf, type Draw } from 'mithaq-admin/node-tree.ts'
+import { drawsKind, formIn, leavesOf, nodesOf, scopeOf, type Draw } from 'mithaq-admin/node-tree.ts'
 import { drawNodes, frameOf, pageOf } from 'mithaq-admin/nodes.tsx'
 import { localesOf } from 'mithaq-admin/refusal.ts'
 import { DocumentDrawer } from 'mithaq-admin/record-frame.tsx'
@@ -60,8 +60,47 @@ export function DrawerForm({ edit, onClose, title, ...props }: Omit<FormProps, '
 /** Whether a refusal says the row changed elsewhere since this form read it, after which no save of this form lands. */
 const staleIn = (thrown: unknown) => (thrown as { data?: { key?: unknown } } | null | undefined)?.data?.key === 'error.conflict.stale'
 
-/** The screen's client as a relationship's inline create calls it, by a kayan named at run time. */
-type CallByName = (call: { kayan: string; operation: string; input: Record<string, unknown> }) => Promise<unknown>
+/**
+ * Payload's add-new beside a relationship: a row of `target` made in a drawer over the form, through the screen's own
+ * client and under the viewer's report, with Save draft beside Publish where the target keeps drafts the viewer reads.
+ * The row it made is handed to `made` and the drawer closes.
+ */
+function AddDrawer({ api, copy, kayans, made, onClose, target }: Pick<FormProps, 'api' | 'kayans'> & {
+  target: ClientKayan
+  made: (row: Record<string, unknown>) => void
+  copy: Copy
+  onClose: () => void
+}): ReactElement | null {
+  const screen = useContext(ScreenContext)
+  if (!screen) return null
+  const report = screen.access.collections?.[target.name]
+  const page = target.pages.create
+  const write = (operation: 'create' | 'update' | 'delete') => (input: Record<string, unknown>, options?: DraftOptions) =>
+    screen.client({ kayan: target.name, operation, input, ...(options?.draft && { draft: true }) })
+  return (
+    <DrawerForm
+      kayan={target}
+      title={newTitleOf({ kayan: target, copy })}
+      // The fields its create page asks for, without the page's shell; every field where it has none.
+      nodes={page && 'page' in page ? formIn(nodesOf(page)) : undefined}
+      client={{ create: write('create'), update: write('update'), delete: write('delete') }}
+      drafts={target.drafts && report?.operations?.findVersions === true ? {} : undefined}
+      operations={report?.operations}
+      value={null}
+      t={copy.t}
+      locale={copy.locale}
+      locales={copy.locales}
+      kayans={kayans}
+      api={api}
+      writes={(field, on) => report?.fields?.[field]?.[on] === true}
+      onDone={(row) => {
+        made(row as Record<string, unknown>)
+        onClose()
+      }}
+      onClose={onClose}
+    />
+  )
+}
 
 function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => void }): ReactElement {
   const { api, blocked, client, drafts, kayan, kayans, locale, nodes, onCancel, operations, screen, t, value, writes } = props
@@ -75,7 +114,12 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // A refusal naming a field is drawn at that field and in the summary; a row changed elsewhere is a lasting notice on
   // the form, since nothing saves until it is read again; any other, a request that failed, is said in a red toast.
   const said = (thrown: unknown) => {
-    if (thrown && !Object.keys(issuesOf(thrown)).length && !staleIn(thrown)) toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
+    if (!thrown || staleIn(thrown)) return
+    const named = Object.entries(issuesOf(thrown))
+    if (!named.length) return void toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
+    // A field the page does not draw has no box to mark, so what is wrong with it is said here.
+    const undrawn = named.filter(([name]) => !drawn.has(name))
+    if (undrawn.length) toast.error(undrawn.map(([name, issue]) => `${labelOf(name)}: ${t(issue, issue) ?? issue}`).join(' '))
   }
   // An autosave's refusal marks its fields quietly: the focus and the open tab stay where the person is typing.
   const quiet = (thrown: unknown) => {
@@ -94,6 +138,10 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // The kayan a relationship's + is making a row of, in a drawer over this form, and what picks the row it made.
   const [adding, setAdding] = useState<{ target: ClientKayan; made: (row: Record<string, unknown>) => void }>()
   const byName = new Map(kayan.fields.map((field) => [field.name, field]))
+  const labelOf = (name: string) => {
+    const field = byName.get(name)
+    return field ? labelFor({ kayan, field, copy }) : name
+  }
   // A create that has autosaved its row edits that row from then on, before the host has handed it.
   const id = String(value?.id ?? props.made ?? '')
   // A row with an id is being changed, one without is being made; a field may be the client's on one operation and the server's on the other.
@@ -106,6 +154,8 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // A screen's page names every field it draws; a form handed no page draws every field in declared
   // order, and no join, whose rows are another kayan's.
   const tree = nodes ?? (screen && nodesOf(screen.page))
+  // The fields this form draws a box for, which its summary lists.
+  const drawn = new Set(tree ? leavesOf(tree) : kayan.fields.map((field) => field.name))
   const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse, seed, seeded, setSeed, status, tree, values, onWritten: forgetPublished, done: (landed) => doneWords({ kayan, copy, ...landed }) })
   const { busy, run, save, readAt, asking, setAsking, leaving } = saving
   // Never while a discard question is open, which says the change is unsaved, nor once a write was refused because
@@ -222,10 +272,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
       headed={headed}
       title={screen || nodes ? undefined : titleOf({ kayan, copy })}
       about={about}
-      problems={Object.entries(sentences).map(([name, sentence]) => {
-        const field = byName.get(name)
-        return { id: `${kayan.name}-${name}`, label: field ? labelFor({ kayan, field, copy }) : name, sentence }
-      })}
+      problems={Object.entries(sentences).filter(([name]) => drawn.has(name)).map(([name, sentence]) => ({ id: `${kayan.name}-${name}`, label: labelOf(name), sentence }))}
       refused={refusals}
       stale={staleIn(held) ? failedWords({ kayan: kayan.name, copy, thrown: held }) : undefined}
       views={controlled ? views : undefined}
@@ -262,37 +309,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
         ) : (
           <FormLayout {...{ api, chrome, control, copy, formId, kayan, kayans, values }} row={value} actions={actionsOf(false)} onSubmit={submit} provided={unnamed.filter(owned)} rest={unnamed.filter((field) => !owned(field))} />
         )}
-        {adding && screenState ? (() => {
-          const { target } = adding
-          const report = screenState.access.collections?.[target.name]
-          const page = target.pages.create
-          const call = screenState.client as unknown as CallByName
-          return (
-            <DrawerForm
-              kayan={target}
-              title={newTitleOf({ kayan: target, copy })}
-              // The fields its create page asks for, without the page's shell; every field where it has none.
-              nodes={page && 'page' in page ? formIn(nodesOf(page)) : undefined}
-              client={{
-                create: (input) => call({ kayan: target.name, operation: 'create', input }),
-                update: (input) => call({ kayan: target.name, operation: 'update', input }),
-                delete: (input) => call({ kayan: target.name, operation: 'delete', input }),
-              }}
-              value={null}
-              t={t}
-              locale={locale}
-              locales={props.locales}
-              kayans={kayans}
-              api={api}
-              writes={(field, on) => report?.fields?.[field]?.[on] === true}
-              onDone={(row) => {
-                adding.made(row as Record<string, unknown>)
-                setAdding(undefined)
-              }}
-              onClose={() => setAdding(undefined)}
-            />
-          )
-        })() : null}
+        {adding ? <AddDrawer {...adding} copy={copy} kayans={kayans} api={api} onClose={() => setAdding(undefined)} /> : null}
       </FormContext>
     </KayanForm.Provider>
   )

@@ -269,7 +269,7 @@ test('5. a field whose kind has no writable control renders read-only, so nothin
 test('6. a refusal\'s toast says the key the server sent, resolved as copy, so a project translates its own refusals', async () => {
   const { failedWords } = await import('../registry/form-rules.tsx')
   assert.equal(failedWords({ copy, thrown: { data: { key: 'error.invalid.value', params: {} } } }), 'That value will not do.', 'the key from the error\'s data.key is resolved through t')
-  assert.equal(failedWords({ copy, thrown: { data: { key: 'error.nothing.translates.this' } } }), 'error.nothing.translates.this', 'an untranslated refusal key is said as the key')
+  assert.equal(failedWords({ copy, thrown: { data: { key: 'error.nothing.translates.this' } } }), 'Something went wrong, so nothing was saved. Try again.', 'an untranslated refusal key is said in the shared words, never as the key')
   assert.equal(failedWords({ copy, thrown: new Error('boom') }), 'Something went wrong, so nothing was saved. Try again.', 'a plain error says the request failed, never undefined')
   assert.ok(!formMarkup({ error: { data: { key: 'error.conflict', params: {} } } }).includes('role="alert"'), 'and the form draws none of it')
 })
@@ -1179,7 +1179,7 @@ test('42. the package holds the same shadcn primitives the app does, so what thi
   const names = readdirSync(ours).sort()
   // Both listings, not the package's alone: a primitive added to the app and not to the package is the drift this step exists for.
   assert.deepEqual(names, readdirSync(theirs).sort(), 'the two directories hold the same primitives, by name')
-  assert.equal(names.length, 41, `which are the forty-one files the app was given: ${names.join(', ')}`)
+  assert.equal(names.length, 40, `which are the forty files the app was given: ${names.join(', ')}`)
   for (const name of names) {
     const mine = readFileSync(new URL(name, ours), 'utf8')
     assert.ok(mine.length > 0, `${name} is not empty`)

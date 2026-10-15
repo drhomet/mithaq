@@ -113,7 +113,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     'done.archive': { en: '{kind} archived', ar: 'تمت أرشفة {kind}' },
     'done.unarchive': { en: '{kind} unarchived', ar: 'تم إلغاء أرشفة {kind}' },
     'done.unpublish': { en: '{kind} unpublished', ar: 'تم إلغاء نشر {kind}' },
-    'done.restoreVersion': { en: 'Published version restored', ar: 'استُعيدت النسخة المنشورة' },
+    'done.restoreVersion': { en: 'Version restored', ar: 'استُعيدت النسخة' },
     'done.ran': { en: '{operation}: done', ar: '{operation}: تم' },
     requestFailed: { en: 'Something went wrong, so nothing was saved. Try again.', ar: 'حدث خطأ، فلم يُحفظ شيء. حاول مرة أخرى.' },
     deleteWarning: { en: 'This cannot be undone.', ar: 'لا يمكن التراجع عن هذا.' },

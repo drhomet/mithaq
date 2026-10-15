@@ -30,6 +30,17 @@ export const toast = Object.assign(add('default'), {
   dismiss: (id?: number) => set(id === undefined ? [] : toasts.filter((one) => one.id !== id)),
 })
 
+const carried = 'mithaq:toast'
+/**
+ * A green toast the next page says, for a write that reads its page again by a reload, which would take a toast along.
+ * Browser storage the page may refuse, in which case the write lands unsaid.
+ */
+export const carry = (message: string) => {
+  try {
+    window.sessionStorage.setItem(carried, message)
+  } catch {}
+}
+
 /** A success leaves on its own; a failure stays until it is closed, so no reason is gone before it is read (WCAG 2.2.1). */
 function Item({ one, closeLabel }: { one: Toast; closeLabel: string }): ReactElement {
   useEffect(() => {
@@ -68,6 +79,13 @@ export function Toaster({ closeLabel }: { closeLabel: string }): ReactElement {
     () => toasts,
     () => none,
   )
+  useEffect(() => {
+    try {
+      const message = window.sessionStorage.getItem(carried)
+      window.sessionStorage.removeItem(carried)
+      if (message) toast.success(message)
+    } catch {}
+  }, [])
   useEffect(() => {
     const pressed = (event: Event) => {
       const target = event.target instanceof Element ? event.target : null

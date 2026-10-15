@@ -217,7 +217,7 @@ export type ScreenPage<Locale extends string = string, Ref extends string | Ui =
   | {
       readonly path: string
       readonly page: ScreenFrame<Locale, Ref, FieldName>
-      /** `create` and `edit` only: the record opens over the list, in one of shadcn's three. */
+      /** `create` and `edit` only: the record opens over the list, in shadcn's dialog or sheet, or a full-page drawer as Payload's document drawer. */
       readonly mode?: 'dialog' | 'drawer' | 'sheet'
       readonly component?: never
     }

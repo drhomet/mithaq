@@ -358,7 +358,9 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
 
   /** Picks a row the drawer just made, beside whatever the field already holds. */
   const made = (row: Record<string, unknown>) => {
-    const one = String(row.id ?? '')
+    // A create whose answer names no id it may read has nothing to pick.
+    if (row?.id === undefined || row.id === null) return
+    const one = String(row.id)
     setChosen((already) => new Map([...already, [one, row]]))
     change(many ? [...held, one] : one)
   }

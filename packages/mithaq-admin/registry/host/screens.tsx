@@ -856,9 +856,9 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
       api={readsOf(related)}
       operations={data.operations}
       related={draw(page).list}
-      // A create opened over its list closes back to it once it lands, the new row in the list, as Payload's drawer does.
-      // ponytail: a kayan that autosaves drafts closes on its first autosave there; hold the drawer open on an autosave's create if one ever opens over its list.
-      edit={(id) => (page.mode ? listHref : hrefOf(kayan, 'edit', id))}
+      // A create opened over its list closes back to it once it lands, the new row in the list, as Payload's drawer does;
+      // one whose kayan autosaves its drafts moves to the row's page instead, since its first autosave is a create too.
+      edit={(id) => (page.mode && listHref && !data.drafts?.autosave ? listHref : hrefOf(kayan, 'edit', id))}
       list={listHref}
       drafts={data.drafts}
       expectedUpdatedAt={data.expectedUpdatedAt}
