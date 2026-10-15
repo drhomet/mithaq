@@ -443,6 +443,8 @@ const memoAsas = buildTestAsas({ http: [fetchHttp()], kayan: [memos, localeMemos
  * Both are shared: a column called `tenant` binds nothing, so the reference check a write
  * runs is the target's own read, which is under test.
  */
+/** The parent a `prune` step removes through the raw store, beside the one the delete names. */
+const prunedParent: { id?: string } = {}
 const markedParents = defineTestKayan({
   name: 'markedParents',
   dbName: 'marked_parents',
@@ -457,7 +459,19 @@ const markedParents = defineTestKayan({
       rules: { providedBy: { create: 'never', update: 'never' } },
     },
   },
-  targets: { service: { operations: defaultOperations } },
+  targets: {
+    service: {
+      operations: {
+        ...defaultOperations,
+        prune: {
+          steps: ({ steps }: { steps: { remove: WriteStep } }) => [
+            (async (ctx, tools) => (await tools.store.remove({ tx: ctx.tx, kayan: 'markedParents', id: prunedParent.id }), ctx)) as WriteStep,
+            steps.remove,
+          ],
+        },
+      },
+    },
+  },
 })
 const markedChildren = defineTestKayan({
   name: 'markedChildren',
@@ -8767,6 +8781,21 @@ test('82. a kayan the access target reads carrying the soft-delete mark is refus
     build('none'),
     'while the same two kayan without the mark build, and the account kayan carrying it is untouched',
   )
+})
+
+test('83a. a delete keeps its soft delete while its step removes a sibling outright', async () => {
+  const parents = markedAsas.kayan.markedParents.operations as typeof markedAsas.kayan.markedParents.operations & { prune: (input: { id: string }) => Promise<unknown> }
+  const rowOf = async (id: string) => (await db.execute(`select deleted_at from marked_parents where id = '${id}'`)).rows[0] as { deleted_at: Date | null } | undefined
+  try {
+    const own = await parents.create({ title: 'Own' })
+    const sibling = await parents.create({ title: 'Sibling' })
+    Object.assign(prunedParent, { id: sibling.id })
+    await parents.prune({ id: own.id })
+    assert.equal(await rowOf(sibling.id), undefined, 'the sibling the step named is removed outright, as a raw remove does')
+    assert.ok((await rowOf(own.id))?.deleted_at, 'while the row the delete names is marked and kept')
+  } finally {
+    await db.execute('delete from marked_parents')
+  }
 })
 
 test('83. a write referencing a parent the delete marked is refused exactly as one referencing a parent that was never there', async () => {

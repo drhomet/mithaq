@@ -97,8 +97,12 @@ const rewriteTenant = (ctx: { tenant?: unknown }) => ((ctx.tenant = 'org2'), ctx
 const linked: { memo?: string } = {}
 /** What a step writes past the managed write, set by the test that makes it: a new note, or `id`'s. */
 const scribbled: { id?: string; data?: Record<string, unknown> } = {}
-/** The row a step of an update or a delete writes past its own: a kayan, an id and, for an update, the values. */
+/** The row a step writes past its own: a kayan, an id and, for an insert or an update, the values. */
 const aimed: { kayan?: string; id?: string; data?: Record<string, unknown> } = {}
+/** A step that writes the row `aimed` names through the raw store, beside the operation's own. */
+const aimAt = (write: 'insert' | 'update' | 'remove') =>
+  async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
+    (await tools.store[write]({ tx: ctx.tx, kayan: aimed.kayan, id: aimed.id, data: aimed.data }), ctx)
 /** The sessions the build's own Better Auth server knows, by the `x-person` header a request carries; `actorOf` writes them. */
 const sessions = new Map<string, { active: string | null | undefined; orgs: string[] }>()
 const sessionOf = (headers: Headers) => sessions.get(headers.get('x-person') ?? '')
@@ -182,18 +186,9 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
             ],
           },
           // A raw write to the row `aimed` names, beside the operation's own.
-          touch: {
-            steps: ({ steps }: { steps: { update: unknown } }) => [
-              async (ctx: { tx: unknown }, tools: { store: { update: (args: object) => Promise<unknown> } }) => (await tools.store.update({ tx: ctx.tx, kayan: aimed.kayan, id: aimed.id, data: aimed.data }), ctx),
-              steps.update,
-            ],
-          },
-          prune: {
-            steps: ({ steps }: { steps: { remove: unknown } }) => [
-              async (ctx: { tx: unknown }, tools: { store: { remove: (args: object) => Promise<unknown> } }) => (await tools.store.remove({ tx: ctx.tx, kayan: aimed.kayan, id: aimed.id }), ctx),
-              steps.remove,
-            ],
-          },
+          poke: { steps: ({ steps }: { steps: { insert: unknown } }) => [aimAt('insert'), steps.insert] },
+          touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] },
+          prune: { steps: ({ steps }: { steps: { remove: unknown } }) => [aimAt('remove'), steps.remove] },
           // A raw insert into another tenant-owned kayan, under another organization.
           plant: {
             steps: ({ steps }: { steps: { insert: unknown } }) => [
@@ -276,7 +271,10 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     schemaName: 'tenant_scope',
     fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, memo: { kind: 'relationship', relationTo: 'memos' }, ...draftFields },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
-    targets: { service: { operations: { ...defaultOperations, ...versionOperations } }, versions: { drafts: { autosave: true } } },
+    targets: {
+      service: { operations: { ...defaultOperations, ...versionOperations, touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] } } },
+      versions: { drafts: { autosave: true } },
+    },
   }
   // Shared files: no organization's, whoever uploads them.
   const assets = { ...files, name: 'assets', fields: { ...defaultFields, ...uploadFields } }
@@ -356,7 +354,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp()], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -624,6 +622,59 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     await memos().prune({ id: last.id }, { actor: one })
     assert.equal(await titleOf('opens', other.id), undefined, 'a row of another kayan is gone')
     assert.equal(await titleOf('memos', own.id), ownTitle, 'and the row the operation updated before stands')
+  })
+
+  test('a raw write in a step naming a versions table or a join table is refused, so another organization\'s snapshots and join rows stay out of reach', async () => {
+    const papers = built.kayan.papers.operations
+    const notes = built.kayan.notes.operations
+    const theirs = await papers.create({ title: 'theirs', _status: 'published' }, { actor: two })
+    const theirNote = await notes.create({ title: 'their note', memo: null, memoSet: [ids.org2], tag: null, cover: null }, { actor: two })
+    const snapshots = async () => (await store.find({ kayan: '_papers_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { parent: { equals: theirs.id } } } })).docs
+    const held = await snapshots()
+    const snapshot = held[0]!
+    const mine = await memos().create({ title: 'aimer' }, { actor: one })
+    const now = new Date()
+    const writes: [typeof aimed, () => Promise<unknown>][] = [
+      [{ kayan: '_papers_versions', data: { parent: theirs.id, version: { ...(snapshot.version as object), title: 'planted' }, latest: true, autosave: false, createdAt: now, updatedAt: now } }, () => memos().poke({ title: 'poke' }, { actor: one })],
+      [{ kayan: '_papers_versions', id: snapshot.id as string, data: { version: { ...(snapshot.version as object), title: 'pwned' } } }, () => memos().touch({ id: mine.id, title: 'touch' }, { actor: one })],
+      [{ kayan: '_papers_versions', id: snapshot.id as string }, () => memos().prune({ id: mine.id }, { actor: one })],
+      [{ kayan: 'notes_memo_set', data: { parent: theirNote.id, target: ids.org1, order: 1 } }, () => memos().poke({ title: 'poke' }, { actor: one })],
+      [{ kayan: 'notes_memo_set', id: theirNote.id, data: { order: 2 } }, () => memos().touch({ id: mine.id, title: 'touch' }, { actor: one })],
+      [{ kayan: 'notes_memo_set', id: theirNote.id }, () => memos().prune({ id: mine.id }, { actor: one })],
+    ]
+    for (const [aim, call] of writes) {
+      Object.assign(aimed, { id: undefined, data: undefined }, aim)
+      await assert.rejects(call(), /names no kayan/, `${aim.kayan} ${aim.id ? 'by id' : 'insert'} is refused`)
+    }
+    assert.deepEqual(await snapshots(), held, 'their snapshots are as they were')
+    assert.deepEqual((await notes.findByID({ id: theirNote.id }, { actor: two })).memoSet, [ids.org2], 'and their join rows')
+    assert.equal((await memos().findByID({ id: mine.id }, { actor: one })).title, 'aimer', 'and the operations around them wrote nothing')
+  })
+
+  test('the operation\'s own row keeps its version while a raw write in its step reaches a sibling, which saves none', async () => {
+    const papers = built.kayan.papers.operations
+    const own = await papers.create({ title: 'own', _status: 'published' }, { actor: one })
+    const sibling = await papers.create({ title: 'sibling', _status: 'published' }, { actor: one })
+    const count = async (id: string) => (await papers.findVersions({ where: { parent: { equals: id } } }, { actor: one })).totalDocs
+    const before = { own: await count(own.id), sibling: await count(sibling.id) }
+    Object.assign(aimed, { kayan: 'papers', id: sibling.id, data: { title: 'sibling raw' } })
+    await papers.touch({ id: own.id, title: 'own touched', _status: 'published' }, { actor: one })
+    assert.equal(await count(own.id), before.own + 1, 'the own row saved its version')
+    assert.equal((await papers.findByID({ id: own.id }, { actor: one })).title, 'own touched')
+    assert.equal(await count(sibling.id), before.sibling, 'the raw write saved none')
+    assert.equal((await papers.findByID({ id: sibling.id }, { actor: one })).title, 'sibling raw')
+  })
+
+  // Postgres answers a uuid in lowercase whatever case it was asked in; the memory store keeps the case it was given.
+  test('a step naming its own row as the store answered it, while the caller sent the id in capitals, still saves the row\'s version', { skip: !postgres }, async () => {
+    const papers = built.kayan.papers.operations
+    const own = await papers.create({ title: 'own', _status: 'published' }, { actor: one })
+    const count = async () => (await papers.findVersions({ where: { parent: { equals: own.id } } }, { actor: one })).totalDocs
+    const before = await count()
+    Object.assign(aimed, { kayan: 'papers', id: own.id, data: { title: 'by the step' } })
+    await papers.touch({ id: own.id.toUpperCase(), title: 'by the caller', _status: 'published' }, { actor: one })
+    assert.equal(await count(), before + 2, 'the step\'s write and the update each saved a version, as writes of the row itself')
+    assert.equal((await papers.findByID({ id: own.id }, { actor: one })).title, 'by the caller')
   })
 
   test('tenant: \'mine\' gives a membership whose roles answer a filter a branch of its own, refuses a sort by a hidden column, and masks joined rows by their membership', async () => {
