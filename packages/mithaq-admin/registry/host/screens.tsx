@@ -174,7 +174,7 @@ const resolveScreen = async (asked: unknown) => {
       ...(actor.impersonatedBy ? { impersonating: true } : {}),
       ...(others.length ? { screens: others } : {}),
       ...(actor.organizations && {
-        // Each locale's name too, which the shell reads in the viewer's locale.
+        // Every locale's, because the frame is read before the viewer's locale is known here; the shell picks one.
         organizations: actor.organizations.map(({ id, name, slug, names }) => ({ id, name, slug, ...(typeof names === 'string' && { names }) })),
         activeOrganizationId: actor.activeOrganizationId ?? null,
       }),
@@ -237,7 +237,8 @@ export const loadEnterable = createServerFn({ method: 'GET' })
     }
     const memberships = actor.organizations ?? []
     const active = memberships.find((one) => one.id === actor.activeOrganizationId)
-    // Each named in the viewer's locale.
+    // Named here, where the locale is known: the page draws what it is handed, and a name the viewer cannot read
+    // in the default locale would be no name to them.
     const named = ({ id, name, slug, names }: NonNullable<Actor['organizations']>[number]) => ({ id, name: nameIn({ name, names }, data.locale), slug })
     return {
       screens: entered,

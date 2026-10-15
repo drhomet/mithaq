@@ -21,7 +21,7 @@ export function OrganizationActions({ value, row }: CellProps) {
   const access = useAccess()
   const screen = useScreen()
   const renames = organizations === 'many' && holds(access, 'organization.rename')
-  // Each locale the organization is named in beside the default, whose box is `name`.
+  // The default locale's name is the required `name` box, so only the others get optional boxes of their own.
   const others = Object.keys(organizationName).filter((one) => one !== defaultLocale)
   const members = holds(access, 'member.find') && screen.kayan.member?.pages.list !== undefined
   const [open, setOpen] = useState(false)
