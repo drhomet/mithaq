@@ -151,10 +151,15 @@ export const orpcHttp = ({
         const { pathname } = new URL(request.url)
         const under = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`)
         if (!handlers.some(([prefix]) => under(prefix))) return null
-        // Read here, so oRPC's own reader never holds a body past the limit.
+        // Read here, so oRPC's own reader never holds a body past the limit. Off a clone, so a plug
+        // after this one reads the body of a route oRPC does not answer.
         if (request.body) {
-          const read = await boundedBody(request, maxBodyBytes)
-          if (!read) return tooLarge(maxBodyBytes)
+          const read = await boundedBody(request.clone(), maxBodyBytes)
+          if (!read) {
+            // The clone's twin, so the source stream is cancelled rather than left to the server.
+            request.body.cancel().catch(() => {})
+            return tooLarge(maxBodyBytes)
+          }
           request = new Request(request.url, { method: request.method, headers: request.headers, body: read, signal: request.signal })
         }
         // Built before any procedure runs, so a throw here is outside the middleware;

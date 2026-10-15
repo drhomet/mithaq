@@ -121,6 +121,14 @@ test('every plug refuses a request body past its maxBodyBytes as a 413 before re
   assert.equal((await send(orpcHttp(), JSON.stringify({ data: 'x'.repeat(defaultMaxBodyBytes) })))!.status, 413)
 })
 
+test('a plug after oRPC reads the whole body of a route under /api that oRPC does not answer', async () => {
+  const { defineKayan, buildAsas } = language()
+  const echo = () => ({ name: 'echo', router: undefined, handle: async (request: Request) => new Response(await request.text()) })
+  const built = buildAsas({ http: [orpcHttp(), echo as never], kayan: [settingsKayan(defineKayan)] })
+  const answered = await built.handler(new Request('http://test/api/echo', { method: 'POST', body: 'held whole' }))
+  assert.equal(await answered!.text(), 'held whole')
+})
+
 test('a path that crosses a relationship onto a json field, one row or a set, is the caller\'s 400', async () => {
   const { defineKayan, buildAsas } = language()
   const notes = defineKayan({
