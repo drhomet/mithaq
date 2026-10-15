@@ -4091,11 +4091,11 @@ test('171d. a refusal naming a field, on a page with a controls node, draws unde
 test('171b. Save draft is offered on a kayan that keeps drafts, whether or not it autosaves, and never to an actor without the key', async () => {
   const autosaving = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 2000 } }))
   assert.ok(buttonNamed(autosaving, 'Save draft'), 'an edit that autosaves still offers Save draft')
-  assert.ok(buttonNamed(autosaving, 'Publish changes'), 'beside Publish changes')
+  assert.ok(publishOf(autosaving), 'beside Publish changes')
   const drafting = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published' } }))
   assert.ok(buttonNamed(drafting, 'Save draft'), 'an edit that does not autosave offers it too')
   const keyless = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: undefined }))
-  assert.equal(!!buttonNamed(keyless, 'Save draft') || !!buttonNamed(keyless, 'Publish changes'), false, 'an actor without findVersions gets neither')
+  assert.equal(!!buttonNamed(keyless, 'Save draft') || !!publishOf(keyless), false, 'an actor without findVersions gets neither')
   assert.ok(buttonNamed(keyless, 'Save'), 'and keeps the plain Save')
 })
 
@@ -4237,6 +4237,10 @@ const draftClient = (calls: DraftCall[], answer: (call: DraftCall) => Promise<un
   delete: async () => ({}),
 })
 const buttonNamed = (host: HTMLElement, words: string) => [...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === words) as HTMLButtonElement | undefined
+/** Publish, which reads Publish changes on a published record and Publish on one never published. */
+const publishOf = (host: HTMLElement) => (host.querySelector('[data-button="publish"]') ?? undefined) as HTMLButtonElement | undefined
+/** Cancel, which reads Back to list beside a draft that saves itself. */
+const cancelOf = (host: HTMLElement) => buttonNamed(host, 'Cancel') ?? buttonNamed(host, 'Back to list')
 const draftRow = { id: 'a-row', title: 'Tajweed', summary: 'A short summary', fee: 300, archived: false }
 
 test('132a. a form over a kayan that keeps drafts offers Save draft and Publish changes in place of Save, and a draft save sends the draft word and skips the rules a publish holds', async () => {
@@ -4244,7 +4248,7 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
   const host = await render(createElement(Form, { kayan: courses, client: draftClient(calls), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published' } }))
   assert.ok(!buttonNamed(host, 'Save'), 'there is no plain Save')
   assert.equal(buttonNamed(host, 'Save draft')?.disabled, true, 'Save draft waits for a change on an update, as Payload\'s does')
-  assert.equal(buttonNamed(host, 'Publish changes')?.disabled, true, 'and so does Publish on a published row with nothing pending')
+  assert.equal(publishOf(host)?.disabled, true, 'and so does Publish on a published row with nothing pending')
   await act(async () => {
     typeInto(host.querySelector('#courses-title')!, 'x'.repeat(121))
   })
@@ -4260,7 +4264,7 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
     typeInto(refusing.querySelector('#courses-title')!, 'x'.repeat(121))
   })
   await act(async () => {
-    click(buttonNamed(refusing, 'Publish changes')!)
+    click(publishOf(refusing)!)
   })
   assert.deepEqual(calls, [], 'and a publish is refused the same title before any request')
 
@@ -4268,9 +4272,9 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
   for (const status of ['draft', 'changed'] as const) {
     calls.length = 0
     const pending = await render(createElement(Form, { kayan: courses, client: draftClient(calls), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status } }))
-    assert.equal(buttonNamed(pending, 'Publish changes')?.disabled, false, `Publish is offered on a ${status} row with nothing changed`)
+    assert.equal(publishOf(pending)?.disabled, false, `Publish is offered on a ${status} row with nothing changed`)
     await act(async () => {
-      click(buttonNamed(pending, 'Publish changes')!)
+      click(publishOf(pending)!)
     })
     assert.deepEqual(calls, [{ operation: 'update', input: { id: 'a-row' } }], 'and publishes the pending draft, a plain write naming the row alone')
   }
@@ -4291,7 +4295,7 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
   const plain = await render(createElement(Form, { kayan: courses, client: draftClient(calls), value: draftRow, t, locale: 'en', onDone: () => {} }))
   assert.ok(buttonNamed(plain, 'Save'))
   assert.ok(!buttonNamed(plain, 'Save draft'))
-  assert.ok(!buttonNamed(plain, 'Publish changes'))
+  assert.ok(!publishOf(plain))
 })
 
 test('132b. a publish the server refuses draws its sentence under the box it names, as a save does', async () => {
@@ -4301,7 +4305,7 @@ test('132b. a publish the server refuses draws its sentence under the box it nam
   })
   const host = await render(createElement(Form, { kayan: courses, client, value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } }))
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
   const box = host.querySelector('#courses-title')!.closest('[data-slot="field"]') ?? host
   assert.ok(box.textContent?.includes('A published course needs a title.'), 'the refusal is drawn beside the title')
@@ -4397,7 +4401,7 @@ test('132e. a field typed back to what the row was loaded with is still saved on
   await act(async () => sleep(50))
   assert.deepEqual(calls.map((one) => one.input.title), ['Tajweed II', 'Tajweed'], 'the title the draft no longer holds is autosaved back')
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
   assert.deepEqual(calls.at(-1), { operation: 'update', input: { id: 'a-row' } }, 'and Publish then sends what differs from the draft, which is nothing')
 })
@@ -4712,7 +4716,7 @@ test('132g. a field-less refusal is said once in a toast and leaves no banner ov
     typeInto(title(), 'Tajweed I')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
   assert.deepEqual(await toasted(), ['error: error.rowChanged'], 'the refusal is a toast, naming no field')
   assert.ok(!host.querySelector('[role="alert"]'), 'and no banner')
@@ -4822,13 +4826,13 @@ test('172f. a Draft and Published switch shows only on a changed row; Published 
   assert.deepEqual(asked, [{ operation: 'findByID', input: { id: 'a-row' } }], 'Published reads the row once, without the draft word')
   assert.equal(title().value, 'Published title', 'and shows the published copy')
   assert.equal([...host.querySelectorAll('input, textarea')].every((one) => (one as HTMLInputElement).disabled), true, 'with every control disabled')
-  assert.deepEqual([!!buttonNamed(host, 'Publish changes'), !!buttonNamed(host, 'Save draft')], [false, false], 'and no Publish or Save draft')
+  assert.deepEqual([!!publishOf(host), !!buttonNamed(host, 'Save draft')], [false, false], 'and no Publish or Save draft')
   await act(async () => {
     click(toggleNamed(host, 'Draft')!)
   })
   assert.equal(title().value, 'Edited', 'Draft again keeps the edit nobody saved')
   assert.equal(title().disabled, false)
-  assert.equal(!!buttonNamed(host, 'Publish changes'), true)
+  assert.equal(!!publishOf(host), true)
   await act(async () => {
     click(toggleNamed(host, 'Published')!)
   })
@@ -5069,7 +5073,7 @@ test('228a. nothing is autosaved while the discard question is open, from Cancel
     typeInto(title(), 'Taj')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   assert.ok(dialogText()?.includes('Leave without saving?'), 'Cancel asks')
   await act(async () => sleep(200))
@@ -5104,7 +5108,7 @@ test('228b. Discard on a create page whose row this page\'s autosave made delete
     await act(async () => {
       typeInto(host.querySelector('#courses-title')!, 'Tajweed')
     })
-    await act(async () => (how === 'cancel' ? click(buttonNamed(host, 'Cancel')!) : block.it!()))
+    await act(async () => (how === 'cancel' ? click(cancelOf(host)!) : block.it!()))
     await act(async () => {
       click(dialogButton('Discard changes')!)
     })
@@ -5131,7 +5135,7 @@ test('228b. Discard on a create page whose row this page\'s autosave made delete
     typeInto(host.querySelector('#courses-title')!, 'Tajweed II')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5147,7 +5151,7 @@ test('228b. Discard on a create page whose row this page\'s autosave made delete
     typeInto(edit.querySelector('#courses-title')!, 'Tajweed II')
   })
   await act(async () => {
-    click(buttonNamed(edit, 'Cancel')!)
+    click(cancelOf(edit)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5167,7 +5171,7 @@ test('228d. an autosave that lands while the discard question is open leaves the
   await act(async () => sleep(120))
   assert.equal(calls.length, 1, 'the autosave is out')
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   assert.ok(dialogText()?.includes('Leave without saving?'), 'Cancel asks while it is out')
   answer = async () => ({ ...draftRow, _status: 'draft' })
@@ -5195,7 +5199,7 @@ test('228e. Discard keeps a draft this page made where the server reads it publi
       typeInto(host.querySelector('#courses-title')!, 'Tajweed')
     })
     await act(async () => {
-      click(buttonNamed(host, 'Cancel')!)
+      click(cancelOf(host)!)
     })
   }
   // Published meanwhile, from another tab: the plain read finds it.
@@ -5253,7 +5257,7 @@ test('228f. once Discard is pressed nothing autosaves the edit it threw away, ho
     typeInto(edit.querySelector('#courses-title')!, 'Tajweed II')
   })
   await act(async () => {
-    click(buttonNamed(edit, 'Cancel')!)
+    click(cancelOf(edit)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5273,7 +5277,7 @@ test('228f. once Discard is pressed nothing autosaves the edit it threw away, ho
     typeInto(host.querySelector('#courses-title')!, 'Tajweed')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5438,7 +5442,7 @@ test('173b. a landed Publish turns a changed row to Published and hides the swit
     click(toggleNamed(host, 'Draft')!)
   })
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
   await act(async () => sleep(0))
   assert.deepEqual(standing(host), ['published', false, undefined])
@@ -5456,7 +5460,7 @@ test('173b. a landed Publish turns a changed row to Published and hides the swit
 
   const drafted = await render(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client: publishedClient([], []), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } }), { record: draftRow })
   await act(async () => {
-    click(buttonNamed(drafted, 'Publish changes')!)
+    click(publishOf(drafted)!)
   })
   assert.equal(standing(drafted)[0], 'published', 'a draft row published is Published too')
 })
@@ -5529,7 +5533,7 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
   assert.equal(title?.getAttribute('title'), title?.textContent, 'the header\'s title, cut short on a phone, carries its whole text')
   const form = host.querySelector('form')!
   assert.equal(bar.querySelector('[data-button="publish"]')?.getAttribute('form'), form.id, 'Publish changes is in the bar and still submits the page\'s form by its id')
-  assert.deepEqual(['Save draft', 'Cancel'].map((words) => bar.contains(buttonNamed(host, words) ?? null)), [true, true], 'Save draft and Cancel are in the bar')
+  assert.deepEqual(['Save draft', 'Back to list'].map((words) => bar.contains(buttonNamed(host, words) ?? null)), [true, true], 'Save draft and Back to list are in the bar')
   // The switch is not in the phone's bar, where it took a quarter of the screen: it sits at the top of the form below xl, and beside the actions from xl up.
   const switches = [...host.querySelectorAll('[data-view-switch]')]
   assert.equal(switches.length, 2, 'the Draft | Published switch is drawn for each width')
@@ -6027,7 +6031,7 @@ test('177s. the same rows in another order are the same read', async () => {
 
 test('182a. the form\'s own row of buttons wraps, so on a page with no header controls its buttons never set the page\'s width, and a row of fields puts each on a line of its own before squeezing it', async () => {
   const host = await render(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: ['title', { row: ['fee', 'currency'] }] }])), client: publishedClient([], []), value: draftRow, t, locale: 'en', onDone: () => {}, onCancel: () => {} }), { record: draftRow })
-  const row = buttonNamed(host, 'Cancel')?.parentElement
+  const row = cancelOf(host)?.parentElement
   assert.equal(row?.contains(buttonNamed(host, 'Save') ?? null), true, 'Cancel and Save share the form\'s own row')
   assert.equal(classesOf(row).includes('flex-wrap'), true, 'which wraps rather than holding every button on one line')
   const fields = host.querySelector('[data-node="row"]')
@@ -7326,7 +7330,7 @@ test('223b. Discard on a create page sends the delete the instant this page\'s l
       typeInto(host.querySelector('#courses-title')!, 'Tajweed II')
     })
     await act(async () => {
-      click(buttonNamed(host, 'Cancel')!)
+      click(cancelOf(host)!)
     })
     await act(async () => {
       click(dialogButton('Discard changes')!)
@@ -7641,4 +7645,25 @@ test('240h. a relationship picker offers a + beside it, for a viewer who may cre
   assert.deepEqual(await toasted(), ['success: Tag created'])
   host = await draw({ access: { collections: { tags: { read: true } } } as never })
   assert.equal(plus(), null, 'a viewer who may not create a tag gets no +')
+})
+
+test('240i. a record never published is published with Publish, one already published with Publish changes, and beside a draft that saves itself Cancel says it goes back to the list', async () => {
+  const named = async (drafts: Record<string, unknown>, value: Record<string, unknown> | null = draftRow) => {
+    const host = await render(createElement(Form, { kayan: courses, client: draftClient([]), value, t: english, locale: 'en', onDone: () => {}, onCancel: () => {}, drafts }))
+    return [publishOf(host)?.textContent?.trim(), cancelOf(host)?.textContent?.trim()]
+  }
+  assert.deepEqual(await named({ status: 'draft' }), ['Publish', 'Cancel'], 'a draft never published')
+  assert.deepEqual(await named({}, null), ['Publish', 'Cancel'], 'and a record being made')
+  assert.deepEqual(await named({ status: 'published' }), ['Publish changes', 'Cancel'], 'a published record')
+  assert.deepEqual(await named({ status: 'changed' }), ['Publish changes', 'Cancel'], 'and one with a draft pending')
+  assert.deepEqual(await named({ status: 'draft', autosave: 2000 }), ['Publish', 'Back to list'], 'a draft that saves itself has nothing to cancel, so the button says where it goes')
+})
+
+test('240k. a yes-or-no field on a record page reads Yes or No under its label, an unset one No, never a dash', async () => {
+  const { FieldValue } = await import('../registry/field-value.tsx')
+  const archived = courses.fields.find((one) => one.name === 'archived')!
+  const words = async (value: unknown) => (await render(createElement(FieldValue, { kayan: courses, field: archived, row: { id: 'c1', archived: value }, copy: { t: english, locale: 'en' } }))).querySelector('[data-field-value="archived"]')?.textContent
+  assert.equal(await words(true), 'ArchivedYes', 'set')
+  assert.equal(await words(false), 'ArchivedNo', 'cleared')
+  assert.equal(await words(null), 'ArchivedNo', 'and a row from before the column, which holds nothing, reads the same as cleared')
 })

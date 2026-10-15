@@ -392,7 +392,7 @@ test('11. a checkbox cell says true from false in words, so the column is not a 
   assert.equal(arabic?.[1], 'نشط', 'and in the other locale it is the other word')
 })
 
-test('184a. a cell joins several values in its locale\'s own list format, never with an ASCII comma, and an unticked box reads apart from an empty one', async () => {
+test('184a. a cell joins several values in its locale\'s own list format, never with an ASCII comma, and an empty box reads as an unticked one', async () => {
   const { RelationshipCell, titleKey } = await import('../registry/relationship-cell.tsx')
   const topics = fieldOf({ name: 'topics', kind: 'textArray' })
   const cell = (locale: string, value: unknown) => staticMarkup(createElement(() => cells.textArray!({ kayan: courses, field: topics, value, t: translator(locale), locale }) as ReactElement))
@@ -404,7 +404,7 @@ test('184a. a cell joins several values in its locale\'s own list format, never 
   const related = staticMarkup(createElement(RelationshipCell, { kayan: courses, field: tags, value: ids, t: translator('ar'), locale: 'ar', titles }))
   assert.equal(related, '<span>مكثف وشهادة</span>', 'and so does a relationship cell holding several rows')
   const box = (value: unknown) => /<span aria-hidden="true"[^>]*>([^<]*)<\/span>/.exec(staticMarkup(createElement(() => cells.checkbox!({ kayan: courses, field: fieldOf({ name: 'archived', kind: 'checkbox' }), value, t: copy.t, locale: 'en' }) as ReactElement)))?.[1]
-  assert.deepEqual([box(true), box(false), box(undefined), box(null)], ['✓', '✗', '—', '—'], 'a false box draws its own glyph, apart from an empty value')
+  assert.deepEqual([box(true), box(false), box(undefined), box(null)], ['✓', '✗', '✗', '✗'], 'an empty box, as a row from before the column holds, is a no like a false one')
 })
 
 test('184c. a search runs only over what the viewer reads, across one relationship to the kayan it points at too, and the box names a far field by the relationship and its own label', () => {

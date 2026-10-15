@@ -40,10 +40,13 @@ export const cells: Cells = {
   // Exact text: a JS double would lose digits.
   decimal: ({ field, value, locale }) => worded(field, value, locale),
   // The glyph is aria-hidden, so the sr-only word is what a screen reader gets. The words are keyed per field because `true` means different things on `archived` and `published`.
-  checkbox: ({ kayan, field, value, t }) => (
+  // A row from before the column holds nothing, which is a no. Drawn whole under its label, it is the word Yes or No.
+  checkbox: ({ kayan, field, value, t, whole }) => whole ? (
+    <>{value === true ? (t('admin.yes', 'Yes') ?? 'Yes') : (t('admin.no', 'No') ?? 'No')}</>
+  ) : (
     <>
       <span aria-hidden className="tabular-nums">
-        {value === true ? '✓' : value === false ? '✗' : '—'}
+        {value === true ? '✓' : '✗'}
       </span>
       <span className="sr-only">
         {value === true

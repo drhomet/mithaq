@@ -27,8 +27,10 @@ export type FormActionsProps = {
   updating: boolean
   /** Whether the form shows the published copy, which takes no save. */
   viewing: boolean
-  /** Whether the kayan keeps drafts, which draws Save draft and Publish changes in place of Save. */
+  /** Whether the kayan keeps drafts, which draws Save draft and Publish in place of Save. */
   drafts: boolean
+  /** Whether the form saves its draft as the person types, which leaves Cancel nothing to cancel. */
+  autosaves?: boolean
   /** The id of the form a submit button names, since a controls node draws the row outside it. */
   formId: string
   /** Asks before an unsaved edit is left. */
@@ -110,6 +112,7 @@ export function ViewSwitch({ className, phone = false, viewing, choose, t }: { c
 // logical, so the row mirrors in Arabic.
 export function FormActions({
   autosaved,
+  autosaves,
   busy,
   dirty,
   drafts,
@@ -167,7 +170,8 @@ export function FormActions({
           aria-haspopup={dirty ? 'dialog' : undefined}
           onClick={dirty ? onAsk : onCancel}
         >
-          {t('admin.cancel', 'Cancel') ?? 'Cancel'}
+          {/* A draft that saves itself is kept on the way out, so the button says where it goes. */}
+          {autosaves ? (t('admin.backToList', 'Back to list') ?? 'Back to list') : (t('admin.cancel', 'Cancel') ?? 'Cancel')}
         </Button>
       ) : null}
       {viewing ? null : drafts ? (
@@ -179,7 +183,8 @@ export function FormActions({
           </Button>
           <Button type="submit" form={formId} size={size} className={`${publishColour} ${tall}`} data-button="publish" disabled={busy || autosaved === 'saving' || (!dirty && status === 'published')}>
             {busy ? <Spinner /> : null}
-            {t('version.publishChanges', 'Publish changes')}
+            {/* Changes are what a published record has; a record never published is published whole. */}
+            {status === 'published' || status === 'changed' ? t('version.publishChanges', 'Publish changes') : t('version.publish', 'Publish')}
           </Button>
         </>
       ) : (

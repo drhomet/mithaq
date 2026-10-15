@@ -23,7 +23,7 @@ const pages: Record<number, Record<string, unknown>[]> = {
   ],
   // A write landed between the two reads, so the second page opens on the
   // entry the first ended with.
-  2: [{ id: 'e2', createdAt: new Date(Date.now() - 3_600_000).toISOString(), operation: 'update', actor: 'u2', changes: change({ fee: [5, 7] }) }, { id: 'e1', createdAt: new Date(Date.now() - 86_400_000).toISOString(), operation: 'create', actor: null, changes: change({ id: [null, 'c1'], title: [null, 'Tajweed'] }) }],
+  2: [{ id: 'e2', createdAt: new Date(Date.now() - 3_600_000).toISOString(), operation: 'update', actor: 'u2', changes: change({ fee: [5, 7] }) }, { id: 'e1', createdAt: new Date(Date.now() - 86_400_000).toISOString(), operation: 'create', actor: null, changes: change({ id: [null, 'c1'], title: [null, 'Tajweed'], notifications: [null, false], summary: [null, null] }) }],
 }
 
 const draw = async (locale: Locale, viewer?: string) => {
@@ -61,7 +61,9 @@ const draw = async (locale: Locale, viewer?: string) => {
 const text = (node: Element | null | undefined) => node?.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 const changed = (entry: Element | undefined, field: string) => {
   const line = entry?.querySelector(`[data-change="${field}"]`)
-  return line ? `${text(line.firstElementChild)}: ${text(line.querySelector('[data-from]'))} → ${text(line.querySelector('[data-to]'))}` : null
+  if (!line) return null
+  const from = line.querySelector('[data-from]')
+  return from ? `${text(line.firstElementChild)}: ${text(from)} → ${text(line.querySelector('[data-to]'))}` : `${text(line.firstElementChild)}: ${text(line.querySelector('[data-to]'))}`
 }
 
 test('the panel reads the record\'s own entries newest first, and draws each change by its label and its cell, in English', async () => {
@@ -85,8 +87,9 @@ test('the panel reads the record\'s own entries newest first, and draws each cha
   const all = [...host.querySelectorAll('[data-entry]')]
   assert.deepEqual(all.map((one) => one.getAttribute('data-entry')), ['archive', 'update', 'create'], 'the next page is drawn after the first, the entry both answered drawn once')
   assert.equal(text(all[2]!.querySelector('[data-event]')), 'Created by The system', 'an entry no person wrote names the system')
-  assert.equal(changed(all[2], 'title'), 'Title: — → Tajweed', 'and the id it was given is not drawn')
-  assert.equal(all[2]!.querySelector('[data-change="id"]'), null)
+  assert.equal(changed(all[2], 'title'), 'Title: Tajweed', 'a create says what was set, with no empty value before it')
+  assert.equal(all[2]!.querySelector('[data-change="id"]'), null, 'and the id it was given is not drawn')
+  assert.deepEqual([changed(all[2], 'notifications'), changed(all[2], 'summary')], [null, null], 'nor a field the person never set, left empty or off')
 
   const before = asked.filter((one) => one.kayan === 'auditLog').length
   await redraw({ id: 'c1', title: 'Tajweed', updatedAt: '2026-09-28T00:00:00.000Z' })

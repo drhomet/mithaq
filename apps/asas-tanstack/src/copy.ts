@@ -260,6 +260,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     invalidFields: { en: 'Fields needing attention: {count}', ar: 'حقول تحتاج إلى مراجعة: {count}' },
     errorSummary: { en: 'Check these fields:', ar: 'راجع هذه الحقول:' },
     addNew: { en: 'Add new {kind}', ar: 'إضافة {kind}' },
+    backToList: { en: 'Back to list', ar: 'العودة إلى القائمة' },
     organizations: { en: 'Organizations', ar: 'المؤسسات' },
     organization: { en: 'Organization', ar: 'مؤسسة' },
     noOrganization: { en: 'No organization', ar: 'لا توجد مؤسسة' },
@@ -804,6 +805,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   version: {
     saveDraft: { en: 'Save draft', ar: 'حفظ المسودة' },
     noReadableChange: { en: 'No field you may read changed.', ar: 'لم يتغير حقل يمكنك قراءته.' },
+    publish: { en: 'Publish', ar: 'نشر' },
     publishChanges: { en: 'Publish changes', ar: 'نشر التغييرات' },
     status: { en: 'Status', ar: 'الحالة' },
     draft: { en: 'Draft', ar: 'مسودة' },

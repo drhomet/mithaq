@@ -201,7 +201,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // the top of the form (`chrome`), so it is never in the phone's fixed bar.
   const views = status === 'changed' && client.findByID ? { viewing, choose } : undefined
   const actionsOf = (header: boolean) => (
-    <FormActions {...{ autosaved, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
+    <FormActions {...{ autosaved, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} autosaves={!!drafts?.autosave} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
   )
   // On a screen's page the title is the page's own `title` node, so the form keeps only the sentence under it.
   const chrome = (
