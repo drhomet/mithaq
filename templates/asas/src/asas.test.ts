@@ -484,6 +484,22 @@ const probeNotes = defineTestKayan({
   targets: { service: { operations: defaultOperations } },
 })
 const notesAsas = buildTestAsas({ http: [fetchHttp()], kayan: [probeNotes, ...accessKayan] })
+/** A row every organization shares, and a per-organization kayan whose drafts name it. */
+const sharedLabels = defineTestKayan({
+  name: 'sharedLabels',
+  dbName: 'shared_labels',
+  access: allowAccess,
+  fields: { ...defaultFields, title: { kind: 'text', label: { en: 'Title', ar: 'العنوان' } } },
+  targets: { service: { operations: defaultOperations } },
+})
+const labelledDrafts = defineTestKayan({
+  name: 'labelledDrafts',
+  dbName: 'labelled_drafts',
+  access: allowAccess,
+  fields: { ...defaultFields, organization, label: { kind: 'relationship', label: { en: 'Label', ar: 'الوسم' }, relationTo: () => sharedLabels }, ...draftFields },
+  targets: { service: { operations: { ...defaultOperations, ...versionOperations } }, versions: { drafts: true } },
+})
+const labelsAsas = buildTestAsas({ http: [fetchHttp()], kayan: [sharedLabels, labelledDrafts, ...accessKayan] })
 
 const projectWide = defineTestGlobal({
   name: 'projectWide',
@@ -800,7 +816,7 @@ before(async () => {
   await db.execute('create table untouched (id integer)')
   await asas.connect()
   await db.execute(`insert into organization (id, name, slug, created_at) values ('borrowed-organization', 'Borrowed', 'borrowed', now())`)
-  for (const built of [actorDefaultAsas, localizedAsas, calendarAsas, measureAsas, galleryAsas, noticeAsas, memoAsas, markedAsas, notesAsas, projectWideAsas, spreadsNoDefaultsAsas, spreadsNoTimestampAsas, softLocalAsas]) {
+  for (const built of [actorDefaultAsas, localizedAsas, calendarAsas, measureAsas, galleryAsas, noticeAsas, memoAsas, markedAsas, notesAsas, labelsAsas, projectWideAsas, spreadsNoDefaultsAsas, spreadsNoTimestampAsas, softLocalAsas]) {
     await built.connect()
   }
 })
@@ -12241,7 +12257,7 @@ test('142c. only a super admin grants a platform role, and a tenant administrato
     const refused = await asas.kayan.memberRoles.operations.create({ role, user: member.id }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
     assert.ok(refused instanceof AsasError && refused.status === 400 && refused.key === 'error.invalid.role', `"${role}" is no role an assignment may name`)
   }
-  assert.equal((await adminRoute('set-role', owner.headers, { userId: member.id, role: 'support' })).status, 403, 'the admin plugin refuses the tenant administrator')
+  assert.equal((await adminRoute('set-role', owner.headers, { userId: member.id, role: 'support' })).status, 401, 'the platform refuses the tenant administrator, who holds no session there')
 
   const platform = await signedUp('platform-142c')
   await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
@@ -17899,6 +17915,29 @@ test('227o. a platform role without a route\'s permission is refused it before a
     const answer = await adminRoute(path, support.headers, body)
     assert.equal(answer.status, 403, `${path}: ${await answer.clone().text()}`)
   }
+})
+
+test('186t. a shared row another organization\'s draft names is not deleted, and the refusal says nothing of that organization\'s rows', async () => {
+  const [a, b] = await twoTenants('186t')
+  const as = async (side: typeof a) => ({ actor: (await asas.auth.actor(side!.owner.headers)) as never })
+  const labels = labelsAsas.kayan.sharedLabels.operations as unknown as Record<'create' | 'delete', (input: unknown, options?: unknown) => Promise<{ id: string }>>
+  const drafted = labelsAsas.kayan.labelledDrafts.operations as unknown as Record<'create' | 'update', (input: unknown, options?: unknown) => Promise<{ id: string }>>
+  const label = await labels.create({ title: 'Shared 186t' })
+  // Published without it, so only the pending draft names it, which no foreign key holds.
+  const row = await drafted.create({}, await as(a))
+  await drafted.update({ id: row.id, label: label.id }, { ...(await as(a)), draft: true })
+  const refused = await labels.delete({ id: label.id }, await as(b)).then(() => undefined, (error: unknown) => error)
+  assert.ok(refused instanceof AsasError && refused.status === 409, 'a caller in another organization does not delete it')
+  assert.deepEqual([refused.key, refused.params], ['error.conflict.referenced', { kayan: 'sharedLabels' }], 'and is told neither how many rows name it nor which')
+  const own = await labels.delete({ id: label.id }, await as(a)).then(() => undefined, (error: unknown) => error)
+  assert.ok(own instanceof AsasError && own.status === 409, 'the organization whose draft names it is refused too')
+  assert.deepEqual((own.params as { uses: unknown }).uses, [{ by: 'labelledDrafts', count: 1, titles: [] }], 'and is told how many of its own')
+})
+
+test('187. each is a bulk operation\'s alone, and names an operation the kayan has', () => {
+  const kayanWith = (operations: Record<string, unknown>) => defineTestKayan({ name: 'eachProbe', access: allowAccess, fields: { ...defaultFields }, targets: { service: { operations: { ...defaultOperations, ...operations } as never } } })
+  assert.throws(() => buildTestAsas({ http: [fetchHttp()], kayan: [kayanWith({ renamed: { ...defaultOperations.update, each: 'update' } }), ...accessKayan] }), /names "each", and only a bulk operation/)
+  assert.throws(() => buildTestAsas({ http: [fetchHttp()], kayan: [kayanWith({ touchMany: { ...defaultOperations.updateMany, each: 'touch' } }), ...accessKayan] }), /runs "touch" on each row it matches, and the kayan has no operation "touch"/)
 })
 
 test('186s. a row that names itself is deleted whatever case its id is sent in', async () => {

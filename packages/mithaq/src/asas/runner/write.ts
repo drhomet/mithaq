@@ -250,9 +250,8 @@ export const referencingIds = async ({ id, pointers, store, tenant, tx }: {
  * Refuses the delete while a live row or the latest version of a row names it, in the delete's own
  * transaction. The row is held `FOR UPDATE` by the delete, and a write naming it holds it the same
  * way in `assertReferences`, a draft save included, so no new reference lands between this count
- * and the delete. The refusal counts every row and names by title only those the actor reads.
- * A shared row that another organization's rows name passes this count, which reads the actor's
- * own, and is refused by the foreign key instead, which names their kayan alone.
+ * and the delete. The refusal counts the actor's own organization's rows and names by title only
+ * those the actor reads; a row another organization's rows name is refused with no count at all.
  */
 const refuseReferenced = async <Actor>({ kayan, existing, pointers, store, tenant, tx, authorize, admin, actor }: {
   kayan: ResolvedKayan
@@ -265,14 +264,28 @@ const refuseReferenced = async <Actor>({ kayan, existing, pointers, store, tenan
   admin: ManagedAdmin<Actor> | undefined
   actor: Actor | null
 }) => {
-  const found = await referencingIds({ id: existing.id, pointers, store, tenant, tx })
-  // A row that names itself goes with itself; read off the stored row, since the caller's id may differ in case.
-  found.get(kayan)?.delete(String(existing.id))
+  const counted = async (within: unknown) => {
+    const found = await referencingIds({ id: existing.id, pointers, store, tenant: within, tx })
+    // A row that names itself goes with itself; read off the stored row, since the caller's id may differ in case.
+    found.get(kayan)?.delete(String(existing.id))
+    return { found, total: [...found.values()].reduce((sum, ids) => sum + ids.size, 0) }
+  }
+  // Every organization's rows gate the delete, since the foreign key holds no draft; only the
+  // actor's own are counted and named to it.
+  const all = await counted(undefined)
+  if (!all.total) return
+  const own = tenant === undefined ? all : await counted(tenant)
+  if (own.total !== all.total) {
+    throw conflict({
+      message: `A "${kayan.name}" row is still named by rows this caller does not see, so it is not deleted.`,
+      key: 'error.conflict.referenced',
+      params: { kayan: kayan.name },
+    })
+  }
   const uses: { by: string; count: number; titles: unknown[]; titleKind?: string }[] = []
-  for (const [one, ids] of found) {
+  for (const [one, ids] of own.found) {
     if (ids.size) uses.push({ by: one.name, count: ids.size, ...(await titlesOf({ kayan: one, ids: [...ids], store, tx, authorize, admin, actor })) })
   }
-  if (!uses.length) return
   throw conflict({
     message: `A "${kayan.name}" row is still named by ${uses.map(({ by, count }) => `${count} "${by}" row${count === 1 ? '' : 's'}`).join(' and ')}, so it is not deleted.`,
     key: 'error.conflict.referenced',

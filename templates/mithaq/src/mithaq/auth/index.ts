@@ -553,16 +553,10 @@ const auditBefore = async (ctx: HookContext) => {
   if (!audited(ctx.path)) return
   const caller: Caller = await getSessionFromCtx(ctx).catch(() => null)
   callers.set(ctx.context, caller)
-  // Only a `super_admin` writes a role, on any route that takes one. The plugin already asks
-  // `user.set-role` of these routes, which only `'*'` holds, but a project's own platform role
-  // granted `user.update` must still write no role through `update-user`.
-  //
   // `/admin/has-permission` is excepted: it carries `role` to ask what that role may do and writes
   // nothing.
   const body = (ctx.body ?? {}) as Parameters<typeof roleOf>[0] & { userId?: unknown; banReason?: unknown; data?: { banned?: unknown; banReason?: unknown } }
   const acts = ctx.path.startsWith('/admin/') && ctx.path !== '/admin/has-permission'
-  const grants = holdsRole(caller?.user.role, (one) => one === 'super_admin')
-  if (acts && roleOf(body) !== undefined && !grants && !firstRegistering.getStore()) throw new APIError('FORBIDDEN', { message: 'Only a platform administrator sets a role.' })
   // Every route that names the person it acts on names them as `userId` in its body. Nobody acts on
   // their own row, and only a super admin acts on a staff member's.
   //
@@ -577,6 +571,11 @@ const auditBefore = async (ctx: HookContext) => {
   if (asks && !String(caller.user.role ?? 'user').split(',').some((one) => roles[one]?.authorize(asks).success)) {
     throw new APIError('FORBIDDEN', { message: 'This role may not use this route.' })
   }
+  // Only a `super_admin` writes a role, on any route that takes one. The plugin already asks
+  // `user.set-role` of these routes, which only `'*'` holds, but a project's own platform role
+  // granted `user.update` must still write no role through `update-user`.
+  const grants = holdsRole(caller.user.role, (one) => one === 'super_admin')
+  if (roleOf(body) !== undefined && !grants && !firstRegistering.getStore()) throw new APIError('FORBIDDEN', { message: 'Only a platform administrator sets a role.' })
   // A ban needs a reason. The provider writes `data.banned` raw unless it is `=== true`, so a
   // non-boolean such as `'true'` would store a ban with no reason and end no session.
   const writes = ctx.path === '/admin/update-user' || ctx.path === '/admin/create-user'
