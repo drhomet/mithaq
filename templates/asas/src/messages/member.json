@@ -15,6 +15,14 @@
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
   },
+  "lastSeenAt.invalid": {
+    "ar": "هذا ليس تاريخا ووقتا.",
+    "en": "This is not a date and time."
+  },
+  "lastSeenAt.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
   "organizationId.invalid": {
     "ar": "اختر عنصرًا من القائمة.",
     "en": "Pick one of the listed entries."

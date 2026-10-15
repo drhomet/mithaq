@@ -1,15 +1,19 @@
 // What `/dashboard` itself draws where the courses add-on, whose home counts
 // its catalogue, is not there: a figure card for each list the nav offers the
-// viewer, with how many rows of it they may read and a link to it. A list
+// viewer, with how many rows of it they may read and a link to it, and with the
+// roles add-on who works here and the roles they hold. A list
 // whose count the viewer may not read, or whose count failed, shows a dash.
 import type { LoaderTools, PageProps } from 'mithaq/admin'
 import { useLocale, useScreen } from 'mithaq/admin/react'
 import { AppShell, iconOf } from '@asas/mithaq/ui/app-shell.tsx'
 import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
 import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
+// add-on: roles
+import { MembersCard, membersFigures } from './members-card.tsx'
+// end add-on: roles
 
 /** How many rows of each kayan the viewer may count, read as the viewer, keyed by its kayan. */
-export const loader = async ({ client, access }: LoaderTools): Promise<Record<string, number | undefined>> =>
+const countsOf = async ({ client, access }: LoaderTools): Promise<Record<string, number | undefined>> =>
   Object.fromEntries(
     await Promise.all(
       Object.entries(access.collections ?? {})
@@ -18,9 +22,24 @@ export const loader = async ({ client, access }: LoaderTools): Promise<Record<st
     ),
   )
 
-export function Home({ loaderData: counts }: PageProps<Record<string, number | undefined>>) {
+export const loader = async (tools: LoaderTools) => ({
+  counts: await countsOf(tools),
+  // add-on: roles
+  // Who works here, where the viewer may list members.
+  members: await membersFigures(tools),
+  // end add-on: roles
+})
+
+export function Home({ loaderData }: PageProps<Awaited<ReturnType<typeof loader>>>) {
+  const counts = loaderData?.counts
   const { locale, t } = useLocale()
   const screen = useScreen()
+  // add-on: roles
+  const members = loaderData?.members ? <MembersCard figures={loaderData.members} href={`${screen.path}/members`} /> : null
+  // end add-on: roles
+  // without add-on: roles
+  // const members = null
+  // end without add-on: roles
   return (
     <AppShell
       regions={{
@@ -44,6 +63,7 @@ export function Home({ loaderData: counts }: PageProps<Record<string, number | u
                   />,
                 ]
               })}
+              {members}
             </div>
           </section>
         ),

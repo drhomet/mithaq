@@ -31,6 +31,7 @@ export type MemberValues = {
   organizationId: string
   userId: string
   role: string
+  lastSeenAt: Date | null
 }
 export type CoursesValues = {
   id: string
