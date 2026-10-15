@@ -1761,6 +1761,9 @@ test('170b. a changed value too long to keep whole is kept as the start of its J
   assert.equal(changes.meta!.from, `${JSON.stringify(large).slice(0, keptLength)}…`, 'the long side is the start of its JSON')
   assert.equal(changes.meta!.to, '{"rows":[]}', 'and the short side of the same change is its JSON whole, so the panel reads both sides one way')
   assert.ok(JSON.stringify(changes).length < keptLength * 2, 'so the entry stays small however large the value')
+  // Counted as the cut is made, by code point: 1502 of them, though 3002 UTF-16 units.
+  const wide = '😀'.repeat(1500)
+  assert.deepEqual(changesOf({ note: 'a' }, { note: wide }).note, { from: 'a', to: wide }, 'a side under the cut in code points is kept whole')
   const meta = fieldOf({ name: 'meta', kind: 'json' })
   const kayan = { ...courses, fields: [...courses.fields, meta] }
   const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: null, changes }

@@ -24,7 +24,8 @@ const textOf = (value: unknown) => {
   const points = [...JSON.stringify(value)]
   return points.length > keptLength ? `${points.slice(0, keptLength).join('')}…` : points.join('')
 }
-const tooLong = (value: unknown) => (JSON.stringify(value)?.length ?? 0) > keptLength
+// By code point, as `textOf` cuts, so a side is cut exactly when it is marked cut.
+const tooLong = (value: unknown) => [...(JSON.stringify(value) ?? '')].length > keptLength
 
 /**
  * What the Activity panel draws as a dash: absent, `null`, an empty string or
