@@ -360,11 +360,6 @@ export const settings = defineGlobal({
   fields: {
     ...defaultFields,
     organization: { ...organization, rules: { ...organization.rules, unique: true } },
-    siteTitle: {
-      kind: 'text',
-      label: { en: 'Site title', ar: 'عنوان الموقع' },
-      rules: { required: true, trim: true, maxLength: 120 },
-    },
     // ...
     globalType: { ...defaultGlobalFields.globalType, rules: { required: true, defaultValue: 'settings' } },
   },
