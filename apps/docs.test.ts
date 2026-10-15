@@ -54,17 +54,27 @@ test('every relative link, anchor and link to this repository on GitHub in a tra
 // name here. An "Upgrading" section names them on purpose, to say what each became.
 const retired = [/admin@admin\.com/, /\bmithaqjs\b/, /\bBun only\b/i, /asas-platform/, /PLATFORM_URL/, /\bscreen\.platform\b/, /platform-roles|platformRoles|platformApp|ui-platform/, /\bplatform (console|app|screen)\b/i, /(^|[\s(`'"])\/?r\/[\w-]+\.json/, /registry\/r\//]
 
+/** Each line naming a retired name, as `<line> <name>`, outside an "Upgrading" section; a fenced line opens or closes none. */
+const staleIn = (lines: string[]) => {
+  const headings = new Map(prose(lines).flatMap(({ raw, number }) => {
+    const heading = /^(#{1,6})\s+(.*)$/.exec(raw)
+    return heading ? [[number, heading] as const] : []
+  }))
+  let upgrading = false
+  return lines.flatMap((line, index) => {
+    const heading = headings.get(index + 1)
+    if (heading) upgrading = heading[1]!.length <= 2 ? /upgrading/i.test(heading[2]!) : upgrading
+    return upgrading ? [] : retired.filter((name) => name.test(line)).map((name) => `${index + 1} ${name}`)
+  })
+}
+
 test('no guide teaches a retired name outside the notes on upgrading', () => {
-  const stale: string[] = []
-  for (const { file, lines } of guides) {
-    let upgrading = false
-    lines.forEach((line, index) => {
-      const heading = /^(#{1,6})\s+(.*)$/.exec(line)
-      if (heading) upgrading = heading[1]!.length <= 2 ? /upgrading/i.test(heading[2]!) : upgrading
-      for (const name of retired) if (!upgrading && name.test(line)) stale.push(`${file}:${index + 1} ${name}`)
-    })
-  }
-  assert.deepEqual(stale, [])
+  assert.deepEqual(guides.flatMap(({ file, lines }) => staleIn(lines).map((one) => `${file}:${one}`)), [])
+})
+
+test('a heading inside a fenced block neither opens nor closes the notes on upgrading', () => {
+  const lines = ['# Guide', '```sh', '## Upgrading', '```', 'PLATFORM_URL', '## Upgrading', '```sh', '# a comment', '```', 'PLATFORM_URL', '## Next', 'PLATFORM_URL']
+  assert.deepEqual(staleIn(lines), ['5 /PLATFORM_URL/', '12 /PLATFORM_URL/'])
 })
 
 test('every skill opens with the frontmatter Claude Code reads: its folder\'s name and a description', () => {
