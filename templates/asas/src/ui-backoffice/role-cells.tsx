@@ -1,4 +1,4 @@
-// The two role columns the platform lists, each named in the viewer's locale
+// The two role columns the backoffice lists, each named in the viewer's locale
 // where the column holds a slug, so an Arabic page reads no English word and
 // no slug for them.
 import type { CellProps } from 'mithaq/admin'
@@ -21,7 +21,7 @@ import { systemRoles } from '@asas/mithaq/roles/system-roles.ts'
 export function MembershipRole({ value }: CellProps) {
   const { locale, t } = useLocale()
   if (typeof value !== 'string' || !value) return null
-  return listed(value.split(',').map((one) => t(`platform.membership.${one.trim()}`) ?? one.trim()), locale)
+  return listed(value.split(',').map((one) => t(`backoffice.membership.${one.trim()}`) ?? one.trim()), locale)
 }
 
 // add-on: roles

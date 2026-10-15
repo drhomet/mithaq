@@ -37,7 +37,7 @@ export const Route = createRootRoute({
       typeof document === 'undefined'
         ? localeOf((ctx as unknown as FromRequest).serverContext?.locale as string | undefined)
         : localeOf(document.documentElement.lang)
-    return { locale, dir: dirOf(locale), app: 'platform.brand' }
+    return { locale, dir: dirOf(locale), app: 'backoffice.brand' }
   },
   // The favicon stops the browser asking for a `/favicon.ico` nobody serves.
   head: ({ match }) => ({

@@ -58,7 +58,7 @@ const creatorSource = join(root, 'packages/create-mithaq')
 rmSync(creator, { recursive: true, force: true })
 const { private: _creatorPrivate, publishConfig: creatorPublished, ...creatorManifest } = JSON.parse(readFileSync(join(creatorSource, 'package.json'), 'utf8')) as { publishConfig: Record<string, unknown>; [key: string]: unknown }
 const excluded = /(\.test\.tsx?|\.probe\.ts|\.smoke\.ts|\.support\.ts|\.fixture\.[^/]+|(^|\/)(test-[^/]*|memory-store|standard-schema-target)\.ts)$/
-const templateFiles = execFileSync('git', ['ls-files', '-z', 'templates/mithaq', 'templates/features', 'templates/asas', 'apps/asas-tanstack', 'apps/asas-platform'], { cwd: root, encoding: 'utf8' })
+const templateFiles = execFileSync('git', ['ls-files', '-z', 'templates/mithaq', 'templates/features', 'templates/asas', 'apps/asas-tanstack', 'apps/asas-backoffice'], { cwd: root, encoding: 'utf8' })
   .split('\0')
   .filter((file) => file && !excluded.test(file))
 for (const file of templateFiles) {

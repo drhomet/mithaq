@@ -108,8 +108,8 @@ export const tenancy = ({ language, assigned, onError, collection }: {
     }
     if (reach === 'all') {
       const trusted = authActor(actor)
-      if (!trusted || !target.platform || (await target.platform({ user: actor })) !== true) {
-        throw refused('tenant "all" reads every organization, which only platform staff in the platform app may.')
+      if (!trusted || !target.backoffice || (await target.backoffice({ user: actor })) !== true) {
+        throw refused('tenant "all" reads every organization, which only backoffice staff in the backoffice app may.')
       }
       return { reach }
     }

@@ -1,13 +1,13 @@
 // Written by `mithaq generate screens`. Do not edit.
 import { createFileRoute } from '@tanstack/react-router'
 import { ScreenNotFound, ScreenPageView, askedFor, pageHead, pageLoader } from '@/screens.tsx'
-import { files } from './platform/files.ts'
+import { files } from './backoffice/files.ts'
 
-export const Route = createFileRoute('/(screens)/platform/$')({
+export const Route = createFileRoute('/(screens)/backoffice/$')({
   validateSearch: askedFor,
-  loader: ({ location, params }) => pageLoader({ screen: 'platform', files, path: params._splat ?? '', query: location.search, href: location.href }),
+  loader: ({ location, params }) => pageLoader({ screen: 'backoffice', files, path: params._splat ?? '', query: location.search, href: location.href }),
   head: ({ loaderData, match }) => pageHead(loaderData, match.context),
-  notFoundComponent: () => <ScreenNotFound files={files} screen={'platform'} />,
+  notFoundComponent: () => <ScreenNotFound files={files} screen={'backoffice'} />,
   component: Page,
 })
 

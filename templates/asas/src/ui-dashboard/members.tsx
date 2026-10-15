@@ -1,5 +1,5 @@
 // The dashboard's one page that belongs to no kayan: who works in the viewer's organization and the roles each holds, and the one place a member's roles are changed.
-// The `loader` reads as the viewer: members from the provider's `list-members` (the active organization only, gated by `member.find`), assignments from `memberRoles`, and the roles the sheet offers: the fixed ones from their code and the organization's own from `roles`, never a platform role.
+// The `loader` reads as the viewer: members from the provider's `list-members` (the active organization only, gated by `member.find`), assignments from `memberRoles`, and the roles the sheet offers: the fixed ones from their code and the organization's own from `roles`, never a backoffice role.
 // Invitations, cancellations and removals go through the provider's own routes, which the auth template gates by `invitation.create`, `invitation.cancel` and `member.delete`.
 import { useEffect, useId, useRef, useState } from 'react'
 import { Lock } from 'lucide-react'
@@ -680,7 +680,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
                 </form>
               </dialog>
             ) : null}
-            {/* The side sheet is the platform's own modal `<dialog>` rather
+            {/* The side sheet is the backoffice's own modal `<dialog>` rather
                 than shadcn's sheet, whose popup is a portal a server render
                 draws nothing of: a closed dialog is in the
                 document and hidden, so the first paint carries every word

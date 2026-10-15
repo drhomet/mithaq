@@ -4,17 +4,17 @@
 // in a file every kayan shares.
 //
 // An organization is written through no managed operation: Better Auth writes
-// it through its own adapter, and the platform renames one through its own route.
+// it through its own adapter, and the backoffice renames one through its own route.
 // In the tenant app a member reads its active organization, the one every tenant-owned
 // row belongs to, and by its id and its name alone, so a tenant
-// relationship shows a name on the dashboard. In the platform app a
-// platform role reads every organization, each column where it holds that
+// relationship shows a name on the dashboard. In the backoffice app a
+// backoffice role reads every organization, each column where it holds that
 // column's key. The id and the name are held by `namesInTenant` for the
 // reason `./user.access.ts` gives.
 import { rows } from '@asas/mithaq'
-import { namesInTenant, platformReads, user } from '@asas/mithaq/roles/tenant-access.ts'
+import { namesInTenant, backofficeReads, user } from '@asas/mithaq/roles/tenant-access.ts'
 
 export const access = rows(
-  { '*': { read: { id: { equals: user.activeOrganizationId } } }, ...platformReads },
+  { '*': { read: { id: { equals: user.activeOrganizationId } } }, ...backofficeReads },
   { holds: namesInTenant('organization') },
 )

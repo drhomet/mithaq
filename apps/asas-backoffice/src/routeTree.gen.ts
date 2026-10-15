@@ -10,21 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
-import { Route as screensPlatformRouteImport } from './routes/(screens)/platform'
+import { Route as screensBackofficeRouteImport } from './routes/(screens)/backoffice'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as AuthCreateFirstUserRouteImport } from './routes/auth.create-first-user'
 import { Route as AuthSignInRouteImport } from './routes/auth.sign-in'
-import { Route as screensPlatformIndexRouteImport } from './routes/(screens)/platform.index'
-import { Route as screensPlatformSplatRouteImport } from './routes/(screens)/platform.$'
+import { Route as screensBackofficeIndexRouteImport } from './routes/(screens)/backoffice.index'
+import { Route as screensBackofficeSplatRouteImport } from './routes/(screens)/backoffice.$'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
   path: '/unauthorized',
   getParentRoute: () => rootRouteImport,
 } as any)
-const screensPlatformRoute = screensPlatformRouteImport.update({
-  id: '/(screens)/platform',
-  path: '/platform',
+const screensBackofficeRoute = screensBackofficeRouteImport.update({
+  id: '/(screens)/backoffice',
+  path: '/backoffice',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
@@ -42,76 +42,76 @@ const AuthSignInRoute = AuthSignInRouteImport.update({
   path: '/auth/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
-const screensPlatformIndexRoute = screensPlatformIndexRouteImport.update({
+const screensBackofficeIndexRoute = screensBackofficeIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => screensPlatformRoute,
+  getParentRoute: () => screensBackofficeRoute,
 } as any)
-const screensPlatformSplatRoute = screensPlatformSplatRouteImport.update({
+const screensBackofficeSplatRoute = screensBackofficeSplatRouteImport.update({
   id: '/$',
   path: '/$',
-  getParentRoute: () => screensPlatformRoute,
+  getParentRoute: () => screensBackofficeRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/unauthorized': typeof UnauthorizedRoute
-  '/platform': typeof screensPlatformRouteWithChildren
+  '/backoffice': typeof screensBackofficeRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/auth/create-first-user': typeof AuthCreateFirstUserRoute
   '/auth/sign-in': typeof AuthSignInRoute
-  '/platform/$': typeof screensPlatformSplatRoute
-  '/platform/': typeof screensPlatformIndexRoute
+  '/backoffice/$': typeof screensBackofficeSplatRoute
+  '/backoffice/': typeof screensBackofficeIndexRoute
 }
 export interface FileRoutesByTo {
   '/unauthorized': typeof UnauthorizedRoute
   '/api/$': typeof ApiSplatRoute
   '/auth/create-first-user': typeof AuthCreateFirstUserRoute
   '/auth/sign-in': typeof AuthSignInRoute
-  '/platform/$': typeof screensPlatformSplatRoute
-  '/platform': typeof screensPlatformIndexRoute
+  '/backoffice/$': typeof screensBackofficeSplatRoute
+  '/backoffice': typeof screensBackofficeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/unauthorized': typeof UnauthorizedRoute
-  '/(screens)/platform': typeof screensPlatformRouteWithChildren
+  '/(screens)/backoffice': typeof screensBackofficeRouteWithChildren
   '/api/$': typeof ApiSplatRoute
   '/auth/create-first-user': typeof AuthCreateFirstUserRoute
   '/auth/sign-in': typeof AuthSignInRoute
-  '/(screens)/platform/$': typeof screensPlatformSplatRoute
-  '/(screens)/platform/': typeof screensPlatformIndexRoute
+  '/(screens)/backoffice/$': typeof screensBackofficeSplatRoute
+  '/(screens)/backoffice/': typeof screensBackofficeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/unauthorized'
-    | '/platform'
+    | '/backoffice'
     | '/api/$'
     | '/auth/create-first-user'
     | '/auth/sign-in'
-    | '/platform/$'
-    | '/platform/'
+    | '/backoffice/$'
+    | '/backoffice/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/unauthorized'
     | '/api/$'
     | '/auth/create-first-user'
     | '/auth/sign-in'
-    | '/platform/$'
-    | '/platform'
+    | '/backoffice/$'
+    | '/backoffice'
   id:
     | '__root__'
     | '/unauthorized'
-    | '/(screens)/platform'
+    | '/(screens)/backoffice'
     | '/api/$'
     | '/auth/create-first-user'
     | '/auth/sign-in'
-    | '/(screens)/platform/$'
-    | '/(screens)/platform/'
+    | '/(screens)/backoffice/$'
+    | '/(screens)/backoffice/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   UnauthorizedRoute: typeof UnauthorizedRoute
-  screensPlatformRoute: typeof screensPlatformRouteWithChildren
+  screensBackofficeRoute: typeof screensBackofficeRouteWithChildren
   ApiSplatRoute: typeof ApiSplatRoute
   AuthCreateFirstUserRoute: typeof AuthCreateFirstUserRoute
   AuthSignInRoute: typeof AuthSignInRoute
@@ -126,11 +126,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UnauthorizedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(screens)/platform': {
-      id: '/(screens)/platform'
-      path: '/platform'
-      fullPath: '/platform'
-      preLoaderRoute: typeof screensPlatformRouteImport
+    '/(screens)/backoffice': {
+      id: '/(screens)/backoffice'
+      path: '/backoffice'
+      fullPath: '/backoffice'
+      preLoaderRoute: typeof screensBackofficeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/$': {
@@ -154,40 +154,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignInRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(screens)/platform/': {
-      id: '/(screens)/platform/'
+    '/(screens)/backoffice/': {
+      id: '/(screens)/backoffice/'
       path: '/'
-      fullPath: '/platform/'
-      preLoaderRoute: typeof screensPlatformIndexRouteImport
-      parentRoute: typeof screensPlatformRoute
+      fullPath: '/backoffice/'
+      preLoaderRoute: typeof screensBackofficeIndexRouteImport
+      parentRoute: typeof screensBackofficeRoute
     }
-    '/(screens)/platform/$': {
-      id: '/(screens)/platform/$'
+    '/(screens)/backoffice/$': {
+      id: '/(screens)/backoffice/$'
       path: '/$'
-      fullPath: '/platform/$'
-      preLoaderRoute: typeof screensPlatformSplatRouteImport
-      parentRoute: typeof screensPlatformRoute
+      fullPath: '/backoffice/$'
+      preLoaderRoute: typeof screensBackofficeSplatRouteImport
+      parentRoute: typeof screensBackofficeRoute
     }
   }
 }
 
-interface screensPlatformRouteChildren {
-  screensPlatformSplatRoute: typeof screensPlatformSplatRoute
-  screensPlatformIndexRoute: typeof screensPlatformIndexRoute
+interface screensBackofficeRouteChildren {
+  screensBackofficeSplatRoute: typeof screensBackofficeSplatRoute
+  screensBackofficeIndexRoute: typeof screensBackofficeIndexRoute
 }
 
-const screensPlatformRouteChildren: screensPlatformRouteChildren = {
-  screensPlatformSplatRoute: screensPlatformSplatRoute,
-  screensPlatformIndexRoute: screensPlatformIndexRoute,
+const screensBackofficeRouteChildren: screensBackofficeRouteChildren = {
+  screensBackofficeSplatRoute: screensBackofficeSplatRoute,
+  screensBackofficeIndexRoute: screensBackofficeIndexRoute,
 }
 
-const screensPlatformRouteWithChildren = screensPlatformRoute._addFileChildren(
-  screensPlatformRouteChildren,
-)
+const screensBackofficeRouteWithChildren =
+  screensBackofficeRoute._addFileChildren(screensBackofficeRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   UnauthorizedRoute: UnauthorizedRoute,
-  screensPlatformRoute: screensPlatformRouteWithChildren,
+  screensBackofficeRoute: screensBackofficeRouteWithChildren,
   ApiSplatRoute: ApiSplatRoute,
   AuthCreateFirstUserRoute: AuthCreateFirstUserRoute,
   AuthSignInRoute: AuthSignInRoute,

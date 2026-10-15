@@ -3,7 +3,7 @@
 // so the dashboard screen here draws only the two role kayan every such build holds and the two provider kayan
 // their assignments point at, whose own declarations write `targets.dashboard`.
 import { defineMithaq, type SystemRoles } from 'mithaq'
-import { accessTarget, arkan, dashboardScreen, platformScreen, portalScreen, serverTargets } from '../../mithaq/src/mithaq.ts'
+import { accessTarget, arkan, dashboardScreen, backofficeScreen, portalScreen, serverTargets } from '../../mithaq/src/mithaq.ts'
 import { systemRoles } from '../../mithaq/src/roles/system-roles.ts'
 
 const languageOf = (roles: SystemRoles) => defineMithaq({
@@ -12,8 +12,8 @@ const languageOf = (roles: SystemRoles) => defineMithaq({
   // The dashboard alone, and without its key: the members page names
   // `member.find` and the dashboard `courses.find`, which a build holding
   // neither kayan's operations could never answer.
-  // The platform lists the same four and the members, whose declarations write
-  // `targets.platform` too.
+  // The backoffice lists the same four and the members, whose declarations write
+  // `targets.backoffice` too.
   targets: {
     ...serverTargets,
     rbac: accessTarget(roles as typeof systemRoles),
@@ -22,7 +22,7 @@ const languageOf = (roles: SystemRoles) => defineMithaq({
     // build does not hold. The sink stays, which a build allows.
     service: { ...serverTargets.service, afterSteps: [] },
     dashboard: { ...dashboardScreen, kayan: ['roles', 'memberRoles', 'user', 'organization'], pages: { dashboard: { path: '/', component: dashboardScreen.pages.dashboard!.component } } },
-    platform: { ...platformScreen, kayan: ['roles', 'memberRoles', 'user', 'organization', 'member'] },
+    backoffice: { ...backofficeScreen, kayan: ['roles', 'memberRoles', 'user', 'organization', 'member'] },
     // The portal titles a person too, for the enrollment drawer's student picker.
     portal: { ...portalScreen, kayan: ['user'] },
   },

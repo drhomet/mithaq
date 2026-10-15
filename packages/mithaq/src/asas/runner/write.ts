@@ -45,7 +45,7 @@ export type ReadOptions<Actor = unknown, Extra extends Record<string, unknown> =
   /**
    * How far the read reaches past the active organization: `'mine'` is every organization the
    * actor is a verified member of, each under the roles it holds there; `'all'` is every tenant,
-   * for platform staff in the platform app alone. A `where` on the tenant field only narrows it.
+   * for backoffice staff in the backoffice app alone. A `where` on the tenant field only narrows it.
    */
   tenant?: TenantReach
 }

@@ -133,7 +133,7 @@ test('a production boot with no DATABASE_URL refuses on import, before any conne
       ...process.env,
       NODE_ENV: 'production',
       BETTER_AUTH_SECRET: 'a-production-secret',
-      PLATFORM_URL: 'https://platform.example.com',
+      BACKOFFICE_URL: 'https://backoffice.example.com',
       BETTER_AUTH_URL: 'https://app.example.com',
       STORAGE_SECRET: 'a-production-storage-secret-of-32-characters',
       STORAGE_PREFIX: 'mithaq/asas',

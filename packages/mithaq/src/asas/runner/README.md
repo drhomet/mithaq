@@ -22,7 +22,7 @@ words kayan, rukn, asas, target or operation are new.
      relationTo: 'organization',
      onDelete: 'restrict',
      organizations,
-     platform: ({ user }) => onPlatform() && platformRolesOf(user).length > 0,
+     backoffice: ({ user }) => onBackoffice() && backofficeRolesOf(user).length > 0,
    }),
    ```
 
@@ -31,7 +31,7 @@ words kayan, rukn, asas, target or operation are new.
    deleted. `organizations` is required; see [Organization modes](#organization-modes). It is
    new: a language that lays down `betterAuthTenant` without it is refused, so a project made
    before it adds `organizations: 'many'`, the behaviour it had.
-   `platform` is optional; see [The platform app](#the-platform-app).
+   `backoffice` is optional; see [The backoffice app](#the-backoffice-app).
 
 2. **Export the field.** The language returns the target as `targets: {
    tenant }`, and its `field` is what a kayan places. The template exports a
@@ -205,9 +205,9 @@ POST /api/courses/find?tenant=mine
   resolve holds no key, adds nothing, and the failure goes to `auth.onError`.
   It needs a Better Auth session and an access target; without either it is a
   403, and so is a read no membership may make.
-- **`'all'`** reads every organization. Only platform staff in the trusted
-  platform app may ask it: the actor must be an authenticated one and the
-  target's `platform` callback must answer `true`. Anyone else gets a 403.
+- **`'all'`** reads every organization. Only backoffice staff in the trusted
+  backoffice app may ask it: the actor must be an authenticated one and the
+  target's `backoffice` callback must answer `true`. Anyone else gets a 403.
 
 Both are for reads alone:
 
@@ -220,30 +220,30 @@ Both are for reads alone:
 - So does a build with no tenant target, and any value other than `'mine'` or
   `'all'`.
 
-## The platform app
+## The backoffice app
 
-`'all'` is meant for an app that serves platform staff and nothing else. The
-`platform` callback decides who that is, and the project decides which app is
+`'all'` is meant for an app that serves backoffice staff and nothing else. The
+`backoffice` callback decides who that is, and the project decides which app is
 trusted: the answer must come from the app's own facts, never from the request.
 
 The template does it like this:
 
-- `apps/asas-platform` runs every request it serves inside `asPlatform`, an
-  `AsyncLocalStorage` that nothing a client sends can set. `onPlatform()`
+- `apps/asas-backoffice` runs every request it serves inside `asBackoffice`, an
+  `AsyncLocalStorage` that nothing a client sends can set. `onBackoffice()`
   answers `true` there and nowhere else.
-- Platform roles (`super_admin`, `support`, `explorer`) live on Better Auth's
+- Backoffice roles (`super_admin`, `support`, `explorer`) live on Better Auth's
   `user.role`, never in an organization's `memberRoles`. The template's
-  `assignedRoles` answers them in the platform app alone, and the tenant app
+  `assignedRoles` answers them in the backoffice app alone, and the tenant app
   never answers them.
-- `platform: ({ user }) => onPlatform() && platformRolesOf(user).length > 0`.
-- The platform screen's reads of a kayan pass `tenant: 'all'`; a global's read
+- `backoffice: ({ user }) => onBackoffice() && backofficeRolesOf(user).length > 0`.
+- The backoffice screen's reads of a kayan pass `tenant: 'all'`; a global's read
   and every write pass nothing.
-- The rows give every platform role `read: true` and `false` for every write,
+- The rows give every backoffice role `read: true` and `false` for every write,
   so staff read every organization's rows and write none.
 
-Where it lives: `templates/mithaq/src/mithaq/auth/index.ts` `asPlatform` and `onPlatform`;
-`templates/mithaq/src/roles/tenant-access.ts` `assignedRoles` and `platformReads`;
-`apps/asas-platform/src/screens.tsx` `inProcess`.
+Where it lives: `templates/mithaq/src/mithaq/auth/index.ts` `asBackoffice` and `onBackoffice`;
+`templates/mithaq/src/roles/tenant-access.ts` `assignedRoles` and `backofficeReads`;
+`apps/asas-backoffice/src/screens.tsx` `inProcess`.
 
 ## Organization modes
 
@@ -408,7 +408,7 @@ At run time:
   `'all'`: 400.
 - The bound field sent by a caller: 400.
 - An actor with no verified active organization: 403.
-- `'all'` from anyone but platform staff in the platform app: 403.
+- `'all'` from anyone but backoffice staff in the backoffice app: 403.
 
 ## What is not supported
 

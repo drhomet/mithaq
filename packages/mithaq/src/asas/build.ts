@@ -911,7 +911,7 @@ export const buildAsas = <
         .filter((operation) => operation.kayan === one.name && operation.effect === effect)
         .map((operation) => operation.name)
       const operations: Record<string, boolean> = {}
-      // Platform staff in the platform app read a tenant-owned kayan across every organization,
+      // Backoffice staff in the backoffice app read a tenant-owned kayan across every organization,
       // so its read is reported as they make it; anyone else is answered in the active one.
       const reach = effect === 'read' && one.tenant && !one.single
         ? await tenant.open({ actor: actorForAccess, reach: 'all', kayan: one }).catch(() => undefined)

@@ -14,44 +14,44 @@ import { z } from 'zod'
 import { sql } from 'mithaq/drizzle'
 import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
 // A module of its own so a screen can list the roles without loading the provider.
-import { platformRoles } from './platform-roles.ts'
+import { backofficeRoles } from './backoffice-roles.ts'
 import { allowedDomains, joinRole, organizations, showOrganization, signUp, verifyEmail } from './organizations.ts'
 // add-on: roles
 import { tenantRoles } from '../../roles/tenant-roles.ts'
 // end add-on: roles
 
-export { platformRoles }
+export { backofficeRoles }
 
-// Set only by the platform app, which wraps every request it serves in `asPlatform`. Nothing a
+// Set only by the backoffice app, which wraps every request it serves in `asBackoffice`. Nothing a
 // client sends sets it.
-const platformRequest = new AsyncLocalStorage<true>()
-/** Runs `run` as a request the platform app serves. Only the platform app calls it. */
-export const asPlatform = <Result>(run: () => Result): Result => platformRequest.run(true, run)
+const backofficeRequest = new AsyncLocalStorage<true>()
+/** Runs `run` as a request the backoffice app serves. Only the backoffice app calls it. */
+export const asBackoffice = <Result>(run: () => Result): Result => backofficeRequest.run(true, run)
 /**
- * Whether the current request is the platform app's, which picks the platform's Better Auth
+ * Whether the current request is the backoffice app's, which picks the backoffice's Better Auth
  * instance and its role set.
  */
-export const onPlatform = () => platformRequest.getStore() === true
+export const onBackoffice = () => backofficeRequest.getStore() === true
 
 /**
- * Whether this project serves the platform console, `apps/asas-platform`, as `generate.screens`
- * in `src/mithaq.ts` says too. Without it no boot asks for PLATFORM_URL, and nobody is linked or
- * sent to a platform app that does not exist.
+ * Whether this project serves the backoffice console, `apps/asas-backoffice`, as `generate.screens`
+ * in `src/mithaq.ts` says too. Without it no boot asks for BACKOFFICE_URL, and nobody is linked or
+ * sent to a backoffice app that does not exist.
  */
-// add-on: platform
-export const platformApp: boolean = true
-// end add-on: platform
-// without add-on: platform
-// export const platformApp: boolean = false
-// end without add-on: platform
+// add-on: backoffice
+export const backofficeApp: boolean = true
+// end add-on: backoffice
+// without add-on: backoffice
+// export const backofficeApp: boolean = false
+// end without add-on: backoffice
 
 // A production boot needs all three: the fallbacks below are for development only, and Better
-// Auth's refusal of its default secret never fires for the platform, whose secret is derived here.
+// Auth's refusal of its default secret never fires for the backoffice, whose secret is derived here.
 const production = process.env.NODE_ENV === 'production'
 const secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET
-if (production && ((platformApp && !process.env.PLATFORM_URL) || !process.env.BETTER_AUTH_URL || !secret)) {
-  throw new Error(platformApp
-    ? 'A production boot needs PLATFORM_URL and BETTER_AUTH_URL, where the two apps are served, and BETTER_AUTH_SECRET, which both sign their sessions under. Set all three.'
+if (production && ((backofficeApp && !process.env.BACKOFFICE_URL) || !process.env.BETTER_AUTH_URL || !secret)) {
+  throw new Error(backofficeApp
+    ? 'A production boot needs BACKOFFICE_URL and BETTER_AUTH_URL, where the two apps are served, and BETTER_AUTH_SECRET, which both sign their sessions under. Set all three.'
     : 'A production boot needs BETTER_AUTH_URL, where the app is served, and BETTER_AUTH_SECRET, which signs its sessions. Set both.')
 }
 
@@ -66,18 +66,18 @@ export const isLocalHost = (url: string): boolean => {
 }
 const remoteWithNoSecret = process.env.BETTER_AUTH_SECRET
   ? undefined
-  : [process.env.PLATFORM_URL, process.env.BETTER_AUTH_URL].filter((url): url is string => typeof url === 'string').find((url) => !isLocalHost(url))
+  : [process.env.BACKOFFICE_URL, process.env.BETTER_AUTH_URL].filter((url): url is string => typeof url === 'string').find((url) => !isLocalHost(url))
 if (remoteWithNoSecret) {
   throw new Error(`BETTER_AUTH_SECRET must be set: ${remoteWithNoSecret} is not localhost, and this file's own secret falls back to a public default without it.`)
 }
 
 /**
- * Where the platform app is served, and the platform instance's `baseURL`. Outside production, or
- * where no platform app is served, it falls back to the `vite dev` port, and nothing links there.
+ * Where the backoffice app is served, and the backoffice instance's `baseURL`. Outside production, or
+ * where no backoffice app is served, it falls back to the `vite dev` port, and nothing links there.
  */
-export const platformURL = process.env.PLATFORM_URL ?? 'http://localhost:5174'
+export const backofficeURL = process.env.BACKOFFICE_URL ?? 'http://localhost:5174'
 
-// The platform's first administrator is made by first-register, and the first owner of a project
+// The backoffice's first administrator is made by first-register, and the first owner of a project
 // of one organization by first-run, and both ask for the `SETUP_CODE` the deploy set, so nobody who
 // merely reaches a new deploy first takes it. Only `vite dev` on this machine skips it: a deploy
 // run with plain `node` sets no `NODE_ENV`, and an unset URL falls back to localhost. The code is
@@ -85,8 +85,8 @@ export const platformURL = process.env.PLATFORM_URL ?? 'http://localhost:5174'
 const setupCode = (process.env.SETUP_CODE?.length ?? 0) >= 32 ? process.env.SETUP_CODE : undefined
 const developing = process.env.NODE_ENV === 'development'
 const setupCodeState = (url: string): 'none' | 'required' | 'unset' => (developing && isLocalHost(url) ? 'none' : setupCode ? 'required' : 'unset')
-// Mirrors the tenant's `rateLimit.enabled`, read off the platform's own address.
-const platformLimited = production || !isLocalHost(platformURL)
+// Mirrors the tenant's `rateLimit.enabled`, read off the backoffice's own address.
+const backofficeLimited = production || !isLocalHost(backofficeURL)
 // Digests, so both sides are always 32 bytes and `timingSafeEqual` neither throws on nor answers
 // sooner for a code of another length.
 const digest = (text: string) => createHash('sha256').update(text).digest()
@@ -121,7 +121,7 @@ const overFirstRunLimit = sharedWindow()
 const setupLock = sql`select pg_advisory_xact_lock(hashtext('mithaq.setup'))`
 
 /**
- * One JSON line, in the shape of the platform's audit, for what the provider does where no kayan
+ * One JSON line, in the shape of the backoffice's audit, for what the provider does where no kayan
  * logs it: a sign-up, a join, a first-run and a role given. Operators keep this output.
  */
 const authAudit = (line: Record<string, unknown>) => console.log(JSON.stringify({ audit: 'auth', ...line, at: new Date().toISOString() }))
@@ -133,18 +133,19 @@ const authAudit = (line: Record<string, unknown>) => console.log(JSON.stringify(
 export const tenantURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:5173'
 
 /**
- * The origins the platform instance trusts beside its own `baseURL`: the `vite dev` and `vite
+ * The origins the backoffice instance trusts beside its own `baseURL`: the `vite dev` and `vite
  * preview` ports, outside production only.
  */
-export const platformOrigins = production ? [] : ['http://localhost:4174', 'http://localhost:5174']
+export const backofficeOrigins = production ? [] : ['http://localhost:4174', 'http://localhost:5174']
 
 // Derived from the deployment secret and never equal to it, so a cookie one app signed fails
 // verification in the other. The apps share one session table and never a session; a session
-// crosses only through the one-time hand-off.
-const platformSecret = createHmac('sha256', secret ?? 'mithaq-development-only').update('mithaq-platform-session').digest('base64url')
+// crosses only through the one-time hand-off. The label keeps the console's old name, `platform`,
+// so a deploy that renamed it derives the same secret and keeps what that secret signed.
+const backofficeSecret = createHmac('sha256', secret ?? 'mithaq-development-only').update('mithaq-platform-session').digest('base64url')
 
-/** The platform's session cookie name, `mithaq-platform.session_token`, beside the tenant's `better-auth.session_token`. */
-export const platformCookiePrefix = 'mithaq-platform'
+/** The backoffice's session cookie name, `mithaq-backoffice.session_token`, beside the tenant's `better-auth.session_token`. */
+export const backofficeCookiePrefix = 'mithaq-backoffice'
 
 /**
  * Better Auth's own actions, which no kayan declares; `buildAsas` adds them to the catalog.
@@ -414,7 +415,7 @@ const organizationOptionsFor = ({ mailer, organizations, showOrganization }: Aut
   },
 })
 
-// `'*'` is the plugin's `adminAc`, every action but `impersonate-admins`, so no platform
+// `'*'` is the plugin's `adminAc`, every action but `impersonate-admins`, so no backoffice
 // administrator mimics another.
 const adminAccess = createAccessControl(adminStatements)
 const adminGrant = (permissions: '*' | readonly string[]) => {
@@ -432,22 +433,22 @@ const adminGrant = (permissions: '*' | readonly string[]) => {
 // trail records a change to, while a column is written like any other row and can be taken back
 // without a deploy.
 //
-// `roles` is the platform roles and `user` only. The plugin's gate reads `roles`, so spreading its
-// `defaultRoles` would make `user.role = 'admin'` a platform administrator this project never
+// `roles` is the backoffice roles and `user` only. The plugin's gate reads `roles`, so spreading its
+// `defaultRoles` would make `user.role = 'admin'` a backoffice administrator this project never
 // declared. `user` is the plugin's `userAc`, which holds no action, and is here because `set-role`
 // refuses a name `roles` does not hold.
 //
-// `adminRoles` is every platform role. None holds `impersonate-admins`, so no staff member can be
-// impersonated. A platform role holds nothing inside a tenant.
+// `adminRoles` is every backoffice role. None holds `impersonate-admins`, so no staff member can be
+// impersonated. A backoffice role holds nothing inside a tenant.
 const adminOptions = {
-  adminRoles: Object.keys(platformRoles),
+  adminRoles: Object.keys(backofficeRoles),
   roles: {
-    ...Object.fromEntries(Object.entries(platformRoles).map(([slug, role]) => [slug, adminGrant(role.permissions)])),
+    ...Object.fromEntries(Object.entries(backofficeRoles).map(([slug, role]) => [slug, adminGrant(role.permissions)])),
     user: userAc,
   },
 }
 
-// The platform screen's actions are the admin plugin's own routes, not this project's operations,
+// The backoffice screen's actions are the admin plugin's own routes, not this project's operations,
 // so the audit step never sees them. Every `/admin/` route is audited here: one JSON line per
 // successful call naming the actor, the real person behind an impersonated session, the route, the
 // target and the role, never a password or other body field. The template keeps no audit table, so
@@ -572,10 +573,10 @@ const auditBefore = async (ctx: HookContext) => {
     throw new APIError('FORBIDDEN', { message: 'This role may not use this route.' })
   }
   // Only a `super_admin` writes a role, on any route that takes one. The plugin already asks
-  // `user.set-role` of these routes, which only `'*'` holds, but a project's own platform role
+  // `user.set-role` of these routes, which only `'*'` holds, but a project's own backoffice role
   // granted `user.update` must still write no role through `update-user`.
   const grants = holdsRole(caller.user.role, (one) => one === 'super_admin')
-  if (roleOf(body) !== undefined && !grants && !firstRegistering.getStore()) throw new APIError('FORBIDDEN', { message: 'Only a platform administrator sets a role.' })
+  if (roleOf(body) !== undefined && !grants && !firstRegistering.getStore()) throw new APIError('FORBIDDEN', { message: 'Only a backoffice administrator sets a role.' })
   // A ban needs a reason. The provider writes `data.banned` raw unless it is `=== true`, so a
   // non-boolean such as `'true'` would store a ban with no reason and end no session.
   const writes = ctx.path === '/admin/update-user' || ctx.path === '/admin/create-user'
@@ -588,17 +589,17 @@ const auditBefore = async (ctx: HookContext) => {
   }
   if (body.userId === undefined) return
   const userId = String(body.userId)
-  if (userId === caller.user.id) throw new APIError('FORBIDDEN', { message: 'Nobody acts on their own row on the platform.' })
+  if (userId === caller.user.id) throw new APIError('FORBIDDEN', { message: 'Nobody acts on their own row on the backoffice.' })
   // The admin plugin's own `role` column, which the core user type does not name.
   const target = (await ctx.context.internalAdapter.findUserById(userId)) as ({ role?: string | null } & Record<string, unknown>) | null
-  if (holdsRole(target?.role, (one) => Object.hasOwn(platformRoles, one)) && !grants) {
-    throw new APIError('FORBIDDEN', { message: 'Only a platform administrator acts on a staff member.' })
+  if (holdsRole(target?.role, (one) => Object.hasOwn(backofficeRoles, one)) && !grants) {
+    throw new APIError('FORBIDDEN', { message: 'Only a backoffice administrator acts on a staff member.' })
   }
   // A role written as it already stands is answered and written nowhere, so the audit holds no line
   // for it.
   if (ctx.path === '/admin/set-role' && target && [body.role].flat().join(',') === (target.role ?? 'user')) return ctx.json({ user: target })
 }
-export const platformAudit = {
+export const backofficeAudit = {
   before: createAuthMiddleware(auditBefore),
   after: createAuthMiddleware(async (ctx) => {
     // `get-full-organization` also answers members and invitations, addresses among them, to any
@@ -633,7 +634,7 @@ export const platformAudit = {
     const target = body.userId ?? query.userId ?? query.id ?? (ctx.context.returned as { user?: { id?: unknown } } | undefined)?.user?.id
     const role = roleOf(body)
     console.log(JSON.stringify({
-      audit: 'platform',
+      audit: 'backoffice',
       action: ctx.path,
       actor: caller?.user.id ?? null,
       impersonatedBy: caller?.session.impersonatedBy ?? null,
@@ -642,20 +643,20 @@ export const platformAudit = {
       at: new Date().toISOString(),
     }))
     if (ctx.path === '/admin/impersonate-user' && ctx.context.newSession) return handOff(ctx)
-    // Ending an impersonation sends the staff member back to the platform, whose session is still
+    // Ending an impersonation sends the staff member back to the backoffice, whose session is still
     // theirs, not to the tenant's sign-in. The answer keeps the provider's `success` and the
     // cookies it cleared.
-    if (ctx.path === '/sign-out') return ctx.json({ success: true, url: platformApp ? platformURL : tenantURL })
+    if (ctx.path === '/sign-out') return ctx.json({ success: true, url: backofficeApp ? backofficeURL : tenantURL })
   }),
 }
 
-// The platform never writes the tenant app's cookie (two origins, two cookies), so an impersonation
+// The backoffice never writes the tenant app's cookie (two origins, two cookies), so an impersonation
 // answers a one-time link into the tenant app, which trades it for the session under its own
 // cookie.
 //
 // The token is stored the way the one-time-token plugin stores its own, because that plugin's
 // `verifyOneTimeToken` consumes it: once, setting the session cookie of whichever instance served
-// the verify. Every cookie the impersonation set is dropped from the answer, so the platform's own
+// the verify. Every cookie the impersonation set is dropped from the answer, so the backoffice's own
 // session is untouched.
 const handOff = async (ctx: HookContext) => {
   const token = randomBytes(32).toString('base64url')
@@ -679,7 +680,7 @@ type SessionBefore = typeof options.databaseHooks.session.create.before
 const staffSession = (next: SessionBefore): SessionBefore => async (session, context) => {
   const mimics = !!(session as { impersonatedBy?: unknown }).impersonatedBy
   const user = mimics || !context ? null : await (await getCurrentAdapter(context.context.adapter as never)).findOne<{ role?: unknown }>({ model: 'user', where: [{ field: 'id', value: session.userId }] })
-  if (!mimics && !holdsRole(user?.role, (one) => Object.hasOwn(platformRoles, one))) {
+  if (!mimics && !holdsRole(user?.role, (one) => Object.hasOwn(backofficeRoles, one))) {
     throw APIError.from('UNAUTHORIZED', BASE_ERROR_CODES.INVALID_EMAIL_OR_PASSWORD)
   }
   return next(session, context)
@@ -826,10 +827,10 @@ export const optionsFor = (settings: AuthSettings) => ({
       ...(settings.mailer && settings.mailer !== logMailer && { backgroundTasks: { handler: inBackground } }),
     },
   }),
-  // How an impersonation crosses from the platform app into the tenant app (`handOff`). The plugin
+  // How an impersonation crosses from the backoffice app into the tenant app (`handOff`). The plugin
   // adds no table, and no client may mint a token over HTTP.
   plugins: [admin(adminOptions), organization(organizationOptionsFor(settings)), oneTimeToken({ disableClientRequest: true })],
-  hooks: platformAudit,
+  hooks: backofficeAudit,
   // The active organization, set where the session is made. Every row this project reads is keyed
   // on it and the provider sets it only when an organization is created, so a user who signed in
   // held none and was refused every read. The user's oldest membership becomes active on a session
@@ -1052,19 +1053,19 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     }] },
   }
   // end add-on: roles
-  // Whether anyone holds a platform role, read as `holdsRole` reads `user.role`: comma-separated,
+  // Whether anyone holds a backoffice role, read as `holdsRole` reads `user.role`: comma-separated,
   // each name trimmed of the whitespace `.trim()` takes. Every tenant user's `user` is passed
   // over before the split, and the scan stops at the first holder.
   type Executes = { execute(query: unknown): Promise<{ rows: unknown[] }> }
   const users = store.tables.user as { role: unknown }
   const administered = async (db: Executes) =>
-    (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(platformRoles)}) limit 1`)).rows.length > 0
+    (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(backofficeRoles)}) limit 1`)).rows.length > 0
   const organizationTable = store.tables.organization
   const organized = async (db: Executes) => (await db.execute(sql`select 1 from ${organizationTable} limit 1`)).rows.length > 0
   const oneOrganization = settings.organizations !== 'many'
   // The tenant's first-run, in one organization: the first owner and the one organization,
   // which nothing else makes, under the lock first-register takes and the setup code. It makes
-  // the owner platform staff too while the platform app is served and has none, so one person
+  // the owner backoffice staff too while the backoffice app is served and has none, so one person
   // sets up both. The account is verified: the setup code is the proof.
   const firstRunClosed = () => new APIError('FORBIDDEN', { code: 'FIRST_RUN_CLOSED', message: 'This app has its organization, so first-run is closed. Sign in instead.' })
   const firstRun = {
@@ -1089,7 +1090,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
           await (tx as Executes).execute(sql`set transaction isolation level read committed`)
           await (tx as Executes).execute(setupLock)
           if (await organized(tx as Executes)) throw firstRunClosed()
-          const staff = platformApp && !(await administered(tx as Executes))
+          const staff = backofficeApp && !(await administered(tx as Executes))
           // ponytail: an instance per call over this transaction, as first-register's; it runs
           // once in a project's life.
           const bound = betterAuthServer({ ...authOptions(storeHooks(tx), settings).options, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
@@ -1098,7 +1099,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
             const { user } = await bound.api.createUser({ body: { name, email, password, role: (staff ? 'super_admin' : 'user') as never, data: { emailVerified: true } } })
             const slug = !settings.showOrganization ? 'main' : `${named.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'organization'}-${randomBytes(3).toString('hex')}`
             const made = (await bound.api.createOrganization({ body: { name: named, slug, userId: user.id } }))!
-            authAudit({ action: 'first-run', user: user.id, organization: made.id, platform: staff })
+            authAudit({ action: 'first-run', user: user.id, organization: made.id, backoffice: staff })
             return { user: { id: user.id }, organization: { id: made.id } }
           }))
         }))
@@ -1134,7 +1135,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   }
   // The same rule wherever the tenant app makes an account, so a sign-in method added later
   // (social, a magic link, a one-time code) never opens a way past it. First-run holds
-  // `firstRegistering`. The platform console's `/admin/create-user`, which only staff reach, makes
+  // `firstRegistering`. The backoffice console's `/admin/create-user`, which only staff reach, makes
   // accounts on its own instance and is not asked: staff add whom they choose.
   const accountGate = async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
     if (!oneOrganization || firstRegistering.getStore()) return
@@ -1149,7 +1150,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   // Who joins the one organization by signing up: in one organization with an open sign-up,
   // when the account is made or, where addresses are verified, when its address is proved. The
   // settings are read now, not at sign-up, so a project that closed its sign-up since joins nobody.
-  // Platform staff join no tenant, and the domains are asked again. Someone who is a member, or holds
+  // Backoffice staff join no tenant, and the domains are asked again. Someone who is a member, or holds
   // an invitation still to answer, is passed over: the invitation is how they join; and so is someone
   // who accepted one, who was a member, perhaps removed since. An account joins once in its life,
   // recorded beside it, so a removed member whose address is made unverified and proved again stays
@@ -1158,7 +1159,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   const joinOpen = async (user: { id: string; email: string; role?: unknown }) => {
     // An account first-run or add-person makes is placed by them.
     if (!oneOrganization || settings.signUp !== 'open' || firstRegistering.getStore()) return
-    if (holdsRole(user.role, (one) => Object.hasOwn(platformRoles, one))) return
+    if (holdsRole(user.role, (one) => Object.hasOwn(backofficeRoles, one))) return
     if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) return
     const [organization] = (await store.find({ kayan: 'organization', args: { limit: 1, page: 1, sort: { field: 'createdAt', direction: 'asc' } } })).docs
     if (!organization) return
@@ -1381,8 +1382,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         if (found && (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: found.id } } } }))) {
           throw new APIError('CONFLICT', { code: 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION', message: 'This person is already a member.' })
         }
-        // Staff hold the platform, so a tenant never touches their sign-in.
-        if (found && (found.emailVerified || holdsRole(found.role, (one) => Object.hasOwn(platformRoles, one)))) {
+        // Staff hold the backoffice, so a tenant never touches their sign-in.
+        if (found && (found.emailVerified || holdsRole(found.role, (one) => Object.hasOwn(backofficeRoles, one)))) {
           const invitation = await tenantApi().createInvitation({ body: { email, role: 'member', organizationId: organization }, headers: ctx.headers! })
           return ctx.json({ invited: true, invitation })
         }
@@ -1488,22 +1489,22 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     database,
   })
   // One answer however often and by whomever it is asked, naming nobody.
-  const closed = () => new APIError('FORBIDDEN', { code: 'FIRST_REGISTER_CLOSED', message: 'This platform has its administrator, so first-register is closed. Sign in instead.' })
-  // The platform's first `super_admin`, which nothing else can make: the provider's own
+  const closed = () => new APIError('FORBIDDEN', { code: 'FIRST_REGISTER_CLOSED', message: 'This backoffice has its administrator, so first-register is closed. Sign in instead.' })
+  // The backoffice's first `super_admin`, which nothing else can make: the provider's own
   // `create-user`, run on an instance bound to a transaction that holds an advisory lock and
   // read no administrator under it, so two concurrent calls never both make one.
   const firstRegister = {
     id: 'first-register',
     endpoints: {
       init: createAuthEndpoint('/init', { method: 'GET' }, async (ctx) =>
-        ctx.json((await administered(store.db as Executes)) ? { initialized: true } : { initialized: false, code: setupCodeState(platformURL) })),
+        ctx.json((await administered(store.db as Executes)) ? { initialized: true } : { initialized: false, code: setupCodeState(backofficeURL) })),
       // `formCsrfMiddleware`, as sign-up has: no session guards this route, so another site's
       // form must not post to it.
       firstRegister: createAuthEndpoint('/first-register', { method: 'POST', use: [formCsrfMiddleware] }, async (ctx) => {
-        if (platformLimited && !ipAddressHeaders && overSharedLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
+        if (backofficeLimited && !ipAddressHeaders && overSharedLimit()) throw new APIError('TOO_MANY_REQUESTS', { message: 'Too many tries. Wait a minute and try again.' })
         if (await administered(store.db as Executes)) throw closed()
         const { name, email, password, code } = (ctx.body ?? {}) as Record<string, unknown>
-        const refused = refusedSetup({ url: platformURL, code, app: 'platform app' })
+        const refused = refusedSetup({ url: backofficeURL, code, app: 'backoffice app' })
         if (refused) throw refused
         // `create-user` checks the address but not the password's length, which sign-up does.
         const { minPasswordLength: min, maxPasswordLength: max } = ctx.context.password.config
@@ -1519,12 +1520,12 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
           // ponytail: an instance per call, built over this transaction; it runs once in a
           // project's life. `built` carries the admin plugin and the audit hooks, which is all
           // `create-user` reads.
-          const bound = betterAuthServer({ ...built, secret: platformSecret, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
-          // The provider writes through the adapter its request stored, which is the platform's
+          const bound = betterAuthServer({ ...built, secret: backofficeSecret, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables }) })
+          // The provider writes through the adapter its request stored, which is the backoffice's
           // pool here, so the user and account rows are pointed at this transaction instead:
           // both commit with the check or neither does, and no second client is taken.
           const adapter = (await bound.$context).adapter
-          // The plugin types a role from `adminOptions.roles`, whose platform roles are built at
+          // The plugin types a role from `adminOptions.roles`, whose backoffice roles are built at
           // runtime, so it names `user` alone.
           // Verified, as first-run's owner is: the setup code is the proof, and staff are never
           // asked to verify an address.
@@ -1536,13 +1537,13 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     // provider limits a password reset.
     rateLimit: [{ pathMatcher: (path: string) => path === '/first-register', window: 60, max: 3 }],
   }
-  // The platform app's own instance: its own cookie name, so on `localhost`, where ports do not
+  // The backoffice app's own instance: its own cookie name, so on `localhost`, where ports do not
   // keep cookies apart, the two apps never read each other's session; its own secret, so
   // neither signs a cookie the other accepts; its own origin alone trusted, so a tenant page
-  // cannot post to it with the platform's cookie; no verify of a one-time token, which would
-  // turn an impersonation into a platform session; and no sign-up, since staff are people the
-  // platform already has. A project with no platform console has no first-register either.
-  const platform = betterAuthServer({
+  // cannot post to it with the backoffice's cookie; no verify of a one-time token, which would
+  // turn an impersonation into a backoffice session; and no sign-up, since staff are people the
+  // backoffice already has. A project with no backoffice console has no first-register either.
+  const backoffice = betterAuthServer({
     ...built,
     plugins: [
       ...built.plugins,
@@ -1550,13 +1551,13 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       // add-on: roles
       keepsRoles,
       // end add-on: roles
-      ...(platformApp ? [firstRegister] : []),
+      ...(backofficeApp ? [firstRegister] : []),
     ],
-    baseURL: platformURL,
-    trustedOrigins: platformOrigins,
-    rateLimit: { ...built.rateLimit, enabled: platformLimited },
-    secret: platformSecret,
-    advanced: { ...built.advanced, cookiePrefix: platformCookiePrefix },
+    baseURL: backofficeURL,
+    trustedOrigins: backofficeOrigins,
+    rateLimit: { ...built.rateLimit, enabled: backofficeLimited },
+    secret: backofficeSecret,
+    advanced: { ...built.advanced, cookiePrefix: backofficeCookiePrefix },
     // Nor a password reset of its own: staff reset through the tenant app's page like anyone,
     // and the reset ends their sessions here too.
     disabledPaths: ['/one-time-token/verify', '/sign-up/email', '/request-password-reset', '/reset-password'],
@@ -1564,5 +1565,5 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     database,
   })
   // One object for the kayan, which answers from whichever instance serves the request.
-  return new Proxy(tenant, { get: (_target, key) => Reflect.get(onPlatform() ? platform : tenant, key) })
+  return new Proxy(tenant, { get: (_target, key) => Reflect.get(onBackoffice() ? backoffice : tenant, key) })
 }

@@ -1,23 +1,23 @@
-// The platform screen's one action no managed operation carries: renaming an
+// The backoffice screen's one action no managed operation carries: renaming an
 // organization and its slug. An organization has no admin route for staff:
 // every route of Better Auth's organization plugin acts as a member of that
 // organization, which staff are not, and the managed `organization` kayan
 // writes nothing, because Better Auth owns the table and the tenant's `'*'`
-// row, which every platform role takes too, names no update. So the rename is
+// row, which every backoffice role takes too, names no update. So the rename is
 // this one route of the project's own, refused without `organization.rename`,
 // a key of the project's own that only `super_admin` holds, and audited in the
-// line every admin route of the platform writes.
+// line every admin route of the backoffice writes.
 //
 // Deleting an organization, removing a member and changing a member's
 // governance role stay out: each is irreversible or passes the plugin's own
 // owner rules by, and staff do each by impersonating a member, which is
 // audited under the real person's name.
 import { AsasError, actorPermissions, denied, invalid, missing, type HttpPlug } from 'mithaq'
-import { oneLine, platformRoles } from '@asas/mithaq/auth'
+import { oneLine, backofficeRoles } from '@asas/mithaq/auth'
 import { targets } from '@asas/mithaq'
 import { assignedRoles, type OrganizationActor } from '@asas/mithaq/roles/tenant-access.ts'
 
-const path = '/api/platform/organizations/update'
+const path = '/api/backoffice/organizations/update'
 /**
  * The project's own key, not `organization.update`: that name is both the
  * provider's action and the managed kayan's update, which the rows refuse to
@@ -40,23 +40,23 @@ const refusal = (thrown: AsasError) =>
   Response.json({ code: codes[thrown.status], data: { key: thrown.key, params: thrown.params }, message: thrown.message }, { status: thrown.status })
 
 /**
- * Answers the route only for an actor the template's reader gave a platform
- * role holding `organization.rename`, which it does in the platform app alone:
+ * Answers the route only for an actor the template's reader gave a backoffice
+ * role holding `organization.rename`, which it does in the backoffice app alone:
  * `'*'` inside a tenant is a tenant's and renames nothing here. The body is
  * `{ id, name, slug }`, both words trimmed; a slug another organization holds
  * is the store's own 409.
  */
-export const platformHttp = () => (): HttpPlug => ({
-  name: 'platform',
+export const backofficeHttp = () => (): HttpPlug => ({
+  name: 'backoffice',
   router: undefined,
   handle: async (request, who) => {
     if (request.method !== 'POST' || new URL(request.url).pathname !== path) return null
     try {
       const actor = (await who()) as (OrganizationActor & { id?: string }) | null
       const held = actorPermissions(actor)
-      const staff = !!actor && assignedRoles(actor).some((slug) => Object.hasOwn(platformRoles, slug))
+      const staff = !!actor && assignedRoles(actor).some((slug) => Object.hasOwn(backofficeRoles, slug))
       if (!staff || !(held === true || held?.has(key))) {
-        throw denied({ message: `Forbidden: renaming an organization is the platform's, and it asks "${key}".`, key: 'error.forbidden.permission', params: { permission: key } })
+        throw denied({ message: `Forbidden: renaming an organization is the backoffice's, and it asks "${key}".`, key: 'error.forbidden.permission', params: { permission: key } })
       }
       // JSON alone, so a form another site posts, which a browser sends with
       // no preflight, is never read as one.
@@ -79,10 +79,10 @@ export const platformHttp = () => (): HttpPlug => ({
         if (!found.docs.length) throw missing({ message: `No organization "${id}".`, key: 'error.not_found.row', params: { kayan: 'organization' } })
         await store.update({ tx, kayan: 'organization', id, data: { name, slug, updatedAt: new Date() } })
       })
-      // The line `platformAudit` writes for an admin route, under this route's own name.
+      // The line `backofficeAudit` writes for an admin route, under this route's own name.
       console.log(JSON.stringify({
-        audit: 'platform',
-        action: '/platform/organizations/update',
+        audit: 'backoffice',
+        action: '/backoffice/organizations/update',
         actor: actor.id ?? null,
         impersonatedBy: actor.impersonatedBy ?? null,
         target: id,

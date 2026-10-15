@@ -71,7 +71,7 @@ function CreateFirstUser() {
   return (
     <AuthFrame
       title={t('auth.createFirstUser', 'Create the first administrator')}
-      description={t('auth.createFirstUserDescription', 'No one administers this platform yet. The account made here becomes its first administrator.')}
+      description={t('auth.createFirstUserDescription', 'No one administers this backoffice yet. The account made here becomes its first administrator.')}
     >
       <form className="grid gap-4" noValidate onSubmit={submit}>
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}

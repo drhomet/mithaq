@@ -13,7 +13,7 @@
 /* The admin's pieces in node_modules, which Tailwind never scans on its own. */
 @import "mithaq-admin/source.css";
 
-/* The project's own shells, pages and components, which the platform screen
+/* The project's own shells, pages and components, which the backoffice screen
    loads, as the tenant app lists them (`apps/asas-tanstack/src/styles.css`).
    Tailwind finds this app's own files, an ejected `src/components/mithaq`
    among them, without one. */
@@ -145,7 +145,7 @@
     @apply font-sans;
     }
 }
-/* What the platform draws beyond the preset, each a rule over a marker the
+/* What the backoffice draws beyond the preset, each a rule over a marker the
    shared pieces already carry, so the tenant app, which does not load this
    file, is unchanged. */
 
@@ -190,7 +190,7 @@ a[data-row-link]:empty::before,
   color: var(--muted-foreground);
 }
 
-/* The platform's cards are square, as its buttons, inputs and home cards are:
+/* The backoffice's cards are square, as its buttons, inputs and home cards are:
    the section and form cards the registry draws with a rounded class of their
    own, the frame a list's table sits in, the filter panel above it and the
    danger region of a record page. */

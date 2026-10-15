@@ -1,15 +1,15 @@
-// What the platform draws of the generated `member` kayan, which `mithaq
+// What the backoffice draws of the generated `member` kayan, which `mithaq
 // generate auth` imports into `./member.ts` because this file sits beside it:
 // every organization's members, each by the person's and the organization's name,
 // filtered to one organization from that organization's row.
-import { platformUi } from '@asas/mithaq'
+import { backofficeUi } from '@asas/mithaq'
 import { appPage } from '@asas/mithaq/mithaq/pages.ts'
 
 /** The provider's governance role by the project's word for it, never its slug. */
-const role = { field: 'role', cell: platformUi('role-cells.tsx#MembershipRole') } as const
+const role = { field: 'role', cell: backofficeUi('role-cells.tsx#MembershipRole') } as const
 
 export const screens = {
-  platform: {
+  backoffice: {
     // A membership's record is titled by its person.
     useAsTitle: 'userId',
     pages: {

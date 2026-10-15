@@ -49,9 +49,9 @@ const coverReads = [
  * one of them or on `'*'` and on nothing else, and `buildAsas` refuses a key
  * that is not in this project's catalog exactly as it does for a row's own.
  *
- * The platform roles, `super_admin` among them, are not here: they are staff
+ * The backoffice roles, `super_admin` among them, are not here: they are staff
  * above every tenant, held on Better Auth's `user.role`, and the access target
- * holds their keys in the platform app alone. Inside a tenant every actor, a
+ * holds their keys in the backoffice app alone. Inside a tenant every actor, a
  * `super_admin` included, holds what its membership's roles hold and nothing
  * more.
  */
@@ -73,7 +73,7 @@ export const tenantRoles = {
   /**
    * The tenant's root granter: every key of the project, which is what lets it
    * author a custom role at all. `'*'` holds every screen's key too, so it
-   * enters the dashboard and the portal alike. It never reaches the platform
+   * enters the dashboard and the portal alike. It never reaches the backoffice
    * app, where the reader answers no membership role at all.
    * `grantedPermissions` returns early on a granter holding everything, so this
    * role and no other may hand out a key it will never use itself.

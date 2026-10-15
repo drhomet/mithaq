@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 type FirstUser = { initialized: true } | { initialized: false; code: 'none' | 'required' | 'unset' }
 
 /**
- * Whether the platform has an administrator yet, and while it has none whether making one asks for
+ * Whether the backoffice has an administrator yet, and while it has none whether making one asks for
  * the setup code: the provider's own `init`, read in process.
  */
 export const firstUser = createServerFn({ method: 'GET' }).handler(async () => {

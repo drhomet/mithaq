@@ -20,11 +20,11 @@ if (env.NODE_ENV === 'production') {
   })
 }
 
-// Every request runs as the platform; nothing a request carries decides it, and the tenant app never does.
+// Every request runs as the backoffice; nothing a request carries decides it, and the tenant app never does.
 // `asas` is imported per request so it is the same module every route reads.
 export default createServerEntry({
   fetch: async (request: Request) => {
-    const { asPlatform } = await import('asas')
-    return asPlatform(() => handler.fetch(withQuietAbort(request)))
+    const { asBackoffice } = await import('asas')
+    return asBackoffice(() => handler.fetch(withQuietAbort(request)))
   },
 })

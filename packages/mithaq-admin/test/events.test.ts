@@ -68,7 +68,7 @@ const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.ts
 const { Dashboard, loader: dashboardLoader } = await import('../../../templates/asas/src/ui-dashboard/dashboard.tsx')
 const { DeleteRole } = await import('../../../templates/features/roles/roles/ui/roles.tsx')
 const { loader: membersLoader } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
-const { RoleName } = await import('../../../templates/asas/src/ui-platform/role-cells.tsx')
+const { RoleName } = await import('../../../templates/asas/src/ui-backoffice/role-cells.tsx')
 
 const screen = asas.targets.dashboard.client
 const kayans: ClientKayan[] = Object.values(screen.kayan)
@@ -2220,7 +2220,7 @@ test('a build whose maxLimit is 5 opens a list with no limit of the registry\'s 
   assert.ok(asked.includes(5) && asked.every((one) => one === undefined || (one as number) <= 5), `the loader asks for at most 5: ${JSON.stringify(asked)}`)
 })
 
-test('the template\'s own page reads ask at the build\'s maxLimit: a role\'s delete, so a smaller one is no swallowed 400 that reads as no holders, the members loader and the platform\'s role cell', async () => {
+test('the template\'s own page reads ask at the build\'s maxLimit: a role\'s delete, so a smaller one is no swallowed 400 that reads as no holders, the members loader and the backoffice\'s role cell', async () => {
   const limits: unknown[] = []
   const client: ScreenState['client'] = async ({ input }) => {
     limits.push(input.limit)
@@ -4101,14 +4101,14 @@ test('174a. Publish changes is green and Save draft amber, in both themes, and t
   assert.equal(classes(plain, 'Save').some((one) => /emerald|amber/.test(one)), false, 'the plain Save on a kayan without drafts keeps its look')
 })
 
-const platform = asas.targets.platform.client
+const backoffice = asas.targets.backoffice.client
 
-test('155a. a platform record page draws each field it names by its cell under its label, in its sections, a relationship by the row\'s title, and a field the report hides not at all; no box takes input and nothing on it writes', async () => {
+test('155a. a backoffice record page draws each field it names by its cell under its label, in its sections, a relationship by the row\'s title, and a field the report hides not at all; no box takes input and nothing on it writes', async () => {
   const { FieldValue } = await import('../registry/field-value.tsx')
   const { pageOf: drawPage, frameOf } = await import('../registry/nodes.tsx')
-  const full = platform.kayan.courses!
+  const full = backoffice.kayan.courses!
   const view = full.pages.view as Extract<PageClient, { page: unknown }> | undefined
-  assert.equal(view?.path, '/courses/:id', 'a course has a page of its own on the platform')
+  assert.equal(view?.path, '/courses/:id', 'a course has a page of its own on the backoffice')
   // What the host crosses for support: the course without its access code, since the report denies the column.
   const kayan = { ...full, fields: full.fields.filter((one) => one.name !== 'accessCode') }
   const row = { id: 'c1', organization: 'o1', title: 'Tajweed', fee: 300, currency: 'SAR', archived: false, tags: ['t1'], accessCode: 'SECRET', createdAt: '2026-09-01T10:00:00.000Z' }
@@ -4117,8 +4117,8 @@ test('155a. a platform record page draws each field it names by its cell under i
   const wrote = (name: string) => async () => (writes.push(name), {})
   const copy = { t, locale: 'en' }
   const shell = ({ regions }: { regions: Record<string, ReactElement> }) => createElement('div', null, regions.main)
-  const page = { refs: { [platform.layouts.app!]: shell, [platform.layouts.record!]: RecordPage } as never, kayan, page: view! }
-  const sessionsOf = platform.kayan.sessions!
+  const page = { refs: { [backoffice.layouts.app!]: shell, [backoffice.layouts.record!]: RecordPage } as never, kayan, page: view! }
+  const sessionsOf = backoffice.kayan.sessions!
   const host = await render(createElement('div', null,
     drawPage(page, {
       kayan,
@@ -4129,7 +4129,7 @@ test('155a. a platform record page draws each field it names by its cell under i
       layout: ({ path, regions, index }) => frameOf({ screen: page, t, path, regions, key: index }),
       control: (leaf) => {
         const field = kayan.fields.find((one) => one.name === (typeof leaf === 'string' ? leaf : leaf.field))
-        return field ? createElement(FieldValue, { key: field.name, kayan, field, leaf: typeof leaf === 'string' ? undefined : leaf, row, copy, api, kayans: Object.values(platform.kayan) }) : null
+        return field ? createElement(FieldValue, { key: field.name, kayan, field, leaf: typeof leaf === 'string' ? undefined : leaf, row, copy, api, kayans: Object.values(backoffice.kayan) }) : null
       },
       // The course's sessions, as the host hands a list of another kayan to a read-only actor: the report allows no operation and no field write.
       list: ({ node, index }) =>
@@ -4142,7 +4142,7 @@ test('155a. a platform record page draws each field it names by its cell under i
           t,
           locale: 'en',
           onQuery: () => {},
-          href: (id: string) => `/platform/sessions/${id}`,
+          href: (id: string) => `/backoffice/sessions/${id}`,
           newHref: '#',
           creates: false,
           operations: {},
@@ -4151,7 +4151,7 @@ test('155a. a platform record page draws each field it names by its cell under i
           edit: { client: { create: wrote('create'), update: wrote('update'), delete: wrote('delete') }, writes: () => false, prefill: { course: 'c1' } },
         }),
     })),
-    { screen: platform, kayan, record: row },
+    { screen: backoffice, kayan, record: row },
   )
   await act(async () => {})
   // The sessions list keeps its search, filter and page boxes, which ask for rows and write none.
@@ -4173,7 +4173,7 @@ test('155a. a platform record page draws each field it names by its cell under i
     const items = [...window.document.querySelectorAll('[data-row-action]')]
     assert.deepEqual(items.map((one) => [one.getAttribute('data-row-action'), one.textContent]), [['view', 'View']], 'a session\'s menu offers View and nothing that writes')
     await act(async () => click(items[0]! as unknown as Element))
-    assert.deepEqual(followed, ['/platform/sessions/s1'], 'which opens the session\'s own record')
+    assert.deepEqual(followed, ['/backoffice/sessions/s1'], 'which opens the session\'s own record')
   } finally {
     stop()
   }
@@ -6106,15 +6106,15 @@ test('182g. the portal\'s page and main column are one shrinkable track, so no w
 })
 
 test('184d. a person\'s actions open from the row\'s menu after its View, the role is picked in its own dialog that outlives the menu and sends nothing unchanged, and the rename dialog says what it changes, holds the slug left to right and closes on Cancel', async () => {
-  const { UserMenu } = await import('../../../templates/asas/src/ui-platform/user-actions.tsx')
-  const { OrganizationActions } = await import('../../../templates/asas/src/ui-platform/organization-actions.tsx')
+  const { UserMenu } = await import('../../../templates/asas/src/ui-backoffice/user-actions.tsx')
+  const { OrganizationActions } = await import('../../../templates/asas/src/ui-backoffice/organization-actions.tsx')
   const { listOf } = await import('../registry/node-tree.ts')
-  const platform = asas.targets.platform.client
-  const over = { screen: platform, access: { permissions: '*' as const }, user: { name: 'Admin', email: 'admin@example.com' }, locale: 'ar', dir: 'rtl' as const }
-  const users = platform.kayan.user!
+  const backoffice = asas.targets.backoffice.client
+  const over = { screen: backoffice, access: { permissions: '*' as const }, user: { name: 'Admin', email: 'admin@example.com' }, locale: 'ar', dir: 'rtl' as const }
+  const users = backoffice.kayan.user!
   const drawn = screenOf(users.pages.list!, users)
   const path = listOf(drawn)?.menu
-  assert.equal(path, './src/ui-platform/user-actions.tsx#UserMenu', 'the users list names its menu')
+  assert.equal(path, './src/ui-backoffice/user-actions.tsx#UserMenu', 'the users list names its menu')
   const listed = (rows: Record<string, unknown>[]) => listOn(users, rows, { screen: { ...drawn, refs: { ...(drawn.refs as object), [path!]: UserMenu } }, edit: { client: {}, writes: {} }, operations: { update: false } })
   const person = { id: 'u2', name: 'Hana', email: 'hana@example.com', role: 'user', banned: false }
   const host = await render(listed([person, { id: 'u1', name: 'Admin', email: 'admin@example.com', role: 'super_admin' }]), over)
@@ -6145,7 +6145,7 @@ test('184d. a person\'s actions open from the row\'s menu after its View, the ro
   await act(async () => sleep(50))
   assert.equal(window.document.querySelector('[data-button="confirm"]'), null, 'and Cancel closes it')
 
-  const organizations = platform.kayan.organization!
+  const organizations = backoffice.kayan.organization!
   const renaming = await render(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'ar' } as never), over)
   await act(async () => click(renaming.querySelector('[data-action="rename"]')!))
   const dialog = () => window.document.querySelector('[role="dialog"]')
@@ -6161,14 +6161,14 @@ test('184d. a person\'s actions open from the row\'s menu after its View, the ro
 })
 
 test('217t. the rename dialog leaves validation to the page, and refuses an empty name and a slug of the wrong shape in its own words before sending', async () => {
-  const { OrganizationActions } = await import('../../../templates/asas/src/ui-platform/organization-actions.tsx')
-  const platform = asas.targets.platform.client
-  const organizations = platform.kayan.organization!
+  const { OrganizationActions } = await import('../../../templates/asas/src/ui-backoffice/organization-actions.tsx')
+  const backoffice = asas.targets.backoffice.client
+  const organizations = backoffice.kayan.organization!
   const sent: string[] = []
   const fetched = globalThis.fetch
   globalThis.fetch = (async (url: string) => (sent.push(String(url)), new Response('{}'))) as typeof fetch
   try {
-    const host = await render(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'ar' } as never), { screen: platform, access: { permissions: '*' as const }, locale: 'ar', dir: 'rtl' as const })
+    const host = await render(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'ar' } as never), { screen: backoffice, access: { permissions: '*' as const }, locale: 'ar', dir: 'rtl' as const })
     await act(async () => click(host.querySelector('[data-action="rename"]')!))
     const form = window.document.querySelector('[role="dialog"] form')!
     assert.equal(form.hasAttribute('novalidate'), true, 'the browser validates nothing')
@@ -6187,9 +6187,9 @@ test('217t. the rename dialog leaves validation to the page, and refuses an empt
 })
 
 test('234a. a rename that lands says so in the dialog and asks the page to read again, and never reloads it', async () => {
-  const { OrganizationActions } = await import('../../../templates/asas/src/ui-platform/organization-actions.tsx')
-  const platform = asas.targets.platform.client
-  const organizations = platform.kayan.organization!
+  const { OrganizationActions } = await import('../../../templates/asas/src/ui-backoffice/organization-actions.tsx')
+  const backoffice = asas.targets.backoffice.client
+  const organizations = backoffice.kayan.organization!
   const fetched = globalThis.fetch
   const reload = window.location.reload
   let reloads = 0
@@ -6199,7 +6199,7 @@ test('234a. a rename that lands says so in the dialog and asks the page to read 
   Object.defineProperty(window.location, 'reload', { configurable: true, value: () => reloads++ })
   globalThis.fetch = (async () => new Response('{}')) as typeof fetch
   try {
-    const host = await render(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'en' } as never), { screen: platform, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const })
+    const host = await render(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'en' } as never), { screen: backoffice, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const })
     await act(async () => click(host.querySelector('[data-action="rename"]')!))
     await act(async () => typeInto(window.document.querySelector('input[name="name"]') as unknown as Element, 'Hana $& Academy'))
     await act(async () => fire(window.document.querySelector('[role="dialog"] form') as unknown as Element, 'submit'))
@@ -6214,20 +6214,20 @@ test('234a. a rename that lands says so in the dialog and asks the page to read 
   }
 })
 
-test('184e. a platform record of a membership, an assignment and an enrollment is titled by its person\'s name, and by its kind while the person is not read', async () => {
+test('184e. a backoffice record of a membership, an assignment and an enrollment is titled by its person\'s name, and by its kind while the person is not read', async () => {
   const { pageOf: drawPage, frameOf } = await import('../registry/nodes.tsx')
   const { api } = fakeApi({ user: [{ id: 'u1', name: 'Hana Saleh', email: 'hana@example.com' }] })
   const client = ({ kayan: target, input }: { kayan: string; input: Record<string, unknown> }) => api[target]!.find(input)
   const shell = ({ regions }: { regions: Record<string, ReactElement> }) => createElement('div', null, regions.header, regions.main)
   const titleOn = async (name: string, row: Record<string, unknown>, locale: string) => {
-    const kayan = platform.kayan[name]!
+    const kayan = backoffice.kayan[name]!
     const view = kayan.pages.view as Extract<PageClient, { page: unknown }>
-    const page = { refs: { [platform.layouts.app!]: shell, [platform.layouts.record!]: RecordPage } as never, kayan, page: view }
+    const page = { refs: { [backoffice.layouts.app!]: shell, [backoffice.layouts.record!]: RecordPage } as never, kayan, page: view }
     const copy = { t, locale }
     const host = await render(createElement('div', null, drawPage(page, {
       kayan, copy, issues: {}, scope: { record: row }, component: () => null, control: () => null,
       layout: ({ path, regions, index }) => frameOf({ screen: page, t: copy.t, path, regions, key: index }),
-    })), { screen: platform, kayan, record: row, client, locale })
+    })), { screen: backoffice, kayan, record: row, client, locale })
     await act(async () => sleep(10))
     return host.querySelector('h1[data-node="title"]')?.textContent ?? ''
   }
@@ -6622,13 +6622,13 @@ test('214c. a relationship cell never draws its id: loading in the server render
 })
 
 test('219d. the role cell of the people list holds the role and no control, on every row, since the actions are the row\'s menu', async () => {
-  const { PlatformRole } = await import('../../../templates/asas/src/ui-platform/user-actions.tsx')
-  const platform = asas.targets.platform.client
-  const over = { screen: platform, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const }
-  const cell = JSON.stringify(platform.kayan.user!.pages.list)
-  assert.ok(cell.includes('user-actions.tsx#PlatformRole') && cell.includes('"menu":"./src/ui-platform/user-actions.tsx#UserMenu"'), 'the role column draws the role, and the row menu the actions')
+  const { BackofficeRole } = await import('../../../templates/asas/src/ui-backoffice/user-actions.tsx')
+  const backoffice = asas.targets.backoffice.client
+  const over = { screen: backoffice, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const }
+  const cell = JSON.stringify(backoffice.kayan.user!.pages.list)
+  assert.ok(cell.includes('user-actions.tsx#BackofficeRole') && cell.includes('"menu":"./src/ui-backoffice/user-actions.tsx#UserMenu"'), 'the role column draws the role, and the row menu the actions')
   for (const role of ['support', 'super_admin']) {
-    const host = await render(createElement(PlatformRole, { value: role }), over)
+    const host = await render(createElement(BackofficeRole, { value: role }), over)
     assert.equal(host.querySelectorAll('button').length, 0, `a ${role} row has nothing to press in its role cell`)
     assert.equal(host.querySelectorAll('[data-slot="badge"]').length, 1, `and shows the role: ${host.textContent}`)
   }

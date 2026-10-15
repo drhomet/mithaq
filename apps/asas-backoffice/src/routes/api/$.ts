@@ -3,8 +3,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import type {} from '@tanstack/start-client-core'
 import { asas } from 'asas'
 
-// The platform reads every organization: a read of a kayan asks `tenant: 'all'`, which the runner
-// grants platform staff in this app alone and refuses anyone else. A global is one organization's row
+// The backoffice reads every organization: a read of a kayan asks `tenant: 'all'`, which the runner
+// grants backoffice staff in this app alone and refuses anyone else. A global is one organization's row
 // and asks for none.
 const reads = new Set(asas.operations.filter((one) => one.effect === 'read' && !one.single).map((one) => `/api/${one.kayan}/${one.name}`))
 

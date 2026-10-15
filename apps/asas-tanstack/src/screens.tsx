@@ -37,13 +37,13 @@ export const getAsas = createServerOnlyFn(async () => (await import('asas')).asa
 type InProcess = Record<string, { operations: Record<string, (input: object, options: object) => Promise<unknown>> }>
 
 /**
- * Each kayan's operations in process. In the platform app a read of a kayan asks `tenant: 'all'`,
- * which the runner grants platform staff there alone, so staff read every organization's rows; a
+ * Each kayan's operations in process. In the backoffice app a read of a kayan asks `tenant: 'all'`,
+ * which the runner grants backoffice staff there alone, so staff read every organization's rows; a
  * global is one organization's row and asks for none, and a write never asks.
  */
 const inProcess = async (asas: Awaited<ReturnType<typeof getAsas>>): Promise<InProcess> => {
   const kayan = asas.kayan as unknown as InProcess
-  if (!(await import('asas')).onPlatform()) return kayan
+  if (!(await import('asas')).onBackoffice()) return kayan
   const reads = new Set(asas.operations.filter((one) => one.effect === 'read' && !one.single).map((one) => `${one.kayan}/${one.name}`))
   return Object.fromEntries(Object.entries(kayan).map(([name, one]) => [name, {
     operations: Object.fromEntries(Object.entries(one.operations).map(([operation, run]) =>
@@ -148,15 +148,15 @@ const resolveScreen = async (asked: unknown) => {
       .filter(([one]) => report.collections?.[one]?.read === true)
       .map(([one, value]) => [one, { ...value, fields: value.fields.filter((field) => report.collections?.[one]?.fields?.[field.name]?.read === true) }]),
   )
-  const { onPlatform, platformEntry, PLATFORM_SCREEN } = await import('asas')
-  const platform = platformEntry(actor)
-  // The other screens of this app the actor may enter. The platform's own name
-  // is left out of a tenant app's list, so the one link to it is `platformEntry`'s alone.
+  const { onBackoffice, backofficeEntry, BACKOFFICE_SCREEN } = await import('asas')
+  const backoffice = backofficeEntry(actor)
+  // The other screens of this app the actor may enter. The backoffice's own name
+  // is left out of a tenant app's list, so the one link to it is `backofficeEntry`'s alone.
   const served = screensOf(asas.targets) as Record<string, { client: ScreenClient }>
   const siblings = (report.screens ?? [])
-    .filter((one) => one !== name && Object.hasOwn(served, one) && (one === PLATFORM_SCREEN) === onPlatform())
+    .filter((one) => one !== name && Object.hasOwn(served, one) && (one === BACKOFFICE_SCREEN) === onBackoffice())
     .map((one) => ({ name: one, path: served[one]!.client.path }))
-  const others = [...siblings, ...(platform ? [{ name: PLATFORM_SCREEN, path: platform }] : [])]
+  const others = [...siblings, ...(backoffice ? [{ name: BACKOFFICE_SCREEN, path: backoffice }] : [])]
   return {
     asas,
     request,
@@ -214,14 +214,14 @@ export const loadEnterable = createServerFn({ method: 'GET' })
     others?: { id: string; name: string; slug?: string }[]
     impersonating?: string
   } | null> => {
-    const [{ getRequest }, asas, { onPlatform, PLATFORM_SCREEN }] = await Promise.all([import('@tanstack/react-start/server'), getAsas(), import('asas')])
+    const [{ getRequest }, asas, { onBackoffice, BACKOFFICE_SCREEN }] = await Promise.all([import('@tanstack/react-start/server'), getAsas(), import('asas')])
     const request = getRequest()
     const actor = (await asas.auth.actor(request.headers)) as Actor | null
     if (!actor?.email) return null
     const report = (await (await asas.handler(new Request(new URL('/api/access', request.url), { headers: request.headers }))).json()) as AccessReport
     const screens = screensOf(asas.targets) as Record<string, { client: ScreenClient }>
     const entered = (report.screens ?? [])
-      .filter((name) => Object.hasOwn(screens, name) && (name === PLATFORM_SCREEN) === onPlatform())
+      .filter((name) => Object.hasOwn(screens, name) && (name === BACKOFFICE_SCREEN) === onBackoffice())
       .map((name) => ({ name, path: screens[name]!.client.path }))
     const impersonating = actor.impersonatedBy ? { impersonating: actor.name ?? actor.email } : {}
     if (entered.length) {
@@ -238,7 +238,7 @@ export const loadEnterable = createServerFn({ method: 'GET' })
       screens: entered,
       email: actor.email,
       organizations: (active ? [active] : memberships).map(({ id, name, slug }) => ({ id, name, slug })),
-      others: onPlatform() ? [] : memberships.filter((one) => one !== active).map(({ id, name, slug }) => ({ id, name, slug })),
+      others: onBackoffice() ? [] : memberships.filter((one) => one !== active).map(({ id, name, slug }) => ({ id, name, slug })),
       ...impersonating,
     }
   })
@@ -508,7 +508,7 @@ const useScreenState = (data: ScreenData): ScreenState => {
 
 /**
  * The bar that says the session is an impersonation, with the way out. Stopping
- * is a sign-out: the staff member's own session lives in the platform app under
+ * is a sign-out: the staff member's own session lives in the backoffice app under
  * that app's cookie, and the sign-out answers where they go next.
  */
 export function ImpersonationBar({ name }: { name: string }): ReactElement {
@@ -674,7 +674,7 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
     return path ? `${base}${id ? path.replace(':id', encodeURIComponent(id)) : path}` : undefined
   }
   // A row opens its kayan's edit page, else the one page whose path draws a
-  // row (how the platform opens a record it only reads).
+  // row (how the backoffice opens a record it only reads).
   const rowPage = (target: ClientKayan) => (target.pages.edit ? 'edit' : Object.keys(target.pages).find((one) => target.pages[one]!.path.includes(':id')))
   const related = relatedOf(data.screen, kayan)
   const go = (href: string | undefined) => void (href ? router.navigate({ href }) : router.invalidate())
@@ -873,4 +873,4 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   }
   return form
 }
-// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 befbb52bfbf8923e0ca819f5ac903049708c19a01578a88449bbd8182c91b939
+// mithaq-admin 0.0.0 c0b33bbc7318856b9c592c055f7066c7149dd76d663ffe7ba4f8d45ac4165af1

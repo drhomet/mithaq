@@ -1,5 +1,5 @@
-import { onPlatform, platformApp, platformRoles, platformURL } from '../mithaq/auth/index.ts'
-import { secret } from '../mithaq/auth/platform-roles.ts'
+import { onBackoffice, backofficeApp, backofficeRoles, backofficeURL } from '../mithaq/auth/index.ts'
+import { secret } from '../mithaq/auth/backoffice-roles.ts'
 import { actorPermissions, actorRoles, authActor, userRefs, type Held, type RowTable, type Store } from 'mithaq'
 // add-on: roles
 import { isOwner, OWNER_ROLE } from './grants.ts'
@@ -26,28 +26,28 @@ export type OrganizationActor = {
 }
 
 /**
- * The platform administrator's slug. Platform roles live on Better Auth's
+ * The backoffice administrator's slug. Backoffice roles live on Better Auth's
  * `user.role`, never in a tenant's assignment: `assignedRoles` drops any such
  * slug there, because the access target holds a slug's keys only where this
  * reader answers it.
  */
-export const PLATFORM = 'super_admin'
+export const BACKOFFICE = 'super_admin'
 
 /**
- * The platform screen, the only place the platform roles answer. The app decides
+ * The backoffice screen, the only place the backoffice roles answer. The app decides
  * this, never the request.
  */
-export const PLATFORM_SCREEN = 'platform'
+export const BACKOFFICE_SCREEN = 'backoffice'
 
 /**
- * The kayan whose session carries the platform column, the one `auth.admin`
+ * The kayan whose session carries the backoffice column, the one `auth.admin`
  * names. A build may run several Better Auth instances, and only this one's
  * `user.role` is the layer above every tenant.
  */
-const PLATFORM_KAYAN = 'user'
+const BACKOFFICE_KAYAN = 'user'
 
 /**
- * Platform roles read every tenant's rows and write none; staff change a
+ * Backoffice roles read every tenant's rows and write none; staff change a
  * tenant's data only by impersonating a member, which is audited. Every write is
  * an explicit `false`, because a slug a table leaves out still takes the `'*'`
  * row, which opens every write. The row opens the door and the keys decide who
@@ -55,19 +55,19 @@ const PLATFORM_KAYAN = 'user'
  */
 const readOnly = { create: false, read: true, update: false, delete: false } as const
 
-/** The read-only row under every platform role, which every row table of this project spreads in. */
-export const platformReads = Object.fromEntries(Object.keys(platformRoles).map((slug) => [slug, readOnly])) as {
-  readonly [Slug in keyof typeof platformRoles]: typeof readOnly
+/** The read-only row under every backoffice role, which every row table of this project spreads in. */
+export const backofficeReads = Object.fromEntries(Object.keys(backofficeRoles).map((slug) => [slug, readOnly])) as {
+  readonly [Slug in keyof typeof backofficeRoles]: typeof readOnly
 }
 
 /**
- * Every operation refused under every platform role, spread in place of
- * `platformReads` by tables the platform does not read, such as the settings
+ * Every operation refused under every backoffice role, spread in place of
+ * `backofficeReads` by tables the backoffice does not read, such as the settings
  * global and the audit log.
  */
 const closed = { create: false, read: false, update: false, delete: false } as const
-export const platformClosed = Object.fromEntries(Object.keys(platformRoles).map((slug) => [slug, closed])) as {
-  readonly [Slug in keyof typeof platformRoles]: typeof closed
+export const backofficeClosed = Object.fromEntries(Object.keys(backofficeRoles).map((slug) => [slug, closed])) as {
+  readonly [Slug in keyof typeof backofficeRoles]: typeof closed
 }
 
 /**
@@ -91,13 +91,13 @@ export const currentOrganization = (user: unknown) => {
 }
 
 /**
- * The platform rows of the tenant-owned kayan: `platformReads` minus the
+ * The backoffice rows of the tenant-owned kayan: `backofficeReads` minus the
  * columns `secret` names. A row's field list closes a column whatever keys the
  * actor holds, and a column an actor may not read is no filter either.
  */
 const readsNoSecret = { ...readOnly, fields: ['*', ...secret.map((key) => `!${key.slice(key.indexOf('.fields.') + '.fields.'.length)}`)] as readonly string[] }
-const secretClosed = Object.fromEntries(Object.keys(platformRoles).map((slug) => [slug, readsNoSecret])) as {
-  readonly [Slug in keyof typeof platformRoles]: typeof readsNoSecret
+const secretClosed = Object.fromEntries(Object.keys(backofficeRoles).map((slug) => [slug, readsNoSecret])) as {
+  readonly [Slug in keyof typeof backofficeRoles]: typeof readsNoSecret
 }
 
 /**
@@ -131,12 +131,12 @@ export const tenantAccess = {
  */
 export const assignedRoles = (actor: OrganizationActor): readonly string[] => {
   if (!authActor(actor)) return []
-  // The platform app answers the platform roles alone and the tenant app the
+  // The backoffice app answers the backoffice roles alone and the tenant app the
   // membership's roles alone, never unioned, so neither adds keys on the other's
   // screens. Which app serves the request is the app's own fact, never the request's.
-  if (onPlatform()) return platformRolesOf(actor)
+  if (onBackoffice()) return backofficeRolesOf(actor)
   if (!currentOrganization(actor)) return []
-  const assigned = (actorRoles(actor) ?? []).filter((slug) => !Object.hasOwn(platformRoles, slug))
+  const assigned = (actorRoles(actor) ?? []).filter((slug) => !Object.hasOwn(backofficeRoles, slug))
   // add-on: roles
   // The slugs are the `memberRoles` kayan's, and `member.role` grants one thing
   // only: an owner always holds `administrator` in its tenant, so the role that
@@ -148,10 +148,10 @@ export const assignedRoles = (actor: OrganizationActor): readonly string[] => {
 
 /**
  * Whether `assignedRoles` answers this actor `super_admin`, which only the
- * platform app does. It is the administrator of `auth.admin`, the one answer
+ * backoffice app does. It is the administrator of `auth.admin`, the one answer
  * local auth's `_verified` writes ask, and the reader and writer of local accounts.
  */
-export const superAdmin = ({ user }: { user: unknown }) => assignedRoles(user as OrganizationActor).includes(PLATFORM)
+export const superAdmin = ({ user }: { user: unknown }) => assignedRoles(user as OrganizationActor).includes(BACKOFFICE)
 
 /**
  * Every operation refused to every actor, the administrator included, for the
@@ -162,45 +162,45 @@ export const superAdmin = ({ user }: { user: unknown }) => assignedRoles(user as
 export const providerOnly = { create: () => false, read: () => false, update: () => false, delete: () => false } as const
 
 /**
- * The platform roles this actor holds on Better Auth's `user.role`, whichever app
- * asks. Several are comma-separated, and only a platform role's name counts.
+ * The backoffice roles this actor holds on Better Auth's `user.role`, whichever app
+ * asks. Several are comma-separated, and only a backoffice role's name counts.
  *
  * The column is read off the trusted snapshot, and only from the admin kayan's
  * session on a Better Auth strategy: a build may run several instances that all
  * write `user.role`, and local auth spreads its kayan's row onto the actor, so a
- * `role` column there would otherwise hand someone a platform role.
+ * `role` column there would otherwise hand someone a backoffice role.
  */
-export const platformRolesOf = (actor: unknown): string[] => {
+export const backofficeRolesOf = (actor: unknown): string[] => {
   const trusted = authActor(actor)
-  if (!trusted || trusted.strategy !== 'better-auth' || trusted.collection !== PLATFORM_KAYAN || typeof trusted.role !== 'string') return []
-  return [...new Set(trusted.role.split(',').map((slug) => slug.trim()).filter((slug) => Object.hasOwn(platformRoles, slug)))]
+  if (!trusted || trusted.strategy !== 'better-auth' || trusted.collection !== BACKOFFICE_KAYAN || typeof trusted.role !== 'string') return []
+  return [...new Set(trusted.role.split(',').map((slug) => slug.trim()).filter((slug) => Object.hasOwn(backofficeRoles, slug)))]
 }
 
 /**
- * Where the tenant app's header links the platform app, for an actor whose
- * platform roles hold `screen.platform`; nothing otherwise. It is a link and
- * grants nothing: the platform app's own server decides entry. A project that
- * serves no platform app links nowhere.
+ * Where the tenant app's header links the backoffice app, for an actor whose
+ * backoffice roles hold `screen.backoffice`; nothing otherwise. It is a link and
+ * grants nothing: the backoffice app's own server decides entry. A project that
+ * serves no backoffice app links nowhere.
  */
-export const platformEntry = (actor: unknown): string | undefined => {
-  if (onPlatform() || !platformApp) return undefined
-  const enters = platformRolesOf(actor).some((slug) => {
-    const held = platformRoles[slug as keyof typeof platformRoles].permissions
-    return held === '*' || (held as readonly string[]).includes(`screen.${PLATFORM_SCREEN}`)
+export const backofficeEntry = (actor: unknown): string | undefined => {
+  if (onBackoffice() || !backofficeApp) return undefined
+  const enters = backofficeRolesOf(actor).some((slug) => {
+    const held = backofficeRoles[slug as keyof typeof backofficeRoles].permissions
+    return held === '*' || (held as readonly string[]).includes(`screen.${BACKOFFICE_SCREEN}`)
   })
-  return enters ? new URL(`/${PLATFORM_SCREEN}`, platformURL).href : undefined
+  return enters ? new URL(`/${BACKOFFICE_SCREEN}`, backofficeURL).href : undefined
 }
 
 /**
  * The keys a provider kayan's columns are graded by, which `rows()` takes as its
  * `holds`: in the tenant app the id and the name alone, and only where the actor
- * holds their keys; in the platform app the actor's own keys. An actor holding no
+ * holds their keys; in the backoffice app the actor's own keys. An actor holding no
  * key reads no column, since an empty set grades every column closed where
  * `undefined` would grade none.
  */
 export const namesInTenant = (kayan: string) => (actor: unknown): Held => {
   const held = actorPermissions(actor)
-  if (onPlatform()) return held
+  if (onBackoffice()) return held
   return new Set(['id', 'name'].map((field) => `${kayan}.fields.${field}`).filter((key) => held === true || held?.has(key) === true))
 }
 
@@ -225,8 +225,8 @@ export const peopleAudience: Readonly<Record<string, readonly string[]>> = {
  * organization is the trusted snapshot's, so a claim is no one's.
  */
 export const membersOf = (store: Pick<Store, 'find'>) => async ({ user: actor }: { user: unknown }) => {
-  // A platform role reads every person in the platform app; the rows answer who holds one.
-  if (onPlatform()) return true
+  // A backoffice role reads every person in the backoffice app; the rows answer who holds one.
+  if (onBackoffice()) return true
   const active = currentOrganization(actor)
   if (!active) return false
   const all = { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } } as const
@@ -250,11 +250,11 @@ export const membersOf = (store: Pick<Store, 'find'>) => async ({ user: actor }:
 
 /**
  * Whether an actor reads past what a kayan's own read narrows for roles not
- * holding `key`: in the platform app, whose staff read every tenant's rows whole,
+ * holding `key`: in the backoffice app, whose staff read every tenant's rows whole,
  * or in a tenant, holding that key. The courses add-on narrows archived courses,
  * sessions and covers of unreadable courses and other people's seats this way.
  */
 export const readsPast = (actor: unknown, key: string) => {
   const held = actorPermissions(actor)
-  return onPlatform() || held === true || held?.has(key) === true
+  return onBackoffice() || held === true || held?.has(key) === true
 }

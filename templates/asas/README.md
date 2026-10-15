@@ -27,7 +27,7 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`). Without it, no storage setting is read. |
 | `media` | The organization's images (`media`), which an upload field points at. A holder of `media.create` reads every one; anyone else only what the features pointing at images hand it, such as the courses add-on's covers of the courses they read. Needs `uploads`. |
 | `courses` | The worked example: courses, sessions and enrollments, each course with a cover from the media, and the business roles that work them. Needs `media`, `roles`, `audit-log` and `rich-text`. |
-| `platform` | The platform console, `apps/asas-platform`. A single package cannot hold it. |
+| `backoffice` | The backoffice console, `apps/asas-backoffice`. A single package cannot hold it. |
 
 It also asks how the project holds its people, or takes `--organizations`, `--show-organization` and `--sign-up`: one organization made by its owner on first run and joined by invitation (the default, and the worked example's: a school), shown by name or never (`--show-organization no`), or many, each sign-up founding its own. [Organization modes](#organization-modes) has the whole story.
 
@@ -41,18 +41,18 @@ What you get is a Bun workspace:
 | `packages/features/<feature>` | One package per feature, `@my-app/<feature>`, each holding one or more kayan (an entity, one data type), each kayan in a folder of its own, such as `packages/features/tags/tags/`. |
 | `packages/asas` | The asas, the runtime: `src/asas.ts` builds it from every feature's kayan. It also holds `src/migrations/`, `src/messages/`, each screen's own pages and `src/seed.ts`, and every `mithaq` command runs here. |
 | `apps/asas-tanstack` | The tenant app, built on TanStack Start. It serves the dashboard at `/dashboard` and the portal at `/portal`, on `http://localhost:5173`. |
-| `apps/asas-platform` | With the platform add-on, the platform console, for staff who work across every organization, on `http://localhost:5174`. |
+| `apps/asas-backoffice` | With the backoffice add-on, the backoffice console, for staff who work across every organization, on `http://localhost:5174`. |
 
 At the root it also writes `bunfig.toml`, which turns on the isolated linker, a `.gitignore`, and a `tsconfig.json`.
 
-It writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-platform`, readable only by you:
+It writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-backoffice`, readable only by you:
 
 ```sh
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/mithaq
 LOCAL_AUTH_SECRET=<64 random hex characters>
 BETTER_AUTH_SECRET=<64 random hex characters>
 BETTER_AUTH_URL=http://localhost:5173
-PLATFORM_URL=http://localhost:5174
+BACKOFFICE_URL=http://localhost:5174
 DEV_ADMIN_EMAIL=admin@example.com
 DEV_ADMIN_PASSWORD=dev-admin-password
 # STORAGE_SECRET=
@@ -82,10 +82,10 @@ bun run dev:setup --seed
 `dev:setup` makes a fresh development database usable in one command:
 
 - It pushes the schema: in development, `asas.connect()` creates or changes the tables to match your kayan, and refuses any change that would lose data.
-- It makes the dev admin that `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` in `.env` name, with its address proved: the owner of "Dev admin's workspace" (with one organization through first-run's own path) and, with the platform console, its `super_admin`. The output names the two variables, never their values.
+- It makes the dev admin that `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` in `.env` name, with its address proved: the owner of "Dev admin's workspace" (with one organization through first-run's own path) and, with the backoffice console, its `super_admin`. The output names the two variables, never their values.
 - With `--seed`, it fills that organization with sample rows (step 5).
 
-It refuses unless `NODE_ENV` is `development` or unset and `DATABASE_URL`, `BETTER_AUTH_URL` and, with the platform console, `PLATFORM_URL` are on this machine, since every project's `.env.example` holds the same development password and a deploy run with plain `node` sets no `NODE_ENV`. It refuses a database that already holds a user, saying how to sign in instead, and a `DEV_ADMIN_PASSWORD` of a length sign-up would refuse.
+It refuses unless `NODE_ENV` is `development` or unset and `DATABASE_URL`, `BETTER_AUTH_URL` and, with the backoffice console, `BACKOFFICE_URL` are on this machine, since every project's `.env.example` holds the same development password and a deploy run with plain `node` sets no `NODE_ENV`. It refuses a database that already holds a user, saying how to sign in instead, and a `DEV_ADMIN_PASSWORD` of a length sign-up would refuse.
 
 Whenever you add or change a kayan, push the schema again:
 
@@ -103,18 +103,18 @@ A pushed database is for development only. Production applies the migration file
 ```sh
 cd ../..
 bun run --cwd apps/asas-tanstack dev   # the tenant app, http://localhost:5173
-bun run --cwd apps/asas-platform dev   # in a second terminal: the platform console, http://localhost:5174
+bun run --cwd apps/asas-backoffice dev   # in a second terminal: the backoffice console, http://localhost:5174
 ```
 
 Each `dev` script first runs `mithaq lock --check`. The template has no `mithaq.lock`, so this prints a notice and carries on.
 
 ### 5. Sign in and seed
 
-Sign in to the tenant app at `http://localhost:5173`, and to the platform console at `http://localhost:5174`, with `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD`.
+Sign in to the tenant app at `http://localhost:5173`, and to the backoffice console at `http://localhost:5174`, with `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD`.
 
-A deploy has no dev admin, and is set up by hand, as you can here on a database `dev:setup` did not set up. With one organization, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization (you name it there, unless it is never shown) and, with the platform console, is its first `super_admin` too. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
+A deploy has no dev admin, and is set up by hand, as you can here on a database `dev:setup` did not set up. With one organization, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization (you name it there, unless it is never shown) and, with the backoffice console, is its first `super_admin` too. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
 
-With many organizations, open `http://localhost:5173/auth/sign-up` and sign up, then open the link the server log shows to choose your password, which proves your address. Signed in and in no organization yet, you are offered your invitations and a box to create an organization: creating it makes you its owner. The platform console's first administrator is made on its own `/auth/create-first-user`.
+With many organizations, open `http://localhost:5173/auth/sign-up` and sign up, then open the link the server log shows to choose your password, which proves your address. Signed in and in no organization yet, you are offered your invitations and a box to create an organization: creating it makes you its owner. The backoffice console's first administrator is made on its own `/auth/create-first-user`.
 
 Either way the owner holds every permission in the organization: through the `administrator` role the roles add-on gives an owner, or through `owner` itself without it.
 
@@ -127,7 +127,7 @@ bun run seed
 
 The seed takes the first user and that user's first organization, or the ones `SEED_EMAIL` and `SEED_ORGANIZATION` name, and writes every row through the asas's own operations, as that owner. Running it twice adds nothing.
 
-The platform console admits platform staff only: the dev admin, the owner first-run made, or, with many organizations, the administrator made on its first-administrator page.
+The backoffice console admits backoffice staff only: the dev admin, the owner first-run made, or, with many organizations, the administrator made on its first-administrator page.
 
 ### 6. Add your first kayan
 
@@ -299,10 +299,10 @@ my-app/
     asas/             package "asas": the build, the migrations, the copy, each screen's own pages
   apps/
     asas-tanstack/    the tenant app: the dashboard and portal screens, sign-in pages, /api
-    asas-platform/    the platform console: the platform screen, for staff
+    asas-backoffice/    the backoffice console: the backoffice screen, for staff
 ```
 
-The language never imports a feature or the asas, and a feature imports another only through its `index.ts`, or names its kayan by name (`relationTo: 'user'`). The apps import the project only through the `asas` package (`import { asas } from 'asas'`), never by a path into `packages/`; it keeps that name because the screen host imports it by it. `packages/asas`, `apps/asas-tanstack` and `apps/asas-platform` each hold a `.env` with the same secrets. The platform app derives its own session secret from `BETTER_AUTH_SECRET`, so the two apps share one session table and never a session.
+The language never imports a feature or the asas, and a feature imports another only through its `index.ts`, or names its kayan by name (`relationTo: 'user'`). The apps import the project only through the `asas` package (`import { asas } from 'asas'`), never by a path into `packages/`; it keeps that name because the screen host imports it by it. `packages/asas`, `apps/asas-tanstack` and `apps/asas-backoffice` each hold a `.env` with the same secrets. The backoffice app derives its own session secret from `BETTER_AUTH_SECRET`, so the two apps share one session table and never a session.
 
 `bun create mithaq my-app --layout single` makes the same tree one package instead: `packages/mithaq/src/` and `packages/asas/src/` are both `src/`, each feature is `src/features/<feature>/`, and the tenant app's `src/` joins them. Each import of the language or a feature is then a path, and every `generate` path in `src/mithaq.ts` is written from the package's root.
 
@@ -312,12 +312,12 @@ The template's own tests stay in the mithaq repository. A new project has none o
 
 ```
 packages/mithaq/
-  package.json        exports ".", "./auth", "./auth/platform-roles" and "./*" for every file under src/
+  package.json        exports ".", "./auth", "./auth/backoffice-roles" and "./*" for every file under src/
   components.json     where mithaq eject writes the storage and step files
   src/
     mithaq.ts         defineMithaq: locales, arkan, targets, screens, generate paths
     mithaq/
-      auth/           the Better Auth options and instances, the platform session and roles
+      auth/           the Better Auth options and instances, the backoffice session and roles
       pages.ts        the page trees every kayan page starts from
       audit-sink.ts   where the audit step hands each write
       rich-text-nodes.ts
@@ -327,9 +327,9 @@ packages/mithaq/
     steps/            steps ejected from mithaq-admin
 ```
 
-**`src/mithaq.ts`** declares the language with one `defineMithaq` call and exports what it returns: `defineKayan`, `defineGlobal`, `buildAsas`, `rows`, `user`, `generate`, `locales`, `targets` and the tenant target. It also exports `organization`, the tenant target's field with a label, which every per-organization kayan places. The arkan (`base`, `richText`, the storage rukn and `versions`), the server targets (`drizzle`, `zod`, `rbac`, `tenant`, `service`) and the three screens (`dashboard`, `portal`, `platform`) are laid down here. `generate` names, from `packages/asas` where every `mithaq` command runs, where each writes and reads: the language the generated kayan import, the features folder, the auth kayan, the providers module, the messages and migrations folders and each screen's routes folder in an app. The language names the asas's folder (its migrations and each screen's own pages) and, with the courses add-on, its session labels by path, and imports neither.
+**`src/mithaq.ts`** declares the language with one `defineMithaq` call and exports what it returns: `defineKayan`, `defineGlobal`, `buildAsas`, `rows`, `user`, `generate`, `locales`, `targets` and the tenant target. It also exports `organization`, the tenant target's field with a label, which every per-organization kayan places. The arkan (`base`, `richText`, the storage rukn and `versions`), the server targets (`drizzle`, `zod`, `rbac`, `tenant`, `service`) and the three screens (`dashboard`, `portal`, `backoffice`) are laid down here. `generate` names, from `packages/asas` where every `mithaq` command runs, where each writes and reads: the language the generated kayan import, the features folder, the auth kayan, the providers module, the messages and migrations folders and each screen's routes folder in an app. The language names the asas's folder (its migrations and each screen's own pages) and, with the courses add-on, its session labels by path, and imports neither.
 
-**`src/mithaq/auth/`** is the Better Auth setup: `organizations.ts` the organization mode and who may sign up ([Organization modes](#organization-modes)); `index.ts` the options and instances (`providers`), the platform session, `asPlatform` and `onPlatform`, and the two apps' URLs; `platform-roles.ts` the platform roles staff hold on `user.role`, the columns staff read, and `secret`, the columns no platform role reads. It is imported as `@my-app/mithaq/auth`.
+**`src/mithaq/auth/`** is the Better Auth setup: `organizations.ts` the organization mode and who may sign up ([Organization modes](#organization-modes)); `index.ts` the options and instances (`providers`), the backoffice session, `asBackoffice` and `onBackoffice`, and the two apps' URLs; `backoffice-roles.ts` the backoffice roles staff hold on `user.role`, the columns staff read, and `secret`, the columns no backoffice role reads. It is imported as `@my-app/mithaq/auth`.
 
 Better Auth's organization routes let any member read every member. The setup gates them by this project's keys, in the active organization alone: `list-members`, and `get-active-member-role` with a `userId`, need `member.find`; `list-invitations` needs `invitation.create`; `get-full-organization` answers the organization to every member, with its `members` empty (and loaded one at most) without `member.find` and its `invitations` empty without `invitation.create`; `get-invitation` answers the invitee without the inviter's address. Only the `administrator` role (and, without the roles add-on, `owner` and `admin`) holds `member.find`, and the Members page is served on it.
 
@@ -338,8 +338,8 @@ Better Auth's organization routes let any member read every member. The setup ga
 **Access and roles.**
 
 - `roles/tenant-roles.ts` holds the roles every organization has, written in code and never stored as rows. A key is `<kayan>.<operation>`, `<kayan>.fields.<field>` or `screen.<screen>`. Without the roles add-on they are Better Auth's own `owner`, `admin` and `member`, from `roles/default-member-roles.ts`, and the access target is `memberRoleTarget`, which answers each member what its `member.role` names in that organization.
-- `roles/system-roles.ts` joins them with the platform roles into `systemRoles`, which the access target takes.
-- `roles/tenant-access.ts` holds the row table every per-organization kayan inherits, the reader that answers an actor's roles, and the platform's checks; `roles/grants.ts` what the role form and the server both read.
+- `roles/system-roles.ts` joins them with the backoffice roles into `systemRoles`, which the access target takes.
+- `roles/tenant-access.ts` holds the row table every per-organization kayan inherits, the reader that answers an actor's roles, and the backoffice's checks; `roles/grants.ts` what the role form and the server both read.
 - `membersOf` in `roles/tenant-access.ts` is whom a `user` read reaches in a tenant: every member to a holder of `member.find`, and to anyone else itself and the members holding a role its own roles name in `peopleAudience` (the instructor reads the students). A role it leaves out, a custom role included, reads itself alone, whatever `user.*` keys it holds; so does a picker or a refusal that names people through that read. A seat's student picker narrows that read to the people holding the student role, through `enrollments.student`'s `filterOptions`, and a seat for anyone else is refused; its session picker offers open sessions of open courses alone, and a seat in an archived one is refused in words of its own.
 - `roles/statements.ts` holds the keys the project adds beside the kayan's own operations.
 
@@ -387,8 +387,8 @@ packages/asas/
     mithaq.ts         where the mithaq command reads the language from
     messages/         one JSON file of copy per kayan, written by mithaq generate messages
     migrations/       written by mithaq migrate, committed
-    ui-dashboard/ ui-portal/ ui-platform/   what one screen draws, such as its home page
-    platform-http.ts seed.ts
+    ui-dashboard/ ui-portal/ ui-backoffice/   what one screen draws, such as its home page
+    backoffice-http.ts seed.ts
 ```
 
 **`src/asas.ts`** builds the asas: `export const asas = buildAsas({ kayan, global, http, statements, auth })`. A feature joins the project when it is a dependency here and its `kayan` is spread into `kayan`.
@@ -397,7 +397,7 @@ packages/asas/
 
 **`src/migrations/`** holds one folder per migration, `<timestamp>_<slug>/` with `migration.sql` and `snapshot.json`, and two files `mithaq migrate` writes and the project commits: `schema.ts`, which names every table, and `drizzle.config.ts`, which `drizzle-kit migrate --config src/migrations/drizzle.config.ts` reads. `mithaq migrate --name <slug>` sets the slug.
 
-**The rest.** `platform-http.ts` is the one hand-written route, renaming an organization, which writes a Better Auth table no managed operation may write. `seed.ts` fills a database for a first look, run with `bun run seed`.
+**The rest.** `backoffice-http.ts` is the one hand-written route, renaming an organization, which writes a Better Auth table no managed operation may write. `seed.ts` fills a database for a first look, run with `bun run seed`.
 
 ### The two apps
 
@@ -434,7 +434,7 @@ apps/asas-tanstack/
 
 The app owns its copy, its routes, its providers and its styling. It says nothing about any kayan: what a kayan is and what a screen draws of it come from the template and the generated files.
 
-**`apps/asas-platform`** is the platform console for staff, at `http://localhost:5174` in development. It has the same shape and serves the `platform` screen alone. Its `server.ts` runs every request inside `asPlatform`, so the platform roles are answered in this app and never in the tenant app. Its `copy.ts` re-exports the tenant app's.
+**`apps/asas-backoffice`** is the backoffice console for staff, at `http://localhost:5174` in development. It has the same shape and serves the `backoffice` screen alone. Its `server.ts` runs every request inside `asBackoffice`, so the backoffice roles are answered in this app and never in the tenant app. Its `copy.ts` re-exports the tenant app's.
 
 ### Naming and where files go
 
@@ -469,11 +469,11 @@ How the project holds its people is six values in `packages/mithaq/src/mithaq/au
 
 A combination that means nothing or opens a door refuses to load, naming the line to change: `'many'` with `'invite'`, a join role, domains, no verification or no organization shown; domains without verification or by invitation; a join role that is no role. A production start with no mailer is refused in every mode, since no reset, proof or invitation would reach anyone ([Environment variables](#environment-variables): `RESEND_API_KEY` and `MAIL_FROM`).
 
-**First run.** In one organization, nothing signs up until the owner is made. `/auth/first-run` takes a name, an address, a password, the organization's name (where it is shown) and the setup code, and makes the owner, the organization and the owner's `administrator` role in one transaction. While the platform console has no administrator it makes the owner one, under the lock its own first-register takes, so the two never both make one. The account is verified, since the code is the proof. Once an organization exists it answers every caller the same refusal. Set `SETUP_CODE` to a random value of 32 characters or more where the app runs (`openssl rand -hex 32`), and remove it once the app is set up: it opens nothing after that, but it need not linger.
+**First run.** In one organization, nothing signs up until the owner is made. `/auth/first-run` takes a name, an address, a password, the organization's name (where it is shown) and the setup code, and makes the owner, the organization and the owner's `administrator` role in one transaction. While the backoffice console has no administrator it makes the owner one, under the lock its own first-register takes, so the two never both make one. The account is verified, since the code is the proof. Once an organization exists it answers every caller the same refusal. Set `SETUP_CODE` to a random value of 32 characters or more where the app runs (`openssl rand -hex 32`), and remove it once the app is set up: it opens nothing after that, but it need not linger.
 
-**By invitation.** A sign-up carries the id of a pending invitation sent to that address; the invitation link's sign-up page sends it. The server accepts that invitation for the account it makes, so the person is in without a second press: at once where holding the id is the proof (one organization by invitation), or, where the sign-up proves its address, when the one link mailed for that sign-up is opened; that mail names the organization it joins. The address's own later sign-up or a password reset takes the invitation off every earlier link, so whoever signs up first with an address they invited never joins its owner to their organization. An id sent to another address, cancelled or expired by then joins nobody. Anything else is refused with one answer, before the provider looks the address up, so the refusal tells nobody whether an address has an account. The same rule holds wherever the tenant app makes an account, so a sign-in method added later cannot open a way past it. Only the platform console's `/admin/create-user`, which staff alone reach, makes an account without it.
+**By invitation.** A sign-up carries the id of a pending invitation sent to that address; the invitation link's sign-up page sends it. The server accepts that invitation for the account it makes, so the person is in without a second press: at once where holding the id is the proof (one organization by invitation), or, where the sign-up proves its address, when the one link mailed for that sign-up is opened; that mail names the organization it joins. The address's own later sign-up or a password reset takes the invitation off every earlier link, so whoever signs up first with an address they invited never joins its owner to their organization. An id sent to another address, cancelled or expired by then joins nobody. Anything else is refused with one answer, before the provider looks the address up, so the refusal tells nobody whether an address has an account. The same rule holds wherever the tenant app makes an account, so a sign-in method added later cannot open a way past it. Only the backoffice console's `/admin/create-user`, which staff alone reach, makes an account without it.
 
-**Invitations.** Each invitation is mailed in one fixed letter, its subject naming no organization and its body the organization's name escaped. An organization's name is one line of 1 to 100 characters however it is made or renamed: a line break, a control character or a direction override in it is taken out, and the platform's rename refuses one. Sending an invitation again needs `invitation.create` in the active organization, as a new one does. With many organizations, where anyone founds one, it is mailed only for an inviter whose own address is proved. Each organization mails at most `invitationLimits` of them, ten a minute and a hundred a day, whoever invites, counting each invitation sent again and each person added once the request succeeds (`packages/mithaq/src/mithaq/auth/index.ts`), beside ten a minute from one address. The Members page lists each pending invitation to whoever may invite, with Copy link in every environment, for an address the mail does not reach: the link lets whoever holds it join as the invited address, so hand it to that person alone.
+**Invitations.** Each invitation is mailed in one fixed letter, its subject naming no organization and its body the organization's name escaped. An organization's name is one line of 1 to 100 characters however it is made or renamed: a line break, a control character or a direction override in it is taken out, and the backoffice's rename refuses one. Sending an invitation again needs `invitation.create` in the active organization, as a new one does. With many organizations, where anyone founds one, it is mailed only for an inviter whose own address is proved. Each organization mails at most `invitationLimits` of them, ten a minute and a hundred a day, whoever invites, counting each invitation sent again and each person added once the request succeeds (`packages/mithaq/src/mithaq/auth/index.ts`), beside ten a minute from one address. The Members page lists each pending invitation to whoever may invite, with Copy link in every environment, for an address the mail does not reach: the link lets whoever holds it join as the invited address, so hand it to that person alone.
 
 **Add person.** With one organization the Members page's first action is Add person, for whoever holds `member.create`: a name, an address and a role they may hand over, sent in one request to `/organization/add-person`, served on the tenant instance with one organization alone. It makes the account with no password, the membership in the caller's own active organization (a body naming another is not read) and the role, under the same rule a role assignment keeps (a role whose every key the caller holds), and mails a link to choose the password that lasts 48 hours; with no mailer the link is answered for the administrator to hand over. Nobody ever knows another's password. An account whose address nobody proved, which may be someone else's squat, is handed to its mailbox: its password and sessions end before it is added. An account whose address is proved, or a staff member's, is never added without its word: it is sent an invitation instead, and an existing member is refused. A person added has joined once, as an open sign-up records it, so removed they never join again by one. Invite stays beside it.
 
@@ -481,9 +481,9 @@ A combination that means nothing or opens a door refuses to load, naming the lin
 
 **In no organization.** Someone signed in who belongs to no organization (a new account with many organizations, or a member removed from their last) is shown, under the sentence saying so, the invitations sent to their address once it is proved, each to accept or decline; with many organizations a box to create one, named "{name}'s workspace" until they change it, which `organizationLimit` still caps; and the address an administrator would invite. The app draws this from `src/no-organization.tsx`, which the screen host's `/unauthorized` imports.
 
-The only owner of an organization is never deleted, by the platform's remove-user or by a delete of their own should one be turned on: the organization would be left with nobody who governs it. Make another member an owner first.
+The only owner of an organization is never deleted, by the backoffice's remove-user or by a delete of their own should one be turned on: the organization would be left with nobody who governs it. Make another member an owner first.
 
-In one organization, nobody founds another organization or leaves the one over HTTP. Each sign-up, join, invitation accepted on the server, person added, first-run and role the setup gives writes one JSON line to the server log (`"audit":"auth"`), beside the platform's own; keep that output.
+In one organization, nobody founds another organization or leaves the one over HTTP. Each sign-up, join, invitation accepted on the server, person added, first-run and role the setup gives writes one JSON line to the server log (`"audit":"auth"`), beside the backoffice's own; keep that output.
 
 **Changing the mode.**
 
@@ -494,13 +494,18 @@ In one organization, nobody founds another organization or leaves the one over H
 
 ## Upgrading
 
+What a project made with the platform console changes when it takes this version, where the console is the backoffice:
+
+- **The target and its app are renamed.** In `packages/mithaq/src/mithaq.ts` the screen target `platform` is `backoffice`, which changes the vocabulary: run `bunx mithaq lock` in `packages/asas` and approve it. Move `apps/asas-platform` to `apps/asas-backoffice` (its `package.json` name too), `packages/asas/src/ui-platform/` to `ui-backoffice/` and `packages/mithaq/src/mithaq/auth/platform-roles.ts` to `backoffice-roles.ts`, then run `bunx mithaq generate screens` and eject the screen host again in both apps.
+- **Names that said platform say backoffice.** `PLATFORM_URL` is `BACKOFFICE_URL`, the permission key `screen.platform` is `screen.backoffice`, the route `/platform` is `/backoffice`, and `asPlatform`, `onPlatform`, `platformApp`, `platformRoles` and the rest are `asBackoffice`, `onBackoffice`, `backofficeApp`, `backofficeRoles`. The console's session cookie is `mithaq-backoffice.session_token`, so staff sign in once again.
+
 What a project made before the organization lifecycle round changes when it takes this version:
 
 - **'none' is gone.** Write `organizations = 'one'` and `showOrganization = false` in `packages/mithaq/src/mithaq/auth/organizations.ts`; nothing else moves.
 - **Many organizations prove every address.** Set `verifyEmail = true`: `'many'` with `false` refuses to load anywhere, development included. Every account made before is unproved and is refused at sign-in until its owner chooses a password from a reset link (Forgot password), which proves the address; tell your people before you deploy.
 - **Every production start needs a mailer.** `RESEND_API_KEY` and `MAIL_FROM`, with many organizations and with one by invitation as with an open sign-up; a deploy without them stops starting. The check runs as the auth setup loads, so a start missing both a mailer and `DATABASE_URL` names the mailer first.
-- **The host's `/unauthorized` imports `src/no-organization.tsx`** from the app. Copy the tenant app's from the template into `apps/asas-tanstack/src/`, and the platform's, which draws nothing, into `apps/asas-platform/src/`, before you eject the screen host again.
-- **Organization names are one line of at most 100 characters.** A name stored before with a line break, a control character or a direction override, or longer, is refused on its next rename until it is put right: rename it on the platform, or once in SQL, `update organization set name = btrim(regexp_replace(name, '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]+', ' ', 'g')) where name ~ '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]'`, and shorten any past 100 by hand.
+- **The host's `/unauthorized` imports `src/no-organization.tsx`** from the app. Copy the tenant app's from the template into `apps/asas-tanstack/src/`, and the backoffice's, which draws nothing, into `apps/asas-backoffice/src/`, before you eject the screen host again.
+- **Organization names are one line of at most 100 characters.** A name stored before with a line break, a control character or a direction override, or longer, is refused on its next rename until it is put right: rename it on the backoffice, or once in SQL, `update organization set name = btrim(regexp_replace(name, '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]+', ' ', 'g')) where name ~ '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]'`, and shorten any past 100 by hand.
 - **`src/mail/`.** `configuredMailer` in `src/mail/index.ts` is a function the auth setup calls as it loads, and `resendMailer` takes `baseURL`; `bunx mithaq upgrade --check` names `src/mail/mailers.ts` as differing.
 
 What a project made before the data round changes:
@@ -510,7 +515,7 @@ What a project made before the data round changes:
 
 ## Adding to the project
 
-Paths are written from the root of a project made by `bun create mithaq`, as laid out in [Project structure](#project-structure). `packages/mithaq` holds the language, its Better Auth setup and roles, `packages/features/*` every kayan, `packages/asas` the build, and `apps/asas-tanstack` and `apps/asas-platform` are the two host apps. The worked examples in the template are `courses` (`packages/features/courses/courses/courses.ts`) and `tags` (`packages/features/tags/tags/tags.ts`). Read them for shape.
+Paths are written from the root of a project made by `bun create mithaq`, as laid out in [Project structure](#project-structure). `packages/mithaq` holds the language, its Better Auth setup and roles, `packages/features/*` every kayan, `packages/asas` the build, and `apps/asas-tanstack` and `apps/asas-backoffice` are the two host apps. The worked examples in the template are `courses` (`packages/features/courses/courses/courses.ts`) and `tags` (`packages/features/tags/tags/tags.ts`). Read them for shape.
 
 Every `mithaq` command runs from `packages/asas`. The bin runs under Node and does not read `.env`, so set `DATABASE_URL` in the shell for any command that reaches a database, and point it at a throwaway database while you work.
 
@@ -526,9 +531,9 @@ The vocabulary of `defineMithaq` is frozen. It is the locales, each kind's label
 
 - **A field says what a value is, and a step says what a write does.** A kind, its rules, its label, its options and who may read it go on the field. Deriving a column or writing another kayan goes in a step, as `markArchived` and `createSessions` do in `courses.ts`.
 - **A rule only a form enforces is not enforced.** Every operation is served over HTTP, so a caller can skip the form. Put the rule in the field's `rules` or in a step. A `when` on a page node only decides whether the node is drawn.
-- **A page component draws and calls operations.** It holds no rule and no write of its own. It lives in the kayan's own `ui/` folder when only that kayan draws with it, in `packages/mithaq/src/ui/` when several share it, and in `packages/asas/src/ui-dashboard/`, `ui-portal/` or `ui-platform/` when it is one screen's own.
+- **A page component draws and calls operations.** It holds no rule and no write of its own. It lives in the kayan's own `ui/` folder when only that kayan draws with it, in `packages/mithaq/src/ui/` when several share it, and in `packages/asas/src/ui-dashboard/`, `ui-portal/` or `ui-backoffice/` when it is one screen's own.
 - **The host app wires things together and says nothing about a kayan.** It holds the copy, the generated routes and the providers. A fact about a kayan written in an app drifts away from the kayan.
-- **A new action is a custom operation, not a hand-written endpoint.** An operation gets its permission key, the access check, the transaction and the audit step, and a page can draw it as a button. The template writes one route by hand, `platformHttp` in `packages/asas/src/platform-http.ts`, because it writes a Better Auth table no managed operation may write. Follow it only for a provider's own table.
+- **A new action is a custom operation, not a hand-written endpoint.** An operation gets its permission key, the access check, the transaction and the audit step, and a page can draw it as a button. The template writes one route by hand, `backofficeHttp` in `packages/asas/src/backoffice-http.ts`, because it writes a Better Auth table no managed operation may write. Follow it only for a provider's own table.
 - **Rows of another kayan on a record page are a related list.** Write a `list` node with `of` and `where` beside the form, as the Sessions tab of a course does. A `join` field holds the data, and a page that names it as a leaf is refused.
 - **A list's states are tabs.** A list node's `tabs` names each one with its `where`, and the list opens on the first, as the courses list opens on Active, keeping archived courses out of the way. A tab narrows what the read answers and never widens it.
 - **A row leaves and comes back through operations of its own.** A course is archived and unarchived, each with its reason, and unpublished back to a draft, as Payload's Unpublish does; a session is archived and unarchived the same way. Each is a line of the activity; `archived` is never set by a create, and on a course by no plain update either.
@@ -594,7 +599,7 @@ The example adds `rooms`, a per-organization list of rooms with a name and a cap
 
 5. **Register it.** Add `rooms` to its feature's `kayan` list; a new feature is a dependency of `packages/asas/package.json` whose `kayan` is spread into `buildAsas` in `packages/asas/src/asas.ts`. A kayan that writes `targets.dashboard` must also be listed in that screen's `kayan` array in `packages/mithaq/src/mithaq.ts`, or the build refuses it with "does not list it in kayan". That array is not part of the vocabulary, so listing a kayan needs no signature.
 
-6. **Give roles their keys.** A key is `<kayan>.<operation>` or `<kayan>.fields.<field>`. The `administrator` role holds `'*'`. Add to each other role in `packages/mithaq/src/roles/tenant-roles.ts` the operations and columns it should reach. If the platform screen lists the kayan, add its columns to the staff reads in `packages/mithaq/src/mithaq/auth/platform-roles.ts`, or to `secret` for a column no platform role may read.
+6. **Give roles their keys.** A key is `<kayan>.<operation>` or `<kayan>.fields.<field>`. The `administrator` role holds `'*'`. Add to each other role in `packages/mithaq/src/roles/tenant-roles.ts` the operations and columns it should reach. If the backoffice screen lists the kayan, add its columns to the staff reads in `packages/mithaq/src/mithaq/auth/backoffice-roles.ts`, or to `secret` for a column no backoffice role may read.
 
 7. **Generate copy and screens.**
 
@@ -604,7 +609,7 @@ The example adds `rooms`, a per-organization list of rooms with a name and a cap
    bunx mithaq generate screens
    ```
 
-   `generate messages` writes `src/messages/rooms.json`. Import it into `apps/asas-tanstack/src/copy.ts` as the kayan's scope, the way that file imports `courses.json`. The platform app re-exports the same file. `generate screens` rewrites each screen's `screen.json`, `types.ts`, `files.ts` and route files under the app folders `generate.screens` names.
+   `generate messages` writes `src/messages/rooms.json`. Import it into `apps/asas-tanstack/src/copy.ts` as the kayan's scope, the way that file imports `courses.json`. The backoffice app re-exports the same file. `generate screens` rewrites each screen's `screen.json`, `types.ts`, `files.ts` and route files under the app folders `generate.screens` names.
 
 8. **Write the migration and read it.**
 
@@ -632,8 +637,8 @@ Change the kayan first, then everything that follows from it.
    3. `bunx mithaq generate screens` when anything a screen draws changed: a field, a page or an operation's button;
    4. `bunx mithaq migrate --name <slug>` when a column changed, then read the `migration.sql`.
 4. **Update what you write by hand.** These must agree with the kayan and nothing regenerates them:
-   - role keys in `tenant-roles.ts` and `platform-roles.ts`, since renaming a field or an operation renames its key;
-   - the staff reads or `secret` in `platform-roles.ts`, for a new column of a kayan the platform lists;
+   - role keys in `tenant-roles.ts` and `backoffice-roles.ts`, since renaming a field or an operation renames its key;
+   - the staff reads or `secret` in `backoffice-roles.ts`, for a new column of a kayan the backoffice lists;
    - an operation's `input` schema and a step's field names, which repeat the kayan's field names;
    - field names inside a page component;
    - copy keys that a step or an `input` schema raises, in every locale.
@@ -697,7 +702,7 @@ The operation's name is its permission key, `rooms.close`, so give it to the rol
 
 #### A column on a screen
 
-Add the field name to the list's `columns`, and to `filters` or `search` if a person should filter or search by it. The build refuses `searchable` on a field whose kind cannot take `like` (only `text` and `email` can), on a localized field, and on a field no one may read. A column with a component of its own names it with `cell`, as `fee` does with `ui('fee-cell.tsx#FeeCell')`. Then run `bunx mithaq generate screens`. If a role should see the column, give it `<kayan>.fields.<field>`. If the platform lists the kayan, decide whether staff read it.
+Add the field name to the list's `columns`, and to `filters` or `search` if a person should filter or search by it. The build refuses `searchable` on a field whose kind cannot take `like` (only `text` and `email` can), on a localized field, and on a field no one may read. A column with a component of its own names it with `cell`, as `fee` does with `ui('fee-cell.tsx#FeeCell')`. Then run `bunx mithaq generate screens`. If a role should see the column, give it `<kayan>.fields.<field>`. If the backoffice lists the kayan, decide whether staff read it.
 
 ### Add a step
 
@@ -779,7 +784,7 @@ A pushed database has no migration history, so it is never a production database
 
 ### `connect()` at start
 
-Each app connects once before it serves any request. Both `apps/asas-tanstack/src/server.ts` and `apps/asas-platform/src/server.ts` do this:
+Each app connects once before it serves any request. Both `apps/asas-tanstack/src/server.ts` and `apps/asas-backoffice/src/server.ts` do this:
 
 ```ts
 const { env } = process
@@ -809,19 +814,19 @@ What `pending: 'refuse'` and `'run'` each do, the lock every writer of the migra
 
 ### Environment variables
 
-`bun create mithaq` writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-platform`, with fresh values for `LOCAL_AUTH_SECRET` and `BETTER_AUTH_SECRET`. Bun (`bun <file>`, `bun run`, `bun -e`) and the apps' dev servers read it. The `mithaq` command runs under Node and does not read it. A variable already set in the environment always wins over `.env`.
+`bun create mithaq` writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-backoffice`, with fresh values for `LOCAL_AUTH_SECRET` and `BETTER_AUTH_SECRET`. Bun (`bun <file>`, `bun run`, `bun -e`) and the apps' dev servers read it. The `mithaq` command runs under Node and does not read it. A variable already set in the environment always wins over `.env`.
 
 In production, set these in the host's environment rather than in a file.
 
 | Variable | Read by | Production | Development |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | `packages/mithaq/src/mithaq.ts`, `seed.ts`, the CLI | Required. Start refuses without it. | Falls back to `postgres://postgres:postgres@localhost:5432/mithaq` for the dev server. `seed`, `migrate`, `rbac assign` and `storage sweep` still refuse without it. Under `node --test` it is required. |
-| `BETTER_AUTH_SECRET` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. Both apps must share the same value: the platform app derives its own session secret from it, so a cookie one app signed never verifies in the other. `AUTH_SECRET` is read when it is unset, but a URL below that is not `localhost` still requires `BETTER_AUTH_SECRET` itself. | A public development default. Even outside production, start refuses when either URL below is not `localhost` and this is unset. |
+| `BETTER_AUTH_SECRET` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. Both apps must share the same value: the backoffice app derives its own session secret from it, so a cookie one app signed never verifies in the other. `AUTH_SECRET` is read when it is unset, but a URL below that is not `localhost` still requires `BETTER_AUTH_SECRET` itself. | A public development default. Even outside production, start refuses when either URL below is not `localhost` and this is unset. |
 | `BETTER_AUTH_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The tenant app's public URL. | `http://localhost:5173` |
-| `PLATFORM_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The platform console's public URL. | `http://localhost:5174` |
+| `BACKOFFICE_URL` | `packages/mithaq/src/mithaq/auth/index.ts` | Required. The backoffice console's public URL. | `http://localhost:5174` |
 | `LOCAL_AUTH_SECRET` | `packages/features/auth/local-users/local-users.ts` | 32 characters at least. If it is unset, local accounts are off: every `POST` under `/api/auth/local` answers 503 and the public sign-up answers 403. | Same. |
 | `TRUSTED_IP_HEADER` | `packages/mithaq/src/mithaq/auth/index.ts`, `local-users.ts` | The header names your proxy overwrites with the client address, comma-separated, such as `cf-connecting-ip`. Both rate limiters key on it, the limit on invitations among them. Trust it only behind exactly one proxy that overwrites it on every request. Without it every limit keys on `x-forwarded-for`, which a caller writes, so a caller who changes it on each request passes the limits. | Defaults to `x-forwarded-for`. |
-| `SETUP_CODE` | `packages/mithaq/src/mithaq/auth/index.ts` | 32 characters or more, random. The platform console's first administrator, and with one organization the first owner on `/auth/first-run`, are made only with it. Shorter counts as unset, and then neither is made. Remove it once the app is set up. | Not asked under `vite dev` on `localhost`. |
+| `SETUP_CODE` | `packages/mithaq/src/mithaq/auth/index.ts` | 32 characters or more, random. The backoffice console's first administrator, and with one organization the first owner on `/auth/first-run`, are made only with it. Shorter counts as unset, and then neither is made. Remove it once the app is set up. | Not asked under `vite dev` on `localhost`. |
 | `RESEND_API_KEY`, `MAIL_FROM` | `packages/mithaq/src/mail/index.ts` | Both or neither; one alone refuses to start, and so does a production start with neither. With both, password resets, invitations and the links that prove an address are mailed through Resend from `MAIL_FROM`, an address at a domain the Resend account verified. Another service is a mailer of your own beside `src/mail/mailers.ts`, named in `src/mail/index.ts`. `RESEND_BASE_URL`, Resend's own variable, sends to another address that speaks its API, such as a test's catcher: https, or http on this machine alone. | Unset: every message is written to the server log, when `NODE_ENV` is `development` and the tenant URL is `localhost`. |
 | `STORAGE_SECRET` | `packages/mithaq/src/storage/index.ts` | Required. Signs every upload reference and local upload token. Every instance must share it. | A fresh random secret per process, with a warning. |
 | `STORAGE_PREFIX` | `storage/index.ts` | Required. The bucket folder this project owns, such as `mithaq/asas`. Every key starts with it, and the sweep lists only inside it. | `mithaq/asas` |
@@ -861,16 +866,16 @@ Each app's `build` script runs `mithaq lock --check` in `packages/asas`, then `v
 
 ```sh
 bun run --cwd apps/asas-tanstack build
-bun run --cwd apps/asas-platform build
+bun run --cwd apps/asas-backoffice build
 ```
 
 The build keeps `asas` and `mithaq` external: the server bundle imports them from `node_modules` at run time. So deploy the whole workspace with its installed `node_modules` and the `packages/asas` source, including `src/migrations/`, not only `dist/`.
 
-The project's own release check serves each build with `vite preview` under Node. Each app's `preview` script runs it after `mithaq lock --check`. The tenant app uses Vite's default port, 4173, and the platform 4174:
+The project's own release check serves each build with `vite preview` under Node. Each app's `preview` script runs it after `mithaq lock --check`. The tenant app uses Vite's default port, 4173, and the backoffice 4174:
 
 ```sh
 NODE_ENV=production bun run --cwd apps/asas-tanstack preview
-NODE_ENV=production bun run --cwd apps/asas-platform preview
+NODE_ENV=production bun run --cwd apps/asas-backoffice preview
 ```
 
 A typical deploy runs in this order:

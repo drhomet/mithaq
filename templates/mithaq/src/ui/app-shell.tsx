@@ -87,7 +87,7 @@ export function UserMenu() {
         // Only once the provider has answered: its sign-out answers 200 with a
         // session or without one, so a refusal stays where it is. `replace`,
         // so Back does not return to the page signed out of. The sign-out that
-        // ends an impersonation answers the platform's address, where the staff
+        // ends an impersonation answers the backoffice's address, where the staff
         // member goes next.
         onSignOut={() => void authArm('sign-out').then((answer) => answer.ok && window.location.replace(String(answer.body?.url ?? '/auth/sign-in')))}
       />
@@ -186,17 +186,17 @@ const measureHeader = (header: HTMLElement | null) => {
 }
 
 /**
- * The one way from a tenant screen to the platform app, in the header, for an actor whose own `user.role` holds a platform role that enters it.
- * The link grants nothing here: the platform app's own server decides entry.
+ * The one way from a tenant screen to the backoffice app, in the header, for an actor whose own `user.role` holds a backoffice role that enters it.
+ * The link grants nothing here: the backoffice app's own server decides entry.
  * Below xl it is its icon alone, a 44 pixel square on a phone, its words kept for a screen reader, so the page's title keeps the header's width.
  */
-export function PlatformLink() {
+export function BackofficeLink() {
   const { t } = useLocale()
-  const platform = useUser().screens?.find((one) => one.name === 'platform')
-  if (!platform) return null
+  const backoffice = useUser().screens?.find((one) => one.name === 'backoffice')
+  if (!backoffice) return null
   return (
-    <a href={platform.path} data-platform-link="" className={buttonVariants({ variant: 'outline', size: 'sm', className: 'ms-auto max-sm:size-11 max-xl:px-2.5 max-sm:px-0 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
-      <span className="max-xl:sr-only">{t('dashboard.openPlatform', 'Open the platform')}</span>
+    <a href={backoffice.path} data-backoffice-link="" className={buttonVariants({ variant: 'outline', size: 'sm', className: 'ms-auto max-sm:size-11 max-xl:px-2.5 max-sm:px-0 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
+      <span className="max-xl:sr-only">{t('dashboard.openBackoffice', 'Open the backoffice')}</span>
       <ArrowUpRight data-icon="inline-end" className="rtl:-scale-x-100" />
     </a>
   )
@@ -234,7 +234,7 @@ export function AppShell({ regions, brand, home }: ShellProps<readonly ['header'
             <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 max-md:size-11" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
             {regions.header}
-            <PlatformLink />
+            <BackofficeLink />
           </div>
         </header>
         <div className="flex min-w-0 flex-1 flex-col px-4 py-4 lg:px-6 lg:py-6">
@@ -249,16 +249,16 @@ export function AppShell({ regions, brand, home }: ShellProps<readonly ['header'
 }
 
 /**
- * The platform's frame, the dashboard's with two changes: the app's name where the organization switcher sits, since staff work above every organization and switch to none of them,
+ * The backoffice's frame, the dashboard's with two changes: the app's name where the organization switcher sits, since staff work above every organization and switch to none of them,
  * and the home entry named as its page names itself, so the nav and the page say one word.
  */
-export function PlatformShell(props: ShellProps<readonly ['header', 'main'], ReactNode>) {
+export function BackofficeShell(props: ShellProps<readonly ['header', 'main'], ReactNode>) {
   const { t } = useLocale()
   return (
     <AppShell
       {...props}
-      brand={<span data-brand="" className="truncate px-2 py-1.5 text-base font-semibold">{t('platform.brand', 'Asas platform')}</span>}
-      home={t('platform.title', 'Platform')}
+      brand={<span data-brand="" className="truncate px-2 py-1.5 text-base font-semibold">{t('backoffice.brand', 'Asas backoffice')}</span>}
+      home={t('backoffice.title', 'Backoffice')}
     />
   )
 }

@@ -9,7 +9,7 @@ const holdsForm = (value: unknown): boolean =>
   Array.isArray(value) ? value.some(holdsForm) : !!value && typeof value === 'object' && ('form' in value || Object.values(value).some(holdsForm))
 
 /**
- * A page in the side-column shell the dashboard and the platform register as
+ * A page in the side-column shell the dashboard and the backoffice register as
  * `app`. A page that holds a form draws the form's controls in the sticky
  * header beside its title, so where the row stands and its save stay on screen
  * on every tab.
@@ -34,15 +34,15 @@ export const topPage = <const Main extends readonly unknown[]>(main: Main) =>
   ({ shell: 'top', header: [{ title: {} }], nav: [{ nav: {} }], main }) as const
 
 /**
- * A tenant kayan's list on the platform: every organization's rows in the
+ * A tenant kayan's list on the backoffice: every organization's rows in the
  * registry's list, read-only, the organization a column and a filter of each.
- * Each row opens its `platformRecord` below.
+ * Each row opens its `backofficeRecord` below.
  */
-export const platformList = <const List extends { readonly columns: readonly unknown[] }>(path: string, list: List) =>
+export const backofficeList = <const List extends { readonly columns: readonly unknown[] }>(path: string, list: List) =>
   ({ list: { path, page: appPage([{ layout: 'table', main: [{ list }] }]) } }) as const
 
 /**
- * What every tenant kayan's record on the platform ends its side column with:
+ * What every tenant kayan's record on the backoffice ends its side column with:
  * whose row it is and when it was written. No id: a record is read by its name,
  * and the address bar holds the id.
  */
@@ -53,7 +53,7 @@ const record = {
 } as const
 
 /**
- * A tenant kayan's record on the platform, which a row of its list opens: a
+ * A tenant kayan's record on the backoffice, which a row of its list opens: a
  * page that holds no form, so every leaf is drawn by its field's cell over the
  * row and nothing on it writes. The page is not called `edit`, since an edit
  * page holds exactly one form; the host opens a row on the page whose path
@@ -62,7 +62,7 @@ const record = {
  * the organization and the stamps. A field the report hides is not in the
  * projection, so it is not drawn.
  */
-export const platformRecord = <const Main extends readonly unknown[], const Side extends readonly unknown[] = readonly []>({ path, main, side }: { path: string; main: Main; side?: Side }) =>
+export const backofficeRecord = <const Main extends readonly unknown[], const Side extends readonly unknown[] = readonly []>({ path, main, side }: { path: string; main: Main; side?: Side }) =>
   ({ view: { path, page: appPage([{ layout: 'record', main, side: [...(side ?? []), record] }]) } }) as const
 
 // add-on: audit-log

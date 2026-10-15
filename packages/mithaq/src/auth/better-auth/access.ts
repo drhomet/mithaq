@@ -40,7 +40,7 @@ export type BetterAuthAccessOptions<Roles extends SystemRoles, Table extends Row
  * membership elsewhere grants nothing here.
  *
  * A `member.role` slug is one a tenant's admin can mint, since the provider's dynamic access control
- * is on, so `roles` holds only slugs a tenant may hold, or `rolesOf` drops the rest: a platform role
+ * is on, so `roles` holds only slugs a tenant may hold, or `rolesOf` drops the rest: a backoffice role
  * named in it would otherwise grant its keys inside the tenant.
  */
 export const memberRoleTarget = <const Roles extends SystemRoles, const Table extends RowTable, Actor>({
@@ -57,7 +57,7 @@ export const memberRoleTarget = <const Roles extends SystemRoles, const Table ex
   reads: ['member'],
   resolve: async ({ store, tenant, member, actor }) => {
     // A read without a tenant would be every tenant's; the actor still goes through `rolesOf`, which
-    // answers platform staff, who have no active organization, their platform roles.
+    // answers backoffice staff, who have no active organization, their backoffice roles.
     const found = scoped(tenant) && scoped(member)
       ? await allRows({ store, kayan: 'member', where: { and: [{ organizationId: { equals: tenant } }, { userId: { equals: member } }] } })
       : { docs: [] }

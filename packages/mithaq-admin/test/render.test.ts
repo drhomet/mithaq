@@ -1756,8 +1756,8 @@ test('276a. a command actor reads in the viewer\'s locale for a reader of the pe
   assert.ok(messages.command?.en && messages.command?.ar, 'the copy has both locales')
 })
 
-test('214d. the platform answers the refusal copy in both locales, through the tenant copy it re-exports', async () => {
-  const { translator } = await import('../../../apps/asas-platform/src/copy.ts')
+test('214d. the backoffice answers the refusal copy in both locales, through the tenant copy it re-exports', async () => {
+  const { translator } = await import('../../../apps/asas-backoffice/src/copy.ts')
   for (const key of ['admin.cannotSee', 'admin.noColumns', 'admin.deleted', 'admin.notAvailable', 'error.conflict.usedBy', 'error.conflict.usedByUnnamed', 'error.conflict.usedMore', 'error.conflict.usedHint']) {
     const en = translator('en')(key, 'fallback')
     const ar = translator('ar')(key, 'fallback')
@@ -1766,8 +1766,8 @@ test('214d. the platform answers the refusal copy in both locales, through the t
 })
 
 test('219a. the row link of a list whose first column is an email holds the address as text, so no link sits inside a link, and an email anywhere else is still a mail link', () => {
-  const platform = asas.targets.platform.client
-  const accounts = platform.kayan.localUsers!
+  const backoffice = asas.targets.backoffice.client
+  const accounts = backoffice.kayan.localUsers!
   const drawn = ({ kayan, docs, href }: { kayan: ClientKayan; docs: Record<string, unknown>[]; href: (id: string) => string }) =>
     renderToStaticMarkup(
       createElement(List, {
@@ -1796,33 +1796,33 @@ test('219a. the row link of a list whose first column is an email holds the addr
   assert.ok(!closed.includes('data-row-link') && closed.includes('href="mailto:learner@example.com"'), 'and so does the email of a list with no row page')
 })
 
-test('219b. every platform record draws a link back to its list above it, in the viewer\'s language, and the dashboard\'s record draws none', async () => {
-  const { PlatformRecordPage } = await import('../../../templates/asas/src/ui-platform/record-page.tsx')
-  const platform = asas.targets.platform.client
+test('219b. every backoffice record draws a link back to its list above it, in the viewer\'s language, and the dashboard\'s record draws none', async () => {
+  const { BackofficeRecordPage } = await import('../../../templates/asas/src/ui-backoffice/record-page.tsx')
+  const backoffice = asas.targets.backoffice.client
   // The nav's words for a list are the project's copy (`roles.plural`), which this harness's table does not hold.
   const words = (key: string, fallback?: string) => (key === 'roles.plural' ? 'Roles' : key === 'user.plural' ? 'People' : fallback)
-  const drawn = (locale: string, kayan: ClientKayan, Layout: typeof PlatformRecordPage | typeof RecordPage) =>
+  const drawn = (locale: string, kayan: ClientKayan, Layout: typeof BackofficeRecordPage | typeof RecordPage) =>
     staticMarkup(
       createElement(
         ScreenContext,
-        { value: { ...state, screen: platform, kayan, locale, t: words, record: { id: 'r1' } } },
+        { value: { ...state, screen: backoffice, kayan, locale, t: words, record: { id: 'r1' } } },
         createElement(Layout, { regions: { main: 'body', side: undefined, danger: undefined }, page: { path: '/x/:id' } as never }),
       ),
     )
-  const roles = platform.kayan.roles!
-  const en = drawn('en', roles, PlatformRecordPage)
-  assert.match(en, /<a href="\/platform\/roles"[^>]*data-back[^>]*>.*?<span>Roles<\/span><\/a>/, 'a link to the roles list, named as the nav names it')
+  const roles = backoffice.kayan.roles!
+  const en = drawn('en', roles, BackofficeRecordPage)
+  assert.match(en, /<a href="\/backoffice\/roles"[^>]*data-back[^>]*>.*?<span>Roles<\/span><\/a>/, 'a link to the roles list, named as the nav names it')
   assert.ok(en.indexOf('data-back') < en.indexOf('body'), 'above the record')
-  assert.match(drawn('ar', platform.kayan.user!, PlatformRecordPage), /href="\/platform\/users"[^>]*data-back/, 'and the people\'s, in Arabic too')
+  assert.match(drawn('ar', backoffice.kayan.user!, BackofficeRecordPage), /href="\/backoffice\/users"[^>]*data-back/, 'and the people\'s, in Arabic too')
   assert.equal(drawn('en', roles, RecordPage).includes('data-back'), false, 'while the shared record page draws none')
 })
 
-test('219c. every platform page names the two timestamps with one pair of labels per locale', async () => {
+test('219c. every backoffice page names the two timestamps with one pair of labels per locale', async () => {
   const { translator: projectCopy } = await import('../../../apps/asas-tanstack/src/copy.ts')
-  const platform = asas.targets.platform.client
+  const backoffice = asas.targets.backoffice.client
   const named = (name: string, locale: 'en' | 'ar') =>
     new Set(
-      Object.values(platform.kayan).flatMap((kayan) => {
+      Object.values(backoffice.kayan).flatMap((kayan) => {
         const field = kayan.fields.find((one) => one.name === name)
         return field ? [labelFor({ kayan, field, copy: { t: projectCopy(locale), locale } })] : []
       }),

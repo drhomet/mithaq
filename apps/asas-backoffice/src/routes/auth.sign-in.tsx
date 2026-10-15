@@ -11,7 +11,7 @@ import { wanted } from '../redirect.ts'
 export const Route = createFileRoute('/auth/sign-in')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.signIn')),
   validateSearch: redirectSearch,
-  // Nobody can sign in to a platform no one administers yet.
+  // Nobody can sign in to a backoffice no one administers yet.
   beforeLoad: async () => {
     if (!(await firstUser()).initialized) throw redirect({ href: '/auth/create-first-user' })
   },
@@ -58,7 +58,7 @@ function SignIn() {
   }
 
   return (
-    <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInPlatformDescription', 'Sign in to reach the platform.')}>
+    <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInBackofficeDescription', 'Sign in to reach the backoffice.')}>
       <form className="grid gap-4" noValidate onSubmit={submit}>
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), { autoComplete: 'current-password', onChange: (event) => setPassword(event.target.value), type: 'password', value: password })}

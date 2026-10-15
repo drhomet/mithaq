@@ -1,6 +1,6 @@
 import { actorPermissions, count, defaultFields, find, findOne, invalid, type Ctx, type Held } from 'mithaq'
 import { defineKayan, rows, organization } from '@asas/mithaq'
-import { platformClosed } from '@asas/mithaq/roles/tenant-access.ts'
+import { backofficeClosed } from '@asas/mithaq/roles/tenant-access.ts'
 import { auditLogName, type Change } from '@asas/mithaq/mithaq/audit-sink.ts'
 
 /** The kayan whose `find` this actor holds, which are the kayan whose entries it reads. */
@@ -103,12 +103,12 @@ const queriedByQueryable = (ctx: Ctx): Ctx => {
  * The audit log's rows: an organization reads its own entries, and nothing writes
  * one through the log, a caller of any role included, since the service
  * target's sink writes each entry through the store inside the write it
- * records. Every platform role is closed: the platform lists no entry, and a
+ * records. Every backoffice role is closed: the backoffice lists no entry, and a
  * staff member's own impersonated writes are the entries it would read.
  */
 const auditLogAccess = rows({
   '*': { create: false, read: true, update: false, delete: false },
-  ...platformClosed,
+  ...backofficeClosed,
 })
 
 /**
@@ -119,7 +119,7 @@ const auditLogAccess = rows({
  *
  * It is its organization's own, and a record's entries are read on that record's edit
  * page. The dashboard lists it for its access report alone, which is what the
- * edit pages' panel is drawn by, and draws no page of it. The platform lists
+ * edit pages' panel is drawn by, and draws no page of it. The backoffice lists
  * none of it and reads none of it.
  */
 export const auditLog = defineKayan({

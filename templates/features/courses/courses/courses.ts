@@ -1,7 +1,7 @@
 import { defaultFields, draftFields, folderOf, invalid, type Ctx, type ReadTools, type WriteTools } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '@asas/mithaq'
-import { activity, appPage, danger, platformList, platformRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, appPage, danger, backofficeList, backofficeRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { sessions } from '../sessions/sessions.ts'
 import { onOffer } from '../domain/on-offer.ts'
@@ -143,12 +143,12 @@ export const courses = defineKayan({
     },
   },
   targets: {
-    /** Every organization's rows on the platform, read-only, with each row's record page and its sessions. */
-    platform: {
+    /** Every organization's rows on the backoffice, read-only, with each row's record page and its sessions. */
+    backoffice: {
       useAsTitle: 'title',
       pages: {
-        ...platformList('/courses', { columns: ['title', 'organization', 'fee', 'archived', 'createdAt'], filters: ['organization', 'title', 'fee', 'archived'], search: ['title'], sort: '-createdAt' }),
-        ...platformRecord({
+        ...backofficeList('/courses', { columns: ['title', 'organization', 'fee', 'archived', 'createdAt'], filters: ['organization', 'title', 'fee', 'archived'], search: ['title'], sort: '-createdAt' }),
+        ...backofficeRecord({
           path: '/courses/:id',
           main: [{ tabs: [
             { tab: 'details', label: { en: 'Details', ar: 'التفاصيل' }, fields: [
@@ -523,7 +523,7 @@ export const courses = defineKayan({
         zod: z.number({ error: 'courses.fee.invalid' }).nonnegative({ error: 'courses.fee.min' }).nullish(),
         dashboard: { filter: true, cell: feeCell },
         portal: { cell: feeCell },
-        platform: { cell: feeCell },
+        backoffice: { cell: feeCell },
       },
     },
     currency: {
@@ -586,7 +586,7 @@ export const courses = defineKayan({
       ],
     },
     // The day enrolment opens, a calendar day with no time of its own, which
-    // the portal draws as the platform's own day picker.
+    // the portal draws as the backoffice's own day picker.
     opensOn: { kind: 'date', label: { en: 'Opens on', ar: 'يفتح في' } },
     archiveReason: {
       kind: 'text',

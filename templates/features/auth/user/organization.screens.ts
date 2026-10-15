@@ -1,21 +1,21 @@
 // What each screen draws of the generated `organization` kayan, which `mithaq
 // generate auth` imports into `./organization.ts` because this file sits beside
 // it, spreading it into the kayan's `targets` after the generated titles of the
-// screens it does not name, so the platform's block here is that screen's whole
+// screens it does not name, so the backoffice's block here is that screen's whole
 // block, its title included, and the dashboard keeps the generated one. The
-// platform lists every organization with the registry's list and renames it or
+// backoffice lists every organization with the registry's list and renames it or
 // opens its members from the slug column.
-import { platformUi } from '@asas/mithaq'
+import { backofficeUi } from '@asas/mithaq'
 import { appPage } from '@asas/mithaq/mithaq/pages.ts'
 
 export const screens = {
-  platform: {
+  backoffice: {
     useAsTitle: 'name',
     pages: {
       list: {
         path: '/organizations',
         page: appPage([{ layout: 'table', main: [{ list: {
-          columns: ['name', { field: 'slug', cell: platformUi('organization-actions.tsx#OrganizationActions') }, 'createdAt'],
+          columns: ['name', { field: 'slug', cell: backofficeUi('organization-actions.tsx#OrganizationActions') }, 'createdAt'],
           filters: ['name', 'slug', 'createdAt'],
           search: ['name', 'slug'],
           sort: 'name',

@@ -1,4 +1,4 @@
-// Boots the built TanStack hosts (tenant and platform apps) and asserts over real sockets.
+// Boots the built TanStack hosts (tenant and backoffice apps) and asserts over real sockets.
 // Not named `*.test.ts` so the default run stays fast; run it with `bun run test:tanstack`.
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { asas } from '../templates/asas/src/asas.ts'
 import { testDatabase } from '../templates/asas/src/test-database.ts'
 import { migratedDatabase } from './migrated-database.ts'
-import { platformRoles } from '../templates/mithaq/src/mithaq/auth/platform-roles.ts'
+import { backofficeRoles } from '../templates/mithaq/src/mithaq/auth/backoffice-roles.ts'
 import { tenantRoles } from '../templates/mithaq/src/roles/system-roles.ts'
 import { defaultRules, providerOf } from '../packages/mithaq/src/index.ts'
 import type { ScreenClient } from '../packages/mithaq/src/screen/client.ts'
@@ -25,10 +25,10 @@ import type { ScreenClient } from '../packages/mithaq/src/screen/client.ts'
 const noColumns = (await import('./asas-tanstack/src/copy.ts')).scopes.admin!.noColumns!.en!.split("'").at(-1)!
 
 const app = fileURLToPath(new URL('./asas-tanstack', import.meta.url))
-const platformApp = fileURLToPath(new URL('./asas-platform', import.meta.url))
+const backofficeApp = fileURLToPath(new URL('./asas-backoffice', import.meta.url))
 
 let served: ReturnType<typeof spawn> | undefined
-let platformServed: ReturnType<typeof spawn> | undefined
+let backofficeServed: ReturnType<typeof spawn> | undefined
 /**
  * Every message the apps mail, caught on this machine: a production start needs a mailer, and the apps' Resend
  * mailer posts here through `RESEND_BASE_URL`, so nothing reaches Resend.
@@ -47,7 +47,7 @@ let env: NodeJS.ProcessEnv = process.env
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     served?.kill()
-    platformServed?.kill()
+    backofficeServed?.kill()
     process.exit(signal === 'SIGINT' ? 130 : 143)
   })
 }
@@ -77,8 +77,8 @@ const freePort = async () => {
 }
 
 let origin = ''
-let platformOrigin = ''
-let platformCookie = ''
+let backofficeOrigin = ''
+let backofficeCookie = ''
 let cookie = ''
 let actorEmail = ''
 const actorName = 'Boot'
@@ -105,7 +105,7 @@ before(async () => {
   await migratedDatabase()
 
   const buildStarted = performance.now()
-  for (const folder of [app, platformApp]) {
+  for (const folder of [app, backofficeApp]) {
     const built = spawnSync(vite, ['build'], { cwd: folder, encoding: 'utf8' })
     assert.equal(built.status, 0, `vite build exits 0 in ${folder}\n${built.stdout}\n${built.stderr}`)
     // Vite replaces only `process.env.NODE_ENV`; a built server run without production would push instead of connecting.
@@ -116,9 +116,9 @@ before(async () => {
   const startStarted = performance.now()
   mailbox.listen(0, '127.0.0.1')
   await once(mailbox, 'listening')
-  const [port, platformPort] = [await freePort(), await freePort()]
+  const [port, backofficePort] = [await freePort(), await freePort()]
   origin = `http://127.0.0.1:${port}`
-  platformOrigin = `http://127.0.0.1:${platformPort}`
+  backofficeOrigin = `http://127.0.0.1:${backofficePort}`
   // No LOCAL_AUTH_SECRET, so both apps draw their screens with local auth switched off.
   const { LOCAL_AUTH_SECRET: _local, ...inherited } = process.env
   env = {
@@ -126,10 +126,10 @@ before(async () => {
     // Under the production NODE_ENV the build sets, Better Auth refuses its default secret.
     BETTER_AUTH_SECRET: 'asas-tanstack-boot-test-secret',
     // The ports are chosen at run time, so each app is handed its own origin and the other's:
-    // an impersonation started in the platform lands in the tenant app.
+    // an impersonation started in the backoffice lands in the tenant app.
     BETTER_AUTH_URL: origin,
-    PLATFORM_URL: platformOrigin,
-    // A production platform makes its first administrator only with this code.
+    BACKOFFICE_URL: backofficeOrigin,
+    // A production backoffice makes its first administrator only with this code.
     SETUP_CODE: setupCode,
     RESEND_API_KEY: 're_tanstack_boot_never_sent',
     MAIL_FROM: 'Boot <mail@example.com>',
@@ -152,9 +152,9 @@ before(async () => {
   // Both start at once over a database with no system roles, so both first requests seed them together.
   const tenant = start(app, port)
   served = tenant.child
-  const platform = start(platformApp, platformPort)
-  platformServed = platform.child
-  await Promise.all([[origin, tenant], [platformOrigin, platform]].map(async ([at, one]) => {
+  const backoffice = start(backofficeApp, backofficePort)
+  backofficeServed = backoffice.child
+  await Promise.all([[origin, tenant], [backofficeOrigin, backoffice]].map(async ([at, one]) => {
     const { child, said } = one as ReturnType<typeof start>
     for (let attempt = 0; ; attempt += 1) {
       if (child.exitCode !== null) assert.fail(`the preview server exited with ${child.exitCode} before it answered:\n${said()}`)
@@ -174,7 +174,7 @@ before(async () => {
 }, { timeout: 600_000 })
 
 after(async () => {
-  for (const child of [served, platformServed]) {
+  for (const child of [served, backofficeServed]) {
     if (!child || child.exitCode !== null || child.signalCode !== null) continue
     child.kill()
     await once(child, 'exit')
@@ -269,18 +269,18 @@ test('2. a session is signed up and an organization created through the auth arm
   assert.equal(created.body.title, title, 'the plain HTTP arm answered with the row the runner wrote')
 })
 
-test('2b. while no one holds a platform role, the platform sends sign-in to the first-administrator page, which asks for the setup code, and both close once an administrator exists', async () => {
-  assert.equal(await sentTo('/auth/sign-in', '', platformOrigin), '/auth/create-first-user', 'sign-in sends a visitor to make the first administrator')
-  const page = await fetch(`${platformOrigin}/auth/create-first-user`)
+test('2b. while no one holds a backoffice role, the backoffice sends sign-in to the first-administrator page, which asks for the setup code, and both close once an administrator exists', async () => {
+  assert.equal(await sentTo('/auth/sign-in', '', backofficeOrigin), '/auth/create-first-user', 'sign-in sends a visitor to make the first administrator')
+  const page = await fetch(`${backofficeOrigin}/auth/create-first-user`)
   assert.equal(page.status, 200)
   const html = await page.text()
   assert.ok(html.includes('Create the first administrator') && html.includes('name="code"'), `the page draws the form with a setup code box:\n${html.slice(0, 600)}`)
-  const wrong = await post('/api/auth/user/first-register', { name: 'Boot', email: `first-${Date.now()}@example.com`, password, code: 'not-the-code' }, { origin: platformOrigin }, platformOrigin)
+  const wrong = await post('/api/auth/user/first-register', { name: 'Boot', email: `first-${Date.now()}@example.com`, password, code: 'not-the-code' }, { origin: backofficeOrigin }, backofficeOrigin)
   assert.deepEqual([wrong.response.status, wrong.body.code], [403, 'SETUP_CODE_WRONG'], 'a wrong code is refused')
   await staffAs('super_admin', async () => {
-    assert.equal(await sentTo('/auth/create-first-user', '', platformOrigin), '/auth/sign-in', 'the page sends everyone to sign-in once an administrator exists')
-    assert.equal(await sentTo('/auth/sign-in', '', platformOrigin), null, 'where sign-in is served')
-    const closed = await post('/api/auth/user/first-register', { name: 'Boot', email: `first-${Date.now()}@example.com`, password, code: setupCode }, { origin: platformOrigin }, platformOrigin)
+    assert.equal(await sentTo('/auth/create-first-user', '', backofficeOrigin), '/auth/sign-in', 'the page sends everyone to sign-in once an administrator exists')
+    assert.equal(await sentTo('/auth/sign-in', '', backofficeOrigin), null, 'where sign-in is served')
+    const closed = await post('/api/auth/user/first-register', { name: 'Boot', email: `first-${Date.now()}@example.com`, password, code: setupCode }, { origin: backofficeOrigin }, backofficeOrigin)
     assert.deepEqual([closed.response.status, closed.body.code], [403, 'FIRST_REGISTER_CLOSED'], 'and first-register refuses even the right code')
   })
 })
@@ -558,7 +558,7 @@ test('12. every copy key the copied registry asks for is answered in both of the
   const directories = [
     fileURLToPath(new URL('../packages/mithaq-admin/registry', import.meta.url)),
     fileURLToPath(new URL('./asas-tanstack/src/routes', import.meta.url)),
-    ...['mithaq/src/ui', 'asas/src/ui-dashboard', 'asas/src/ui-portal', 'asas/src/ui-platform', 'features/roles/roles/ui', 'features/courses/enrollments/ui'].map((where) => fileURLToPath(new URL(`../templates/${where}`, import.meta.url))),
+    ...['mithaq/src/ui', 'asas/src/ui-dashboard', 'asas/src/ui-portal', 'asas/src/ui-backoffice', 'features/roles/roles/ui', 'features/courses/enrollments/ui'].map((where) => fileURLToPath(new URL(`../templates/${where}`, import.meta.url))),
   ]
   const source = [
     ...directories.flatMap((directory) =>
@@ -694,8 +694,8 @@ test('16. the path a redirect carries is honoured only when it names this origin
   assert.equal(wanted({ asked: '/\\/evil.example', home: '/dashboard' }), '/dashboard', 'and a backslash before a slash, which it reads the same way')
   assert.equal(wanted({ asked: '/\t/evil.example', home: '/dashboard' }), '/dashboard', 'and a control character between the two slashes, which it strips before it reads the host')
   assert.equal(wanted({ asked: 'javascript:alert(1)', home: '/dashboard' }), '/dashboard', 'and a scheme that is no origin at all')
-  assert.equal(wanted({ asked: undefined, home: '/platform' }), '/platform', 'no path at all lands on the home it is handed')
-  assert.equal(wanted({ asked: '//elsewhere.example/steal', home: '/platform' }), '/platform', 'and another origin is refused there too')
+  assert.equal(wanted({ asked: undefined, home: '/backoffice' }), '/backoffice', 'no path at all lands on the home it is handed')
+  assert.equal(wanted({ asked: '//elsewhere.example/steal', home: '/backoffice' }), '/backoffice', 'and another origin is refused there too')
 })
 
 test('17. every page of every kayan the access report lets this session read answers, and a path no page has answers 404', async () => {
@@ -1299,27 +1299,27 @@ const staffAs = async (role: string, body: () => Promise<void>) => {
 }
 
 /**
- * Signs this file's actor in to the platform app once, under the platform's own cookie. That app makes a session for
- * staff alone, so the actor holds a platform role while signing in; `staffAs` sets the role each test walks under.
+ * Signs this file's actor in to the backoffice app once, under the backoffice's own cookie. That app makes a session for
+ * staff alone, so the actor holds a backoffice role while signing in; `staffAs` sets the role each test walks under.
  */
-const platformSignIn = async () => {
-  if (platformCookie) return platformCookie
+const backofficeSignIn = async () => {
+  if (backofficeCookie) return backofficeCookie
   await staffAs('explorer', async () => {
-    const signedIn = await fetch(`${platformOrigin}/api/auth/user/sign-in/email`, {
+    const signedIn = await fetch(`${backofficeOrigin}/api/auth/user/sign-in/email`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin: platformOrigin },
+      headers: { 'content-type': 'application/json', origin: backofficeOrigin },
       body: JSON.stringify({ email: actorEmail, password }),
     })
-    assert.equal(signedIn.status, 200, `the platform app signs the actor in: ${await signedIn.clone().text()}`)
-    platformCookie = signedIn.headers.getSetCookie().map((one) => one.split(';')[0]).join('; ')
+    assert.equal(signedIn.status, 200, `the backoffice app signs the actor in: ${await signedIn.clone().text()}`)
+    backofficeCookie = signedIn.headers.getSetCookie().map((one) => one.split(';')[0]).join('; ')
   })
-  return platformCookie
+  return backofficeCookie
 }
 
 test('50. the web studio is gone: each screen\'s former _studio path is that screen\'s own not-found page, and every answer of either app is framed by its own origin alone', async () => {
   // Every answer of either app, a page, a redirect or the data API, may be
   // framed by its own origin alone.
-  for (const [at, paths] of [[origin, ['/', '/dashboard', '/auth/sign-in', '/api/not-ours']], [platformOrigin, ['/', '/platform', '/auth/sign-in']]] as const) {
+  for (const [at, paths] of [[origin, ['/', '/dashboard', '/auth/sign-in', '/api/not-ours']], [backofficeOrigin, ['/', '/backoffice', '/auth/sign-in']]] as const) {
     for (const path of paths) {
       const answer = await fetch(`${at}${path}`, { headers: { cookie: at === origin ? cookie : '' }, redirect: 'manual' })
       assert.equal(answer.headers.get('content-security-policy'), "frame-ancestors 'self'", `${at}${path} (${answer.status}) is framed by its own app alone`)
@@ -1333,54 +1333,54 @@ test('50. the web studio is gone: each screen\'s former _studio path is that scr
     assert.deepEqual(await notFound(origin, `/${name}/_studio`, cookie), await notFound(origin, `/${name}/no-such-page`, cookie), `/${name}/_studio is the ${name} screen's not-found page`)
     assert.deepEqual(await notFound(origin, `/${name}/_studio`, cookie), { status: 404, studio: false }, 'a 404 that draws no studio')
   }
-  const session = await platformSignIn()
+  const session = await backofficeSignIn()
   await staffAs('super_admin', async () => {
-    assert.deepEqual(await notFound(platformOrigin, '/platform/_studio', session), await notFound(platformOrigin, '/platform/no-such-page', session), '/platform/_studio is the platform screen\'s not-found page')
-    assert.deepEqual(await notFound(platformOrigin, '/platform/_studio', session), { status: 404, studio: false }, 'a 404 that draws no studio')
+    assert.deepEqual(await notFound(backofficeOrigin, '/backoffice/_studio', session), await notFound(backofficeOrigin, '/backoffice/no-such-page', session), '/backoffice/_studio is the backoffice screen\'s not-found page')
+    assert.deepEqual(await notFound(backofficeOrigin, '/backoffice/_studio', session), { status: 404, studio: false }, 'a 404 that draws no studio')
   })
 })
 
-test('50b. the platform app: support lists people and organizations, opens each row\'s read-only record, and may impersonate into the tenant app, explorer reads everything and changes nothing, a tenant administrator is sent to /unauthorized, a super admin moves between the two apps without signing out, and the tenant app serves no platform route', async () => {
+test('50b. the backoffice app: support lists people and organizations, opens each row\'s read-only record, and may impersonate into the tenant app, explorer reads everything and changes nothing, a tenant administrator is sent to /unauthorized, a super admin moves between the two apps without signing out, and the tenant app serves no backoffice route', async () => {
   const organization = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string } }).session.activeOrganizationId
   const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { addMember(args: unknown): Promise<unknown> } } }).server
-  const member = await signedUpHere('platform-member')
+  const member = await signedUpHere('backoffice-member')
   await server.api.addMember({ body: { userId: member.id, organizationId: organization, role: 'member' } })
   await assignRole(organization, member.id, 'registrar')
-  const colleague = await signedUpHere('platform-colleague')
+  const colleague = await signedUpHere('backoffice-colleague')
   const db = (asas.targets.drizzle as unknown as { db: { execute(query: string): Promise<unknown> } }).db
   await db.execute(`update "user" set role = 'super_admin' where id = '${colleague.id}'`)
-  const session = await platformSignIn()
+  const session = await backofficeSignIn()
   const pageAt = async (at: string, path: string, with_: string) => {
     const response = await fetch(`${at}${path}`, { headers: { cookie: with_ } })
     assert.equal(response.status, 200, `${at}${path} answers 200`)
     return response.text()
   }
   const tenantPage = (path: string) => pageAt(origin, path, cookie)
-  const platformPage = (path: string) => pageAt(platformOrigin, path, session)
+  const backofficePage = (path: string) => pageAt(backofficeOrigin, path, session)
   // The member's own page draws its buttons on the server, where the list's row menu holds the same actions only while open.
   const actions = async () =>
-    (/data-person-actions="([a-z -]+)"/.exec(await platformPage(`/platform/users/${member.id}`))?.[1]?.split(' ') ?? []).sort()
-  const platformPost = (path: string, body: unknown) => post(`/api/auth/user/${path}`, body, { cookie: session, origin: platformOrigin }, platformOrigin)
-  const link = `href="${platformOrigin}/platform"`
-  const usersAt = `/platform/users?search=${encodeURIComponent(member.email)}`
+    (/data-person-actions="([a-z -]+)"/.exec(await backofficePage(`/backoffice/users/${member.id}`))?.[1]?.split(' ') ?? []).sort()
+  const backofficePost = (path: string, body: unknown) => post(`/api/auth/user/${path}`, body, { cookie: session, origin: backofficeOrigin }, backofficeOrigin)
+  const link = `href="${backofficeOrigin}/backoffice"`
+  const usersAt = `/backoffice/users?search=${encodeURIComponent(member.email)}`
   const slug = ((await db.execute(`select slug from "organization" where id = '${organization}'`)) as unknown as { rows: { slug: string }[] }).rows[0]!.slug
-  const organizationsAt = `/platform/organizations?search=${encodeURIComponent(slug)}`
+  const organizationsAt = `/backoffice/organizations?search=${encodeURIComponent(slug)}`
   const organizationActions = (html: string) => {
     const row = html.slice(html.indexOf(`data-organization="${organization}"`)).split('data-organization="')[1] ?? ''
     return [...new Set([...row.matchAll(/data-action="([a-z-]+)"/g)].map((hit) => hit[1]))].sort()
   }
   const opensRecords = async (lists: string[]) => {
     for (const list of lists) {
-      const href = /<a href="([^"]+)" data-row-link=/.exec(await platformPage(`/platform/${list}`))?.[1]
-      assert.ok(href?.startsWith(`/platform/${list}/`), `a row of ${list} opens its record: ${href}`)
-      const record = await platformPage(href!)
+      const href = /<a href="([^"]+)" data-row-link=/.exec(await backofficePage(`/backoffice/${list}`))?.[1]
+      assert.ok(href?.startsWith(`/backoffice/${list}/`), `a row of ${list} opens its record: ${href}`)
+      const record = await backofficePage(href!)
       assert.ok(record.includes('data-layout="record"') && record.includes('data-field-value='), `${href} draws the record, each field by its cell`)
       assert.ok(!record.includes('<form') && !record.includes('data-control=') && !record.includes('type="submit"'), `${href} draws no box and nothing that submits`)
     }
   }
-  const navOf = (html: string) => ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles', 'local-users'].filter((one) => html.includes(`href="/platform/${one}"`))
+  const navOf = (html: string) => ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles', 'local-users'].filter((one) => html.includes(`href="/backoffice/${one}"`))
 
-  for (const path of ['/platform', '/platform/users']) {
+  for (const path of ['/backoffice', '/backoffice/users']) {
     assert.equal((await fetch(`${origin}${path}`, { headers: { cookie }, redirect: 'manual' })).status, 404, `the tenant app answers ${path} 404`)
   }
   // Nor any of the provider's admin routes, to a staff member's own tenant session least of all.
@@ -1388,116 +1388,116 @@ test('50b. the platform app: support lists people and organizations, opens each 
     const refused = await post('/api/auth/user/admin/ban-user', { userId: member.id }, { cookie, origin })
     assert.equal(refused.response.status, 404, 'a tenant session calls no admin route')
   })
-  assert.ok(cookie.startsWith('better-auth.session_token=') && session.startsWith('mithaq-platform.session_token='), 'the two apps keep sessions under two names')
-  // `/` is the platform screen, which sends a visitor to sign-in, whose page offers no sign-up.
-  const landing = await fetch(`${platformOrigin}/`, { redirect: 'manual' })
+  assert.ok(cookie.startsWith('better-auth.session_token=') && session.startsWith('mithaq-backoffice.session_token='), 'the two apps keep sessions under two names')
+  // `/` is the backoffice screen, which sends a visitor to sign-in, whose page offers no sign-up.
+  const landing = await fetch(`${backofficeOrigin}/`, { redirect: 'manual' })
   assert.equal(landing.status, 307)
-  assert.equal(landing.headers.get('location'), '/platform', '/ is the platform screen')
-  assert.equal(await sentTo('/platform', '', platformOrigin), '/auth/sign-in', 'which sends a visitor to sign in')
-  const signInPage = await (await fetch(`${platformOrigin}/auth/sign-in`)).text()
-  assert.ok(signInPage.includes('Sign in to reach the platform.') && !signInPage.includes('/auth/sign-up'), 'a sign-in for the platform, with no sign-up offered')
-  assert.equal((await fetch(`${platformOrigin}/auth/sign-up`, { redirect: 'manual' })).status, 404, 'and no sign-up page')
+  assert.equal(landing.headers.get('location'), '/backoffice', '/ is the backoffice screen')
+  assert.equal(await sentTo('/backoffice', '', backofficeOrigin), '/auth/sign-in', 'which sends a visitor to sign in')
+  const signInPage = await (await fetch(`${backofficeOrigin}/auth/sign-in`)).text()
+  assert.ok(signInPage.includes('Sign in to reach the backoffice.') && !signInPage.includes('/auth/sign-up'), 'a sign-in for the backoffice, with no sign-up offered')
+  assert.equal((await fetch(`${backofficeOrigin}/auth/sign-up`, { redirect: 'manual' })).status, 404, 'and no sign-up page')
 
-  // A tenant administrator: `'*'` inside its tenant, nothing in the platform app.
-  assert.equal(await sentTo('/platform', session, platformOrigin), '/unauthorized', 'a tenant administrator is sent from /platform to /unauthorized')
-  assert.equal(await sentTo('/platform/users', session, platformOrigin), '/unauthorized', 'and from its pages')
-  assert.ok(!(await tenantPage('/dashboard')).includes('data-platform-link'), 'and its dashboard header links no platform')
+  // A tenant administrator: `'*'` inside its tenant, nothing in the backoffice app.
+  assert.equal(await sentTo('/backoffice', session, backofficeOrigin), '/unauthorized', 'a tenant administrator is sent from /backoffice to /unauthorized')
+  assert.equal(await sentTo('/backoffice/users', session, backofficeOrigin), '/unauthorized', 'and from its pages')
+  assert.ok(!(await tenantPage('/dashboard')).includes('data-backoffice-link'), 'and its dashboard header links no backoffice')
 
   await staffAs('super_admin', async () => {
     const dashboard = await tenantPage('/dashboard')
     assert.match(dashboard, /data-dashboard="dashboard"/, 'the super admin uses /dashboard as its organization\'s owner')
-    assert.ok(dashboard.includes('data-platform-link') && dashboard.includes(link), 'whose header links the platform app')
+    assert.ok(dashboard.includes('data-backoffice-link') && dashboard.includes(link), 'whose header links the backoffice app')
     assert.ok(dashboard.includes('[[data-node=controls]:not(:empty)~&amp;]:ms-0'), 'which gives up its margin only to controls that drew something')
-    const home = await platformPage('/platform')
-    assert.match(home, /data-dashboard="platform"/, 'and the platform app as the platform, with no sign-out between')
+    const home = await backofficePage('/backoffice')
+    assert.match(home, /data-dashboard="backoffice"/, 'and the backoffice app as the backoffice, with no sign-out between')
     assert.ok(!home.includes('/_studio'), 'which links no studio')
-    const users = await platformPage(usersAt)
+    const users = await backofficePage(usersAt)
     assert.ok(users.includes(`data-row="${member.id}"`) && users.includes(member.email), 'lists every person, searched by the URL')
     assert.deepEqual(await actions(), ['ban', 'impersonate', 'set-role'], 'with every action')
     assert.ok(users.includes(`value="${member.email}"`), 'and the search box holds what the URL asked')
-    const organizations = await platformPage(organizationsAt)
+    const organizations = await backofficePage(organizationsAt)
     assert.ok(organizations.includes(`data-organization="${organization}"`), 'and every organization')
     assert.deepEqual(organizationActions(organizations), ['members', 'rename'], 'with its rename and its members')
-    assert.ok(organizations.includes(`/platform/members?where%5Bor%5D%5B0%5D%5Band%5D%5B0%5D%5BorganizationId%5D%5Bequals%5D=${organization}`), 'whose members link is the members list filtered to it')
+    assert.ok(organizations.includes(`/backoffice/members?where%5Bor%5D%5B0%5D%5Band%5D%5B0%5D%5BorganizationId%5D%5Bequals%5D=${organization}`), 'whose members link is the members list filtered to it')
     assert.deepEqual(navOf(home), ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles', 'local-users'], 'the nav lists every list, the local accounts last')
-    const courses = await platformPage(`/platform/courses?where[organization][equals]=${organization}&search=${encodeURIComponent(title)}`)
-    assert.ok(courses.includes(title), 'the platform lists a tenant\'s course, filtered to its organization')
-    assert.ok(!courses.includes('href="/platform/courses/new"'), 'and offers no create')
+    const courses = await backofficePage(`/backoffice/courses?where[organization][equals]=${organization}&search=${encodeURIComponent(title)}`)
+    assert.ok(courses.includes(title), 'the backoffice lists a tenant\'s course, filtered to its organization')
+    assert.ok(!courses.includes('href="/backoffice/courses/new"'), 'and offers no create')
     const course = ((await db.execute(`select id from courses where title = '${title}'`)) as unknown as { rows: { id: string }[] }).rows[0]!.id
     const row = [...courses.matchAll(/<tr[^>]*data-row="[^"]+"[^>]*>[\s\S]*?<\/tr>/g)].map((hit) => hit[0]).find((one) => one.includes(`data-row="${course}"`)) ?? ''
     assert.ok(row.includes(title), 'the course is a row of the table')
-    assert.ok(row.includes(`href="/platform/courses/${course}"`) && row.includes('tabindex="0"') && row.includes('data-row-menu='), `and opens the course's record: ${row.slice(0, 300)}`)
+    assert.ok(row.includes(`href="/backoffice/courses/${course}"`) && row.includes('tabindex="0"') && row.includes('data-row-menu='), `and opens the course's record: ${row.slice(0, 300)}`)
     const heads = [...courses.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
     assert.equal(heads[0], 'Title', `the title column first: ${heads.join(', ')}`)
     await opensRecords(['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles'])
-    const record = await platformPage(`/platform/courses/${course}`)
+    const record = await backofficePage(`/backoffice/courses/${course}`)
     assert.ok(record.includes(title) && record.includes('About the course') && !record.includes('data-field-value="accessCode"'), 'the course\'s record draws the dashboard\'s sections, and no access code even for super_admin')
     assert.ok(record.includes('data-field-value="organization"') && record.includes('data-node="list"'), 'with its organization and its sessions')
-    const arabic = await pageAt(platformOrigin, `/platform/courses/${course}`, `${session}; locale=ar`)
+    const arabic = await pageAt(backofficeOrigin, `/backoffice/courses/${course}`, `${session}; locale=ar`)
     assert.ok(['عن الدورة', 'التسعير', 'الجلسات', 'السجل', 'العنوان'].every((words) => arabic.includes(words)), 'and every label of it in Arabic')
-    const sessionRecord = await platformPage(`/platform/sessions/${screenSession}`)
+    const sessionRecord = await backofficePage(`/backoffice/sessions/${screenSession}`)
     assert.ok(sessionRecord.includes('data-node="list"') && /<tr[^>]*data-row="/.test(sessionRecord), 'a session\'s record lists its enrollments')
-    const write = await post('/api/courses/update', { id: course, fee: 1 }, { cookie: session }, platformOrigin)
-    assert.equal(write.response.status, 403, 'a write to it from the platform app is refused')
+    const write = await post('/api/courses/update', { id: course, fee: 1 }, { cookie: session }, backofficeOrigin)
+    assert.equal(write.response.status, 403, 'a write to it from the backoffice app is refused')
     // Both apps run without LOCAL_AUTH_SECRET, so local auth is off and a sign-up is refused; the account is one
     // written straight to the table, which the super admin still lists and verifies.
     const localEmail = `local-50b-${Date.now()}@example.com`
     assert.equal((await post('/api/localUsers/create', { email: localEmail, password })).response.status, 403, 'a public sign-up is refused without the secret')
     const made = ((await db.execute(`insert into local_users (email, hash, salt) values ('${localEmail}', 'not-a-hash', 'not-a-salt') returning id`)) as unknown as { rows: { id: string }[] }).rows[0]!
     const signUp = { body: { id: made.id } }
-    const accounts = await platformPage(`/platform/local-users?search=${encodeURIComponent(localEmail)}`)
-    assert.ok(accounts.includes(localEmail) && accounts.includes(`href="/platform/local-users/${String(signUp.body.id)}"`), 'the platform lists the sign-up and opens its edit page')
+    const accounts = await backofficePage(`/backoffice/local-users?search=${encodeURIComponent(localEmail)}`)
+    assert.ok(accounts.includes(localEmail) && accounts.includes(`href="/backoffice/local-users/${String(signUp.body.id)}"`), 'the backoffice lists the sign-up and opens its edit page')
     // The row's link holds the address as text: a mail link inside it would nest one `<a>` in another, which React reports on hydration.
-    const rowLink = new RegExp(`<a href="/platform/local-users/${String(signUp.body.id)}" data-row-link="[^"]*"[^>]*>([^<]*)</a>`).exec(accounts)?.[1]
+    const rowLink = new RegExp(`<a href="/backoffice/local-users/${String(signUp.body.id)}" data-row-link="[^"]*"[^>]*>([^<]*)</a>`).exec(accounts)?.[1]
     assert.equal(rowLink, localEmail, 'the row link holds the plain address')
     assert.ok(!accounts.includes('href="mailto:'), 'and the list draws no mail link inside it')
     const localHeads = [...accounts.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
     assert.deepEqual(localHeads.filter((head) => head !== 'Actions').sort(), ['Created at', 'Email', 'Verified'], `by its email, its verified state and its date: ${localHeads.join(', ')}`)
-    const account = await platformPage(`/platform/local-users/${String(signUp.body.id)}`)
+    const account = await backofficePage(`/backoffice/local-users/${String(signUp.body.id)}`)
     assert.ok(account.includes('<form') && account.includes(localEmail), 'the edit page is a form titled by the email')
-    assert.match(account, /<a href="\/platform\/local-users"[^>]*data-back/, 'and links back to the list')
+    assert.match(account, /<a href="\/backoffice\/local-users"[^>]*data-back/, 'and links back to the list')
     assert.deepEqual([...account.matchAll(/data-control="([^"]+)"/g)].map((hit) => hit[1]), ['checkbox'], 'whose one control is the verified toggle')
     assert.deepEqual([...account.matchAll(/data-field-value="([^"]+)"/g)].map((hit) => hit[1]), ['email', 'createdAt'], 'under the email and the date as text')
     assert.ok(!/<input[^>]*type="email"/.test(account), 'with no email box')
     assert.ok(!account.includes('type="password"'), 'and there is no password box')
-    const arabicAccount = await pageAt(platformOrigin, `/platform/local-users/${String(signUp.body.id)}`, `${session}; locale=ar`)
+    const arabicAccount = await pageAt(backofficeOrigin, `/backoffice/local-users/${String(signUp.body.id)}`, `${session}; locale=ar`)
     assert.ok(['التحقق', 'موثق'].every((words) => arabicAccount.includes(words)), 'labelled in Arabic too')
     assert.match(await tenantPage('/dashboard'), /data-dashboard="dashboard"/, 'and is back in /dashboard as the owner')
   })
 
   await staffAs('support', async () => {
-    assert.ok((await tenantPage('/dashboard')).includes(link), 'support is linked to the platform app too')
-    const users = await platformPage(usersAt)
+    assert.ok((await tenantPage('/dashboard')).includes(link), 'support is linked to the backoffice app too')
+    const users = await backofficePage(usersAt)
     assert.ok(users.includes(`data-row="${member.id}"`), 'support lists the people')
     assert.deepEqual(await actions(), ['impersonate'], 'and draws impersonate and neither ban nor set role')
-    const organizations = await platformPage(organizationsAt)
+    const organizations = await backofficePage(organizationsAt)
     assert.ok(organizations.includes(`data-organization="${organization}"`), 'and lists the organizations')
     assert.deepEqual(organizationActions(organizations), ['members'], 'and opens their members and renames none')
     await opensRecords(['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags'])
     const course = ((await db.execute(`select id from courses where title = '${title}'`)) as unknown as { rows: { id: string }[] }).rows[0]!.id
-    const record = await platformPage(`/platform/courses/${course}`)
+    const record = await backofficePage(`/backoffice/courses/${course}`)
     assert.ok(record.includes('data-field-value="title"') && !record.includes('data-field-value="accessCode"'), 'support opens a course\'s record without its access code, which it holds no key of')
-    assert.equal((await post('/api/platform/organizations/update', { id: organization, name: 'By support', slug: 'by-support' }, { cookie: session }, platformOrigin)).response.status, 403, 'the server refuses support a rename')
-    assert.deepEqual(navOf(await platformPage('/platform')), ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags'], 'the nav lists the tenants\' business and none of their roles')
+    assert.equal((await post('/api/backoffice/organizations/update', { id: organization, name: 'By support', slug: 'by-support' }, { cookie: session }, backofficeOrigin)).response.status, 403, 'the server refuses support a rename')
+    assert.deepEqual(navOf(await backofficePage('/backoffice')), ['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags'], 'the nav lists the tenants\' business and none of their roles')
     // A page of a kayan support may not read is the same denial as a page whose key it does not hold.
-    assert.equal(await sentTo('/platform/local-users', session, platformOrigin), '/unauthorized', 'and the local accounts send it to /unauthorized')
-    assert.equal(await sentTo('/platform/roles', session, platformOrigin), '/unauthorized', 'and so does a role list it holds no key of')
-    assert.equal((await post('/api/roles/find', {}, { cookie: session }, platformOrigin)).response.status, 403, 'and the server refuses the read')
-    assert.equal((await platformPost('admin/ban-user', { userId: member.id, banReason: 'Spam' })).response.status, 403, 'the server refuses support a ban')
-    assert.equal((await platformPost('admin/set-role', { userId: member.id, role: 'support' })).response.status, 403, 'and a role change')
-    assert.equal((await platformPost('admin/impersonate-user', { userId: colleague.id })).response.status, 403, 'and an impersonation of a super admin')
-    // A page of the tenant app's origin cannot drive the platform's routes.
-    assert.equal((await post('/api/auth/user/admin/impersonate-user', { userId: member.id }, { cookie: session, origin }, platformOrigin)).response.status, 403, 'the platform refuses a post from the tenant app\'s origin')
+    assert.equal(await sentTo('/backoffice/local-users', session, backofficeOrigin), '/unauthorized', 'and the local accounts send it to /unauthorized')
+    assert.equal(await sentTo('/backoffice/roles', session, backofficeOrigin), '/unauthorized', 'and so does a role list it holds no key of')
+    assert.equal((await post('/api/roles/find', {}, { cookie: session }, backofficeOrigin)).response.status, 403, 'and the server refuses the read')
+    assert.equal((await backofficePost('admin/ban-user', { userId: member.id, banReason: 'Spam' })).response.status, 403, 'the server refuses support a ban')
+    assert.equal((await backofficePost('admin/set-role', { userId: member.id, role: 'support' })).response.status, 403, 'and a role change')
+    assert.equal((await backofficePost('admin/impersonate-user', { userId: colleague.id })).response.status, 403, 'and an impersonation of a super admin')
+    // A page of the tenant app's origin cannot drive the backoffice's routes.
+    assert.equal((await post('/api/auth/user/admin/impersonate-user', { userId: member.id }, { cookie: session, origin }, backofficeOrigin)).response.status, 403, 'the backoffice refuses a post from the tenant app\'s origin')
 
-    // The impersonation: the platform keeps no cookie of it and answers a
+    // The impersonation: the backoffice keeps no cookie of it and answers a
     // one-time link into the tenant app, which trades it for the session.
-    const started = await fetch(`${platformOrigin}/api/auth/user/admin/impersonate-user`, {
+    const started = await fetch(`${backofficeOrigin}/api/auth/user/admin/impersonate-user`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: session, origin: platformOrigin },
+      headers: { 'content-type': 'application/json', cookie: session, origin: backofficeOrigin },
       body: JSON.stringify({ userId: member.id }),
     })
     assert.equal(started.status, 200, `support impersonates a tenant user: ${await started.clone().text()}`)
-    assert.deepEqual(started.headers.getSetCookie(), [], 'the platform app sets no cookie')
+    assert.deepEqual(started.headers.getSetCookie(), [], 'the backoffice app sets no cookie')
     const { url } = (await started.json()) as { url: string }
     assert.equal(new URL(url).origin + new URL(url).pathname, `${origin}/auth/handoff`, 'the link lands in the tenant app')
     const landed = await fetch(url, { redirect: 'manual' })
@@ -1510,21 +1510,21 @@ test('50b. the platform app: support lists people and organizations, opens each 
     assert.equal(mimicked.status, 200, 'the impersonated registrar enters the dashboard')
     const html = await mimicked.text()
     assert.ok(html.includes('data-impersonating') && html.includes('You are impersonating') && html.includes('Stop impersonating'), 'under the bar that says so and stops it')
-    assert.ok(!html.includes('data-platform-link'), 'and with no link to the platform, since the registrar is no staff')
+    assert.ok(!html.includes('data-backoffice-link'), 'and with no link to the backoffice, since the registrar is no staff')
     const stopped = await post('/api/auth/user/sign-out', {}, { cookie: as, origin })
     assert.equal(stopped.response.status, 200, 'stopping is signing out of the tenant app')
     assert.equal((await fetch(`${origin}/dashboard`, { headers: { cookie: as }, redirect: 'manual' })).status, 307, 'which ends the impersonation')
-    assert.ok((await platformPage(usersAt)).includes(`data-row="${member.id}"`), 'while support stays signed in to the platform app')
+    assert.ok((await backofficePage(usersAt)).includes(`data-row="${member.id}"`), 'while support stays signed in to the backoffice app')
   })
 
   await staffAs('explorer', async () => {
-    assert.ok((await tenantPage('/dashboard')).includes(link), 'explorer is linked to the platform app')
+    assert.ok((await tenantPage('/dashboard')).includes(link), 'explorer is linked to the backoffice app')
     assert.deepEqual(await actions(), [], 'explorer reads the people and acts on none')
-    const organizations = await platformPage(organizationsAt)
+    const organizations = await backofficePage(organizationsAt)
     assert.ok(organizations.includes(`data-organization="${organization}"`), 'reads the organizations')
     assert.deepEqual(organizationActions(organizations), ['members'], 'renames none')
-    assert.ok(navOf(await platformPage('/platform')).includes('roles'), 'and reads the tenants\' roles too')
-    assert.ok(!navOf(await platformPage('/platform')).includes('local-users'), 'and no local account, which a super admin alone reads')
+    assert.ok(navOf(await backofficePage('/backoffice')).includes('roles'), 'and reads the tenants\' roles too')
+    assert.ok(!navOf(await backofficePage('/backoffice')).includes('local-users'), 'and no local account, which a super admin alone reads')
     await opensRecords(['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles'])
   })
 })
@@ -1555,8 +1555,8 @@ test('51. the portal\'s route chunks do not carry the dashboard\'s members page,
   // The project's server code stays on the server: two refusals only `buildAsas` and the drizzle target write are in no client chunk.
   assert.deepEqual([...chunks].filter(([, source]) => source.includes('declares no target of capability') || source.includes('mithaq_dev_push')).map(([file]) => file), [], 'no client chunk carries asas\'s server code')
   // A role's label is handed over by the server, so no page imports the code declaring the fixed roles,
-  // whose platform labels are in no copy.
-  const declared = [platformRoles.super_admin.label.ar, platformRoles.explorer.label.ar]
+  // whose backoffice labels are in no copy.
+  const declared = [backofficeRoles.super_admin.label.ar, backofficeRoles.explorer.label.ar]
   assert.deepEqual([...chunks].filter(([, source]) => declared.some((label) => source.includes(label))).map(([file]) => file), [], 'no client chunk carries the fixed roles\' code')
 })
 
@@ -1707,7 +1707,7 @@ test('55. the tenant back office is served at /dashboard, and every old /admin p
   assert.ok(doubled.headers.get('location')?.startsWith('/dashboard/'), `a doubled slash lands under /dashboard/ on this origin: ${doubled.headers.get('location')}`)
 })
 
-test('56. in Arabic, no page of the dashboard draws a word of the English copy: every page of every kayan, a row of each, the screen\'s own pages, the header\'s platform link and the impersonation bar', async () => {
+test('56. in Arabic, no page of the dashboard draws a word of the English copy: every page of every kayan, a row of each, the screen\'s own pages, the header\'s backoffice link and the impersonation bar', async () => {
   // Every piece of copy carries every locale and nothing falls back. The English side is every English string the copy holds
   // where its Arabic differs, every English record the projection carries, and every English fallback the copied files write.
   const { scopes } = await import('./asas-tanstack/src/copy.ts')
@@ -1773,11 +1773,11 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
     assert.deepEqual(leaked, [], `${path} draws no English copy in Arabic`)
     return { html, shown }
   }
-  // As platform staff, so every page's header draws the link to the platform app.
+  // As backoffice staff, so every page's header draws the link to the backoffice app.
   await staffAs('super_admin', async () => {
     for (const path of paths) {
       const { html, shown } = await drawn(path, cookie)
-      assert.ok(html.includes('data-platform-link') && shown.includes('فتح المنصة'), `${path} draws the platform link in Arabic`)
+      assert.ok(html.includes('data-backoffice-link') && shown.includes('فتح لوحة الإدارة الخلفية'), `${path} draws the backoffice link in Arabic`)
       if (path === '/') assert.ok(html.includes('data-home-table="sessions"') && shown.includes('الجلسات القادمة'), 'the home draws its table in Arabic')
       if (path === '/courses') assert.ok(html.includes('data-row-menu=') && html.includes('aria-label="إجراءات '), 'a list draws each row\'s menu, named in Arabic')
       if (/\/[0-9a-f-]{36}$/.test(path)) assert.ok(html.includes('data-button="delete"') && shown.includes('حذف'), `${path} draws its delete in Arabic`)
@@ -1811,11 +1811,11 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
   const organization = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string } }).session.activeOrganizationId
   await server.api.addMember({ body: { userId: member.id, organizationId: organization, role: 'member' } })
   await assignRole(organization, member.id, 'registrar')
-  const staff = await platformSignIn()
+  const staff = await backofficeSignIn()
   await staffAs('support', async () => {
-    const started = await fetch(`${platformOrigin}/api/auth/user/admin/impersonate-user`, {
+    const started = await fetch(`${backofficeOrigin}/api/auth/user/admin/impersonate-user`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: staff, origin: platformOrigin },
+      headers: { 'content-type': 'application/json', cookie: staff, origin: backofficeOrigin },
       body: JSON.stringify({ userId: member.id }),
     })
     assert.equal(started.status, 200, await started.clone().text())
@@ -1887,7 +1887,7 @@ test('57. the course page lists only its own sessions in a Sessions tab, searche
   })
 })
 
-test('58. the platform link is the dashboard\'s alone: a dashboard page in the top shell draws it for staff, and no portal page draws it for the same person', async () => {
+test('58. the backoffice link is the dashboard\'s alone: a dashboard page in the top shell draws it for staff, and no portal page draws it for the same person', async () => {
   // The portal draws its own top shell, which has no link, and the dashboard's keeps it: decided by the shell each screen names, not the URL.
   const course = (await post('/api/courses/create', { title: `${title} portal link`, fee: 10, delivery: 'live', currency: 'SAR' }, { cookie })).body
   const me = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { cookie } })).json()) as { user: { id: string } }
@@ -1902,10 +1902,10 @@ test('58. the platform link is the dashboard\'s alone: a dashboard page in the t
   assert.ok(paths.length >= 6, `every portal page: ${paths.join(', ')}`)
   await staffAs('super_admin', async () => {
     const board = await screenHtml('/dashboard/courses/board')
-    assert.ok(board.includes('data-shell="top"') && board.includes('data-platform-link'), 'the dashboard\'s top-shell page draws the link for staff')
+    assert.ok(board.includes('data-shell="top"') && board.includes('data-backoffice-link'), 'the dashboard\'s top-shell page draws the link for staff')
     for (const path of paths) {
       const html = await screenHtml(`/portal${path === '/' ? '' : path}`)
-      assert.ok(!html.includes('data-platform-link'), `the portal's ${path} draws no platform link`)
+      assert.ok(!html.includes('data-backoffice-link'), `the portal's ${path} draws no backoffice link`)
     }
   })
 })
@@ -1928,7 +1928,7 @@ test('59. an enrollment served over HTTP names the tenant\'s own member as its s
   assert.equal(own.response.status, 200, `the tenant's own member is admitted: ${JSON.stringify(own.body)}`)
 })
 
-test('60. the dashboard is one look: affixes are addons, every checkbox and select draws the same classes, every row opens its record with its title first and a menu last, the Roles page lists no platform role, and the home carries the table of upcoming sessions, in both locales', async () => {
+test('60. the dashboard is one look: affixes are addons, every checkbox and select draws the same classes, every row opens its record with its title first and a menu last, the Roles page lists no backoffice role, and the home carries the table of upcoming sessions, in both locales', async () => {
   const course = (await post('/api/courses/create', { title: `${title} one look`, fee: 450, delivery: 'live', currency: 'USD' }, { cookie })).body
   const soon = (await post('/api/sessions/create', { course: course.id, startsAt: new Date(Date.now() + 3_600_000).toISOString(), capacity: 7, venue: 'campus', format: 'lecture' }, { cookie })).body
   assert.equal(typeof soon.id, 'string', JSON.stringify(soon))
@@ -1972,7 +1972,7 @@ test('60. the dashboard is one look: affixes are addons, every checkbox and sele
     assert.match(row, new RegExp(`data-row-menu="${course.id}"[^>]*aria-label="${menu}"|aria-label="${menu}"[^>]*data-row-menu="${course.id}"`), 'and a menu at its end named for its row')
 
     const roles = await as('/dashboard/roles', locale)
-    for (const [slug, role] of Object.entries(platformRoles)) assert.ok(!roles.includes(`>${slug}<`) && !roles.includes(`>${role.label[locale]}<`), `the Roles page lists no ${slug}`)
+    for (const [slug, role] of Object.entries(backofficeRoles)) assert.ok(!roles.includes(`>${slug}<`) && !roles.includes(`>${role.label[locale]}<`), `the Roles page lists no ${slug}`)
     assert.ok(roles.includes(`>${tenantRoles.administrator.label[locale]}<`), 'and still lists the tenant roles, by their labels')
     assert.ok(!roles.includes('>administrator<'), 'never by their slugs')
 
@@ -2037,7 +2037,7 @@ test('61. each dashboard edit page draws the record\'s activity beside its form 
   }
 })
 
-test('62. a member\'s roles are changed on the members page: its sheet offers every role of the tenant and no platform role, an administrator adds and removes one through the assignment kayan, a role the actor may not grant is offered disabled and refused anyway, and the Roles page locks each fixed role and counts a custom one\'s holders', async () => {
+test('62. a member\'s roles are changed on the members page: its sheet offers every role of the tenant and no backoffice role, an administrator adds and removes one through the assignment kayan, a role the actor may not grant is offered disabled and refused anyway, and the Roles page locks each fixed role and counts a custom one\'s holders', async () => {
   const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { addMember(args: unknown): Promise<unknown> } } }).server
   const organization = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string } }).session.activeOrganizationId
   const member = await signedUpHere('sheet')
@@ -2049,7 +2049,7 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   const sheet = page.slice(page.indexOf('data-member-sheet'))
   const offered = [...sheet.matchAll(/data-role="([^"]+)" data-disabled="(true|false)"/g)].map((hit) => [hit[1]!, hit[2]!] as const)
   for (const role of ['administrator', 'registrar', 'instructor', custom.name]) assert.ok(offered.some(([name]) => name === role), `the sheet offers ${role}`)
-  for (const role of Object.keys(platformRoles)) assert.ok(!offered.some(([name]) => name === role), `and never the platform role ${role}`)
+  for (const role of Object.keys(backofficeRoles)) assert.ok(!offered.some(([name]) => name === role), `and never the backoffice role ${role}`)
   assert.deepEqual(offered.filter(([, disabled]) => disabled === 'true'), [], 'and disables none for the tenant administrator')
   assert.ok(page.includes(`data-edit-roles="${member.id}"`), 'each member row carries its Edit roles button')
   assert.ok(!page.includes('href="/dashboard/member-roles'), 'and nothing links a Member roles page, which the dashboard no longer has')
@@ -2128,7 +2128,7 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   for (const group of ['screen', 'courses', 'tags', 'roles']) assert.ok(opened.includes(`data-group="${group}"`), `the badges hold a ${group} group`)
   assert.ok(keys.length > 100, `a badge per key: ${keys.length}`)
   for (const [key] of keys) assert.ok(asas.catalog.includes(key), `every badge is a key of the catalog: ${key}`)
-  assert.ok(!keys.some(([key]) => key === 'screen.platform'), 'and none the platform\'s')
+  assert.ok(!keys.some(([key]) => key === 'screen.backoffice'), 'and none the backoffice\'s')
   for (const [key, element] of keys) assert.match(element, new RegExp(`data-selected="${key === 'screen.dashboard' || key === 'tags.find' || key === 'tags.fields.id'}"`), `${key} is selected exactly when the role holds it`)
   assert.ok(keys.every(([, element]) => element.includes('data-disabled="false"')), 'and none is disabled for a root granter')
   assert.ok(opened.includes('>List<') && opened.includes('>Archive<'), 'each operation named in words')
@@ -2438,7 +2438,7 @@ test('69. every auth page reads cleanly in both locales: a way home, the languag
 
 test('70. every page names itself and its app in the browser tab in both locales, both apps serve a favicon, a page draws one h1, and the portal nav marks where the viewer is', async () => {
   const { scopes } = await import('./asas-tanstack/src/copy.ts')
-  const platform = await platformSignIn()
+  const backoffice = await backofficeSignIn()
   const html = async (at: string, path: string, sent: string) => {
     const response = await fetch(`${at}${path}`, { headers: { cookie: sent } })
     assert.equal(response.status, 200, `${path} answers 200`)
@@ -2449,7 +2449,7 @@ test('70. every page names itself and its app in the browser tab in both locales
     for (const locale of ['en', 'ar'] as const) {
       const word = (scope: string, key: string) => scopes[scope]?.[key]?.[locale] ?? ''
       const tenant = word('marketing', 'brand')
-      const staff = word('platform', 'brand')
+      const staff = word('backoffice', 'brand')
       const pages: [string, string, string, string][] = [
         [origin, '/portal', cookie, word('screens', 'portal')],
         [origin, '/portal/courses', cookie, word('courses', 'plural')],
@@ -2462,9 +2462,9 @@ test('70. every page names itself and its app in the browser tab in both locales
         [origin, '/auth/sign-up', '', word('auth', 'signUp')],
         [origin, '/auth/forgot-password', '', word('auth', 'forgotPassword')],
         [origin, '/auth/reset-password?token=not-a-real-one', '', word('auth', 'resetPassword')],
-        [platformOrigin, '/auth/sign-in', '', word('auth', 'signIn')],
-        [platformOrigin, '/platform', platform, word('screens', 'platform')],
-        [platformOrigin, '/platform/courses', platform, word('courses', 'plural')],
+        [backofficeOrigin, '/auth/sign-in', '', word('auth', 'signIn')],
+        [backofficeOrigin, '/backoffice', backoffice, word('screens', 'backoffice')],
+        [backofficeOrigin, '/backoffice/courses', backoffice, word('courses', 'plural')],
       ]
       for (const [at, path, sent, name] of pages) {
         const page = await html(at, path, `${sent}; locale=${locale}`)
@@ -2475,7 +2475,7 @@ test('70. every page names itself and its app in the browser tab in both locales
     }
   })
 
-  for (const at of [origin, platformOrigin]) {
+  for (const at of [origin, backofficeOrigin]) {
     const icon = await fetch(`${at}/favicon.svg`)
     assert.equal(icon.status, 200, `${at} serves its favicon`)
     assert.equal(icon.headers.get('content-type')?.split(';')[0], 'image/svg+xml', 'as an SVG')
@@ -2548,10 +2548,10 @@ test('72. the portal holds what its viewer may do: its home counts each list, th
   })
 })
 
-test('73. the platform reads by name in both locales: its sign-in is the tenant\'s frame, its shell names itself and switches no organization, its home counts what staff may read, a person\'s actions sit in one menu, a record is titled by its row and reads every value in words, a list joins in the locale\'s own words, every search finds a person, a session and a role by what staff look for, and an impersonation lands where the person may enter, under the bar', async () => {
-  const platform = await platformSignIn()
-  const page = async (path: string, locale: 'en' | 'ar', sent = platform) => {
-    const response = await fetch(`${platformOrigin}${path}`, { headers: { cookie: `${sent}; locale=${locale}` } })
+test('73. the backoffice reads by name in both locales: its sign-in is the tenant\'s frame, its shell names itself and switches no organization, its home counts what staff may read, a person\'s actions sit in one menu, a record is titled by its row and reads every value in words, a list joins in the locale\'s own words, every search finds a person, a session and a role by what staff look for, and an impersonation lands where the person may enter, under the bar', async () => {
+  const backoffice = await backofficeSignIn()
+  const page = async (path: string, locale: 'en' | 'ar', sent = backoffice) => {
+    const response = await fetch(`${backofficeOrigin}${path}`, { headers: { cookie: `${sent}; locale=${locale}` } })
     assert.equal(response.status, 200, `${path} answers 200 in ${locale}`)
     return (await response.text()).replace(/<script[\s\S]*?<\/script>/g, '')
   }
@@ -2572,36 +2572,36 @@ test('73. the platform reads by name in both locales: its sign-in is the tenant\
   }
 
   await staffAs('super_admin', async () => {
-    // The platform's shell names the app where the switcher sat, and its home entry and its home page say one word.
+    // The backoffice's shell names the app where the switcher sat, and its home entry and its home page say one word.
     for (const locale of ['en', 'ar'] as const) {
-      const home = await page('/platform', locale)
-      const word = locale === 'en' ? 'Platform' : 'المنصة'
+      const home = await page('/backoffice', locale)
+      const word = locale === 'en' ? 'Backoffice' : 'لوحة الإدارة الخلفية'
       assert.ok(home.includes('data-brand=') && !shownIn(home).includes(locale === 'en' ? 'No organization' : 'لا توجد مؤسسة'), `the shell draws the app's name and no organization switcher in ${locale}`)
-      assert.ok(/<a href="\/platform"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span>([^<]+)<\/span>/.exec(home)?.[1] === word && new RegExp(`<h1>${word}</h1>`).test(home), `the nav's home entry and the page both say ${word}`)
+      assert.ok(/<a href="\/backoffice"[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span>([^<]+)<\/span>/.exec(home)?.[1] === word && new RegExp(`<h1>${word}</h1>`).test(home), `the nav's home entry and the page both say ${word}`)
       for (const kayan of ['user', 'organization', 'member', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'memberRoles']) {
         assert.ok(home.includes(`data-kpi="${kayan}"`), `the home counts ${kayan} in ${locale}`)
       }
     }
-    assert.ok((await page('/platform/courses', 'en')).includes('data-brand='), 'and so does every list')
+    assert.ok((await page('/backoffice/courses', 'en')).includes('data-brand='), 'and so does every list')
 
     // A person's role cell is the role alone, never a picker or a button: the actions are the row's menu and the person's page.
     const other = await signedUpHere('menu')
-    const users = await page(`/platform/users?search=${encodeURIComponent(other.email)}`, 'en')
+    const users = await page(`/backoffice/users?search=${encodeURIComponent(other.email)}`, 'en')
     const row = users.slice(users.indexOf(`data-row="${other.id}"`)).split('</tr>')[0]!
     assert.ok(!row.includes('<select') && !row.includes('data-action='), `a person's row holds no picker and no action outside its menu: ${row.slice(0, 300)}`)
     assert.ok(row.includes(`data-row-menu="${other.id}"`), 'and one menu, which holds the actions')
-    assert.match(await page(`/platform/users/${other.id}`, 'en'), /data-person-actions="set-role ban impersonate"/, 'and the person\'s page offers every action this viewer may take')
+    assert.match(await page(`/backoffice/users/${other.id}`, 'en'), /data-person-actions="set-role ban impersonate"/, 'and the person\'s page offers every action this viewer may take')
 
-    // A person's record is titled by their name, reads their platform role by its label, an unticked box apart from an empty one, and no id.
-    const person = await page(`/platform/users/${me.user.id}`, 'en')
+    // A person's record is titled by their name, reads their backoffice role by its label, an unticked box apart from an empty one, and no id.
+    const person = await page(`/backoffice/users/${me.user.id}`, 'en')
     assert.match(person, /<h1[^>]*data-node="title"[^>]*>Boot<\/h1>/, 'a person\'s record is titled by their name')
-    assert.ok(person.includes('Platform administrator') && !/data-field-value="role"[\s\S]{0,400}>user</.test(person), 'and reads the platform role by its label')
+    assert.ok(person.includes('Backoffice administrator') && !/data-field-value="role"[\s\S]{0,400}>user</.test(person), 'and reads the backoffice role by its label')
     assert.ok(/data-field-value="emailVerified"[\s\S]*?<span aria-hidden="true"[^>]*>✗<\/span>/.test(person), 'and an unticked box as a no')
     assert.ok(!person.includes('data-field-value="id"'), 'and draws no id')
     // A tenant's own role, since the roles this project ships are code and never a row.
     const role = (await db.execute(`select id, name, label_en, label_ar from roles where permissions @> array['courses.find']::text[] order by created_at limit 1`)).rows[0] as { id: string; name: string; label_en: string; label_ar: string }
     for (const locale of ['en', 'ar'] as const) {
-      const custom = await page(`/platform/roles/${role.id}`, locale)
+      const custom = await page(`/backoffice/roles/${role.id}`, locale)
       assert.match(custom, new RegExp(`<h1[^>]*data-node="title"[^>]*>${locale === 'en' ? role.label_en : role.label_ar}</h1>`), `a role's record is titled by its label in ${locale}`)
       assert.ok(custom.includes('data-permissions=') && custom.includes('data-group="courses"') && !custom.includes('courses.find, courses'), `and draws its keys grouped, never as one run in ${locale}`)
       assert.ok(!custom.includes('data-field-value="id"') && !shownIn(custom).includes(role.name), `and no id and no slug in ${locale}`)
@@ -2610,16 +2610,16 @@ test('73. the platform reads by name in both locales: its sign-in is the tenant\
     // A course's topics join in the locale's own words, and the Arabic pages draw no English copy and no slug of a role or a membership.
     const course = (await post('/api/courses/create', { title: `Topics ${Date.now()}`, fee: 10, currency: 'SAR', delivery: 'live', topics: ['script', 'grammar'] }, { cookie })).body
     assert.ok(typeof course.id === 'string', `a course with two topics: ${JSON.stringify(course)}`)
-    assert.ok(shownIn(await page(`/platform/courses/${course.id}`, 'ar')).includes('الخط والنحو'), 'its topics join in Arabic\'s own words, never with an ASCII comma')
-    assert.ok(shownIn(await page(`/platform/courses/${course.id}`, 'en')).includes('Script, Grammar'), 'and the English one')
-    const members = shownIn(await page(`/platform/members?search=${encodeURIComponent(actorEmail)}`, 'ar'))
+    assert.ok(shownIn(await page(`/backoffice/courses/${course.id}`, 'ar')).includes('الخط والنحو'), 'its topics join in Arabic\'s own words, never with an ASCII comma')
+    assert.ok(shownIn(await page(`/backoffice/courses/${course.id}`, 'en')).includes('Script, Grammar'), 'and the English one')
+    const members = shownIn(await page(`/backoffice/members?search=${encodeURIComponent(actorEmail)}`, 'ar'))
     assert.ok(members.includes('المالك') && !members.includes('owner'), `a membership's role reads in Arabic: ${members.join(' | ')}`)
-    const assignments = shownIn(await page('/platform/member-roles?search=Boot', 'ar'))
+    const assignments = shownIn(await page('/backoffice/member-roles?search=Boot', 'ar'))
     assert.ok(assignments.includes(tenantRoles.administrator.label.ar) && !assignments.includes('administrator'), 'an assignment names its role by its label')
-    const roles = shownIn(await page('/platform/roles', 'ar'))
+    const roles = shownIn(await page('/backoffice/roles', 'ar'))
     assert.ok(!roles.includes('registrar') && !roles.includes('Organization') && roles.includes('المؤسسة'), 'the roles list draws no slug, and its organization column in Arabic')
 
-    // No page of the platform draws a word of the English copy in Arabic, as test 56 holds the dashboard to.
+    // No page of the backoffice draws a word of the English copy in Arabic, as test 56 holds the dashboard to.
     const { scopes } = await import('./asas-tanstack/src/copy.ts')
     const english = new Set<string>()
     for (const scope of Object.values(scopes)) for (const copy of Object.values(scope)) if (copy.en && copy.ar && copy.en !== copy.ar) english.add(copy.en)
@@ -2629,7 +2629,7 @@ test('73. the platform reads by name in both locales: its sign-in is the tenant\
       if (typeof record.en === 'string' && typeof record.ar === 'string' && record.en !== record.ar) english.add(record.en)
       for (const one of Object.values(record)) walk(one)
     }
-    const screen = asas.targets.platform.client
+    const screen = asas.targets.backoffice.client
     walk(screen)
     // A person's name is data, never copy, so no fixture names a person like
     // a copy string: one that did would hide that string from the check below.
@@ -2637,9 +2637,9 @@ test('73. the platform reads by name in both locales: its sign-in is the tenant\
     assert.deepEqual(named, [], 'no person is named like a string of the English copy')
     for (const [name, kayan] of Object.entries(screen.kayan)) {
       for (const one of Object.values(kayan.pages)) {
-        const id = one.path.includes(':id') ? (/<a href="\/platform[^"]*\/([^"/]+)" data-row-link=/.exec(await page(`/platform${one.path.replace('/:id', '')}`, 'ar'))?.[1]) : undefined
+        const id = one.path.includes(':id') ? (/<a href="\/backoffice[^"]*\/([^"/]+)" data-row-link=/.exec(await page(`/backoffice${one.path.replace('/:id', '')}`, 'ar'))?.[1]) : undefined
         if (one.path.includes(':id') && !id) continue
-        const html = await page(`/platform${one.path.replace(':id', id ?? '')}`, 'ar')
+        const html = await page(`/backoffice${one.path.replace(':id', id ?? '')}`, 'ar')
         const leaked = shownIn(html).filter((text) => english.has(text))
         assert.deepEqual(leaked, [], `${name} ${one.path} draws no English copy in Arabic`)
       }
@@ -2647,18 +2647,18 @@ test('73. the platform reads by name in both locales: its sign-in is the tenant\
 
     const rowsOf = (html: string) => [...html.matchAll(/<tr[^>]*data-row="([^"]+)"/g)].map((hit) => hit[1])
     const membership = (await db.execute(`select id from member where user_id = '${me.user.id}' and organization_id = '${organization}'`)).rows[0]!.id as string
-    assert.ok(rowsOf(await page(`/platform/members?search=${encodeURIComponent(actorEmail)}`, 'en')).includes(membership), 'a membership is found by its person\'s email')
-    assert.ok(rowsOf(await page(`/platform/members?search=${actorName}`, 'en')).includes(membership), 'and by their name')
-    assert.ok(rowsOf(await page(`/platform/sessions?search=${encodeURIComponent(screenTitle)}`, 'en')).includes(screenSession), 'a session by its course\'s title')
-    assert.ok(rowsOf(await page(`/platform/roles?search=${encodeURIComponent(role.label_ar)}`, 'ar')).includes(role.id), 'a role by its name in Arabic')
-    assert.ok(rowsOf(await page(`/platform/roles?search=${encodeURIComponent(role.label_en)}`, 'en')).includes(role.id), 'and in English')
+    assert.ok(rowsOf(await page(`/backoffice/members?search=${encodeURIComponent(actorEmail)}`, 'en')).includes(membership), 'a membership is found by its person\'s email')
+    assert.ok(rowsOf(await page(`/backoffice/members?search=${actorName}`, 'en')).includes(membership), 'and by their name')
+    assert.ok(rowsOf(await page(`/backoffice/sessions?search=${encodeURIComponent(screenTitle)}`, 'en')).includes(screenSession), 'a session by its course\'s title')
+    assert.ok(rowsOf(await page(`/backoffice/roles?search=${encodeURIComponent(role.label_ar)}`, 'ar')).includes(role.id), 'a role by its name in Arabic')
+    assert.ok(rowsOf(await page(`/backoffice/roles?search=${encodeURIComponent(role.label_en)}`, 'en')).includes(role.id), 'and in English')
   })
 
   // A lower role: support counts only what it reads, and no role or assignment.
   await staffAs('support', async () => {
-    const home = await page('/platform', 'en')
+    const home = await page('/backoffice', 'en')
     assert.ok(home.includes('data-kpi="user"') && !home.includes('data-kpi="roles"') && !home.includes('data-kpi="memberRoles"'), 'support\'s home counts the people and no role')
-    const ar = await page(`/platform/members?search=${encodeURIComponent(actorEmail)}`, 'ar')
+    const ar = await page(`/backoffice/members?search=${encodeURIComponent(actorEmail)}`, 'ar')
     assert.ok(shownIn(ar).includes('المالك'), 'and reads a membership\'s role in Arabic')
   })
 
@@ -2670,9 +2670,9 @@ test('73. the platform reads by name in both locales: its sign-in is the tenant\
     await server.api.addMember({ body: { userId: person.id, organizationId: organization, role: 'member' } })
     await assignRole(organization, person.id, held)
     await staffAs('support', async () => {
-      const started = await fetch(`${platformOrigin}/api/auth/user/admin/impersonate-user`, {
+      const started = await fetch(`${backofficeOrigin}/api/auth/user/admin/impersonate-user`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', cookie: platform, origin: platformOrigin },
+        headers: { 'content-type': 'application/json', cookie: backoffice, origin: backofficeOrigin },
         body: JSON.stringify({ userId: person.id }),
       })
       assert.equal(started.status, 200, await started.clone().text())
@@ -2872,7 +2872,7 @@ test('76. the not-found page is a page with a way home, inside the screen\'s she
   const dashboard = await fetch(`${origin}/dashboard`, { headers: { cookie } })
   assert.match(dashboard.headers.get('cache-control') ?? '', /no-store/, 'a signed-in page is never stored')
   assert.ok((await dashboard.text()).includes('event.persisted'), 'and reloads when the browser restores it from its cache')
-  assert.match((await fetch(`${platformOrigin}/auth/sign-in`)).headers.get('cache-control') ?? '', /no-store/, 'the platform\'s pages too')
+  assert.match((await fetch(`${backofficeOrigin}/auth/sign-in`)).headers.get('cache-control') ?? '', /no-store/, 'the backoffice\'s pages too')
 
   await holding('registrar', async () => {
     const refused = await fetch(`${origin}/dashboard/enrollments`, { headers: { cookie }, redirect: 'manual' })
@@ -2928,13 +2928,13 @@ test('76. the not-found page is a page with a way home, inside the screen\'s she
   const anonymous = await fetch(`${origin}/dashboard/nope-230`, { redirect: 'manual' })
   assert.equal(anonymous.status, 307)
   assert.equal(new URL(anonymous.headers.get('location') ?? '', origin).pathname, '/auth/sign-in', 'an anonymous visitor is sent to sign-in')
-  const staff = await platformSignIn()
+  const staff = await backofficeSignIn()
   await staffAs('explorer', async () => {
-    const missing = await fetch(`${platformOrigin}/platform/nonsense`, { headers: { cookie: staff } })
-    assert.equal(missing.status, 404, '/platform/nonsense answers 404')
+    const missing = await fetch(`${backofficeOrigin}/backoffice/nonsense`, { headers: { cookie: staff } })
+    assert.equal(missing.status, 404, '/backoffice/nonsense answers 404')
     const html = await missing.text()
-    assert.ok(html.includes('data-shell="app"'), 'inside the platform\'s shell')
-    assert.match(html, /<a[^>]*href="\/platform"/, 'with the way back to the platform\'s home')
+    assert.ok(html.includes('data-shell="app"'), 'inside the backoffice\'s shell')
+    assert.match(html, /<a[^>]*href="\/backoffice"/, 'with the way back to the backoffice\'s home')
   })
 
   const made = await post('/api/courses/create', { title: `Tab ${Date.now()}`, fee: 1, currency: 'SAR', audience: 'beginner', delivery: 'live', accessCode: 'TAB230' }, { cookie })

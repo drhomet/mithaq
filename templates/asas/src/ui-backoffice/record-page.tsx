@@ -1,4 +1,4 @@
-// The platform's record page: the shared one under a link back to the list the
+// The backoffice's record page: the shared one under a link back to the list the
 // record belongs to, so a person's page, an organization's and a role's are never
 // a dead end. The link is named as the nav names the list, which is already the
 // viewer's own word for it.
@@ -11,7 +11,7 @@ import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 
 export const regions = ['main', 'side', 'danger'] as const
 
-export function PlatformRecordPage(props: LayoutProps<readonly ['main', 'side', 'danger'], ReactNode>) {
+export function BackofficeRecordPage(props: LayoutProps<readonly ['main', 'side', 'danger'], ReactNode>) {
   const { locale, t } = useLocale()
   const screen = useScreen()
   const kayan = useKayan()

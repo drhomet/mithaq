@@ -21,7 +21,7 @@ const csrf = createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === 'server
 
 // The location is a path of this origin, so nothing the request's host header says reaches it.
 const home = createMiddleware({ type: 'request' }).server(({ request, next }) =>
-  new URL(request.url).pathname === '/' ? new Response(null, { status: 307, headers: { location: '/platform' } }) : next(),
+  new URL(request.url).pathname === '/' ? new Response(null, { status: 307, headers: { location: '/backoffice' } }) : next(),
 )
 
 // Only this origin may frame the pages, so no other site can lay this app under its own page and steer a click.

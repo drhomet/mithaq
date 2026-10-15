@@ -42,7 +42,7 @@ type TrustedActor = {
   // Snapshotted, not read off the actor: a role the caller wrote would select rows.
   memberRole?: unknown
   organizations?: readonly ({ id?: unknown } & Record<string, unknown>)[]
-  // The provider's platform column `user.role`, snapshotted for the reason `memberRole` is.
+  // The provider's backoffice column `user.role`, snapshotted for the reason `memberRole` is.
   role?: unknown
   // Snapshotted when the strategy returned the actor, so a later mutation of the actor
   // cannot widen what a callback answers. `true` is `'*'`.

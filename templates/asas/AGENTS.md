@@ -15,13 +15,13 @@ The project is three steps, each named after what it holds, and each imports onl
    - `src/ui/`: the shells, layouts and pieces several screens draw.
    - `src/steps/`, `src/mail/` and, with the uploads add-on, `src/storage/`: a write step, the mailers and storage adapters ejected from `mithaq-admin`, and the `index.ts` that chooses the mailer. They are this project's files.
 2. **The features**, `packages/features/<feature>` (`@asas/<feature>`), each holding one or more kayan. `index.ts` exports the feature's `kayan` list (and `global`, for a single-row kayan). The media feature's `kayan` is a function of `reads`, what opens an image to an actor without `media.create`; a feature whose rows point at images exports its read (courses' `coverReads`), and the asas hands it in. Each kayan has a folder of its own, `<kayan>/<kayan>.ts`, with any page pieces only it draws in `<kayan>/ui/`; a child kayan is a sibling folder in its feature, never nested. `auth/user/` holds the Better Auth kayan, written by `mithaq generate auth`.
-3. **The asas**, `packages/asas` (`asas`). `src/asas.ts` is the build: it spreads each feature's `kayan` into `buildAsas`. Beside it are each screen's own pieces (`src/ui-dashboard/`, `src/ui-portal/`, `src/ui-platform/`), `src/messages/` (one copy file per kayan, which `mithaq generate messages` fills with missing keys; translate in place), `src/migrations/` (written by `mithaq migrate`; commit them) and `src/seed.ts`.
+3. **The asas**, `packages/asas` (`asas`). `src/asas.ts` is the build: it spreads each feature's `kayan` into `buildAsas`. Beside it are each screen's own pieces (`src/ui-dashboard/`, `src/ui-portal/`, `src/ui-backoffice/`), `src/messages/` (one copy file per kayan, which `mithaq generate messages` fills with missing keys; translate in place), `src/migrations/` (written by `mithaq migrate`; commit them) and `src/seed.ts`.
 
 A feature reaches another feature's kayan by its name (`relationTo: 'user'`) or through that feature's `index.ts`, never an inner file. The language never imports a feature or the asas.
 
-`apps/asas-tanstack/` is the tenant app, serving `/dashboard` and `/portal`; `apps/asas-platform/`, with the platform add-on, is the platform console for staff across every organization. Both import the asas alone.
+`apps/asas-tanstack/` is the tenant app, serving `/dashboard` and `/portal`; `apps/asas-backoffice/`, with the backoffice add-on, is the backoffice console for staff across every organization. Both import the asas alone.
 
-The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `rich-text`, `uploads`, `media`, `courses`, `platform`); `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
+The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `rich-text`, `uploads`, `media`, `courses`, `backoffice`); `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
 
 ## Adding a kayan
 
@@ -90,9 +90,9 @@ From the project root:
 ```sh
 bunx tsc -p .
 bunx tsc -p apps/asas-tanstack
-bunx tsc -p apps/asas-platform
+bunx tsc -p apps/asas-backoffice
 bun run --cwd apps/asas-tanstack dev    # http://localhost:5173
-bun run --cwd apps/asas-platform dev    # http://localhost:5174
+bun run --cwd apps/asas-backoffice dev    # http://localhost:5174
 ```
 
 `README.md` beside this file is the guide to this project. The language reference is [packages/mithaq/README.md](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/README.md).

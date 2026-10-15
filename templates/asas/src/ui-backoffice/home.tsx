@@ -1,4 +1,4 @@
-// What `/platform` itself draws: where staff start, inside the platform's
+// What `/backoffice` itself draws: where staff start, inside the backoffice's
 // shell, with the figure card the dashboard and the portal homes draw for each
 // list the nav offers the viewer, with how many rows of it they may read across
 // every organization and a link to it. A list whose count the viewer may not
@@ -6,7 +6,7 @@
 import { ArrowRight } from 'lucide-react'
 import type { LoaderTools, PageProps } from 'mithaq/admin'
 import { useLocale, useScreen } from 'mithaq/admin/react'
-import { PlatformShell, iconOf } from '@asas/mithaq/ui/app-shell.tsx'
+import { BackofficeShell, iconOf } from '@asas/mithaq/ui/app-shell.tsx'
 import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
 import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 
@@ -24,14 +24,14 @@ export function Home({ loaderData: counts }: PageProps<Record<string, number | u
   const { locale, t } = useLocale()
   const screen = useScreen()
   return (
-    <PlatformShell
+    <BackofficeShell
       regions={{
-        header: <h1>{t('platform.title', 'Platform')}</h1>,
+        header: <h1>{t('backoffice.title', 'Backoffice')}</h1>,
         main: (
-          <section data-dashboard="platform" className="@container grid gap-4">
-            <p className="text-muted-foreground">{t('platform.about', 'Every organization and every person on the platform, for its staff.')}</p>
+          <section data-dashboard="backoffice" className="@container grid gap-4">
+            <p className="text-muted-foreground">{t('backoffice.about', 'Every organization and every person on the backoffice, for its staff.')}</p>
             {/* Cards as tall as their content, the figure and the link: the card's own padding and gap
-                are the roomy ones of the platform's style, which a count and one link do not need. */}
+                are the roomy ones of the backoffice's style, which a count and one link do not need. */}
             <div className="grid grid-cols-2 items-start gap-4 @2xl:grid-cols-3 @5xl:grid-cols-4 [&_[data-slot=card]]:[--card-spacing:--spacing(4)]">
               {screen.nav.flatMap((entry) => {
                 if (!entry.kayan) return []

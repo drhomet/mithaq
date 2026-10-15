@@ -1,13 +1,13 @@
 import type { SystemRoles } from 'mithaq'
 
-/** One kayan read whole on the platform: its list, its count, one row, and each column named. */
+/** One kayan read whole on the backoffice: its list, its count, one row, and each column named. */
 const reads = (kayan: string, fields: readonly string[]) => [`${kayan}.find`, `${kayan}.count`, `${kayan}.findByID`, ...fields.map((field) => `${kayan}.fields.${field}`)]
 const stamps = ['id', 'createdAt', 'updatedAt'] as const
 
 /**
- * The columns of a kayan the platform lists that no staff role reads, each
- * one a decision written down rather than a name left out. No platform role
- * reads one, `super_admin`'s `'*'` included: the platform's row closes each
+ * The columns of a kayan the backoffice lists that no staff role reads, each
+ * one a decision written down rather than a name left out. No backoffice role
+ * reads one, `super_admin`'s `'*'` included: the backoffice's row closes each
  * by name whatever keys the actor holds.
  */
 export const secret: readonly `${string}.fields.${string}`[] = [
@@ -18,7 +18,7 @@ export const secret: readonly `${string}.fields.${string}`[] = [
 ]
 
 /**
- * The kayan the platform lists that no staff role reads at all, a decision
+ * The kayan the backoffice lists that no staff role reads at all, a decision
  * about the whole kayan rather than about its columns: no staff role holds a
  * key of one, and only `super_admin`'s `'*'` lists it. `localUsers` is read
  * and verified by a super admin alone, which the kayan's own access says, so a
@@ -59,26 +59,26 @@ const grants: string[] = [
 ]
 
 /**
- * The platform roles: staff above every tenant, held on Better Auth's own
+ * The backoffice roles: staff above every tenant, held on Better Auth's own
  * `user.role` rather than on a tenant's assignment. The column may hold several,
  * comma-separated, which is how the admin plugin reads it.
  *
  * Each holds catalog keys the way a tenant role does, and the access target
- * holds them only in the platform app: in the tenant app an actor holds its
+ * holds them only in the backoffice app: in the tenant app an actor holds its
  * membership's roles in its active organization and nothing of these. The
  * admin plugin's own roles are built from the same lists below, so the routes
  * that set a role, ban and impersonate refuse what the list does not name.
  *
  * `organization.rename` is this template's own statement, added beside these in
  * `asas.ts`. Every read is a kayan's own keys: its list, its count and one row,
- * and one key per column, since a platform role reads a column only where it
- * holds that column's key. A project adds its own platform role, `billing` say,
+ * and one key per column, since a backoffice role reads a column only where it
+ * holds that column's key. A project adds its own backoffice role, `billing` say,
  * as one more entry here.
  */
-export const platformRoles = {
-  /** Every key, and so the only role that grants a platform role, `user.set-role`, and renames an organization, `organization.rename`. */
+export const backofficeRoles = {
+  /** Every key, and so the only role that grants a backoffice role, `user.set-role`, and renames an organization, `organization.rename`. */
   super_admin: {
-    label: { ar: 'مدير المنصة', en: 'Platform administrator' },
+    label: { ar: 'مدير لوحة الإدارة الخلفية', en: 'Backoffice administrator' },
     permissions: '*',
   },
   /**
@@ -88,11 +88,11 @@ export const platformRoles = {
    */
   support: {
     label: { ar: 'الدعم', en: 'Support' },
-    permissions: ['screen.platform', 'user.impersonate', ...people, ...business],
+    permissions: ['screen.backoffice', 'user.impersonate', ...people, ...business],
   },
-  /** Reads everything on the platform, each tenant's roles included, and changes nothing. */
+  /** Reads everything on the backoffice, each tenant's roles included, and changes nothing. */
   explorer: {
     label: { ar: 'مستكشف', en: 'Explorer' },
-    permissions: ['screen.platform', ...people, ...business, ...grants],
+    permissions: ['screen.backoffice', ...people, ...business, ...grants],
   },
 } as const satisfies SystemRoles

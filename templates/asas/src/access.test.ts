@@ -2293,10 +2293,10 @@ test('59. a role the assignment guard cannot read is the largest role it could b
 
 /**
  * A system role's keys are code, and nothing but the build reads them against the catalog: a typo or a field renamed under
- * a role grants nothing and would otherwise say nothing. Core knows no platform, so a tenant role and a platform role are the
+ * a role grants nothing and would otherwise say nothing. Core knows no backoffice, so a tenant role and a backoffice role are the
  * same entry of the target's `roles`.
  */
-test('60. a system role key the catalog does not name is refused at buildAsas, naming the role and the key, for a tenant role and a platform role alike, and \'*\' passes', () => {
+test('60. a system role key the catalog does not name is refused at buildAsas, naming the role and the key, for a tenant role and a backoffice role alike, and \'*\' passes', () => {
   const build = (roles: SystemRoles) => () => {
     const mithaq = defineMithaq({
       arkan: [base],
@@ -2315,11 +2315,11 @@ test('60. a system role key the catalog does not name is refused at buildAsas, n
   assert.throws(
     build({ super_admin: { label, permissions: '*' }, support: { label, permissions: ['courses.find', 'courses.fields.archiveReason'] } }),
     /System role "support" holds permission "courses\.fields\.archiveReason", which is not a key of this project's catalog/,
-    'and so does a column a platform role still names after the kayan dropped it',
+    'and so does a column a backoffice role still names after the kayan dropped it',
   )
   assert.throws(
-    build({ explorer: { label, permissions: ['screen.platform'] } }),
-    /System role "explorer" holds permission "screen\.platform"/,
+    build({ explorer: { label, permissions: ['screen.backoffice'] } }),
+    /System role "explorer" holds permission "screen\.backoffice"/,
     'a screen this build does not hold is no key either',
   )
   assert.doesNotThrow(
@@ -2408,12 +2408,12 @@ test('64. memberRoleTarget answers a member the system roles its Better Auth mem
   const roles = {
     owner: { label: { ar: 'مالك', en: 'Owner' }, permissions: '*' },
     member: { label: { ar: 'عضو', en: 'Member' }, permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'] },
-    super_admin: { label: { ar: 'مدير المنصة', en: 'Platform administrator' }, permissions: '*' },
+    super_admin: { label: { ar: 'مدير لوحة الإدارة الخلفية', en: 'Backoffice administrator' }, permissions: '*' },
   } as const satisfies SystemRoles
   const store = memoryStore()
-  // As the template's reader answers: the platform role in the platform app alone, and never off a membership.
-  const rolesOf = (actor: RbacActor & { platform?: boolean }) =>
-    actor.platform ? ['super_admin'] : (actorRoles(actor) ?? []).filter((slug) => slug !== 'super_admin')
+  // As the template's reader answers: the backoffice role in the backoffice app alone, and never off a membership.
+  const rolesOf = (actor: RbacActor & { backoffice?: boolean }) =>
+    actor.backoffice ? ['super_admin'] : (actorRoles(actor) ?? []).filter((slug) => slug !== 'super_admin')
   const target = memberRoleTarget({ roles, access: rbacTable, rolesOf })
   const mithaq = defineMithaq({
     arkan: [base],
@@ -2440,14 +2440,14 @@ test('64. memberRoleTarget answers a member the system roles its Better Auth mem
     { id: 4, organizationId: 'org1', userId: 'u-minted', role: 'super_admin' },
     { id: 5, organizationId: 'org1', userId: 'u-spaced', role: 'member, owner' },
   ])
-  const held = (member: string, tenant = 'org1', platform = false) => target.resolve({ store: store as never, tenant, member, actor: { activeOrganizationId: tenant, platform }, ownership: () => undefined })
+  const held = (member: string, tenant = 'org1', backoffice = false) => target.resolve({ store: store as never, tenant, member, actor: { activeOrganizationId: tenant, backoffice }, ownership: () => undefined })
   assert.deepEqual(await held('u-owner'), { permissions: '*', roles: ['owner', 'stray'] }, 'an owner holds every key')
   assert.deepEqual(await held('u-member'), { permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'], roles: ['member'] }, 'a member holds what its role lists')
   assert.deepEqual(await held('u-elsewhere'), { permissions: [], roles: [] }, 'a membership of another organization holds nothing here')
   assert.deepEqual(await held('u-nobody'), { permissions: [], roles: [] }, 'and no membership holds nothing')
   assert.deepEqual(await held('u-owner', ''), { permissions: [], roles: [] }, 'nor does a read with no organization')
-  assert.deepEqual(await held('u-staff', '', true), { permissions: '*', roles: ['super_admin'] }, 'platform staff, with no organization, hold what their platform role does')
-  assert.deepEqual(await held('u-minted'), { permissions: [], roles: [] }, 'a platform role a tenant minted into member.role holds nothing')
+  assert.deepEqual(await held('u-staff', '', true), { permissions: '*', roles: ['super_admin'] }, 'backoffice staff, with no organization, hold what their backoffice role does')
+  assert.deepEqual(await held('u-minted'), { permissions: [], roles: [] }, 'a backoffice role a tenant minted into member.role holds nothing')
   assert.deepEqual(await held('u-spaced'), { permissions: ['courses.find', 'courses.fields.id', 'courses.fields.title'], roles: ['member', ' owner'] }, '` owner` is no owner, and grants nothing')
   // Through the strategy, so the keys are the ones the actor carries into an operation.
   const resolve = ({ tenant, member, actor }: { tenant: unknown; member: unknown; actor: object }) => target.resolve({ store: store as never, tenant, member, actor, ownership: () => undefined })

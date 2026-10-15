@@ -306,7 +306,7 @@ test('236. a form trims a field under `trim` before it calls it empty, as the se
 })
 
 test('220k. the rename\'s slug sentence and the organization\'s two required refusals each read in both locales, and differently in each', () => {
-  for (const key of ['platform.slugPattern', 'organization.name.required', 'organization.slug.required']) {
+  for (const key of ['backoffice.slugPattern', 'organization.name.required', 'organization.slug.required']) {
     const en = translator('en')(key)
     const ar = translator('ar')(key)
     assert.equal(typeof en === 'string' && en.length > 0, true, `${key} has an English sentence`)

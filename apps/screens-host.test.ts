@@ -79,7 +79,7 @@ for (const [folder, served] of apps) test(`rebuilds the committed app of ${serve
     assert.doesNotMatch(source, /from '[^']*screens\.tsx'/, `${file} imports no screen code`)
   }
 
-  // `mithaq eject` of the host writes each file at its target, less a file the app deleted (the platform app has no landing page).
+  // `mithaq eject` of the host writes each file at its target, less a file the app deleted (the backoffice app has no landing page).
   await symlink(fileURLToPath(new URL('node_modules/', app)), fileURLToPath(new URL('node_modules', fresh)))
   assert.equal(await eject(fresh, 'mithaq-screens-host'), 0)
   for (const one of host) if (!appFiles.includes(one.target.replace(/^src\//, ''))) await rm(new URL(one.target, fresh))

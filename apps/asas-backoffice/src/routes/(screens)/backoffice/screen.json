@@ -1,5 +1,5 @@
 {
-  "path": "/platform",
+  "path": "/backoffice",
   "providers": [
     "./src/ui-dashboard/theme-provider.tsx#ThemeProvider",
     "@asas/mithaq:./src/ui/rich-text-nodes.tsx#RichTextNodes",
@@ -8,7 +8,7 @@
   "pages": {
     "home": {
       "path": "/",
-      "component": "./src/ui-platform/home.tsx#Home"
+      "component": "./src/ui-backoffice/home.tsx#Home"
     }
   },
   "nav": [
@@ -74,8 +74,8 @@
     }
   ],
   "layouts": {
-    "app": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
-    "record": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+    "app": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
+    "record": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
     "table": "@asas/mithaq:./src/ui/table-page.tsx#TablePage"
   },
   "components": {},
@@ -287,7 +287,7 @@
         "list": {
           "path": "/users",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -312,7 +312,7 @@
                         },
                         {
                           "field": "role",
-                          "cell": "./src/ui-platform/user-actions.tsx#PlatformRole",
+                          "cell": "./src/ui-backoffice/user-actions.tsx#BackofficeRole",
                           "decided": "leaf"
                         },
                         {
@@ -337,7 +337,7 @@
                         "name",
                         "email"
                       ],
-                      "menu": "./src/ui-platform/user-actions.tsx#UserMenu",
+                      "menu": "./src/ui-backoffice/user-actions.tsx#UserMenu",
                       "sort": "email"
                     }
                   }
@@ -349,7 +349,7 @@
         "view": {
           "path": "/users/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -357,10 +357,10 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
-                    "component": "./src/ui-platform/user-actions.tsx#UserButtons"
+                    "component": "./src/ui-backoffice/user-actions.tsx#UserButtons"
                   },
                   {
                     "section": "person",
@@ -394,14 +394,14 @@
                   {
                     "section": "standing",
                     "label": {
-                      "en": "Standing on the platform",
-                      "ar": "الوضع في المنصة"
+                      "en": "Standing in the backoffice",
+                      "ar": "الوضع في لوحة الإدارة الخلفية"
                     },
                     "fields": [
                       {
                         "field": "role",
                         "component": "text",
-                        "cell": "./src/ui-platform/user-actions.tsx#PlatformRole",
+                        "cell": "./src/ui-backoffice/user-actions.tsx#BackofficeRole",
                         "decided": "table"
                       },
                       {
@@ -568,7 +568,7 @@
         "list": {
           "path": "/organizations",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -588,7 +588,7 @@
                         },
                         {
                           "field": "slug",
-                          "cell": "./src/ui-platform/organization-actions.tsx#OrganizationActions",
+                          "cell": "./src/ui-backoffice/organization-actions.tsx#OrganizationActions",
                           "decided": "leaf"
                         },
                         {
@@ -617,7 +617,7 @@
         "view": {
           "path": "/organizations/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -625,7 +625,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "section": "organization",
@@ -797,7 +797,7 @@
         "list": {
           "path": "/members",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -822,7 +822,7 @@
                         },
                         {
                           "field": "role",
-                          "cell": "./src/ui-platform/role-cells.tsx#MembershipRole",
+                          "cell": "./src/ui-backoffice/role-cells.tsx#MembershipRole",
                           "decided": "leaf"
                         },
                         {
@@ -852,7 +852,7 @@
         "view": {
           "path": "/members/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -860,7 +860,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "section": "membership",
@@ -882,7 +882,7 @@
                       {
                         "field": "role",
                         "component": "text",
-                        "cell": "./src/ui-platform/role-cells.tsx#MembershipRole",
+                        "cell": "./src/ui-backoffice/role-cells.tsx#MembershipRole",
                         "decided": "table"
                       }
                     ]
@@ -1431,7 +1431,7 @@
         "list": {
           "path": "/courses",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -1490,7 +1490,7 @@
         "view": {
           "path": "/courses/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -1498,7 +1498,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "tabs": [
@@ -2017,7 +2017,7 @@
         "list": {
           "path": "/sessions",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2077,7 +2077,7 @@
         "view": {
           "path": "/sessions/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2085,7 +2085,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "tabs": [
@@ -2404,7 +2404,7 @@
         "list": {
           "path": "/enrollments",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2454,7 +2454,7 @@
         "view": {
           "path": "/enrollments/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2462,7 +2462,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "section": "enrollment",
@@ -2654,7 +2654,7 @@
         "list": {
           "path": "/tags",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2699,7 +2699,7 @@
         "view": {
           "path": "/tags/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2707,7 +2707,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "section": "tag",
@@ -2918,7 +2918,7 @@
         "list": {
           "path": "/roles",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2958,7 +2958,7 @@
         "view": {
           "path": "/roles/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -2966,7 +2966,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "section": "role",
@@ -3168,7 +3168,7 @@
         "list": {
           "path": "/member-roles",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -3188,7 +3188,7 @@
                         },
                         {
                           "field": "role",
-                          "cell": "./src/ui-platform/role-cells.tsx#RoleName",
+                          "cell": "./src/ui-backoffice/role-cells.tsx#RoleName",
                           "decided": "leaf"
                         },
                         {
@@ -3216,7 +3216,7 @@
         "view": {
           "path": "/member-roles/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -3224,7 +3224,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "section": "assignment",
@@ -3241,7 +3241,7 @@
                       {
                         "field": "role",
                         "component": "text",
-                        "cell": "./src/ui-platform/role-cells.tsx#RoleName",
+                        "cell": "./src/ui-backoffice/role-cells.tsx#RoleName",
                         "decided": "table"
                       }
                     ]
@@ -3525,7 +3525,7 @@
         "list": {
           "path": "/local-users",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -3603,7 +3603,7 @@
         "edit": {
           "path": "/local-users/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell",
+            "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [
               {
                 "title": {}
@@ -3614,7 +3614,7 @@
             ],
             "main": [
               {
-                "layout": "./src/ui-platform/record-page.tsx#PlatformRecordPage",
+                "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
                   {
                     "form": [

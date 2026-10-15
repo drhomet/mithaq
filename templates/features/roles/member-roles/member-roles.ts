@@ -1,13 +1,13 @@
 import { sql } from 'mithaq/drizzle'
 import type { NodePgDatabase } from 'mithaq/drizzle/node-postgres'
 import { assignableRole, conflict, defaultFields, defaultOperations, denied, type Ctx, type WriteTools } from 'mithaq'
-import { defineKayan, platformUi, rows, organization } from '@asas/mithaq'
-import { platformList, platformRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { defineKayan, backofficeUi, rows, organization } from '@asas/mithaq'
+import { backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { tenantRoles } from '@asas/mithaq/roles/system-roles.ts'
-import { platformReads } from '@asas/mithaq/roles/tenant-access.ts'
+import { backofficeReads } from '@asas/mithaq/roles/tenant-access.ts'
 import { managesRoles, OWNER, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
 
-const role = { field: 'role', cell: platformUi('role-cells.tsx#RoleName') } as const
+const role = { field: 'role', cell: backofficeUi('role-cells.tsx#RoleName') } as const
 
 /**
  * Nobody takes from themselves the role that lets them manage roles: their own
@@ -143,14 +143,14 @@ export const memberRoles = defineKayan({
   name: 'memberRoles',
   dbName: 'member_roles',
   targets: {
-    // Every organization's rows on the platform, read-only, and each row's
+    // Every organization's rows on the backoffice, read-only, and each row's
     // record. An assignment is looked for by its person, is titled by them, and
     // reads its role by the role's label, never its slug.
-    platform: {
+    backoffice: {
       useAsTitle: 'user',
       pages: {
-        ...platformList('/member-roles', { columns: ['user', role, 'organization'], filters: ['organization', 'user', 'role'], search: ['user.name', 'user.email'] }),
-        ...platformRecord({ path: '/member-roles/:id', main: [{ section: 'assignment', label: { en: 'Assignment', ar: 'الإسناد' }, fields: ['user', role] }] }),
+        ...backofficeList('/member-roles', { columns: ['user', role, 'organization'], filters: ['organization', 'user', 'role'], search: ['user.name', 'user.email'] }),
+        ...backofficeRecord({ path: '/member-roles/:id', main: [{ section: 'assignment', label: { en: 'Assignment', ar: 'الإسناد' }, fields: ['user', role] }] }),
       },
     },
     // No dashboard page and so no nav entry: a member's roles are changed on the
@@ -163,7 +163,7 @@ export const memberRoles = defineKayan({
         // the column is a string, and the write has not happened, so a refused
         // assignment leaves no row. Without it a custom role holding
         // `memberRoles.create` assigns itself `administrator`. It is handed the
-        // tenant roles alone, so a platform role such as `support` reads as an
+        // tenant roles alone, so a backoffice role such as `support` reads as an
         // unknown custom role and is refused 400. `'roles'` is the kayan it reads
         // the tenant's custom roles from.
         create: { steps: ({ steps }) => [assignableRole(tenantRoles, 'roles'), steps.insert] },
@@ -177,12 +177,12 @@ export const memberRoles = defineKayan({
     },
   },
   // Its own rows, since the inherited table would close the instructor's
-  // delete here. Every platform role reads the assignments of every tenant in
-  // the platform app and changes none; in the tenant app `assignedRoles` omits
-  // the platform slugs.
+  // delete here. Every backoffice role reads the assignments of every tenant in
+  // the backoffice app and changes none; in the tenant app `assignedRoles` omits
+  // the backoffice slugs.
   access: rows({
     '*': { create: true, read: true, update: true, delete: true },
-    ...platformReads,
+    ...backofficeReads,
   }),
   /** A member holds a role once per tenant. A second assignment answers 409 `error.conflict.unique`. */
   indexes: [{ within: 'organization', unique: [['user', 'role']] }],

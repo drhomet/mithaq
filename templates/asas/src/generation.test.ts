@@ -180,7 +180,7 @@ test('generateAuth titles a table that has a name field by it, on each screen th
     user: { fields: { name: 'displayName' } },
     plugins: [{ id: 'test', schema: { team: { fields: { name: { type: 'string' as const, required: true } } }, ticket: { fields: { code: { type: 'string' as const } } } } }],
   }
-  const screens = { dashboard: ['user', 'team', 'ticket'], portal: ['team'], platform: [] }
+  const screens = { dashboard: ['user', 'team', 'ticket'], portal: ['team'], backoffice: [] }
   try {
     await generateAuth({ language: '../../../mithaq.ts', options, directory, screens })
     assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens, check: true }), [])
@@ -227,18 +227,18 @@ test('generateAuth takes what the screens draw of a kayan from a <kayan>.screens
   // generator reads, beside `<kayan>.access.ts`.
   const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-auth-screens-sibling-'))}/`)
   const directory = new URL('kayan/auth/user/', root)
-  const screens = { dashboard: ['user'], platform: ['user'] }
+  const screens = { dashboard: ['user'], backoffice: ['user'] }
   try {
     await generateAuth({ language: '../../../mithaq.ts', options, directory, screens })
     const read = async (file: string) => readFile(new URL(file, directory), 'utf8')
     const sibling = new URL('user.screens.ts', directory)
-    const written = "export const screens = { platform: { useAsTitle: 'name', pages: {} } } as const\n"
+    const written = "export const screens = { backoffice: { useAsTitle: 'name', pages: {} } } as const\n"
     await writeFile(sibling, written)
     assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens, check: true }), ['user.ts'], 'a sibling that came is drift')
     await generateAuth({ language: '../../../mithaq.ts', options, directory, screens })
     const user = await read('user.ts')
     assert.match(user, /\nimport \{ screens \} from '\.\/user\.screens\.ts'\n/)
-    assert.match(user, /\n  targets: \{ dashboard: \{ useAsTitle: 'name' \}, \.\.\.screens, service: \{ operations: defaultOperations \} \},\n/, 'the dashboard the sibling does not name keeps its generated title, the platform is the sibling\'s, and the service stays the generator\'s')
+    assert.match(user, /\n  targets: \{ dashboard: \{ useAsTitle: 'name' \}, \.\.\.screens, service: \{ operations: defaultOperations \} \},\n/, 'the dashboard the sibling does not name keeps its generated title, the backoffice is the sibling\'s, and the service stays the generator\'s')
     assert.match(await read('session.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \} \},\n/, 'and only the kayan it sits beside imports it')
     assert.equal(await read('user.screens.ts'), written, 'the sibling is the project\'s and is left as written')
     assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, screens, check: true }), [])
@@ -1507,7 +1507,7 @@ test('generateScreens reads an installed package through its node_modules link, 
 })
 
 test('packageOf answers no package for a file under a Windows drive root that no package.json sits above, rather than walking up forever', async () => {
-  // `new URL('../', 'file:///C:/')` is `file:///C:/` again on every platform,
+  // `new URL('../', 'file:///C:/')` is `file:///C:/` again on every backoffice,
   // so a walk that waits for the pathname `/` never ends there. The walk runs
   // in a child the test kills, so a regression fails here instead of hanging.
   const source = `import { packageOf } from ${JSON.stringify(new URL('../../../packages/mithaq/src/screen/index.ts', import.meta.url).href)}; process.stdout.write(String(packageOf(new URL('file:///C:/outside/any/package/Page.tsx'))))`
@@ -1561,31 +1561,31 @@ test('`mithaq generate screens` writes each screen\'s files under generate.scree
 })
 
 test('`mithaq generate screens` writes each screen into the folder generate.screens names for it, where the screens are served by more than one app', async () => {
-  const platform = { ...screenClient(), path: '/platform' }
+  const backoffice = { ...screenClient(), path: '/backoffice' }
   const root = await projectOf(`export const asas = { targets: {
   portal: { capability: 'screen', client: ${JSON.stringify(screenClient())} },
-  platform: { capability: 'screen', client: ${JSON.stringify(platform)} },
+  backoffice: { capability: 'screen', client: ${JSON.stringify(backoffice)} },
 } }
 `)
   try {
     await writeFile(
       new URL('src/mithaq.ts', root),
-      "export const generate = { messages: 'src/messages/', screens: { portal: 'tenant/src/routes/(screens)/', platform: 'staff/src/routes/(screens)/' } }\n",
+      "export const generate = { messages: 'src/messages/', screens: { portal: 'tenant/src/routes/(screens)/', backoffice: 'staff/src/routes/(screens)/' } }\n",
     )
     const wrote = await command(root, 'generate', 'screens')
     assert.equal(wrote.code, 0, wrote.stderr)
     const under = async (folder: string) => (await readdir(new URL(folder, root))).sort()
     assert.deepEqual(await under('tenant/src/routes/(screens)/'), ['portal', 'portal.$.tsx', 'portal.index.tsx', 'portal.tsx'], 'the tenant app holds the portal and no other screen')
-    assert.deepEqual(await under('staff/src/routes/(screens)/'), ['platform', 'platform.$.tsx', 'platform.index.tsx', 'platform.tsx'], 'the staff app holds the platform and no other screen')
+    assert.deepEqual(await under('staff/src/routes/(screens)/'), ['backoffice', 'backoffice.$.tsx', 'backoffice.index.tsx', 'backoffice.tsx'], 'the staff app holds the backoffice and no other screen')
     const again = await command(root, 'generate', 'screens', '--check')
     assert.equal(again.code, 0, again.stderr)
     await writeFile(new URL('src/mithaq.ts', root), "export const generate = { messages: 'src/messages/', screens: { portal: 'tenant/src/routes/(screens)/' } }\n")
     const unnamed = await command(root, 'generate', 'screens')
     assert.notEqual(unnamed.code, 0, 'a screen generate.screens names no folder for is refused')
-    assert.match(unnamed.stderr, /generate\.screens names no folder for the screen platform/)
-    // A project with no app serving the platform screen says so, and nothing is written for it.
+    assert.match(unnamed.stderr, /generate\.screens names no folder for the screen backoffice/)
+    // A project with no app serving the backoffice screen says so, and nothing is written for it.
     await rm(new URL('staff/', root), { recursive: true })
-    await writeFile(new URL('src/mithaq.ts', root), "export const generate = { messages: 'src/messages/', screens: { portal: 'tenant/src/routes/(screens)/', platform: false } }\n")
+    await writeFile(new URL('src/mithaq.ts', root), "export const generate = { messages: 'src/messages/', screens: { portal: 'tenant/src/routes/(screens)/', backoffice: false } }\n")
     const unserved = await command(root, 'generate', 'screens')
     assert.equal(unserved.code, 0, unserved.stderr)
     await assert.rejects(readdir(new URL('staff/', root)), 'no folder is made for a screen no app serves')
@@ -1961,7 +1961,7 @@ export const { defineKayan, generate } = defineMithaq({
   // files are globbed off the app or the project, which refuses them anywhere else, so the project
   // holds those folders as links; the language's and the features' files are read through the
   // asas's `node_modules`, linked too.
-  for (const folder of ['ui-dashboard', 'ui-platform', 'ui-portal']) {
+  for (const folder of ['ui-dashboard', 'ui-backoffice', 'ui-portal']) {
     await symlink(fileURLToPath(new URL(`${folder}/`, import.meta.url)), fileURLToPath(new URL(`src/${folder}`, root)))
   }
   await symlink(fileURLToPath(new URL('../node_modules/', import.meta.url)), fileURLToPath(new URL('node_modules', root)))

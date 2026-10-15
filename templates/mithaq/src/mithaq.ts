@@ -42,9 +42,9 @@ import { systemRoles } from './roles/system-roles.ts'
 // add-on: uploads
 import { storageConfig } from './storage/index.ts'
 // end add-on: uploads
-import { onPlatform } from './mithaq/auth/index.ts'
+import { onBackoffice } from './mithaq/auth/index.ts'
 import { organizations, showOrganization } from './mithaq/auth/organizations.ts'
-import { assignedRoles, platformRolesOf, tenantAccess } from './roles/tenant-access.ts'
+import { assignedRoles, backofficeRolesOf, tenantAccess } from './roles/tenant-access.ts'
 // without add-on: roles
 // import { accessTarget } from './roles/member-access.ts'
 // end without add-on: roles
@@ -184,10 +184,10 @@ export const serverTargets = {
     onDelete: 'restrict',
     // How many organizations this project holds; in one a start over more is refused.
     organizations,
-    // Staff read every organization with `tenant: 'all'` in the platform app
+    // Staff read every organization with `tenant: 'all'` in the backoffice app
     // alone, which is the app's own fact and never the request's; their rows
     // there write nothing.
-    platform: ({ user }) => onPlatform() && platformRolesOf(user).length > 0,
+    backoffice: ({ user }) => onBackoffice() && backofficeRolesOf(user).length > 0,
   }),
   // The runner is a target too (`capability: 'service'`); a build has exactly
   // one, under this name. It holds no operations: each kayan spreads
@@ -301,7 +301,7 @@ export const requestContext = (_request: Request) => ({ requestId: crypto.random
 export const ui = folderOf(new URL('./ui/', import.meta.url))
 export const dashboardUi = folderOf(new URL('ui-dashboard/', asasSource))
 export const portalUi = folderOf(new URL('ui-portal/', asasSource))
-export const platformUi = folderOf(new URL('ui-platform/', asasSource))
+export const backofficeUi = folderOf(new URL('ui-backoffice/', asasSource))
 // add-on: courses
 /** Every screen's provider of course titles for a session's label, which the courses feature draws. */
 const sessionLabels = folderOf(new URL('courses/enrollments/ui/', featuresFolder))('session-labels.tsx#SessionLabels')
@@ -349,7 +349,7 @@ export const portalScreen = screenTarget({
     // end add-on: courses
   ],
   pages: { home: { path: '/', component: portalUi('home.tsx#Home') } },
-  // Its own top shell, which draws no link to the platform app: staff reach it
+  // Its own top shell, which draws no link to the backoffice app: staff reach it
   // from the dashboard alone. Every portal page is that shell over one of its
   // layouts: its own single column, or the dashboard's record layout, which a
   // course's edit page draws.
@@ -437,22 +437,22 @@ export const dashboardScreen = screenTarget({
 })
 
 /**
- * The platform screen: staff above every tenant, entered by `screen.platform`,
- * which only a platform role holds, and served by its own app,
- * `apps/asas-platform`, whose requests alone get the platform roles from the
+ * The backoffice screen: staff above every tenant, entered by `screen.backoffice`,
+ * which only a backoffice role holds, and served by its own app,
+ * `apps/asas-backoffice`, whose requests alone get the backoffice roles from the
  * template's role reader. It lists the provider's generated kayan and every
- * tenant kayan across organizations, read-only: a platform role reads every
+ * tenant kayan across organizations, read-only: a backoffice role reads every
  * tenant's rows by its keys and writes none. Local accounts are listed for a
  * super admin alone, who verifies a sign-up there. The settings global is not
  * listed: a list across tenants reads by `find`, which a global declares none
  * of.
  */
-export const platformScreen = screenTarget({
+export const backofficeScreen = screenTarget({
   ...shared,
   // The dashboard's frame with no organization switcher, which staff have no
   // use for, and a record page with a link back to its list.
-  layouts: { ...shared.layouts, app: ui('app-shell.tsx#PlatformShell'), record: platformUi('record-page.tsx#PlatformRecordPage') },
-  path: '/platform',
+  layouts: { ...shared.layouts, app: ui('app-shell.tsx#BackofficeShell'), record: backofficeUi('record-page.tsx#BackofficeRecordPage') },
+  path: '/backoffice',
   kayan: [
     'user',
     'organization',
@@ -478,7 +478,7 @@ export const platformScreen = screenTarget({
     sessionLabels,
     // end add-on: courses
   ],
-  pages: { home: { path: '/', component: platformUi('home.tsx#Home') } },
+  pages: { home: { path: '/', component: backofficeUi('home.tsx#Home') } },
   components: {},
 })
 
@@ -496,7 +496,7 @@ const language = defineMithaq({
     // glob and route files under `generate.screens`.
     dashboard: dashboardScreen,
     portal: portalScreen,
-    platform: platformScreen,
+    backoffice: backofficeScreen,
   },
   // Not a key the language knows: the project's own, passed through typed, and
   // read by `mithaq generate auth`, `messages` and `screens` to find where each
@@ -504,8 +504,8 @@ const language = defineMithaq({
   // instances from and writes into each generated kayan's import, and `language`
   // the module each of them imports `defineKayan` from. `screens` is
   // the host app's routes folder, one per screen because more than one app
-  // serves them: the tenant's two by `apps/asas-tanstack`, the platform by
-  // `apps/asas-platform`.
+  // serves them: the tenant's two by `apps/asas-tanstack`, the backoffice by
+  // `apps/asas-backoffice`.
   // Each path is from the asas's folder, where every `mithaq` command runs.
   generate: {
     language: '@asas/mithaq',
@@ -517,12 +517,12 @@ const language = defineMithaq({
     screens: {
       dashboard: '../../apps/asas-tanstack/src/routes/(screens)/',
       portal: '../../apps/asas-tanstack/src/routes/(screens)/',
-      // add-on: platform
-      platform: '../../apps/asas-platform/src/routes/(screens)/',
-      // end add-on: platform
-      // without add-on: platform
-      // platform: false,
-      // end without add-on: platform
+      // add-on: backoffice
+      backoffice: '../../apps/asas-backoffice/src/routes/(screens)/',
+      // end add-on: backoffice
+      // without add-on: backoffice
+      // backoffice: false,
+      // end without add-on: backoffice
     },
   },
 })
@@ -535,7 +535,7 @@ export type Language = typeof language
 
 /**
  * The field every tenant-owned kayan places, as `organization`: the tenant target's own, under the
- * platform's word for a tenant. Its copy is all a kayan may change of it, and a kayan that places
+ * backoffice's word for a tenant. Its copy is all a kayan may change of it, and a kayan that places
  * none is shared.
  */
 export const organization = { ...tenant.field, label: { en: 'Organization', ar: 'المؤسسة' } }

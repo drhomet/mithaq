@@ -3,8 +3,8 @@
 // `npm create mithaq` do, with `mithaq` and `mithaq-admin` installed from the packed tarballs and no framework source; each
 // consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request, seeds and passes
 // `mithaq generate --check`: a monorepo with every add-on with Bun, a minimal one (auth and the tags example) with npm,
-// which writes its own first migration and boots with no PLATFORM_URL, a single package with every add-on it can hold,
-// and a monorepo with settings, rich text, media without courses and the platform console but no roles, whose staff hold their keys through
+// which writes its own first migration and boots with no BACKOFFICE_URL, a single package with every add-on it can hold,
+// and a monorepo with settings, rich text, media without courses and the backoffice console but no roles, whose staff hold their keys through
 // Better Auth's member roles' access target as they do through the roles add-on's. A full project speaks the frozen
 // vocabulary, and every other one that vocabulary less the words its missing add-ons bring. A project with no rich text,
 // `mithaq` alone with npm, proves no Lexical is installed with it.
@@ -63,7 +63,7 @@ const vocabularyIn = ({ folder, source, extension }: { folder: string; source: s
 }
 // The template's, which holds every add-on and so every word, frozen until the owner signs a change.
 const vocabulary = vocabularyIn({ folder: join(root, 'templates/asas'), source: join(root, 'packages/mithaq/src'), extension: '.ts' })
-assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), '9fbe5ee8c20646b5e2455af0c88d5dab7e2da418763c73ffdbde6a8d24955b10', 'the template speaks the frozen vocabulary')
+assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), 'bbea29bc3551d376f822fb2b5cdd1161a13c7043603ab8f23de652b9ba35bd21', 'the template speaks the frozen vocabulary')
 type Words = Record<'kinds' | 'rules' | 'targets', Record<string, unknown>>
 const bare = vocabularyOf({ arkan: [base] }) as Words
 /** The words each add-on that brings any adds to the language: its rukn's kinds, rules and targets beyond `base`'s. */
@@ -118,7 +118,7 @@ try {
     { manager: 'bun', addOns: ['--full'], modes: [] },
     { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
     { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
-    { manager: 'bun', addOns: ['--with', 'settings,platform,rich-text,media'], modes: ['--organizations', 'many'] },
+    { manager: 'bun', addOns: ['--with', 'settings,backoffice,rich-text,media'], modes: ['--organizations', 'many'] },
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
@@ -162,8 +162,8 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
   const many = modes.includes('many')
   const open = modes.includes('open')
   const full = addOns.includes('--full')
-  // `--full` holds the platform console where the layout can.
-  const platform = !single && (full || addOns.some((one) => /(^|,)platform(,|$)/.test(one)))
+  // `--full` holds the backoffice console where the layout can.
+  const backoffice = !single && (full || addOns.some((one) => /(^|,)backoffice(,|$)/.test(one)))
   const name = `${manager}-${layout}-${full ? 'full' : addOns.length ? 'pick' : 'minimal'}`
   const consumer = join(scratch, name)
   const servers: ReturnType<typeof spawn>[] = []
@@ -183,11 +183,11 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const chosen = /^Created .*?, (?:with (.+)|minimal)\.$/m.exec(created.stdout)?.[1]?.split(', ') ?? []
     assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev   # the tenant app`))
     assert.match(created.stdout, new RegExp(`\\n  ${manager} run dev:setup${manager === 'npm' ? ' --' : ''} --seed\\n`))
-    assert.equal(created.stdout.includes(`from apps/asas-platform: ${manager} run dev`), platform)
+    assert.equal(created.stdout.includes(`from apps/asas-backoffice: ${manager} run dev`), backoffice)
     assert.equal(created.stdout.includes('The package is named asas'), single)
     const features = single ? [] : readdirSync(join(consumer, 'packages/features')).map((one) => `packages/features/${one}`)
-    const workspaces = single ? [''] : ['packages/mithaq', ...features, 'packages/asas', 'apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : [])]
-    assert.deepEqual(['templates', 'packages', 'apps/asas-platform'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : platform ? ['packages', 'apps/asas-platform'] : ['packages'])
+    const workspaces = single ? [''] : ['packages/mithaq', ...features, 'packages/asas', 'apps/asas-tanstack', ...(backoffice ? ['apps/asas-backoffice'] : [])]
+    assert.deepEqual(['templates', 'packages', 'apps/asas-backoffice'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : backoffice ? ['packages', 'apps/asas-backoffice'] : ['packages'])
     // Each package that draws or ejects a piece names mithaq-admin; one that holds only kayan or the auth setup's server side need not.
     const drawing = workspaces.filter((workspace) => (JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }).dependencies?.['mithaq-admin'] !== undefined)
     assert.ok(['packages/mithaq', 'packages/asas', 'apps/asas-tanstack'].every((one) => single || drawing.includes(one)), `${drawing.join(', ')} name mithaq-admin`)
@@ -197,7 +197,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       assert.ok(!existsSync(join(consumer, workspace, 'src/asas.test.ts')) && !existsSync(join(consumer, workspace, 'src/test-database.ts')), `${workspace} has no tests`)
     }
     const app = single ? consumer : join(consumer, 'apps/asas-tanstack')
-    const platformApp = join(consumer, 'apps/asas-platform')
+    const backofficeApp = join(consumer, 'apps/asas-backoffice')
     const mithaq = realpathSync(installed(app, 'mithaq'))
     assert.ok(mithaq.startsWith(join(realpathSync(consumer), 'node_modules')), `mithaq resolves to the installed tarball, not ${mithaq}`)
     assert.equal((JSON.parse(readFileSync(join(mithaq, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq')
@@ -215,7 +215,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     // installed mithaq-admin and must be up to date; with no package there the check answers undefined and this fails.
     // The storage adapters and their defaults come with uploads; the step and the mailers are every project's.
     const held = chosen.includes('uploads') ? 7 : 2
-    for (const [workspace, files] of single ? [[consumer, 13 + held]] as const : [[app, 13], ...(platform ? [[platformApp, 12]] as const : []), [language, held]] as const) {
+    for (const [workspace, files] of single ? [[consumer, 13 + held]] as const : [[app, 13], ...(backoffice ? [[backofficeApp, 12]] as const : []), [language, held]] as const) {
       installed(workspace, '.bin/mithaq')
       const check = spawnSync(process.execPath, ['--input-type=module', '-e', "import { pathToFileURL } from 'node:url'; import { upgradeCheck } from 'mithaq/upgrade'; console.log(JSON.stringify(await upgradeCheck(pathToFileURL(`${process.cwd()}/`))))"], { cwd: workspace, encoding: 'utf8' })
       assert.equal(check.status, 0, check.stderr)
@@ -245,7 +245,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     command(installed(app, '.bin/mithaq'), ['eject', 'nav-links'], app)
     const ejected = join(app, 'src/components/mithaq/nav-links.tsx')
     writeFileSync(ejected, `${readFileSync(ejected, 'utf8')}(globalThis as { ejectedProbe?: string }).ejectedProbe = 'mithaq-ejected-probe'\n`)
-    for (const project of single ? ['.'] : ['apps/asas-tanstack', ...(platform ? ['apps/asas-platform'] : []), '.']) command(tsc, ['-p', project], consumer)
+    for (const project of single ? ['.'] : ['apps/asas-tanstack', ...(backoffice ? ['apps/asas-backoffice'] : []), '.']) command(tsc, ['-p', project], consumer)
     // The database as a deploy leaves it: emptied, then migrated with the `drizzle-kit` the installed `mithaq` resolves.
     // Node runs the rest: the project's `.ts` lies outside `node_modules`, where Node strips types.
     command(process.execPath, ['--input-type=module', '-e', "import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute('drop schema if exists public cascade; create schema public; drop schema if exists drizzle cascade;'); await asas.destroy()"], template)
@@ -265,7 +265,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     command(manager, ['run', 'build'], app)
     const client = join(app, 'dist/client')
     assert.ok(readdirSync(client, { recursive: true, encoding: 'utf8' }).some((file) => file.endsWith('.js') && readFileSync(join(client, file), 'utf8').includes('mithaq-ejected-probe')), 'the build draws the ejected nav-links.tsx')
-    if (platform) command(manager, ['run', 'build'], platformApp)
+    if (backoffice) command(manager, ['run', 'build'], backofficeApp)
 
     const freePort = async () => {
       const held = createServer().listen(0, '127.0.0.1')
@@ -274,13 +274,13 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       await new Promise((done) => held.close(done))
       return port
     }
-    const [port, platformPort] = [await freePort(), await freePort()]
+    const [port, backofficePort] = [await freePort(), await freePort()]
     const origin = `http://127.0.0.1:${port}`
-    const platformOrigin = `http://127.0.0.1:${platformPort}`
-    const { BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _fallback, PLATFORM_URL: _platform, ...withoutAuthSecret } = process.env
-    // One organization is set up with the code alone; many leaves it unset, so the platform says to set it.
+    const backofficeOrigin = `http://127.0.0.1:${backofficePort}`
+    const { BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _fallback, BACKOFFICE_URL: _backoffice, ...withoutAuthSecret } = process.env
+    // One organization is set up with the code alone; many leaves it unset, so the backoffice says to set it.
     const setupCode = 'mithaq-release-consumer-setup-code-of-40-chars'
-    // A production boot needs these settings, PLATFORM_URL only where a platform app is served. `BETTER_AUTH_SECRET` is
+    // A production boot needs these settings, BACKOFFICE_URL only where a backoffice app is served. `BETTER_AUTH_SECRET` is
     // left out on purpose: each app answering proves it read the `.env` `create-mithaq` wrote, which TanStack Start
     // loads into `process.env`, a variable already set winning. Every production start needs a mailer, which mails into
     // this check's own catcher.
@@ -288,7 +288,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       ...withoutAuthSecret,
       NODE_ENV: 'production',
       BETTER_AUTH_URL: origin,
-      ...(platform && { PLATFORM_URL: platformOrigin }),
+      ...(backoffice && { BACKOFFICE_URL: backofficeOrigin }),
       STORAGE_SECRET: 'mithaq-release-consumer-storage-secret-32',
       STORAGE_PREFIX: 'mithaq/asas',
       STORAGE_ADAPTER: 'local',
@@ -317,7 +317,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     }
     // `vite preview` because the build writes a fetch handler and no server; spawned as Node on Vite's own entry,
     // not through `bun run`, so `kill()` reaches the process that holds the port.
-    for (const [at, child] of [[origin, start(app, port)], ...(platform ? [[platformOrigin, start(platformApp, platformPort)]] as const : [])] as const) {
+    for (const [at, child] of [[origin, start(app, port)], ...(backoffice ? [[backofficeOrigin, start(backofficeApp, backofficePort)]] as const : [])] as const) {
       for (let attempt = 0; ; attempt++) {
         assert.ok(child.exitCode === null && child.signalCode === null, `the app on ${at} exited:\n${output}`)
         const answered = await fetch(`${at}/api/not-ours`, { signal: AbortSignal.timeout(1_000) }).catch(() => undefined)
@@ -331,12 +331,12 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       }
     }
 
-    // Only the platform app makes a first administrator, so a project without one has no way to.
+    // Only the backoffice app makes a first administrator, so a project without one has no way to.
     const tenantFirst = await fetch(`${origin}/api/auth/user/first-register`, { method: 'POST', headers: { 'content-type': 'application/json', origin }, body: '{}', signal: AbortSignal.timeout(10_000) })
     assert.equal(tenantFirst.status, 404, 'the tenant app serves no first-register')
-    if (platform) {
-      // The `.env` `create-mithaq` wrote leaves SETUP_CODE empty, and a production platform says to set it; set, it asks for it.
-      const page = await (await fetch(`${platformOrigin}/auth/create-first-user`, { signal: AbortSignal.timeout(10_000) })).text()
+    if (backoffice) {
+      // The `.env` `create-mithaq` wrote leaves SETUP_CODE empty, and a production backoffice says to set it; set, it asks for it.
+      const page = await (await fetch(`${backofficeOrigin}/auth/create-first-user`, { signal: AbortSignal.timeout(10_000) })).text()
       assert.equal(page.includes('SETUP_CODE is unset or shorter than 32 characters'), many, `the first-administrator page says whether SETUP_CODE is set:\n${page.slice(0, 600)}`)
       assert.equal(page.includes('The SETUP_CODE this server was started with.'), !many, 'and asks for it where it is')
     }
@@ -372,12 +372,12 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       assert.equal((await post('sign-in/email', { email: person, password: 'release-test-password' })).status, 200, 'and signs in')
       const membersPage = await (await fetch(`${origin}/dashboard/members`, { headers: { cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).text()
       assert.ok(membersPage.includes('data-add-person'), `the Members page offers Add person:\n${membersPage.slice(0, 600)}`)
-      if (platform) {
-        // First-run made the owner the platform's administrator too, since it had none.
-        const staff = await post('sign-in/email', { email: owner, password: 'release-test-password' }, {}, platformOrigin)
+      if (backoffice) {
+        // First-run made the owner the backoffice's administrator too, since it had none.
+        const staff = await post('sign-in/email', { email: owner, password: 'release-test-password' }, {}, backofficeOrigin)
         assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
-        const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: cookieOf(staff) }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
-        assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s first owner holds every platform key: ${JSON.stringify(report).slice(0, 400)}`)
+        const report = await (await fetch(`${backofficeOrigin}/api/access`, { headers: { origin: backofficeOrigin, cookie: cookieOf(staff) }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
+        assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s first owner holds every backoffice key: ${JSON.stringify(report).slice(0, 400)}`)
       }
     } else {
       const email = `release-${stamp}@example.com`
@@ -391,9 +391,9 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const cookie = cookieOf(signedIn)
       const organization = await post('organization/create', { name: 'Release', slug: `release-${stamp}` }, { cookie })
       assert.equal(organization.status, 200, `${await organization.text()}\n${output}`)
-      if (platform) {
-        // A staff member who belongs to no organization, so the platform session has none active: the access target is
-        // asked with no tenant, and only the project's role reader answers the platform role. Whichever target the
+      if (backoffice) {
+        // A staff member who belongs to no organization, so the backoffice session has none active: the access target is
+        // asked with no tenant, and only the project's role reader answers the backoffice role. Whichever target the
         // project's add-ons chose, staff hold every key there.
         const email = `staff-${stamp}@example.com`
         const joined = await fetch(`${origin}/api/auth/user/sign-up/email`, {
@@ -404,18 +404,18 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
         })
         assert.equal(joined.status, 200, `${await joined.text()}\n${output}`)
         command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = '${email}'"); await asas.destroy()`], template)
-        const staff = await fetch(`${platformOrigin}/api/auth/user/sign-in/email`, {
+        const staff = await fetch(`${backofficeOrigin}/api/auth/user/sign-in/email`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', origin: platformOrigin },
+          headers: { 'content-type': 'application/json', origin: backofficeOrigin },
           body: JSON.stringify({ email, password: 'release-test-password' }),
           signal: AbortSignal.timeout(10_000),
         })
         assert.equal(staff.status, 200, `${await staff.text()}\n${output}`)
         const staffCookie = staff.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
-        const session = await (await fetch(`${platformOrigin}/api/auth/user/get-session`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { session?: { activeOrganizationId?: string | null } } | null
+        const session = await (await fetch(`${backofficeOrigin}/api/auth/user/get-session`, { headers: { origin: backofficeOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { session?: { activeOrganizationId?: string | null } } | null
         assert.equal(session?.session?.activeOrganizationId ?? null, null, `the staff session has no organization active: ${JSON.stringify(session).slice(0, 400)}`)
-        const report = await (await fetch(`${platformOrigin}/api/access`, { headers: { origin: platformOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
-        assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s platform staff hold every key: ${JSON.stringify(report).slice(0, 400)}`)
+        const report = await (await fetch(`${backofficeOrigin}/api/access`, { headers: { origin: backofficeOrigin, cookie: staffCookie }, signal: AbortSignal.timeout(10_000) })).json() as { canAccessAdmin?: boolean; permissions?: unknown }
+        assert.deepEqual([report.canAccessAdmin, report.permissions], [true, '*'], `${name}'s backoffice staff hold every key: ${JSON.stringify(report).slice(0, 400)}`)
       }
     }
     // The sample rows of whatever the project holds, written through its own operations as that organization's owner.
@@ -442,17 +442,17 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     assert.match(setUp.stdout, /"totals":\{"tags":6[,}]/, setUp.stdout)
     const signIn = [
       "import { asas } from './src/asas.ts'",
-      `const { asPlatform, platformApp } = await import('${single ? './src/mithaq/auth/index.ts' : `@${name}/mithaq/auth`}')`,
+      `const { asBackoffice, backofficeApp } = await import('${single ? './src/mithaq/auth/index.ts' : `@${name}/mithaq/auth`}')`,
       "const server = asas.auth.strategies.find((one) => one.name === 'user').server",
       'const body = { email: process.env.DEV_ADMIN_EMAIL, password: process.env.DEV_ADMIN_PASSWORD }',
       'const tenant = (await server.api.signInEmail({ body, asResponse: true })).status',
-      'const platform = platformApp ? (await asPlatform(() => server.api.signInEmail({ body, asResponse: true }))).status : null',
-      'console.log(JSON.stringify({ tenant, platform }))',
+      'const backoffice = backofficeApp ? (await asBackoffice(() => server.api.signInEmail({ body, asResponse: true }))).status : null',
+      'console.log(JSON.stringify({ tenant, backoffice }))',
       'await asas.destroy()',
     ].join('\n')
     const signedIn = spawnSync(process.execPath, ['--env-file=.env', '--input-type=module', '-e', signIn], { cwd: template, encoding: 'utf8', env: { ...process.env, DATABASE_URL: fresh } })
     assert.equal(signedIn.status, 0, signedIn.stderr)
-    assert.deepEqual(JSON.parse(signedIn.stdout.trim().split('\n').at(-1)!), { tenant: 200, platform: platform ? 200 : null }, `${name}'s dev admin signs in to each app`)
+    assert.deepEqual(JSON.parse(signedIn.stdout.trim().split('\n').at(-1)!), { tenant: 200, backoffice: backoffice ? 200 : null }, `${name}'s dev admin signs in to each app`)
     command(process.execPath, ['--input-type=module', '-e', recreate.replace("; await asas.targets.drizzle.db.execute('create database mithaq_dev_setup')", '')], template)
     console.log(`release consumer passed: ${name}`)
   } finally {

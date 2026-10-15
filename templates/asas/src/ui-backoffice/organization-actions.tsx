@@ -32,22 +32,22 @@ export function OrganizationActions({ value, row }: CellProps) {
     const slug = box('slug')
     const found = {
       name: name.trim() ? undefined : t('organization.name.required', 'This field is required.'),
-      slug: !slug ? t('organization.slug.required', 'This field is required.') : slugShape.test(slug) ? undefined : t('platform.slugPattern', 'A slug is lowercase letters and digits joined by single dashes, such as admin-org.'),
+      slug: !slug ? t('organization.slug.required', 'This field is required.') : slugShape.test(slug) ? undefined : t('backoffice.slugPattern', 'A slug is lowercase letters and digits joined by single dashes, such as admin-org.'),
     }
     setWrong(found)
     if (found.name || found.slug) return
-    const response = await fetch('/api/platform/organizations/update', {
+    const response = await fetch('/api/backoffice/organizations/update', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id, name, slug }),
     })
     if (!response.ok) {
       const key = ((await response.json().catch(() => null)) as { data?: { key?: string } } | null)?.data?.key
-      return setRefusal((key && t(key)) ?? t('platform.refused', 'The platform refused that action.'))
+      return setRefusal((key && t(key)) ?? t('backoffice.refused', 'The backoffice refused that action.'))
     }
     window.dispatchEvent(new Event('mithaq:refresh'))
     // A function, so a name holding `$&` is put in as written.
-    setDone((t('platform.renamed', 'The organization is now named {name}.') ?? '').replace('{name}', () => name))
+    setDone((t('backoffice.renamed', 'The organization is now named {name}.') ?? '').replace('{name}', () => name))
   }
   return (
     <div data-organization={id} className="flex items-center gap-2 whitespace-nowrap">
@@ -55,7 +55,7 @@ export function OrganizationActions({ value, row }: CellProps) {
       <span dir="ltr">{String(value ?? '')}</span>
       {renames ? (
         <Button size="sm" variant="outline" className="max-sm:h-11" data-action="rename" onClick={() => setOpen(true)}>
-          {t('platform.rename', 'Rename')}
+          {t('backoffice.rename', 'Rename')}
         </Button>
       ) : null}
       {members ? (
@@ -67,7 +67,7 @@ export function OrganizationActions({ value, row }: CellProps) {
           nativeButton={false}
           render={<a href={`${screen.path}${screen.kayan.member!.pages.list!.path}?${new URLSearchParams(writeQuery({ where: { or: [{ and: [{ organizationId: { equals: id } }] }] } }))}`} />}
         >
-          {t('platform.members', 'Members')}
+          {t('backoffice.members', 'Members')}
         </Button>
       ) : null}
       {open ? (
@@ -76,8 +76,8 @@ export function OrganizationActions({ value, row }: CellProps) {
               English alone, is not drawn beside it. */}
           <DialogContent showCloseButton={false}>
             <DialogHeader>
-              <DialogTitle>{t('platform.rename', 'Rename')}</DialogTitle>
-              <DialogDescription aria-live="polite">{done ?? t('platform.renameAbout', 'The new name and slug take the place of the old ones for everyone in this organization.')}</DialogDescription>
+              <DialogTitle>{t('backoffice.rename', 'Rename')}</DialogTitle>
+              <DialogDescription aria-live="polite">{done ?? t('backoffice.renameAbout', 'The new name and slug take the place of the old ones for everyone in this organization.')}</DialogDescription>
             </DialogHeader>
             {done ? (
               <DialogFooter>

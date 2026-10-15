@@ -1,10 +1,10 @@
 // This project's access for the generated `member` kayan, which `mithaq
 // generate auth` imports into `./member.ts` because this file sits beside it. A
-// platform role reads every organization's members in the platform app, by the
+// backoffice role reads every organization's members in the backoffice app, by the
 // keys it holds, and no one writes through it. There is no `'*'` row, so a
 // tenant's actor takes no row here and reads nothing: a tenant lists its
 // members through the provider's own `list-members`.
 import { rows } from '@asas/mithaq'
-import { platformReads } from '@asas/mithaq/roles/tenant-access.ts'
+import { backofficeReads } from '@asas/mithaq/roles/tenant-access.ts'
 
-export const access = rows(platformReads)
+export const access = rows(backofficeReads)
