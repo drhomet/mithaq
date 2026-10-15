@@ -26,12 +26,14 @@ export const wanted = ({ asked, home }: { asked: string | undefined; home: strin
 
 /**
  * Where a signed-in person goes: the path asked for where it lies inside a screen they open, else the
- * one screen they open, else `/unauthorized`, which asks which of several or says why there is none.
- * A path in a screen they do not open is not followed, since there they would only be refused.
+ * one screen they open, else the dashboard, since whoever opens several is staff, else `/unauthorized`,
+ * which asks which of several or says why there is none. The dashboard is found by its screen's name,
+ * never its place in the list. A path in a screen they do not open is not followed, since there they
+ * would only be refused.
  */
-export const landing = ({ asked, screens }: { asked: string | undefined; screens: readonly string[] }): string => {
-  const home = screens.length === 1 ? screens[0]! : '/unauthorized'
+export const landing = ({ asked, screens }: { asked: string | undefined; screens: readonly { name: string; path: string }[] }): string => {
+  const home = (screens.length === 1 ? screens[0] : screens.find((one) => one.name === 'dashboard'))?.path ?? '/unauthorized'
   const path = wanted({ asked, home })
   const { pathname } = new URL(path, base)
-  return screens.some((screen) => pathname === screen || pathname.startsWith(`${screen}/`)) ? path : home
+  return screens.some(({ path: screen }) => pathname === screen || pathname.startsWith(`${screen}/`)) ? path : home
 }
