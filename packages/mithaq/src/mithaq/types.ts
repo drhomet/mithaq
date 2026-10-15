@@ -77,6 +77,8 @@ type Named<Locale extends string = string> = {
   options?: readonly { readonly value: string; readonly label: Localized<Locale> }[]
   /** A `json` field only: the JSON Schema its value is checked against, as Payload's field takes it. */
   jsonSchema?: JsonSchema
+  /** A `json` field only, and every one names it: the longest JSON text its value is, `defaultJsonMaxBytes` or its own. */
+  maxBytes?: number
   /** The column name. A relationship without one gets `<snake_case name>_id`. */
   dbName?: string
   /**

@@ -18,6 +18,7 @@ import {
   defaultGlobalFields,
   defaultGlobalOperations,
   defaultJoinLimit,
+  defaultJsonMaxBytes,
   defaultLimit,
   defaultMaxLimit,
   defaultOperations,
@@ -136,7 +137,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const memos = language.defineKayan({
     name: 'memos',
     schemaName: 'tenant_scope',
-    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, meta: { kind: 'json', rules: { defaultValue: {} } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
+    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, meta: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: {} } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
     // `read: true` for an editor: the broadest answer a row gives.
     // A reader's answer is a filter, so under `tenant: 'mine'` its organizations take a branch of their own.
     access: language.rows({ editor: { create: true, read: true, update: true, delete: true }, reader: { read: { title: { not_equals: 'hidden' } } }, staff: { read: true } } as never),

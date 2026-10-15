@@ -146,11 +146,11 @@ const target = {
     fields: F,
   ): ZodShapes<F> {
     const built = fieldShapes(fields, this.kinds, this.rules)
-    // A stored row is read against its kinds alone, with no rule, no `options` and no `jsonSchema`, so
-    // one added after rows were stored refuses their next save, never their read.
+    // A stored row is read against its kinds alone, with no rule, `options`, `jsonSchema` or `maxBytes`,
+    // so one added after rows were stored refuses their next save, never their read.
     const kinds = Object.fromEntries(Object.entries(fields).map(([name, field]) => [
       name,
-      { ...field, options: undefined, jsonSchema: undefined, ...(field.kind === 'richText' && { richText: storedRichText }) },
+      { ...field, options: undefined, jsonSchema: undefined, maxBytes: undefined, ...(field.kind === 'richText' && { richText: storedRichText }) },
     ]))
     const stored = fieldShapes(kinds, this.kinds, { localized: this.rules.localized! })
     const drafted = fieldShapes(

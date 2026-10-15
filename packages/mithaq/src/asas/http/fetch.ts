@@ -53,7 +53,35 @@ export const draftOptions = (request: Request) => {
   }
 }
 
+/**
+ * The largest request body a plug reads, which a project names as `maxBodyBytes`: room for a
+ * json field's `defaultJsonMaxBytes` written in any script. A file never comes this way.
+ */
+export const defaultMaxBodyBytes = 4 * 1024 * 1024
+
+/**
+ * The body, or `undefined` once it passes `limit` bytes. Counted as it arrives, since a
+ * `content-length` may be absent or wrong, and the rest is never read.
+ */
+export const boundedBody = async (request: Request, limit: number): Promise<Blob | undefined> => {
+  if (Number(request.headers.get('content-length')) > limit) return undefined
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for await (const chunk of (request.body ?? []) as AsyncIterable<Uint8Array>) {
+    size += chunk.byteLength
+    // Leaving the loop cancels the stream.
+    if (size > limit) return undefined
+    chunks.push(chunk)
+  }
+  return new Blob(chunks as BlobPart[])
+}
+
+export const tooLarge = (limit: number) =>
+  Response.json({ code: codes[413], message: `The request body holds at most ${limit} bytes.` }, { status: 413 })
+
 export type FetchHttpOptions = {
+  /** The largest body a call takes, answered 413 past it: `defaultMaxBodyBytes` or the project's own. */
+  maxBodyBytes?: number
   /**
    * Builds the context every step of a served call reads, from the request and the actor.
    * The plug reads no header or body key into it; a throw is answered 500.
@@ -67,7 +95,7 @@ export type FetchHttpOptions = {
  * The default HTTP plug: `POST /api/<kayan>/<operation>` with a JSON body, over
  * `Request` and `Response` alone. The runner parses each operation's input.
  */
-export const fetchHttp = ({ context, onError = console.error }: FetchHttpOptions = {}) =>
+export const fetchHttp = ({ context, onError = console.error, maxBodyBytes = defaultMaxBodyBytes }: FetchHttpOptions = {}) =>
   <View>(operations: OperationTable<View>): HttpPlug => {
     const table = new Map(operations.map((one) => [`${one.kayan}/${one.name}`, one]))
     return {
@@ -82,7 +110,9 @@ export const fetchHttp = ({ context, onError = console.error }: FetchHttpOptions
         if (api !== 'api' || !kayan || !name || rest.length > 0) return null
         const operation = table.get(`${kayan}/${name}`)
         if (!operation) return null
-        const body = await request.text()
+        const read = await boundedBody(request, maxBodyBytes)
+        if (!read) return tooLarge(maxBodyBytes)
+        const body = await read.text()
         // Keyless: refused before any operation, and the key names an operation's refusal.
         const undecodable = (message: string) => Response.json({ code: codes[400], message }, { status: 400 })
         let input: unknown = {}

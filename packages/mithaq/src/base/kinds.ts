@@ -40,6 +40,12 @@ export const kind = <Value>(accepts: (value: unknown) => value is Value) =>
 /** A value `JSON.parse` could hand back. */
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 
+/**
+ * The longest JSON text a json field holds, which a field names as its `maxBytes`, so one write
+ * never stores a value every read of the row then carries.
+ */
+export const defaultJsonMaxBytes = 1_000_000
+
 /** How deep a json value nests: past it every reader that walks it, this check first, would run out of stack. */
 export const jsonDepth = 64
 

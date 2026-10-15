@@ -10,6 +10,7 @@ import { combineWhere } from '../mithaq/where.ts'
 import type { ReaderMap } from './runner/read.ts'
 import { bulk, read as readers, write, type ServiceTarget } from '../service/index.ts'
 import { invalid } from './runner/errors.ts'
+import { boundedBody, defaultMaxBodyBytes, tooLarge } from './http/fetch.ts'
 import { fieldlessOperation, keepOperationKeys } from '../rbac/steps.ts'
 import { resolvedKayans, type ActorBoundAccess, type AdminAccess, type Kayan, type RuntimeField, type ResolvedKayan, type ServiceOf } from '../mithaq/types.ts'
 import { accessTargetOf, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceKeys, serviceTargetOf, type Language, type Store } from '../mithaq/language.ts'
@@ -1097,13 +1098,14 @@ export const buildAsas = <
           // Read here first, so a client that goes away mid-body is answered 499 here rather than
           // logged by the provider as its own 500.
           if (!request.body) return strategy.handler(request)
-          let body: ArrayBuffer
+          let body: Blob | undefined
           try {
-            body = await request.arrayBuffer()
+            body = await boundedBody(request, defaultMaxBodyBytes)
           } catch (thrown) {
             if (request.signal.aborted) return new Response(null, { status: 499 })
             throw thrown
           }
+          if (!body) return tooLarge(defaultMaxBodyBytes)
           return strategy.handler(new Request(request.url, { method: request.method, headers: request.headers, body, signal: request.signal }))
         }
       }

@@ -11,7 +11,7 @@ export { heldPermissions, type Assigned, type CommandActor } from './rbac/index.
 export { holdsPermission, requestOrganization } from './auth/better-auth/index.ts'
 export type { AssignedResolver, AuthStrategy, KayanAuth } from './asas/actor.ts'
 export type { AuthConfig, HttpPlug, Operation, OperationTable, Vocabulary } from './asas/build.ts'
-export { fetchHttp, type FetchHttpOptions } from './asas/http/fetch.ts'
+export { defaultMaxBodyBytes, fetchHttp, type FetchHttpOptions } from './asas/http/fetch.ts'
 export { AfterCommitError, AsasError, conflict, denied, invalid, missing, Notice, type MessageKey } from './asas/runner/errors.ts'
 export {
   audit,
@@ -70,7 +70,7 @@ export { uploadFields } from './storage/storage.ts'
 export { accessFor, fieldAccessFor } from './mithaq/types.ts'
 export type { Access, AccessArgs, AccessResult, AdminAccess, AdminAccessArgs, CompoundIndex, FieldAccess, FieldAccessArgs, Field, FilterOptions, JsonSchema, Kayan, KayanService, LabelFunction, Localized, LocalesOf, MessageMap, MessageTree, ResolvedField, ResolvedKayan, RuntimeField } from './mithaq/types.ts'
 export type { Copy, MessageRegistry, MessageScope, MessagesResolver, ProjectMessages } from './mithaq/messages.ts'
-export { defaultKinds, isJson, kind, type Json, type Kind, type OnDelete } from './base/kinds.ts'
+export { defaultJsonMaxBytes, defaultKinds, isJson, kind, type Json, type Kind, type OnDelete } from './base/kinds.ts'
 export { jsonSchemaCheck } from './base/json-schema.ts'
 export type { RichTextNode, RichTextValue } from './rich-text/value.ts'
 export { defineRukn, type KayanConfigs, type Rukn } from './mithaq/rukn.ts'

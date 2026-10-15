@@ -43,7 +43,7 @@ export const uniqueRuleIndexes = new WeakSet<object>()
 
 export const isPlainIdentifier = (value: string) => value.length <= 63 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value)
 
-const fixed = new Set(['access', 'column', 'custom', 'dbName', 'description', 'jsonSchema', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
+const fixed = new Set(['access', 'column', 'custom', 'dbName', 'description', 'jsonSchema', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'maxBytes', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
 
 // Every list holds exactly one store or managed read step, and none of the three
 // the runner owns; the effect is read off that one step, so it is never declared.
@@ -690,6 +690,10 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
     }
   }
   const jsonSchemaNamed = (where: string, field: RuntimeField) => {
+    if (field.kind !== 'json' && field.maxBytes !== undefined) throw new Error(`${where} has a maxBytes, and kind "${field.kind}" takes none; only a json field does.`)
+    if (field.kind === 'json' && !(Number.isInteger(field.maxBytes) && field.maxBytes! > 0)) {
+      throw new Error(`${where} is json and names no maxBytes; name maxBytes: defaultJsonMaxBytes, or a whole number of its own.`)
+    }
     const { jsonSchema } = field
     if (jsonSchema === undefined) return
     if (field.kind !== 'json') throw new Error(`${where} has a jsonSchema, and kind "${field.kind}" takes none; only a json field does.`)

@@ -32,6 +32,7 @@ import {
   defaultDepth,
   defaultLimit,
   defaultMaxLimit,
+  defaultMaxBodyBytes,
   defaultJoinLimit,
   defaultBulkLimit,
   defaultLockTime,
@@ -18076,6 +18077,15 @@ test('220d. a request to an auth arm whose client went away while sending its bo
     logged.mock.restore()
   }
   await assert.rejects(() => asas.handler(reading(false)), /aborted/, 'a body that failed with the client still there is a fault the host reports')
+})
+
+test('220e. a body to an auth arm past defaultMaxBodyBytes is answered 413 before it is read whole, and never reaches the provider', async () => {
+  const sent = (body: BodyInit, headers: Record<string, string> = {}) =>
+    asas.handler(new Request('http://test/api/auth/user/sign-in/email', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body, duplex: 'half' } as RequestInit))
+  const large = JSON.stringify({ email: 'x'.repeat(defaultMaxBodyBytes), password: 'y' })
+  assert.equal((await sent(large)).status, 413)
+  const streamed = new ReadableStream({ start: (stream) => { stream.enqueue(new TextEncoder().encode(large)); stream.close() } })
+  assert.equal((await sent(streamed)).status, 413, 'counted as it arrives, with no length said')
 })
 
 const roleTenant = async (slug: string) => {

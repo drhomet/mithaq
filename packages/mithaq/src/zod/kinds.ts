@@ -61,7 +61,7 @@ export const kinds = {
   // Only what JSON can say, so a value reads back as it was written; `z.json()` lets a cycle through.
   // A `jsonSchema` only judges: what is stored is the value as sent.
   json: (field?: ResolvedField) => {
-    const shape = z.custom<Json>((value) => isJson(value), { error: errorOf(field) })
+    const shape = z.custom<Json>((value) => isJson(value) && !(field?.maxBytes && JSON.stringify(value).length > field.maxBytes), { error: errorOf(field) })
     return field?.jsonSchema ? shape.refine(jsonSchemaCheck(field), { error: errorOf(field) }) : shape
   },
   // Left loose: the child's row shape may not be derived yet, and the child's own read already parsed the rows.
