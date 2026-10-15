@@ -361,6 +361,7 @@ export const settings = defineGlobal({
     ...defaultFields,
     organization: { ...organization, rules: { ...organization.rules, unique: true } },
     // ...
+    contactEmail: { kind: 'email', label: { en: 'Contact email', ar: 'بريد التواصل' } },
     globalType: { ...defaultGlobalFields.globalType, rules: { required: true, defaultValue: 'settings' } },
   },
   // ...

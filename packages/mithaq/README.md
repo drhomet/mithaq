@@ -406,7 +406,7 @@ export const settings = defineGlobal({
   name: 'settings',
   fields: {
     ...defaultFields,
-    siteTitle: { kind: 'text', label: { en: 'Site title', ar: 'عنوان الموقع' }, rules: { required: true } },
+    contactEmail: { kind: 'email', label: { en: 'Contact email', ar: 'بريد التواصل' } },
     ...defaultGlobalFields,
   },
   targets: { service: { operations: defaultGlobalOperations } },
