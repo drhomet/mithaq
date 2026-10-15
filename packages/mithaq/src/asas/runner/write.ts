@@ -5,7 +5,7 @@ import { authActor } from '../actor.ts'
 import { AfterCommitError, AsasError, conflict, denied, invalid, missing } from './errors.ts'
 import type { AdminAccess, FieldAccess, LocalesOf, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
-import { defaultKinds, type Kind } from '../../base/kinds.ts'
+import { defaultKinds, isStorableText, type Kind } from '../../base/kinds.ts'
 import type { RichTextValue } from '../../rich-text/value.ts'
 import type { Access } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
@@ -79,6 +79,9 @@ const known: ReadonlySet<string> = new Set<Operator>(operatorList)
 const and = new Intl.ListFormat('en-GB', { type: 'conjunction' })
 
 const checkOperatorValue = (said: string, field: string, operator: string, value: unknown) => {
+  if ([value].flat().some((one) => typeof one === 'string' && !isStorableText(one))) {
+    throw new Error(`${said} field "${field}" operator "${operator}" compares text holding a NUL or half a surrogate pair, which no column holds.`)
+  }
   if (operator === 'exists') {
     if (typeof value !== 'boolean') throw new Error(`${said} field "${field}" operator "exists" needs a boolean.`)
     return
@@ -108,7 +111,7 @@ const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; s
   const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments, or a key at each segment after a json field.`
   const field = parts[0]!
   const resolved = kayan.fields[field]
-  if ((parts.length > 2 && resolved?.kind !== 'json') || parts.some((part) => !part)) throw new Error(unsupported)
+  if ((parts.length > 2 && resolved?.kind !== 'json') || parts.some((part) => !part || !isStorableText(part))) throw new Error(unsupported)
   const path = parts[1]
   if (!resolved) throw new Error(`${said} names unknown field "${key}".`)
   if (resolved.kind === 'json') return { field, key, kind: resolved.kind, operators: resolved.operators }

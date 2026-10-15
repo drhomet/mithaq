@@ -341,6 +341,24 @@ describe('postgres', () => {
     }
   })
 
+  test('a NUL or a lone surrogate, in a path, a compared value or a written json string or key, is the caller\'s 400 rather than Postgres\'s 500', async () => {
+    for (const where of [
+      { 'data.a\u0000': { exists: true } },
+      { 'data.\ud800': { exists: true } },
+      { 'data.a': { equals: 'x\u0000' } },
+      { 'data.a': { in: ['ok', 'x\u0000'] } },
+      { 'data.a': { contains: '\udc00' } },
+      { label: { equals: 'x\u0000' } },
+      { label: { like: 'x\u0000' } },
+    ]) {
+      await assert.rejects(() => operations.find({ where: where as never }), refused, JSON.stringify(where))
+    }
+    for (const data of [{ a: 'x\u0000' }, { 'k\u0000': 1 }, ['\ud800'], { '\udfff': true }]) {
+      await assert.rejects(() => operations.create({ label: 'bad', data: data as never }), refused, JSON.stringify(data))
+    }
+    await operations.create({ label: 'paired', data: { '😀': '😀 مرحبا' } })
+  })
+
   test('a version snapshots a json value whole, a draft holds its own, and a restore writes the snapshot back as it was', async () => {
     const page = built.kayan.pages.operations
     const first = { blocks: [{ type: 'hero', title: 'One' }], seo: { index: true } }

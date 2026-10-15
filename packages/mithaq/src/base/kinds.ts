@@ -49,20 +49,26 @@ export const defaultJsonMaxBytes = 1_000_000
 /** How deep a json value nests: past it every reader that walks it, this check first, would run out of stack. */
 export const jsonDepth = 64
 
+/** Text Postgres holds: no NUL, which no `text` or `jsonb` takes, and no half of a surrogate pair. */
+export const isStorableText = (text: string) => !text.includes('\u0000') && text.isWellFormed()
+
 /**
  * Plain JSON, nested at most `jsonDepth` deep: no `undefined`, no number that is
- * not finite, no `Date`, class instance or function, and no cycle. A store would
+ * not finite, no `Date`, class instance or function, no cycle, and no string or key
+ * Postgres cannot store. A store would
  * otherwise drop, rewrite or refuse it on the way in, and read back something else.
  */
 export const isJson = (value: unknown, open: object[] = []): value is Json => {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
+  if (typeof value === 'string') return isStorableText(value)
+  if (value === null || typeof value === 'boolean') return true
   if (typeof value === 'number') return Number.isFinite(value)
   if (typeof value !== 'object' || open.length >= jsonDepth || open.includes(value)) return false
   const prototype = Object.getPrototypeOf(value)
   if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return false
   open.push(value)
   // `Object.values` skips a hole, which `JSON.stringify` would write as `null`, so the length is checked too.
-  const plain = (!Array.isArray(value) || Object.keys(value).length === value.length) && Object.values(value).every((one) => isJson(one, open))
+  const plain = (Array.isArray(value) ? Object.keys(value).length === value.length : Object.keys(value).every(isStorableText))
+    && Object.values(value).every((one) => isJson(one, open))
   open.pop()
   return plain
 }
