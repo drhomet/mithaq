@@ -33,7 +33,7 @@ export const authGate = createServerFn({ method: 'GET' }).handler(async () => {
   const [signedIn, { password }] = await Promise.all([signedInAs(asas.auth.actor(getRequest().headers)), provider.server.$context])
   const entered = signedIn ? ((await loadEnterable())?.screens ?? []) : []
   const home: { path: string; name?: string } = entered[0] ?? { path: '/unauthorized' }
-  return { signedIn, home, screens: entered.map((one) => one.path), password: { min: password.config.minPasswordLength, max: password.config.maxPasswordLength } }
+  return { signedIn, home, screens: entered, password: { min: password.config.minPasswordLength, max: password.config.maxPasswordLength } }
 })
 
 /**
@@ -57,7 +57,7 @@ export const useHomeLabel = () => {
 }
 
 /** What the forgot and reset pages draw for someone already signed in: the way on, and a sign-out. */
-export function AlreadySignedIn({ redirect: asked, home, screens }: { redirect?: string; home: { path: string; name?: string }; screens: readonly string[] }) {
+export function AlreadySignedIn({ redirect: asked, home, screens }: { redirect?: string; home: { path: string; name?: string }; screens: readonly { name: string; path: string }[] }) {
   const { t } = useCopy()
   const label = useHomeLabel()
   const to = landing({ asked, screens })
@@ -147,4 +147,4 @@ export function AuthBox({
     </FieldShell>
   )
 }
-// mithaq-admin 0.0.0 cb5f3a201b5311a85a347a97c8b7ff0a45940f013a597e972c108df46f9075f8
+// mithaq-admin 0.0.0 e498423cf4a61adb8cf6358d043d31ae92d853de4c6939a9c0fe138c848b7211

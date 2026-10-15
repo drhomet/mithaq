@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { landing, wanted } from './redirect.ts'
 
-test('signing in lands where it was asked inside a screen the person opens, else on the one screen they open, else on the chooser', () => {
-  const portal = ['/portal']
-  const both = ['/dashboard', '/portal']
+test('signing in lands where it was asked inside a screen the person opens, else on the one screen they open, else on the dashboard for staff who open several, else on the chooser', () => {
+  const portal = [{ name: 'portal', path: '/portal' }]
+  const both = [{ name: 'dashboard', path: '/dashboard' }, { name: 'portal', path: '/portal' }]
   assert.equal(landing({ asked: undefined, screens: portal }), '/portal', 'a student, who opens the portal alone, lands on it')
   assert.equal(landing({ asked: '/dashboard', screens: portal }), '/portal', 'and is not sent to the dashboard it would be refused')
   assert.equal(landing({ asked: '/dashboard/courses?page=2', screens: portal }), '/portal', 'nor to a page of it')
@@ -22,8 +22,10 @@ test('signing in lands where it was asked inside a screen the person opens, else
   assert.equal(landing({ asked: 'javascript:alert(1)', screens: portal }), '/portal', 'and a scheme is no path')
   assert.equal(landing({ asked: '/PORTAL', screens: portal }), '/portal', 'a path is matched as it is spelled')
   assert.equal(landing({ asked: '/portal/courses#top', screens: portal }), '/portal/courses#top', 'while a page keeps its fragment')
-  assert.equal(landing({ asked: undefined, screens: both }), '/unauthorized', 'someone who opens several screens is asked which')
-  assert.equal(landing({ asked: '/dashboard/courses', screens: both }), '/dashboard/courses', 'unless they asked for one of them')
+  assert.equal(landing({ asked: undefined, screens: both }), '/dashboard', 'staff, who open several screens, land on the dashboard')
+  assert.equal(landing({ asked: undefined, screens: [...both].reverse() }), '/dashboard', 'chosen by its name, whatever order the screens come in')
+  assert.equal(landing({ asked: '/portal/courses', screens: both }), '/portal/courses', 'unless they asked for a page of one of them')
+  assert.equal(landing({ asked: '/elsewhere', screens: [{ name: 'portal', path: '/portal' }, { name: 'shop', path: '/shop' }] }), '/unauthorized', 'and several screens with no dashboard among them are a choice')
   assert.equal(landing({ asked: '/portal', screens: [] }), '/unauthorized', 'and someone who opens none is told why')
 })
 
