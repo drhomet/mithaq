@@ -5798,18 +5798,20 @@ test('38. two concurrent first updates on a tenant global make one row, not two'
   const options = { actor }
   const before = (await db.select().from(tables.settings!)).length
 
-  // Both writes read an empty tenant before either has committed, so the unique
-  // tenant column is what leaves one row and one error rather than two rows.
-  const results = await Promise.allSettled([
-    settings.update({ contactEmail: 'first@mithaq.test' }, options),
-    settings.update({ contactEmail: 'second@mithaq.test' }, options),
-  ])
-  assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
-  assert.match(refusal(results), /settings_organization_id_key/)
+  const writes = [{ contactEmail: 'first@mithaq.test', maintenance: true }, { contactEmail: 'second@mithaq.test', maintenance: false }]
+  const results = await Promise.allSettled(writes.map((write) => settings.update(write, options)))
+  // Two writes that both read an empty tenant collide on the unique tenant column, so one is refused.
+  // Under load one can commit before the other reads, and that one then updates the row it finds,
+  // as a second update after the first would: both succeed, and the row is still one.
+  if (results.some((result) => result.status === 'rejected')) {
+    assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
+    assert.match(refusal(results), /settings_organization_id_key/)
+  }
   assert.equal((await db.select().from(tables.settings!)).length, before + 1)
   const found = await settings.findOne({}, options)
   assert.ok(found)
-  assert.ok(['first@mithaq.test', 'second@mithaq.test'].includes(String(found.contactEmail)))
+  // One write's values whole, never a mix of the two.
+  assert.ok(writes.some((write) => found.contactEmail === write.contactEmail && found.maintenance === write.maintenance), JSON.stringify(found))
 })
 
 test('39. a global on a language with no tenant field refuses a create or delete access key and a duplicate name, and is one row on one table for the project', async () => {
