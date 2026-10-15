@@ -86,7 +86,8 @@ const yetToStart = (startsAt: unknown) => new Date(startsAt as string | Date).ge
  */
 const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Promise<Ctx> => {
   const id = ctx.data.session
-  if (typeof id !== 'string') return ctx
+  // An edit of a seat the actor may not reach loaded no row; the store answers it the 404 a missing one gets.
+  if (typeof id !== 'string' || (tools.operation !== 'create' && !ctx.dataBefore)) return ctx
   if (!(await tools.of(sessions).findByID({ id }).catch(() => null))) return ctx
   const session = await sessionHeld({ tx: ctx.tx, session: id })
   if (!session) return ctx

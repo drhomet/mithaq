@@ -1623,6 +1623,11 @@
                                 "field": "opensOn",
                                 "component": "date",
                                 "decided": "table"
+                              },
+                              {
+                                "field": "selfEnroll",
+                                "component": "checkbox",
+                                "decided": "table"
                               }
                             ]
                           },

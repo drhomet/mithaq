@@ -170,7 +170,7 @@ export const courses = defineKayan({
             { tab: 'details', label: { en: 'Details', ar: 'التفاصيل' }, fields: [
               { section: 'about', label: { en: 'About the course', ar: 'عن الدورة' }, fields: ['title', 'summary', 'details'] },
               { section: 'pricing', label: { en: 'Pricing', ar: 'التسعير' }, fields: [{ row: ['fee', 'currency'] }, 'audience', 'topics'] },
-              { section: 'teaching', label: { en: 'Teaching', ar: 'التدريس' }, fields: ['delivery', 'accessCode', 'level', 'opensOn'] },
+              { section: 'teaching', label: { en: 'Teaching', ar: 'التدريس' }, fields: ['delivery', 'accessCode', 'level', 'opensOn', 'selfEnroll'] },
               { section: 'notes', label: { en: 'Notes', ar: 'ملاحظات' }, fields: ['archiveReason'] },
             ] },
             { tab: 'sessions', label: { en: 'Sessions', ar: 'الجلسات' }, fields: [{ list: {
@@ -589,12 +589,9 @@ export const courses = defineKayan({
     // deleted while a course points at it, since an upload restricts. Declared
     // last, for the same column order.
     cover: { kind: 'upload', relationTo: 'media', label: { en: 'Cover image', ar: 'صورة الغلاف' } },
-    // Whether a student takes a seat in this course's sessions from the portal. Off, staff enroll each student.
-    // Declared last, for the same column order.
-    selfEnroll: {
-      kind: 'checkbox',
-      label: { en: 'Students may enroll themselves', ar: 'يسجّل الطلاب أنفسهم' },
-      rules: { defaultValue: false },
-    },
+    // Whether a student takes a seat in this course's sessions from the portal: only where it is true, so a course
+    // that never says is one whose staff enroll each student. No default, which every create would then write, and
+    // a role without the column's key would be refused. Declared last, for the same column order.
+    selfEnroll: { kind: 'checkbox', label: { en: 'Students may enroll themselves', ar: 'يسجّل الطلاب أنفسهم' } },
   },
 })

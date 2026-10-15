@@ -38,7 +38,7 @@ const people = [
 const business = [
   // add-on: courses
   // Every column but the one `secret` names.
-  ...reads('courses', [...stamps, 'organization', 'title', 'summary', 'details', 'cover', 'fee', 'currency', 'level', 'notifications', 'delivery', 'audience', 'archived', 'topics', 'opensOn', 'archiveReason', 'tags', 'scheduledSessions', '_status']),
+  ...reads('courses', [...stamps, 'organization', 'title', 'summary', 'details', 'cover', 'fee', 'currency', 'level', 'notifications', 'delivery', 'audience', 'archived', 'topics', 'opensOn', 'archiveReason', 'tags', 'scheduledSessions', '_status', 'selfEnroll']),
   // A course's versions, each cut to the columns above, so staff read a
   // draft's history across every organization and restore none of it: no
   // staff role but `super_admin`'s `'*'` holds `courses.restoreVersion`.

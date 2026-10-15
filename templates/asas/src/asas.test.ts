@@ -1592,8 +1592,9 @@ test('3. the tables carry exactly the columns the kayan describe', async () => {
     // in the same place.
     '_status',
     'details',
-    // The cover, an upload's foreign key, last.
+    // The cover, an upload's foreign key, then whether students enroll themselves, each declared last in its round.
     'cover_id',
+    'self_enroll',
     'updated_at',
     'created_at',
   ])
@@ -7828,7 +7829,7 @@ test('68. the provider\'s own role table is published like every other auth kaya
 
 test('69. the tenancy table grades nothing, so what an actor may do is the access target\'s answer alone: an assigned role keeps the find operation and the title field, and a role that holds neither is refused each by name', async () => {
   const { actor: owner } = await tenantOptions()
-  await courses.operations.create({ title: 'Graded', fee: 100 }, { actor: owner as never })
+  await courses.operations.create({ title: 'Graded', fee: 100, notifications: true }, { actor: owner as never })
 
   /**
    * A second member of the same organization, carrying one of this project's own roles.
@@ -7873,8 +7874,10 @@ test('69. the tenancy table grades nothing, so what an actor may do is the acces
   assert.ok(refused instanceof AsasError, 'and the instructor, which holds no such key, is refused')
   assert.equal(refused.status, 403, 'with 403, never a 401 and never a 500')
   assert.equal(refused.key, 'error.forbidden.permission', 'for the key rather than for the row')
-  const seen = await courses.operations.find({}, { actor: instructor as never })
-  assert.ok(!Object.keys(seen.docs[0]!).includes('fee'), 'and a field key it never names hides that column')
+  // The notifications switch is staff's: the instructor names no key for it, and the portal draws none.
+  const seen = await courses.operations.find({ where: { title: { equals: 'Graded' } } }, { actor: instructor as never })
+  assert.equal((await courses.operations.find({ where: { title: { equals: 'Graded' } } }, { actor: owner as never })).docs[0]!.notifications, true, 'the course holds a value there')
+  assert.ok(!Object.keys(seen.docs[0]!).includes('notifications'), 'and a field key it never names hides that column')
 })
 
 test('70. the access target opens the operation a role names, but a field of the same kayan stays hidden until the role also names that field\'s own key', async () => {
@@ -18319,7 +18322,9 @@ test('222a. a student reads its own enrollments alone, in its own tenant, over H
   assert.equal((named.body.data as { key?: string }).key, 'error.forbidden.field_read', 'as a column it may not read')
 
   // A role that may create an enrollment but not name its student is refused the student
-  // the create fills from the actor, as the field's write key decides.
+  // the create fills from the actor, as the field's write key decides, in a course that
+  // lets its students enroll themselves, so the seat's own rules pass.
+  await courses.operations.update({ id: course.id, selfEnroll: true }, tenant.options)
   const made = await tenant.as('admin', 'roles/create', { name: 'enroller-222a', label: { en: 'Enroller', ar: 'مسجل' }, permissions: ['enrollments.create', 'enrollments.fields.id', 'enrollments.fields.session', 'enrollments.fields.organization'] })
   assert.equal(made.status, 200, JSON.stringify(made.body))
   await assignRole(tenant.organization, other.id, 'enroller-222a')
@@ -18381,7 +18386,10 @@ test('222b. a role reads and writes every seat of its organization only while it
   assert.equal((await enrollments.operations.findByID({ id: own.id }, tenant.options))?.student, clerk.id, 'and the seat is still its own')
   const later = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-06-08T09:00:00Z') }, tenant.options)
   assert.equal((await as('enrollments/create', { session: later.id, student: pupil.id })).status, 403, 'nor makes one for another person')
-  assert.equal((await as('enrollments/create', { session: later.id, student: clerk.id })).status, 200, 'while it makes its own')
+  // A role that writes its own seats alone is held to what the course lets its students do.
+  assert.equal((await as('enrollments/create', { session: later.id, student: clerk.id })).status, 400, 'nor its own in a course its school enrolls')
+  await courses.operations.update({ id: course.id, selfEnroll: true }, tenant.options)
+  assert.equal((await as('enrollments/create', { session: later.id, student: clerk.id })).status, 200, 'while it makes its own where the course lets it')
 
   const widened = await tenant.as('admin', 'roles/update', { id: role.body.id, permissions: [...keys, 'enrollments.others'] })
   assert.equal(widened.status, 200, JSON.stringify(widened.body))
@@ -18484,7 +18492,7 @@ const keyOf = (body: Record<string, unknown>) => (body.data as { key?: string } 
 test('R7a. a student enrolls itself only where its course lets students do so and before the session starts, never anyone else, and gives the seat back before then; staff enroll in any course', async () => {
   const tenant = await roleTenant('self-r7a')
   const course = await courses.operations.create({ title: 'Self R7a' }, tenant.options)
-  assert.equal(course.selfEnroll, false, 'a course lets nobody enroll themselves until staff say so')
+  assert.notEqual(course.selfEnroll, true, 'a course lets nobody enroll themselves until staff say so')
   const later = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 7 * 864e5) }, tenant.options)
   const started = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() - 864e5) }, tenant.options)
 
@@ -18531,12 +18539,12 @@ test('R7b. a session takes no seat past its capacity, whoever writes, even when 
   const cased = await Promise.all([students[1]!('enrollments/create', { session: last.id }), students[2]!('enrollments/create', { session: last.id.toUpperCase() })])
   assert.deepEqual(cased.map((one) => one.status).sort(), [200, 409], `one seat, whatever case either id is sent in: ${cased.map((one) => JSON.stringify(one.body)).join(', ')}`)
   const kept = cased.find((one) => one.status === 200)!
-  const same = await tenant.as('instructor', 'enrollments/update', { id: kept.body.id, session: last.id.toUpperCase() })
+  const same = await tenant.as('admin', 'enrollments/update', { id: kept.body.id, session: last.id.toUpperCase() })
   assert.equal(same.status, 200, `a seat kept in its session, named in another case, takes no new one: ${JSON.stringify(same.body)}`)
   const elsewhere = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 8 * 864e5) }, tenant.options)
-  const parked = await tenant.as('instructor', 'enrollments/create', { session: elsewhere.id, student: tenant.people.registrar.id })
+  const parked = await tenant.as('instructor', 'enrollments/create', { session: elsewhere.id, student: tenant.people.student.id })
   assert.equal(parked.status, 200, JSON.stringify(parked.body))
-  const moved = await tenant.as('instructor', 'enrollments/update', { id: parked.body.id, session: session.id })
+  const moved = await tenant.as('admin', 'enrollments/update', { id: parked.body.id, session: session.id })
   assert.equal(keyOf(moved.body), 'error.conflict.session_full', 'a seat moved into a full session is refused as a new one is')
 })
 
@@ -18577,7 +18585,8 @@ test('R7c. a course\'s sessions answer the seats each has left to a student, who
   const course = await courses.operations.create({ title: 'Left R7c', selfEnroll: true }, tenant.options)
   const session = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 7 * 864e5), capacity: 3, venue: 'campus', format: 'workshop' }, tenant.options)
   const open = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 8 * 864e5) }, tenant.options)
-  await enrollments.operations.create({ session: session.id, student: tenant.people.registrar.id }, tenant.options)
+  const classmate = await anotherStudent(tenant, 'left-r7c-classmate')
+  assert.equal((await classmate('enrollments/create', { session: session.id })).status, 200)
   const answer = await tenant.as('student', 'courses/findWithSessions', { id: course.id })
   assert.equal(answer.status, 200, JSON.stringify(answer.body))
   const byId = new Map((answer.body.sessions as { id: string; seatsLeft: number | null; venue?: string; format?: string }[]).map((one) => [one.id, one]))
