@@ -278,7 +278,9 @@ export const courses = defineKayan({
           // puts that refusal back.
           input: ({ row }) => row.pick({ id: true }).strict(),
           steps: ({ steps }) => [steps.findOne, attachSessions],
-          output: ({ row }) => row.extend({ sessions: z.array(sessionRow) }),
+          // Every column optional but the id: the output is read after the reader's projection, which leaves out a
+          // column the reader holds no key for, as a student's leaves out the access code.
+          output: ({ row }) => row.partial().required({ id: true }).extend({ sessions: z.array(sessionRow) }),
         },
       }),
     },

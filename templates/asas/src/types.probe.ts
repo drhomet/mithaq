@@ -971,8 +971,8 @@ type OverrideInputFallsBackToKind = Expect<
 >
 
 type WithSessions = NonNullable<Awaited<ReturnType<typeof asas.kayan.courses.operations.findWithSessions>>>
-type CarriesTitle = Expect<Equal<WithSessions['title'], string>>
-type CarriesFee = Expect<Equal<WithSessions['fee'], number | null>>
+type CarriesTitle = Expect<Equal<WithSessions['title'], string | undefined>>
+type CarriesFee = Expect<Equal<WithSessions['fee'], number | null | undefined>>
 type CarriesSessions = Expect<
   Equal<WithSessions['sessions'], { id: string; startsAt: Date; capacity: number | null; venue?: string | null | undefined; format?: string | null | undefined; archived?: boolean | null | undefined; seatsLeft: number | null }[]>
 >

@@ -166,7 +166,7 @@ export function PortalShell({ regions }: ShellProps<readonly ['header', 'main'],
         </div>
       </header>
       <main data-region="main" className="mx-auto grid w-full max-w-6xl grid-cols-[minmax(0,1fr)] content-start gap-6 px-4 pt-6 pb-28 sm:px-6 md:pb-12">
-        {closed ? <Closed contact={contact} /> : <>{regions.header}{regions.main}</>}
+        {closed ? <Closed contact={contact} /> : <><div data-region="header">{regions.header}</div>{regions.main}</>}
       </main>
       {contact && !closed ? (
         <footer className="mx-auto w-full max-w-6xl px-4 pb-28 sm:px-6 md:pb-8">

@@ -18327,8 +18327,12 @@ test('222a. a student reads its own enrollments alone, in its own tenant, over H
   await courses.operations.update({ id: course.id, selfEnroll: true }, tenant.options)
   const made = await tenant.as('admin', 'roles/create', { name: 'enroller-222a', label: { en: 'Enroller', ar: 'مسجل' }, permissions: ['enrollments.create', 'enrollments.fields.id', 'enrollments.fields.session', 'enrollments.fields.organization'] })
   assert.equal(made.status, 200, JSON.stringify(made.body))
-  await assignRole(tenant.organization, other.id, 'enroller-222a')
-  const filled = await apiCall('enrollments/create', { session: session.id }, { cookie: other.headers.get('cookie') ?? '' })
+  // Someone holding this role alone: a student's own keys would name the student for it.
+  const enroller = await signedUp('own-222a-enroller')
+  await server.api.addMember({ body: { userId: enroller.id, organizationId: tenant.organization, role: 'member' } })
+  await server.api.setActiveOrganization({ body: { organizationId: tenant.organization }, headers: enroller.headers })
+  await assignRole(tenant.organization, enroller.id, 'enroller-222a')
+  const filled = await apiCall('enrollments/create', { session: session.id }, { cookie: enroller.headers.get('cookie') ?? '' })
   assert.equal(filled.status, 403, await filled.clone().text())
   const refusal = (await bodyOf(filled)).data as { key: string; params: { fields: string[] } }
   assert.equal(refusal.key, 'error.forbidden.field_write')
