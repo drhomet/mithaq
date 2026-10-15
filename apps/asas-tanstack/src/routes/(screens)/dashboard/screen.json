@@ -2654,7 +2654,7 @@
               }
             ]
           },
-          "mode": "sheet"
+          "mode": "drawer"
         },
         "edit": {
           "path": "/tags/:id",

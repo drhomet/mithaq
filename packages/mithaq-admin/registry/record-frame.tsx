@@ -2,7 +2,7 @@ import { useRef, type ReactElement, type ReactNode, type RefObject } from 'react
 import { XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { useDirection } from '@/components/ui/direction'
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 /**
@@ -73,9 +73,51 @@ export const initialFocusIn = (popup: RefObject<HTMLElement | null>) => (type: s
     : popup.current?.querySelector<HTMLElement>('form :is(input:not([type=hidden]), textarea, select, [contenteditable=true], [role=combobox]):not(:disabled, [aria-hidden=true], [tabindex="-1"])') ?? true
 
 /**
+ * Payload's document drawer: a record that covers the page it opened over from the inline end, leaving a strip of the
+ * page showing under it, with its title and close button in a bar of its own. Esc, the close button or a press on that
+ * strip closes it; the page underneath keeps its place. A page that draws its own title passes `titled={false}`, which
+ * keeps the drawer's for a screen reader alone.
+ */
+export function DocumentDrawer({ children, closeLabel, edit, onClose, title, titled = true }: {
+  title: string
+  titled?: boolean
+  closeLabel: string
+  onClose: () => void
+  /** The row the drawer edits, `new` for one it makes, which a test or a project's style can find it by. */
+  edit?: string
+  children?: ReactNode
+}): ReactElement {
+  const popup = useRef<HTMLDivElement>(null)
+  // Sheet's sides are physical, so the inline end is the left in Arabic.
+  const side = useDirection() === 'rtl' ? 'left' : 'right'
+  return (
+    <Sheet open onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        ref={popup}
+        side={side}
+        showCloseButton={false}
+        initialFocus={initialFocusIn(popup)}
+        data-document-drawer=""
+        data-mithaq-inline-edit={edit}
+        className="w-[calc(100%-2rem)] gap-0 data-[side=left]:w-[calc(100%-2rem)] data-[side=right]:w-[calc(100%-2rem)] data-[side=left]:sm:max-w-none data-[side=right]:sm:max-w-none max-sm:data-[side=left]:w-full max-sm:data-[side=right]:w-full"
+      >
+        <header className="flex items-center gap-2 border-b px-4 py-3">
+          <SheetClose render={<Button variant="ghost" size="icon-sm" className="max-sm:size-11" />}>
+            <XIcon aria-hidden="true" />
+            <span className="sr-only">{closeLabel}</span>
+          </SheetClose>
+          <SheetTitle className={titled ? 'min-w-0 truncate text-base font-medium' : 'sr-only'}>{title}</SheetTitle>
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">{children}</div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+/**
  * Where a create or an edit opens over the list, when its page names a mode:
- * shadcn's dialog, sheet or drawer, open while it is drawn, and closing it is
- * the host's navigation back to the list.
+ * shadcn's dialog or sheet, or the full-page document drawer above, open while
+ * it is drawn, and closing it is the host's navigation back to the list.
  */
 export function RecordFrame({
   mode,
@@ -99,7 +141,7 @@ export function RecordFrame({
     // The title is for a screen reader alone, as the page draws its own title node inside. The close
     // button is this file's own, as the primitive's is named in English.
     mode === 'sheet' ? <Sheet open onOpenChange={change}><SheetContent ref={popup} showCloseButton={false} initialFocus={initialFocusIn(popup)} className="gap-4 overflow-y-auto p-4 data-[side=left]:max-sm:w-full data-[side=right]:max-sm:w-full"><SheetTitle className="sr-only">{title}</SheetTitle>{children}<CloseButton Close={SheetClose} label={closeLabel} /></SheetContent></Sheet>
-    : mode === 'drawer' ? <Drawer open onOpenChange={change}><DrawerContent><DrawerTitle className="sr-only">{title}</DrawerTitle><div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-4">{children}</div></DrawerContent></Drawer>
+    : mode === 'drawer' ? <DocumentDrawer title={title} titled={false} closeLabel={closeLabel} onClose={onClose}>{children}</DocumentDrawer>
     : <Dialog open onOpenChange={change}><DialogContent ref={popup} showCloseButton={false} initialFocus={initialFocusIn(popup)}><DialogTitle className="sr-only">{title}</DialogTitle>{children}<CloseButton Close={DialogClose} label={closeLabel} /></DialogContent></Dialog>
   // A server render draws nothing of the popup, which is a portal, so the mode is said here.
   return (

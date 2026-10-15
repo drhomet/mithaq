@@ -259,6 +259,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     record: { en: 'Record', ar: 'السجل' },
     invalidFields: { en: 'Fields needing attention: {count}', ar: 'حقول تحتاج إلى مراجعة: {count}' },
     errorSummary: { en: 'Check these fields:', ar: 'راجع هذه الحقول:' },
+    addNew: { en: 'Add new {kind}', ar: 'إضافة {kind}' },
     organizations: { en: 'Organizations', ar: 'المؤسسات' },
     organization: { en: 'Organization', ar: 'مؤسسة' },
     noOrganization: { en: 'No organization', ar: 'لا توجد مؤسسة' },

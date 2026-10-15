@@ -41,9 +41,9 @@ export const tags = defineKayan({
       },
       pages: {
         list: { path: '/tags', page: appPage([{ layout: 'table', main: [{ list: { columns: ['name', 'createdAt'], search: ['name'] } }] }]) },
-        // The sheet's title says it makes a tag, so its one box is drawn
+        // The drawer's title says it makes a tag, so its one box is drawn
         // bare rather than under a second heading that says "Tag" again.
-        create: { path: '/tags/new', mode: 'sheet', page: appPage([{ layout: 'record', main: [{ form: ['name'] }] }]) },
+        create: { path: '/tags/new', mode: 'drawer', page: appPage([{ layout: 'record', main: [{ form: ['name'] }] }]) },
         edit: { path: '/tags/:id', page: appPage([{ layout: 'record', main: [{ form: tag }], danger: danger() }]) },
       },
     },

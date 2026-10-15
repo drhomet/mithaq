@@ -1,8 +1,8 @@
 import { useContext, useId, useState, type FormEvent, type ReactElement } from 'react'
-import type { ClientField, LeafClient } from 'mithaq/admin'
+import type { ClientField, ClientKayan, LeafClient } from 'mithaq/admin'
 import { FormContext, ScreenContext } from 'mithaq/admin/react'
 import { Card, CardContent } from '@/components/ui/card'
-import { descriptionOf, labelFor, titleOf } from 'mithaq-admin/copy.ts'
+import { descriptionOf, labelFor, newTitleOf, titleOf } from 'mithaq-admin/copy.ts'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
 import { BoundField, FieldValue } from 'mithaq-admin/field-value.tsx'
 import { readOnlyField } from 'mithaq-admin/field-values.ts'
@@ -16,9 +16,10 @@ import type { FormProps } from 'mithaq-admin/form-types.tsx'
 import { LeafControl } from 'mithaq-admin/leaf-control.tsx'
 import { NavLinks } from 'mithaq-admin/nav-links.tsx'
 import { pageButtonOf, type PageButton } from 'mithaq-admin/node-buttons.tsx'
-import { drawsKind, nodesOf, scopeOf, type Draw } from 'mithaq-admin/node-tree.ts'
+import { drawsKind, formIn, nodesOf, scopeOf, type Draw } from 'mithaq-admin/node-tree.ts'
 import { drawNodes, frameOf, pageOf } from 'mithaq-admin/nodes.tsx'
 import { localesOf } from 'mithaq-admin/refusal.ts'
+import { DocumentDrawer } from 'mithaq-admin/record-frame.tsx'
 import { refOf } from 'mithaq-admin/screen-refs.ts'
 import { useAutosave } from 'mithaq-admin/use-autosave.tsx'
 import { useDraftView } from 'mithaq-admin/use-draft-view.tsx'
@@ -42,6 +43,23 @@ export function Form(props: FormProps): ReactElement {
   return <FormScreen key={`${props.kayan.name}:${held.mount}`} {...props} made={held.made} onMade={(made) => setHeld((before) => ({ ...before, made }))} />
 }
 
+/**
+ * A form in Payload's document drawer: a create or an edit over the page it opened from. Closing it with a change
+ * nobody saved asks the form's own discard question first; the caller closes it once the write lands.
+ */
+export function DrawerForm({ edit, onClose, title, ...props }: Omit<FormProps, 'onCancel' | 'onDirty' | 'blocked'> & { title: string; onClose: () => void; edit?: string }): ReactElement {
+  const [dirty, setDirty] = useState(false)
+  const [closing, setClosing] = useState(false)
+  return (
+    <DocumentDrawer title={title} edit={edit} closeLabel={props.t('admin.close', 'Close') ?? 'Close'} onClose={() => (dirty ? setClosing(true) : onClose())}>
+      <Form {...props} onDirty={setDirty} onCancel={onClose} blocked={closing ? { proceed: onClose, reset: () => setClosing(false) } : undefined} />
+    </DocumentDrawer>
+  )
+}
+
+/** The screen's client as a relationship's inline create calls it, by a kayan named at run time. */
+type CallByName = (call: { kayan: string; operation: string; input: Record<string, unknown> }) => Promise<unknown>
+
 function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => void }): ReactElement {
   const { api, blocked, client, drafts, kayan, kayans, locale, nodes, onCancel, operations, screen, t, value, writes } = props
   const copy = { t, locale, locales: props.locales }
@@ -59,7 +77,10 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     else toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
   }
   // The access report a node's `when` reads as `$user`; none outside a screen.
-  const access = useContext(ScreenContext)?.access
+  const screenState = useContext(ScreenContext)
+  const access = screenState?.access
+  // The kayan a relationship's + is making a row of, in a drawer over this form, and what picks the row it made.
+  const [adding, setAdding] = useState<{ target: ClientKayan; made: (row: Record<string, unknown>) => void }>()
   const byName = new Map(kayan.fields.map((field) => [field.name, field]))
   // A create that has autosaved its row edits that row from then on, before the host has handed it.
   const id = String(value?.id ?? props.made ?? '')
@@ -101,6 +122,8 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const formId = useId()
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    // A form in a drawer over another is that form's child in React, whose submit would otherwise reach it too.
+    event.stopPropagation()
     save()
   }
   const control = (leaf: string | LeafClient) => {
@@ -205,7 +228,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   return (
     // The provider is around the whole screen, not just the column of inputs, so a panel the project
     // registered binds a field of this form through `useKayanField` wherever the layout put it.
-    <KayanForm.Provider value={{ check, forget, form, issues: sentences, locales: localesOf(held), on, writes }}>
+    <KayanForm.Provider value={{ check, forget, form, issues: sentences, locales: localesOf(held), on, writes, add: screenState ? (target, made) => setAdding({ target, made }) : undefined }}>
       <FormContext value={{ getData: () => showing, setValue, disabled: busy || viewing, saves: saving.saves, expectedUpdatedAtOn: props.expectedUpdatedAtOn }}>
         {/* One question for both ways out, Cancel and a blocked navigation, kept mounted so nothing but an answer closes it. */}
         <DiscardDialog
@@ -225,6 +248,37 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
         ) : (
           <FormLayout {...{ api, chrome, control, copy, formId, kayan, kayans, values }} row={value} actions={actionsOf(false)} onSubmit={submit} provided={unnamed.filter(owned)} rest={unnamed.filter((field) => !owned(field))} />
         )}
+        {adding && screenState ? (() => {
+          const { target } = adding
+          const report = screenState.access.collections?.[target.name]
+          const page = target.pages.create
+          const call = screenState.client as unknown as CallByName
+          return (
+            <DrawerForm
+              kayan={target}
+              title={newTitleOf({ kayan: target, copy })}
+              // The fields its create page asks for, without the page's shell; every field where it has none.
+              nodes={page && 'page' in page ? formIn(nodesOf(page)) : undefined}
+              client={{
+                create: (input) => call({ kayan: target.name, operation: 'create', input }),
+                update: (input) => call({ kayan: target.name, operation: 'update', input }),
+                delete: (input) => call({ kayan: target.name, operation: 'delete', input }),
+              }}
+              value={null}
+              t={t}
+              locale={locale}
+              locales={props.locales}
+              kayans={kayans}
+              api={api}
+              writes={(field, on) => report?.fields?.[field]?.[on] === true}
+              onDone={(row) => {
+                adding.made(row as Record<string, unknown>)
+                setAdding(undefined)
+              }}
+              onClose={() => setAdding(undefined)}
+            />
+          )
+        })() : null}
       </FormContext>
     </KayanForm.Provider>
   )

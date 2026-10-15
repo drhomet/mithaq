@@ -2,9 +2,9 @@ import { useId, useRef, useState, type ReactElement, type ReactNode } from 'reac
 import type { ButtonClient, Row } from 'mithaq/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { descriptionOf, titleOf, type Copy } from 'mithaq-admin/copy.ts'
+import { descriptionOf, newTitleOf, titleOf, type Copy } from 'mithaq-admin/copy.ts'
 import { filterPathsOf } from 'mithaq-admin/filter-operators.ts'
-import { Form } from 'mithaq-admin/form.tsx'
+import { DrawerForm } from 'mithaq-admin/form.tsx'
 import { counted } from 'mithaq-admin/format.tsx'
 import { ListButton } from 'mithaq-admin/list-button.tsx'
 import { Columns, columnsOf, withColumns } from 'mithaq-admin/list-columns.tsx'
@@ -212,21 +212,23 @@ export function List(props: ListProps): ReactElement {
 
             {unreadable ? null : <Pagination page={page} t={t} locale={locale} onPage={(next) => onQuery({ ...query, page: next })} onLimit={(limit) => refine({ limit })} />}
 
+            {/* A row of another kayan is made or changed in Payload's document drawer over the page, which closes once
+                the write lands; the host's re-read draws the row behind it. */}
             {edits && editing !== undefined ? (
-              <div data-mithaq-inline-edit={editing ? String(editing.id ?? '') : 'new'} className="bg-muted/30 rounded-md border p-3">
-                <Form
-                  {...{ api, kayan, locale, t }}
-                  screen={screen && { ...screen, kayan }}
-                  nodes={node!.columns}
-                  client={edits.client}
-                  writes={edits.writes}
-                  value={editing}
-                  locales={props.locales}
-                  kayans={client}
-                  onDone={() => setEditing(undefined)}
-                  onCancel={() => setEditing(undefined)}
-                />
-              </div>
+              <DrawerForm
+                {...{ api, kayan, locale, t }}
+                edit={editing ? String(editing.id ?? '') : 'new'}
+                title={editing ? rowTitle({ kayan, row: editing, locale }) || titleOf({ kayan, copy }) : newTitleOf({ kayan, copy })}
+                screen={screen && { ...screen, kayan }}
+                nodes={node!.columns}
+                client={edits.client}
+                writes={edits.writes}
+                value={editing}
+                locales={props.locales}
+                kayans={client}
+                onDone={() => setEditing(undefined)}
+                onClose={() => setEditing(undefined)}
+              />
             ) : null}
           </div>
         </CardContent>

@@ -170,13 +170,14 @@ test('217j. the accepted types read as names, never as raw MIME types, each name
   assert.deepEqual(typeNames(['image/svg+xml', 'image/svg', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.oasis.opendocument.text', 'image/x-icon']), ['SVG', 'DOCX', 'TEXT', 'ICON'])
 })
 
-test('217k. a sheet\'s and a dialog\'s close button is the registry\'s own, named in the page\'s language, and the host hands it the copy', async () => {
-  for (const mode of ['sheet', 'dialog'] as const) {
+test('217k. a sheet\'s, a dialog\'s and a drawer\'s close button is the registry\'s own, named in the page\'s language, and the host hands it the copy', async () => {
+  for (const mode of ['sheet', 'dialog', 'drawer'] as const) {
     await mountIn(createElement(RecordFrame, { mode, title: 'وسم', closeLabel: 'إغلاق', onClose: () => {} }, createElement('p', null, 'x')), 'ar')
-    const closes = [...window.document.querySelectorAll(`[data-slot="${mode}-close"]`)]
+    const slot = mode === 'dialog' ? 'dialog' : 'sheet'
+    const closes = [...window.document.querySelectorAll(`[data-slot="${slot}-close"]`)]
     assert.equal(closes.length, 1, `${mode}: one close button, the primitive's own English one not drawn`)
     assert.equal(closes[0]?.textContent?.trim(), 'إغلاق', mode)
-    assert.equal(window.document.querySelector(`[data-slot="${mode}-content"]`)?.textContent?.includes('Close'), false, `${mode}: no English`)
+    assert.equal(window.document.querySelector(`[data-slot="${slot}-content"]`)?.textContent?.includes('Close'), false, `${mode}: no English`)
   }
   // The host passes the translated close label, so its source is read.
   const host = readFileSync(new URL('../registry/host/screens.tsx', import.meta.url), 'utf8')

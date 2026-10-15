@@ -24,16 +24,19 @@ export type FieldShellProps = {
   onBlur?: () => void
 }
 
-/** The popups a control opens, which a portal draws outside its field: focus moving into one is not leaving the field. */
-const popups = '[data-slot=popover-content],[data-slot=select-content],[data-slot=combobox-content],[data-slot=dropdown-menu-content]'
+/** The popups and drawers a portal draws outside the field that opened them. */
+const popups = '[data-slot=popover-content],[data-slot=select-content],[data-slot=combobox-content],[data-slot=dropdown-menu-content],[data-slot=sheet-content],[data-slot=dialog-content],[data-slot=alert-dialog-content]'
 
 /**
  * Whether focus left the field for good: not to another box of the same field (a moment's day and time), nor into a
- * popup it opened. Focus going nowhere, as a test's or a closed window's, counts as leaving.
+ * popup over it, such as its calendar or the drawer its + opened. A box of the same drawer the field sits in is
+ * leaving, and so is focus going nowhere, as a test's or a closed window's.
  */
 const left = (event: FocusEvent<HTMLElement>) => {
   const to = event.relatedTarget
-  return !(to instanceof Element) || (!event.currentTarget.contains(to) && !to.closest(popups))
+  if (!(to instanceof Element) || event.currentTarget.contains(to)) return !(to instanceof Element)
+  const over = to.closest(popups)
+  return !over || over.contains(event.currentTarget)
 }
 
 export function FieldShell({ beside, children, control, description, error, id, label, onBlur, width }: FieldShellProps): ReactElement {

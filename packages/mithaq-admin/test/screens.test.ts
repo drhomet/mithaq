@@ -694,7 +694,8 @@ test('a button\'s run asks its confirm first on every path, so a project\'s own 
 for (const mode of ['dialog', 'sheet', 'drawer'] as const) {
   test(`a record opens over the list as a ${mode}`, async () => {
     await render(createElement(RecordFrame, { mode, title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement('p', { id: `in-${mode}` }, 'form')))
-    const popup = document.querySelector(`[data-slot="${mode}-content"]`)
+    // The drawer is Payload's full-page document drawer, a sheet across the page.
+    const popup = document.querySelector(mode === 'drawer' ? '[data-document-drawer]' : `[data-slot="${mode}-content"]`)
     assert.ok(popup, `the ${mode} is open`)
     assert.ok(popup!.querySelector(`#in-${mode}`), 'with the record inside it')
   })

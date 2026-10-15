@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import { useField, useStore, type AnyFormApi } from '@tanstack/react-form'
+import type { ClientKayan } from 'mithaq/admin'
 
 /** The form a bound field reads and writes, which `Form` provides around its whole screen. */
 export const KayanForm = createContext<
@@ -11,6 +12,8 @@ export const KayanForm = createContext<
       on: 'create' | 'update'
       check: (name: string, value: unknown) => string | undefined
       forget: (name: string) => void
+      /** Opens a drawer that makes a row of `target` over this form, handing the row it made to `made`; only on a screen. */
+      add?: (target: ClientKayan, made: (row: Record<string, unknown>) => void) => void
     }
   | undefined
 >(undefined)

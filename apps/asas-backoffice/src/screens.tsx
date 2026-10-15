@@ -855,7 +855,9 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
       api={readsOf(related)}
       operations={data.operations}
       related={draw(page).list}
-      edit={(id) => hrefOf(kayan, 'edit', id)}
+      // A create opened over its list closes back to it once it lands, the new row in the list, as Payload's drawer does.
+      // ponytail: a kayan that autosaves drafts closes on its first autosave there; hold the drawer open on an autosave's create if one ever opens over its list.
+      edit={(id) => (page.mode ? listHref : hrefOf(kayan, 'edit', id))}
       list={listHref}
       drafts={data.drafts}
       expectedUpdatedAt={data.expectedUpdatedAt}
@@ -876,4 +878,4 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   }
   return form
 }
-// mithaq-admin 0.0.0 83573d26ec0f4de0db5f0ce2ba70f880ca57d02439162249242a9dd164cd068b
+// mithaq-admin 0.0.0 7684e1a5a3654f1305cb73392791318b0c9db0106c740c35bb34691fa2dfd703

@@ -3663,7 +3663,7 @@ test('144f. a create page draws every field it names, a timestamp the server fil
   assert.equal(host.querySelector('#courses-createdAt'), null, 'as text, not as a control')
 })
 
-test('145a. a list of another kayan edits one row in place below its table, adds one holding the page\'s row, archives the ticked ones in bulk, and sits outside the page\'s own form', async () => {
+test('145a. a list of another kayan edits one row in a drawer over the page, adds one holding the page\'s row, archives the ticked ones in bulk, and sits outside the page\'s own form', async () => {
   // The course edit page as the dashboard projects it, its Sessions tab a list of `sessions` whose `course` is this row.
   const edit = courses.pages.edit as Extract<PageClient, { page: unknown }>
   const writes: { write: string; input: Record<string, unknown> }[] = []
@@ -3721,7 +3721,7 @@ test('145a. a list of another kayan edits one row in place below its table, adds
   assert.equal(pageForm.contains(table), false, 'and the list is not inside it')
   const button = (text: string, within: ParentNode = host) => [...within.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
   assert.ok(host.querySelector('h2'), 'the list is headed as a part of the page')
-  assert.equal(host.querySelector('[data-mithaq-inline-edit]'), null, 'no row is being edited to begin with')
+  assert.equal(window.document.querySelector('[data-mithaq-inline-edit]'), null, 'no row is being edited to begin with')
 
   const rows = () => [...host.querySelectorAll('tbody tr')]
   const editRow = async (row: Element) => {
@@ -3729,14 +3729,14 @@ test('145a. a list of another kayan edits one row in place below its table, adds
     await act(async () => click(window.document.querySelector('[data-row-action="edit"]')! as unknown as Element))
   }
   await editRow(rows()[0]!)
-  const inline = () => host.querySelector('[data-mithaq-inline-edit]')!
+  const inline = () => window.document.querySelector('[data-mithaq-inline-edit]') as unknown as Element
   assert.equal(inline().getAttribute('data-mithaq-inline-edit'), 's1')
-  assert.equal(inline().closest('table'), null, 'below the table, not inside it')
+  assert.equal(inline().closest('table'), null, 'in a drawer over the page, not inside the table')
   assert.ok(inline().querySelector('#sessions-capacity'), 'drawing the list\'s own columns')
   assert.equal(inline().querySelector('[data-shell], [data-layout]'), null, 'with no shell or layout around them')
   assert.equal(host.querySelectorAll('form form').length, 0, 'and no form is inside another')
   await editRow(rows()[1]!)
-  assert.equal(host.querySelectorAll('[data-mithaq-inline-edit]').length, 1, 'one row at a time')
+  assert.equal(window.document.querySelectorAll('[data-mithaq-inline-edit]').length, 1, 'one row at a time')
   assert.equal(inline().getAttribute('data-mithaq-inline-edit'), 's2')
   const capacity = inline().querySelector('#sessions-capacity') as unknown as HTMLInputElement
   await act(async () => typeInto(capacity as unknown as Element, '9'))
@@ -3744,7 +3744,7 @@ test('145a. a list of another kayan edits one row in place below its table, adds
   await act(async () => fire(capacity.form as unknown as Element, 'submit'))
   assert.deepEqual([...writes], [{ write: 'update', input: { capacity: 9, id: 's2' } }], 'the save is the session\'s own update, of what changed')
   assert.deepEqual(pageWrites, [], 'and the page\'s own form saved nothing')
-  assert.equal(host.querySelector('[data-mithaq-inline-edit]'), null, 'the form closes once the write lands')
+  assert.equal(window.document.querySelector('[data-mithaq-inline-edit]'), null, 'the form closes once the write lands')
 
   await act(async () => click(button('New') as unknown as Element))
   assert.equal(inline().getAttribute('data-mithaq-inline-edit'), 'new')
@@ -6040,11 +6040,11 @@ test('182b. a create opened as a drawer draws only its page: its title once, the
   const { RecordFrame } = await import('../registry/record-frame.tsx')
   const page = { path: '/courses/new', mode: 'drawer', page: { shell: screen.layouts.app!, header: [{ title: {} }], nav: [{ nav: {} }], main: [{ form: ['title'] }] } } as unknown as PageClient
   await render(createElement(RecordFrame, { mode: 'drawer', title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement(Form, { kayan: courses, screen: screenOf(page), client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })))
-  const drawer = window.document.querySelector('[data-slot="drawer-content"]') as unknown as Element | null
+  const drawer = window.document.querySelector('[data-document-drawer]') as unknown as Element | null
   assert.equal(drawer?.querySelectorAll('[data-node="nav"]').length, 0, 'the list\'s shell already draws the nav, so the drawer draws none')
   assert.equal(drawer?.querySelectorAll('[data-node="title"]').length, 1, 'the page\'s title node is drawn once')
   assert.equal(drawer?.querySelector('[data-node="title"]')?.tagName, 'H2', 'as an h2, as Payload titles its drawer, so the list\'s h1 behind it stays the page\'s one')
-  assert.equal(classesOf(drawer?.querySelector('[data-slot="drawer-title"]')).includes('sr-only'), true, 'and the drawer\'s own title is for a screen reader alone')
+  assert.equal(classesOf(drawer?.querySelector('[data-slot="sheet-title"]')).includes('sr-only'), true, 'and the drawer\'s own title is for a screen reader alone')
   const box = drawer?.querySelector('[data-node="title"]')?.closest('.overflow-y-auto')
   assert.deepEqual(['p-4', 'gap-4'].map((one) => classesOf(box).includes(one)), [true, true], 'the page sits in a padded box that scrolls, as the sheet\'s does')
 })
@@ -6107,7 +6107,7 @@ test('182f. a page opened as a drawer draws no nav at any depth', async () => {
   const { RecordFrame } = await import('../registry/record-frame.tsx')
   const page = { path: '/courses/new', mode: 'drawer', page: { shell: screen.layouts.app!, header: [{ title: {} }], main: [{ row: [{ nav: {} }] }, { form: ['title'] }] } } as unknown as PageClient
   await render(createElement(RecordFrame, { mode: 'drawer', title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement(Form, { kayan: courses, screen: screenOf(page), client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })))
-  assert.equal(window.document.querySelector('[data-slot="drawer-content"]')?.querySelectorAll('[data-node="nav"]').length, 0, 'a nav inside a row is left out too')
+  assert.equal(window.document.querySelector('[data-document-drawer]')?.querySelectorAll('[data-node="nav"]').length, 0, 'a nav inside a row is left out too')
 })
 
 test('182g. the portal\'s page and main column are one shrinkable track, so no wide child stretches the page past the screen', async () => {
@@ -7563,4 +7563,82 @@ test('240f. a box is told it is wrong only once the person leaves its field: nev
   popup.remove()
   await act(async () => void leave(host.querySelector('#sessions-capacity')))
   assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'leaving for another field marks it')
+})
+
+/** The full-page drawer a create opens in, which a portal draws on the body. */
+const documentDrawer = () => window.document.querySelector('[data-document-drawer]') as unknown as Element | null
+
+test('240g. a child made from its parent\'s tab opens in a full-page drawer over the page, as Payload\'s document drawer does, which closes once the write lands and says so in a toast', async () => {
+  await toasted()
+  const writes: { write: string; input: Record<string, unknown> }[] = []
+  const docs = [{ id: 's1', course: 'c1', startsAt: '2026-10-01T10:00:00.000Z', capacity: 5, venue: 'campus', format: 'lecture', archived: false }]
+  const host = await render(withToaster(createElement(Form, {
+    kayan: courses,
+    screen: screenOf(courses.pages.edit!),
+    client: draftClient([]),
+    value: { id: 'c1', title: 'Tajweed' },
+    t: english,
+    locale: 'en',
+    onDone: () => {},
+    related: ({ node }) => createElement(List, {
+      key: 'sessions', kayan: sessions, node, page: pageOf(docs), query: {}, t: english, locale: 'en', onQuery: () => {},
+      href: (id: string) => `/sessions/${id}`, newHref: '#', screen: screenOf(courses.pages.edit!), creates: true, operations: { update: true }, writes: () => true,
+      edit: {
+        client: {
+          create: async (input: Record<string, unknown>) => (writes.push({ write: 'create', input }), { id: 'made', ...input }),
+          update: async (input: Record<string, unknown>) => (writes.push({ write: 'update', input }), input),
+          delete: async () => ({}),
+        },
+        writes: () => true,
+        prefill: { course: 'c1' },
+      },
+    }),
+  })), { record: { id: 'c1', title: 'Tajweed' } })
+  await act(async () => click([...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.includes('Sessions'))!))
+  await act(async () => click([...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === 'New session' || one.textContent?.trim() === 'New')!))
+  const drawer = documentDrawer()
+  assert.ok(drawer, 'New opens a drawer')
+  assert.equal(host.querySelector('[data-mithaq-inline-edit]'), null, 'and no form under the list')
+  assert.equal(drawer!.getAttribute('data-slot'), 'sheet-content', 'a modal the page stays under, which Esc and its close button leave')
+  assert.ok(classesOf(drawer).some((one) => one.includes('w-[calc(100%-')), 'as wide as the page but a strip of it, as Payload\'s')
+  assert.equal(drawer!.querySelector('h2')?.textContent, 'New session', 'its title says what it makes')
+  assert.ok(drawer!.querySelector('[data-slot="sheet-close"]'), 'and it has a close button')
+  await act(async () => click(drawer!.querySelector('button#sessions-startsAt')!))
+  await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
+  await act(async () => typeInto(drawer!.querySelector('input[type="time"]')!, '09:30'))
+  await act(async () => fire(drawer!.querySelector('form')!, 'submit'))
+  assert.deepEqual(writes.map((one) => [one.write, one.input.course]), [['create', 'c1']], 'the drawer\'s save is the session\'s own create, holding this course')
+  assert.equal(documentDrawer(), null, 'and the drawer closes once it lands')
+  assert.deepEqual(await toasted(), ['success: Session created'], 'with a toast that says so')
+})
+
+test('240h. a relationship picker offers a + beside it, for a viewer who may create its kayan, that makes the row in a drawer and picks it', async () => {
+  await toasted()
+  const made: Record<string, unknown>[] = []
+  const client = async ({ kayan, operation, input }: { kayan: string; operation: string; input: Record<string, unknown> }) => {
+    made.push({ kayan, operation, input })
+    return { id: 'tag-new', ...input }
+  }
+  const tags = screen.kayan.tags!
+  const access = { collections: { tags: { create: true, read: true, fields: { name: { create: true, read: true } } } } }
+  const draw = (over: Partial<ScreenState>) => render(withToaster(createElement(Form, {
+    kayan: courses, screen: screenOf(recordPage([{ form: ['title', 'tags'] }])), client: recording().client, value: draftRow, t: english, locale: 'en', onDone: () => {},
+    kayans, api: fakeApi({ tags: [] }).api,
+  })), { client: client as never, access: access as never, ...over })
+  let host = await draw({})
+  const plus = () => host.querySelector('[data-control="relationship"] button[data-add-new]') as HTMLButtonElement | null
+  assert.equal(plus()?.getAttribute('aria-label'), 'Add new Tag', 'the + is named for what it makes')
+  await act(async () => click(plus()!))
+  const drawer = documentDrawer()
+  assert.ok(drawer, 'and opens a drawer')
+  assert.equal(drawer!.querySelector('h2')?.textContent, 'New tag')
+  await act(async () => typeInto(drawer!.querySelector('#tags-name')!, 'Beginner'))
+  await act(async () => fire(drawer!.querySelector('form')!, 'submit'))
+  await act(async () => sleep(0))
+  assert.deepEqual(made.map((one) => [one.kayan, one.operation]), [['tags', 'create']], 'the row is made through the screen\'s client')
+  assert.equal(documentDrawer(), null, 'the drawer closes')
+  assert.ok(host.querySelector('[data-control="relationship"]')?.textContent?.includes('Beginner'), 'and the new row is picked')
+  assert.deepEqual(await toasted(), ['success: Tag created'])
+  host = await draw({ access: { collections: { tags: { read: true } } } as never })
+  assert.equal(plus(), null, 'a viewer who may not create a tag gets no +')
 })

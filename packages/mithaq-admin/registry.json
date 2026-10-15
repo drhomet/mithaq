@@ -553,11 +553,11 @@
       "name": "mithaq-record-frame",
       "type": "registry:component",
       "title": "Mithaq record frame",
-      "description": "The dialog, sheet or drawer a record opens in over its list, its close button named in the viewer's language, and the focus held inside it while it is open.",
+      "description": "The dialog, sheet or full-page document drawer a record opens in over its list or its page, its close button named in the viewer's language, and the focus held inside it while it is open.",
       "registryDependencies": [
         "button",
         "dialog",
-        "drawer",
+        "direction",
         "sheet"
       ],
       "files": [
@@ -1050,6 +1050,7 @@
       "title": "Mithaq relationship control",
       "description": "The picker for a relationship field: a debounced search over the target kayan's own find, paged on scroll, with the selected row hydrated by one read.",
       "registryDependencies": [
+        "button",
         "combobox",
         "spinner"
       ],
