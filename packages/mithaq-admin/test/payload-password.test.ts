@@ -182,19 +182,26 @@ test('a password set while a rehash ran is never overwritten by it', async () =>
   assert.equal(await storedOf(id), newer)
 })
 
-test('a password longer than maxPasswordLength is refused before it is verified', async () => {
-  await imported({ email: 'long@example.com', password: 'correct-horse' })
-  let verified = 0
-  const counting = authOf({ ...payloadPassword(), verify: (args) => (verified++, payloadPassword().verify(args)) })
-  for (const signIn of [
-    () => counting.api.signInEmail({ body: { email: 'long@example.com', password: 'x'.repeat(129) } }),
-    () => counting.api.signInUsername({ body: { username: 'long', password: 'x'.repeat(129) } }),
-  ]) {
-    await assert.rejects(signIn(), (error: APIError) => error.body?.code === 'PASSWORD_TOO_LONG')
-  }
-  assert.equal(verified, 0)
-  await assert.rejects(counting.api.signInEmail({ body: { email: 'long@example.com', password: 'x'.repeat(128) } }), (error: APIError) => error.status === 'UNAUTHORIZED')
-  assert.equal(verified, 1, 'a password at the limit is verified')
+test('a rehash replaces only the hash the sign-in verified, never one a cutover wrote after it', async () => {
+  const id = await imported({ email: 'swapped@example.com', password: 'correct-horse' })
+  const rewritten = payloadHashToAccountPassword(payloadFrom390('another-password'))
+  // The cutover lands between the route's verify and the hook's read.
+  const swapping = authOf({ ...payloadPassword(), verify: async (args) => {
+    const verified = await payloadPassword().verify(args)
+    await pool.query('update account set password = $1 where user_id = $2', [rewritten, id])
+    return verified
+  } })
+  assert.equal((await swapping.api.signInEmail({ body: { email: 'swapped@example.com', password: 'correct-horse' } })).user.id, id)
+  assert.equal(await storedOf(id), rewritten)
+})
+
+test('a Payload password longer than Better Auth\'s maxPasswordLength signs in, since Payload let it be set', async () => {
+  // Payload caps a password at its `defaultMaxTextLength`, 40000 characters; Better Auth's sign-up at 128.
+  const long = 'x'.repeat(40000)
+  const id = await imported({ email: 'long@example.com', password: long })
+  assert.equal((await auth.api.signInEmail({ body: { email: 'long@example.com', password: long } })).user.id, id)
+  assert.equal((await auth.api.signInUsername({ body: { username: 'long', password: long } }))!.user.id, id)
+  assert.match(await storedOf(id), /^[0-9a-f]{32}:/)
 })
 
 /**

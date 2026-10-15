@@ -15,10 +15,15 @@
 // ponytail: the rehash is a sign-in hook because Better Auth's `verify` answers a boolean alone.
 // Once it can answer that a hash needs replacing (better-auth/better-auth#10291), that answer
 // replaces the plugin.
+//
+// ponytail: sign-in timing tells a v1 user's address from an unknown one while users move (about
+// 105-130 ms of pbkdf2 against about 60 ms of the scrypt Better Auth runs for an unknown address).
+// It lasts as long as the window and ends as each user is rehashed; closing it sooner means
+// running a dummy pbkdf2 for every sign-in that holds no Payload hash.
 import { pbkdf2, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
-import { BASE_ERROR_CODES, type BetterAuthPlugin } from 'better-auth'
-import { APIError, createAuthMiddleware } from 'better-auth/api'
+import type { BetterAuthPlugin } from 'better-auth'
+import { createAuthMiddleware } from 'better-auth/api'
 import { hashPassword, verifyPassword } from 'better-auth/crypto'
 
 // Payload's two pbkdf2-sha256 schemes, as `generatePasswordSaltHash.ts` derives them at v3.89.0 and v3.90.0.
@@ -58,21 +63,13 @@ export const payloadPassword = () => ({
 const signIns = (ctx: { path?: string }) => ctx.path === '/sign-in/email' || ctx.path === '/sign-in/username'
 
 /**
- * Replaces a Payload hash with Better Auth's own after its user signs in with it. Better Auth's
- * sign-in never checks `maxPasswordLength`, which only caps a password being set, so this refuses
- * a longer one before it reaches `verify`: nobody could have set it, and 600000 iterations on
- * whatever a caller sends is work nobody asked for.
+ * Replaces a Payload hash with Better Auth's own after its user signs in with it. It caps no
+ * password length: Payload let one of up to 40000 characters be set, past Better Auth's 128,
+ * and Better Auth's sign-in checks none.
  */
 export const payloadRehash = () => ({
   id: 'payload-rehash',
   hooks: {
-    before: [{
-      matcher: signIns,
-      handler: createAuthMiddleware(async (ctx) => {
-        const { password } = (ctx.body ?? {}) as { password?: unknown }
-        if (typeof password === 'string' && password.length > ctx.context.password.config.maxPasswordLength) throw APIError.from('BAD_REQUEST', BASE_ERROR_CODES.PASSWORD_TOO_LONG)
-      }),
-    }],
     after: [{
       matcher: signIns,
       handler: createAuthMiddleware(async (ctx) => {
@@ -83,7 +80,9 @@ export const payloadRehash = () => ({
         // and the next sign-in tries again.
         try {
           const account = await ctx.context.internalAdapter.findCredentialAccount(userId)
-          if (!account?.password?.startsWith('payload-pbkdf2')) return
+          // Verified again, since the route verified whatever was stored before this read: a cutover
+          // run in between may have written another Payload hash, which this password does not open.
+          if (!account?.password?.startsWith('payload-pbkdf2') || !(await payloadPassword().verify({ hash: account.password, password }))) return
           // Only over the hash that was read, so a password set meanwhile (a reset in another tab) stands.
           await ctx.context.adapter.updateMany({
             model: 'account',

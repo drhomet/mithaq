@@ -216,7 +216,7 @@ Auth verify both, and replaces each Payload hash with Better Auth's the first
 time its user signs in.
 
 1. Eject it into the language, where the Better Auth setup lives. In
-   `packages/mithaq`:
+   `packages/mithaq` (the project's root in a single package):
 
    ```sh
    bunx mithaq eject payload-password   # writes src/mithaq/auth/payload-password.ts
@@ -239,15 +239,19 @@ time its user signs in.
      iterations, a 32-byte key), and hands anything else to Better Auth's.
      A malformed value refuses the password; it never throws.
    - `payloadRehash()` runs after `/sign-in/email` and `/sign-in/username`.
-     When the sign-in succeeded on a Payload hash, it writes Better Auth's hash
-     of the same password, only over the hash it read, so a password set
-     meanwhile stands. A failed write is logged and never fails the sign-in;
-     the next sign-in tries again. The prefix is the only flag: no column says
-     who has moved.
-   - Better Auth's sign-in never checks `maxPasswordLength` (128 by default),
-     which caps only a password being set. `payloadRehash()` refuses a longer
-     one with `PASSWORD_TOO_LONG` before it is verified, since nobody could
-     have set it.
+     When the sign-in succeeded on a Payload hash, it verifies the password
+     against the hash it reads again, then writes Better Auth's hash of it only
+     over that hash, so neither a cutover run meanwhile nor a password set
+     meanwhile is overwritten. A failed write is logged and never fails the
+     sign-in; the next sign-in tries again. The prefix is the only flag: no
+     column says who has moved. A project that signs in with the phone-number
+     plugin adds `/sign-in/phone-number` to its matcher, `signIns`.
+   - No password length is capped on sign-in. Payload let a password of up to
+     40000 characters be set, past Better Auth's `maxPasswordLength` of 128,
+     which caps only a password being set.
+   - A known limit while users move: sign-in timing tells the address of a user
+     still on a Payload 3.90 hash from an unknown one, about 105 to 130 ms of
+     pbkdf2 against about 60 ms of scrypt. It ends as each user is rehashed.
 
 3. At cutover, give each account its user's Payload hash. Payload stores `salt`
    and `hash` in two columns of its `users` table, and
