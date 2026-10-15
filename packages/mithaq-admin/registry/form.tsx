@@ -203,11 +203,12 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const actionsOf = (header: boolean) => (
     <FormActions {...{ autosaved, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} autosaves={!!drafts?.autosave} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
   )
-  // On a screen's page the title is the page's own `title` node, so the form keeps only the sentence under it.
+  // On a screen's page the title is the page's own `title` node, and a form handed its nodes sits in a drawer or a list
+  // that titles it, so the form keeps only the sentence under it.
   const chrome = (
     <FormChrome
       headed={headed}
-      title={screen ? undefined : titleOf({ kayan, copy })}
+      title={screen || nodes ? undefined : titleOf({ kayan, copy })}
       about={about}
       problems={Object.entries(sentences).map(([name, sentence]) => {
         const field = byName.get(name)

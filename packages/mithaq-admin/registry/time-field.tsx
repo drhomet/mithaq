@@ -106,9 +106,18 @@ export function TimeField({ describedBy, disabled, error, form, id, label, local
   /** Two digits fill a segment and move on; one waits for a second, read as `0d` until it comes. */
   const typed = (segment: Segment, digits: string) => {
     if (!digits) return
+    // A whole time pasted into the hours, `930` or `0930`, fills both segments.
+    if (segment === 'hours' && digits.length >= 3) {
+      const at = digits.length - 2
+      pending.current = undefined
+      write({ ...held, hours: clamp(Number(digits.slice(0, at)), ranges.hours), minutes: clamp(Number(digits.slice(at, at + 2)), ranges.minutes) })
+      return next('minutes')
+    }
     const waiting = pending.current?.segment === segment && Date.now() - pending.current.at < 2000 && held[segment] !== ''
     const pair = digits.length >= 2 ? digits.slice(-2) : waiting ? held[segment].slice(-1) + digits : `0${digits}`
-    const whole = digits.length >= 2 || waiting
+    // A digit no second can follow, 2 to 9 of a 12-hour clock's hour or 6 to 9 of the minutes, is the segment whole,
+    // as a native time box reads it; openstatus waits for a second there.
+    const whole = digits.length >= 2 || waiting || Number(digits) * 10 > ranges[segment].max
     // A twelve-hour clock has no hour 00: a lone 0 waits for the digit that makes it 01 to 09.
     const value = segment === 'hours' && twelve && pair === '00' && !whole ? '' : clamp(Number(pair), ranges[segment])
     pending.current = whole ? undefined : { segment, at: Date.now() }
@@ -156,7 +165,12 @@ export function TimeField({ describedBy, disabled, error, form, id, label, local
       className="w-12 text-center tabular-nums caret-transparent max-sm:h-11"
       onKeyDown={keyed(segment)}
       // What a keyboard that names no key types, as Android's does, and a paste arrive here.
-      onChange={(event) => typed(segment, digitsOf(event.target.value).slice(digitsOf(shown(held[segment], locale)).length) || digitsOf(event.target.value))}
+      onChange={(event) => {
+        // A digit added after the segment's own is typed on; anything else, a paste over it, is read whole.
+        const all = digitsOf(event.target.value)
+        const own = digitsOf(shown(held[segment], locale))
+        typed(segment, own && all.startsWith(own) ? all.slice(own.length) : all)
+      }}
     />
   )
   const flip = () => write({ ...held, period: held.period === 'AM' ? 'PM' : 'AM' })

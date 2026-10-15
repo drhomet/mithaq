@@ -7654,6 +7654,7 @@ test('240h. a relationship picker offers a + beside it, for a viewer who may cre
   const drawer = documentDrawer()
   assert.ok(drawer, 'and opens a drawer')
   assert.equal(drawer!.querySelector('h2')?.textContent, 'New tag')
+  assert.equal(drawer!.querySelectorAll('h1').length, 0, 'which is its one title: the form draws no heading of its own under it')
   await act(async () => typeInto(drawer!.querySelector('#tags-name')!, 'Beginner'))
   await act(async () => fire(drawer!.querySelector('form')!, 'submit'))
   await act(async () => sleep(0))
@@ -7697,7 +7698,8 @@ test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the sam
   await act(async () => click(host.querySelector('button#sessions-startsAt') as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
   await act(async () => press(segment('hours') as unknown as Element, '9'))
-  assert.equal(segment('hours').value, '09', 'one digit reads as the hour, waiting for a second')
+  assert.equal(segment('hours').value, '09', 'a digit no second can follow is the whole hour')
+  assert.equal(window.document.activeElement === (segment('minutes') as unknown), true, 'and the minutes are next, as a native time box goes on')
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(written.length, 0, 'half a time writes no moment')
   assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'and a required one says so')
@@ -7711,6 +7713,8 @@ test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the sam
   await act(async () => press(segment('minutes') as unknown as Element, 'Backspace'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(written.length, 1, 'clearing a complete time clears the moment, which a required start refuses')
+  await act(async () => typeInto(segment('hours') as unknown as Element, '1045'))
+  assert.deepEqual([segment('hours').value, segment('minutes').value], ['10', '45'], 'a whole time pasted into the hours fills both')
 
   const arabic = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/:id'), client, value: { id: 's1', course: 'c1', startsAt: new Date(2026, 9, 15, 13, 5).toISOString() }, t: appCopy('ar'), locale: 'ar', onDone: () => {} }))
   const arabicSegment = (name: string) => arabic.querySelector(`[data-time-field] [data-segment="${name}"]`) as HTMLInputElement
@@ -7718,4 +7722,26 @@ test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the sam
   assert.equal(arabicSegment('hours').closest('[dir]')?.getAttribute('dir'), 'ltr', 'the clock reads hours then minutes, as a clock does, on a page right to left')
   await act(async () => typeInto(arabicSegment('hours') as unknown as Element, '٠٢'))
   assert.equal(arabic.querySelector('[data-time-field]')?.getAttribute('data-value'), '14:05', 'and Arabic digits typed are read')
+})
+
+test('240m. a hovered list row tints every cell itself, the pinned title and actions included, so the row highlights as one in either theme', async () => {
+  const host = await render(createElement(List, {
+    kayan: courses, page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300 }]), query: {}, t, locale: 'en', onQuery: () => {},
+    href: (id: string) => `/courses/${id}`, newHref: '/courses/new', operations: { delete: true }, run: async () => ({}),
+  }))
+  const cells = [...host.querySelectorAll('tbody tr[data-row="c1"] > td')]
+  const tint = (cell: Element) => classesOf(cell).filter((one) => one.startsWith('group-hover/row:bg-'))
+  assert.ok(cells.length > 2 && cells.some((cell) => classesOf(cell).includes('sticky')), 'the row has pinned cells and others')
+  assert.deepEqual(cells.map(tint), cells.map(() => ['group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]']), 'each cell paints the same opaque tint, so nothing but the cells decides the row\'s colour')
+})
+
+test('240n. a picker for an upload offers no + of its own, which its Upload new already is', async () => {
+  const access = { collections: { media: { create: true, fields: { alt: { create: true }, file: { create: true } } }, tags: { create: true, fields: { name: { create: true } } } } }
+  const host = await render(createElement(Form, {
+    kayan: courses, screen: screenOf(recordPage([{ form: ['cover', 'tags'] }])), client: recording().client, value: draftRow, t: english, locale: 'en', onDone: () => {},
+    kayans, api: fakeApi({ tags: [], media: [] }).api,
+  }), { client: (async () => ({})) as never, access: access as never })
+  assert.ok(host.querySelector('[data-control="relationship"] button[data-add-new]'), 'a relationship has it')
+  assert.ok(host.querySelector('[data-control="upload"]'), 'the cover is drawn by its upload control')
+  assert.equal(host.querySelector('[data-control="upload"] button[data-add-new]') === null, true, 'which draws no + beside its picker')
 })
