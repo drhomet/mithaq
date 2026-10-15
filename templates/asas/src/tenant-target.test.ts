@@ -49,7 +49,7 @@ const organization: Kayan = { name: 'organization', fields: { id: { kind: 'text'
 
 /** Builds `organization` and the kayan given, as plain data, through the language given. */
 const build = (language: { buildAsas: (args: never) => unknown }, ...kayan: Kayan[]) =>
-  language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [organization, ...kayan] } as never) as {
+  language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [organization, ...kayan] } as never) as {
     targets: { drizzle: { tables: Record<string, PgTable> } }
     kayan: Record<string, { targets: { zod: { schemas: { create: z.ZodObject; update: z.ZodObject } } } }>
   }
@@ -133,7 +133,7 @@ test('a global carrying a bound field is one row per organization: the field uni
   const unique = { ...tenant.field, rules: { ...tenant.field.rules, unique: true } }
   const prefs = (fields: Kayan['fields']) =>
     tenanted.defineGlobal({ name: 'prefs', fields: { ...defaultFields, ...fields, theme: { kind: 'text' } }, access: { read: () => true, update: () => true }, targets: { service: { operations: defaultGlobalOperations } } } as never)
-  const built = (fields: Kayan['fields']) => tenanted.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [organization], global: [prefs(fields)] } as never) as ReturnType<typeof build>
+  const built = (fields: Kayan['fields']) => tenanted.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [organization], global: [prefs(fields)] } as never) as ReturnType<typeof build>
   const columns = getTableConfig(built({ owner: unique, globalType }).targets.drizzle.tables.prefs!).columns
   const column = (name: string) => columns.find((one) => one.name === name)!
   assert.deepEqual([column('owner_id').isUnique, column('owner_id').notNull], [true, true], 'one row per organization, under any key')
@@ -147,7 +147,7 @@ test('a global carrying a bound field is one row per organization: the field uni
 test('buildAsas refuses a second Better Auth kayan beside a tenant-owned kayan, whose organizations one instance alone holds', () => {
   const server = () => ({ api: { getSession: async () => null }, handler: async () => new Response(null) })
   const instance = (name: string): Kayan => ({ name, fields: { id: { kind: 'text' } }, auth: betterAuth({ server: server as never }), targets: operations } as Kayan)
-  const twice = { http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [organization, instance('staff'), instance('shoppers')], auth: { onError: () => {} } }
+  const twice = { http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [organization, instance('staff'), instance('shoppers')], auth: { onError: () => {} } }
   const owned = { ...twice, kayan: [...twice.kayan, notes({ organizationId: tenant.field })] }
   assert.throws(() => tenanted.buildAsas(owned as never), /Kayan "staff" and "shoppers" each carry Better Auth, and kayan "notes" belongs to the organization a session names\./)
   assert.doesNotThrow(() => tenanted.buildAsas(twice as never), 'a build with no tenant-owned kayan keeps both')
@@ -296,7 +296,7 @@ test('connect() refuses a store holding more than one organization where the ten
         service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }),
       } as {},
     })
-    const built = (language as unknown as { buildAsas: (args: unknown) => { connect(args?: { readOnly?: boolean }): Promise<void> } }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [organization] })
+    const built = (language as unknown as { buildAsas: (args: unknown) => { connect(args?: { readOnly?: boolean }): Promise<void> } }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [organization] })
     for (let at = 0; at < count; at++) await store.insert({ tx: undefined, kayan: 'organization', data: { id: `org-${at}`, name: `Org ${at}` } })
     return built.connect({ readOnly })
   }

@@ -97,6 +97,13 @@ export const assertMaxBodyBytes = (owner: string, value: unknown) => {
   }
 }
 
+/** Refused by name, as `auth.onError` and `storage.onError` are: core reports no fault of its own. */
+export const assertOnError = (owner: string, value: unknown) => {
+  if (typeof value !== 'function') {
+    throw new Error(`${owner} names no "onError" function, which it hands every error that is no refusal before it answers 500. Name the project's own, such as console.error.`)
+  }
+}
+
 export const tooLarge = (limit: number) =>
   Response.json({ code: codes[413], message: `The request body holds at most ${limit} bytes.` }, { status: 413 })
 
@@ -108,16 +115,17 @@ export type FetchHttpOptions = {
    * The plug reads no header or body key into it; a throw is answered 500.
    */
   context?: (request: Request, actor: unknown) => Promise<Record<string, unknown>> | Record<string, unknown>
-  /** Handed every error that is not an `AsasError`, before the 500 goes out with its message replaced. Defaults to `console.error`. */
-  onError?: (error: unknown) => void
+  /** Handed every error that is not an `AsasError`, before the 500 goes out with its message replaced. Required. */
+  onError: (error: unknown) => void
 }
 
 /**
  * The default HTTP plug: `POST /api/<kayan>/<operation>` with a JSON body, over
  * `Request` and `Response` alone. The runner parses each operation's input.
  */
-export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: FetchHttpOptions = {} as FetchHttpOptions) => {
+export const fetchHttp = ({ context, onError, maxBodyBytes }: FetchHttpOptions = {} as FetchHttpOptions) => {
   assertMaxBodyBytes('fetchHttp', maxBodyBytes)
+  assertOnError('fetchHttp', onError)
   return <View>(operations: OperationTable<View>): HttpPlug => {
     const table = new Map(operations.map((one) => [`${one.kayan}/${one.name}`, one]))
     return {
@@ -160,7 +168,7 @@ export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: Fe
         } catch (thrown) {
           if (thrown instanceof AfterCommitError) {
             try {
-              onError?.(thrown.cause)
+              onError(thrown.cause)
             } catch {
               // Reporting cannot change a committed result.
             }
@@ -175,7 +183,7 @@ export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: Fe
             )
           }
           try {
-            onError?.(thrown)
+            onError(thrown)
           } catch {
             // Deliberately empty: reporting may not change what is reported.
           }

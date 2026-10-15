@@ -206,7 +206,7 @@ const actorDefaults = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const actorDefaultAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [defaultActors, actorDefaults, ...accessKayan] })
+const actorDefaultAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [defaultActors, actorDefaults, ...accessKayan] })
 
 const localizedNotes = defineTestKayan({
   name: 'localizedNotes',
@@ -256,7 +256,7 @@ const integerIds = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const localizedAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [localizedNotes, localizedRefs, integerIds, ...accessKayan] })
+const localizedAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [localizedNotes, localizedRefs, integerIds, ...accessKayan] })
 
 /**
  * `date` is a calendar day held as a `YYYY-MM-DD` string in a postgres `date` column;
@@ -280,7 +280,7 @@ const calendars = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const calendarAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [calendars, ...accessKayan] })
+const calendarAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [calendars, ...accessKayan] })
 
 /**
  * `decimal` is a `numeric(precision, scale)` read back as text. The second kayan keeps
@@ -322,7 +322,7 @@ const ledgers = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const measureAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [measures, draftMeasures, ledgers, ...accessKayan] })
+const measureAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [measures, draftMeasures, ledgers, ...accessKayan] })
 
 const probeMedia = defineTestKayan({
   name: 'probeMedia',
@@ -346,7 +346,7 @@ const galleries = defineTestKayan({
   fields: { ...defaultFields, images: { kind: 'upload', relationTo: () => probeMedia, hasMany: true } },
   targets: { service: { operations: defaultOperations } },
 })
-const galleryAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [probeMedia, galleries, ...accessKayan] })
+const galleryAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [probeMedia, galleries, ...accessKayan] })
 
 /**
  * These are their own kayan rather than the template's courses and sessions, because a
@@ -391,7 +391,7 @@ const noticeReplies = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const noticeAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notices, noticeReplies, ...accessKayan] })
+const noticeAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [notices, noticeReplies, ...accessKayan] })
 
 const memos = defineTestKayan({
   name: 'memos',
@@ -438,7 +438,7 @@ const briefs = defineTestKayan({
   },
   targets: { service: { operations: { ...defaultOperations, ...versionOperations } }, versions: { drafts: true, max: 1 } },
 })
-const memoAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [memos, localeMemos, briefs, ...accessKayan] })
+const memoAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [memos, localeMemos, briefs, ...accessKayan] })
 
 /**
  * Both are shared: a column called `tenant` binds nothing, so the reference check a write
@@ -485,7 +485,7 @@ const markedChildren = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const markedAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [markedParents, markedChildren, ...accessKayan] })
+const markedAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [markedParents, markedChildren, ...accessKayan] })
 /** A kayan that names a person and itself, which no template kayan beside the seats does. */
 const probeNotes = defineTestKayan({
   name: 'probeNotes',
@@ -498,7 +498,7 @@ const probeNotes = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const notesAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [probeNotes, ...accessKayan] })
+const notesAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [probeNotes, ...accessKayan] })
 /** A row every organization shares, and a per-organization kayan whose drafts name it. */
 const sharedLabels = defineTestKayan({
   name: 'sharedLabels',
@@ -514,7 +514,7 @@ const labelledDrafts = defineTestKayan({
   fields: { ...defaultFields, organization, label: { kind: 'relationship', label: { en: 'Label', ar: 'الوسم' }, relationTo: () => sharedLabels }, ...draftFields },
   targets: { service: { operations: { ...defaultOperations, ...versionOperations } }, versions: { drafts: true } },
 })
-const labelsAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [sharedLabels, labelledDrafts, ...accessKayan] })
+const labelsAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [sharedLabels, labelledDrafts, ...accessKayan] })
 
 const projectWide = defineTestGlobal({
   name: 'projectWide',
@@ -556,7 +556,7 @@ const readHiddenProjectWide = defineTestGlobal({
   targets: { service: { operations: defaultGlobalOperations } },
 })
 const projectWideAsas = buildTestAsas({
-  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   kayan: [...accessKayan],
   global: [projectWide, deniedProjectWide, hiddenProjectWide, readHiddenProjectWide],
 })
@@ -571,7 +571,7 @@ const spreadsNoDefaults = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const spreadsNoDefaultsAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [spreadsNoDefaults, ...accessKayan] })
+const spreadsNoDefaultsAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [spreadsNoDefaults, ...accessKayan] })
 
 /**
  * The soft-delete mark is on both because the language names the field and refuses a
@@ -608,7 +608,7 @@ const spreadsNoUpdatedAt = defineTestKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const spreadsNoTimestampAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [spreadsNoCreatedAt, spreadsNoUpdatedAt, ...accessKayan] })
+const spreadsNoTimestampAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [spreadsNoCreatedAt, spreadsNoUpdatedAt, ...accessKayan] })
 
 /**
  * A unique violation reaches a caller as a 409 `AsasError` whose message names no
@@ -745,7 +745,7 @@ const softLocalUsers = defineTestKayan({
   targets: { service: { operations: localOperations } },
 })
 const softLocalAsas = buildTestAsas({
-  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   kayan: [authenticating(softLocalUsers, local({ ...localRequired, secret: 'soft-local-users-secret-of-thirty-two-characters' })), ...accessKayan],
 })
 
@@ -785,7 +785,7 @@ const localAuthProject = async (
   const { onError = console.error, ...options } = provider
   const authenticated = authenticating(kayan, local({ ...localRequired, secret: `${name}-a-local-auth-test-secret`, ...options }))
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticated],
     auth: { onError, ...(admin && { admin: { kayan: authenticated, access: admin.access } }) },
   })
@@ -1530,7 +1530,7 @@ test('admin update of a generated Better Auth row bumps updatedAt through the ka
   // template closes the session to everyone, so this build takes it with that access left out.
   await tenantOptions()
   const adminAsas = buildTestAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: accessKayan.map((one) => (one.name === 'session' ? { ...one, access: undefined } : one)),
     auth: { admin: { kayan: authKayan.core[0]!, access: () => true }, onError: console.error },
   })
@@ -1551,7 +1551,7 @@ test('2. buildAsas returns, and refuses a kind no target has an entry for', () =
   assert.throws(
     () =>
       withoutColumn.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [withoutColumn.defineKayan({ name: 'fees', fields: { id: defaultFields.id, fee: { kind: 'number' } }, targets: { service: { operations: defaultOperations } } })],
       }),
     /field "fee" has kind "number"[\s\S]*"drizzle" target's kinds/,
@@ -1562,7 +1562,7 @@ test('2. buildAsas returns, and refuses a kind no target has an entry for', () =
   assert.throws(
     () =>
       withoutShape.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [withoutShape.defineKayan({ name: 'fees', fields: { id: defaultFields.id, fee: { kind: 'number' } }, targets: { service: { operations: defaultOperations } } })],
       }),
     /field "fee" has kind "number"[\s\S]*"zod" target's kinds/,
@@ -2095,7 +2095,7 @@ test('8. every rule is one entry per target, and a rule a target does not name t
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({ name: 'notes', fields: { id: defaultFields.id, body: { kind: 'text', rules: { unique: true } } }, targets: { service: { operations: defaultOperations } } }),
         ],
@@ -2143,7 +2143,7 @@ test('8. every rule is one entry per target, and a rule a target does not name t
     },
   })
   const customBuilt = custom.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       custom.defineKayan({
         name: 'scores',
@@ -2171,7 +2171,7 @@ test("8a. a kind carries the sentence a value it refuses is shown as and one wri
         zod: { ...zodTarget, kinds: zodKinds, rules: zodRules },
         service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
       },
-    } as never) as unknown as { buildAsas: (one: { kayan: []; http: unknown[] }) => unknown }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [] })
+    } as never) as unknown as { buildAsas: (one: { kayan: []; http: unknown[] }) => unknown }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] })
   assert.throws(() => without({ kinds: { ...defaultKinds, text: { ...defaultKinds.text, message: undefined } } }), /kind "text" declares no message/)
   assert.doesNotThrow(
     () =>
@@ -2204,7 +2204,7 @@ test('9. a target override replaces what would have been derived', async () => {
 
   const language = online()
   const reused = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'mirror',
@@ -2227,7 +2227,7 @@ test('9. a target override replaces what would have been derived', async () => {
 
   const columns = offline()
   const probe = columns.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       columns.defineKayan({
         name: 'notes',
@@ -2253,7 +2253,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'nodes',
@@ -2270,7 +2270,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'nodes',
@@ -2288,7 +2288,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.throws(
     () =>
       withoutPrimary.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [withoutPrimary.defineKayan({ name: 'notes', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } })],
       }),
     /field "id" is the primary key, and "primary" has no entry in the "drizzle" target's rules/,
@@ -2301,7 +2301,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
     assert.throws(
       () =>
         language.buildAsas({
-          http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+          http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
           kayan: [language.defineKayan({ name: 'notes', fields: { id: { kind } }, targets: { service: { operations: defaultOperations } } })],
         }),
       new RegExp(`field "id" is the primary key with kind "${kind}", which the "drizzle" target builds no id of`),
@@ -2310,7 +2310,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   for (const kind of ['text', 'number', 'uuid'] as const) {
     assert.doesNotThrow(() =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [language.defineKayan({ name: 'notes', fields: { id: { kind } }, targets: { service: { operations: defaultOperations } } })],
       }),
     )
@@ -2322,7 +2322,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [language.defineKayan({ name: 'notes', fields: { id: { kind: 'text', rules: { maxLength: 10 } } }, targets: { service: { operations: defaultOperations } } })],
       }),
     /field "id" is the primary key, and "maxLength" on it would build a column and a shape no foreign key pointing at it shares/,
@@ -2331,7 +2331,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.doesNotThrow(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'notes',
@@ -2345,13 +2345,13 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
 
   const one = language.defineKayan({ name: 'one', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } })
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [one, one] as (typeof one)[] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [one, one] as (typeof one)[] }),
     /Kayan name "one" is declared more than once/,
   )
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({ name: 'one', dbName: 'shared', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }),
           language.defineKayan({ name: 'two', dbName: 'shared', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }),
@@ -2362,7 +2362,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'columns',
@@ -2379,7 +2379,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           registered,
           language.defineKayan({
@@ -2393,7 +2393,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   )
 
   const dynamic = (field: Kayan['fields'][string]) =>
-    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'dynamic', fields: { id: defaultFields.id, value: field } }] })
+    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ name: 'dynamic', fields: { id: defaultFields.id, value: field } }] })
   assert.throws(
     () => dynamic({ kind: 'number', rules: { pattern: /x/ } }),
     /kind "number" which does not accept nested rule "pattern"/,
@@ -2438,7 +2438,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   // dbName that is not a plain identifier is refused at build, by kayan and value.
   const tabled = (dbName: string) =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [language.defineKayan({ name: 'notes', dbName, fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } })],
     })
   for (const dbName of ['*', 'a*', 'a?', 'a[b]', '!notes', 'a b', 'a-b', '1notes', 'x'.repeat(64), 'é'.repeat(32)]) {
@@ -2449,7 +2449,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   // never sees, so every table the push filters on is checked as built.
   const joined = (field: string, joiner = online()) =>
     joiner.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         joiner.defineKayan({
           name: 'notes',
@@ -2473,7 +2473,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   const versioned = (dbName: string) => {
     const made = reporting(defineMithaq({ arkan: [base, versionsRukn({ max: 100 })], targets: offlineTargets() }))
     return made.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         made.defineKayan({
           name: 'drafted',
@@ -2497,7 +2497,7 @@ test('10. what buildAsas cannot build throws, naming the field', async () => {
   assert.throws(
     () =>
       overridden.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           overridden.defineKayan({
             name: 'mirror',
@@ -2517,7 +2517,7 @@ test('10b. a schemaName the drizzle store cannot build in is refused at build, b
   const schemed = (schemaName: unknown, extra: Record<string, unknown> = {}) => {
     const language = online()
     return language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [language.defineKayan({ name: 'notes', schemaName, fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } }, ...extra } as never)],
     })
   }
@@ -2552,7 +2552,7 @@ test('10b. a schemaName the drizzle store cannot build in is refused at build, b
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({ name: 'notes', schemaName: 'app', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }),
           language.defineKayan({ name: 'appSchema', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }),
@@ -2564,7 +2564,7 @@ test('10b. a schemaName the drizzle store cannot build in is refused at build, b
   const versioned = (own: Record<string, unknown>) => {
     const made = reporting(defineMithaq({ arkan: [base, versionsRukn({ max: 100 })], targets: offlineTargets() }))
     return made.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         made.defineKayan({
           name: 'notes',
@@ -2590,7 +2590,7 @@ test('10b. a schemaName the drizzle store cannot build in is refused at build, b
   assert.throws(
     () =>
       twice.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           twice.defineKayan({ name: 'notes', schemaName: 'app', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }),
           twice.defineKayan({ name: 'memos', dbName: 'notes', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }),
@@ -2606,7 +2606,7 @@ test('10c. a kayan\'s indexes are built on its own table in its own schema, name
   const indexed = (indexes: unknown, extra: Record<string, unknown> = {}) => {
     const language = reporting(defineMithaq({ locales: ['ar', 'en'] as const, arkan: [base], targets: offlineTargets() }))
     return language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'playbooks',
@@ -2746,7 +2746,7 @@ test('10c. a kayan\'s indexes are built on its own table in its own schema, name
   const pair = (one: Record<string, unknown>, other: Record<string, unknown>) => {
     const language = online()
     return language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [one, other].map((kayan) => language.defineKayan({ fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } }, ...kayan } as never)) as never,
     })
   }
@@ -2780,7 +2780,7 @@ test('10d. a hasMany join table is keyed on (parent_id, order) and indexed on ta
   const built = (notes: Record<string, unknown> = {}, memos: Record<string, unknown> = {}) => {
     const language = online()
     return language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({ name: 'tags', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }),
         language.defineKayan({
@@ -2827,7 +2827,7 @@ test('11. the push is scoped to the tables the adapter built', async () => {
   assert.deepEqual(handed.filter.schemas, ['public'])
   // drizzle-kit reads an empty filter as no filter, so an adapter that built no
   // table pushes nothing at all instead of diffing the whole schema.
-  const nothing = offline().buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [] })
+  const nothing = offline().buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] })
   await assert.doesNotReject(() => nothing.connect())
   await nothing.destroy()
 
@@ -2850,7 +2850,7 @@ test('11a. the push leaves every enum and sequence of another tool as it found t
   const language = online()
   const pushed = (fields: Record<string, unknown>) =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [language.defineKayan({ name: 'pushedBeside', access: allowAccess, fields: { ...defaultFields, ...fields } })],
     })
   const created = pushed({ title: { kind: 'text' } })
@@ -2896,7 +2896,7 @@ test('11c. a column that uses an enum gets its type from the push, in the kayan\
     const built = (labels: [string, ...string[]] = ['happy', 'sad'], name = 'mood') => {
       const mood = schema === 'public' ? pgEnum(name, labels) : pgSchema(schema).enum(name, labels)
       return language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'enumBacked',
@@ -2954,7 +2954,7 @@ test('11c. a column that uses an enum gets its type from the push, in the kayan\
       // Its own language: a language builds every kayan it was handed, `enumBacked` among them.
       const alone = online()
       return alone.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           alone.defineKayan({
             name: 'enumTagged',
@@ -2987,7 +2987,7 @@ test('each build has tables of its own: a refused build leaves nothing for the n
   const language = online()
   const notes = (field: string) =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'notes_259',
@@ -3006,7 +3006,7 @@ test('each build has tables of its own: a refused build leaves nothing for the n
   // table is gone from the database and from what the push diffs.
   await db.execute('drop table notes_259_tags, notes_259')
   const renamed = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [language.defineKayan({ name: 'memos_259', access: allowAccess, fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } })],
   })
   assert.deepEqual(Object.keys(renamed.targets.drizzle.tables), ['memos_259'])
@@ -3034,7 +3034,7 @@ test('each build has tables of its own: a refused build leaves nothing for the n
     targets: { ...offlineTargets(), drizzle: { ...drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }), connect: async () => {} } },
   }))
   assert.throws(
-    () => unwrapped.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [unwrapped.defineKayan({ name: 'memos_259', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } })] }),
+    () => unwrapped.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [unwrapped.defineKayan({ name: 'memos_259', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } })] }),
     /wraps the drizzle store and not its init/,
   )
   // The store the language holds merges every build's tables, so it pushes
@@ -3048,7 +3048,7 @@ test('an update naming only a kayan\'s sets, on a kayan with no updatedAt, write
   await db.execute('drop table if exists linked_sets_tags, linked_sets')
   const language = online()
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'linked_sets',
@@ -3087,7 +3087,7 @@ test('11b. a push that fails part way leaves nothing it ran before the failure, 
   assert.equal(before.length, 1, 'the push in `before` left its marker')
   const language = online()
   const broken = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({ name: 'pushedFirst', access: allowAccess, fields: { ...defaultFields, title: { kind: 'text' } } }),
       language.defineKayan({ name: 'pushedBroken', dbName: 'pushed_broken', access: allowAccess, fields: { id: defaultFields.id, count: { kind: 'number' } } }),
@@ -3108,7 +3108,7 @@ test('12b. a required relationship declared set null is refused at build by name
   const language = offline()
   assert.throws(
     () => language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [language.defineKayan({
         name: 'nodes',
         fields: { id: { kind: 'text' }, parent: { kind: 'relationship', relationTo: 'nodes', rules: { required: true, onDelete: 'set null' } } },
@@ -3122,7 +3122,7 @@ test('12b. a required relationship declared set null is refused at build by name
 test('12. onDelete is a rule, a relationship that names none restricts, and a required Better Auth foreign key cascades', async () => {
   const language = offline()
   const nodes = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'nodes',
@@ -3246,7 +3246,7 @@ test('14a. declared output validates a single update and a bulk envelope', async
       },
     },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [notes] })
   await built.connect()
   try {
     await built.kayan.outputNotes.operations.create({ id: 'n1', title: 'Old', secret: 'private' })
@@ -3288,7 +3288,7 @@ test('14. a second store is checked and used, every target is checked, and what 
     },
     fields: { id: { kind: 'text' }, body: { kind: 'text', rules: { required: true } } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [notes] })
   await built.connect()
   const row = await built.kayan.notes.operations.create({ id: 'n1', body: 'Kept in memory' })
   assert.deepEqual(memory.rows.get('notes'), [{ id: 'n1', body: 'Kept in memory' }])
@@ -3308,7 +3308,7 @@ test('14. a second store is checked and used, every target is checked, and what 
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           notes,
           language.defineKayan({
@@ -3338,7 +3338,7 @@ test('14. a second store is checked and used, every target is checked, and what 
   assert.throws(
     () =>
       partial.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [partial.defineKayan({ name: 'events', fields: { id: defaultFields.id, at: { kind: 'datetime' } }, targets: { service: { operations: defaultOperations } } })],
       }),
     /field "at" has kind "datetime"[\s\S]*"memory" target's kinds/,
@@ -3346,7 +3346,7 @@ test('14. a second store is checked and used, every target is checked, and what 
 
   // The rest of the checks are on a kayan written as data, the way a generator
   // or a project's own loader hands one over, with none of the types in the way.
-  const raw = (kayan: Kayan) => () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [kayan] })
+  const raw = (kayan: Kayan) => () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [kayan] })
 
   assert.throws(raw({ name: 'notes', targets: { service: { store: 'nowhere' } }, fields: { id: defaultFields.id } }), /names store "nowhere", which is not a store/)
   assert.throws(raw({ name: 'notes', targets: { service: { store: 'zod' } }, fields: { id: defaultFields.id } }), /names store "zod", which is not a store/)
@@ -3480,7 +3480,7 @@ test('16. a kayan restates its create list, and the step it adds runs inside the
       drizzle: tables.courses,
     },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [stamped, fragile] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [stamped, fragile] })
 
   const row = await built.kayan.stamped.operations.create({ title: 'Stamped' })
   assert.deepEqual(seen, ['stamp'])
@@ -3517,7 +3517,7 @@ test('16a. bound reads see the parent transaction and roll back with it', async 
       drizzle: tables.courses,
     },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [txRows] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [txRows] })
   await assert.rejects(() => built.kayan.txRows.operations.create({ title: 'Transient nested read' }), /rollback after nested read/)
   assert.equal(seenTitle, 'Transient nested read')
   assert.deepEqual(
@@ -3553,7 +3553,7 @@ test('16b. configured audit handlers run in the write transaction and can fail t
     fields: { ...defaultFields, ...borrowed, title: { kind: 'text', rules: { required: true } } },
     targets: { drizzle: tables.courses, service: { operations: defaultOperations } },
   })
-  const auditedBuilt = auditedLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [auditEntries, audited] })
+  const auditedBuilt = auditedLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [auditEntries, audited] })
   const actor = { id: 'auditor' }
   const row = await auditedBuilt.kayan.auditedRows.operations.create({ title: 'Audited row' }, { actor })
   await auditedBuilt.kayan.auditedRows.operations.update({ id: row.id, title: 'Audited row changed' }, { actor })
@@ -3580,7 +3580,7 @@ test('16b. configured audit handlers run in the write transaction and can fail t
     },
   })
   const failing = failingLanguage.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       failingLanguage.defineKayan({
         name: 'auditFails',
@@ -3761,12 +3761,12 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
   const language = offline()
   const users = language.defineKayan({ name: 'users', fields: localAuthFields, targets: { service: { operations: localOperations } } })
   const plainUsers = language.defineKayan({ name: 'users', fields: localAuthFields, targets: { service: { operations: defaultOperations } } })
-  const omitted = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [plainUsers] })
+  const omitted = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [plainUsers] })
   assert.equal(omitted.auth.strategies.length, 0)
   assert.equal((await omitted.handler(new Request('http://test/api/auth/local/login'))).status, 404)
 
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(plainUsers, { provider: 'better-auth', server: true })] as never }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(plainUsers, { provider: 'better-auth', server: true })] as never }),
     /kayan "users" carries auth: betterAuth\(\{ server \}\), and server must be a factory/,
   )
   const missing = language.defineKayan({
@@ -3775,13 +3775,13 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
     targets: { service: { operations: defaultOperations } },
   })
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(missing, local({ ...localRequired, secret: 'missing-columns-secret-of-thirty-two-characters' }))] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(missing, local({ ...localRequired, secret: 'missing-columns-secret-of-thirty-two-characters' }))] }),
     /kayan "missingColumns" carries auth: local\(\.\.\.\) and needs field "loginAttempts"\. Spread \.\.\.localAuthFields into its fields\.$/,
   )
   const { email: _address, ...withoutEmail } = localAuthFields
   const addressless = language.defineKayan({ name: 'addresslessColumns', fields: withoutEmail, targets: { service: { operations: localOperations } } })
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(addressless, local({ ...localRequired, email: undefined, secret: 'addressless-secret-of-thirty-two-characters' }))] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(addressless, local({ ...localRequired, email: undefined, secret: 'addressless-secret-of-thirty-two-characters' }))] }),
     (error: Error) => {
       assert.match(error.message, /kayan "addresslessColumns" carries auth: local\(\.\.\.\) and needs field "email"\. Spread \.\.\.localAuthFields into its fields\.$/)
       return true
@@ -3790,7 +3790,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [authenticating(addressless, local({ ...localRequired, secret: 'addressless-secret-of-thirty-two-characters', email: { send: async () => {} } }))],
       }),
     /needs field "email"\. local\(\{ email \}\)\.send is handed that field as the address, so a kayan without it has nowhere to send a token\./,
@@ -3809,19 +3809,19 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
     ['ownDenial', { ...localAuthFields.hash, access: { read: () => false } }],
   ] as const) {
     assert.throws(
-      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [readable(name, hash)] }),
+      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [readable(name, hash)] }),
       new RegExp(`^Error: kayan "${name}" carries auth: local\\(\\.\\.\\.\\) and its field "hash" is readable\\. Write hash: localAuthFields\\.hash, or spread \\.\\.\\.localAuthFields into its fields, so its access is the shipped one\\.$`),
       `${name} is refused by the field's name`,
     )
   }
   assert.doesNotThrow(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [readable('shippedDenial', { ...localAuthFields.hash, label: { en: 'Hash', ar: 'البصمة' } })] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [readable('shippedDenial', { ...localAuthFields.hash, label: { en: 'Hash', ar: 'البصمة' } })] }),
     'a field spreading the shipped one keeps its read, whatever else it adds',
   )
   // An account is one identity across organizations, so a local kayan placing the tenant field is refused.
   assert.throws(
     () => buildTestAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         defineTestKayan({
           name: 'tenantedLocalUsers',
@@ -3839,7 +3839,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
   // for, so a kayan spreading them with no `local()` is refused rather than
   // printing every token it mints.
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [language.defineKayan({ name: 'strayMint', fields: localAuthFields, targets: { service: { operations: localOperations } } })] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [language.defineKayan({ name: 'strayMint', fields: localAuthFields, targets: { service: { operations: localOperations } } })] }),
     /^Error: kayan "strayMint" holds the verification steps of localAuthOperations and carries no auth: local\(\.\.\.\)\. Carry local\(\.\.\.\), or leave localAuthOperations out of its operations\.$/,
   )
   // A create missing the hash, the mint or the handover, or with them out of order or with
@@ -3869,17 +3869,17 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
     ['bulkOverPlainUpdate', { ...localOperations, updateMany: defaultOperations.updateMany, update: defaultOperations.update }, 'update', 'update'],
   ] as const) {
     assert.throws(
-      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [withOperations(name, operations)] }),
+      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [withOperations(name, operations)] }),
       (error: Error) => error.message.startsWith(`kayan "${name}" carries auth: local(...)`) && shippedSteps(operation, list).test(error.message),
       `${name} is refused by the kayan's and the operation's name`,
     )
   }
   assert.doesNotThrow(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [withOperations('customShipped', { ...localOperations, enroll: localAuthOperations.create, archive: localAuthOperations.update })] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [withOperations('customShipped', { ...localOperations, enroll: localAuthOperations.create, archive: localAuthOperations.update })] }),
     'a custom operation written with the shipped steps is built, and so is the bulk update over the shipped update',
   )
   assert.doesNotThrow(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [withOperations('ownStep', { ...localOperations, create: { ...localAuthOperations.create, steps: [...localAuthOperations.create.steps, (ctx: Ctx) => ctx] } })] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [withOperations('ownStep', { ...localOperations, create: { ...localAuthOperations.create, steps: [...localAuthOperations.create.steps, (ctx: Ctx) => ctx] } })] }),
     'a create that adds its own step around the shipped four is built',
   )
   // `_verified` keeps the shipped writes, which admit the administrator alone,
@@ -3891,24 +3891,24 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
       local({ ...localRequired, secret: `${name}-secret-of-thirty-two-characters` }),
     )
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [withFields('openVerified', { _verified: { kind: 'checkbox', rules: { defaultValue: false } } })] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [withFields('openVerified', { _verified: { kind: 'checkbox', rules: { defaultValue: false } } })] }),
     /^Error: kayan "openVerified" carries auth: local\(\.\.\.\) and its field "_verified" is writable on create\. Write _verified: localAuthFields\._verified, or spread \.\.\.localAuthFields into its fields, so its access is the shipped one\.$/,
   )
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [withFields('suppliedHash', { hash: { ...localAuthFields.hash, rules: { required: true } } })] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [withFields('suppliedHash', { hash: { ...localAuthFields.hash, rules: { required: true } } })] }),
     /^Error: kayan "suppliedHash" carries auth: local\(\.\.\.\) and its field "hash" is supplied by a caller on create\. Write hash: localAuthFields\.hash, or spread \.\.\.localAuthFields into its fields, so the provider alone writes it\.$/,
   )
   // `auth.admin` is the one place a kayan is named from outside, so the two identity
   // refusals are its.
   const authenticated = authenticating(users, local({ ...localRequired, secret: 'admin-identity-secret-of-thirty-two-characters' }))
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [], auth: { admin: { kayan: authenticated }, onError: console.error } }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], auth: { admin: { kayan: authenticated }, onError: console.error } }),
     /auth\.admin\.kayan "users" is not in the buildAsas kayan list/,
   )
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [authenticated],
         auth: { admin: { kayan: authenticating(language.defineKayan({ name: 'users', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }), local(localRequired)) }, onError: console.error },
       }),
@@ -3923,7 +3923,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
     authenticate: async () => ({ user: { id: 'own-shape' } }),
   }
   const ownShape = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(language.defineKayan({ name: 'ownShapeUsers', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }), carriesProvider)],
   })
   assert.deepEqual(ownShape.auth.strategies.map((one) => one.name), ['carriesProvider'])
@@ -3933,7 +3933,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [authenticating(language.defineKayan({ name: 'neitherUsers', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }), { provider: 'oauth' })] as never,
       }),
     /kayan "neitherUsers" carries an auth that is neither a strategy, which is an object with an `authenticate`, nor one of the shipped declarations, betterAuth\(\{ server \}\) and local\(\{ \.\.\. \}\)\./,
@@ -3946,7 +3946,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           authenticating(language.defineKayan({ name: 'twinOne', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }), twin),
           authenticating(language.defineKayan({ name: 'twinTwo', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }), twin),
@@ -3957,7 +3957,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           authenticating(language.defineKayan({ name: 'localOne', fields: localAuthFields, targets: { service: { operations: localOperations } } }), local({ ...localRequired, development: true })),
           authenticating(language.defineKayan({ name: 'localTwo', fields: localAuthFields, targets: { service: { operations: localOperations } } }), local({ ...localRequired, development: true })),
@@ -4026,7 +4026,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
     access: { create: async () => true },
   })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [omittedAccess, missingCreateAccess, deniedCreate, undefinedCreate, invalidCreate, throwingCreate, rejectingCreate, asyncCreate],
   })
   await assert.rejects(() => built.kayan.omittedAccess.operations.create({ title: 'Anonymous default deny' }), /Forbidden/)
@@ -4051,7 +4051,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [adminUser, authenticating(defaultAdminAccess, betterAuthProvider({ server: () => fakeBetterAuth }))],
         auth: { admin: { kayan: adminUser }, onError: console.error },
       }),
@@ -4065,7 +4065,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [probeAdmin, defaultAdminAccess],
         auth: { admin: { kayan: probeAdmin }, onError: console.error },
       }),
@@ -4073,7 +4073,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   )
   const betterAdminUser = authenticating(adminUser, betterAuthProvider({ server: () => fakeBetterAuth }))
   const mappedAdminBuilt = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [betterAdminUser, defaultAdminAccess],
     auth: { admin: { kayan: betterAdminUser }, onError: console.error },
   })
@@ -4084,7 +4084,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
     /Forbidden/,
   )
   const adminAllowedBuilt = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [betterAdminUser, defaultAdminAccess],
     auth: { admin: { kayan: betterAdminUser, access: async ({ user }: AdminAccessArgs<{ id: string }>) => user.id === 'admin-1' }, onError: console.error },
   })
@@ -4093,7 +4093,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   ;(allowedActor as { collection?: string }).collection = 'other'
   await adminAllowedBuilt.kayan.defaultAdminAccess.operations.create({ title: 'Admin default snapshot still allowed' }, { actor: allowedActor! })
   const adminDeniedBuilt = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [betterAdminUser, defaultAdminAccess],
     auth: { admin: { kayan: betterAdminUser, access: () => false }, onError: console.error },
   })
@@ -4111,7 +4111,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
     }),
   )
   const customerBuilt = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [customerAdminUser, defaultAdminAccess],
     auth: { admin: { kayan: customerAdminUser, access: ({ user }: AdminAccessArgs<{ id: string }>) => user.id === 'admin-1' }, onError: console.error },
   })
@@ -4152,7 +4152,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
       delete: () => ({ title: { equals: 'Delete me' } }),
     },
   })
-  const constrainedBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [constrained] })
+  const constrainedBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [constrained] })
   const mine = await constrainedBuilt.kayan.constrained.operations.create({ title: 'Mine' })
   const other = await constrainedBuilt.kayan.constrained.operations.create({ title: 'Other' })
   const user = { id: 'actor-1' }
@@ -4180,7 +4180,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
     targets: { drizzle: tables.courses, service: { operations: defaultOperations } },
     access: { update: () => ({ title: { greater_than: 'Mine' } } as never) },
   })
-  const unsupportedBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [unsupported] })
+  const unsupportedBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [unsupported] })
   await assert.rejects(
     () => unsupportedBuilt.kayan.unsupported.operations.update({ id: mine.id, summary: 'unsupported' }),
     /only supports numeric, date and datetime fields/,
@@ -4222,7 +4222,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
     },
     access: { create: () => true },
   })
-  const deniedCustomBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [deniedCustom, missingCustomAccess] })
+  const deniedCustomBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [deniedCustom, missingCustomAccess] })
   await assert.rejects(() => deniedCustomBuilt.kayan.deniedCustom.operations.rename({ id: mine.id }), /Forbidden/)
   assert.equal(customStepRan, false)
   await assert.rejects(() => deniedCustomBuilt.kayan.missingCustomAccess.operations.rename({ id: mine.id }), /Forbidden/)
@@ -4244,7 +4244,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
     },
     access: { create: () => true, update: () => true },
   })
-  const retargetBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [retargeting] })
+  const retargetBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [retargeting] })
   await assert.rejects(() => retargetBuilt.kayan.retargeting.operations.retarget({ id: mine.id }), /cannot change the authorized target id|object is not extensible/)
   // Keyed by id rather than ordered by it: a uuid id gives the two rows no
   // order a test could name, and what is asserted is which row holds what.
@@ -4260,7 +4260,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
     return ctx
   }
   const noAuthorize = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'noAuthorize',
@@ -4361,7 +4361,7 @@ test('20a. managed reads apply collection and field access before query, count a
     targets: { drizzle: tables.courses, service: { operations: defaultOperations } },
     access: allowAccess,
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [scoped, idDenied, idAllowed, missingRead, malformedRead, docGuard] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [scoped, idDenied, idAllowed, missingRead, malformedRead, docGuard] })
 
   const a1 = await built.kayan.scopedReads.operations.create({ title: 'A1', summary: 'a', archiveReason: 'input secret' })
   const a2 = await built.kayan.scopedReads.operations.create({ title: 'A2', summary: 'a' })
@@ -4488,7 +4488,7 @@ test('20b. update field access reads the existing doc under a row lock', async (
     },
     access: allowAccess,
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [guarded] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [guarded] })
   const row = await built.kayan.lockedPolicyRows.operations.create({ title: 'old', summary: 'open' })
   const changing = built.kayan.lockedPolicyRows.operations.updateTitle({ id: row.id, title: 'new' })
   await loadedDoc
@@ -4523,7 +4523,7 @@ test('20c. a field a row hides is refused in where, sort and count, not only in 
       member: { create: true, read: true, update: true, delete: true, fields: ['*', '!archiveReason'] },
     }),
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [hidden] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [hidden] })
   const actor = { id: 'row-1', roles: ['member'] }
 
   const row = await built.kayan.hiddenByRow.operations.create({ title: 'Hidden row', summary: 'row layer open' }, { actor })
@@ -4567,7 +4567,7 @@ test('20c2. a tenant filter whose user reference is null throws against Postgres
       member: { read: { organization: { equals: user.activeOrganizationId } }, create: true },
     }),
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [tenanted] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [tenanted] })
 
   // An actor between organizations carries `null`, which is not a tenant to
   // filter on. Without the throw the filter would read every untenanted row.
@@ -4598,7 +4598,7 @@ test('20d. a denied write throws an AsasError carrying 403 with the message it a
     targets: { drizzle: tables.courses, service: { operations: defaultOperations } },
     access: { create: () => false },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [deniedKayan] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [deniedKayan] })
 
   const error = await built.kayan.deniedStatus.operations.create({ title: 'Denied' }).catch((thrown: unknown) => thrown)
   assert.ok(error instanceof AsasError, 'a denied write is an AsasError')
@@ -4645,13 +4645,13 @@ test('20e. a managed read that names no sort answers newest first, tie-broken by
     targets: { drizzle: tables.courses, service: { operations: defaultOperations } },
     access: mine,
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [dated, undated] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [dated, undated] })
   // `sortable` is a screen's key, and this language has no screen, so the third
   // kayan is built on the file's language with one. No `destroy` for it: that
   // build holds the adapter every build of that language shares.
   const drawn = onScreen('defaultSortedColumnless')
   const columnless = drawn.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       drawn.defineKayan({
         name: 'defaultSortedColumnless',
@@ -4739,7 +4739,7 @@ test('20e1. a page whose every sortable field denies, the id taken out of sortin
       createdAt: { kind: 'datetime', rules: { required: true, defaultNow: true, index: true }, access: hidden },
     },
   })
-  const built = drawn.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [hiddenOrder, ...accessKayan] })
+  const built = drawn.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [hiddenOrder, ...accessKayan] })
 
   const ordered = ['Newest', 'Middle', 'Oldest']
   for (const [offset, title] of ordered.entries()) {
@@ -4848,7 +4848,7 @@ test('21a. local auth public responses apply field read access to custom fields'
     targets: { service: { operations: localOperations } },
   })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(privateUsers, local({ ...localRequired, secret: 'private-local-secret-of-thirty-two-characters' }))],
   })
   await built.connect()
@@ -4915,7 +4915,7 @@ test('21b. first registration hands every step the context local()\'s own functi
     targets: { service: { operations: localOperations } },
   })
   assert.throws(
-    () => language.buildAsas({ auth: { onError: console.error }, http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, secret: 'context-local-secret-of-thirty-two-characters' }))] }),
+    () => language.buildAsas({ auth: { onError: console.error }, http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, secret: 'context-local-secret-of-thirty-two-characters' }))] }),
     /kayan "contextLocalUsers" carries auth: local\(\.\.\.\) with no context function, and this build's runner declares a context/,
   )
   const built = language.buildAsas({
@@ -4925,7 +4925,7 @@ test('21b. first registration hands every step the context local()\'s own functi
       secret: 'context-local-secret-of-thirty-two-characters',
       context: (request) => ({ requestId: request.headers.get('x-request-id') ?? 'missing' }),
     }))],
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: 'served' }) })],
+    http: [fetchHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: 'served' }) })],
   })
   await built.connect()
   try {
@@ -5068,7 +5068,7 @@ test('24. local auth requires an explicit secret unless development is opted in'
   const language = offline()
   const users = language.defineKayan({ name: 'users', fields: localAuthFields, targets: { service: { operations: localOperations } } })
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local(localRequired))] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local(localRequired))] }),
     /local\(\{ secret \}\) is required/,
   )
   // The secret is the project's to pass, so none is read from the environment in its place.
@@ -5077,7 +5077,7 @@ test('24. local auth requires an explicit secret unless development is opted in'
     process.env[name] = 'a-secret-in-the-environment'
     try {
       assert.throws(
-        () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local(localRequired))] }),
+        () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local(localRequired))] }),
         /local\(\{ secret \}\) is required/,
         `${name} stands in for no secret`,
       )
@@ -5088,26 +5088,26 @@ test('24. local auth requires an explicit secret unless development is opted in'
   }
   for (const secret of ['short', 'thirty-one-characters-is-short!', 1 as never]) {
     assert.throws(
-      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, secret }))] }),
+      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, secret }))] }),
       /local\(\{ secret \}\) signs every token and is a string of 32 characters at least\./,
       String(secret),
     )
   }
   assert.doesNotThrow(() =>
-    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, secret: 'thirty-two-characters-is-enough!' }))] }),
+    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, secret: 'thirty-two-characters-is-enough!' }))] }),
   )
   assert.doesNotThrow(() =>
-    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, development: true }))] }),
+    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, development: true }))] }),
   )
   // A project that names what local auth answers without a secret builds without one, and
   // that answer is words, never an empty string.
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, withoutSecret: '' }))] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, withoutSecret: '' }))] }),
     /local\(\{ secret \}\) is required unless local\(\{ development: true \}\) is set, or local\(\{ withoutSecret \}\) names what local auth answers without one\./,
   )
   const notices: unknown[] = []
   const unsigned = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(users, local({ ...localRequired, withoutSecret: 'No secret here: set MY_SECRET.' }))],
     auth: { onError: (error: unknown) => notices.push(error) },
   })
@@ -5116,7 +5116,7 @@ test('24. local auth requires an explicit secret unless development is opted in'
   assert.equal(refused.status, 503)
   assert.deepEqual(await refused.json(), { code: 'SERVICE_UNAVAILABLE', message: 'No secret here: set MY_SECRET.' })
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, secret: 'thirty-two-characters-is-enough!', email: {} as never }))] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, secret: 'thirty-two-characters-is-enough!', email: {} as never }))] }),
     /local\(\{ email \}\) hands every token to its send, which must be a function\./,
   )
 })
@@ -5128,7 +5128,7 @@ test('24d. local() names its token lifetime, its login limit and its lock time, 
   for (const key of ['tokenExpiration', 'maxLoginAttempts', 'lockTime'] as const) {
     const options = { ...localRequired, secret: 'thirty-two-characters-is-enough!', [key]: undefined }
     assert.throws(
-      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local(options as never))] }),
+      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local(options as never))] }),
       new RegExp(`local\\(\\{ ${key} \\}\\) is required\\. Pass default${key[0]!.toUpperCase()}${key.slice(1)}`),
       key,
     )
@@ -5139,7 +5139,7 @@ test('24d. local() names its token lifetime, its login limit and its lock time, 
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
       const bad = { ...localRequired, secret: 'thirty-two-characters-is-enough!', [key]: value }
       assert.throws(
-        () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local(bad))] }),
+        () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local(bad))] }),
         (error: Error) => {
           assert.match(error.message, new RegExp(`^local\\(\\{ ${key} \\}\\) is ${String(value)}, which is not a finite number of 0 or more\\.`))
           assert.doesNotMatch(error.message, /is required/)
@@ -5225,7 +5225,7 @@ test('24b. a build whose kayan carry auth names its own auth.onError, which hear
   const language = defineMithaq({ arkan: [base], targets: offlineTargets() })
   const users = language.defineKayan({ name: 'users', fields: localAuthFields, targets: { service: { operations: localOperations } } })
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, development: true }))] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, development: true }))] }),
     /buildAsas was handed no "auth\.onError", and kayan "users" carries auth\./,
   )
 
@@ -5239,7 +5239,7 @@ test('24b. a build whose kayan carry auth names its own auth.onError, which hear
     targets: { service: { operations: defaultOperations } },
   })
   const heard: unknown[] = []
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [failing], auth: { onError: (error) => void heard.push(error) } })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [failing], auth: { onError: (error) => void heard.push(error) } })
   assert.equal(await built.auth.actor(new Headers()), null)
   assert.equal(heard.length, 1, 'told once')
   assert.match((heard[0] as Error).message, /Auth strategy "failing" failed\./)
@@ -5283,14 +5283,14 @@ test('24a. a store carrying the drizzle marker without db or tables fails the bu
   })
   const impostorUsers = impostorLanguage.defineKayan({ name: 'probeUsers', fields: localAuthFields, targets: { service: { operations: localOperations } } })
   assert.throws(
-    () => impostorLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(impostorUsers, local({ ...localRequired, development: true }))], auth: { onError: console.error } }),
+    () => impostorLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(impostorUsers, local({ ...localRequired, development: true }))], auth: { onError: console.error } }),
     { message: 'kayan "probeUsers" carries auth: local(...) and must use a store declaring sql: "drizzle" with db and tables.' },
   )
 
   const realLanguage = offline()
   const realUsers = realLanguage.defineKayan({ name: 'realProbeUsers', fields: localAuthFields, targets: { service: { operations: localOperations } } })
   assert.doesNotThrow(() =>
-    realLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(realUsers, local({ ...localRequired, development: true }))] }),
+    realLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(realUsers, local({ ...localRequired, development: true }))] }),
   )
 })
 
@@ -5307,7 +5307,7 @@ test('25. Better Auth remains wired through buildAsas and does not refresh durin
   }
   const language = offline()
   const users = language.defineKayan({ name: 'users', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, betterAuthProvider({ server: () => fake }))] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, betterAuthProvider({ server: () => fake }))] })
   const actor = await built.auth.actor(new Headers({ cookie: 'better=1' }))
   assert.equal((actor as Record<string, unknown>)?.strategy, 'better-auth')
   assert.equal(((actor as { user?: { id?: string } })?.user)?.id, 'better-user')
@@ -5335,7 +5335,7 @@ test('26. auth strategies receive Payload-shaped args and the loop takes the fir
       return { responseHeaders: new Headers({ 'x-second': '2' }), user: { id: 'u1' } }
     },
   }
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, first), authenticating(language.defineKayan({ name: 'secondUsers', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }), second)] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, first), authenticating(language.defineKayan({ name: 'secondUsers', fields: { id: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }), second)] })
   // Response headers a strategy returns reach nothing: `asas.auth.actor` answers the actor
   // alone. The first strategy answers null and the second the actor, so this asserts the
   // precedence the order of the list carries.
@@ -5850,7 +5850,7 @@ test('39. a global on a language with no tenant field refuses a create or delete
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [],
         global: [
           language.defineGlobal({
@@ -5866,7 +5866,7 @@ test('39. a global on a language with no tenant field refuses a create or delete
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [],
         global: [{ ...(projectSettings as unknown as Record<string, unknown>), name: 'plainGlobal', access: { read: () => true, create: () => true } } as never],
       }),
@@ -5877,14 +5877,14 @@ test('39. a global on a language with no tenant field refuses a create or delete
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [language.defineKayan({ name: 'projectSettings', fields: { ...defaultFields, title: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } })],
         global: [projectSettings],
       }),
     /"projectSettings" is declared more than once/,
   )
 
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [], global: [projectSettings] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], global: [projectSettings] })
   await built.connect()
   const table = built.targets.drizzle.tables.projectSettings!
   try {
@@ -5934,7 +5934,7 @@ test('40. a global refuses the globalType a caller sends with a 403 raised befor
     fields: { ...defaultFields, siteTitle: { kind: 'text', rules: { required: true, maxLength: 120 } }, ...defaultGlobalFields },
     targets: { service: { operations: defaultGlobalOperations } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [], global: [stamped] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], global: [stamped] })
   await built.connect()
   const table = built.targets.drizzle.tables.stampedSettings!
   try {
@@ -5985,7 +5985,7 @@ test('42. a global runs findOne and update alone, whatever operation a plain-dat
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [],
         global: [{ ...plain, targets: { service: { operations: { ...operations, find: defaultOperations.find } } } } as never],
       }),
@@ -5995,7 +5995,7 @@ test('42. a global runs findOne and update alone, whatever operation a plain-dat
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [],
         global: [{ ...plain, targets: { service: { operations: { ...operations, archive: op([update]) } } } } as never],
       }),
@@ -6066,7 +6066,7 @@ test('44. a global that declares its own validate shape still parses the insert 
   // the partial with a required id. A global's update never carries an id, so
   // that shape is the update branch's alone.
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [],
     global: [
       {
@@ -6118,7 +6118,7 @@ test('45. a global writes its own name into globalType whatever a step put there
   // the store seal is what stamps the global's own name over it.
   const forge: WriteStep = (ctx) => ({ ...ctx, data: { ...ctx.data, globalType: 'x' } })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [],
     global: [
       {
@@ -6165,7 +6165,7 @@ test('46. a single kayan with no globalType field is refused at buildAsas by nam
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [],
         global: [{ ...plain, fields: fieldsWithoutGlobalType } as never],
       }),
@@ -6370,7 +6370,7 @@ test('52. an actor resolved from a bearer header reaches the operation exactly a
   })
   const built = language.buildAsas({
     kayan: [authenticating(bearerUsers, local({ ...localRequired, secret: 'bearer-local-secret-of-thirty-two-characters' })), bearerNotes],
-    http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   })
   await built.connect()
   const note = (input: unknown, headers: Record<string, string> = {}, path = 'bearerNotes/create') =>
@@ -6419,7 +6419,7 @@ test('53. a kayan named auth is refused at buildAsas, because the auth arm has t
     fields: { ...defaultFields, title: { kind: 'text', label: { en: 'Title', ar: 'العنوان' } } },
     targets: { service: { operations: defaultOperations } },
   })
-  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [clash] }), /Kayan name "auth" is reserved/)
+  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [clash] }), /Kayan name "auth" is reserved/)
 })
 
 const freshTenant = async (slug: string) => {
@@ -6531,7 +6531,7 @@ test('56. an actor a caller sends in a find payload never replaces the one its o
   })
   const built = language.buildAsas({
     kayan: [authenticating(forgedUsers, local({ ...localRequired, secret: 'forged-local-secret-of-thirty-two-characters' })), forgedNotes],
-    http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   })
   await built.connect()
   try {
@@ -6994,7 +6994,7 @@ test('63. access asks the same key per operation name the runner asks, so an eff
     targets: { service: { operations: defaultOperations } },
   })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(users, local({ ...localRequired, secret: 'can-local-secret-of-thirty-two-characters' })), courses],
   })
   await built.connect()
@@ -8071,7 +8071,7 @@ test('73. a localized field takes every declared locale and nothing else, is nul
   assert.throws(
     () =>
       withoutLocales.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           withoutLocales.defineKayan({
             name: 'unlocalizedNotes',
@@ -8186,7 +8186,7 @@ test('74. a filter names a locale as a second segment, the field alone is still 
   // and the near field has no `target`, so without the refusal the column lookup would read
   // a table named `undefined`.
   const overridden = buildTestAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       defineTestKayan({
         name: 'overriddenNotes',
@@ -8255,7 +8255,7 @@ test('74. a filter names a locale as a second segment, the field alone is still 
     },
     targets: { service: { operations: defaultOperations } },
   })
-  const hopAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [farNotes, nearRefs, ...accessKayan] })
+  const hopAsas = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [farNotes, nearRefs, ...accessKayan] })
   const dotted = await hopAsas.kayan.nearRefs.operations
     .find({ where: { 'note.fee': { equals: 12 } } } as never)
     .catch((thrown: unknown) => thrown)
@@ -8315,7 +8315,7 @@ test('75. a localized field declaring a defaultValue, a localized field whose pe
   assert.throws(
     () =>
       buildTestAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           defineTestKayan({
             name: 'defaultedNotes',
@@ -8334,7 +8334,7 @@ test('75. a localized field declaring a defaultValue, a localized field whose pe
   assert.throws(
     () =>
       buildTestAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           defineTestKayan({
             name: 'collidingNotes',
@@ -8362,7 +8362,7 @@ test('75. a localized field declaring a defaultValue, a localized field whose pe
   assert.throws(
     () =>
       buildTestAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           defineTestKayan({
             name: 'keyedNotes',
@@ -8412,7 +8412,7 @@ test('75. a localized field declaring a defaultValue, a localized field whose pe
   assert.throws(
     () =>
       bothLanguage.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           bothTarget,
           bothLanguage.defineKayan({
@@ -8515,7 +8515,7 @@ test('77. every managed read stops seeing a soft-deleted row: find, findByID, co
 test('78. a soft-delete field that the runner could not write, could not read as one column, or a caller could write is refused at buildAsas', () => {
   const build = (deletedAt: Record<string, unknown>) => () =>
     buildTestAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         defineTestKayan({
           name: 'refusedNotices',
@@ -8683,7 +8683,7 @@ test('81. a build whose language names a soft-delete field that no kayan in it d
   assert.throws(
     () =>
       buildTestAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           defineTestKayan({
             name: 'unmarkedNotices',
@@ -8701,7 +8701,7 @@ test('81. a build whose language names a soft-delete field that no kayan in it d
   assert.doesNotThrow(
     () =>
       buildTestAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           defineTestKayan({
             name: 'unmarkedNotices',
@@ -8764,7 +8764,7 @@ test('82. a kayan the access target reads carrying the soft-delete mark is refus
     })
     return language.buildAsas({
       auth: { onError: console.error },
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         made('refusedRoles', 'refused_roles', { name: { kind: 'text' }, permissions: { kind: 'textArray' } }),
         made('refusedMemberRoles', 'refused_member_roles', { role: { kind: 'text' } }),
@@ -9058,7 +9058,7 @@ test('86a. a create colliding on a unique compound index answers through the han
     indexes: [{ fields: ['customerCode', 'tenantCode'], unique: true }],
     targets: { service: { operations: defaultOperations } },
   })
-  const built = language.buildAsas({ http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [pairs] })
+  const built = language.buildAsas({ http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [pairs] })
   await built.connect()
   const create = (input: unknown) =>
     built.handler(
@@ -9089,7 +9089,7 @@ test('86b. two rows with no tenant and one name collide on a unique index with n
   const language = online()
   const named = (nullsNotDistinct: boolean) =>
     language.buildAsas({
-      http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'nulledPairs',
@@ -9138,7 +9138,7 @@ test('87. a screen refuses a useAsTitle naming a field the kayan does not have, 
   const language = screened('notes')
   const build = (dashboard: unknown) =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'notes',
@@ -9167,7 +9167,7 @@ test('a field\'s own component and cell are checked by the screen that draws it,
   const language = screened('probes')
   const build = (field: unknown) => () =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'probes',
@@ -9226,7 +9226,7 @@ test('a kind the project declares takes any built-in control, because its value 
       targets: { ...stores, dashboard: screen(['slugProbe'], { ...screenKinds, slug: { cell: 'text', control } }), service },
     } as never) as ReturnType<typeof screened>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'slugProbe',
@@ -9298,7 +9298,7 @@ test('90. a screen\'s controls are refused where a row names a kind the language
     const { service, ...stores } = offlineTargets()
     const language = defineMithaq({ arkan: [base], targets: { ...stores, dashboard: screen(['notes'], controls), service } })
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'notes',
@@ -9341,7 +9341,7 @@ test('91. a screen\'s list keys on a field are refused where a search cannot tak
   const language = screened('notes')
   const build = (fields: Record<string, unknown>) =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'notes',
@@ -9370,7 +9370,7 @@ test('91. a screen\'s list keys on a field are refused where a search cannot tak
   assert.throws(
     () =>
       localized.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           localized.defineKayan({
             name: 'notes',
@@ -9410,7 +9410,7 @@ test('91. a screen\'s list keys on a field are refused where a search cannot tak
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'notes',
@@ -9428,7 +9428,7 @@ test('91. a screen\'s list keys on a field are refused where a search cannot tak
   // The same table with one row that does admit it builds: the check refuses
   // only what it can decide, and a role that may read the field is enough.
   language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'notes',
@@ -9446,7 +9446,7 @@ test('91. a screen\'s list keys on a field are refused where a search cannot tak
   // relationship is a page's list node, `{ list: { of, where } }`.
   const drawnWith = (drawn: Record<string, unknown>) => () =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'notes',
@@ -9892,7 +9892,7 @@ test('98. a local-auth kayan whose own access opens every read and every create 
     fields: { ...defaultFields, userId: { kind: 'text' } },
     targets: { service: { operations: { ...defaultOperations, peek: { input: ({ id }) => id, steps: ({ steps }) => [steps.findOne, peek] } } } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [users, peekers] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [users, peekers] })
   await built.connect()
   // The nine the provider writes and no caller may read, written out rather
   // than read off the shipped value, so this cannot agree with a wrong list.
@@ -10009,7 +10009,7 @@ test('98a. one create makes a local account for an administrator and for a publi
     },
   })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [users],
     auth: { admin: { kayan: users, access: ({ user }: { user: unknown }) => (user as { user: { email: string } }).user.email === 'admin@example.com' }, onError: console.error },
   })
@@ -10236,7 +10236,7 @@ test('99. a many-to-many writes its set into the join table in the write\'s own 
 test('100. a hasMany relationship is refused where a rule would build on a column it has not, where a mode says the same thing, and where a sort names it', async () => {
   const many = (fields: Record<string, unknown>) => () =>
     buildTestAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         defineTestKayan({ name: 'manyTargets', fields: { ...defaultFields, name: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }),
         defineTestKayan({
@@ -10432,7 +10432,7 @@ test('104. an operation input field is refused where the operation\'s own schema
   const drawn = onScreen()
   const withArchive = (fields: Record<string, unknown>, shape: z.ZodType) => () =>
     drawn.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         drawn.defineKayan({
           name: 'inputHolders',
@@ -10477,7 +10477,7 @@ test('104. an operation input field is refused where the operation\'s own schema
   assert.throws(
     () =>
       drawn.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           drawn.defineKayan({
             name: 'bareValidate',
@@ -10549,7 +10549,7 @@ test('104. an operation input field is refused where the operation\'s own schema
   assert.throws(
     () =>
       drawn.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           drawn.defineKayan({
             name: 'holders',
@@ -10566,7 +10566,7 @@ test('104. an operation input field is refused where the operation\'s own schema
   assert.throws(
     () =>
       drawn.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           drawn.defineKayan({
             name: 'holders',
@@ -10618,7 +10618,7 @@ test('a kayan, a global and a field each carry an own custom bag that nothing in
         fields: { ...defaultFields, siteTitle: { kind: 'text', label: { en: 'Site title', ar: 'عنوان الموقع' } }, ...defaultGlobalFields },
         targets: { service: { operations: defaultGlobalOperations } },
       })
-  const built = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [holders, ...accessKayan], global: [wide] })
+  const built = buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [holders, ...accessKayan], global: [wide] })
   // Carried untouched through `resolve` and `buildAsas`, on the kayan, the global and the
   // field, and read by nothing in mithaq: the reader is the project's own generator. A built
   // kayan publishes no declaration metadata, so the kayan's bag and the global's are read
@@ -10636,7 +10636,7 @@ test('a field key that misspells custom is still refused by name', () => {
   // One key and not a prefix. The bag is the one own key a field may carry, so a name one
   // character off is read as a rule written in the wrong place and says so.
   assert.throws(
-    () => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'notes', fields: { id: defaultFields.id, body: { kind: 'text', customs: {} } } }, ...accessKayan] as never }),
+    () => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ name: 'notes', fields: { id: defaultFields.id, body: { kind: 'text', customs: {} } } }, ...accessKayan] as never }),
     /field "body" carries key "customs", which is not a field key; put rules under "rules"/,
   )
 })
@@ -10815,7 +10815,7 @@ test('239. an unsized decimal is a bare numeric in Postgres, and a value with ma
 test('106. the two case rules on one field, a minimum above its maximum and a case rule on a number are each refused at buildAsas, and a field carrying the three normalizing rules builds the column a field without them builds', async () => {
   const language = offline()
   const notes = (fields: Record<string, unknown>) => () =>
-    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [language.defineKayan({ name: 'notes', fields: { id: defaultFields.id, ...fields } as never, targets: { service: { operations: defaultOperations } } })] })
+    language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [language.defineKayan({ name: 'notes', fields: { id: defaultFields.id, ...fields } as never, targets: { service: { operations: defaultOperations } } })] })
 
   // The first exclusive pair among the rules: each rewrites what the other
   // wrote, so what is stored would be whichever of the two ran last.
@@ -10857,7 +10857,7 @@ test('106. the two case rules on one field, a minimum above its maximum and a ca
   // build the column the same field without them builds and a push has nothing
   // to diff.
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'notes',
@@ -10885,7 +10885,7 @@ test('107. what a kayan carries is what its own fields names, and one that names
   assert.throws(
     () =>
       buildTestAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           defineTestKayan({
             name: 'idlessNotes',
@@ -10902,7 +10902,7 @@ test('107. what a kayan carries is what its own fields names, and one that names
   assert.throws(
     () =>
       buildTestAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [...accessKayan],
         global: [defineTestGlobal({ name: 'idlessSettings', fields: { siteTitle: { kind: 'text', label: { en: 'Site title', ar: 'عنوان الموقع' } }, ...defaultGlobalFields }, targets: { service: { operations: defaultGlobalOperations } } })],
       }),
@@ -10999,7 +10999,7 @@ test('109. afterCommit runs after the transaction committed, where the row is vi
       drizzle: tables.courses,
     },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [committed, noisy] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [committed, noisy] })
 
   await built.kayan.committedRows.operations.create({ title: 'Committed row' })
   assert.deepEqual(
@@ -11055,7 +11055,7 @@ test('110. beforeTransaction runs outside the transaction: it sees no row before
     fields,
     targets: { drizzle: tables.courses, service: { operations: defaultOperations } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [slow, quick] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [slow, quick] })
 
   const row = await built.kayan.quickRows.operations.create({ title: 'Unlocked' })
   const held = built.kayan.slowRows.operations.update({ id: row.id, title: 'Held' })
@@ -11107,7 +11107,7 @@ test('111. a nested write through tools.of still joins the outer transaction and
       drizzle: tables.courses,
     },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [children, parents] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [children, parents] })
 
   await assert.rejects(
     () => built.kayan.nestedParents.operations.create({ title: 'Nested parent' }),
@@ -11410,7 +11410,7 @@ test('116. the access target answers for a local actor too, under no organizatio
   const heard: unknown[] = []
   const built = language.buildAsas({
     auth: { onError: (error) => void heard.push(error) },
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(accounts, local({ ...localRequired, secret: 'local-tenant-secret-of-thirty-two-characters' })), notes, roleRows, assignments],
   })
   await built.connect()
@@ -11485,7 +11485,7 @@ test('117. a build declaring the access target without a kayan that target reads
         fields: { ...defaultFields, name: { kind: 'text' } },
         targets: { service: { operations: defaultOperations } },
       })
-    return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: declare.map(made) })
+    return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: declare.map(made) })
   }
 
   assert.throws(
@@ -11625,20 +11625,29 @@ test('119a. a plug that names no maxBodyBytes is refused by name, since core hol
   }
 })
 
-test('119. a build naming no http is refused by name, a build naming [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] answers POST /api/<kayan>/<operation> and GET /api/access, and nothing core reaches imports oRPC', async () => {
+test('119a2. a plug that names no onError is refused by name, as auth and storage are, since core reports no fault of its own', () => {
+  for (const [name, plug] of [['fetchHttp', fetchHttp], ['orpcHttp', orpcHttp]] as const) {
+    for (const onError of [undefined, 'console.error']) {
+      assert.throws(() => (plug as (options: unknown) => unknown)({ maxBodyBytes: defaultMaxBodyBytes, onError }), new RegExp(`${name} names no "onError" function`), `${name} ${onError}`)
+    }
+    assert.doesNotThrow(() => plug({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} }))
+  }
+})
+
+test('119. a build naming no http is refused by name, a build naming [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] answers POST /api/<kayan>/<operation> and GET /api/access, and nothing core reaches imports oRPC', async () => {
   const language = online()
   // Core picks no plug of its own: the key is required by the type and refused by name when
   // written as data.
   assert.throws(
     // @ts-expect-error http is required
     () => language.buildAsas({ kayan: [openCourses('plainCourses', 'plain_courses', language)] }),
-    /buildAsas was handed no "http", and core picks no plug of its own\. Name the plugs: http: \[fetchHttp\(\{ maxBodyBytes: defaultMaxBodyBytes \}\)\]/,
+    /buildAsas was handed no "http", and core picks no plug of its own\. Name the plugs: http: \[fetchHttp\(\{ maxBodyBytes: defaultMaxBodyBytes, onError: console\.error \}\)\]/,
   )
-  const built = language.buildAsas({ kayan: [openCourses('plainCourses', 'plain_courses', language)], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] })
+  const built = language.buildAsas({ kayan: [openCourses('plainCourses', 'plain_courses', language)], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] })
   await built.connect()
 
   const made = await posted(built, '/api/plainCourses/create', { title: 'Default plug' })
-  assert.equal(made.status, 200, 'a build that names [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] answers a create over plain HTTP')
+  assert.equal(made.status, 200, 'a build that names [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] answers a create over plain HTTP')
   assert.equal(((await made.json()) as { title?: string }).title, 'Default plug', 'and answers with the row the runner returned')
 
   const found = await posted(built, '/api/plainCourses/find', { limit: 10 })
@@ -11685,7 +11694,7 @@ test('120. http is a list the handler loops in order, and the first plug that an
   const language = online()
   const seen: string[] = []
   const counted = (operations: OperationTable): HttpPlug => {
-    const one = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })(operations)
+    const one = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(operations)
     return {
       ...one,
       handle: async (request, actor) => {
@@ -11697,7 +11706,7 @@ test('120. http is a list the handler loops in order, and the first plug that an
   }
   const built = language.buildAsas({
     kayan: [openCourses('listedCourses', 'listed_courses', language)],
-    http: [counted, orpcHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [counted, orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   })
   await built.connect()
 
@@ -11750,7 +11759,7 @@ test('121. a 400, a 403, a 404 and a 409 carry the same key and the same params 
     // build, over one kayan, one actor and one set of rows. `fetchHttp` reads
     // two segments under `/api`, so `/api/orpc/...` is three and falls through
     // it to the plug that owns that prefix.
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
   })
   await built.connect()
   const registered = await built.handler(
@@ -11844,7 +11853,7 @@ test('124. a JSON body that is not an object is a keyless 400 and not a 500, and
     kayan: [openCourses('bodyCourses', 'body_courses', language)],
     // Both plain arms in one build, the oRPC one moved off `/api`, so the two answers to one
     // body are compared arm to arm.
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
   })
   await built.connect()
 
@@ -11896,7 +11905,7 @@ test('public HTTP find caps pages at 100 without changing local unbounded reads'
   const language = online()
   const built = language.buildAsas({
     kayan: [openCourses('boundedCourses', 'bounded_courses', language)],
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/rpc' })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, api: '/api/rpc' })],
   })
   await built.connect()
   const row = await built.kayan.boundedCourses!.operations.create({ title: 'Visible' })
@@ -11922,7 +11931,7 @@ test('public HTTP find caps pages at 100 without changing local unbounded reads'
 
 test('public HTTP accepts declared ISO datetimes in session writes and nested course sessions', async () => {
   const { actor } = await tenantOptions()
-  const plain = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })(asas.operations)
+  const plain = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(asas.operations)
   const send = (path: string, input: object) => plain.handle(
     new Request(`http://test/api/${path}`, { method: 'POST', body: JSON.stringify(input) }),
     async () => actor,
@@ -11954,7 +11963,7 @@ test('public HTTP accepts declared ISO datetimes in session writes and nested co
   await assert.rejects(() => sessions.operations.create({ course: course.id, startsAt: '2026-10-04T09:00:00Z' } as never, { actor }), (error: unknown) =>
     error instanceof AsasError && error.status === 400)
 
-  const calendar = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })(calendarAsas.operations)
+  const calendar = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(calendarAsas.operations)
   const day = await calendar.handle(new Request('http://test/api/calendars/create', {
     method: 'POST',
     body: JSON.stringify({ day: '2026-10-04', moment: '2026-10-04T09:00:00Z' }),
@@ -11984,14 +11993,14 @@ test('125. a fault the shipped plug answers as a 500 is reported to console.erro
   const language = online()
   const fault = new Error('The project threw.')
   // The swap comes before the build, because the default is read where the plug
-  // is made, which is the `fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })` the build lists below.
+  // is made, which is the `fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })` the build lists below.
   const reported: unknown[] = []
   const held = console.error
   console.error = (...args: unknown[]) => {
     reported.push(args[0])
   }
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'faultCourses',
@@ -12207,7 +12216,7 @@ test('128. an impersonated write audits the real person beside the actor it was 
     fields: { ...defaultFields, title: { kind: 'text', rules: { required: true } } },
     targets: { service: { operations: defaultOperations } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [audited] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [audited] })
   await built.connect()
   try {
     const owner = await server.api.signUpEmail({
@@ -13596,7 +13605,7 @@ test('129a. the backoffice slug is Better Auth\'s column and no other provider\'
     targets: { service: { operations: localOperations } },
   })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(withRole, local({ ...localRequired, secret: 'role-carrying-local-secret-of-thirty-two-characters' }))],
   })
   await built.connect()
@@ -13690,7 +13699,7 @@ test('131. two Better Auth kayan are two servers and two /api/auth/<kayan>/* pre
     auth: betterAuthProvider({ server: () => instance('shopper-session', 'shopper-1') }),
     targets: { service: { operations: defaultOperations } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [staff, shoppers] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [staff, shoppers] })
 
   assert.deepEqual(
     built.auth.strategies.map((one) => one.name),
@@ -13745,8 +13754,8 @@ test('132. the backoffice slug is read from the admin kayan\'s session alone, so
     auth: betterAuthProvider({ server: () => session('customer-1') }),
     targets: { service: { operations: defaultOperations } },
   })
-  const backofficeOnly = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [backoffice] })
-  const customersOnly = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [customers] })
+  const backofficeOnly = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [backoffice] })
+  const customersOnly = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [customers] })
 
   const admin = await asBackoffice(() => backofficeOnly.auth.actor(new Headers()))
   assert.equal((admin as { strategy?: string } | null)?.strategy, 'better-auth')
@@ -13760,7 +13769,7 @@ test('132. the backoffice slug is read from the admin kayan\'s session alone, so
 
 test('134. every component name a field writes is checked by the screen that draws it, an operation\'s input field among them, and a targets key naming no target of the build is refused by name', () => {
   const language = screened('notes')
-  const build = (kayan: unknown) => () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [kayan] as never })
+  const build = (kayan: unknown) => () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [kayan] as never })
 
   // A field's own component, which is the first place a browser resolves one.
   assert.throws(
@@ -13772,7 +13781,7 @@ test('134. every component name a field writes is checked by the screen that dra
     /Screen "dashboard" kayan "notes" field "fee" targets\.dashboard\.component names "monney", which is no name in this screen's components and no control the registry ships\./,
   )
   language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [language.defineKayan({
       name: 'notes',
       fields: { id: defaultFields.id, fee: { kind: 'number', targets: { dashboard: { component: 'money' } } } },
@@ -13955,7 +13964,7 @@ test('135. a join is the rows of another kayan, read through that kayan\'s own a
   const language = offline()
   const joined = (on: string) => () =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'parents',
@@ -13983,7 +13992,7 @@ test('135. a join is the rows of another kayan, read through that kayan\'s own a
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'parents',
@@ -14039,7 +14048,7 @@ test('137. a rule declares the rules it excludes on its own value, a field decla
     })
   const build = (projectRule: Rule<boolean>, fields: Record<string, unknown>) => () => {
     const one = language(projectRule)
-    one.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [one.defineKayan({ name: 'notes', fields: { id: defaultFields.id, ...fields } as never, targets: { service: { operations: defaultOperations } } })] })
+    one.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [one.defineKayan({ name: 'notes', fields: { id: defaultFields.id, ...fields } as never, targets: { service: { operations: defaultOperations } } })] })
   }
 
   assert.throws(
@@ -14305,11 +14314,11 @@ test('141. in a build graded by the template\'s own access target, a local-auth 
   // Its organizations are not the ones the tenant field points at, so a build holding a
   // tenant-owned kayan, as the role kayan are, refuses it before its column could answer.
   assert.throws(
-    () => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [...accessKayan, customers] }),
+    () => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [...accessKayan, customers] }),
     /Kayan "user" and "backofficeCustomers" each carry Better Auth, and kayan "roles" belongs to the organization a session names/,
   )
   const built = buildTestAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [...accessKayan, authenticating(localWithRole, local({ ...localRequired, secret: 'backoffice-local-secret-of-thirty-two-characters' }))],
   })
   // The adapter is the one `asas` itself holds, so its pool is closed by the
@@ -14345,7 +14354,7 @@ test('143. the runner is a target: a build with none is refused naming the fix, 
   const build = (language: Record<string, unknown>) => () =>
     (defineMithaq({ arkan: [base], ...language } as never) as unknown as {
       buildAsas: (args: { kayan: Kayan[]; http: unknown[] }) => unknown
-    }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'notes', fields: { id: defaultFields.id, title: { kind: 'text' } } }] })
+    }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ name: 'notes', fields: { id: defaultFields.id, title: { kind: 'text' } } }] })
 
   assert.doesNotThrow(build({ targets: { ...targets(), service: runner() } }))
 
@@ -14365,7 +14374,7 @@ test('143. the runner is a target: a build with none is refused naming the fix, 
   )
   for (const transport of ['http', 'orpc']) {
     assert.throws(
-      build({ targets: { ...targets(), service: { ...runner(), [transport]: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] } } }),
+      build({ targets: { ...targets(), service: { ...runner(), [transport]: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] } } }),
       new RegExp(`The service target declares "${transport}", and transport is not the runner's`),
     )
   }
@@ -14403,7 +14412,7 @@ test('144. audit and depth on the language root are refused by name', () => {
         drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
         zod: zodTarget,
         service: runner,
-      }, [key]: value }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [] }),
+      }, [key]: value }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] }),
       new RegExp(`"${key}" is not a key of the language: it is a key of the service target`),
     )
   }
@@ -14418,7 +14427,7 @@ test('145. a listed audit step requires a service sink', () => {
     defineMithaq({ arkan: [base], targets: {
       ...targets,
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, authorize: defaultAuthorize, store: 'drizzle', schema: 'zod', afterSteps, ...(auditSink ? { audit: auditSink } : {}) }),
-    } }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [] })
+    } }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] })
   assert.throws(() => build([audit]), /The service target lists the "audit" step without an audit sink.*Declare.*audit.*drop the step/)
   assert.doesNotThrow(() => build([audit], () => {}))
   assert.doesNotThrow(() => build([]))
@@ -14427,13 +14436,13 @@ test('145. a listed audit step requires a service sink', () => {
     ...targets,
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, authorize: defaultAuthorize, store: 'drizzle', schema: 'zod' }),
   } })
-  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [language.defineKayan({
+  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [language.defineKayan({
     name: 'notes', fields: { id: defaultFields.id }, targets: { service: { operations: { ...defaultOperations, create: { steps: [insert], afterSteps: [audit] } } } },
   })] }), /Kayan "notes" operation "create" lists the "audit" step without an audit sink\. Declare audit on the service target or drop the step\./)
   // A project's own record, spread by every kayan that wants it, is checked on each kayan
   // that spreads it.
   const audited = { ...defaultOperations, create: { steps: [insert], afterSteps: [audit] } }
-  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [language.defineKayan({
+  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [language.defineKayan({
     name: 'shared', fields: { id: defaultFields.id }, targets: { service: { operations: audited } },
   })] }), /Kayan "shared" operation "create" lists the "audit" step without an audit sink/)
 })
@@ -14463,7 +14472,7 @@ test('146. a built kayan is name, fields, operations and targets, and the two op
       },
     },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [notes] })
   await built.connect()
   try {
     const one = built.kayan.placedNotes
@@ -14497,12 +14506,12 @@ test('147. a kayan declares operations, store and schema on its service target, 
   const fields = { id: { kind: 'text' as const }, title: { kind: 'text' as const } }
   for (const key of ['operations', 'store', 'schema'] as const) {
     assert.throws(
-      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'strayRoot', fields, access: allowAccess, [key]: key === 'operations' ? {} : 'memory' }] as never }),
+      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ name: 'strayRoot', fields, access: allowAccess, [key]: key === 'operations' ? {} : 'memory' }] as never }),
       new RegExp(`Kayan "strayRoot" writes "${key}" at its root[\\s\\S]*targets: \\{ service: \\{ ${key}`),
     )
   }
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'strayService', fields, access: allowAccess, targets: { service: { authorize: defaultAuthorize } } }] as never }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ name: 'strayService', fields, access: allowAccess, targets: { service: { authorize: defaultAuthorize } } }] as never }),
     /Kayan "strayService" writes "targets\.service\.authorize", which is no key of a kayan's service target\. A kayan writes operations, schema, store there\./,
   )
 })
@@ -14531,7 +14540,7 @@ test('148. a built kayan publishes only the outputs the targets it selected buil
     fields: { id: { kind: 'text' }, title: { kind: 'text' } },
     targets: { service: { store: 'memory', schema: 'plain', operations: defaultOperations } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [held, loose] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [held, loose] })
   assert.deepEqual(Object.keys(built.kayan.heldRows.targets).sort(), ['drizzle', 'service', 'zod'])
   assert.equal(built.kayan.heldRows.targets.drizzle.table, built.targets.drizzle.tables.heldRows)
   assert.equal(built.kayan.heldRows.targets.zod.schemas.create.safeParse({ title: 'Given' }).success, true)
@@ -14565,7 +14574,7 @@ test('149. registration order changes no selection: the service target may be de
       targets: runnerFirst ? { service, ...rest } : { ...rest, service },
     })
     return language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         language.defineKayan({
           name: 'orderedRows',
@@ -14678,7 +14687,7 @@ test('151. a kayan that declares no operations answers none, and one that spread
     fields: { id: defaultFields.id, title: { kind: 'text' } },
     targets: { service: { operations: { ...defaultOperations } } },
   })
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [bare, spread] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [bare, spread] })
   assert.deepEqual(Object.keys(built.kayan.bare.operations), [], 'a kayan that declares none answers no operation')
   assert.deepEqual(built.statements.bare, ['fields.id', 'fields.title'], 'and the catalog names no operation of it')
   assert.deepEqual(Object.keys(built.kayan.spread.operations).sort(), Object.keys(defaultOperations).sort())
@@ -14695,7 +14704,7 @@ test('152. the service target takes no operations, and passing one is refused by
     },
   })
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] }),
     /The service target declares "operations", and a kayan's operations are its own: write them under targets: \{ service: \{ operations: \{ \.\.\.defaultOperations \} \} \} on each kayan\./,
   )
 })
@@ -14705,7 +14714,7 @@ test('153. false is no operation value, and a kayan that wants fewer operations 
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           {
             name: 'countless',
@@ -14718,7 +14727,7 @@ test('153. false is no operation value, and a kayan that wants fewer operations 
   )
   const { count: _count, ...rest } = defaultOperations
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [language.defineKayan({ name: 'countless', fields: { id: defaultFields.id }, targets: { service: { operations: rest } } })],
   })
   assert.equal('count' in built.kayan.countless.operations, false, 'the operation left out of the object is not there')
@@ -14733,12 +14742,12 @@ test('154. a global declares its globalType and its operations itself, and one w
     targets: { service: { operations: defaultGlobalOperations } },
   })
   assert.deepEqual(Object.keys(declared.fields), ['id', 'updatedAt', 'createdAt', 'siteTitle', 'globalType'], 'the fields are the ones the file wrote')
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [], global: [declared] })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], global: [declared] })
   assert.deepEqual(Object.keys(built.global.declared.operations).sort(), ['findOne', 'update'])
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [],
         global: [
           language.defineGlobal({
@@ -14759,7 +14768,7 @@ test('155. a global is one row for the project unless it places the tenant field
   // field is `tenant-target.test.ts`'s, one row per organization.
   const oneRow = (fields: Record<string, unknown>) => () =>
     language.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [],
       global: [
         language.defineGlobal({
@@ -14782,7 +14791,7 @@ test('155. a global is one row for the project unless it places the tenant field
   // Written as plain data, the one way a global reaches indexes: dropping its unique index is refused.
   const plain = { ...language.defineGlobal({ name: 'oneRow', fields: { ...defaultFields, ...defaultGlobalFields }, targets: { service: { operations: defaultGlobalOperations } } }), indexes: () => [{ fields: ['globalType', 'id'], unique: true }] }
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [], global: [plain as never] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], global: [plain as never] }),
     /^Error: Global "oneRow" builds no unique index over "globalType" alone, and that index is what keeps the global to one row\. Keep it in indexes\.$/,
   )
 })
@@ -14818,7 +14827,7 @@ test('156. a kayan, field or operation named for what Object.prototype carries b
         targets: { service: { operations } },
       }),
     ],
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
   })
   await db.execute('drop table if exists "constructor", "toString"')
   await built.connect()
@@ -14863,7 +14872,7 @@ test('157. a field named __proto__ is refused at buildAsas, naming the kayan and
   assert.throws(
     () =>
       language.buildAsas({
-        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [
           language.defineKayan({
             name: 'protoNotes',
@@ -14892,7 +14901,7 @@ test('158. first-register drains the create\'s afterCommit once its transaction 
     fields: { ...defaultFields, ...localAuthFields },
     targets: { service: { operations: { ...localOperations, create: { ...localAuthOperations.create, afterCommit: [recordAfterCommit] } } } },
   })
-  const okBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(okKayan, local({ ...localRequired, secret: `${okName}-secret-of-thirty-two-characters` }))] })
+  const okBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(okKayan, local({ ...localRequired, secret: `${okName}-secret-of-thirty-two-characters` }))] })
   await okBuilt.connect()
   try {
     const response = await call(okBuilt, 'first-register', {
@@ -14931,7 +14940,7 @@ test('158. first-register drains the create\'s afterCommit once its transaction 
       },
     },
   })
-  const failBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(failKayan, local({ ...localRequired, secret: `${failName}-secret-of-thirty-two-characters` }))] })
+  const failBuilt = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(failKayan, local({ ...localRequired, secret: `${failName}-secret-of-thirty-two-characters` }))] })
   await failBuilt.connect()
   try {
     await assert.rejects(
@@ -15045,7 +15054,7 @@ test('160. without an access target, only the auth.admin actor its access admits
   })
   let admitted = true
   const authenticated = authenticating(kayan, local({ ...localRequired, secret: 'screen-local-secret-of-thirty-two-characters' }))
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticated], auth: { admin: { kayan: authenticated, access: () => admitted }, onError: console.error } })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticated], auth: { admin: { kayan: authenticated, access: () => admitted }, onError: console.error } })
   await built.connect()
   try {
     const screens = async (cookie?: string) =>
@@ -15137,7 +15146,7 @@ test('162. a create and an update carrying a value outside a field\'s options ar
       fields: optionFields,
       targets: { service: { operations: defaultOperations } },
     })
-    const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [kayan] })
+    const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [kayan] })
     await built.connect()
 
     const badStatus = await posted(built, '/api/optionRows/create', { id: '1', status: 'archived', tags: ['a'] })
@@ -15400,7 +15409,7 @@ test('173. a local() with no ip is refused at build, naming the key, and nothing
   console.warn = (...parts: unknown[]) => void warned.push(parts.join(' '))
   try {
     assert.throws(
-      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [authenticating(users, local({ ...localRequired, secret: 'thirty-two-characters-is-enough!', ip: undefined as never }))] }),
+      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, secret: 'thirty-two-characters-is-enough!', ip: undefined as never }))] }),
       /local\(\{ ip \}\) is required\./,
     )
   } finally {
@@ -17356,8 +17365,8 @@ test('132z2. publishing a row made as a draft is refused when the publisher lack
 test('132aa. a draft request parses against the draft shape through the oRPC plug exactly as through the plain one', async () => {
   const { options } = await versionsTenant('132aa')
   const plugs = {
-    orpc: orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, context: (_request, actor) => ({ actor, requestId: '132aa' }) })(asas.operations as never),
-    plain: fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: '132aa' }) })(asas.operations as never),
+    orpc: orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, context: (_request, actor) => ({ actor, requestId: '132aa' }) })(asas.operations as never),
+    plain: fetchHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: '132aa' }) })(asas.operations as never),
   }
   const answers: Record<string, { status: number; level?: unknown; title?: unknown; _status?: unknown }> = {}
   for (const [name, plug] of Object.entries(plugs)) {
@@ -17465,8 +17474,8 @@ test('132ah. a course draft keeps a title past its length, and publishing it is 
 test('132ai. a draft request whose body is no JSON object is refused 400 by the oRPC plug as by the plain one, and the draft word on an operation that saves no draft changes nothing', async () => {
   const { options } = await versionsTenant('132ai')
   const plugs = {
-    orpc: orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, context: (_request, actor) => ({ actor, requestId: '132ai' }) })(asas.operations as never),
-    plain: fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: '132ai' }) })(asas.operations as never),
+    orpc: orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, context: (_request, actor) => ({ actor, requestId: '132ai' }) })(asas.operations as never),
+    plain: fetchHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: '132ai' }) })(asas.operations as never),
   }
   const call = async (plug: keyof typeof plugs, path: string, body: string) => {
     const response = await plugs[plug].handle(new Request(`http://test/api/${path}`, {
@@ -17495,8 +17504,8 @@ test('132ai. a draft request whose body is no JSON object is refused 400 by the 
 test('132aj. an id not of the kayan\'s shape is refused 400 by both plugs, with the draft word or without it, before any store is asked', async () => {
   const { options } = await versionsTenant('132aj')
   const plugs = {
-    orpc: orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, context: (_request, actor) => ({ actor, requestId: '132aj' }) })(asas.operations as never),
-    plain: fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: '132aj' }) })(asas.operations as never),
+    orpc: orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, context: (_request, actor) => ({ actor, requestId: '132aj' }) })(asas.operations as never),
+    plain: fetchHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, context: () => ({ requestId: '132aj' }) })(asas.operations as never),
   }
   const call = async (plug: keyof typeof plugs, path: string, input: unknown, rpc = false) => {
     const response = await plugs[plug].handle(new Request(`http://test/api/${rpc ? 'rpc/' : ''}${path}`, {
@@ -17642,7 +17651,7 @@ test('169w3. a where on a number id, on a localized column and on findVersions i
 
 test('169w4. a where value of its column\'s kind reads as it did, and a number or a checkbox sent as text is read as one, as Payload reads it', async () => {
   const language = online()
-  const built = language.buildAsas({ kayan: [kindedRows(language, 'kindedReads')], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] })
+  const built = language.buildAsas({ kayan: [kindedRows(language, 'kindedReads')], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] })
   await built.connect()
   const rows = built.kayan.kindedReads!.operations
   const first = await rows.create({ title: 'First', mail: 'first@example.com', count: 3, day: '2026-01-02', at: new Date('2026-01-02T09:30:00Z'), done: true })
@@ -18381,8 +18390,8 @@ test('186t. a shared row another organization\'s draft names is not deleted, and
 
 test('187. each is a bulk operation\'s alone, and names an operation the kayan has', () => {
   const kayanWith = (operations: Record<string, unknown>) => defineTestKayan({ name: 'eachProbe', access: allowAccess, fields: { ...defaultFields }, targets: { service: { operations: { ...defaultOperations, ...operations } as never } } })
-  assert.throws(() => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [kayanWith({ renamed: { ...defaultOperations.update, each: 'update' } }), ...accessKayan] }), /names "each", and only a bulk operation/)
-  assert.throws(() => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [kayanWith({ touchMany: { ...defaultOperations.updateMany, each: 'touch' } }), ...accessKayan] }), /runs "touch" on each row it matches, and the kayan has no operation "touch"/)
+  assert.throws(() => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [kayanWith({ renamed: { ...defaultOperations.update, each: 'update' } }), ...accessKayan] }), /names "each", and only a bulk operation/)
+  assert.throws(() => buildTestAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [kayanWith({ touchMany: { ...defaultOperations.updateMany, each: 'touch' } }), ...accessKayan] }), /runs "touch" on each row it matches, and the kayan has no operation "touch"/)
 })
 
 test('186s. a row that names itself is deleted whatever case its id is sent in', async () => {

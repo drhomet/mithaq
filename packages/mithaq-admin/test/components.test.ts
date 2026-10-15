@@ -28,7 +28,7 @@ type ControlProps = import('../registry/control-props.ts').ControlProps
 const screen = asas.targets.dashboard.client
 // One build of the color language for every test here: a build's pool ends once.
 const { language, swatches } = await import('./color-language.ts')
-const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [swatches] })
+const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [swatches] })
 after(() => built.destroy())
 const courses = screen.kayan.courses!
 const t = (_key: string, fallback?: string) => fallback

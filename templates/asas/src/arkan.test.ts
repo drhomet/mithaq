@@ -53,7 +53,7 @@ const offline = (kinds: Record<string, unknown> = drizzleKinds) => ({
 const build = (language: unknown, fields: Record<string, unknown> = { title: { kind: 'text' } }) => {
   const one = language as { defineKayan: (kayan: unknown) => unknown; buildAsas: (args: unknown) => unknown }
   return one.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [one.defineKayan({ name: 'notes', fields: { id: defaultFields.id, ...fields }, targets: { service: { operations: defaultOperations } } })],
   }) as {
     targets: Record<string, { tables?: Record<string, Record<string, { getSQLType(): string }>>; client?: { controls: Record<string, { control: string; cell: string }>; kayan: Record<string, { fields: { name: string; cell: string }[] }> } }>
@@ -226,7 +226,7 @@ test('a kayan\'s table is read under its own store\'s key, whatever the store is
   }
   const language = dbLanguage()
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [language.defineKayan({ name: 'notes', fields: { id: defaultFields.id, title: { kind: 'text' } }, targets: { db: own, service: { operations: defaultOperations } } })],
   })
   assert.equal(built.targets.db.tables.notes, own)
@@ -236,7 +236,7 @@ test('a kayan\'s table is read under its own store\'s key, whatever the store is
   // number, and the override makes it a text column.
   const fieldLanguage = dbLanguage()
   const field = fieldLanguage.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       fieldLanguage.defineKayan({
         name: 'notes',
@@ -257,7 +257,7 @@ test('a field\'s own shape is read under its kayan\'s schema target\'s key, what
   const { zod, ...rest } = offline()
   const language = defineMithaq({ targets: { ...rest, check: zod, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'check', authorize: defaultAuthorize }) }, arkan: [base] })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'notes',
@@ -314,7 +314,7 @@ test('the storage rukn brings the upload kind, with its own reference column, id
     fields: { id: defaultFields.id, cover: { kind: 'upload', relationTo: () => media }, gallery: { kind: 'upload', relationTo: () => media, hasMany: true } },
     targets: { service: { operations: defaultOperations } },
   } as never)
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [media, notes] } as never) as unknown as {
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [media, notes] } as never) as unknown as {
     targets: { drizzle: { tables: Record<string, Parameters<typeof getTableConfig>[0] & Record<string, { getSQLType(): string }>> }; dashboard: { client: { controls: Record<string, { control: string; cell: string }> } } }
     kayan: { notes: { targets: { zod: { schemas: { create: z.ZodType } } } } }
     destroy(): Promise<void>
@@ -424,7 +424,7 @@ test('a localized field whose column is overridden under a store keyed db is tha
   const { drizzle, ...rest } = offline()
   const language = defineMithaq({ locales: ['ar', 'en'] as const, targets: { ...rest, db: drizzle, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'db', schema: 'zod', authorize: defaultAuthorize }) }, arkan: [base] })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'notes',
@@ -456,7 +456,7 @@ test('the template\'s plain target reads a field\'s own shape under the plain ta
   const { zod: _zod, ...rest } = offline()
   const language = defineMithaq({ targets: { ...rest, check: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'check', authorize: defaultAuthorize }) }, arkan: [base] })
   const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'notes',
@@ -502,7 +502,7 @@ test('a project kind says for itself which operators it takes, that it cannot or
     },
     targets: { service: { operations: defaultOperations } },
   })
-  const built = pointing.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [parents, children] })
+  const built = pointing.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [parents, children] })
   const { columns, foreignKeys } = getTableConfig(built.targets.drizzle.tables.children!)
   assert.deepEqual(columns.map((column) => column.name).sort(), ['id', 'kept_id', 'named_id', 'parent_id'], 'each holds the id of the row it points at')
   assert.deepEqual(
@@ -514,7 +514,7 @@ test('a project kind says for itself which operators it takes, that it cannot or
   const silent = languageOf({ anchor: anchorOf({ pointsAtRow: true }) })
   const lone = silent.defineKayan({ name: 'parents', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } })
   assert.throws(
-    () => silent.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [lone, silent.defineKayan({ name: 'children', fields: { id: defaultFields.id, parent: { kind: 'anchor', relationTo: () => lone } }, targets: { service: { operations: defaultOperations } } })] }),
+    () => silent.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [lone, silent.defineKayan({ name: 'children', fields: { id: defaultFields.id, parent: { kind: 'anchor', relationTo: () => lone } }, targets: { service: { operations: defaultOperations } } })] }),
     /Kayan "children" field "parent" has kind "anchor", which points at a row and says no onDelete default\. Give the kind its own onDelete\./,
   )
 
@@ -522,7 +522,7 @@ test('a project kind says for itself which operators it takes, that it cannot or
   const tagged = languageOf({ tag }, { dashboard: screen })
   const notes = (pages: Record<string, unknown>) =>
     tagged.buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [tagged.defineKayan({ name: 'notes', fields: { id: defaultFields.id, tag: { kind: 'tag' } }, targets: { service: { operations: defaultOperations }, dashboard: { pages } } })],
     })
   const form = (when: unknown) => ({ create: { path: '/notes/new', page: { shell: 'app', main: [{ layout: 'record', main: [{ form: [{ field: 'tag', when }] }] }] } } })

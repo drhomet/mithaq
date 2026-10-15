@@ -26,7 +26,7 @@ const { List } = await import('../registry/list.tsx')
 const { ComponentsProvider, checkComponents } = await import('../registry/components.tsx')
 const { defaultComponents } = await import('../registry/default-components.tsx')
 const { language, notes } = await import('./plain-language.ts')
-const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })
+const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [notes] })
 after(() => built.destroy())
 
 test('a language with no rich text and no files starts, and draws its forms and lists, with defaultComponents alone and loads neither add-on', () => {

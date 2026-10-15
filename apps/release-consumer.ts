@@ -141,7 +141,7 @@ function withoutRichText(tarball: string) {
     "const notes = defineKayan({ name: 'notes', fields: { ...defaultFields, title: { kind: 'text', label: { en: 'Title' } } }, targets: { service: { operations: defaultOperations } } })",
     '// @ts-expect-error a language without the richText rukn has no richText kind',
     "defineKayan({ name: 'pages', fields: { ...defaultFields, body: { kind: 'richText', label: { en: 'Body' } } }, targets: { service: { operations: defaultOperations } } })",
-    'buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })',
+    'buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [notes] })',
     "console.log('built without rich text')",
     '',
   ].join('\n'))

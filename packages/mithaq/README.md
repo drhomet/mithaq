@@ -538,7 +538,7 @@ checks everything, and returns the runtime.
 export const asas = buildAsas({
   kayan: [...betterAuth.core, ...betterAuth.organization, roles, memberRoles, tags, courses],
   global: [settings],
-  http: [orpcHttp({ /* ... */ }), fetchHttp({ context: requestContext, maxBodyBytes: defaultMaxBodyBytes })],
+  http: [orpcHttp({ /* ... */ }), fetchHttp({ context: requestContext, maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   statements: { ...providerStatements },
   auth: { admin: { kayan: user, access: superAdmin }, onError: (error) => console.error(error) },
 })
@@ -555,10 +555,12 @@ every behaviour it might change. `buildAsas` refuses a config that leaves a
 required one out:
 
 - `http`: at least one plug, such as `fetchHttp({ maxBodyBytes:
-  defaultMaxBodyBytes })`. Each plug requires its `maxBodyBytes`, the largest
-  request body it reads, and answers one past it with 413 before it reads the
-  rest; the template names `defaultMaxBodyBytes` (4 MiB) on both, and an auth
-  route holds every body to it. Files are never sent this way.
+  defaultMaxBodyBytes, onError: console.error })`. Each plug requires its
+  `maxBodyBytes`, the largest request body it reads, and answers one past it
+  with 413 before it reads the rest; the template names `defaultMaxBodyBytes`
+  (4 MiB) on both, and an auth route holds every body to it. Files are never
+  sent this way. Each plug requires its `onError` too, handed every fault it
+  answers 500.
 - `auth.onError`, once any kayan carries auth.
 - On the service target: `authorize` (`defaultAuthorize`), `depth`
   (`defaultDepth`, 8), `defaultLimit` (10), `maxLimit` (100), `joinLimit` (10),

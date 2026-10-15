@@ -513,7 +513,7 @@ export const buildAsas = <
   // Refused before any work: core picks no plug of its own.
   if (!http?.length) {
     throw new Error(
-      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], or http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes }), fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] for the typed client.',
+      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], or orpcHttp with the same options first for the typed client.',
     )
   }
   const globals = (global ?? []) as readonly Kayan[]
