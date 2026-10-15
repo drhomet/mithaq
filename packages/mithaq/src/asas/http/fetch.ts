@@ -116,7 +116,7 @@ export type FetchHttpOptions = {
  * The default HTTP plug: `POST /api/<kayan>/<operation>` with a JSON body, over
  * `Request` and `Response` alone. The runner parses each operation's input.
  */
-export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: FetchHttpOptions) => {
+export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: FetchHttpOptions = {} as FetchHttpOptions) => {
   assertMaxBodyBytes('fetchHttp', maxBodyBytes)
   return <View>(operations: OperationTable<View>): HttpPlug => {
     const table = new Map(operations.map((one) => [`${one.kayan}/${one.name}`, one]))

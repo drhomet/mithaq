@@ -11616,8 +11616,9 @@ const posted = (built: { handler: (request: Request) => Promise<Response> }, pat
     }),
   )
 
-test('119a. a plug that names no maxBodyBytes is refused by name, since core holds no limit of its own', () => {
+test('119a. a plug that names no maxBodyBytes is refused by name, since core holds no limit of its own, called with no options at all included', () => {
   for (const [name, plug] of [['fetchHttp', fetchHttp], ['orpcHttp', orpcHttp]] as const) {
+    assert.throws(() => (plug as () => unknown)(), new RegExp(`${name} names no "maxBodyBytes"`), `${name}()`)
     for (const maxBodyBytes of [undefined, 0, 1.5]) {
       assert.throws(() => (plug as (options: unknown) => unknown)({ maxBodyBytes }), new RegExp(`${name} names no "maxBodyBytes", the largest request body`), `${name} ${maxBodyBytes}`)
     }

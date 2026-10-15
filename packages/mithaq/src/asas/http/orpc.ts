@@ -67,7 +67,7 @@ export const orpcHttp = ({
   context,
   onError,
   maxBodyBytes,
-}: OrpcHttpOptions) => {
+}: OrpcHttpOptions = {} as OrpcHttpOptions) => {
   assertMaxBodyBytes('orpcHttp', maxBodyBytes)
   return <View>(operations: OperationTable<View>) => {
     // A reporter that throws must not replace the error the host has to see.
