@@ -1,4 +1,4 @@
-import { actorPermissions, count, defaultFields, find, findOne, invalid, type Ctx, type Held } from 'mithaq'
+import { actorPermissions, count, defaultFields, denied, find, findOne, invalid, type Ctx, type Held } from 'mithaq'
 import { defineKayan, rows, organization } from '@asas/mithaq'
 import { backofficeClosed } from '@asas/mithaq/roles/tenant-access.ts'
 import { auditLogName, type Change } from '@asas/mithaq/mithaq/audit-sink.ts'
@@ -96,6 +96,10 @@ const columnsOf = (catalog: readonly string[]) => {
   return columns
 }
 
+// ponytail: the reach here and `visibleChanges` grade by keys alone. A tenant role that a row
+// table narrows further, by a `fields` list or a row filter on its read, would be told of columns
+// and rows its own reads hide; grade each entry through the kayan's own field access and read
+// `where` before a project adds one.
 /**
  * The kayan one search of a change reaches for this actor, or `true` for every
  * one. The text reaches a kayan whose every column the actor reads; a column's
@@ -139,6 +143,13 @@ const narrowed = (where: unknown, reach: (column: string, rules: unknown) => tru
  * lets through.
  */
 const queriedByQueryable = (ctx: Ctx, tools: { catalog: readonly string[] }): Ctx => {
+  // The runner names the organization a read is scoped to only where the read is not widened.
+  // `reachOf` and `visibleChanges` grade by the active organization's keys, so a read across every
+  // membership (`tenant: 'mine'`) would grade another organization's entries by this one's: it is
+  // refused before anything else of it is judged.
+  if (ctx.tenant === undefined) {
+    throw denied({ message: 'Kayan "auditLog" is read in the active organization alone.', key: 'error.forbidden.read', params: {} })
+  }
   const { where, sort } = ctx.data as { where?: unknown; sort?: unknown }
   const field = namedIn(where).find((name) => !queryable.has(name) && !searched.has(name))
   if (field !== undefined) {

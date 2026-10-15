@@ -15883,6 +15883,26 @@ test('177d. the log is searched by a change\'s text and by the columns it change
   }
 })
 
+test('177e. the log is read in the active organization alone: a read widened to every membership is refused, since each change is graded by the active one\'s keys, and a search never reaches another organization', async () => {
+  const [a, b] = await twoTenants('177e')
+  // The administrator of A, who is B's registrar and reads no access code there.
+  await server.api.addMember({ body: { userId: a!.owner.id, organizationId: b!.organization, role: 'member' } })
+  await assignRole(b!.organization, a!.owner.id, 'registrar')
+  const bOwner = { actor: (await asas.auth.actor(b!.owner.headers)) as never }
+  await courses.operations.update({ id: b!.course, delivery: 'live', accessCode: 'SECRET177E' } as never, bOwner)
+  const actor = (await asas.auth.actor(a!.owner.headers)) as never
+  const log = asas.kayan.auditLog.operations as unknown as Record<'find' | 'findByID' | 'count', (input: unknown, options: unknown) => Promise<any>>
+  const one = (await log.find({ limit: 1 }, { actor })).docs[0] as { id: string }
+  for (const [operation, input] of [['find', { where: { changes: { contains: 'SECRET177E' } } }], ['findByID', { id: one.id }], ['count', {}]] as const) {
+    const thrown = await log[operation](input, { actor, tenant: 'mine' }).catch((error: unknown) => error)
+    assert.ok(thrown instanceof AsasError && thrown.status === 403, `${operation} under tenant 'mine' is refused: ${thrown}`)
+  }
+  const served = await asas.handler(new Request('http://test/api/auditLog/find?tenant=mine', { method: 'POST', headers: new Headers({ cookie: a!.owner.headers.get('cookie')!, 'content-type': 'application/json' }), body: JSON.stringify({ where: { changes: { contains: 'SECRET177E' } } }) }))
+  assert.equal(served.status, 403, 'and served')
+  assert.deepEqual((await log.find({ where: { changes: { contains: 'SECRET177E' } } }, { actor })).docs, [], 'a search in the active organization finds nothing of another')
+  assert.equal((await log.count({ where: { changes: { contains: 'SECRET177E' } } }, bOwner)).totalDocs, 1, 'while B\'s own administrator finds its entry')
+})
+
 test('276d. a command actor\'s operating-system user is read by a holder of the people alone, and a reader of none is refused every filter and sort by `actor`', async () => {
   const [a] = await twoTenants('276d')
   const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
