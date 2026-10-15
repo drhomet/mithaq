@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ComponentProps, type ReactElement } from 'react'
+import { Button } from '@/components/ui/button'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { DraftBanner } from 'mithaq-admin/draft-banner.tsx'
 import { ViewSwitch, type Views } from 'mithaq-admin/form-actions.tsx'
@@ -58,7 +59,7 @@ export function ErrorSummary({ problems, refused, t }: { problems: readonly Prob
  * What a form draws above its fields: its title and sentence, the summary of the fields a save was refused over,
  * the draft or published switch below xl, and what a changed row says.
  */
-export function FormChrome({ about, draft, headed, problems, refused, t, title, views }: {
+export function FormChrome({ about, draft, headed, problems, refused, stale, t, title, views }: {
   /** Whether the form draws a header at all: on a screen's page a kayan with no sentence draws none, and no rule under it. */
   headed: boolean
   /** The heading, which a screen's page leaves to its own `title` node. */
@@ -67,6 +68,8 @@ export function FormChrome({ about, draft, headed, problems, refused, t, title, 
   problems: readonly Problem[]
   /** How many saves have been refused over fields, which moves the focus to the summary on each. */
   refused: number
+  /** What the form says once its row changed elsewhere, which stays until the page is read again. */
+  stale?: string
   /** The draft or published switch, where a controls node draws the actions and so leaves the switch to the top of the form. */
   views?: Views
   /** What a changed row says, on a changed row only. */
@@ -80,6 +83,12 @@ export function FormChrome({ about, draft, headed, problems, refused, t, title, 
           {title === undefined ? null : <h1 className="text-2xl font-bold tracking-tight">{title}</h1>}
           {about ? <p className="text-muted-foreground mt-1 text-sm">{about}</p> : null}
         </header>
+      ) : null}
+      {stale ? (
+        <div role="alert" data-stale-notice="" className="border-destructive/50 text-destructive flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm">
+          <p className="min-w-0 flex-1">{stale}</p>
+          <Button type="button" variant="outline" size="sm" data-button="reload" onClick={() => window.location.reload()}>{t('admin.reload', 'Reload')}</Button>
+        </div>
       ) : null}
       <ErrorSummary problems={problems} refused={refused} t={t} />
       {views ? <ViewSwitch className="xl:hidden" phone {...views} t={t} /> : null}

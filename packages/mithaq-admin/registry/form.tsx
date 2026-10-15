@@ -1,4 +1,4 @@
-import { useContext, useId, useState, type FormEvent, type ReactElement } from 'react'
+import { useContext, useEffect, useId, useState, type FormEvent, type ReactElement } from 'react'
 import type { ClientField, ClientKayan, LeafClient } from 'mithaq/admin'
 import { FormContext, ScreenContext } from 'mithaq/admin/react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -57,6 +57,9 @@ export function DrawerForm({ edit, onClose, title, ...props }: Omit<FormProps, '
   )
 }
 
+/** Whether a refusal says the row changed elsewhere since this form read it, after which no save of this form lands. */
+const staleIn = (thrown: unknown) => (thrown as { data?: { key?: unknown } } | null | undefined)?.data?.key === 'error.conflict.stale'
+
 /** The screen's client as a relationship's inline create calls it, by a kayan named at run time. */
 type CallByName = (call: { kayan: string; operation: string; input: Record<string, unknown> }) => Promise<unknown>
 
@@ -67,15 +70,24 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const [revision, setRevision] = useState(0)
   const { seed, setSeed, seeded, form, values, dirty } = useFormSeed({ kayan, value, status: drafts?.status, onDirty: props.onDirty })
   const { held, shown, issues, sentences, setRefused, forget } = useFormRefusal({ copy, error: props.error, form })
-  // How many writes were refused over fields, which moves the focus to the summary on each.
+  // How many writes the person pressed were refused over fields, which moves the focus to the summary on each.
   const [refusals, setRefusals] = useState(0)
-  // A refusal naming a field is drawn at that field and in the summary; any other, a request that failed, is said in a red toast.
-  const refuse = (thrown: unknown) => {
-    setRefused(thrown)
-    if (!thrown) return
-    if (Object.keys(issuesOf(thrown)).length) setRefusals((already) => already + 1)
-    else toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
+  // A refusal naming a field is drawn at that field and in the summary; a row changed elsewhere is a lasting notice on
+  // the form, since nothing saves until it is read again; any other, a request that failed, is said in a red toast.
+  const said = (thrown: unknown) => {
+    if (thrown && !Object.keys(issuesOf(thrown)).length && !staleIn(thrown)) toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
   }
+  // An autosave's refusal marks its fields quietly: the focus and the open tab stay where the person is typing.
+  const quiet = (thrown: unknown) => {
+    setRefused(thrown)
+    said(thrown)
+  }
+  const refuse = (thrown: unknown) => {
+    quiet(thrown)
+    if (thrown && Object.keys(issuesOf(thrown)).length) setRefusals((already) => already + 1)
+  }
+  // A refusal the host caught, which no write of this form said.
+  useEffect(() => said(props.error), [props.error])
   // The access report a node's `when` reads as `$user`; none outside a screen.
   const screenState = useContext(ScreenContext)
   const access = screenState?.access
@@ -90,7 +102,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // access denied); it decides both the disabled control and whether the field is in the write.
   const owned = (field: ClientField) => readOnlyField(field, on) || (writes ? !writes(field.name, on) : false)
   const status = drafts && seed.status
-  const { viewing, showing, choose, forget: forgetPublished } = useDraftView({ client, id, kayan, refuse, status, values })
+  const { viewing, showing, choose, forget: forgetPublished } = useDraftView({ client, id, kayan, refuse: quiet, status, values })
   // A screen's page names every field it draws; a form handed no page draws every field in declared
   // order, and no join, whose rows are another kayan's.
   const tree = nodes ?? (screen && nodesOf(screen.page))
@@ -99,7 +111,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // Never while a discard question is open, which says the change is unsaved, nor once a write was refused because
   // the row changed since this form read it: every autosave after it would be refused the same way.
   const interval = viewing || asking || blocked || leaving || shown === 'error.conflict.stale' ? undefined : drafts?.autosave
-  const autosaved = useAutosave({ ...props, ...saving, client, form, id, interval, owned, readAt: () => readAt(props.expectedUpdatedAt), refuse, seed, seeded, setSeed, values })
+  const autosaved = useAutosave({ ...props, ...saving, client, form, id, interval, owned, readAt: () => readAt(props.expectedUpdatedAt), refuse: quiet, seed, seeded, setSeed, values })
 
   const setValue = (name: string, next: unknown) => {
     const field = byName.get(name)
@@ -215,6 +227,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
         return { id: `${kayan.name}-${name}`, label: field ? labelFor({ kayan, field, copy }) : name, sentence }
       })}
       refused={refusals}
+      stale={staleIn(held) ? failedWords({ kayan: kayan.name, copy, thrown: held }) : undefined}
       views={controlled ? views : undefined}
       t={t}
       draft={status === 'changed' ? {

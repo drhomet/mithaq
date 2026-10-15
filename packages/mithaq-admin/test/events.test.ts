@@ -123,7 +123,7 @@ const toasted = async () => {
   await act(async () => void toast.dismiss())
   return said
 }
-const withToaster = (element: ReactElement) => createElement('div', null, element, createElement(Toaster))
+const withToaster = (element: ReactElement) => createElement('div', null, element, createElement(Toaster, { closeLabel: 'Close' }))
 
 test('the switch override reports a boolean', async () => {
   const reported: unknown[] = []
@@ -7305,7 +7305,7 @@ test('223a. on a kayan that keeps drafts and whose update takes expectedUpdatedA
   }
   await type('Tajweed IV')
   assert.equal(calls.length, 4, 'the stale autosave was asked once')
-  assert.ok((await toasted()).includes('error: error.conflict.stale'), 'and the person is told why')
+  assert.ok(host.querySelector('[data-stale-notice]')?.textContent?.includes('error.conflict.stale'), 'and the person is told why, on the form, for as long as it holds')
   await type('Tajweed V')
   await type('Tajweed VI')
   assert.equal(calls.length, 4, 'and nothing autosaves after it, whatever is typed')
@@ -7450,14 +7450,14 @@ test('240a. a save, a create, a publish, a draft save, a delete and a kayan\'s o
 
 test('240b. a save the server refuses over no field, or that never reaches it, says why in a red toast and draws nothing in the page header', async () => {
   await toasted()
-  const refusal = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.stale', params: {} } })
+  const refusal = Object.assign(new Error('Forbidden'), { status: 403, data: { key: 'error.forbidden.update', params: {} } })
   let thrown: unknown = refusal
   const client = draftClient([], async () => {
     throw thrown
   })
   const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client, value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })), { record: draftRow })
   await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
-  assert.deepEqual(await toasted(), [`error: ${english('error.conflict.stale')}`], 'the refusal\'s own sentence, in red')
+  assert.deepEqual(await toasted(), [`error: ${english('error.forbidden.update')}`], 'the refusal\'s own sentence, in red')
   assert.equal(host.querySelectorAll('[role="alert"]').length, 0, 'and no alert on the page, in the header or the form')
   thrown = new TypeError('Failed to fetch')
   await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
@@ -7745,4 +7745,53 @@ test('240n. a picker for an upload offers no + of its own, which its Upload new 
   assert.ok(host.querySelector('[data-control="relationship"] button[data-add-new]'), 'a relationship has it')
   assert.ok(host.querySelector('[data-control="upload"]'), 'the cover is drawn by its upload control')
   assert.equal(host.querySelector('[data-control="upload"] button[data-add-new]') === null, true, 'which draws no + beside its picker')
+})
+
+test('240o. an autosave refused over a field marks it and lists it quietly, and never takes the focus from the box being typed in', async () => {
+  await toasted()
+  const refusal = Object.assign(new Error('Bad Request'), { status: 400, data: { key: 'error.invalid.value', params: { issues: [{ path: 'summary', message: 'Too long.' }] } } })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, client: draftClient([], async () => {
+    throw refusal
+  }), value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 50 } })))
+  const title = host.querySelector('#courses-title') as unknown as HTMLInputElement
+  title.focus()
+  await act(async () => typeInto(title as unknown as Element, 'Tajweed II'))
+  await act(async () => sleep(200))
+  await act(async () => sleep(50))
+  assert.ok(host.querySelector('[data-error-summary]')?.textContent?.includes('Too long.'), 'the refused field is listed')
+  assert.equal(window.document.activeElement === (title as unknown), true, 'and the focus stays in the box being typed in')
+})
+
+test('240p. a refusal the host hands the form that names no field is said in a red toast', async () => {
+  await toasted()
+  await render(withToaster(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t: english, locale: 'en', onDone: () => {}, error: { status: 403, data: { key: 'error.forbidden.update' } } })))
+  assert.deepEqual(await toasted(), [`error: ${english('error.forbidden.update')}`])
+})
+
+test('240q. a red toast stays until it is closed, with its own close button, a green one leaves on its own, and a stale row is a lasting notice on the form with a reload, not a toast', async (t) => {
+  await toasted()
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    const host = await render(withToaster(createElement('p', null, 'page')))
+    await act(async () => {
+      toast.success('Saved')
+      toast.error('Refused')
+    })
+    await act(async () => t.mock.timers.tick(60_000))
+    assert.deepEqual([...host.querySelectorAll('[data-toast]')].map((one) => one.getAttribute('data-toast')), ['error'], 'a minute on, the failure is still there and the success is gone')
+    assert.equal(host.querySelectorAll('[aria-live]').length, 1, 'in one live region')
+    await act(async () => click(host.querySelector('[data-toast] [data-toast-close]')!))
+    assert.equal(host.querySelectorAll('[data-toast]').length, 0, 'and its close button takes it away')
+  } finally {
+    t.mock.timers.reset()
+  }
+  const stale = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.stale', params: {} } })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, client: draftClient([], async () => {
+    throw stale
+  }), value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(await toasted(), [], 'a row changed elsewhere is no toast')
+  const notice = host.querySelector('[data-stale-notice]')
+  assert.ok(notice?.textContent?.includes(english('error.conflict.stale')!), 'it stays on the form, in its own sentence')
+  assert.ok(notice?.querySelector('button[data-button="reload"]'), 'beside a reload, since nothing saves until the row is read again')
 })

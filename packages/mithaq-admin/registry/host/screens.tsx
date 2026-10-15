@@ -553,6 +553,7 @@ function ScreenBar({ user }: { user: ScreenData['user'] }): ReactElement | null 
 
 /** The screen's own frame: its providers, outermost first, around the frame's bar and the page. */
 export function ScreenFrame({ files, data, children }: { files: Files; data: ScreenData; children: ReactNode }): ReactElement {
+  const { t } = useCopy()
   const refs = refsOf(files, data.screen)
   // One per frame: made per request on the server, so no row one actor read
   // reaches another's render; held for the frame's life in the browser.
@@ -600,7 +601,7 @@ export function ScreenFrame({ files, data, children }: { files: Files; data: Scr
           <ScreenBar user={data.user} />
           {children}
           {/* The one place every write's toast is drawn, kept across the screen's pages. */}
-          <Toaster />
+          <Toaster closeLabel={t('admin.close', 'Close') ?? 'Close'} />
         </>,
       )}
     </Suspense>

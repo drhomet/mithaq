@@ -261,6 +261,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     errorSummary: { en: 'Check these fields:', ar: 'راجع هذه الحقول:' },
     addNew: { en: 'Add new {kind}', ar: 'إضافة {kind}' },
     backToList: { en: 'Back to list', ar: 'العودة إلى القائمة' },
+    reload: { en: 'Reload', ar: 'إعادة التحميل' },
     hours: { en: 'Hours', ar: 'الساعات' },
     minutes: { en: 'Minutes', ar: 'الدقائق' },
     period: { en: 'AM or PM', ar: 'صباحا أو مساء' },

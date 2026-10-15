@@ -893,6 +893,9 @@
           "type": "registry:component",
           "target": "@components/mithaq/form-chrome.tsx"
         }
+      ],
+      "registryDependencies": [
+        "button"
       ]
     },
     {
