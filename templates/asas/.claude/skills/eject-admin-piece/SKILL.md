@@ -5,7 +5,7 @@ description: Change how the admin draws something in this mithaq project, by rep
 
 # Change an admin piece
 
-The guide is the admin's, `node_modules/mithaq/docs/packages/mithaq-admin/README.md` ("Add or replace a control", "Replace a node", "Eject a piece"), and `eject` in `node_modules/mithaq/docs/packages/mithaq/src/asas/cli/README.md`.
+The installed mithaq is `packages/asas/node_modules/mithaq/`, or `node_modules/mithaq/` where the package manager hoists it to the root. The guide is the admin's, its `docs/packages/mithaq-admin/README.md` ("Add or replace a control", "Replace a node", "Eject a piece"), and `eject` in its `docs/packages/mithaq/src/asas/cli/README.md`.
 
 1. Reach for the components map first: a control, a cell or a node is replaced in the app's `src/components.ts` without ejecting anything.
 2. Otherwise eject the piece, in the app that draws it (`apps/asas-tanstack` or `apps/asas-backoffice`):
@@ -20,9 +20,9 @@ The guide is the admin's, `node_modules/mithaq/docs/packages/mithaq-admin/README
 
    ```sh
    bunx mithaq upgrade --check       # the held files against the installed mithaq-admin
-   bunx tsc -p .
+   bunx --package typescript tsc -p .
    ```
 
 To go back to the package's piece, delete the file, or run `bunx mithaq eject --prune`, which deletes every ejected file nobody edited.
 
-In a project made with `--layout single`, read each path as `AGENTS.md` maps it.
+In a project made with `--layout single`, read each path as `AGENTS.md` maps it; the installed mithaq is `node_modules/mithaq/`.

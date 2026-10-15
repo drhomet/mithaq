@@ -5,7 +5,7 @@ description: Add, change or remove a field of an existing kayan in this mithaq p
 
 # Add a field and its migration
 
-The guide is "A field" under "Add a feature to an existing kayan" in `README.md`, and "Migrations" in `AGENTS.md`. Every kind and rule is in the language reference, `node_modules/mithaq/docs/packages/mithaq/README.md`; `mithaq migrate` is in `node_modules/mithaq/docs/packages/mithaq/src/asas/cli/README.md`.
+The guide is "A field" under "Add a feature to an existing kayan" in `README.md`, and "Migrations" in `AGENTS.md`. The installed mithaq is `packages/asas/node_modules/mithaq/`, or `node_modules/mithaq/` where the package manager hoists it to the root: every kind and rule is in its `docs/packages/mithaq/README.md`, and `mithaq migrate` in its `docs/packages/mithaq/src/asas/cli/README.md`.
 
 1. Edit `fields` in the kayan's file. A kind or rule the language does not hold changes the vocabulary: stop and ask the developer.
 2. A new `required` field on a table with rows needs a literal `defaultValue`, or goes in without `required` and becomes required in a later migration.
@@ -20,8 +20,8 @@ The guide is "A field" under "Add a feature to an existing kayan" in `README.md`
    ```
 
 5. When `mithaq migrate` stops and asks for an answer in `mithaq.hints.json`, it is a rename or a drop. A drop deletes rows: ask the developer before you answer it.
-6. From the project root, `bunx tsc -p .` and each app's config.
+6. From the project root, `bunx --package typescript tsc -p .` and the same with `-p` naming each app.
 
 Commit the migration folder.
 
-In a project made with `--layout single`, read each path as `AGENTS.md` maps it.
+In a project made with `--layout single`, read each path as `AGENTS.md` maps it; the installed mithaq is `node_modules/mithaq/`.

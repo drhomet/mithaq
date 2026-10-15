@@ -205,6 +205,11 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     // The guides the project's AGENTS.md sends an agent to, at the installed version.
     for (const guide of ['packages/mithaq/README.md', 'packages/mithaq/src/asas/runner/README.md', 'templates/asas/README.md']) assert.ok(existsSync(join(mithaq, 'docs', guide)), `the installed mithaq ships docs/${guide}`)
     assert.ok(existsSync(join(mithaq, 'skills/upgrade-mithaq/SKILL.md')), 'and the skills upgrade-mithaq copies again')
+    // Where AGENTS.md and the skills send an agent from the root: `packages/asas/node_modules/mithaq`, else the root's.
+    const anchored = [join(consumer, 'packages/asas/node_modules/mithaq'), join(consumer, 'node_modules/mithaq')].find((one) => existsSync(one))
+    for (const file of ['docs/templates/asas/README.md', 'skills/add-kayan/SKILL.md']) assert.ok(anchored && existsSync(join(anchored, file)), `${file} is found where the skills look`)
+    // Bun's isolated linker puts no mithaq in the root's node_modules, which is why the anchor is `packages/asas`.
+    if (manager === 'bun' && !single) assert.equal(anchored, join(consumer, 'packages/asas/node_modules/mithaq'))
     const admin = realpathSync(installed(app, 'mithaq-admin'))
     assert.equal((JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq-admin')
     assert.ok(!existsSync(join(app, 'src/components/mithaq')), 'the app holds no piece: each is drawn from the package')
