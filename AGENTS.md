@@ -82,4 +82,6 @@ Start at `README.md`. Each guide is the `README.md` of the folder it describes:
 - `packages/mithaq/src/drizzle/README.md`: migrations in production.
 - `packages/mithaq-admin/README.md`: the admin package, ejecting a piece, and migrating a project that holds copies.
 
+Each of these guides also ships in `@drhomet/mithaq` under `docs/` at its repository path (`apps/pack.ts`), where a created project's agent reads it, so a link between two guides is relative and a link out of them is absolute.
+
 `CONTRIBUTING.md` has the repository layout and the pull request steps. Keep each guide beside the code it describes.

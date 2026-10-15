@@ -202,6 +202,8 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const mithaq = realpathSync(installed(app, 'mithaq'))
     assert.ok(mithaq.startsWith(join(realpathSync(consumer), 'node_modules')), `mithaq resolves to the installed tarball, not ${mithaq}`)
     assert.equal((JSON.parse(readFileSync(join(mithaq, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq')
+    // The guides the project's AGENTS.md sends an agent to, at the installed version.
+    for (const guide of ['packages/mithaq/README.md', 'packages/mithaq/src/asas/runner/README.md', 'templates/asas/README.md']) assert.ok(existsSync(join(mithaq, 'docs', guide)), `the installed mithaq ships docs/${guide}`)
     const admin = realpathSync(installed(app, 'mithaq-admin'))
     assert.equal((JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq-admin')
     assert.ok(!existsSync(join(app, 'src/components/mithaq')), 'the app holds no piece: each is drawn from the package')

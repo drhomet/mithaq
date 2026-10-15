@@ -4,6 +4,8 @@ This project is built on mithaq. Each data type is a kayan (an entity), declared
 
 Run every `mithaq` command from `packages/asas/` unless it says otherwise. `README.md` beside this file is the full guide, with the steps and examples behind each section here. In a project made with `--layout single`, every folder below is one package: `packages/mithaq/src/` and `packages/asas/src/` are both `src/`, and `packages/features/<feature>/` is `src/features/<feature>/`.
 
+The guides of the installed mithaq ship in its package, at their paths in the mithaq repository, under `node_modules/mithaq/docs/` (from `packages/asas/`, the nearest `node_modules` holding `mithaq`: its own or the root's). They match the installed version, so read them before GitHub, whose `main` describes the next release: `docs/packages/mithaq/README.md` is the language reference, `docs/packages/mithaq/src/asas/cli/README.md` the `mithaq` command, `docs/packages/mithaq/src/asas/runner/README.md` tenancy, `docs/packages/mithaq/src/drizzle/README.md` migrations in production and `docs/packages/mithaq-admin/README.md` the admin.
+
 ## Where things go
 
 The project is three steps, each named after what it holds, and each imports only the steps before it.

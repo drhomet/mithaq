@@ -99,6 +99,8 @@ The guides sit beside the code they describe, each as its folder's `README.md`:
 - [`packages/mithaq/src/drizzle/README.md`](packages/mithaq/src/drizzle/README.md), migrations in production;
 - [`packages/mithaq-admin/README.md`](packages/mithaq-admin/README.md), the admin package.
 
+Every guide above but the front page also ships in `@drhomet/mithaq` under `docs/`, at its repository path, so the links between them resolve in `node_modules/mithaq/docs/`, where a created project's agent reads the guides of the version it installed. A new user guide joins the list in `apps/pack.ts`, and `apps/pack.test.ts` proves the package holds it.
+
 ### `packages/mithaq/src`
 
 The folders follow the parts of the framework. `index.ts` re-exports the public API, and `package.json` names the other entries, such as `mithaq/admin`, `mithaq/admin/react`, `mithaq/orpc`, `mithaq/rich-text` and `mithaq/drizzle`.

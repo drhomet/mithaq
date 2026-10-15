@@ -47,6 +47,11 @@ cpSync(join(root, 'LICENSES'), join(stagedAdmin, 'LICENSES'), { recursive: true 
 console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
 
 cpSync(join(root, 'README.md'), join(staged, 'README.md'))
+// The user guides at their repository paths, so each relative link between them resolves as it does on GitHub, and a
+// project's agent reads the ones that match the version it installed. The contributor AGENTS.md files stay out.
+for (const guide of ['packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']) {
+  cpSync(join(root, guide), join(staged, 'docs', guide))
+}
 cpSync(join(root, 'LICENSE'), join(staged, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(staged, 'LICENSES'), { recursive: true })
 console.log(`staged ${staged}`)

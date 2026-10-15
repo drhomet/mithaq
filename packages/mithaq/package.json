@@ -26,6 +26,11 @@
   "publishConfig": {
     "name": "@drhomet/mithaq",
     "version": "0.1.1",
+    "files": [
+      "dist",
+      "docs",
+      "LICENSES"
+    ],
     "repository": {
       "type": "git",
       "url": "git+https://github.com/drhomet/mithaq.git",
