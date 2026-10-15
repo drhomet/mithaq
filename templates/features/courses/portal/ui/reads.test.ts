@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { FetchClient, Row } from 'mithaq/admin'
-import { catalogueOf, seatsOf } from './reads.ts'
+import { catalogueOf, readSeats } from './reads.ts'
 
 const now = Date.parse('2026-10-15T12:00:00Z')
 const refused = Object.assign(new Error('Forbidden'), { status: 403, data: { key: 'error.forbidden.read' } })
@@ -52,13 +52,13 @@ test('a seat is drawn with its session, its course, the course\'s cover and, whe
     media: [{ id: 'm1', url: '/api/media/file/m1' }],
     user: [{ id: 'u1', name: 'Sara' }],
   })
-  const seats = await seatsOf({ client, maxLimit: 100, people: true })
+  const seats = await readSeats({ client, maxLimit: 100, people: true })
   assert.deepEqual(seats.map((one) => [one.seat.id, one.session?.id, one.course?.title, one.cover?.id, one.student?.name, one.startsAt]), [
     ['e1', 's1', 'Calligraphy', 'm1', 'Sara', '2026-10-20T09:00:00Z'],
     ['e2', undefined, undefined, undefined, undefined, undefined],
   ], 'a session the viewer cannot read leaves its seat bare, and a person it cannot read leaves the name out')
   asked.length = 0
-  await seatsOf({ client, maxLimit: 100, where: { student: { equals: 'u1' } } })
+  await readSeats({ client, maxLimit: 100, where: { student: { equals: 'u1' } } })
   assert.equal(asked.some((one) => one.kayan === 'user'), false, 'no person is read unless asked')
   assert.deepEqual(asked[0]!.input.where, { student: { equals: 'u1' } })
 })

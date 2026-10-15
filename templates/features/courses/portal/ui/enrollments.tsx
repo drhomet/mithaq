@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PortalShell, display } from './portal-shell.tsx'
 import { CardsLoading, Cover, ReadFailed, usePlace } from './parts.tsx'
 import { byWhen, startsIn, whenOf } from './portal.ts'
-import { seatsOf, type Seat } from './reads.ts'
+import { readSeats, type Seat } from './reads.ts'
 
 export function Enrollments() {
   const { t } = useLocale()
@@ -25,7 +25,7 @@ export function Enrollments() {
   const others = holds(access, 'enrollments.others')
   // A student is never asked for people, whom it reads none of.
   const people = others && access.collections?.enrollments?.fields?.student?.read === true
-  const read = useQuery({ queryKey: ['portal-enrollments', people], queryFn: () => seatsOf({ client, maxLimit: screen.maxLimit, people }) })
+  const read = useQuery({ queryKey: ['portal-enrollments', people], queryFn: () => readSeats({ client, maxLimit: screen.maxLimit, people }) })
   const [when, setWhen] = useState<'upcoming' | 'past'>('upcoming')
   const now = Date.now()
   const split = read.data && byWhen(read.data, now)

@@ -59,7 +59,7 @@ export type Seat = { seat: Row; startsAt?: unknown; session?: Row; course?: Row;
  * the viewer's own. People are read only where `people` is set, and each is one the viewer may read: a name the
  * server keeps from it is left out.
  */
-export const seatsOf = async ({ client, maxLimit, where, people = false }: Reads & { where?: Row; people?: boolean }): Promise<Seat[]> => {
+export const readSeats = async ({ client, maxLimit, where, people = false }: Reads & { where?: Row; people?: boolean }): Promise<Seat[]> => {
   // ponytail: one page of the build's cap, the newest; pages once a viewer holds more seats than that.
   const seats = (await find({ client, kayan: 'enrollments', input: { sort: '-createdAt', limit: maxLimit, ...(where && { where }) } })).docs
   const sessions = await byIds({ client, maxLimit, kayan: 'sessions', ids: idsOf(seats, 'session') })

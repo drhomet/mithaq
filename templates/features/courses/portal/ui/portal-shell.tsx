@@ -8,9 +8,11 @@ import { use, useState, type ReactNode } from 'react'
 import { BookOpen, ClipboardCheck, House, Wrench, type LucideIcon } from 'lucide-react'
 // add-on: settings
 import { useQuery } from '@tanstack/react-query'
+import type { Row } from 'mithaq/admin'
+import { useClient } from 'mithaq/admin/react'
 // end add-on: settings
-import type { NavEntry, Row, ShellProps } from 'mithaq/admin'
-import { ScreenContext, useAccess, useClient, useLocale, useNav, useScreen, useUser } from 'mithaq/admin/react'
+import type { NavEntry, ShellProps } from 'mithaq/admin'
+import { ScreenContext, useAccess, useLocale, useNav, useScreen, useUser } from 'mithaq/admin/react'
 import { holds } from 'mithaq/admin'
 import { currentOf } from 'mithaq-admin/nav-links.tsx'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
@@ -157,7 +159,7 @@ export function PortalShell({ regions }: ShellProps<readonly ['header', 'main'],
           <div className="flex shrink-0 items-center gap-2">
             <LocaleButton />
             {/* The avatar alone: the menu signs out and switches locale too. */}
-            <div className="w-12 [&_[data-slot=avatar]]:bg-[--portal-amber]">
+            <div className="w-12 [&_[data-slot=avatar]]:grayscale-0 [&_[data-slot=avatar-fallback]]:bg-(--portal-amber) [&_[data-slot=avatar-fallback]]:text-[#1B1F24]">
               <UserMenu />
             </div>
           </div>

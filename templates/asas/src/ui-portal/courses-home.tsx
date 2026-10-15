@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { PortalShell, display } from '@asas/courses/portal/ui/portal-shell.tsx'
 import { CardsLoading, Cover, CourseCard, ReadFailed, usePlace } from '@asas/courses/portal/ui/parts.tsx'
 import { byWhen, partOfDay, startsIn, whenOf } from '@asas/courses/portal/ui/portal.ts'
-import { catalogueOf, seatsOf } from '@asas/courses/portal/ui/reads.ts'
+import { catalogueOf, readSeats } from '@asas/courses/portal/ui/reads.ts'
 
 /** How many courses the home offers before its link to the rest. */
 const offered = 3
@@ -29,13 +29,14 @@ export function Home() {
   // The viewer's own seats, whoever it is: an instructor reads every seat, and its next session is still its own.
   const mine = useQuery({
     queryKey: ['portal-mine', user.id],
-    queryFn: () => seatsOf({ client, maxLimit: screen.maxLimit, where: { student: { equals: user.id } } }),
+    queryFn: () => readSeats({ client, maxLimit: screen.maxLimit, where: { student: { equals: user.id } } }),
     enabled: !!user.id,
   })
   const catalogue = useQuery({ queryKey: ['portal-catalogue'], queryFn: () => catalogueOf({ client, maxLimit: screen.maxLimit, now }), staleTime: 30_000 })
   const next = mine.data && byWhen(mine.data, now).upcoming[0]
   const held = new Set(mine.data?.map((one) => String(one.course?.id)))
-  const open = catalogue.data?.courses.filter((course) => !held.has(String(course.id)) && catalogue.data.next.has(String(course.id))).slice(0, offered)
+  // A course the student may enroll itself in, with a session to come, and no seat of its own in it yet.
+  const open = catalogue.data?.courses.filter((course) => course.selfEnroll === true && !held.has(String(course.id)) && catalogue.data.next.has(String(course.id))).slice(0, offered)
   // One sentence per locale, so each says the name where its grammar puts it.
   const greeting = (hour === undefined ? t('portal.welcome', 'Welcome, {name}') : t(`portal.greeting.${partOfDay(hour)}`, 'Hello, {name}'))!.replace('{name}', () => user.name)
   return (

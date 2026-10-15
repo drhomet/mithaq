@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { PortalShell, display } from './portal-shell.tsx'
 import { Cover, Tags, useOption, usePlace } from './parts.tsx'
 import { feeOf, seatsOf, whenOf } from './portal.ts'
-import { byIds, seatsOf as seatsRead } from './reads.ts'
+import { byIds, readSeats } from './reads.ts'
 
 type Session = Row & { seatsLeft?: number | null }
 
@@ -41,7 +41,7 @@ export function Course() {
       const [covers, tags, mine] = await Promise.all([
         byIds({ client, maxLimit: screen.maxLimit, kayan: 'media', ids: typeof course.cover === 'string' ? [course.cover] : [] }),
         byIds({ client, maxLimit: screen.maxLimit, kayan: 'tags', ids: Array.isArray(course.tags) ? course.tags.map(String) : [] }),
-        user.id && course.sessions.length ? seatsRead({ client, maxLimit: screen.maxLimit, where: { and: [{ student: { equals: user.id } }, { session: { in: course.sessions.map((one) => one.id) } }] } }) : [],
+        user.id && course.sessions.length ? readSeats({ client, maxLimit: screen.maxLimit, where: { and: [{ student: { equals: user.id } }, { session: { in: course.sessions.map((one) => one.id) } }] } }) : [],
       ])
       return { course, cover: covers.get(String(course.cover)), tags, mine }
     },

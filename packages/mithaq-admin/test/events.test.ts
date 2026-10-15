@@ -7253,11 +7253,13 @@ const soon = (days: number) => new Date(Date.now() + days * 864e5).toISOString()
 const portalRows = (over: { settings?: Record<string, unknown> | null } = {}) => ({
   courses: [
     { id: 'c1', title: 'Calligraphy', summary: 'First strokes.', fee: 50, currency: 'USD', tags: ['t1'], selfEnroll: true },
-    { id: 'c2', title: 'Python', summary: 'First programs.', fee: 0, currency: 'USD', tags: [] },
+    { id: 'c2', title: 'Python', summary: 'First programs.', fee: 0, currency: 'USD', tags: [], selfEnroll: true },
+    { id: 'c3', title: 'Rhetoric', summary: 'Staff enroll.', fee: 10, currency: 'USD', tags: [] },
   ],
   sessions: [
     { id: 's1', course: 'c1', startsAt: soon(1), venue: 'campus', format: 'workshop', capacity: 10 },
     { id: 's2', course: 'c2', startsAt: soon(5) },
+    { id: 's3', course: 'c3', startsAt: soon(6) },
   ],
   enrollments: [{ id: 'e1', session: 's1', student: 'u1' }, { id: 'e2', session: 's2', student: 'u9' }],
   tags: [{ id: 't1', name: { en: 'Arts', ar: 'فنون' } }],
@@ -7268,7 +7270,7 @@ const portalClient = (rows: ReturnType<typeof portalRows>, asked: { kayan: strin
   (async ({ kayan, operation, input }: { kayan: string; operation: string; input: Record<string, unknown> }) => {
     asked.push({ kayan, operation, input })
     if (kayan === 'settings') return rows.settings
-    if (operation === 'findWithSessions') return { ...rows.courses.find((one) => one.id === input.id), sessions: rows.sessions.map((one) => ({ ...one, seatsLeft: one.id === 's2' ? 0 : 2 })) }
+    if (operation === 'findWithSessions') return { ...rows.courses.find((one) => one.id === input.id), sessions: rows.sessions.filter((one) => one.course === input.id || one.id === 's2').map((one) => ({ ...one, seatsLeft: one.id === 's2' ? 0 : 2 })) }
     if (operation !== 'find') return { id: 'new' }
     const where = input.where as { id?: { in?: string[] }; student?: { equals?: string } } | undefined
     const docs = ((rows as Record<string, unknown>)[kayan] as Record<string, unknown>[] | undefined ?? [])
@@ -7296,7 +7298,7 @@ test('233n. the portal home is the organization\'s, in its own look: its name at
   assert.match(next?.textContent ?? '', /Calligraphy/, 'the next session is its own, of the course it holds a seat in')
   assert.match(next?.textContent ?? '', /Campus · Workshop/, 'with where and how it meets, in the viewer\'s words')
   const joinable = [...host.querySelectorAll('section[aria-labelledby="join"] a[href^="/portal/courses/"]')].map((one) => one.getAttribute('href'))
-  assert.deepEqual(joinable, ['/portal/courses/c2'], 'and offers the course it holds no seat in')
+  assert.deepEqual(joinable, ['/portal/courses/c2'], 'and offers the course it holds no seat in and may enroll itself in, not one its school enrolls')
   assert.ok(host.querySelector('footer a[href="mailto:office@school.test"]'), 'the contact address is at the foot')
   assert.deepEqual([...host.querySelectorAll('nav')].map((one) => one.getAttribute('aria-label')), ['Portal', 'Portal'], 'one nav at the top from md up, one at the foot of a phone')
   assert.equal(host.querySelector('nav a[aria-current="page"]')?.getAttribute('href'), '/portal', 'Home is current on the home')
@@ -7321,7 +7323,7 @@ test('233q. the catalogue draws each course on offer as a card with its tag, nex
   const asked: { kayan: string; operation: string; input: Record<string, unknown> }[] = []
   const host = await drawPortal(createElement(Catalogue), { access: student, client: portalClient(portalRows(), asked), kayan: portalScreen.kayan.courses })
   const cards = () => [...host.querySelectorAll('a[href^="/portal/courses/"]')].map((one) => one.textContent ?? '')
-  assert.equal(cards().length, 2)
+  assert.equal(cards().length, 3)
   assert.match(cards()[0]!, /Arts.*Calligraphy.*First strokes\..*Next session.*\$50\.00/, 'the tag, title, summary, next session and fee')
   assert.match(cards()[1]!, /Free/, 'a fee of nought reads as free')
   assert.deepEqual(asked.find((one) => one.kayan === 'courses')?.input.where, { or: [{ archived: { exists: false } }, { archived: { equals: false } }] }, 'only courses not archived are asked for')
