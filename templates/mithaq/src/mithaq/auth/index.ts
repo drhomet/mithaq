@@ -132,6 +132,14 @@ const authAudit = (line: Record<string, unknown>) => console.log(JSON.stringify(
  */
 export const tenantURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:5173'
 
+// A browser isolates scripts and storage by origin and by nothing finer, so the backoffice on a
+// path of the customer app's origin would put every staff session within reach of any script flaw
+// in the customer app. Two subdomains are two origins.
+const sharedOrigin = URL.parse(backofficeURL)?.origin
+if (backofficeApp && sharedOrigin && sharedOrigin === URL.parse(tenantURL)?.origin) {
+  throw new Error(`BACKOFFICE_URL (${backofficeURL}) and BETTER_AUTH_URL (${tenantURL}) share the origin ${sharedOrigin}. Serve the backoffice on its own origin, such as backoffice.example.com beside app.example.com: browsers isolate by origin (scheme, host and port), so on one origin a script flaw (XSS) in the customer app would reach staff sessions in the backoffice.`)
+}
+
 /**
  * The origins the backoffice instance trusts beside its own `baseURL`: the `vite dev` and `vite
  * preview` ports, outside production only.

@@ -12979,7 +12979,7 @@ test('181c. the backoffice app answers a person who holds no backoffice role exa
 /** A production start needs a mailer; nothing here mails, and the discard port refuses what would. */
 const mailerEnv: Record<string, string> = { RESEND_API_KEY: 're_never_sent', MAIL_FROM: 'mail@example.com', RESEND_BASE_URL: 'http://127.0.0.1:9' }
 
-test('142j. a production boot is refused without BACKOFFICE_URL, BETTER_AUTH_URL or BETTER_AUTH_SECRET, and a live host with no secret set is refused whatever NODE_ENV says', async () => {
+test('142j. a production boot is refused without BACKOFFICE_URL, BETTER_AUTH_URL or BETTER_AUTH_SECRET, a live host with no secret set is refused whatever NODE_ENV says, and so are the two apps on one origin', async () => {
   const provider = new URL('../../mithaq/src/mithaq/auth/index.ts', import.meta.url).href
   const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const { BACKOFFICE_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
@@ -13004,6 +13004,19 @@ test('142j. a production boot is refused without BACKOFFICE_URL, BETTER_AUTH_URL
     const refused = await boot(env)
     assert.notEqual(refused.code, 0, `refused with no NODE_ENV and ${JSON.stringify(env)}`)
     assert.match(refused.stderr, /BETTER_AUTH_SECRET must be set/)
+  }
+  // Two apps on one origin share what a browser isolates, so a script flaw in
+  // the customer app would reach staff sessions; a path or a port spelled out
+  // as the default is still the same origin.
+  for (const [backoffice, tenant] of [
+    ['https://example.com/backoffice', 'https://example.com'],
+    ['https://EXAMPLE.com:443/admin', 'https://example.com/'],
+  ]) {
+    for (const env of [{ NODE_ENV: 'production' }, {}] as Record<string, string>[]) {
+      const refused = await boot({ ...env, BETTER_AUTH_SECRET: 'a-production-secret', BACKOFFICE_URL: backoffice!, BETTER_AUTH_URL: tenant! })
+      assert.notEqual(refused.code, 0, `refused with ${backoffice} beside ${tenant}`)
+      assert.match(refused.stderr, /BACKOFFICE_URL \(.*\) and BETTER_AUTH_URL \(.*\) share the origin https:\/\/example\.com\..*own origin.*backoffice\.example\.com.*script flaw \(XSS\) in the customer app would reach staff sessions/)
+    }
   }
   // The same boot, with the secret set, answers rather than refuses: this
   // guard is only ever about the secret, never about `NODE_ENV` itself.
