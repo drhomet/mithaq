@@ -1,9 +1,11 @@
+import { useRouter } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { localeEntries } from 'mithaq-admin/locale-menu.ts'
-import { locales, switchLocale, type Locale } from './copy.ts'
+import { locales, showLocale, type Locale } from './copy.ts'
 
-/** The language switch for pages without a form: `switchLocale` reloads without asking, so a page with a form must use the user menu, which asks first. */
+/** The language switch of the auth and landing pages, which redraws the page in place, so a form keeps what was typed. */
 export function LocaleSwitch({ locale }: { locale: Locale }) {
+  const router = useRouter()
   return (
     <div className="flex items-center gap-1">
       {localeEntries(locales, locale).map((entry) => (
@@ -14,7 +16,7 @@ export function LocaleSwitch({ locale }: { locale: Locale }) {
           size="xs"
           aria-current={entry.active}
           aria-label={entry.label}
-          onClick={() => switchLocale({ to: entry.locale })}
+          onClick={() => void showLocale({ to: entry.locale, router })}
         >
           <span className="hidden sm:inline">{entry.label}</span>
           <span className="sm:hidden">{entry.locale.toUpperCase()}</span>
@@ -23,4 +25,4 @@ export function LocaleSwitch({ locale }: { locale: Locale }) {
     </div>
   )
 }
-// mithaq-admin 2d3ab739c92c6c2b397041b76bf4b23b2902b7a2 f368446b658a96c18880d9553abb0c09b71aa52808b542dfb023a3788bb99a87
+// mithaq-admin 0.0.0 37e32a32766452cd88389e2e4cc6c246ccc3ccb40bf941f8c1e3835b4e377f98

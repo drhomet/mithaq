@@ -1081,8 +1081,21 @@ export const documentHead = ({ locale, app }: { locale: Locale; app?: string }, 
 }
 
 /**
+ * Sets the cookie the request middleware reads and redraws the page in `to` where it stands, as Payload's language
+ * switch refreshes its router: nothing typed into a form is lost. The root route reads the locale off the document.
+ */
+export const showLocale = async ({ to, router }: { to: string; router: { invalidate(): Promise<unknown> } }) => {
+  const locale = localeOf(to)
+  document.cookie = localeCookieValue(locale)
+  document.documentElement.lang = locale
+  document.documentElement.dir = dirOf(locale)
+  await router.invalidate()
+}
+
+/**
  * Sets the cookie the request middleware reads, then reloads so the server draws the document
- * in it. The unsaved-changes guard is dropped because the shell already asked in its own dialog.
+ * in it: a screen's form is seeded again from whatever row the host hands, so the shell asks before it
+ * drops a change nobody saved, and its own unsaved-changes guard is dropped because the shell already asked.
  */
 export const switchLocale = ({ to }: { to: string }): void => {
   window.onbeforeunload = null

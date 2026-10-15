@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module'
 import { test } from 'node:test'
 import { act, createElement } from 'react'
 import '../../../packages/mithaq-admin/test/tsx.ts'
-import { click, fire, mount, type as typeInto } from '../../../packages/mithaq-admin/test/dom.ts'
+import { click, fire, mount, type as typeInto, window } from '../../../packages/mithaq-admin/test/dom.ts'
 
 registerHooks({
   resolve: (specifier, context, next) =>
@@ -147,6 +147,44 @@ test('the forgot and reset pages say a refusal the provider gives a code or a st
     assert.equal(await refusedWith('/auth/forgot-password', forgot, locale, 429, { message: 'Too many requests. Please try again later.' }, asked), copy.tooManyRequests![locale], `and too many requests in ${locale}`)
     assert.equal(await refusedWith('/auth/reset-password?token=t', reset, locale, 400, { code: 'INVALID_TOKEN', message: 'Invalid token' }, newPassword), copy.tokenInvalid![locale], `the reset page says the token is no good in ${locale}`)
     assert.equal(await refusedWith('/auth/reset-password?token=t', reset, locale, 429, { message: 'Too many requests. Please try again later.' }, newPassword), copy.tooManyRequests![locale], `and too many requests in ${locale}`)
+  }
+})
+
+test('switching the language on the sign-in page keeps what was typed and the refusal shown, and redraws the page in the language chosen with no reload', async (t) => {
+  const reload = t.mock.method(window.location, 'reload', () => {})
+  window.document.documentElement.lang = 'en'
+  // The root reads the locale off the document on the client, as the app's own does.
+  const root = createRootRoute({ beforeLoad: () => { const locale = window.document.documentElement.lang; return { dir: locale === 'ar' ? 'rtl' : 'ltr', locale, app: 'marketing.brand' } }, component: () => createElement(Outlet) })
+  const router = createRouter({
+    history: createMemoryHistory({ initialEntries: ['/auth/sign-in'] }),
+    routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: '/auth/sign-in', beforeLoad: () => ({ password: { min: 8, max: 128 } }), component: signIn })]),
+  })
+  const host = mount()
+  const mounted = createRoot(host)
+  await act(async () => {
+    await router.load()
+    mounted.render(createElement(RouterProvider, { router }))
+  })
+  const fetched = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ code: 'INVALID_EMAIL_OR_PASSWORD' }), { status: 401 })) as typeof fetch
+  try {
+    await act(async () => {
+      typeInto(host.querySelector('#email')!, 'someone@example.com')
+      typeInto(host.querySelector('#password')!, 'a-password-typed')
+    })
+    await act(async () => fire(host.querySelector('form')!, 'submit'))
+    await act(async () => click([...host.querySelectorAll('header button')].find((one) => one.getAttribute('aria-label') === 'العربية')!))
+    assert.equal(reload.mock.callCount(), 0, 'the page is not reloaded')
+    assert.match(window.document.cookie, /locale=ar/, 'the choice is kept for the next request')
+    assert.equal(host.querySelector('h1')?.textContent, scopes.auth!.signIn!.ar, 'the page reads in Arabic')
+    assert.equal((host.querySelector('#email') as HTMLInputElement).value, 'someone@example.com', 'the email typed is kept')
+    assert.equal((host.querySelector('#password') as HTMLInputElement).value, 'a-password-typed', 'and the password')
+    assert.equal(host.querySelector('[role="alert"]')?.textContent, scopes.auth!.invalidCredentials!.ar, 'and the refusal, said again in Arabic')
+  } finally {
+    globalThis.fetch = fetched
+    await act(async () => mounted.unmount())
+    window.document.cookie = 'locale=en; Path=/'
+    window.document.documentElement.lang = 'en'
   }
 })
 
