@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -13,6 +13,19 @@ const staged = join(root, '.pack/mithaq')
 const { publishConfig, private: _private, devDependencies: _dev, scripts: _scripts, ...manifest } = JSON.parse(
   readFileSync(join(source, 'package.json'), 'utf8'),
 ) as { publishConfig: { version: string; exports: Record<string, string> }; exports: Record<string, string>; [key: string]: unknown }
+
+// Committed files only, as the template is staged, so nothing left in the working tree ships.
+const tracked = (...paths: string[]) => execFileSync('git', ['ls-files', '-z', ...paths], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
+const guides = ['packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']
+const skills = 'templates/asas/.claude/skills'
+// The build compiles every `src/**/*.ts` it finds, so a file git does not track there would ship in `dist/`. Release CI
+// checks out clean; this guards a publish from a working tree, over every path staged from the tree.
+const untracked = execFileSync('git', ['ls-files', '-z', '--others', '--exclude-standard', 'packages/mithaq/src', 'LICENSES', ...guides, skills], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
+assert.deepEqual(untracked, [], 'git tracks none of these files: commit or remove each before packing')
+const stageLicenses = (to: string) => {
+  cpSync(join(root, 'LICENSE'), join(to, 'LICENSE'))
+  for (const file of tracked('LICENSES')) cpSync(join(root, file), join(to, file))
+}
 
 rmSync(staged, { recursive: true, force: true })
 execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(source, 'tsconfig.build.json'), '--outDir', join(staged, 'dist')], { stdio: 'inherit' })
@@ -42,13 +55,18 @@ for (const { name, files } of items) for (const { path } of files) assert.ok(exi
 // isolated linker; whether an `npm:` alias satisfies an exact pin is untested. Pin the release version once a consumer
 // installed from the registry proves it.
 writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version }, null, 2)}\n`)
-cpSync(join(root, 'LICENSE'), join(stagedAdmin, 'LICENSE'))
-cpSync(join(root, 'LICENSES'), join(stagedAdmin, 'LICENSES'), { recursive: true })
+stageLicenses(stagedAdmin)
 console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
 
 cpSync(join(root, 'README.md'), join(staged, 'README.md'))
-cpSync(join(root, 'LICENSE'), join(staged, 'LICENSE'))
-cpSync(join(root, 'LICENSES'), join(staged, 'LICENSES'), { recursive: true })
+// The user guides at their repository paths, so each relative link between them resolves as it does on GitHub, and a
+// project's agent reads the ones that match the version it installed. The contributor AGENTS.md files stay out.
+for (const guide of tracked(...guides)) {
+  cpSync(join(root, guide), join(staged, 'docs', guide))
+}
+// The workflow skills a created project carries in `.claude/skills/`, at this version, for an upgrade to copy again.
+for (const file of tracked(skills)) cpSync(join(root, file), join(staged, 'skills', relative(skills, file)))
+stageLicenses(staged)
 console.log(`staged ${staged}`)
 
 // The template as it is at this version, so creating a project reads nothing over the network but the install.
@@ -72,6 +90,5 @@ const { engines, devDependencies: { typescript: _typescript, ...devDependencies 
 writeFileSync(join(creator, 'template/package.json'), `${JSON.stringify({ private: true, type: 'module', engines, workspaces: ['packages/mithaq', 'packages/features/*', 'packages/asas', 'apps/*'], devDependencies }, null, 2)}\n`)
 writeFileSync(join(creator, 'package.json'), `${JSON.stringify({ ...creatorManifest, ...creatorPublished, version: publishConfig.version }, null, 2)}\n`)
 cpSync(join(creatorSource, 'index.js'), join(creator, 'index.js'))
-cpSync(join(root, 'LICENSE'), join(creator, 'LICENSE'))
-cpSync(join(root, 'LICENSES'), join(creator, 'LICENSES'), { recursive: true })
+stageLicenses(creator)
 console.log(`staged ${creator}, with ${templateFiles.length} template files`)

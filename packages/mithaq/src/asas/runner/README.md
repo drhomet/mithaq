@@ -17,6 +17,7 @@ words kayan, rukn, asas, target or operation are new.
 1. **Lay down the tenant target** in `defineMithaq`'s `targets`, under the key
    `tenant`:
 
+   <!-- from: templates/mithaq/src/mithaq.ts -->
    ```ts
    tenant: betterAuthTenant({
      relationTo: 'organization',
@@ -37,8 +38,9 @@ words kayan, rukn, asas, target or operation are new.
    tenant }`, and its `field` is what a kayan places. The template exports a
    labelled copy, under its own word for a tenant:
 
+   <!-- from: templates/mithaq/src/mithaq.ts -->
    ```ts
-   export const { defineKayan, defineGlobal, buildAsas, rows, user, targets: { tenant } } = language
+   export const { defineKayan, defineGlobal, buildAsas, rows, user, generate, locales, targets, targets: { tenant } } = language
 
    export const organization = { ...tenant.field, label: { en: 'Organization', ar: 'المؤسسة' } }
    ```
@@ -67,15 +69,20 @@ A kayan is per-organization when it carries a field bound to the tenant target.
 The binding is the field's `targets: { tenant: true }`, which `tenant.field`
 already carries:
 
+<!-- from: templates/features/tags/tags/tags.ts -->
 ```ts
 export const tags = defineKayan({
   name: 'tags',
+  // ...
   fields: {
     ...defaultFields,
     organization,
-    name: { kind: 'text', label: { en: 'Name', ar: 'الاسم' }, rules: { required: true } },
+    name: {
+      kind: 'text',
+      label: { en: 'Name', ar: 'الاسم' },
+      rules: { localized: true, required: true, trim: true, maxLength: 60, index: true },
+    },
   },
-  targets: { service: { operations: defaultOperations } },
 })
 ```
 
@@ -346,16 +353,26 @@ Where it lives: `packages/mithaq/src/storage/storage.ts` `signReference`,
 A global that places the bound field is one row per organization. Write the
 field `unique` and `globalType` not unique:
 
+<!-- from: templates/features/settings/settings/settings.ts -->
 ```ts
 export const settings = defineGlobal({
   name: 'settings',
   fields: {
     ...defaultFields,
     organization: { ...organization, rules: { ...organization.rules, unique: true } },
-    siteTitle: { kind: 'text', label: { en: 'Site title', ar: 'عنوان الموقع' }, rules: { required: true } },
-    globalType: { ...defaultGlobalFields.globalType, rules: { required: true } },
+    siteTitle: {
+      kind: 'text',
+      label: { en: 'Site title', ar: 'عنوان الموقع' },
+      rules: { required: true, trim: true, maxLength: 120 },
+    },
+    // ...
+    globalType: { ...defaultGlobalFields.globalType, rules: { required: true, defaultValue: 'settings' } },
   },
-  targets: { service: { operations: defaultGlobalOperations } },
+  // ...
+  targets: {
+    service: { operations: defaultGlobalOperations },
+    // ...
+  },
 })
 ```
 

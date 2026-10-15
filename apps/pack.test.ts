@@ -1,0 +1,40 @@
+// What `apps/pack.ts` stages beside the build: the user guides, at their repository paths so a link from one to another
+// resolves inside `node_modules/mithaq/docs/`, where a project's agent reads the guides of the version it installed, and
+// the workflow skills a created project carries. Each from committed files alone.
+import assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
+
+const root = fileURLToPath(new URL('..', import.meta.url))
+const staged = join(root, '.pack/mithaq')
+const packed = spawnSync(process.execPath, ['apps/pack.ts'], { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+assert.equal(packed.status, 0, `apps/pack.ts failed:\n${packed.stdout}\n${packed.stderr}`)
+
+const tracked = (path: string) => execFileSync('git', ['ls-files', path], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean).map((file) => file.slice(path.length + 1)).sort()
+const filesUnder = (folder: string) => readdirSync(join(staged, folder), { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name).slice(join(staged, folder).length + 1)).sort()
+const guides = ['packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']
+
+test('the mithaq package ships each user guide as the repository holds it, and every link between them resolves inside the package', () => {
+  assert.deepEqual(filesUnder('docs'), execFileSync('git', ['ls-files', ...guides], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean).sort(), 'the tracked guides alone, no contributor AGENTS.md')
+  assert.equal(filesUnder('docs').length, guides.length)
+  for (const guide of guides) {
+    const text = readFileSync(join(staged, 'docs', guide), 'utf8')
+    assert.equal(text, readFileSync(join(root, guide), 'utf8'), guide)
+    for (const [, link] of text.matchAll(/\]\((?!https?:|#)([^)#\s]+)/g)) assert.ok(existsSync(join(staged, 'docs', dirname(guide), link!)), `${guide} links ${link}`)
+  }
+  assert.ok((JSON.parse(readFileSync(join(staged, 'package.json'), 'utf8')) as { files: string[] }).files.includes('docs'), 'and npm packs them')
+})
+
+test('the mithaq package ships the workflow skills a created project carries in .claude/skills, at that version', () => {
+  const skills = join(root, 'templates/asas/.claude/skills')
+  for (const skill of readdirSync(skills)) assert.equal(readFileSync(join(staged, 'skills', skill, 'SKILL.md'), 'utf8'), readFileSync(join(skills, skill, 'SKILL.md'), 'utf8'), skill)
+  assert.ok((JSON.parse(readFileSync(join(staged, 'package.json'), 'utf8')) as { files: string[] }).files.includes('skills'), 'and npm packs them')
+})
+
+test('the skills and the license notices staged are exactly the files git tracks there', () => {
+  assert.deepEqual(filesUnder('skills'), tracked('templates/asas/.claude/skills'))
+  assert.deepEqual(filesUnder('LICENSES'), tracked('LICENSES'))
+})

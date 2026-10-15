@@ -14,7 +14,7 @@ You need Bun 1.3, Node.js 24 or later, and PostgreSQL 15 or later. Docker is the
 bun create mithaq my-app
 ```
 
-This copies the template into `my-app`, pins `mithaq` to the published package, and runs `bun install`. If it was not started by Bun, it skips the install and tells you to run `bun install` yourself. Install with Bun only: the admin screens find their files through Bun's isolated installer, and npm, pnpm and yarn lay `node_modules` out differently.
+This copies the template into `my-app`, pins `mithaq` to the published package, and installs with the package manager that ran it (`npm create mithaq my-app` works too). A project installs with npm, pnpm 10.6 or later, Yarn 1 or Bun 1.3; Yarn 2 and later install a copy of mithaq for each workspace of a monorepo, which the build refuses. Started by any other, it skips the install and tells you to run it yourself.
 
 A project starts minimal: the language, the asas, the `auth` feature and the `tags` example. `--full` adds every add-on, the whole worked example this guide walks through, and `--with roles,settings` picks some, each with the add-ons it needs. Asked with neither, it offers minimal, full or pick.
 
@@ -33,7 +33,7 @@ It also asks how the project holds its people, or takes `--organizations`, `--sh
 
 `rich-text` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
 
-What you get is a Bun workspace:
+What you get is a workspace:
 
 | Folder | What it is |
 | --- | --- |
@@ -43,7 +43,7 @@ What you get is a Bun workspace:
 | `apps/asas-tanstack` | The tenant app, built on TanStack Start. It serves the dashboard at `/dashboard` and the portal at `/portal`, on `http://localhost:5173`. |
 | `apps/asas-backoffice` | With the backoffice add-on, the backoffice console, for staff who work across every organization, on `http://localhost:5174`. |
 
-At the root it also writes `bunfig.toml`, which turns on the isolated linker, a `.gitignore`, and a `tsconfig.json`.
+At the root it also writes `AGENTS.md`, `CLAUDE.md` and this guide, `README.md`, for you and a coding agent, the agent's workflow skills in `.claude/`, a `.gitignore`, a `tsconfig.json`, and the settings pnpm and Yarn read (`pnpm-workspace.yaml`, `.yarnrc.yml`).
 
 It writes the same `.env` into `packages/asas`, `apps/asas-tanstack` and `apps/asas-backoffice`, readable only by you:
 
@@ -285,6 +285,10 @@ This runs the lock check, every generator in check mode, and the migration check
 
 ```
 my-app/
+  README.md           this guide
+  AGENTS.md           the rules for a coding agent working in the project
+  CLAUDE.md           one line, @AGENTS.md, so Claude Code reads the same rules
+  .claude/skills/     workflow skills for a coding agent: add a kayan, add a field, eject a piece, upgrade mithaq
   package.json        workspaces packages/mithaq, packages/features/*, packages/asas and apps/*; no scripts
   tsconfig.json       one strict config over every package's .ts and apps/*/src
   .gitignore          node_modules, .env, dist, .storage/
@@ -379,9 +383,6 @@ packages/asas/
   package.json        "asas": exports ".", "./messages/*", "./ui-dashboard/*"; script "seed"
   mithaq.hints.json   the project's answers to "is this a rename?" questions mithaq migrate asks
   mithaq.lock         the signed vocabulary, when the project keeps one
-  README.md           this guide
-  AGENTS.md           the rules for a coding agent working in the project
-  CLAUDE.md           one line, @AGENTS.md, so Claude Code reads the same rules
   .env.example
   src/
     asas.ts           buildAsas: every feature's kayan, globals, HTTP plugs, statements, auth
@@ -769,7 +770,6 @@ No command adds an add-on yet. Make two throwaway projects at your mithaq versio
 ### Tests
 
 - Give tests a throwaway database, named by `DATABASE_URL`, and never the development database. Under `node --test` the template's `packages/mithaq/src/mithaq.ts` refuses to load without `DATABASE_URL`. The mithaq repository's own tests need more; see [CONTRIBUTING.md](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md#set-up).
-- Run with Bun and its isolated linker, which `bun create mithaq` sets in `bunfig.toml`.
 - Put a test beside the code it tests as `<name>.test.ts`, and run it with `node --test`.
 - Write security cases first: the read of another organization's row, the write without the key, the refused input.
 - See each test fail before it passes. Break the property, watch the failure, then restore it.
@@ -801,6 +801,7 @@ A pushed database has no migration history, so it is never a production database
 
 Each app connects once before it serves any request. Both `apps/asas-tanstack/src/server.ts` and `apps/asas-backoffice/src/server.ts` do this:
 
+<!-- from: apps/asas-tanstack/src/server.ts -->
 ```ts
 const { env } = process
 if (env.NODE_ENV === 'production') {
@@ -813,6 +814,7 @@ if (env.NODE_ENV === 'production') {
 
 In production, `connect()` does not push. It checks the migrations instead, as `prodMigrations` on `drizzleAdapter` says. Without `prodMigrations`, a production `connect()` refuses to start. The template sets it in `packages/mithaq/src/mithaq.ts`:
 
+<!-- from: templates/mithaq/src/mithaq.ts -->
 ```ts
 const drizzleStore = drizzleAdapter({
   connectionString,
