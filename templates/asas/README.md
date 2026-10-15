@@ -143,6 +143,8 @@ import { notes } from './notes/notes.ts'
 export const kayan = [notes] as const
 ```
 
+Name `mithaq` in every package by the same spec, with the same peers: two specs, even two paths to one tarball, install two copies, and `buildAsas` refuses a step the other copy sealed.
+
 #### The kayan file
 
 Create `packages/features/notes/notes/notes.ts`:

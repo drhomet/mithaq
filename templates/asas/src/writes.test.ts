@@ -84,6 +84,29 @@ const language = (
     },
   })
 
+test('18a. a step sealed by a second copy of mithaq is refused by name, and no copy can lend this one a seal', async () => {
+  const mithaq = language(memoryStore())
+  const notes = (operations: Record<string, OperationDeclaration>) => () =>
+    mithaq.buildAsas({
+      http: [fetchHttp()],
+      kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: { ...defaultOperations, ...operations } } } })],
+    })
+  // A second instance of the module, as a second install of the package loads it.
+  const copy = await import(new URL('../../../packages/mithaq/src/asas/runner/steps.ts?copy', import.meta.url).href) as { defaultOperations: Record<string, OperationDeclaration> }
+  assert.throws(
+    notes({ create: copy.defaultOperations.create! }),
+    /Kayan "notes" operation "create" holds a step another copy of mithaq sealed, loaded from .*steps\.ts\?copy.*same spec/s,
+  )
+  // A copy that answers for any function still only refuses: this copy recognises its own seals alone.
+  const copies = (globalThis as Record<symbol, Map<string, (step: unknown) => unknown>>)[Symbol.for('mithaq.copies')]!
+  copies.set('forged', () => 'insert')
+  try {
+    assert.throws(notes({ create: op([(ctx) => ctx]) }), /another copy of mithaq sealed, loaded from forged/)
+  } finally {
+    copies.delete('forged')
+  }
+})
+
 test('18. a restated list is sealed, and the one step it holds says what the operation does', async () => {
   const mithaq = language(memoryStore())
   const notes = (operations: Record<string, OperationDeclaration>) => () =>
