@@ -101,12 +101,10 @@ export const auditSink: AuditHandler = async ({ effect, kayan, operation, dataBe
     operation: operation === 'update' && changes._status?.to === 'published' ? 'publish' : operation,
     actor: stringOf(actor?.id) ?? (typeof actor?.command === 'string' ? `${actor.command} (${String(actor.osUser)})` : null),
     impersonatedBy: stringOf(actor?.impersonatedBy),
-    // JSON in a text column, the one it has been since before the language
-    // had a json kind. The log is never ordered by it, and searched by it only
-    // within the kayan its reader reads whole (`reachOf`), since a match in
-    // any other column would tell a value its reader may not read.
-    changes: JSON.stringify(changes),
-    // Each name between two spaces, so a search of one never matches part of another.
-    changed: ` ${Object.keys(changes).join(' ')} `,
+    // The object itself, a jsonb value. The log is never ordered by it, and
+    // searched by it only within the kayan whose columns its reader may be
+    // told of (`reachOf`), since a match in any other would tell a value its
+    // reader may not read.
+    changes,
   } })
 }

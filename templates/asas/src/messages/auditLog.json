@@ -75,25 +75,13 @@
     "ar": "الكل",
     "en": "Any"
   },
-  "changed": {
-    "ar": "الحقول المتغيرة",
-    "en": "Changed columns"
-  },
-  "changed.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "changed.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
   "changes": {
     "ar": "التغييرات",
     "en": "Changes"
   },
   "changes.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+    "ar": "هذه ليست بيانات JSON يقبلها هذا الحقل.",
+    "en": "This is not JSON this field takes."
   },
   "changes.required": {
     "ar": "هذا الحقل مطلوب.",

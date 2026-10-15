@@ -1744,7 +1744,7 @@ test('170. a create\'s audit entry holds only the fields it set, so the Activity
   const { changesOf } = await import('../../../templates/mithaq/src/mithaq/audit-sink.ts')
   const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const row = { id: 'c1', organization: 't1', title: 'Tajweed', fee: 300, summary: null, accessCode: undefined, tags: [], archiveReason: '' }
-  const entry = { id: 'e1', createdAt: new Date(0), operation: 'create', actor: null, changes: JSON.stringify(changesOf({}, row)) }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'create', actor: null, changes: changesOf({}, row) }
   const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, t: copy.t, locale: 'en' }))
   assert.deepEqual([...html.matchAll(/data-change="([^"]+)"/g)].map((hit) => hit[1]), ['title', 'fee'], 'a line for each field the create set, the technical columns left out')
   assert.doesNotMatch(html, /data-from="">—<\/span><span[^>]*>→<\/span><span data-to="">—</, 'and no line reads a dash to a dash')
@@ -1763,7 +1763,7 @@ test('170b. a changed value too long to keep whole is kept as the start of its J
   assert.ok(JSON.stringify(changes).length < keptLength * 2, 'so the entry stays small however large the value')
   const meta = fieldOf({ name: 'meta', kind: 'json' })
   const kayan = { ...courses, fields: [...courses.fields, meta] }
-  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: null, changes: JSON.stringify(changes) }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: null, changes }
   for (const [locale, note] of [['en', 'Too long to keep whole'], ['ar', 'أطول من أن يُحفظ كاملا']] as const) {
     const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan, t: translator(locale), locale }))
     const line = /<li[^>]*data-change="meta"[\s\S]*?<\/li>/.exec(html)?.[0] ?? ''
@@ -1776,7 +1776,7 @@ test('170b. a changed value too long to keep whole is kept as the start of its J
 test('214. the Activity panel names every operation in the viewer\'s locale and a person it may not read in neutral words, never by the raw id', async () => {
   const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
-  const entry = { id: 'e1', createdAt: new Date(0), operation: 'restoreVersion', actor: 'u-hidden', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'restoreVersion', actor: 'u-hidden', changes: { title: { from: 'Old', to: 'New' } } }
   for (const [locale, said] of [['en', 'Restored a version by Someone'], ['ar', 'استُعيد إصدار بواسطة شخص ما']] as const) {
     // The reader holds no key of the provider's people, so the title read answers nothing for the actor.
     const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, titles: new Map([['user:u-hidden', false as const]]), t: translator(locale), locale }))
@@ -1793,7 +1793,7 @@ test('214. the Activity panel names every operation in the viewer\'s locale and 
 test('276a. a command actor reads in the viewer\'s locale for a reader of the people, and as someone for a reader of none', async () => {
   const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
-  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: 'mithaq rbac assign (osuser)', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: 'mithaq rbac assign (osuser)', changes: { title: { from: 'Old', to: 'New' } } }
   const titles = new Map([['user:mithaq rbac assign (osuser)', false as const]])
   for (const [locale, said] of [['en', 'Updated by the command'], ['ar', 'حُدِّث بواسطة الأمر']] as const) {
     const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, titles, people: true, t: translator(locale), locale }))

@@ -4208,7 +4208,7 @@
         },
         {
           "name": "changes",
-          "kind": "text",
+          "kind": "json",
           "label": {
             "en": "Changes",
             "ar": "التغييرات"
@@ -4216,22 +4216,8 @@
           "rules": {
             "required": true
           },
-          "component": "text",
-          "cell": "text",
-          "sortable": false
-        },
-        {
-          "name": "changed",
-          "kind": "text",
-          "label": {
-            "en": "Changed columns",
-            "ar": "الحقول المتغيرة"
-          },
-          "rules": {
-            "required": false
-          },
-          "component": "text",
-          "cell": "text",
+          "component": "json",
+          "cell": "json",
           "sortable": false
         }
       ],

@@ -15,7 +15,7 @@ const { defaultComponents } = await import('mithaq-admin/default-components.tsx'
 const screen = asas.targets.dashboard.client
 const courses = screen.kayan.courses!
 const change = (changes: Record<string, [unknown, unknown]>) =>
-  JSON.stringify(Object.fromEntries(Object.entries(changes).map(([name, [from, to]]) => [name, { from, to }])))
+  Object.fromEntries(Object.entries(changes).map(([name, [from, to]]) => [name, { from, to }]))
 const created = { id: 'e1', createdAt: new Date(Date.now() - 86_400_000).toISOString(), operation: 'create', actor: null, changes: change({ id: [null, 'c1'], title: [null, 'Tajweed'], notifications: [null, false], summary: [null, null] }) }
 const pages: Record<number, Record<string, unknown>[]> = {
   1: [
@@ -143,7 +143,7 @@ test('the panel reads its entries again after every save the form lands, a draft
 
 const { ActivityLog, whereOf, filtersOf } = await import('../../../templates/mithaq/src/ui/activity.tsx')
 
-test('the Activity\'s filters are one `where` the log reads: a search of the values, a person, a column between its spaces, an action and whole days in the viewer\'s time zone', () => {
+test('the Activity\'s filters are one `where` the log reads: a search of the values, a person, a path into the column that changed, an action and whole days in the viewer\'s time zone', () => {
   assert.equal(whereOf({}), undefined, 'no filter, no where')
   const where = whereOf({ kayan: 'courses', record: 'c1', search: ' Tajweed ', actor: 'u2', field: 'fee', action: 'published', from: '2026-10-01', to: '2026-10-02' })
   assert.deepEqual(where, { and: [
@@ -151,7 +151,7 @@ test('the Activity\'s filters are one `where` the log reads: a search of the val
     { record: { equals: 'c1' } },
     { changes: { contains: 'Tajweed' } },
     { actor: { equals: 'u2' } },
-    { changed: { contains: ' fee ' } },
+    { 'changes.fee': { exists: true } },
     { operation: { equals: 'publish' } },
     { createdAt: { greater_than_equal: new Date(2026, 9, 1).toISOString() } },
     { createdAt: { less_than: new Date(2026, 9, 3).toISOString() } },

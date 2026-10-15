@@ -1,4 +1,4 @@
-import { actorPermissions, count, defaultFields, denied, find, findOne, invalid, type Ctx, type Held } from 'mithaq'
+import { actorPermissions, count, defaultFields, defaultJsonMaxBytes, denied, find, findOne, invalid, type Ctx, type Held } from 'mithaq'
 import { defineKayan, rows, organization } from '@asas/mithaq'
 import { backofficeClosed } from '@asas/mithaq/roles/tenant-access.ts'
 import { auditLogName, type Change } from '@asas/mithaq/mithaq/audit-sink.ts'
@@ -48,14 +48,13 @@ const commandActor = /^(.+?) \(.+\)$/
 const visibleChanges = (ctx: Ctx): Ctx => {
   const held = actorPermissions(ctx.actor)
   const trim = (entry: unknown) => {
-    if (!entry || typeof entry !== 'object' || typeof (entry as { changes?: unknown }).changes !== 'string') return entry
-    const { kayan, changes } = entry as { kayan: string; changes: string }
-    const all = JSON.parse(changes) as Record<string, Change>
-    const kept = Object.fromEntries(Object.entries(all).filter(([field]) => readsField(held, kayan, field)))
+    const changes = (entry as { changes?: unknown } | null)?.changes
+    if (!changes || typeof changes !== 'object') return entry
+    const { kayan, actor } = entry as { kayan: string; actor?: unknown }
+    const kept = Object.fromEntries(Object.entries(changes as Record<string, Change>).filter(([field]) => readsField(held, kayan, field)))
     // A command's actor is the command alone to a reader of no people, its operating-system user blanked.
-    const actor = (entry as { actor?: unknown }).actor
     const named = !readsPeople(held) && typeof actor === 'string' ? { actor: commandActor.exec(actor)?.[1] ?? actor } : {}
-    return { ...entry, ...named, changes: JSON.stringify(kept) }
+    return { ...(entry as object), ...named, changes: kept }
   }
   const data: unknown = ctx.data
   const page = data && typeof data === 'object' && Array.isArray((data as { docs?: unknown }).docs) ? (data as { docs: unknown[] }) : undefined
@@ -69,19 +68,17 @@ const visibleChanges = (ctx: Ctx): Ctx => {
 const queryable = new Set(['kayan', 'record', 'createdAt', 'operation', 'actor'])
 
 /**
- * What a change is searched by besides those, never ordered by: its text,
- * `changes`, and the names of the columns it changed, `changed`. Each takes one
- * `contains` alone and reaches only the kayan whose columns it may tell of
- * (`reachOf`), because a match in a column the reader holds no key for would say
- * what that column held before `visibleChanges` trims the page.
+ * What the log is searched by besides those, never ordered by: `changes`, the
+ * whole of each change, or a path into it, `changes.<column>` and deeper. Each
+ * search takes any of the json kind's operators and reaches only the kayan whose
+ * columns it may tell of (`reachOf`), because a match in a column the reader
+ * holds no key for would say what that column held before `visibleChanges`
+ * trims the page.
  */
-const searched = new Set(['changes', 'changed'])
+const searched = 'changes'
 
-/** One column's name between the spaces `changed` holds each in, which is all a search of it may ask. */
-// ponytail: `contains` is the store's ILIKE, so ` title ` also finds a kayan's ` Title `; harmless
-// while no kayan holds two columns differing in case alone, which none does. A case-sensitive
-// operator in the where language is the upgrade.
-const oneColumn = /^ ([A-Za-z_][A-Za-z0-9_]*) $/
+/** The field a `where` key names: `changes.title.to` names `changes`. */
+const fieldOf = (key: string) => key.split('.')[0]!
 
 const namedIn = (where: unknown): string[] => {
   if (!where || typeof where !== 'object') return []
@@ -105,34 +102,29 @@ const columnsOf = (catalog: readonly string[]) => {
 // `where` before a project adds one.
 /**
  * The kayan one search of a change reaches for this actor, or `true` for every
- * one. The text reaches a kayan whose every column the actor reads; a column's
- * name reaches a kayan whose column of that name it reads, since `changed` holds
- * names alone. Anything but one `contains`, and a `changed` naming anything but
- * one column, is refused.
+ * one. The whole change reaches a kayan whose every column the actor reads, since
+ * it matches any of them; a path into one column, `changes.<column>`, a kayan
+ * whose column of that name it reads, since it matches inside that column alone.
  */
-const reachOf = ({ held, catalog }: { held: Held; catalog: readonly string[] }) => (column: string, rules: unknown): true | string[] => {
-  const asked = rules && typeof rules === 'object' ? Object.entries(rules) : []
-  const [operator, value] = asked[0] ?? []
-  const name = column === 'changed' && typeof value === 'string' ? oneColumn.exec(value)?.[1] : undefined
-  if (asked.length !== 1 || operator !== 'contains' || typeof value !== 'string' || (column === 'changed' && name === undefined)) {
-    throw invalid({ message: `Kayan "auditLog" is searched by "${column}" with one "contains" alone${column === 'changed' ? ', of one column\'s name between two spaces' : ''}.`, key: 'error.invalid.where', params: { kayan: 'auditLog', field: column } })
-  }
+const reachOf = ({ held, catalog }: { held: Held; catalog: readonly string[] }) => (key: string): true | string[] => {
   if (held === true) return true
+  const column = key.split('.')[1]
   return [...columnsOf(catalog)]
-    .filter(([kayan, keys]) => held?.has(`${kayan}.find`) && (name === undefined ? keys.every((key) => held.has(key)) : held.has(`${kayan}.fields.${name}`)))
+    .filter(([kayan, keys]) => held?.has(`${kayan}.find`) && (column === undefined ? keys.every((one) => held.has(one)) : held.has(`${kayan}.fields.${column}`)))
     .map(([kayan]) => kayan)
 }
 
 /**
  * The `where` with each search of a change ANDed, where it stands, with the kayan
- * it reaches, so an `or` around it still means what it said.
+ * it reaches, so an `or` around it still means what it said, and a negation, a
+ * `not_equals` or an `exists: false`, still answers no entry past its reach.
  */
-const narrowed = (where: unknown, reach: (column: string, rules: unknown) => true | string[]): unknown => {
+const narrowed = (where: unknown, reach: (key: string) => true | string[]): unknown => {
   if (!where || typeof where !== 'object') return where
   const parts = Object.entries(where).map(([key, value]) => {
     if ((key === 'and' || key === 'or') && Array.isArray(value)) return { [key]: value.map((one) => narrowed(one, reach)) }
-    if (!searched.has(key)) return { [key]: value }
-    const kayans = reach(key, value)
+    if (fieldOf(key) !== searched) return { [key]: value }
+    const kayans = reach(key)
     return kayans === true ? { [key]: value } : { and: [{ [key]: value }, { kayan: { in: kayans } }] }
   })
   return parts.length === 1 ? parts[0] : { and: parts }
@@ -154,9 +146,9 @@ const queriedByQueryable = (ctx: Ctx, tools: { catalog: readonly string[] }): Ct
     throw denied({ message: 'Kayan "auditLog" is read in the active organization alone.', key: 'error.forbidden.read', params: {} })
   }
   const { where, sort } = ctx.data as { where?: unknown; sort?: unknown }
-  const field = namedIn(where).find((name) => !queryable.has(name) && !searched.has(name))
+  const field = namedIn(where).find((name) => !queryable.has(name) && fieldOf(name) !== searched)
   if (field !== undefined) {
-    throw invalid({ message: `Kayan "auditLog" is filtered by ${[...queryable, ...searched].join(', ')} alone, and not by "${field}".`, key: 'error.invalid.where', params: { kayan: 'auditLog', field } })
+    throw invalid({ message: `Kayan "auditLog" is filtered by ${[...queryable, searched].join(', ')} alone, and not by "${field}".`, key: 'error.invalid.where', params: { kayan: 'auditLog', field } })
   }
   const held = actorPermissions(ctx.actor)
   // A reader of no people names an actor in no filter and no sort: a pattern, a range, an order or
@@ -284,11 +276,9 @@ export const auditLog = defineKayan({
     operation: { kind: 'text', label: { en: 'Operation', ar: 'العملية' }, rules: { required: true, maxLength: 60 } },
     actor: { kind: 'text', label: { en: 'Actor', ar: 'المنفذ' } },
     impersonatedBy: { kind: 'text', label: { en: 'Impersonated by', ar: 'انتحل الصفة' } },
-    // Never an order, and searched by `queriedByQueryable`'s rules alone.
-    changes: { kind: 'text', label: { en: 'Changes', ar: 'التغييرات' }, rules: { required: true }, targets: { dashboard: { sortable: false } } },
-    // The names of the columns `changes` holds, each between two spaces, so the
-    // Activity's column filter finds a change of one column without searching a
-    // value. Empty on an entry written before it was.
-    changed: { kind: 'text', label: { en: 'Changed columns', ar: 'الحقول المتغيرة' }, targets: { dashboard: { sortable: false } } },
+    // Each changed column by name, so a search finds the change of one column by
+    // the path `changes.<column>`, which `queriedByQueryable` grades by that
+    // column's key. Never an order, as no json field is.
+    changes: { kind: 'json', label: { en: 'Changes', ar: 'التغييرات' }, maxBytes: defaultJsonMaxBytes, rules: { required: true } },
   },
 })

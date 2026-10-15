@@ -15904,7 +15904,7 @@ test('177. a course\'s create, update, archive and delete each write one audit e
   const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
   const log = asas.kayan.auditLog.operations as unknown as Record<string, ((input: unknown, options: unknown) => Promise<any>) | undefined> & Record<'find' | 'findByID', (input: unknown, options: unknown) => Promise<any>>
   const entriesOf = async (record: string, options: unknown) =>
-    (await log.find({ where: { and: [{ kayan: { equals: 'courses' } }, { record: { equals: record } }] }, sort: '-createdAt' }, options)).docs as { operation: string; actor: string | null; organization: string; changes: string }[]
+    (await log.find({ where: { and: [{ kayan: { equals: 'courses' } }, { record: { equals: record } }] }, sort: '-createdAt' }, options)).docs as { operation: string; actor: string | null; organization: string; changes: Record<string, { from: unknown; to: unknown }> }[]
 
   const course = await courses.operations.create({ title: 'Audited 153', fee: 5 }, owner)
   await courses.operations.update({ id: course.id as string, fee: 7, summary: 'A summary' } as never, owner)
@@ -15914,12 +15914,13 @@ test('177. a course\'s create, update, archive and delete each write one audit e
   assert.deepEqual(entries.map((entry) => entry.operation), ['archive', 'update', 'create'], 'one entry per write that changed the row, newest first')
   assert.equal(entries[0]!.actor, a!.owner.id, 'the actor is the person the write ran as')
   assert.equal(entries[0]!.organization, a!.organization, 'and the entry is the row\'s tenant\'s')
-  const updated = JSON.parse(entries[1]!.changes) as Record<string, { from: unknown; to: unknown }>
+  // The log's own json value, read as the object the sink wrote and never as text to parse.
+  const updated = entries[1]!.changes
   assert.deepEqual(updated.fee, { from: 5, to: 7 }, 'a change holds the value before and after')
   assert.deepEqual(updated.summary, { from: null, to: 'A summary' })
-  assert.deepEqual(JSON.parse(entries[0]!.changes).archiveReason, { from: null, to: 'Done' }, 'archive records what it wrote')
+  assert.deepEqual(entries[0]!.changes.archiveReason, { from: null, to: 'Done' }, 'archive records what it wrote')
   // A create lists the fields it set and none that is empty before and after.
-  const created = JSON.parse(entries[2]!.changes) as Record<string, { from: unknown; to: unknown }>
+  const created = entries[2]!.changes
   assert.deepEqual(created.title, { from: null, to: 'Audited 153' }, 'a create records what it set')
   // Empty is what the Activity panel draws as a dash: none, an empty string or an empty list.
   const blank = (value: unknown) => value === null || value === '' || (Array.isArray(value) && !value.length)
@@ -15935,7 +15936,7 @@ test('177. a course\'s create, update, archive and delete each write one audit e
   await assignRole(a!.organization, registrar.id, 'registrar')
   const graded = await entriesOf(course.id as string, { actor: (await asas.auth.actor(registrar.headers)) as never })
   assert.equal(graded.length, 3, 'the registrar reads every entry of a course')
-  const seen = JSON.parse(graded[1]!.changes) as Record<string, unknown>
+  const seen = graded[1]!.changes
   assert.ok('fee' in seen && !('summary' in seen), `a column it may not read shows neither value: ${Object.keys(seen)}`)
 
   const other = { actor: (await asas.auth.actor(b!.owner.headers)) as never }
@@ -15945,9 +15946,10 @@ test('177. a course\'s create, update, archive and delete each write one audit e
   await assert.rejects(() => log.findByID({ id: ids[0] }, other), notFound, 'an entry of another tenant is not found by id')
 
   await courses.operations.delete({ id: course.id as string }, owner)
-  const written = (await db.execute(`select operation, changes from audit_log where record = '${course.id}' order by created_at`)).rows as { operation: string; changes: string }[]
+  const written = (await db.execute(`select operation, changes, jsonb_typeof(changes) as type from audit_log where record = '${course.id}' order by created_at`)).rows as { operation: string; changes: Record<string, unknown>; type: string }[]
   assert.deepEqual(written.map((row) => row.operation), ['create', 'update', 'archive', 'delete'], 'the delete wrote the fourth entry')
-  assert.deepEqual(JSON.parse(written[3]!.changes).title, { from: 'Audited 153', to: null }, 'and holds what the row held')
+  assert.deepEqual(written[3]!.changes.title, { from: 'Audited 153', to: null }, 'and holds what the row held')
+  assert.deepEqual(written.map((row) => row.type), ['object', 'object', 'object', 'object'], 'each entry a jsonb object, never a string holding JSON')
 
   for (const operation of ['create', 'update', 'delete', 'updateMany', 'deleteMany']) {
     assert.equal(log[operation], undefined, `no ${operation} operation`)
@@ -15961,7 +15963,7 @@ test('177. a course\'s create, update, archive and delete each write one audit e
   assert.equal((await db.execute(`select count(*)::int as n from audit_log where operation = 'forged'`)).rows[0]!.n, 0)
 })
 
-test('177b. the log is read by its kayan, record, time, operation and actor alone, so no filter or sort on a change, however nested, can probe a value the reader may not read, in process or served', async () => {
+test('177b. the log is read by its kayan, record, time, operation and actor, and searched by a change\'s text or a path into one column, so no filter or sort on a change, however nested, can probe a value the reader may not read, in process or served', async () => {
   const [a] = await twoTenants('153b')
   const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
   await courses.operations.update({ id: a!.course, delivery: 'live', accessCode: 'AB1234' } as never, owner)
@@ -15971,25 +15973,35 @@ test('177b. the log is read by its kayan, record, time, operation and actor alon
   await assignRole(a!.organization, registrar.id, 'registrar')
   const reader = { actor: (await asas.auth.actor(registrar.headers)) as never }
   const log = asas.kayan.auditLog.operations as unknown as Record<'find' | 'findByID' | 'count', (input: unknown, options: unknown) => Promise<any>>
-  const probe = '"accessCode":{"from":null,"to":"AB12'
-  // A `contains` over the text reaches only the kayan the reader reads whole, and the registrar
-  // reads no access code, so it finds nothing however the search is nested.
-  for (const where of [{ changes: { contains: probe } }, { or: [{ record: { equals: 'none' } }, { changes: { contains: probe } }] }]) {
-    assert.deepEqual((await log.find({ where }, reader)).docs, [], `the registrar's ${JSON.stringify(where)} answers nothing`)
+  // Every search the json kind takes, of the whole change or of a path into one column, reaches
+  // only the kayan the reader may be told of: the registrar reads no access code, so each finds
+  // nothing of the course however it is nested, while the owner, who reads the code, finds its entry.
+  const ofCourse = (where: unknown) => ({ and: [{ kayan: { equals: 'courses' } }, { record: { equals: a!.course } }, where] })
+  const probes = [
+    { changes: { contains: 'AB12' } },
+    { changes: { like: 'accessCode AB12' } },
+    { 'changes.accessCode': { exists: true } },
+    { 'changes.accessCode.to': { equals: 'AB1234' } },
+    { 'changes.accessCode.to': { contains: 'AB12' } },
+    { 'changes.accessCode.to': { in: ['AB1234'] } },
+    { 'changes.accessCode.from': { exists: false } },
+    { 'changes.accessCode.to': { not_equals: 'ZZ' } },
+    { or: [{ record: { equals: 'none' } }, { 'changes.accessCode.to': { like: 'AB12' } }] },
+  ]
+  for (const where of probes) {
+    assert.deepEqual((await log.find({ where: ofCourse(where) }, reader)).docs, [], `the registrar's ${JSON.stringify(where)} answers nothing`)
+    assert.ok((await log.count({ where: ofCourse(where) }, owner)).totalDocs >= 1, `while the owner's ${JSON.stringify(where)} finds the entry`)
   }
-  assert.equal((await log.count({ where: { changes: { contains: probe } } }, owner)).totalDocs, 1, 'while the owner, who reads the code, finds its entry')
   const refused = [
-    { where: { changes: { like: 'accessCode AB12' } } },
-    { where: { changes: { equals: 'x' } } },
-    { where: { changes: { contains: probe, equals: 'x' } } },
+    { where: { changes: { greater_than: 'x' } } },
+    { where: { 'changes.accessCode.to': { less_than: 'B' } } },
     { where: { changed: { contains: 'accessCode' } } },
-    { where: { changed: { contains: ' accessCode fee ' } } },
-    { where: { changed: { equals: ' accessCode ' } } },
     { sort: 'changed' },
     { where: { impersonatedBy: { exists: true } } },
     { where: { organization: { equals: a!.organization } } },
     { sort: 'changes' },
     { sort: '-changes' },
+    { sort: 'changes.accessCode.to' },
     { sort: 'organization' },
   ]
   for (const input of refused) {
@@ -16005,15 +16017,23 @@ test('177b. the log is read by its kayan, record, time, operation and actor alon
     }))
     assert.equal(served.status, 400, `served, it refuses ${JSON.stringify(input)}`)
   }
+  for (const where of probes) {
+    const served = await asas.handler(new Request('http://test/api/auditLog/find', {
+      method: 'POST',
+      headers: new Headers({ cookie: registrar.headers.get('cookie')!, 'content-type': 'application/json' }),
+      body: JSON.stringify({ where: ofCourse(where) }),
+    }))
+    assert.deepEqual([served.status, ((await served.json()) as { docs: unknown[] }).docs], [200, []], `served, the registrar's ${JSON.stringify(where)} answers nothing`)
+  }
   const one = (await log.find({ limit: 1 }, reader)).docs[0] as { id: string }
-  const byId = await log.findByID({ id: one.id, where: { changes: { like: probe } } }, owner).catch((error: unknown) => error)
+  const byId = await log.findByID({ id: one.id, where: { 'changes.accessCode.to': { equals: 'AB1234' } } }, owner).catch((error: unknown) => error)
   assert.ok(byId instanceof AsasError && byId.status === 400, `findByID refuses a where: ${byId}`)
   const ok = await log.find({ where: { and: [{ kayan: { equals: 'courses' } }, { record: { equals: a!.course } }, { createdAt: { exists: true } }, { or: [{ operation: { equals: 'update' } }, { operation: { equals: 'create' } }] }] }, sort: '-createdAt' }, reader)
-  assert.ok(ok.docs.length > 0 && ok.docs.every((entry: { changes: string }) => !('accessCode' in JSON.parse(entry.changes))), 'the panel\'s read is answered, and holds no access code')
+  assert.ok(ok.docs.length > 0 && ok.docs.every((entry: { changes: object }) => !('accessCode' in entry.changes)), 'the panel\'s read is answered, and holds no access code')
   assert.equal((await log.count({ where: { operation: { equals: 'update' } } }, owner)).totalDocs > 0, true, 'and a count by a column the log is read by')
 })
 
-test('177d. the log is searched by a change\'s text and by the columns it changed, each within the kayan the reader may tell of, by its own tenant alone, a publish is an entry of its own, and a reader without the log\'s key is refused before its search is judged', async () => {
+test('177d. the log is searched by a change\'s text and by a path into the column it changed, each within the kayan the reader may tell of, by its own tenant alone, a publish is an entry of its own, and a reader without the log\'s key is refused before its search is judged', async () => {
   const [a, b] = await twoTenants('177d')
   const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
   const log = asas.kayan.auditLog.operations as unknown as Record<'find' | 'count', (input: unknown, options: unknown) => Promise<any>>
@@ -16029,9 +16049,12 @@ test('177d. the log is searched by a change\'s text and by the columns it change
 
   assert.deepEqual(await found({ changes: { contains: 'needle' } }, owner), ['tags:update', 'courses:update'], 'the owner finds each change holding the text, whatever its case')
   assert.deepEqual(await found({ changes: { contains: 'needle' } }, reader), ['tags:update'], 'the registrar the one in a kayan it reads whole: it reads no course\'s summary')
-  assert.deepEqual(await found({ changed: { contains: ' summary ' } }, owner), ['courses:update'], 'a change of a column is found by its name')
-  assert.deepEqual(await found({ changed: { contains: ' summary ' } }, reader), [], 'by a reader of that column alone')
-  assert.deepEqual(await found({ and: [{ kayan: { equals: 'courses' } }, { changed: { contains: ' fee ' } }] }, reader), ['courses:update', 'courses:create'], 'and a column the registrar reads is found in a kayan it does not read whole')
+  assert.deepEqual(await found({ 'changes.summary': { exists: true } }, owner), ['courses:update'], 'a change of a column is found by its path')
+  assert.deepEqual(await found({ 'changes.summary.to': { contains: 'needle' } }, owner), ['courses:update'], 'and a value it changed to by a path into it')
+  assert.deepEqual(await found({ 'changes.summary': { exists: true } }, reader), [], 'by a reader of that column alone')
+  assert.deepEqual(await found({ 'changes.Summary': { exists: true } }, owner), [], 'by its exact name, not one differing in case')
+  assert.deepEqual(await found({ and: [{ kayan: { equals: 'courses' } }, { 'changes.fee': { exists: true } }] }, reader), ['courses:update', 'courses:create'], 'and a column the registrar reads is found in a kayan it does not read whole')
+  assert.deepEqual(await found({ and: [{ kayan: { equals: 'courses' } }, { 'changes.fee.to': { equals: 9 } }] }, reader), ['courses:update'], 'by the value it changed to')
   const other = { actor: (await asas.auth.actor(b!.owner.headers)) as never }
   assert.deepEqual(await found({ changes: { contains: 'needle' } }, other), [], 'another tenant finds none of it')
 
@@ -16045,7 +16068,7 @@ test('177d. the log is searched by a change\'s text and by the columns it change
   const stranger = await signedUp('stranger-177d')
   await server.api.addMember({ body: { userId: stranger.id, organizationId: a!.organization, role: 'member' } })
   await server.api.setActiveOrganization({ body: { organizationId: a!.organization }, headers: stranger.headers })
-  for (const where of [{ changed: { equals: 1 } }, { changes: { like: 'x' } }, { organization: { equals: a!.organization } }]) {
+  for (const where of [{ 'changes.fee': { equals: 1 } }, { changes: { like: 'x' } }, { organization: { equals: a!.organization } }]) {
     const served = await asas.handler(new Request('http://test/api/auditLog/find', { method: 'POST', headers: new Headers({ cookie: stranger.headers.get('cookie')!, 'content-type': 'application/json' }), body: JSON.stringify({ where }) }))
     assert.equal(served.status, 403, `${JSON.stringify(where)} is refused for the key first`)
   }
@@ -16067,8 +16090,10 @@ test('177e. the log is read in the active organization alone: a read widened to 
   }
   const served = await asas.handler(new Request('http://test/api/auditLog/find?tenant=mine', { method: 'POST', headers: new Headers({ cookie: a!.owner.headers.get('cookie')!, 'content-type': 'application/json' }), body: JSON.stringify({ where: { changes: { contains: 'ZQ7E01' } } }) }))
   assert.equal(served.status, 403, 'and served')
-  assert.deepEqual((await log.find({ where: { changes: { contains: 'ZQ7E01' } } }, { actor })).docs, [], 'a search in the active organization finds nothing of another')
-  assert.equal((await log.count({ where: { changes: { contains: 'ZQ7E01' } } }, bOwner)).totalDocs, 1, 'while B\'s own administrator finds its entry')
+  for (const where of [{ changes: { contains: 'ZQ7E01' } }, { 'changes.accessCode.to': { equals: 'ZQ7E01' } }, { 'changes.accessCode': { exists: true } }]) {
+    assert.deepEqual((await log.find({ where }, { actor })).docs, [], `${JSON.stringify(where)} in the active organization finds nothing of another`)
+    assert.equal((await log.count({ where }, bOwner)).totalDocs, 1, 'while B\'s own administrator finds its entry')
+  }
 })
 
 test('276d. a command actor\'s operating-system user is read by a holder of the people alone, and a reader of none is refused every filter and sort by `actor`', async () => {

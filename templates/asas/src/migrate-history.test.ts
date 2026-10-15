@@ -432,6 +432,81 @@ test('the committed migration keys courses_tags on a database holding its rows, 
   }
 })
 
+const auditJson = '20261015162438_audit_changes_json'
+
+/** Entries as the audit sink wrote them before the log's `changes` was json: its object as JSON text, a cut one among them. */
+const oldEntries = async () => {
+  const { changesOf } = await import('../../mithaq/src/mithaq/audit-sink.ts')
+  const large = { rows: Array.from({ length: 500 }, (_, index) => ({ index, label: `صف ${index} 😀` })) }
+  return [
+    changesOf({ id: 'c1', fee: 5, summary: null }, { id: 'c1', fee: 7, summary: 'A summary' }),
+    changesOf({ id: 'c1', meta: large }, { id: 'c1', meta: { rows: [] } }),
+    changesOf({}, { id: 'c2', title: 'قديم "quoted" \\ 😀', tags: ['a', 'b'], details: { nested: [1, 2.5, true, null] }, createdAt: new Date(0) }),
+    {},
+  ].map((changes, at) => ({ record: `r${at}`, text: JSON.stringify(changes) }))
+}
+
+/** The committed migrations up to the json one, applied, with one organization to own the entries a step writes. */
+const beforeAuditJson = async (root: URL) => {
+  const { folders, migrated, copied } = await committedIn(root)
+  assert.ok(folders.includes(auditJson))
+  assert.equal(await sqlIn(root, 'drop schema public cascade; create schema public; drop schema if exists drizzle cascade;'), 0)
+  await copied(folders.filter((folder) => folder < auditJson))
+  const before = await migrated()
+  assert.equal(before.code, 0, before.output)
+  assert.equal(await sqlIn(root, `insert into organization (id, name, slug, created_at) values ('org-a', 'A', 'a', now())`), 0)
+  const db = drizzle({ connection: { connectionString: migrateEnv.DATABASE_URL!, max: 1 } })
+  const insert = (record: string, text: string) =>
+    db.$client.query(`insert into audit_log (organization_id, kayan, record, operation, changes, changed) values ('org-a', 'courses', $1, 'update', $2, ' x ')`, [record, text])
+  return { db, insert, rest: () => copied(folders.filter((folder) => folder >= auditJson)), migrated }
+}
+
+test('the committed migration turns each audit entry\'s changes from JSON text into the jsonb it held, a cut one among them, every entry equal as JSON to the text it was, and drops the column names it held beside', async () => {
+  await migrateDatabase()
+  const root = await migrationProject(withSummary)
+  const { db, insert, rest, migrated } = await beforeAuditJson(root)
+  try {
+    const entries = await oldEntries()
+    assert.ok(entries[1]!.text.includes('"truncated":true'), 'one entry holds a cut change')
+    for (const { record, text } of entries) await insert(record, text)
+    await rest()
+    const after = await migrated()
+    assert.equal(after.code, 0, after.output)
+    const { rows } = await db.$client.query<{ record: string; changes: unknown; type: string }>(`select record, changes, jsonb_typeof(changes) as type from audit_log order by record`)
+    assert.deepEqual(rows.map((row) => row.record), entries.map((entry) => entry.record), 'every entry is kept')
+    for (const [at, row] of rows.entries()) {
+      assert.equal(row.type, 'object', `${row.record} is a jsonb object, never a string holding JSON`)
+      assert.deepEqual(row.changes, JSON.parse(entries[at]!.text), `${row.record} holds exactly what its text held`)
+    }
+    const { rows: columns } = await db.$client.query<{ name: string; type: string }>(`select column_name as name, data_type as type from information_schema.columns where table_schema = 'public' and table_name = 'audit_log' and column_name in ('changes', 'changed')`)
+    assert.deepEqual(columns, [{ name: 'changes', type: 'jsonb' }], 'the column is jsonb, and the names beside it are gone')
+  } finally {
+    await db.$client.end()
+    await sqlIn(root, resetSchemas)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('the committed migration refuses a database holding an audit entry whose changes is no JSON, naming its count, and changes nothing', async () => {
+  await migrateDatabase()
+  const root = await migrationProject(withSummary)
+  const { db, insert, rest, migrated } = await beforeAuditJson(root)
+  try {
+    await insert('kept', '{"fee":{"from":5,"to":7}}')
+    await insert('broken', '{"fee":{"from":5,')
+    await rest()
+    const refused = await migrated()
+    assert.notEqual(refused.code, 0, 'the migration stops')
+    assert.match(refused.output, /Table audit_log holds 1 row\(s\) whose changes is not JSON, which a jsonb column cannot hold\. Correct or delete each one, then run the migration again\. Nothing was changed\./)
+    const { rows } = await db.$client.query<{ record: string; changes: unknown; changed: string }>(`select record, changes, changed from audit_log order by record`)
+    assert.deepEqual(rows, [{ record: 'broken', changes: '{"fee":{"from":5,', changed: ' x ' }, { record: 'kept', changes: '{"fee":{"from":5,"to":7}}', changed: ' x ' }], 'the text, and the column beside it, are as they were')
+  } finally {
+    await db.$client.end()
+    await sqlIn(root, resetSchemas)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('an existing project moves its history out of drizzle\'s default table without a migrated database ever reading as fresh', async (t) => {
   await migrateDatabase()
   const root = await migrationProject(withSummary)

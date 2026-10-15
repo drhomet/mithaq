@@ -2008,10 +2008,10 @@ test('61. each dashboard edit page draws the record\'s activity beside its form 
   const read = await post('/api/auditLog/find', { where: { and: [{ kayan: { equals: 'courses' } }, { record: { equals: course.id } }] }, sort: '-createdAt', limit: 10, page: 1, depth: 0 }, { cookie })
   assert.equal(read.response.status, 200, JSON.stringify(read.body))
   assert.deepEqual((read.body.docs as { operation: string }[]).map((entry) => entry.operation), ['archive', 'update', 'create'], 'one entry per write, newest first')
-  const fee = JSON.parse((read.body.docs as { changes: string }[])[1]!.changes).fee
+  const fee = (read.body.docs as { changes: Record<string, unknown> }[])[1]!.changes.fee
   assert.deepEqual(fee, { from: 10, to: 20 }, 'the update holds the fee before and after')
   // A create names what it set and no field empty before and after, so the panel draws no line of a dash to a dash.
-  const created = Object.keys(JSON.parse((read.body.docs as { changes: string }[])[2]!.changes) as object)
+  const created = Object.keys((read.body.docs as { changes: object }[])[2]!.changes)
   assert.ok(['title', 'fee', 'delivery', 'currency'].every((name) => created.includes(name)) && !['summary', 'accessCode', 'notifications', 'tags', 'topics'].some((name) => created.includes(name)), `the create's entry lists what it set alone: ${created}`)
   for (const operation of ['create', 'update', 'delete']) {
     const refused = await post(`/api/auditLog/${operation}`, { id: (read.body.docs as { id: string }[])[0]!.id, operation: 'forged' }, { cookie })
@@ -2048,11 +2048,15 @@ test('61. each dashboard edit page draws the record\'s activity beside its form 
     const page = await (await fetch(`${origin}/portal/courses/${course.id}`, { headers: { cookie: `${cookie}; locale=en` } })).text()
     assert.ok(page.includes('That page does not exist.') && !page.includes(String(course.title)), 'a student opening an archived course is drawn not-found')
   })
-  // A change is searched by one `contains` alone, which the server narrows to the kayan its reader reads whole.
-  for (const body of [{ where: { changes: { equals: '"fee"' } } }, { where: { or: [{ record: { equals: course.id } }, { changes: { like: 'fee' } }] } }, { where: { changed: { contains: 'fee' } } }, { sort: 'changes' }, { sort: 'changed' }]) {
+  // A change is searched by the json kind's operators, over its text or a path into one column, and never ordered by.
+  for (const body of [{ where: { changes: { greater_than: 'fee' } } }, { where: { changed: { contains: 'fee' } } }, { sort: 'changes' }, { sort: 'changes.fee' }]) {
     assert.equal((await post('/api/auditLog/find', body, { cookie })).response.status, 400, `the log refuses ${JSON.stringify(body)}`)
   }
-  assert.equal((await post('/api/auditLog/find', { where: { changes: { contains: '"fee"' } } }, { cookie })).response.status, 200, 'and answers a search of a change\'s text')
+  const searched = await post('/api/auditLog/find', { where: { and: [{ record: { equals: course.id } }, { changes: { contains: 'fee' } }] } }, { cookie })
+  assert.equal(searched.response.status, 200, 'and answers a search of a change\'s text')
+  assert.equal((searched.body.docs as unknown[]).length, 2, 'finding the create and the update that set the fee')
+  const byPath = await post('/api/auditLog/find', { where: { and: [{ record: { equals: course.id } }, { 'changes.fee.to': { equals: 20 } }] } }, { cookie })
+  assert.deepEqual((byPath.body.docs as { operation: string }[]).map((entry) => entry.operation), ['update'], 'and a value by a path into its column')
   assert.equal((await post('/api/auditLog/find?tenant=mine', { where: { record: { equals: course.id } } }, { cookie })).response.status, 403, 'and no read widened past the active organization')
 })
 

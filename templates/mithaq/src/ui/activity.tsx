@@ -33,7 +33,7 @@ export type Entry = {
   operation: string
   actor?: string | null
   impersonatedBy?: string | null
-  changes: string
+  changes: Readonly<Record<string, Change>>
 }
 
 /** How many entries the record page's side column draws: the last few, the rest on the Activity page. */
@@ -59,13 +59,7 @@ const recordField = (kayan: string) => ({ name: `record:${kayan}`, kind: 'relati
  */
 const commandOf = /^(.+?) \((.+)\)$/
 
-const changesOf = (entry: Entry): [string, Change][] => {
-  try {
-    return Object.entries(JSON.parse(entry.changes) as Record<string, Change>)
-  } catch {
-    return []
-  }
-}
+const changesOf = (entry: Entry): [string, Change][] => Object.entries(entry.changes ?? {})
 
 const units: [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3_600], ['minute', 60], ['second', 1]]
 
@@ -226,7 +220,7 @@ export const whereOf = (filters: ActivityFilters) => {
     filters.record && { record: { equals: filters.record } },
     filters.search?.trim() && { changes: { contains: filters.search.trim() } },
     filters.actor && { actor: { equals: filters.actor } },
-    filters.field && { changed: { contains: ` ${filters.field} ` } },
+    filters.field && { [`changes.${filters.field}`]: { exists: true } },
     filters.action && Object.hasOwn(actionWheres, filters.action) && actionWheres[filters.action as ActionName],
     from && { createdAt: { greater_than_equal: from } },
     to && { createdAt: { less_than: to } },

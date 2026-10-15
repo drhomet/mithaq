@@ -129,8 +129,7 @@ export type AuditLogValues = {
   operation: string
   actor: string | null
   impersonatedBy: string | null
-  changes: string
-  changed: string | null
+  changes: unknown
 }
 export type Values = {
   courses: CoursesValues
