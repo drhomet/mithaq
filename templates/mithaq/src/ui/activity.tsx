@@ -118,7 +118,7 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
         // A cut change holds JSON text, which no cell of the field's kind reads.
         const drawn = (field: ClientField, value: unknown, change: Change): ReactNode =>
           empty(value) ? '—' : change.truncated
-            ? <code dir="ltr" className="break-all font-mono">{value}</code>
+            ? <code dir="ltr" className="break-all font-mono">{String(value)}</code>
             : cellFor({ cells, field })({ kayan: kayan!, field, value, t, locale, titles })
         const at = new Date(entry.createdAt)
         // Every operation has its words in the log's own scope, in the past
