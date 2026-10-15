@@ -7,7 +7,7 @@ import { mock, test } from 'node:test'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { StrictMode, act, createElement, useLayoutEffect, useState, type ReactElement } from 'react'
 import { asas } from 'asas'
-import { fetchHttp } from 'mithaq'
+import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import { FormContext, ListContext, ScreenContext, useForm, useKayan, useRecord, type ScreenState } from 'mithaq/admin/react'
 import './tsx.ts'
 import { click, fire, mount, press, window, type as typeInto } from './dom.ts'
@@ -456,6 +456,29 @@ test('26. no control reports a change while it is read-only, and every writable 
       }
     }
   }
+})
+
+test('26b. a json box reports what its text parses to, nothing for an emptied box, and text that is no JSON as a value no save takes, keeping the text as typed', async () => {
+  const reported: unknown[] = []
+  const Probe = () => {
+    const [value, setValue] = useState<unknown>({ a: 1 })
+    return createElement(controls.json!, {
+      values: {}, setValue: () => {}, field: { name: 'meta', kind: 'json', rules: {} } as never, kayan: courses, id: 'meta', t, value, readOnly: false,
+      onChange: (next: unknown) => (reported.push(next), setValue(next)),
+    })
+  }
+  const host = await render(createElement(Probe))
+  const box = host.querySelector('textarea')!
+  await act(async () => typeInto(box, '{"a": [1, "two", null]}'))
+  assert.deepEqual(reported.at(-1), { a: [1, 'two', null] })
+  assert.equal(box.value, '{"a": [1, "two", null]}', 'text that parses is left as typed, not rewritten under the caret')
+  await act(async () => typeInto(box, '{"a": '))
+  assert.equal(typeof reported.at(-1), 'symbol', 'no JSON value, so a save is refused and a draft\'s sends no key')
+  assert.equal(box.value, '{"a": ', 'and the text stays for the person to finish')
+  await act(async () => typeInto(box, '  '))
+  assert.equal(reported.at(-1), null)
+  await act(async () => typeInto(box, '"text"'))
+  assert.equal(reported.at(-1), 'text')
 })
 
 test('178d. a date picks off the calendar in the viewer\'s locale and writes the day the column holds; a moment keeps its time when its day changes and its day when its time does', async () => {
@@ -2144,7 +2167,7 @@ test('a datetime the plain text input draws is edited, saved through the fetch p
   // A datetime drawn with the plain `text` control must show the shape the fetch plug decodes back into a `Date`; `String(date)` would be posted and refused by `z.date()`.
   // The operation behind the plug is `sessions.update` with its call replaced by the parse the runner makes first, so no store is needed.
   const update = asas.operations.find((one) => one.kayan === 'sessions' && one.name === 'update')!
-  const plug = fetchHttp()([{ ...update, call: async (input: unknown) => update.input['~standard'].validate(input) }])
+  const plug = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })([{ ...update, call: async (input: unknown) => update.input['~standard'].validate(input) }])
   const answers: Record<string, unknown>[] = []
   const post = async (input: Record<string, unknown>) => {
     const response = await plug.handle(new Request('http://mithaq.test/api/sessions/update', { method: 'POST', body: JSON.stringify(input) }), async () => null)

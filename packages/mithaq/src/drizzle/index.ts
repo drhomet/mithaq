@@ -20,6 +20,7 @@ import {
   type PgEnum,
   type PgDateStringBuilder,
   type PgIntegerBuilder,
+  type PgJsonbBuilder,
   type PgNumericBuilder,
   type PgNumericNumberBuilder,
   type PgSchema,
@@ -96,6 +97,8 @@ type ShippedBuilder<F, List extends Registry, Name> = F extends { kind: 'number'
             ? PgTimestampBuilder
             : F extends { kind: 'date' }
               ? PgDateStringBuilder
+              : F extends { kind: 'json' }
+              ? PgJsonbBuilder
               : F extends { rules: { maxLength: number } }
                 ? PgVarcharBuilder
                 : PgTextBuilder
@@ -322,6 +325,48 @@ const conditionsOf = (column: SQLWrapper, rules: Record<string, unknown>): SQL |
   return checks.length === 1 ? checks[0] : and(...checks)
 }
 
+// Payload's own path, `$[*].a[*].b[*]`: a list at any segment, a list inside a list included, is
+// matched by any of its entries. The path and every value are bound parameters, and each key a
+// quoted jsonpath string, so nothing a caller wrote is read as SQL or jsonpath.
+const jsonConditionsOf = (column: SQLWrapper, path: readonly string[], rules: Record<string, unknown>): SQL | undefined => {
+  const at = `$[*]${path.map((key) => `.${JSON.stringify(key)}[*]`).join('')}`
+  const some = (test: SQL) => sql`exists (select 1 from jsonb_path_query(${column}, ${at}::jsonpath) as item(value) where ${test})`
+  // A JSON `null` is no value, as a SQL `NULL` is: `exists` and `equals: null` read both alike.
+  const present = some(sql`item.value <> 'null'::jsonb`)
+  const text = sql`(item.value #>> '{}')`
+  const equal = (value: unknown) => (value === null ? sql`not ${present}` : some(sql`item.value = ${JSON.stringify(value)}::jsonb`))
+  // One subquery for the whole list, against a hashed set: one per value, or `= any(array)`, compares
+  // every item with every value, which took seconds for a thousand values over 20,000 rows.
+  const listed = (value: unknown) => {
+    const { hasNull, values } = splitNulls(value)
+    const hit = values.length ? some(sql`item.value in (select unnest(${sql.param(values.map((one) => JSON.stringify(one)))}::jsonb[]))`) : sql`false`
+    return hasNull ? or(sql`not ${present}`, hit)! : hit
+  }
+  const checks = Object.entries(rules).map(([operator, value]): SQL | undefined => {
+    switch (operator as Operator) {
+      case 'contains':
+        return some(ilike(text, pattern(String(value))))
+      case 'like': {
+        const words = String(value).trim().split(/\s+/).filter(Boolean)
+        return words.length ? some(and(...words.map((word) => ilike(text, pattern(word))))!) : undefined
+      }
+      case 'equals':
+        return equal(value)
+      case 'not_equals':
+        return value === null ? present : and(present, sql`not ${equal(value)}`)
+      case 'exists':
+        return value ? present : sql`not ${present}`
+      case 'in':
+        return listed(value)
+      case 'not_in':
+        return and(present, sql`not ${listed(value)}`)
+    }
+    // Unreachable past the kind's operators, but never left out of a `where` that carries an access constraint.
+    throw new Error(`Unsupported where operator "${operator}" on a json field.`)
+  })
+  return checks.length === 1 ? checks[0] : and(...checks)
+}
+
 const whereOf = (
   db: Database,
   tables: Tables,
@@ -338,8 +383,13 @@ const whereOf = (
   if (Array.isArray(disjunction)) parts.push(or(...disjunction.map((one) => whereOf(db, tables, kayanByName, name, one))))
   for (const [field, rules] of Object.entries(where)) {
     if (field === 'and' || field === 'or') continue
-    const [ownField, relatedField] = field.split('.')
+    const [ownField, ...path] = field.split('.')
+    const relatedField = path[0]
     const relationField = kayan.fields[ownField!]
+    if (relationField?.kind === 'json') {
+      parts.push(jsonConditionsOf(table[ownField!]!, path, rules as Record<string, unknown>))
+      continue
+    }
     // Whether a versions table's snapshot holds an id in one field, alone or in a set: the delete's
     // reference check asks it, and a caller's read of versions refuses every path before here.
     // Lowered, since a draft keeps a uuid as its writer sent it.

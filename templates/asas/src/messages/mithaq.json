@@ -71,6 +71,14 @@
     "ar": "هذه ليست قائمة عناصر مرتبطة.",
     "en": "This is not a list of related entries."
   },
+  "kinds.json": {
+    "ar": "JSON",
+    "en": "JSON"
+  },
+  "kinds.json.invalid": {
+    "ar": "هذه ليست بيانات JSON يقبلها هذا الحقل.",
+    "en": "This is not JSON this field takes."
+  },
   "kinds.number": {
     "ar": "رقم",
     "en": "Number"

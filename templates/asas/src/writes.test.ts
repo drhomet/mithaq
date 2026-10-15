@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { setTimeout } from 'node:timers/promises'
 import { z } from 'zod'
 import {
+  defaultMaxBodyBytes,
   AsasError,
   AfterCommitError,
   audit,
@@ -88,7 +89,7 @@ test('18a. a step sealed by a second copy of mithaq is refused by name, and no c
   const mithaq = language(memoryStore())
   const notes = (operations: Record<string, OperationDeclaration>) => () =>
     mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: { ...defaultOperations, ...operations } } } })],
     })
   // A second instance of the module, as a second install of the package loads it.
@@ -111,7 +112,7 @@ test('18. a restated list is sealed, and the one step it holds says what the ope
   const mithaq = language(memoryStore())
   const notes = (operations: Record<string, OperationDeclaration>) => () =>
     mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: { ...defaultOperations, ...operations } } } })],
     })
 
@@ -144,7 +145,7 @@ test('19. defaults reads the actor, and a write with none says so', async () => 
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -174,7 +175,7 @@ test('19c. a default reading a key the actor does not carry throws, the way a ro
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -207,7 +208,7 @@ test('19a. transformed zod overrides validate writes and returned rows', async (
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'transformed',
@@ -237,7 +238,7 @@ test('19a. transformed zod overrides validate writes and returned rows', async (
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'bareTransform',
@@ -251,7 +252,7 @@ test('19a. transformed zod overrides validate writes and returned rows', async (
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'nestedBareTransform',
@@ -268,7 +269,7 @@ test('19b. `defaultNow` fills a datetime with the write\'s moment on create, `no
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -314,7 +315,7 @@ test('19b. `defaultNow` fills a datetime with the write\'s moment on create, `no
   )
 
   const dynamic = (field: Kayan['fields'][string]) =>
-    language(memoryStore()).buildAsas({ http: [fetchHttp()], kayan: [{ name: 'dynamic', fields: { id: { kind: 'number' }, stamp: field } }] })
+    language(memoryStore()).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'dynamic', fields: { id: { kind: 'number' }, stamp: field } }] })
   // The two rules sit on the datetime kind's list alone, so any other kind
   // refuses them the way it refuses a rule it never named.
   assert.throws(
@@ -370,7 +371,7 @@ test('19b. `defaultNow` fills a datetime with the write\'s moment on create, `no
   })
   assert.doesNotThrow(() =>
     custom.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         custom.defineKayan({
           name: 'events',
@@ -391,7 +392,7 @@ test('19b. `defaultNow` fills a datetime with the write\'s moment on create, `no
           zod: { ...zodTarget, kinds: { ...zodTarget.kinds, stamp: zodTarget.kinds.datetime } },
           service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
         },
-      }).buildAsas({ http: [fetchHttp()], kayan: [{ name: 'events', fields: { id: { kind: 'number' }, at: { kind: 'stamp', rules: { defaultNow: true } } } }] }),
+      }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'events', fields: { id: { kind: 'number' }, at: { kind: 'stamp', rules: { defaultNow: true } } } }] }),
     /field "at" nested rule "defaultNow" does not match kind "stamp"/,
   )
 })
@@ -412,7 +413,7 @@ test('20. a write that calls another counts the depth and joins the transaction 
   }
   const mithaq = language(store, 2)
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'nodes',
@@ -447,7 +448,7 @@ test('20a. nested writes to another store are rejected while a transaction is op
   const secondStore = memoryStore()
   const secondLanguage = language(secondStore)
   const second = secondLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       secondLanguage.defineKayan({
         name: 'secondNotes',
@@ -463,7 +464,7 @@ test('20a. nested writes to another store are rejected while a transaction is op
   }
   const firstLanguage = language(firstStore)
   const first = firstLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       firstLanguage.defineKayan({
         name: 'firstNotes',
@@ -507,7 +508,7 @@ test('20a1. a top-level managed read receives the context its caller passed, and
   }
   const mithaq = language(store)
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -554,7 +555,7 @@ for (const [key, value] of [['actor', { id: 'forged' }], ['context', { requestId
           targets: { service: { operations: { ...defaultOperations, find: { steps: [record, find] } } } },
         }),
       ],
-      http: [fetchHttp({ onError: () => {} })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })],
     })
     const response = await built.handler(new Request('http://test/api/notes/find', {
       method: 'POST',
@@ -580,7 +581,7 @@ test('20a3a. a served global read whose body carries an id is refused and hands 
         targets: { service: { operations: defaultGlobalOperations } },
       }),
     ],
-    http: [fetchHttp({ onError: () => {} })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })],
   })
   const response = await built.handler(new Request('http://test/api/settings/findOne', {
     method: 'POST',
@@ -596,7 +597,7 @@ test('20a3a. a served global read whose body carries an id is refused and hands 
 test('20a3b. a global\'s read takes a depth and nothing else, so a query it cannot run is refused at the parse', async () => {
   const mithaq = language(memoryStore())
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [],
     global: [
       mithaq.defineGlobal({
@@ -643,8 +644,8 @@ test('20a5. a served call hands every step the context the project\'s own functi
       }),
     ],
     http: [
-      fetchHttp({ context: (request) => fromRequest(request) }),
-      orpcHttp({ api: '/api/orpc', context: (request, actor) => ({ actor, ...fromRequest(request) }) }),
+      fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, context: (request) => fromRequest(request) }),
+      orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc', context: (request, actor) => ({ actor, ...fromRequest(request) }) }),
     ],
   })
   for (const [path, id, rpc] of [
@@ -685,8 +686,8 @@ test('20a6. a served call through a listed plug given no context function, under
   })
   const onError = (error: unknown) => void reported.push(error)
   for (const built of [
-    mithaq.buildAsas({ kayan: [notes], http: [fetchHttp({ onError })] }),
-    mithaq.buildAsas({ kayan: [notes], http: [orpcHttp({ onError })] }),
+    mithaq.buildAsas({ kayan: [notes], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError })] }),
+    mithaq.buildAsas({ kayan: [notes], http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError })] }),
   ]) {
     const response = await built.handler(new Request('http://test/api/notes/find', {
       method: 'POST',
@@ -711,7 +712,7 @@ test('20a4. an override named find on another seal is called with the input and 
   }
   const mithaq = language(memoryStore())
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -746,7 +747,7 @@ test('20b. a store is the target that declares the capability, and one that omit
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, access: allowAccess, targets: { service: { operations: defaultOperations } } })],
       }),
     /The service target names store "memory", which is not a store: a store target declares capability "store"/,
@@ -758,7 +759,7 @@ test('20b. a store is the target that declares the capability, and one that omit
     targets: { memory: declared, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = withCapability.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [withCapability.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, access: allowAccess, targets: { service: { operations: defaultOperations } } })],
   })
   await built.kayan.notes.operations.create({ id: 1, body: 'a declared store' })
@@ -770,7 +771,7 @@ test('20b1. count asks the store aggregate where the store has one, and find wit
 
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -823,7 +824,7 @@ test('20b2. a schema target that declares no derive is refused at buildAsas, nam
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, access: allowAccess, targets: { service: { operations: defaultOperations } } })],
       }),
     /The service target names "shapeless" as its schema target, which declares no derive/,
@@ -835,7 +836,7 @@ test('20b2. a schema target that declares no derive is refused at buildAsas, nam
   assert.throws(
     () =>
       own.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [{ name: 'notes', targets: { service: { schema: 'shapeless' } }, fields: { id: { kind: 'number' } }, access: allowAccess }],
       }),
     /Kayan "notes" names "shapeless" as its schema target, which declares no derive/,
@@ -866,7 +867,7 @@ test('20c. count is a default operation: the method, the table entry, the route 
   })
   const built = mithaq.buildAsas({
     kayan: [mithaq.defineKayan({ name: 'notes', access: allowAccess, fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } })],
-    http: [fetchHttp({ onError: () => {} })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })],
   })
   for (const [id, body] of [[1, 'one'], [2, 'two']] as const) await built.kayan.notes.operations.create({ id, body })
   const notes = built.kayan.notes
@@ -889,7 +890,7 @@ test('20c0. a kayan overrides count with its own list, or leaves it out of its r
   const { count: _count, ...countless } = defaultOperations
   const doubled: ReadStep = async (ctx) => ({ ...ctx, data: { totalDocs: (ctx.data as { totalDocs: number }).totalDocs * 2 } })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -913,7 +914,7 @@ test('20c0. a kayan overrides count with its own list, or leaves it out of its r
   assert.ok(built.kayan.quiet.operations.find, 'find stays where count is off')
   const signedIn = { create: ({ user }: { user: unknown }) => !!user, read: ({ user }: { user: unknown }) => !!user, update: () => true, delete: () => true }
   const renamed = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'picked',
@@ -939,7 +940,7 @@ test('20c1. memory store enforces managed read access and field projection', asy
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -971,7 +972,7 @@ test('20d. memory managed reads compare supported scalar types and stable ties',
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'rows',
@@ -1013,7 +1014,7 @@ test('20d1. a read option the caller wrote badly is refused with 400 and a messa
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'rows',
@@ -1088,7 +1089,7 @@ test('20d2. a kayan with no sortable field can be counted, but a page needs a so
     },
     targets: { service: { operations: defaultOperations } },
   })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [allLocalized] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [allLocalized] })
 
   // The declaration is legal and `buildAsas` takes it, which is what keeps the
   // refusal here rather than there: a write of the kayan runs and stores a row.
@@ -1102,7 +1103,7 @@ test('20d2. a kayan with no sortable field can be counted, but a page needs a so
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'pointsAtIdless',
@@ -1138,13 +1139,13 @@ test('20e. custom language authorize cannot bypass collection access or read con
     targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: async () => undefined }) },
   })
   const denied = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({ name: 'denied', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, access: { create: () => false }, targets: { service: { operations: defaultOperations } } })],
   })
   await assert.rejects(() => denied.kayan.denied.operations.create({ body: 'nope' }), /create access denied/)
 
   const constrained = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1178,7 +1179,7 @@ test('20f. public output schemas run once after field masking for write/read/lis
   const writeStore = memoryStore()
   const writeLanguage = language(writeStore)
   const writeBuilt = writeLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [writeLanguage.defineKayan({ name: 'writeRows', access: allowAccess, fields, targets: { service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, output } } } } })],
   })
   assert.equal((await writeBuilt.kayan.writeRows.operations.create({ id: 1, title: 'public', secret: 'hidden' })).title, 'public:masked')
@@ -1186,7 +1187,7 @@ test('20f. public output schemas run once after field masking for write/read/lis
   const readStore = memoryStore()
   const readLanguage = language(readStore)
   const readBuilt = readLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       readLanguage.defineKayan({
         name: 'readRows',
@@ -1212,7 +1213,7 @@ test('20f. public output schemas run once after field masking for write/read/lis
   const reintroduces = z.object({ title: z.string() }).transform((row) => ({ ...row, secret: 'leaked' }))
   const unsafeLanguage = language(memoryStore())
   const unsafeBuilt = unsafeLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [unsafeLanguage.defineKayan({ name: 'unsafeRows', access: allowAccess, fields, targets: { service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, output: reintroduces } } } } })],
   })
   await assert.rejects(
@@ -1245,7 +1246,7 @@ test('20f1. a function output receives the derived shapes, behaves as the same s
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1323,7 +1324,7 @@ test('20f2. a read step attaches what a nested read returned, and the output fun
       },
     },
   })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [machines, parts] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [machines, parts] })
   await built.kayan.machines.operations.create({ id: 1, title: 'lathe', serial: 'S-1' })
   await built.kayan.machines.operations.create({ id: 2, title: 'press', serial: 'S-2' })
   for (const [id, machine] of [[10, 1], [11, 1], [12, 2]] as const) await built.kayan.parts.operations.create({ id, machine })
@@ -1339,7 +1340,7 @@ test('20f3. a schema target with no validation library runs create, update, find
   const store = memoryStore()
   const mithaq = plainLanguage(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'plainNotes',
@@ -1433,7 +1434,7 @@ test('20f4. an output built from row without omitting a hidden field throws, bec
       },
     },
   })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [machines] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [machines] })
   await built.kayan.machines.operations.create({ id: 1, title: 'lathe', serial: 'S-1' })
   await assert.rejects(() => built.kayan.machines.operations.whole({ id: 1 }), /serial/)
   assert.deepEqual(await built.kayan.machines.operations.visible({ id: 1 }), { id: 1, title: 'lathe' })
@@ -1460,7 +1461,7 @@ test('20f5. a schema that refuses a value and reports no issues still names itse
       },
     },
   })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [notes] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })
   // An empty issue list joins into an empty message, and an Error with no text
   // says nothing at all, so the vendor the schema declares is the fallback.
   await assert.rejects(
@@ -1531,7 +1532,7 @@ test('20g. read operation steps run and custom input validates once', async () =
   }
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1563,7 +1564,7 @@ test('20g6. a field callback judges the value a step wrote, not only the value t
   const raiseFee: Step = (ctx) => ({ ...ctx, data: { ...ctx.data, fee: 500 } })
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1606,7 +1607,7 @@ test('20g6. a field callback judges the value a step wrote, not only the value t
   const second = memoryStore()
   const secondMithaq = language(second)
   const secondBuilt = secondMithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       secondMithaq.defineKayan({
         name: 'notes',
@@ -1637,7 +1638,7 @@ test('20g7. a nested read uses the service depth cap or its default of eight', a
   }
   const mithaq = language(store, 4)
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1658,7 +1659,7 @@ test('20g7. a nested read uses the service depth cap or its default of eight', a
     /Read depth 5 is past the cap of 4: notes\.findByID -> notes\.findByID -> notes\.findByID -> notes\.findByID -> notes\.findByID\.$/,
   )
   const defaultMithaq = language(memoryStore())
-  built = defaultMithaq.buildAsas({ http: [fetchHttp()], kayan: [defaultMithaq.defineKayan({
+  built = defaultMithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [defaultMithaq.defineKayan({
     name: 'notes',
     access: allowAccess,
     fields: { id: { kind: 'number' }, body: { kind: 'text' } },
@@ -1676,7 +1677,7 @@ test('20g8. a custom read operation with the bare validate step takes the id its
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1749,7 +1750,7 @@ test('20g4. steps get user, dataBefore, persisted dataAfter snapshots and bound 
   // A kayan with no delete leaves the bulk made of it out too: nothing drops it.
   const { delete: _delete, deleteMany: _deleteMany, ...withoutDelete } = defaultOperations
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'customers',
@@ -1794,7 +1795,7 @@ test('20g4. steps get user, dataBefore, persisted dataAfter snapshots and bound 
 
   const allowedLanguage = language(memoryStore())
   const allowed = allowedLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       allowedLanguage.defineKayan({
         name: 'snapshots',
@@ -1856,7 +1857,7 @@ test('20g5. read-step bound kayan tools expose only read effects, and a managed 
   }
   const mithaq = language(store)
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1886,7 +1887,7 @@ test('20g1. read authorization runs before custom read/list steps and aliases us
   }
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'guarded',
@@ -1921,7 +1922,7 @@ test('20g2. read admission carries target id before custom steps', async () => {
   }
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'idGuarded',
@@ -1950,7 +1951,7 @@ test('20g3. custom outputs must return row objects', async () => {
   const fields = { id: { kind: 'number' }, title: { kind: 'text' } } satisfies Record<string, Field<keyof typeof defaultKinds, Rules>>
   const scalarLanguage = language(memoryStore())
   const scalar = scalarLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [scalarLanguage.defineKayan({
       name: 'scalarRows',
       access: allowAccess,
@@ -1966,7 +1967,7 @@ test('20g3. custom outputs must return row objects', async () => {
 
   const arrayLanguage = language(memoryStore())
   const array = arrayLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [arrayLanguage.defineKayan({
       name: 'arrayRows',
       access: allowAccess,
@@ -1985,7 +1986,7 @@ test('20h. a steps function runs once and is sealed like a list, and depth is to
   const mithaq = language(memoryStore())
   let runs = 0
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({
       name: 'notes',
       access: allowAccess,
@@ -2019,7 +2020,7 @@ test('20h. a steps function runs once and is sealed like a list, and depth is to
   assert.equal(runs, 1)
   assert.throws(
     () => mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [mithaq.defineKayan({
         name: 'unsealed',
         fields: { id: { kind: 'number' }, body: { kind: 'text' } },
@@ -2035,13 +2036,13 @@ test('20h. a steps function runs once and is sealed like a list, and depth is to
 
   const badDepthLanguage = language(memoryStore(), 0)
   assert.throws(
-    () => badDepthLanguage.buildAsas({ http: [fetchHttp()], kayan: [badDepthLanguage.defineKayan({ name: 'badDepth', fields: { id: { kind: 'number' } }, targets: { service: { operations: defaultOperations } } })] }),
+    () => badDepthLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [badDepthLanguage.defineKayan({ name: 'badDepth', fields: { id: { kind: 'number' } }, targets: { service: { operations: defaultOperations } } })] }),
     /service\.depth must be a positive integer/,
   )
 
   const namedLanguage = language(memoryStore())
   const named = namedLanguage.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [namedLanguage.defineKayan({
       name: 'namedDepth',
       access: allowAccess,
@@ -2065,7 +2066,7 @@ test('21. a step is handed the three writes and no store, and a seal cannot be f
   }
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2093,7 +2094,7 @@ test('21. a step is handed the three writes and no store, and a seal cannot be f
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'notes',
@@ -2115,7 +2116,7 @@ test('22. the runner fills the defaults no list names, and a write entry that is
   const mithaq = language(store)
   const notes = (operations: Record<string, OperationDeclaration>) => () =>
     mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         mithaq.defineKayan({
           name: 'notes',
@@ -2164,7 +2165,7 @@ test('23. the runner never writes into what it was passed, a change with nothing
   }
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2218,7 +2219,7 @@ test('24. the context a step is handed is frozen, so no step can reset the depth
   }
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2255,7 +2256,7 @@ test('25. a write that joins a transaction its outer write has already settled s
   }
   const mithaq = language(store)
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'nodes',
@@ -2282,7 +2283,7 @@ test('26. an addressed operation carries its id inside its one object: update, d
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2321,7 +2322,7 @@ const suppliedNotes = <const Ops extends Record<string, OperationDeclaration>>(
 ) => {
   const mithaq = language(store)
   return mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2429,7 +2430,7 @@ test('29. a field that declares no providedBy is in every shape it was in before
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2450,7 +2451,7 @@ test('30. a field that declares both a defaultValue and a provider other than th
   const mithaq = language(store)
   const built = (rules: Rules) =>
     mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         mithaq.defineKayan({
           name: 'notes',
@@ -2514,7 +2515,7 @@ test('32. a global\'s first update parses against the create shape, so a field n
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [],
     global: [
       mithaq.defineGlobal({
@@ -2601,7 +2602,7 @@ test('34. the timestamps the runner owns are out of both wire shapes, filled by 
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({ name: 'notes', access: allowAccess, fields: { ...defaultFields, body: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } })],
   })
 
@@ -2642,7 +2643,7 @@ test('35. a global\'s globalType is unchanged by the split: the runner writes it
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [],
     global: [
       mithaq.defineGlobal({
@@ -2675,7 +2676,7 @@ test('36. a column called tenant is an ordinary column: the runner keeps no guar
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2726,7 +2727,7 @@ test('37. a language authorize returning a malformed constraint is refused by qu
     },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2753,7 +2754,7 @@ test('37. a language authorize returning a malformed constraint is refused by qu
     targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: async () => undefined }) },
   })
   const plain = open.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [open.defineKayan({ name: 'notes', access: allowAccess, fields: { id: { kind: 'number' }, title: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } })],
   })
   assert.equal((await plain.kayan.notes.operations.find()).totalDocs, 0, 'a language that answers no constraint reads as it always did')
@@ -2785,7 +2786,7 @@ test('38. the three normalizing rules rewrite a value before every narrowing rul
   // `required: false` into every one, and each shape is wrapped before the write reaches it: the
   // wrappers carry the rewrite through, and a localized field is wrapped twice.
   const plainParts = mithaq.defineKayan({ name: 'plainParts', targets: { service: { schema: 'plain', operations: defaultOperations } }, access: allowAccess, fields: { id: { kind: 'number' }, ...fields } })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [parts, plainParts] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [parts, plainParts] })
 
   for (const [target, kayan] of [
     ['zod', built.kayan.parts],
@@ -2845,7 +2846,7 @@ test('104. a bulk over more rows than the ceiling is refused under its own key b
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2916,7 +2917,7 @@ test('109. every shipped list is one word, and the runner fills the defaults, pa
   const store = memoryStore()
   const mithaq = slotted(store, { audit: (entry) => void entries.push(entry) })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2964,7 +2965,7 @@ test('110. an operation that names input parses the caller\'s own shape, and the
     return { ...ctx, data: { ...ctx.data, archived: true, archiveReason: reason } }
   }
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -3016,7 +3017,7 @@ test('111. a list that writes defaults, validate or audit is refused at buildAsa
   const mithaq = slotted(memoryStore())
   const notes = (operations: Record<string, OperationDeclaration>) => () =>
     mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: { ...defaultOperations, ...operations } } } })],
     })
 
@@ -3046,7 +3047,7 @@ test('112. a store or managed read step outside steps is refused by name, on an 
   const withSlots = (slots: Parameters<typeof slotted>[1]) => () => {
     const mithaq = slotted(store, slots)
     return mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } })],
     })
   }
@@ -3078,7 +3079,7 @@ test('112. a store or managed read step outside steps is refused by name, on an 
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'notes',
@@ -3096,7 +3097,7 @@ test('112. a store or managed read step outside steps is refused by name, on an 
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'notes',
@@ -3115,7 +3116,7 @@ test('112. a store or managed read step outside steps is refused by name, on an 
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'notes',
@@ -3136,7 +3137,7 @@ test('112. a store or managed read step outside steps is refused by name, on an 
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [
           mithaq.defineKayan({
             name: 'notes',
@@ -3153,7 +3154,7 @@ test('113. beforeTransaction and afterCommit on a read are refused by name, beca
   const mithaq = slotted(memoryStore())
   const notes = (operations: Record<string, OperationDeclaration>) => () =>
     mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' } }, targets: { service: { operations: { ...defaultOperations, ...operations } } } })],
     })
   const mark: Step = (ctx) => ctx
@@ -3177,7 +3178,7 @@ test('114. afterSteps on one operation replaces the service target\'s, so a list
   const store = memoryStore()
   const mithaq = slotted(store, { audit: (entry) => void entries.push(entry.operation) })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -3266,7 +3267,7 @@ test('115. a step outside the transaction writes through tools.of in a transacti
     targets: { service: { operations: defaultOperations } },
   })
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -3353,7 +3354,7 @@ test('116. every queued afterCommit runs even when one throws, and the first err
   }
   const mithaq = language(store)
   built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -3408,7 +3409,7 @@ test('a committed write returns its original body and a warning on both HTTP plu
         },
       },
     })],
-    http: [fetchHttp({ onError: (error) => void reported.push(error) }), orpcHttp({ api: '/api/orpc', onError: (error) => void reported.push(error) })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => void reported.push(error) }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc', onError: (error) => void reported.push(error) })],
   })
   for (const [path, id, rpc] of [
     ['/api/notes/create', 1, false],
@@ -3441,7 +3442,7 @@ test('a write whose afterCommit did not fail answers the header ok on both HTTP 
       fields: { id: { kind: 'number' }, body: { kind: 'text' } },
       targets: { service: { operations: { ...defaultOperations, latest: defaultOperations.find } } },
     })],
-    http: [fetchHttp({ onError: () => {} }), orpcHttp({ api: '/api/orpc', onError: () => {} })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc', onError: () => {} })],
   })
   for (const [prefix, rpc] of [['/api', false], ['/api/orpc', false], ['/api/rpc', true]] as const) {
     const post = async (operation: string, input: unknown) => {
@@ -3498,7 +3499,7 @@ test('a nested write whose afterCommit throws never answers the outer operation 
         },
       }),
     ],
-    http: [fetchHttp({ onError: () => {} }), orpcHttp({ api: '/api/orpc', onError: () => {} })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc', onError: () => {} })],
   })
   for (const [path, id, rpc] of [
     ['/api/notes/create', 1, false],
@@ -3551,7 +3552,7 @@ test('a nested bulk whose afterCommit throws never answers the outer operation a
         },
       }),
     ],
-    http: [fetchHttp({ onError: () => {} })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })],
   })
   await built.kayan.tags.operations.create({ id: 1, body: 'before' })
   const response = await built.handler(new Request('http://test/api/notes/create', {
@@ -3571,7 +3572,7 @@ test('a bulk afterCommit failure reports its committed docs while transaction fa
   const fail: Step = () => { throw new Error('later failed') }
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({
       name: 'notes',
       access: allowAccess,
@@ -3628,7 +3629,7 @@ test('117. a service target a project wrote in the capability\'s shape runs an o
   }
   const mithaq = defineMithaq({ arkan: [base], targets: { memory: store, zod: zodTarget, service: own } })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -3664,7 +3665,7 @@ test('117. a service target a project wrote in the capability\'s shape runs an o
       () =>
         (defineMithaq({ arkan: [base], targets: { memory: memoryStore(), zod: zodTarget, service: short } } as never) as unknown as {
           buildAsas: (args: { kayan: Kayan[]; http: unknown[] }) => unknown
-        }).buildAsas({ http: [fetchHttp()], kayan: [{ name: 'notes', fields: { id: { kind: 'number' } } }] }),
+        }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'notes', fields: { id: { kind: 'number' } } }] }),
       new RegExp(`The service target declares no "${member}", and every build's runner has one\\. Add it to serviceTarget\\(\\{ \\.\\.\\. \\}\\)\\.`),
     )
   }
@@ -3677,7 +3678,7 @@ test('117. a service target a project wrote in the capability\'s shape runs an o
     [{ maxLimit: 2.5 }, /service\.maxLimit must be a positive integer\./],
   ] as const) {
     assert.throws(
-      () => defineMithaq({ arkan: [base], targets: { memory: memoryStore(), zod: zodTarget, service: { ...own, ...change } } }).buildAsas({ http: [fetchHttp()], kayan: [] }),
+      () => defineMithaq({ arkan: [base], targets: { memory: memoryStore(), zod: zodTarget, service: { ...own, ...change } } }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [] }),
       refusal,
     )
   }
@@ -3692,7 +3693,7 @@ test('118. a kayan\'s own afterSteps function is handed the service target\'s li
   }
   const mithaq = slotted(memoryStore(), { audit: (entry) => void entries.push(entry.operation) })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -3746,7 +3747,7 @@ test('123. tools.of(kayan) is the bound kayan tools.kayans holds under its name:
     fields: { id: { kind: 'number' }, body: { kind: 'text', rules: { required: true } } },
     targets: { service: { operations: { ...defaultOperations, create: { steps: [insert, nest] } } } },
   })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [children, parents] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [children, parents] })
 
   await built.kayan.parents.operations.create({ id: 1, body: 'outer' }, { actor: { id: 'u1' }, context: { requestId: 'r1' } })
   assert.deepEqual(seen, [{ id: 'u1' }, 'r1', 2], 'the nested write ran under the outer actor and context, one deeper')
@@ -3766,7 +3767,7 @@ test('123a. a write through tools.of past the depth cap is refused by name', asy
     fields: { id: { kind: 'number' }, body: { kind: 'text', rules: { required: true } } },
     targets: { service: { operations: { ...defaultOperations, create: { steps: [insert, deeper] } } } },
   })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [nodes] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [nodes] })
   await assert.rejects(
     () => built.kayan.nodes.operations.create({ body: 'root' }),
     /Write depth 3 is past the cap of 2: nodes\.create -> nodes\.create -> nodes\.create/,
@@ -3823,7 +3824,7 @@ test('123b. a read step\'s tools.of holds the read operations alone, and tools.o
     return ctx
   }
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [notes, mithaq.defineKayan({
       name: 'readers',
       access: allowAccess,
@@ -3862,7 +3863,7 @@ test('124. a resolved kayan\'s access and a resolved field\'s access are frozen 
     },
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [posts, authors] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [posts, authors] })
 
   // Server code holding only `asas.kayan.posts` reaches the related kayan through its relationship
   // field.
@@ -3892,7 +3893,7 @@ test('125. a field\'s `pattern` RegExp is left unfrozen by the freeze after buil
     access: allowAccess,
     targets: { service: { operations: defaultOperations } },
   })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [codes] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [codes] })
   assert.equal(Object.isFrozen(code), false, 'a RegExp in rules is not frozen')
   assert.ok(Object.isFrozen(codes.fields.code.rules), 'while the rules holding it are')
   // zod resets `lastIndex` on every parse, so the second write is the one a
@@ -3917,7 +3918,7 @@ test('126. a relationship write refuses an id the target\'s read access hides fr
   const mithaq = language(store)
   const ownOrganization = ({ user }: { user: unknown }) => ({ org: { equals: (user as { activeOrganizationId: string }).activeOrganizationId } })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'people',
@@ -4007,7 +4008,7 @@ test('160a. minRows and maxRows bound a list on either schema target, Payload\'s
   } satisfies Record<string, Field<keyof typeof defaultKinds, Rules>>
   const lists = mithaq.defineKayan({ name: 'lists', access: allowAccess, fields: { id: { kind: 'number' }, ...fields }, targets: { service: { operations: defaultOperations } } })
   const plainLists = mithaq.defineKayan({ name: 'plainLists', targets: { service: { schema: 'plain', operations: defaultOperations } }, access: allowAccess, fields: { id: { kind: 'number' }, ...fields } })
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [lists, plainLists] })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [lists, plainLists] })
   let id = 0
   for (const [target, kayan, name] of [
     ['zod', built.kayan.lists, 'lists'],
@@ -4039,7 +4040,7 @@ test('160a. minRows and maxRows bound a list on either schema target, Payload\'s
   // like a `min` above its `max`, and a bound on a kind that holds no list is
   // refused by the kind.
   const dynamic = (field: Kayan['fields'][string]) =>
-    language(memoryStore()).buildAsas({ http: [fetchHttp()], kayan: [{ name: 'dynamic', fields: { id: { kind: 'number' }, value: field } }] })
+    language(memoryStore()).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'dynamic', fields: { id: { kind: 'number' }, value: field } }] })
   assert.throws(
     () => dynamic({ kind: 'textArray', rules: { minRows: 3, maxRows: 2 } }),
     /field "value" declares "minRows" 3 and "maxRows" 2, and no value is both at once/,
@@ -4069,12 +4070,12 @@ test('161a. a row stored before a stricter rule was declared still reads on eith
     mithaq.defineKayan({ name: 'zodRows', access: allowAccess, fields: { id: { kind: 'number' }, ...fields }, targets: { service: { operations: defaultOperations } } }),
     mithaq.defineKayan({ name: 'plainRows', access: allowAccess, fields: { id: { kind: 'number' }, ...fields }, targets: { service: { schema: 'plain', operations: defaultOperations } } }),
   ]
-  const earlier = mithaq.buildAsas({ http: [fetchHttp()], kayan: both(loose) })
+  const earlier = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: both(loose) })
   const stored = { id: 1, tags: ['a', 'b', 'c'], keys: ['a'], code: 'toolong' }
   await earlier.kayan.zodRows.operations.create(stored as never)
   await earlier.kayan.plainRows.operations.create(stored as never)
 
-  const later = mithaq.buildAsas({ kayan: both(strict), http: [fetchHttp({ onError: () => {} })] })
+  const later = mithaq.buildAsas({ kayan: both(strict), http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })] })
   const served = (path: string, body: unknown) =>
     later.handler(new Request(`http://test/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
   for (const name of ['zodRows', 'plainRows'] as const) {
@@ -4137,12 +4138,12 @@ test('164a. a row holding an option the kayan has since removed reads as stored 
     mithaq.defineKayan({ name: 'zodOptions', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } }),
     mithaq.defineKayan({ name: 'plainOptions', access: allowAccess, fields, targets: { service: { schema: 'plain', operations: defaultOperations } } }),
   ]
-  const earlier = mithaq.buildAsas({ http: [fetchHttp()], kayan: both(fieldsOf('draft', 'live', 'archived')) })
+  const earlier = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: both(fieldsOf('draft', 'live', 'archived')) })
   const stored = { id: 1, status: 'archived', tags: ['draft', 'archived'] }
   await earlier.kayan.zodOptions.operations.create(stored as never)
   await earlier.kayan.plainOptions.operations.create(stored as never)
 
-  const later = mithaq.buildAsas({ kayan: both(fieldsOf('draft', 'live')), http: [fetchHttp({ onError: () => {} })] })
+  const later = mithaq.buildAsas({ kayan: both(fieldsOf('draft', 'live')), http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })] })
   const served = (path: string, body: unknown) =>
     later.handler(new Request(`http://test/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
   for (const name of ['zodOptions', 'plainOptions'] as const) {
@@ -4183,7 +4184,7 @@ test('164b. a stored row that is not of its kind is a server fault on either sch
       mithaq.defineKayan({ name: 'zodBroken', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } }),
       mithaq.defineKayan({ name: 'plainBroken', access: allowAccess, fields, targets: { service: { schema: 'plain', operations: defaultOperations } } }),
     ],
-    http: [fetchHttp({ onError: (error) => void reported.push(error) }), orpcHttp({ api: '/api/orpc', onError: (error) => void reported.push(error) })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => void reported.push(error) }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc', onError: (error) => void reported.push(error) })],
   })
   // Written past the runner, the way a row reaches a table from a script or
   // an old release: a number where the kind holds text.
@@ -4225,7 +4226,7 @@ test('160b. a list kind takes a list as its default, the empty one included, and
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'defaults',
@@ -4245,7 +4246,7 @@ test('160b. a list kind takes a list as its default, the empty one included, and
   assert.deepEqual(second.some, ['a', 'b', 'c'], 'and each row its own copy of it')
 
   const dynamic = (field: Kayan['fields'][string]) =>
-    language(memoryStore()).buildAsas({ http: [fetchHttp()], kayan: [{ name: 'dynamic', fields: { id: { kind: 'number' }, value: field } }] })
+    language(memoryStore()).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ name: 'dynamic', fields: { id: { kind: 'number' }, value: field } }] })
   assert.throws(() => dynamic({ kind: 'text', rules: { defaultValue: ['a'] } as never }), /field "value" nested rule "defaultValue" does not match kind "text"/)
   assert.throws(() => dynamic({ kind: 'textArray', rules: { defaultValue: [1] } as never }), /field "value" nested rule "defaultValue" does not match kind "textArray"/)
 })
@@ -4263,7 +4264,7 @@ test('132. a kayan keeps versions only where the language declares them, and dra
       } as never,
     })
   const build = (mithaq: ReturnType<typeof versioned>, kayan: Record<string, unknown>) => () =>
-    mithaq.buildAsas({ http: [fetchHttp()], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' } }, ...kayan } as never)] })
+    mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' } }, ...kayan } as never)] })
   const operations = { service: { operations: { ...defaultOperations, ...versionOperations } } }
 
   assert.throws(
@@ -4281,7 +4282,7 @@ test('132. a kayan keeps versions only where the language declares them, and dra
   assert.throws(
     () => {
       const mithaq = versioned()
-      mithaq.buildAsas({ http: [fetchHttp()], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' }, ...draftFields }, targets: { ...operations, versions: { drafts: { autosave: { interval: 0 } } } } } as never)] })
+      mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' }, ...draftFields }, targets: { ...operations, versions: { drafts: { autosave: { interval: 0 } } } } } as never)] })
     },
     /Kayan "notes" writes "targets\.versions" with an autosave interval of 0/,
   )
@@ -4292,20 +4293,20 @@ test('132. a kayan keeps versions only where the language declares them, and dra
   assert.throws(
     () => {
       const mithaq = versioned('plain')
-      mithaq.buildAsas({ http: [fetchHttp()], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' }, ...draftFields }, targets: { ...operations, versions: { drafts: true } } } as never)] })
+      mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' }, ...draftFields }, targets: { ...operations, versions: { drafts: true } } } as never)] })
     },
     /Kayan "notes" keeps drafts, and its schema target "plain" derives no draft shape/,
   )
   assert.throws(
     () => {
       const mithaq = versioned()
-      mithaq.buildAsas({ http: [fetchHttp()], kayan: [], global: [mithaq.defineGlobal({ name: 'notes', fields: { ...defaultFields, ...defaultGlobalFields }, targets: { service: { operations: defaultGlobalOperations }, versions: {} } } as never)] })
+      mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [], global: [mithaq.defineGlobal({ name: 'notes', fields: { ...defaultFields, ...defaultGlobalFields }, targets: { service: { operations: defaultGlobalOperations }, versions: {} } } as never)] })
     },
     /Kayan "notes" writes "targets\.versions", and a global keeps no versions/,
   )
   assert.doesNotThrow(() => {
     const mithaq = versioned()
-    mithaq.buildAsas({ http: [fetchHttp()], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' }, ...draftFields }, targets: { ...operations, versions: { drafts: { autosave: true } } } } as never)] })
+    mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [mithaq.defineKayan({ name: 'notes', fields: { ...defaultFields, body: { kind: 'text' }, ...draftFields }, targets: { ...operations, versions: { drafts: { autosave: true } } } } as never)] })
   })
 })
 
@@ -4320,7 +4321,7 @@ test('132m. a kayan keeping versions has a uuid id, since a version is addressed
     } as never,
   })
   assert.throws(
-    () => mithaq.buildAsas({ http: [fetchHttp()], kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: { ...defaultOperations, ...versionOperations } }, versions: {} } } as never)] }),
+    () => mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' }, body: { kind: 'text' } }, targets: { service: { operations: { ...defaultOperations, ...versionOperations } }, versions: {} } } as never)] }),
     /Kayan "notes" writes "targets\.versions", and its id is of kind "number"/,
   )
 })
@@ -4357,7 +4358,7 @@ test('185. a richText value is Lexical\'s editor state, walked and then parsed w
       mithaq.defineKayan({ name: 'zodNotes', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } }),
       mithaq.defineKayan({ name: 'plainNotes', access: allowAccess, fields, targets: { service: { schema: 'plain', operations: defaultOperations } } }),
     ],
-    http: [fetchHttp({ onError: () => {} }), orpcHttp({ api: '/api/orpc', onError: () => {} })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc', onError: () => {} })],
   })
   const callout = (tone: string, text: string) => ({ root: { type: 'root', children: [{ type: 'callout', tone, version: 1, direction: null, format: '', indent: 0, children: [{ type: 'paragraph', children: [{ type: 'text', text, format: 0, detail: 0, mode: 'normal', style: '' }] }] }] } })
   const linkTo = (url: string) => ({ root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'link', url, children: [{ type: 'text', text: 'here' }] }] }] } })
@@ -4439,7 +4440,7 @@ test('185. a richText value is Lexical\'s editor state, walked and then parsed w
   }
 
   const defaults = defineMithaq({ arkan: [base, richTextRukn({ nodes: defaultNodes })], targets })
-  const plain = defaults.buildAsas({ http: [fetchHttp()], kayan: [defaults.defineKayan({ name: 'odd', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } })] })
+  const plain = defaults.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [defaults.defineKayan({ name: 'odd', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } })] })
   const without = await plain.kayan.odd.operations.create({ id: 1, details: callout('info', 'x'), lead: richText('Lead') } as never).catch((error: unknown) => error)
   assert.ok(without instanceof AsasError && without.status === 400, 'a rukn over the default list refuses the callout')
 })
@@ -4450,7 +4451,7 @@ test('185i. a draft of a required rich text field may be blank, since required i
     targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({
       name: 'notes',
       access: allowAccess,
@@ -4478,7 +4479,7 @@ test('223c. the memory store gives each version row an id of its own, so every s
     targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({
       name: 'notes',
       access: allowAccess,
@@ -4509,7 +4510,7 @@ test('266. on a drafts kayan whose findVersions is row-limited, a row it does no
     targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({
       name: 'notes',
       access: allowAccess,
@@ -4580,7 +4581,7 @@ test('205. a bulk call checks its key and access before beforeTransaction, so a 
     store.rows.set('notes', [{ id: 1, body: 'kept' }])
     const mithaq = language(store)
     return mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         mithaq.defineKayan({
           name: 'notes',
@@ -4629,7 +4630,7 @@ test('207. the page a read opens with, the most a served read may ask for, a joi
     },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp(), orpcHttp({ api: '/api/orpc' })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
     kayan: [
       mithaq.defineKayan({
         name: 'parents',
@@ -4694,7 +4695,7 @@ test('207. the page a read opens with, the most a served read may ask for, a joi
 
   const joined = (parentField: Record<string, unknown>, kidField: Record<string, unknown> = {}) => () =>
     mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         mithaq.defineKayan({ name: 'parents', fields: { id: { kind: 'number' }, kids: parentField as never }, targets: { service: { operations: defaultOperations } } }),
         mithaq.defineKayan({ name: 'kids', fields: { id: { kind: 'number' }, parent: { kind: 'relationship', relationTo: 'parents', ...kidField } as never }, targets: { service: { operations: defaultOperations } } }),
@@ -4714,7 +4715,7 @@ test('207. the page a read opens with, the most a served read may ask for, a joi
   })
   assert.throws(
     () => negative.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         negative.defineKayan({ name: 'parents', fields: { id: { kind: 'number' }, kids: { kind: 'join', relationTo: 'kids', on: 'parent', defaultLimit: 1 } }, targets: { service: { operations: defaultOperations } } }),
         negative.defineKayan({ name: 'kids', fields: { id: { kind: 'number' }, parent: { kind: 'relationship', relationTo: 'parents' } }, targets: { service: { operations: defaultOperations } } }),
@@ -4738,7 +4739,7 @@ test('251. an operation\'s own input key that shares a join\'s name is never rea
     return find(args)
   }) as typeof find
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'parents',
@@ -4794,7 +4795,7 @@ test('241. a join reads its rows in the order its defaultSort names, as Payload\
     targets: { service: { operations: defaultOperations } },
   })
   const build = (defaultSort: unknown, fields?: Record<string, unknown>) => mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'parents',
@@ -4841,7 +4842,7 @@ test('242. the shipped findByID takes depth, as Payload\'s does, so a served rea
       targets: { memory: memoryStore(), zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema, authorize: defaultAuthorize }) },
     })
     const built = mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         mithaq.defineKayan({
           name: 'parents',
@@ -4910,7 +4911,7 @@ test('242. the shipped findByID takes depth, as Payload\'s does, so a served rea
     targets: { memory: memoryStore(), zod: older, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   assert.throws(
-    () => mithaq.buildAsas({ http: [fetchHttp()], kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' } }, targets: { service: { operations: defaultOperations } } })] }),
+    () => mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [mithaq.defineKayan({ name: 'notes', fields: { id: { kind: 'number' } }, targets: { service: { operations: defaultOperations } } })] }),
     (thrown: Error) => thrown.message === 'Kayan "notes" names schema target "zod", which derives no byID shape, which is what a read of one row parses. Derive "byID" beside "id": the id and an optional depth.',
   )
 })
@@ -4933,7 +4934,7 @@ test('215a. a required text refuses the empty value on a publish and on a kayan 
   } as const
   const full = { title: 'T', tags: ['a'], name: { ar: 'ا', en: 'N' } }
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({ name: 'notes', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } }),
       mithaq.defineKayan({ name: 'plainNotes', access: allowAccess, fields, targets: { service: { schema: 'plain', operations: defaultOperations } } }),
@@ -4977,7 +4978,7 @@ test('215b. a bulk update handed no data writes nothing, and says so under the e
   const store = memoryStore()
   const mithaq = language(store)
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({ name: 'notes', access: allowAccess, fields: { ...defaultFields, body: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } } as never)],
   })
   const notes = built.kayan.notes!.operations as unknown as Record<string, (input: unknown) => Promise<Record<string, unknown>>>
@@ -4997,7 +4998,7 @@ test('215i. a stored empty value in a required text reads on either schema targe
   })
   const fields = { id: { kind: 'number' }, title: { kind: 'text', rules: { required: true } }, tags: { kind: 'textArray', rules: { required: true } } } as const
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({ name: 'notes', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } }),
       mithaq.defineKayan({ name: 'plainNotes', access: allowAccess, fields, targets: { service: { schema: 'plain', operations: defaultOperations } } }),
@@ -5016,7 +5017,7 @@ test('215j. null is the field\'s own required refusal only where the field is re
     targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({
       name: 'notes',
       access: allowAccess,
@@ -5045,7 +5046,7 @@ test('215k. a draft takes an emptied required title, and a publish of that draft
     targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [mithaq.defineKayan({
       name: 'drafts',
       access: allowAccess,
@@ -5076,7 +5077,7 @@ test('215l. a bulk over rows never published leaves them and names each in error
       targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize }), versions: versionsTarget({ max: 100 }) },
     })
     const built = mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [mithaq.defineKayan({
         name: 'drafts',
         access: allowAccess,
@@ -5114,7 +5115,7 @@ test('215n. a required trimmed text refuses a value of spaces on either schema t
   })
   const fields = { id: { kind: 'number' }, code: { kind: 'text', rules: { required: true, trim: true } } } as const
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({ name: 'notes', access: allowAccess, fields, targets: { service: { operations: defaultOperations } } }),
       mithaq.defineKayan({ name: 'plainNotes', access: allowAccess, fields, targets: { service: { schema: 'plain', operations: defaultOperations } } }),

@@ -114,7 +114,8 @@ const protectedField = async <Actor>(
   // A locale is one column of the root field: no hop, and read access is per field, so
   // the check over the root is the whole security surface.
   const locale = relatedField && root?.locales?.includes(relatedField) ? relatedField : undefined
-  const hop = locale ? undefined : relatedField
+  // A json field's path stays inside its own value, so the field's read access is the whole of it.
+  const hop = locale || root?.kind === 'json' ? undefined : relatedField
   const found = hop ? root?.target?.fields[hop] : root
   if (!root || !found) throw invalid({ message: `Kayan "${kayan.name}" query names unknown field "${field}".`, key: 'error.invalid.unknown_field', params: { kayan: kayan.name, field } })
   // A `join` is no column of any table; across a hop it would reach the store as
@@ -240,6 +241,8 @@ const whereIssues = async (kayan: ResolvedKayan, where: Where, at: readonly Prop
     }
     const [name, second] = key.split('.') as [string, string | undefined]
     const field = kayan.fields[name]!
+    // A value inside a json field is any scalar, which no column of a kind holds.
+    if (field.kind === 'json') continue
     // A hop compares a column of the kayan the field points at, and a set of
     // many named alone compares that kayan's id; a locale is a column of this one.
     const hop = !!field.target && (second ? !field.locales?.includes(second) : !!field.hasMany)

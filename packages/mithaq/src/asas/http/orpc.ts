@@ -8,7 +8,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import type { OperationTable } from '../build.ts'
 import { AfterCommitError, AsasError, afterCommitHeader, codes } from '../runner/errors.ts'
 import { issueRefusal, withoutPrototype } from '../runner/steps.ts'
-import { decodeJson, draftOptions } from './fetch.ts'
+import { assertMaxBodyBytes, boundedBody, decodeJson, draftOptions } from './fetch.ts'
 import type { StandardSchemaIssue } from '../../mithaq/standard-schema.ts'
 
 /** The context every procedure is handed, which defaults to the actor alone. */
@@ -29,6 +29,8 @@ export type OrpcHttpOptions = {
    * A host's own deliberate `ORPCError` reaches it too, so a host logging only faults filters on the code.
    */
   onError?: (error: unknown) => void
+  /** The largest body a call takes, answered 413 past it: `defaultMaxBodyBytes` or the project's own. Required. */
+  maxBodyBytes: number
 }
 
 // Matched on the `ValidationError` cause, not the shape of `data`, so a host's own
@@ -64,8 +66,10 @@ export const orpcHttp = ({
   api = '/api',
   context,
   onError,
-}: OrpcHttpOptions = {}) =>
-  <View>(operations: OperationTable<View>) => {
+  maxBodyBytes,
+}: OrpcHttpOptions) => {
+  assertMaxBodyBytes('orpcHttp', maxBodyBytes)
+  return <View>(operations: OperationTable<View>) => {
     // A reporter that throws must not replace the error the host has to see.
     const report = (thrown: unknown) => {
       try {
@@ -148,6 +152,17 @@ export const orpcHttp = ({
         const { pathname } = new URL(request.url)
         const under = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`)
         if (!handlers.some(([prefix]) => under(prefix))) return null
+        // Read here, so oRPC's own reader never holds a body past the limit. Off a clone, so a plug
+        // after this one reads the body of a route oRPC does not answer.
+        if (request.body) {
+          const read = await boundedBody(request.clone(), maxBodyBytes)
+          if (read instanceof Response) {
+            // The clone's twin, so the source stream is cancelled rather than left to the server.
+            request.body.cancel().catch(() => {})
+            return read
+          }
+          request = new Request(request.url, { method: request.method, headers: request.headers, body: read, signal: request.signal })
+        }
         // Built before any procedure runs, so a throw here is outside the middleware;
         // it still reaches `onError`.
         let held: OrpcContext
@@ -171,3 +186,4 @@ export const orpcHttp = ({
       },
     }
   }
+}

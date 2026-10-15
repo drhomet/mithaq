@@ -63,7 +63,7 @@ const vocabularyIn = ({ folder, source, extension }: { folder: string; source: s
 }
 // The template's, which holds every add-on and so every word, frozen until the owner signs a change.
 const vocabulary = vocabularyIn({ folder: join(root, 'templates/asas'), source: join(root, 'packages/mithaq/src'), extension: '.ts' })
-assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), 'bbea29bc3551d376f822fb2b5cdd1161a13c7043603ab8f23de652b9ba35bd21', 'the template speaks the frozen vocabulary')
+assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), 'e4c797b0f387d25d5590a9debb12b58aec3188847d90b8b215ab85e651e0b5f4', 'the template speaks the frozen vocabulary')
 type Words = Record<'kinds' | 'rules' | 'targets', Record<string, unknown>>
 const bare = vocabularyOf({ arkan: [base] }) as Words
 /** The words each add-on that brings any adds to the language: its rukn's kinds, rules and targets beyond `base`'s. */
@@ -133,7 +133,7 @@ function withoutRichText(tarball: string) {
   writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'without-rich-text', private: true, type: 'module', dependencies: { mithaq: tarball } }))
   writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, module: 'nodenext', target: 'esnext', noEmit: true, skipLibCheck: true, types: [] }, files: ['index.ts'] }))
   writeFileSync(join(project, 'index.ts'), [
-    "import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, drizzleAdapter, drizzleTarget, fetchHttp, serviceTarget, zodTarget } from 'mithaq'",
+    "import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxBodyBytes, defaultMaxLimit, defaultOperations, defineMithaq, drizzleAdapter, drizzleTarget, fetchHttp, serviceTarget, zodTarget } from 'mithaq'",
     'const { defineKayan, buildAsas } = defineMithaq({',
     '  arkan: [base],',
     "  targets: { drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', ...drizzleTarget }), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }) },",
@@ -141,7 +141,7 @@ function withoutRichText(tarball: string) {
     "const notes = defineKayan({ name: 'notes', fields: { ...defaultFields, title: { kind: 'text', label: { en: 'Title' } } }, targets: { service: { operations: defaultOperations } } })",
     '// @ts-expect-error a language without the richText rukn has no richText kind',
     "defineKayan({ name: 'pages', fields: { ...defaultFields, body: { kind: 'richText', label: { en: 'Body' } } }, targets: { service: { operations: defaultOperations } } })",
-    'buildAsas({ http: [fetchHttp()], kayan: [notes] })',
+    'buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })',
     "console.log('built without rich text')",
     '',
   ].join('\n'))

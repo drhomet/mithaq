@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import {
+  defaultMaxBodyBytes,
   adapterOf,
   checkReference,
   defaultAuthorize,
@@ -55,6 +56,7 @@ const secret = 'a-test-secret-of-at-least-thirty-two-characters'
 /** The project's own storage functions, and the file size it names. */
 const functions = {
   fileSize: named.fileSize,
+  maxBodyBytes: named.maxBodyBytes,
   key: named.key,
   verify: named.verify,
   disposition: named.disposition,
@@ -152,7 +154,7 @@ const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, 
   // The same kayan on both schema targets, the zod one and the template's own.
   const notes = noteOf('notes', 'zod')
   const plainNotes = noteOf('plainNotes', 'plain')
-  const asas = language.buildAsas({ http: [fetchHttp()], kayan: [fileKayan, notes, plainNotes], auth: { onError: console.error } } as never) as unknown as {
+  const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [fileKayan, notes, plainNotes], auth: { onError: console.error } } as never) as unknown as {
     handler(request: Request): Promise<Response>
     targets: { storage: { commands: { sweep(input: { asas: unknown; flags: readonly string[] }): Promise<number> } }; memory: { rows: Map<string, Record<string, unknown>[]> } }
     destroy(): Promise<void>
@@ -386,6 +388,16 @@ test('186d. instructions refuse a type the kayan does not hold, a file over its 
   await rm(named1000.dir, { recursive: true, force: true })
 })
 
+test('186d2. instructions answer a body past the storage\'s maxBodyBytes with 413 before reading the rest or asking who sent it', async () => {
+  const built = await project({ storage: { maxBodyBytes: 100 } })
+  // Never closed, so a reader that waits for the end never answers.
+  const body = new ReadableStream({ start: (controller) => controller.enqueue(new TextEncoder().encode(`{"filename":"${'a'.repeat(200)}`)) })
+  const answered = await built.asas.handler(new Request('http://test/api/files/uploadInstructions', { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as RequestInit))
+  assert.equal(answered.status, 413)
+  assert.match(((await answered.json()) as { message: string }).message, /at most 100 bytes/)
+  await rm(built.dir, { recursive: true, force: true })
+})
+
 test('186e. an SVG is taken only where it is listed, and is never served inline, whatever the disposition function says', async () => {
   const built = await project({
     files: { storage: { mimeTypes: ['image/svg+xml'] } },
@@ -467,7 +479,7 @@ test('190a. the build refuses a second target of capability storage beside the r
     },
   })
   const plain = language.defineKayan({ name: 'plain', targets: { service: { operations: defaultOperations } }, fields: { ...defaultFields } })
-  assert.throws(() => language.buildAsas({ http: [fetchHttp()], kayan: [plain] }), /Targets "storage" and "files" both declare capability "storage", and a build has at most one storage target\. Drop one of them\./)
+  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [plain] }), /Targets "storage" and "files" both declare capability "storage", and a build has at most one storage target\. Drop one of them\./)
 })
 
 test('186h. the build refuses a storage that names no function, a kayan that cannot hold files, and public on a read that is not open', async () => {
@@ -476,6 +488,7 @@ test('186h. the build refuses a storage that names no function, a kayan that can
     await assert.rejects(project({ storage: { [missing]: undefined }, files: { service: { operations } } }), new RegExp(`storage names no "${missing}" function`), missing)
   }
   await assert.rejects(project({ storage: { fileSize: undefined } }), /storage names no "fileSize", the largest file in bytes/)
+  await assert.rejects(project({ storage: { maxBodyBytes: undefined } }), /storage names no "maxBodyBytes", the largest request body/)
   for (const fileSize of [0, 1.5, '10']) {
     await assert.rejects(project({ storage: { fileSize: fileSize as never } }), new RegExp(`storage.fileSize is ${JSON.stringify(fileSize)}, and it is a whole number of bytes above 0`), String(fileSize))
   }
@@ -501,7 +514,7 @@ test('186h. the build refuses a storage that names no function, a kayan that can
   const language = languageOf()
   const plain = language.defineKayan({ name: 'plain', targets: { service: { operations: defaultOperations } }, fields: { ...defaultFields } })
   const pointing = language.defineKayan({ name: 'pointing', targets: { service: { operations: defaultOperations } }, fields: { ...defaultFields, file: { kind: 'upload', relationTo: () => plain } } })
-  assert.throws(() => language.buildAsas({ http: [fetchHttp()], kayan: [plain, pointing] }), /field "file" is an upload, and kayan "plain" it points at writes no targets.storage/)
+  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [plain, pointing] }), /field "file" is an upload, and kayan "plain" it points at writes no targets.storage/)
 })
 
 test('202a. the build refuses a kayan holding files where no operation makes a row', async () => {
@@ -565,7 +578,7 @@ test('186i. a public kayan whose read is open hands out the adapter\'s own addre
     targets: { storage: { mimeTypes: ['image/png'], public: true }, service: { operations: fileOperations(functions) } },
     fields: { ...defaultFields, ...uploadFields },
   } as never)
-  const asas = language.buildAsas({ http: [fetchHttp()], kayan: [open] } as never) as unknown as {
+  const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [open] } as never) as unknown as {
     kayan: { files: { operations: { find(input: unknown, options: unknown): Promise<{ docs: Record<string, unknown>[] }> } } }
     targets: { memory: { rows: Map<string, Record<string, unknown>[]> } }
   }
@@ -901,7 +914,7 @@ test('189f. a kayan holding files keeps its key unique across the whole store, a
       fields: { ...defaultFields, ...uploadFields, title: { kind: 'text' } },
       indexes,
     } as never)
-  const build = (indexes: unknown) => language.buildAsas({ http: [fetchHttp()], kayan: [files(indexes)] } as never)
+  const build = (indexes: unknown) => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [files(indexes)] } as never)
   assert.doesNotThrow(() => build(undefined))
   assert.throws(
     () => build(() => [{ fields: ['title', 'key'], unique: true }]),
@@ -1003,7 +1016,7 @@ test('189d. a replaced serve that sets no headers still answers nosniff, and a p
     targets: { storage: { mimeTypes: ['image/png'], public: true }, service: { operations: fileOperations(functions) } },
     fields: { ...defaultFields, ...uploadFields },
   } as never)
-  const asas = language.buildAsas({ http: [fetchHttp()], kayan: [open] } as never) as unknown as {
+  const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [open] } as never) as unknown as {
     handler(request: Request): Promise<Response>
     targets: { memory: { rows: Map<string, Record<string, unknown>[]> } }
   }

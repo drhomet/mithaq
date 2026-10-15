@@ -80,13 +80,13 @@ test('defineMithaq keeps the object it received, reachable from the defineKayan 
 // `storage` and `versions`, the last two building the storage and versions
 // targets.
 test('the shipped kinds split into base, richText and upload arkan, and the versions target built by its rukn, record what the root held before them', () => {
-  const { text, email, number, integer, decimal, checkbox, datetime, date, textArray, uuid, relationship, join: joinKind } = defaultKinds
+  const { text, email, number, integer, decimal, checkbox, datetime, date, textArray, uuid, relationship, json, join: joinKind } = defaultKinds
   const { richText } = richTextRukn({ nodes: defaultNodes }).kinds
   const files = storageRukn(storageConfig)
   const { upload } = files.kinds
   const history = versionsRukn({ max: 100 })
   const arkan = [
-    defineRukn({ name: 'base', kinds: { text, email, number, integer, decimal, checkbox, datetime, date, textArray, uuid, relationship, join: joinKind }, rules: defaultRules }),
+    defineRukn({ name: 'base', kinds: { text, email, number, integer, decimal, checkbox, datetime, date, textArray, uuid, relationship, json, join: joinKind }, rules: defaultRules }),
     defineRukn({ name: 'richText', kinds: { richText } }),
     defineRukn({ name: 'storage', kinds: { upload }, targets: files.targets }),
     history,
@@ -358,14 +358,14 @@ test('the #167 lock, kept as a fixture with `previous` and `restart` in its seal
   assert.equal(typeof seal.previous, 'string', 'the owner signed it with `previous`')
   assert.ok(seal.restart, 'and wrote `restart` beside it')
   // A lock signed before the `versions`, `storage` and `tenant` targets, the
-  // `richText`, `upload`, `integer` and `decimal` kinds, the `precision` and
+  // `richText`, `upload`, `integer`, `decimal` and `json` kinds, the `precision` and
   // `scale` rules and the arkan existed holds the language
   // without any of them, its kinds and rules at the root, and names the
   // backoffice target by its old name, `platform`.
   const { arkan: _arkan, ...root } = language
   const vocabulary = vocabularyOf({
     ...root,
-    kinds: { ...defaultKinds, richText: undefined, upload: undefined, integer: undefined, decimal: undefined },
+    kinds: { ...defaultKinds, richText: undefined, upload: undefined, integer: undefined, decimal: undefined, json: undefined },
     rules: { ...defaultRules, precision: undefined, scale: undefined },
     targets: { ...language.targets, backoffice: undefined, platform: language.targets.backoffice, versions: undefined, storage: undefined, tenant: undefined },
   })

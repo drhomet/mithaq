@@ -7,7 +7,7 @@
 import { useContext, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan, ComponentProps, Row } from 'mithaq/admin'
 import { FormContext, useAccess, useClient, useKayan, useLocale, useRecord, useScreen, useUser } from 'mithaq/admin/react'
-import { empty } from '../mithaq/audit-sink.ts'
+import { empty, type Change } from '../mithaq/audit-sink.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,7 +33,7 @@ export type Entry = {
   operation: string
   actor?: string | null
   impersonatedBy?: string | null
-  changes: string
+  changes: Readonly<Record<string, Change>>
 }
 
 /** How many entries the record page's side column draws: the last few, the rest on the Activity page. */
@@ -59,13 +59,7 @@ const recordField = (kayan: string) => ({ name: `record:${kayan}`, kind: 'relati
  */
 const commandOf = /^(.+?) \((.+)\)$/
 
-const changesOf = (entry: Entry): [string, { from: unknown; to: unknown }][] => {
-  try {
-    return Object.entries(JSON.parse(entry.changes) as Record<string, { from: unknown; to: unknown }>)
-  } catch {
-    return []
-  }
-}
+const changesOf = (entry: Entry): [string, Change][] => Object.entries(entry.changes ?? {})
 
 const units: [Intl.RelativeTimeFormatUnit, number][] = [['year', 31_536_000], ['month', 2_592_000], ['week', 604_800], ['day', 86_400], ['hour', 3_600], ['minute', 60], ['second', 1]]
 
@@ -115,8 +109,11 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
     <ol className="grid gap-4 text-sm">
       {entries.map((entry) => {
         const kayan = one ?? kayans?.[entry.kayan ?? '']
-        const drawn = (field: ClientField, value: unknown): ReactNode =>
-          empty(value) ? '—' : cellFor({ cells, field })({ kayan: kayan!, field, value, t, locale, titles })
+        // A cut change holds JSON text, which no cell of the field's kind reads.
+        const drawn = (field: ClientField, value: unknown, change: Change): ReactNode =>
+          empty(value) ? '—' : change.truncated
+            ? <code dir="ltr" className="break-all font-mono">{String(value)}</code>
+            : cellFor({ cells, field })({ kayan: kayan!, field, value, t, locale, titles })
         const at = new Date(entry.createdAt)
         // Every operation has its words in the log's own scope, in the past
         // tense the sentence reads in, and one a project adds before it
@@ -128,9 +125,10 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
           : named(entry.actor)
         // A create says what the person set: a field left empty, or a box left off, is nothing they did.
         const made = entry.operation === 'create'
-        const shown = changesOf(entry).flatMap(([name, change]) => {
-          const field = technical.has(name) ? undefined : kayan?.fields.find((field) => field.name === name)
-          return field && !(made && (empty(change.to) || change.to === false)) ? [{ field, change }] : []
+        // In the order the kayan declares its fields: jsonb keeps its keys in an order of its own.
+        const shown = (kayan?.fields ?? []).flatMap((field) => {
+          const change = technical.has(field.name) || !Object.hasOwn(entry.changes ?? {}, field.name) ? undefined : entry.changes[field.name]
+          return change && !(made && (empty(change.to) || change.to === false)) ? [{ field, change }] : []
         })
         return (
           <li key={entry.id} data-entry={entry.operation} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
@@ -158,11 +156,12 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
                       {': '}
                       {made ? null : (
                         <>
-                          <span data-from>{drawn(field, change.from)}</span>
+                          <span data-from>{drawn(field, change.from, change)}</span>
                           <span aria-hidden className="mx-1 inline-block rtl:rotate-180">→</span>
                         </>
                       )}
-                      <span data-to>{drawn(field, change.to)}</span>
+                      <span data-to>{drawn(field, change.to, change)}</span>
+                      {change.truncated ? <span data-truncated className="block">{t('auditLog.truncated', 'Too long to keep whole; its start is shown.')}</span> : null}
                     </li>
                   ))}
                 </ul>
@@ -222,7 +221,7 @@ export const whereOf = (filters: ActivityFilters) => {
     filters.record && { record: { equals: filters.record } },
     filters.search?.trim() && { changes: { contains: filters.search.trim() } },
     filters.actor && { actor: { equals: filters.actor } },
-    filters.field && { changed: { contains: ` ${filters.field} ` } },
+    filters.field && { [`changes.${filters.field}`]: { exists: true } },
     filters.action && Object.hasOwn(actionWheres, filters.action) && actionWheres[filters.action as ActionName],
     from && { createdAt: { greater_than_equal: from } },
     to && { createdAt: { less_than: to } },

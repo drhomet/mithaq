@@ -5,6 +5,7 @@ export const codes = {
   403: 'FORBIDDEN',
   404: 'NOT_FOUND',
   409: 'CONFLICT',
+  413: 'PAYLOAD_TOO_LARGE',
   429: 'TOO_MANY_REQUESTS',
   503: 'SERVICE_UNAVAILABLE',
 } as const

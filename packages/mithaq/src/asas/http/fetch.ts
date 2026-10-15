@@ -53,7 +53,56 @@ export const draftOptions = (request: Request) => {
   }
 }
 
+/**
+ * The largest request body a plug reads, which a project names as `maxBodyBytes`: room for a
+ * json field's `defaultJsonMaxBytes` written in any script. A file never comes this way.
+ */
+export const defaultMaxBodyBytes = 4 * 1024 * 1024
+
+/**
+ * The body, or the answer that refuses it: 413 once it passes `limit` bytes, and 499 to a client
+ * that went away mid-body, which is no fault of the server's. Counted as it arrives, since a
+ * `content-length` may be absent or wrong, and the rest is never read.
+ */
+export const boundedBody = async (request: Request, limit: number): Promise<Blob | Response> => {
+  const reader = request.body?.getReader()
+  const refused = () => {
+    // Not awaited: a clone's cancel settles only once its twin is cancelled too, which the
+    // caller does after this returns.
+    reader?.cancel().catch(() => {})
+    return tooLarge(limit)
+  }
+  if (Number(request.headers.get('content-length')) > limit) return refused()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    let read: ReadableStreamReadResult<Uint8Array>
+    try {
+      read = (await reader?.read()) ?? { done: true, value: undefined }
+    } catch (thrown) {
+      if (request.signal.aborted) return new Response(null, { status: 499 })
+      throw thrown
+    }
+    if (read.done) return new Blob(chunks as BlobPart[])
+    size += read.value.byteLength
+    if (size > limit) return refused()
+    chunks.push(read.value)
+  }
+}
+
+/** Refused by name, since core holds no limit of its own. */
+export const assertMaxBodyBytes = (owner: string, value: unknown) => {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    throw new Error(`${owner} names no "maxBodyBytes", the largest request body in bytes it reads, as a whole number above 0. Name the project's own, such as defaultMaxBodyBytes from mithaq.`)
+  }
+}
+
+export const tooLarge = (limit: number) =>
+  Response.json({ code: codes[413], message: `The request body holds at most ${limit} bytes.` }, { status: 413 })
+
 export type FetchHttpOptions = {
+  /** The largest body a call takes, answered 413 past it: `defaultMaxBodyBytes` or the project's own. Required. */
+  maxBodyBytes: number
   /**
    * Builds the context every step of a served call reads, from the request and the actor.
    * The plug reads no header or body key into it; a throw is answered 500.
@@ -67,8 +116,9 @@ export type FetchHttpOptions = {
  * The default HTTP plug: `POST /api/<kayan>/<operation>` with a JSON body, over
  * `Request` and `Response` alone. The runner parses each operation's input.
  */
-export const fetchHttp = ({ context, onError = console.error }: FetchHttpOptions = {}) =>
-  <View>(operations: OperationTable<View>): HttpPlug => {
+export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: FetchHttpOptions) => {
+  assertMaxBodyBytes('fetchHttp', maxBodyBytes)
+  return <View>(operations: OperationTable<View>): HttpPlug => {
     const table = new Map(operations.map((one) => [`${one.kayan}/${one.name}`, one]))
     return {
       name: 'fetch',
@@ -82,7 +132,9 @@ export const fetchHttp = ({ context, onError = console.error }: FetchHttpOptions
         if (api !== 'api' || !kayan || !name || rest.length > 0) return null
         const operation = table.get(`${kayan}/${name}`)
         if (!operation) return null
-        const body = await request.text()
+        const read = await boundedBody(request, maxBodyBytes)
+        if (read instanceof Response) return read
+        const body = await read.text()
         // Keyless: refused before any operation, and the key names an operation's refusal.
         const undecodable = (message: string) => Response.json({ code: codes[400], message }, { status: 400 })
         let input: unknown = {}
@@ -133,3 +185,4 @@ export const fetchHttp = ({ context, onError = console.error }: FetchHttpOptions
       },
     }
   }
+}

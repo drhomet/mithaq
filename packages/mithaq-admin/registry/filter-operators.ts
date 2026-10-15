@@ -34,6 +34,8 @@ export const operatorsByKind: Readonly<Record<string, readonly OperatorName[]>> 
   uuid: [...equality, ...membership, 'exists'],
   relationship: [...equality, ...membership, 'exists'],
   textArray: ['exists'],
+  // Only `exists`: the panel's value box for any other is the field's own control, which reports parsed JSON.
+  json: ['exists'],
 }
 
 /** What an operator's value is: a boolean for `exists`, a list for `in` and `not_in`, one value of the field's kind otherwise. */

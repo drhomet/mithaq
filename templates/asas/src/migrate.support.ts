@@ -118,11 +118,11 @@ export const accessSource = `    defineKayan({
     defineKayan({ name: 'organization', fields: { id: { kind: 'text' }, name: { kind: 'text' } } }),
     defineKayan({ name: 'member', fields: { id: { kind: 'text' } } }),
 `
-export const kayanSourceOf = (fields: string, tags = true) => `import { fetchHttp } from '${mithaqEntry}'
+export const kayanSourceOf = (fields: string, tags = true) => `import { defaultMaxBodyBytes, fetchHttp } from '${mithaqEntry}'
 import { buildAsas, defineKayan } from '${template}'
 
 export const asas = buildAsas({
-  http: [fetchHttp()],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
   kayan: [
     defineKayan({
       name: 'notes',

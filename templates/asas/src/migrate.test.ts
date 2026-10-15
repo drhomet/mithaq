@@ -330,7 +330,7 @@ test('a kayan spreading only defaultIdField migrates to a table with no timestam
   await migrateDatabase()
   const root = await migrationProject(withSummary)
   const source = kayanSourceOf("        ...defaultIdField,\n        title: { kind: 'text' },")
-    .replace('import { fetchHttp }', 'import { defaultIdField, defaultOperations, fetchHttp }')
+    .replace('import { defaultMaxBodyBytes, fetchHttp }', 'import { defaultIdField, defaultMaxBodyBytes, defaultOperations, fetchHttp }')
     .replace(
       "name: 'notes',",
       "name: 'notes',\n      access: { create: () => true, read: () => true, update: () => true, delete: () => true },\n      targets: { service: { operations: defaultOperations } },",
@@ -371,7 +371,7 @@ await asas.destroy()
 test('a new table puts the timestamps after every field the kayan declares, wherever its fields spread them', async () => {
   await migrateDatabase()
   const root = await migrationProject("        ...defaultFields,\n        title: { kind: 'text' },")
-  await writeFile(new URL('src/asas.ts', root), kayanSourceOf("        ...defaultFields,\n        title: { kind: 'text' },").replace('import { fetchHttp }', 'import { defaultFields, fetchHttp }'))
+  await writeFile(new URL('src/asas.ts', root), kayanSourceOf("        ...defaultFields,\n        title: { kind: 'text' },").replace('import { defaultMaxBodyBytes, fetchHttp }', 'import { defaultFields, defaultMaxBodyBytes, fetchHttp }'))
   try {
     assert.equal(await sqlIn(root, resetSchemas), 0)
     const migrated = await migrating(root, 'migrate')

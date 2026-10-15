@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 import {
+  defaultMaxBodyBytes,
   screenKinds,
   defaultAuthorize,
   defaultDepth,
@@ -76,7 +77,7 @@ const archive = { ar: 'أرشفة', en: 'Archive' }
 const build = (dashboard: unknown, portal?: unknown, extra?: Record<string, unknown>, operations?: Record<string, unknown>) => {
   const language = screens(extra)
   return language.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       language.defineKayan({
         name: 'courses',
@@ -176,11 +177,11 @@ test('a build publishes each screen under asas.targets.<screen>.client, the decl
 test('a kayan in targets.<screen> the screen does not list, and a listed name that is no kayan, are refused', () => {
   const language = screens()
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp()], kayan: [language.defineKayan({ name: 'tags', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations }, portal: {} } } as never), language.defineKayan({ name: 'courses', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })] as never }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [language.defineKayan({ name: 'tags', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations }, portal: {} } } as never), language.defineKayan({ name: 'courses', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })] as never }),
     /Kayan "tags" writes targets\.portal, and screen "portal" does not list it in kayan\./,
   )
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp()], kayan: [language.defineKayan({ name: 'notes', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })] }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [language.defineKayan({ name: 'notes', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })] }),
     /Screen "dashboard" kayan lists "courses", which is no kayan of this build\./,
   )
 })
@@ -192,7 +193,7 @@ test('a target named screen is refused', () => {
 test('a kayan named screen is refused by name, because the catalog derives screen.<name> for every screen', () => {
   const language = screens()
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp()], kayan: [
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [
       language.defineKayan({ name: 'courses', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } }),
       language.defineKayan({ name: 'screen', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } }),
     ] }),
@@ -346,7 +347,7 @@ test('a built-in on a kind it does not draw, a project kind with no controls row
     },
   } as never) as ReturnType<typeof screens>
   assert.throws(
-    () => project.buildAsas({ http: [fetchHttp()], kayan: [project.defineKayan({ name: 'notes', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })] }),
+    () => project.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [project.defineKayan({ name: 'notes', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })] }),
     /Screen "dashboard" controls has no row for kind "slug", and every kind of the language needs one\./,
   )
   assert.throws(
@@ -625,7 +626,7 @@ test('a list with of and where lists another kayan of the screen scoped to the r
       { tab: 'sessions', label, fields: [{ list }] },
     ] }
     return language.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         language.defineKayan({
           name: 'courses',
@@ -868,7 +869,7 @@ test('the five shadcn controls the registry adds are built-ins, each on the kind
 test('a text or numeric field carries a prefix and a suffix, one string per locale, which every screen draws from the field', () => {
   const language = screens()
   const built = (field: object) => language.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [language.defineKayan({ name: 'courses', fields: { ...defaultFields, fee: field }, targets: { service: { operations: defaultOperations } } } as never)],
   })
   const fee = built({ kind: 'number', prefix: { ar: 'ر.س', en: 'SAR' }, suffix: { ar: 'لكل مقعد', en: 'per seat' } }).targets.portal.client.kayan.courses!.fields.find((one) => one.name === 'fee')!
@@ -1167,7 +1168,7 @@ test("a field's label, description or placeholder written as a function is left 
     },
   })
   const built = language.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       {
         name: 'hatches',
@@ -1212,7 +1213,7 @@ test("a field's label, description or placeholder written as a function is left 
 test('an option label, a placeholder, and a button, tab or section label short of a declared locale is refused at build by name', () => {
   const language = screens()
   const field = (extra: object) => language.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [language.defineKayan({ name: 'courses', fields: { ...defaultFields, title: { kind: 'text', ...extra } }, targets: { service: { operations: defaultOperations } } } as never)],
   })
   assert.throws(

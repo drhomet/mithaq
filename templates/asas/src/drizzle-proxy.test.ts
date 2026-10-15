@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  defaultMaxBodyBytes,
   base,
   defaultAuthorize,
   defaultBulkLimit,
@@ -34,7 +35,7 @@ const build = (table?: PgTable) => {
     arkan: [base],
   })
   return language.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       language.defineKayan({
         name: 'notes',

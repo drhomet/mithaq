@@ -484,12 +484,12 @@ export const providers = {
   await providersOf("'auth'")
   await writeFile(
     new URL('src/asas.ts', root),
-    `import { fetchHttp } from '${mithaqEntry}'
+    `import { defaultMaxBodyBytes, fetchHttp } from '${mithaqEntry}'
 import { buildAsas, defineKayan } from '${template}'
 import { betterAuth } from './kayan/auth/user/index.ts'
 
 export const asas = buildAsas({
-  http: [fetchHttp()],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
   kayan: [
     ...betterAuth.core,
     ...betterAuth.organization,

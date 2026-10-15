@@ -4,6 +4,7 @@
 export { afterCommitHeader } from '../asas/runner/errors.ts'
 export { allowedType } from '../storage/allowed-type.ts'
 export { compareDecimals, decimalDigits, isDecimal } from '../base/decimal.ts'
+export { isJson } from '../base/kinds.ts'
 // What a screen hands a browser, `screen.json`'s own shape.
 export type {
   ButtonClient,
@@ -161,6 +162,7 @@ export const builtInScreenKinds = {
   date: ['date'],
   textArray: ['textArray'],
   uuid: ['uuid'],
+  json: ['json'],
   // A file is a row of a storage kayan, so the picker of rows draws it too.
   relationship: ['relationship', 'upload'],
   join: ['join'],
@@ -185,7 +187,7 @@ export const registryControls = [
   'richText',
   'upload',
 ] as const
-export const registryCells = ['text', 'email', 'number', 'integer', 'decimal', 'checkbox', 'datetime', 'date', 'textArray', 'uuid', 'relationship', 'join', 'richText', 'upload'] as const
+export const registryCells = ['text', 'email', 'number', 'integer', 'decimal', 'checkbox', 'datetime', 'date', 'textArray', 'uuid', 'json', 'relationship', 'join', 'richText', 'upload'] as const
 
 /** The built-in controls that draw a field's `options`; the build refuses one over a field that declares none. */
 export const choiceControls = ['radio', 'toggleGroup', 'select', 'nativeSelect', 'combobox', 'buttonGroup', 'checkboxGroup']

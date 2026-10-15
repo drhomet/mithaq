@@ -5,7 +5,7 @@ import { authActor } from '../actor.ts'
 import { AfterCommitError, AsasError, conflict, denied, invalid, missing } from './errors.ts'
 import type { AdminAccess, FieldAccess, LocalesOf, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
-import { defaultKinds, type Kind } from '../../base/kinds.ts'
+import { defaultKinds, isStorableText, type Kind } from '../../base/kinds.ts'
 import type { RichTextValue } from '../../rich-text/value.ts'
 import type { Access } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
@@ -79,6 +79,9 @@ const known: ReadonlySet<string> = new Set<Operator>(operatorList)
 const and = new Intl.ListFormat('en-GB', { type: 'conjunction' })
 
 const checkOperatorValue = (said: string, field: string, operator: string, value: unknown) => {
+  if ([value].flat().some((one) => typeof one === 'string' && !isStorableText(one))) {
+    throw new Error(`${said} field "${field}" operator "${operator}" compares text holding a NUL or half a surrogate pair, which no column holds.`)
+  }
   if (operator === 'exists') {
     if (typeof value !== 'boolean') throw new Error(`${said} field "${field}" operator "exists" needs a boolean.`)
     return
@@ -102,18 +105,22 @@ const checkOperatorValue = (said: string, field: string, operator: string, value
 
 // A second segment is a locale or a related field, never both: `resolve` refuses
 // `localized` beside `relationTo` on the field itself, whatever the kind is named.
+// A json field's path may run past two segments: its keys are no columns, and Payload names them so.
 const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; said: string }) => {
   const parts = key.split('.')
-  const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments.`
-  if (parts.length > 2 || parts.some((part) => !part)) throw new Error(unsupported)
+  const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments, or a key at each segment after a json field.`
   const field = parts[0]!
-  const path = parts[1]
   const resolved = kayan.fields[field]
+  if ((parts.length > 2 && resolved?.kind !== 'json') || parts.some((part) => !part || !isStorableText(part))) throw new Error(unsupported)
+  const path = parts[1]
   if (!resolved) throw new Error(`${said} names unknown field "${key}".`)
+  if (resolved.kind === 'json') return { field, key, kind: resolved.kind, operators: resolved.operators }
   if (!path || resolved.locales?.includes(path)) return { field, key, kind: resolved.kind, operators: resolved.operators }
   if (!resolved.target) throw new Error(unsupported)
   const target = resolved.target.fields[path]
   if (!target) throw new Error(`${said} path "${key}" names unknown related field.`)
+  // A path into json across a hop would be a third segment, and a json value compared whole has no store answer.
+  if (target.kind === 'json') throw new Error(`${said} path "${key}" reaches json field "${path}" across a relationship, and a json field is filtered on its own kayan alone.`)
   return { field, key, kind: target.kind, operators: target.operators }
 }
 
@@ -150,6 +157,13 @@ export const assertFieldWhere = ({ said, key, kind, operators, value, valued = t
       throw new Error(`${said} field "${key}" operator "${operator}" only supports numeric, date and datetime fields.`)
     }
     checkOperatorValue(said, key, operator, operand)
+    if (!valued && Array.isArray(operand) && operand.length > whereLimits.values) {
+      throw new Error(`${said} field "${key}" operator "${operator}" lists at most ${whereLimits.values} values.`)
+    }
+    // Each word of a `like` is a pattern the store matches, so its words are held to the same count.
+    if (!valued && operator === 'like' && typeof operand === 'string' && operand.trim().split(/\s+/).length > whereLimits.values) {
+      throw new Error(`${said} field "${key}" operator "like" holds at most ${whereLimits.values} words.`)
+    }
     // A value an integer or decimal column cannot hold would reach Postgres as a 500.
     // A caller's own query skips this: its row shape refuses values with a path each.
     if (valued && (kind === 'integer' || kind === 'decimal') && operator !== 'exists') {
@@ -171,7 +185,14 @@ export const assertWhere = (kayan: ResolvedKayan, where: unknown): Where =>
 export const assertWhereGrammar = (kayan: ResolvedKayan, where: unknown): Where =>
   normalizedWhere({ kayan, where, valued: false, said: `Kayan "${kayan.name}" query` })
 
-const normalizedWhere = ({ kayan, where, valued, said }: { kayan: ResolvedKayan; where: unknown; valued: boolean; said: string }): Where => {
+/**
+ * How large a caller's `where` may be: the values one `in` or `not_in` lists, and the fields, `and`s and
+ * `or`s it holds in all, however nested. Each is a condition the store runs, so past these a read is
+ * refused before it reaches the store rather than holding it for minutes.
+ */
+export const whereLimits = { values: 1000, nodes: 200 } as const
+
+const normalizedWhere = ({ kayan, where, valued, said, nodes = { left: whereLimits.nodes } }: { kayan: ResolvedKayan; where: unknown; valued: boolean; said: string; nodes?: { left: number } }): Where => {
   if (!where || typeof where !== 'object' || Array.isArray(where)) {
     throw new Error(`${said} is not an object of fields.`)
   }
@@ -180,11 +201,13 @@ const normalizedWhere = ({ kayan, where, valued, said }: { kayan: ResolvedKayan;
   // No prototype, so `__proto__` is a key like any other.
   const normalized: Record<string, unknown> = Object.create(null)
   for (const [key, value] of entries) {
+    // An access constraint is the project's own to size; a caller's is held to the limits.
+    if (!valued && --nodes.left < 0) throw new Error(`${said} holds at most ${whereLimits.nodes} fields, "and"s and "or"s.`)
     if (key === 'and' || key === 'or') {
       if (!Array.isArray(value) || !value.length) {
         throw new Error(`${said} "${key}" must be a non-empty array.`)
       }
-      normalized[key] = value.map((one) => normalizedWhere({ kayan, where: one, valued, said }))
+      normalized[key] = value.map((one) => normalizedWhere({ kayan, where: one, valued, said, nodes }))
       continue
     }
     const queried = queryField({ kayan, key, said })

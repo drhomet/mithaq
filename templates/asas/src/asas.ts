@@ -18,7 +18,7 @@ import * as roles from '@asas/roles'
 import * as settings from '@asas/settings'
 // end add-on: settings
 import * as tags from '@asas/tags'
-import { fetchHttp, Notice } from 'mithaq'
+import { defaultMaxBodyBytes, fetchHttp, Notice } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
 import { buildAsas, requestContext } from '@asas/mithaq'
 import { backofficeHttp } from './backoffice-http.ts'
@@ -56,7 +56,7 @@ export const asas = buildAsas({
     ...settings.global,
     // end add-on: settings
   ],
-  // The HTTP layer, a list the handler asks in order. `orpcHttp()` is first
+  // The HTTP layer, a list the handler asks in order. `orpcHttp` is first
   // because it owns `/api/rpc`, where a typed client would reach the build, and
   // because `asas.router` is the first plug's. It also claims `/api`, so the
   // plain plug behind it answers only what oRPC's own OpenAPI arm matched
@@ -69,10 +69,11 @@ export const asas = buildAsas({
   // plain plug would read `/api/backoffice/*` as a kayan's route.
   // A fault either plug answers 500 is written to this project's log, the
   // console, as `fetchHttp`'s default does; the oRPC plug takes no default.
+  // A body past `maxBodyBytes` is answered 413 before it is read whole.
   http: [
-    orpcHttp({ context: (request, actor) => ({ actor, ...requestContext(request) }), onError: (error) => console.error(error) }),
+    orpcHttp({ context: (request, actor) => ({ actor, ...requestContext(request) }), onError: (error) => console.error(error), maxBodyBytes: defaultMaxBodyBytes }),
     backofficeHttp(),
-    fetchHttp({ context: requestContext }),
+    fetchHttp({ context: requestContext, maxBodyBytes: defaultMaxBodyBytes }),
   ],
   // Better Auth's own actions, which no declaration of this project derives.
   // They join the catalog under the resources they name, so a role holds

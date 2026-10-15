@@ -149,7 +149,7 @@ const formMarkup = (extra: Record<string, unknown> = {}) =>
   )
 
 test('1. every shipped kind has a control and a cell, and both chains prefer the screen\'s decided component name over its kind', () => {
-  for (const kind of ['text', 'email', 'number', 'integer', 'decimal', 'checkbox', 'datetime', 'date', 'textArray', 'uuid', 'relationship']) {
+  for (const kind of ['text', 'email', 'number', 'integer', 'decimal', 'checkbox', 'datetime', 'date', 'textArray', 'uuid', 'json', 'relationship']) {
     assert.ok(controls[kind], `the control map carries the shipped kind "${kind}"`)
     assert.notEqual(cellFor(fieldOf({ name: 'x', kind })), undefined, `the cell chain answers for kind "${kind}"`)
   }
@@ -1649,6 +1649,31 @@ test('178. a text box and a text area follow their own text\'s direction, and an
   for (const kind of ['email', 'number']) assert.match(drawn(kind), /dir="ltr"/, `${kind} is dir="ltr"`)
 })
 
+test('178a. a json field is a monospace text area that reads left to right in an Arabic page too, named and described by its shell, and its cell is one short line of the JSON', async () => {
+  const field = fieldOf({ name: 'meta', kind: 'json', rules: { required: true } })
+  const value = { colour: 'أحمر', sizes: [1, 2], nested: { deep: true } }
+  const html = renderToStaticMarkup(createElement(controls.json!, { values: {}, setValue: () => {}, value, onChange: () => {}, field, kayan: courses, readOnly: false, t: copy.t, id: 'meta', describedBy: 'meta-description', error: 'Not JSON', locale: 'ar' }))
+  const box = /<textarea[^>]*>/.exec(html)?.[0] ?? ''
+  for (const attribute of ['id="meta"', 'name="meta"', 'dir="ltr"', 'aria-describedby="meta-description"', 'aria-invalid="true"', 'aria-required="true"', 'spellCheck="false"']) {
+    assert.ok(box.toLowerCase().includes(attribute.toLowerCase()), `${attribute} on ${box}`)
+  }
+  assert.match(box, /font-mono/)
+  assert.ok(html.includes(JSON.stringify(value, null, 2).replaceAll('"', '&quot;')), `the value written out whole, two spaces deep: ${html}`)
+  const cell = (held: unknown) => staticMarkup(createElement(() => cells.json!({ kayan: courses, field, value: held, t: translator('ar'), locale: 'ar' }) as ReactElement))
+  const line = cell({ long: 'x'.repeat(200) })
+  assert.match(line, /<code[^>]*dir="ltr"/, `a cell reads left to right too: ${line}`)
+  assert.ok(line.includes('…'), `and is cut to a line: ${line}`)
+  assert.equal(cell(null), '', 'and nothing at all is no cell')
+  assert.match(cell('text'), /&quot;text&quot;/, 'a string reads as JSON, quoted, so it is told from a number')
+  assert.equal(cell({ a: 1 }).includes('…'), false, 'a short value is drawn whole')
+  const emoji = cell({ e: '😀'.repeat(100) }).replaceAll('&quot;', '"')
+  assert.ok(emoji.isWellFormed() && emoji.includes(`{"e":"${'😀'.repeat(54)}…`), `a cut never splits a character in two: ${emoji}`)
+  const { brokenRule } = await import('../registry/form-rules.tsx')
+  assert.equal(brokenRule(field, value), undefined)
+  assert.equal(brokenRule(field, Symbol('unparsable')), 'invalid', 'what the box reports for text that is no JSON is refused before a save')
+  assert.equal(brokenRule(field, null), 'required')
+})
+
 test('178b. a yes or no field drawn as a switch carries its label beside it and says whether it is on', () => {
   const html = formMarkup({ value: { id: 'x', notifications: true }, screen: screenOf(recordPage([{ form: [{ field: 'notifications' }] }])) })
   const field = /<div[^>]*role="group"[^>]*data-control="switch"[^>]*>[\s\S]*?<\/label>/.exec(html)?.[0] ?? ''
@@ -1720,16 +1745,53 @@ test('170. a create\'s audit entry holds only the fields it set, so the Activity
   const { changesOf } = await import('../../../templates/mithaq/src/mithaq/audit-sink.ts')
   const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const row = { id: 'c1', organization: 't1', title: 'Tajweed', fee: 300, summary: null, accessCode: undefined, tags: [], archiveReason: '' }
-  const entry = { id: 'e1', createdAt: new Date(0), operation: 'create', actor: null, changes: JSON.stringify(changesOf({}, row)) }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'create', actor: null, changes: changesOf({}, row) }
   const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, t: copy.t, locale: 'en' }))
   assert.deepEqual([...html.matchAll(/data-change="([^"]+)"/g)].map((hit) => hit[1]), ['title', 'fee'], 'a line for each field the create set, the technical columns left out')
   assert.doesNotMatch(html, /data-from="">—<\/span><span[^>]*>→<\/span><span data-to="">—</, 'and no line reads a dash to a dash')
 })
 
+test('170a. an entry lists its changes in the order the kayan declares its fields, whatever order the log keeps its keys in', async () => {
+  const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
+  const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
+  const declared = courses.fields.map((field) => field.name).filter((name) => ['title', 'fee', 'currency'].includes(name))
+  assert.equal(declared.length, 3)
+  const changes = Object.fromEntries([...declared].reverse().map((name) => [name, { from: name === 'fee' ? 1 : 'a', to: name === 'fee' ? 2 : 'b' }]))
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: null, changes }
+  const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, t: translator('en'), locale: 'en' }))
+  assert.deepEqual([...html.matchAll(/data-change="([^"]+)"/g)].map((match) => match[1]), declared)
+})
+
+test('170b. a changed value too long to keep whole is kept as the start of its JSON with a note, so a large json value never swells the log, and the panel says so in both locales', async () => {
+  const { changesOf, keptLength } = await import('../../../templates/mithaq/src/mithaq/audit-sink.ts')
+  const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
+  const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
+  const large = { rows: Array.from({ length: 2000 }, (_, index) => ({ index, label: `row ${index}` })) }
+  const changes = changesOf({ id: 'c1', title: 'Old', meta: large }, { id: 'c1', title: 'New', meta: { rows: [] } })
+  assert.deepEqual(changes.title, { from: 'Old', to: 'New' }, 'a short change is kept whole, with no note')
+  assert.equal(changes.meta!.truncated, true)
+  assert.equal(changes.meta!.from, `${JSON.stringify(large).slice(0, keptLength)}…`, 'the long side is the start of its JSON')
+  assert.equal(changes.meta!.to, '{"rows":[]}', 'and the short side of the same change is its JSON whole, so the panel reads both sides one way')
+  assert.ok(JSON.stringify(changes).length < keptLength * 2, 'so the entry stays small however large the value')
+  // Counted as the cut is made, by code point: 1502 of them, though 3002 UTF-16 units.
+  const wide = '😀'.repeat(1500)
+  assert.deepEqual(changesOf({ note: 'a' }, { note: wide }).note, { from: 'a', to: wide }, 'a side under the cut in code points is kept whole')
+  const meta = fieldOf({ name: 'meta', kind: 'json' })
+  const kayan = { ...courses, fields: [...courses.fields, meta] }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: null, changes }
+  for (const [locale, note] of [['en', 'Too long to keep whole'], ['ar', 'أطول من أن يُحفظ كاملا']] as const) {
+    const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan, t: translator(locale), locale }))
+    const line = /<li[^>]*data-change="meta"[\s\S]*?<\/li>/.exec(html)?.[0] ?? ''
+    assert.ok(line.includes(note), `${locale} says the value was cut: ${line.slice(0, 300)}`)
+    assert.ok(line.includes('{&quot;rows&quot;:[{&quot;index&quot;:0'), `and draws its start as text: ${line.slice(0, 300)}`)
+    assert.match(line, /<span data-to="true"><code[^>]*>\{&quot;rows&quot;:\[\]\}<\/code>/, `and the short side as its JSON: ${line.slice(-300)}`)
+  }
+})
+
 test('214. the Activity panel names every operation in the viewer\'s locale and a person it may not read in neutral words, never by the raw id', async () => {
   const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
-  const entry = { id: 'e1', createdAt: new Date(0), operation: 'restoreVersion', actor: 'u-hidden', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'restoreVersion', actor: 'u-hidden', changes: { title: { from: 'Old', to: 'New' } } }
   for (const [locale, said] of [['en', 'Restored a version by Someone'], ['ar', 'استُعيد إصدار بواسطة شخص ما']] as const) {
     // The reader holds no key of the provider's people, so the title read answers nothing for the actor.
     const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, titles: new Map([['user:u-hidden', false as const]]), t: translator(locale), locale }))
@@ -1746,7 +1808,7 @@ test('214. the Activity panel names every operation in the viewer\'s locale and 
 test('276a. a command actor reads in the viewer\'s locale for a reader of the people, and as someone for a reader of none', async () => {
   const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
   const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
-  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: 'mithaq rbac assign (osuser)', changes: JSON.stringify({ title: { from: 'Old', to: 'New' } }) }
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: 'mithaq rbac assign (osuser)', changes: { title: { from: 'Old', to: 'New' } } }
   const titles = new Map([['user:mithaq rbac assign (osuser)', false as const]])
   for (const [locale, said] of [['en', 'Updated by the command'], ['ar', 'حُدِّث بواسطة الأمر']] as const) {
     const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, titles, people: true, t: translator(locale), locale }))

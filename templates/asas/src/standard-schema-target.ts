@@ -3,6 +3,8 @@
 import {
   defaultKinds,
   defaultRules,
+  isJson,
+  jsonSchemaCheck,
   providerOf,
   type CreateOf,
   type Derives,
@@ -126,6 +128,12 @@ export const kinds = {
   textArray: textArrayShape,
   uuid,
   relationship: (field: ResolvedField) => idShape(field.target!.fields.id!.kind),
+  // Held to its `jsonSchema` by core's own check, the one the zod target calls.
+  json: (field: ResolvedField) => {
+    const check = field.jsonSchema ? jsonSchemaCheck(field) : () => true
+    const fits = (value: unknown) => !field.maxBytes || new TextEncoder().encode(JSON.stringify(value)).length <= field.maxBytes
+    return also(typed('JSON', (value) => isJson(value)), (value) => (fits(value) && check(value) ? undefined : optionsInvalid(field)))
+  },
   // The child's rows, checked as a list and no further: the child kayan's own
   // shape covers what they hold, whichever order the build derives the two.
   join: () => typed('list of rows', (value) => Array.isArray(value)),
@@ -347,7 +355,7 @@ const target = {
     // judge a value. A field's `options` are left off too, so a value an option
     // removed since still reads.
     const stored = Object.fromEntries(
-      Object.values(fields).map((field) => [field.name, shapeOf({ ...field, options: undefined, ...(field.kind === 'richText' && { richText: storedRichText }) }, this.kinds, { localized: this.rules.localized, required: nullable })]),
+      Object.values(fields).map((field) => [field.name, shapeOf({ ...field, options: undefined, jsonSchema: undefined, maxBytes: undefined, ...(field.kind === 'richText' && { richText: storedRichText }) }, this.kinds, { localized: this.rules.localized, required: nullable })]),
     )
     /**
      * One operation's object: the fields the client supplies for it, and the id,

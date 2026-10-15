@@ -6,6 +6,7 @@ import { test } from 'node:test'
 import { setTimeout } from 'node:timers/promises'
 import { z } from 'zod'
 import {
+  defaultMaxBodyBytes,
   AsasError,
   base,
   defaultAuthorize,
@@ -38,7 +39,7 @@ const build = <Expected extends z.ZodType<Date | undefined>>(expected: Expected)
     },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp(), orpcHttp({ api: '/api/orpc' })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -107,7 +108,7 @@ test('a kayan with no updatedAt field that lists the step refuses every update a
     },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',

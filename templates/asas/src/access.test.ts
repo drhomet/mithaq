@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  defaultMaxBodyBytes,
   actorPermissions,
   actorRoles,
   AsasError,
@@ -139,7 +140,7 @@ const built = () => {
     access: courseRows(mithaq),
     targets: { service: { operations: defaultOperations } },
   })
-  return { courses, store, ...mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] }) }
+  return { courses, store, ...mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] }) }
 }
 
 const seed = async (asas: ReturnType<typeof built>) => {
@@ -238,7 +239,7 @@ test('7. a denied field write names the kayan, the operation, the roles and ever
     }),
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
 
   await assert.rejects(
     () => asas.kayan.courses.operations.create({ id: 1, title: 'Mine', fee: 300, summary: 'x' }, { actor: member }),
@@ -271,7 +272,7 @@ test('7. a denied field write names the kayan, the operation, the roles and ever
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: { service: { operations: defaultOperations } },
   })
-  const plain = mithaq.buildAsas({ http: [fetchHttp()], kayan: [notes, ...accessKayan] })
+  const plain = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes, ...accessKayan] })
   await plain.kayan.notes.operations.create({ id: 1, body: 'kept', secret: 'kept' }, { actor: admin })
   const changed = await plain.kayan.notes.operations.update({ id: 1, body: 'changed', secret: 'dropped' })
   assert.equal(changed.body, 'changed')
@@ -302,7 +303,7 @@ test('8. a callback beside rows narrows and cannot widen', async () => {
     access: table,
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, guarded, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, guarded, ...accessKayan] })
   await asas.kayan.courses.operations.create({ id: 1, title: 'Kept', fee: 300 }, { actor: member })
   await asas.kayan.courses.operations.create({ id: 2, title: 'Dropped', fee: 400 }, { actor: member })
 
@@ -332,7 +333,7 @@ test('9. two rows in either order give the same answers', async () => {
     access: mithaq.rows({ auditor: table.auditor, member: table.member }),
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [forward, backward, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [forward, backward, ...accessKayan] })
   for (const name of ['forward', 'backward'] as const) {
     store.rows.set(name, [
       { id: 1, title: 'Open one', fee: null, tenant: 'org1' },
@@ -450,7 +451,7 @@ test('14. a fields list of only exclusions reads as every field but those', asyn
     }),
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
   await asas.kayan.courses.operations.create({ id: 1, title: 'Mine', fee: 300 }, { actor: admin })
 
   const seen = await asas.kayan.courses.operations.findByID({ id: 1 }, { actor: member })
@@ -476,7 +477,7 @@ test('15. under rows, a field callback beside them throws the naming error too',
     access: mithaq.rows({ member: { create: true, read: true, update: true, delete: true } }),
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
   await asas.kayan.courses.operations.create({ id: 1, title: 'Mine', fee: 300 }, { actor: member })
 
   await assert.rejects(
@@ -526,7 +527,7 @@ test('18. the string form that a typed reference replaced throws and names the r
   } as const
   const mithaq = language(store, table)
   const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, access: mithaq.rows(table), targets: { service: { operations: defaultOperations } } })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
 
   await assert.rejects(
     () => asas.kayan.courses.operations.find({}, { actor: member }),
@@ -581,7 +582,7 @@ test('20. a kayan table is compiled with the language reader, so a role it never
     targets: { service: { operations: defaultOperations } },
   })
   const options = mithaq.rows({ member: { create: true, read: true } }, {})
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
   const tiered = { id: 'u1', tier: 'member', activeOrganizationId: 'org1' }
   const audited = { id: 'u2', tier: 'auditor', roles: ['member'], activeOrganizationId: 'org1' }
   const roled = { id: 'u3', roles: ['member'], activeOrganizationId: 'org1' }
@@ -610,7 +611,7 @@ test('21. an update naming an id that is not there and a delete naming a row ano
   } as const satisfies RowTable
   const mithaq = language(store, table)
   const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, access: mithaq.rows(table), targets: { service: { operations: defaultOperations } } })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
   await asas.kayan.courses.operations.create({ id: 1, title: 'Mine', fee: 300 }, { actor: admin })
   await asas.kayan.courses.operations.create({ id: 2, title: 'Theirs', fee: 400 }, { actor: otherAdmin })
 
@@ -707,7 +708,7 @@ const graded = () => {
     targets: { service: { operations: defaultOperations } },
   })
   const settings = mithaq.defineGlobal({ name: 'settings', fields: settingsFields, access: mithaq.rows(gradedGlobalTable) as Pick<ReturnType<typeof mithaq.rows>, 'read' | 'update'>, targets: { service: { operations: defaultGlobalOperations } } })
-  return { courses, settings, store, ...mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan], global: [settings] }) }
+  return { courses, settings, store, ...mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan], global: [settings] }) }
 }
 
 test('22. the catalog is derived once, an operation key and a field key per declared kayan and per declared global and nothing for a kayan the project never declared', () => {
@@ -842,7 +843,7 @@ test('27. a permission key no kayan declares is refused at buildAsas, naming the
     targets: { service: { operations: defaultOperations } },
   })
   assert.throws(
-    () => mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses] }),
+    () => mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses] }),
     /Access row "member" holds permission "courses\.archive", which is not a key of this project's catalog/,
   )
 })
@@ -879,7 +880,7 @@ test('29. a global holding a row table no kayan shares has its keys checked agai
   const settings = mithaq.defineGlobal({ name: 'settings', fields: tenantSettingsFields(mithaq), targets: { service: { operations: defaultGlobalOperations } } })
 
   assert.throws(
-    () => mithaq.buildAsas({ http: [fetchHttp()], kayan: [organizationOf(mithaq)], global: [settings] }),
+    () => mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [organizationOf(mithaq)], global: [settings] }),
     /Access row "member" holds permission "settings\.archive", which is not a key of this project's catalog/,
   )
 })
@@ -1018,7 +1019,7 @@ const rbacBuilt = () => {
     access: mithaq.rows({ '*': { create: true, read: tenantRow, update: tenantRow } }),
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, roles, memberRoles, notes] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, roles, memberRoles, notes] })
   return { asas, courses, notes, roles, store, target }
 }
 
@@ -1485,12 +1486,12 @@ test('43. a global\'s access is exactly what defineKayan produced: the same inhe
   assert.equal(globalAccess[mark], kayanAccess[mark], 'and it is the one compiled table, shared')
 
   // The refusal reads the declaration rather than the compiled object, so this global builds.
-  assert.ok(mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, organizationOf(mithaq), ...accessKayan], global: [settings] }), 'a global inheriting four callbacks builds')
+  assert.ok(mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, organizationOf(mithaq), ...accessKayan], global: [settings] }), 'a global inheriting four callbacks builds')
 
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         kayan: [organizationOf(mithaq)],
         global: [
           mithaq.defineGlobal({
@@ -1678,7 +1679,7 @@ test('49. a build has exactly one access target, two are refused by name, and a 
   })
   const courses = two.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
   assert.throws(
-    () => two.buildAsas({ http: [fetchHttp()], kayan: [courses] }),
+    () => two.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses] }),
     (thrown: unknown) =>
       thrown instanceof Error &&
       /Targets "rbac" and "provider" both declare capability "access"/.test(thrown.message) &&
@@ -1697,7 +1698,7 @@ test('49. a build has exactly one access target, two are refused by name, and a 
     access: { create: () => true, read: () => true, update: () => false, delete: () => false },
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = floor.buildAsas({ http: [fetchHttp()], kayan: [plain] })
+  const asas = floor.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [plain] })
   const anyone = { id: 'u1', activeOrganizationId: 'org1' }
   await asas.kayan.courses.operations.create({ id: 1, title: 'Mine', fee: 300 }, { actor: anyone })
   assert.equal((await asas.kayan.courses.operations.find({}, { actor: anyone })).docs.length, 1, 'a callback that allows admits, with no key asked for')
@@ -1719,7 +1720,7 @@ const withStatements = () => {
   const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
   return {
     asas: mithaq.buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [courses, ...accessKayan],
       statements: { invitation: ['cancel'], courses: ['archive'] },
     }),
@@ -1767,7 +1768,7 @@ test('51. the default sort runs the chosen field\'s own read access and takes th
     }),
     targets: { service: { operations: defaultOperations } },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [hidden, opaque, ...accessKayan] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [hidden, opaque, ...accessKayan] })
   // The id order and the `createdAt` order disagree, so the page says which of
   // the two it was ordered by.
   const uuid = (last: number) => `00000000-0000-4000-8000-00000000000${last}`
@@ -1805,7 +1806,7 @@ test('51. the default sort runs the chosen field\'s own read access and takes th
     targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const partial = localizedMithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       localizedMithaq.defineKayan({
         name: 'partial',
@@ -1841,7 +1842,7 @@ test('52. a field read callback that reads the row denies the actor-only sort pr
     targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'perRow',
@@ -1914,7 +1915,7 @@ test('53. a service target whose store names no target is refused by name on the
   assert.throws(
     () =>
       mithaq.buildAsas({
-        http: [fetchHttp()],
+        http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
         // Never invoked: the refusal throws before the factory is reached.
         kayan: [{ ...users, auth: { provider: 'better-auth' as const, server: (() => ({})) as never } }],
       }),
@@ -1932,7 +1933,7 @@ test('54. a filter names a locale as a second path segment, and a locale of a fi
     targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -1982,7 +1983,7 @@ test('55. a dotted key whose near field carries no relationTo is refused by name
     targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2048,7 +2049,7 @@ test('56. a field\'s keys other than its name contribute nothing to the catalog,
   // Every key a field may carry beside its name, declared at once, with the three access phases and, under `targets.rbac`,
   // the `onDenied`.
   const built = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -2117,7 +2118,7 @@ test('57. a bulk operation is graded by its own catalog key, and holding that ke
     } as const satisfies RowTable),
     targets: { service: { operations: defaultOperations } },
   })
-  const half = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+  const half = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
   await half.kayan.courses.operations.create({ id: 1, title: 'Mine', fee: 300 }, { actor: admin })
   const partial = await half.kayan.courses.operations
     .updateMany({ where: { title: { equals: 'Mine' } }, data: { fee: 1 } }, { actor: halfGranted })
@@ -2168,7 +2169,7 @@ test('58. the access report answers per operation name beside the four effects, 
   // The report answers for whatever actor the strategy loop resolved, so the actor is handed over by a one-line strategy
   // instead of as an option.
   const asas = mithaq.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [{ ...courses, auth: { name: 'fixture', authenticate: () => ({ user: member }) } }, ...accessKayan],
     auth: { onError: console.error },
   })
@@ -2263,7 +2264,7 @@ test('59. a role the assignment guard cannot read is the largest role it could b
       },
     },
   })
-  const asas = mithaq.buildAsas({ http: [fetchHttp()], kayan: [roleCatalog, memberRoles] })
+  const asas = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [roleCatalog, memberRoles] })
   // A custom role of this tenant, in the kayan the target reads. The guard
   // never sees it, because it looks in a kayan of another name.
   store.rows.set('roleCatalog', [{ id: 1, name: 'super', permissions: ['memberRoles.delete'], tenant: 'org1' }])
@@ -2303,7 +2304,7 @@ test('60. a system role key the catalog does not name is refused at buildAsas, n
       targets: { memory: memoryStore(), zod: zodTarget, rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
     })
     const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
-    return mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+    return mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
   }
   const label = { ar: 'دور', en: 'Role' }
 
@@ -2362,7 +2363,7 @@ test('63. a system role holding an operation key of a kayan and no field key of 
       targets: { memory: memoryStore(), zod: zodTarget, rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
     })
     const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
-    return mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, ...accessKayan] })
+    return mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, ...accessKayan] })
   }
   const label = { ar: 'دور', en: 'Role' }
   assert.throws(
@@ -2387,7 +2388,7 @@ test('63. a system role holding an operation key of a kayan and no field key of 
       targets: { memory: memoryStore(), zod: zodTarget, rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
     })
     const kayan = ['user', 'tag', 'tags'].map((name) => mithaq.defineKayan({ name, fields: { id: courseFields.id, title: courseFields.title }, targets: { service: { operations: defaultOperations } } }))
-    return mithaq.buildAsas({ http: [fetchHttp()], kayan: [...kayan, ...accessKayan], statements: { user: ['impersonate', 'update'] } })
+    return mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [...kayan, ...accessKayan], statements: { user: ['impersonate', 'update'] } })
   }
   assert.doesNotThrow(withProvider({ support: { label, permissions: ['user.impersonate'] } }), 'a role holding only a provider action builds')
   assert.doesNotThrow(withProvider({ support: { label, permissions: ['user.update'] } }), 'and so does one holding a provider action that also names an operation')
@@ -2430,8 +2431,8 @@ test('64. memberRoleTarget answers a member the system roles its Better Auth mem
     },
     targets: { service: { operations: defaultOperations } },
   })
-  assert.throws(() => mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses] }), /The access target reads kayan "member", which this build does not declare/)
-  const built = mithaq.buildAsas({ http: [fetchHttp()], kayan: [courses, membership] })
+  assert.throws(() => mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses] }), /The access target reads kayan "member", which this build does not declare/)
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses, membership] })
   // `owner,stray` names a role the project does not ship, which grants nothing beside the one it does.
   store.rows.set('member', [
     { id: 1, organizationId: 'org1', userId: 'u-owner', role: 'owner,stray' },

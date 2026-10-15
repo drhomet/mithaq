@@ -9,6 +9,7 @@ import { AsasError, codes, denied, invalid, missing } from '../asas/runner/error
 import { sealOf, type Ctx } from '../asas/runner/steps.ts'
 import type { Authorize, ManagedAdmin } from '../asas/runner/write.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
+import { assertMaxBodyBytes, boundedBody } from '../asas/http/fetch.ts'
 import { allowedType } from './allowed-type.ts'
 
 /** Written by the runner when the row is made, from the signed upload, and by nobody after. */
@@ -96,6 +97,8 @@ export type StorageConfig = {
   adapter: string
   /** The largest file in bytes a kayan holds when its `targets.storage` names no `fileSize`. */
   fileSize: number
+  /** The largest request body `uploadInstructions` reads, answered 413 past it: `defaultMaxBodyBytes` or the project's own. */
+  maxBodyBytes: number
   /** The object key, decided before the upload. */
   key: (args: { prefix: string; tenant: string | null; kayan: string; id: string; filename: string }) => string
   verify: (args: VerifyArgs) => Promise<Verified>
@@ -318,6 +321,7 @@ export const resolveStorage = ({ language, resolved, storeOf, active }: {
   if (!Number.isSafeInteger(given.fileSize) || given.fileSize < 1) {
     throw new Error(`storage.fileSize is ${JSON.stringify(given.fileSize)}, and it is a whole number of bytes above 0.`)
   }
+  assertMaxBodyBytes('storage', given.maxBodyBytes)
   if (typeof given.onError !== 'function') throw new Error('storage names no "onError" function, which a file route hands what it threw before it answers 500. Name the project\'s own, such as console.error.')
   const adapters = Object.entries(given.adapters ?? {})
   if (!adapters.length) throw new Error('storage names no adapters, so no file has anywhere to go.')
@@ -482,9 +486,12 @@ export const storageRoutes = <Actor>({
     if (!one) return null
     try {
       if (verb === 'uploadInstructions' && id === undefined && request.method === 'POST') {
+        // Bounded before the actor is asked, so no caller holds the server to a body of any size.
+        const read = await boundedBody(request, config.maxBodyBytes)
+        if (read instanceof Response) return read
         let input: unknown
         try {
-          input = await request.json()
+          input = JSON.parse(await read.text())
         } catch {
           input = undefined
         }

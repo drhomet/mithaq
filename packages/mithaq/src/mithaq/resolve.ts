@@ -1,5 +1,6 @@
 import { admissions, rowsOf, rowsOfField } from './rows.ts'
 import { isRef, refuseLiteral } from './user.ts'
+import { jsonSchemaCheck } from '../base/json-schema.ts'
 import {
   bulkSeals,
   defaultGlobalOperations,
@@ -18,7 +19,7 @@ import {
   type ResolvedOperation,
   type Seal,
 } from '../asas/runner/steps.ts'
-import { kayanServiceKeys, unsortable, type CompoundIndex, type Kayan, type KayanService, type RuntimeField, type LabelFunction, type Localized, type MessageMap, type MessageTree, type ResolvedKayan } from './types.ts'
+import { kayanServiceKeys, unsortable, type CompoundIndex, type Kayan, type KayanService, type RuntimeField, type LabelFunction, type Localized, type MessageMap, type MessageTree, type ResolvedField, type ResolvedKayan } from './types.ts'
 import { defaultKinds } from '../base/kinds.ts'
 import { compareDecimals } from '../base/decimal.ts'
 import type { ScreenField } from '../screen/index.ts'
@@ -43,7 +44,7 @@ export const uniqueRuleIndexes = new WeakSet<object>()
 
 export const isPlainIdentifier = (value: string) => value.length <= 63 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value)
 
-const fixed = new Set(['access', 'column', 'custom', 'dbName', 'description', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
+const fixed = new Set(['access', 'column', 'custom', 'dbName', 'description', 'jsonSchema', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'maxBytes', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
 
 // Every list holds exactly one store or managed read step, and none of the three
 // the runner owns; the effect is read off that one step, so it is never declared.
@@ -689,6 +690,31 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       }
     }
   }
+  const jsonSchemaNamed = (where: string, field: RuntimeField) => {
+    if (field.kind !== 'json' && field.maxBytes !== undefined) throw new Error(`${where} has a maxBytes, and kind "${field.kind}" takes none; only a json field does.`)
+    if (field.kind === 'json' && !(Number.isInteger(field.maxBytes) && field.maxBytes! > 0)) {
+      throw new Error(`${where} is json and names no maxBytes; name maxBytes: defaultJsonMaxBytes, or a whole number of its own.`)
+    }
+    const { jsonSchema } = field
+    if (jsonSchema === undefined) return
+    if (field.kind !== 'json') throw new Error(`${where} has a jsonSchema, and kind "${field.kind}" takes none; only a json field does.`)
+    const schema = (jsonSchema as { schema?: unknown } | null)?.schema
+    if (typeof schema !== 'boolean' && (!schema || typeof schema !== 'object' || Array.isArray(schema))) {
+      throw new Error(`${where} jsonSchema names no "schema"; a schema is held in the field and never fetched from its "uri".`)
+    }
+    const { uri, fileMatch } = jsonSchema
+    if ((uri !== undefined && typeof uri !== 'string') || (fileMatch !== undefined && !(Array.isArray(fileMatch) && fileMatch.every((one) => typeof one === 'string')))) {
+      throw new Error(`${where} jsonSchema "fileMatch" is a list of strings and "uri" a string.`)
+    }
+  }
+  // Else every create that leaves the field out would be refused for a value it never sent.
+  const jsonDefaultNamed = (where: string, field: ResolvedField) => {
+    const value = field.rules?.defaultValue
+    if (field.kind !== 'json' || value === undefined || isRef(value)) return
+    if (new TextEncoder().encode(JSON.stringify(value)).length > field.maxBytes! || (field.jsonSchema && !jsonSchemaCheck(field)(value))) {
+      throw new Error(`${where} defaultValue is refused by its own jsonSchema or maxBytes.`)
+    }
+  }
   const declaredTargets = (where: string, wrote: Record<string, unknown> | undefined, known = targetNames) => {
     for (const name of Object.keys(wrote ?? {})) {
       if (known.has(name)) continue
@@ -821,6 +847,8 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       }
       optionsNamed(where, field.kind, field)
       affixesNamed(where, field.kind, field)
+      jsonSchemaNamed(where, field)
+      jsonDefaultNamed(where, field)
       for (const [screen, block] of Object.entries(field.targets ?? {})) {
         if (!isScreen(language.targets[screen])) continue
         const drawn = block as ScreenField

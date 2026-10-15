@@ -16,6 +16,7 @@ import {
   draftFields,
   drizzleAdapter,
   drizzleTarget,
+  defaultMaxBodyBytes,
   fetchHttp,
   serviceTarget,
   versionOperations,
@@ -65,5 +66,5 @@ test('a global\'s defaults are its own fields and operations, in the order its d
 
 test('a kayan built without defineKayan that writes its operations as a function is refused, since nothing hands it the defaults', () => {
   const raw = { name: 'raw', fields: defaultFields, targets: { service: { operations: () => defaultOperations } } }
-  assert.throws(() => language.buildAsas({ http: [fetchHttp()], kayan: [raw] } as never), /Kayan "raw" writes its operations as a function, which only defineKayan and defineGlobal run/)
+  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [raw] } as never), /Kayan "raw" writes its operations as a function, which only defineKayan and defineGlobal run/)
 })

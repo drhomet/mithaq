@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
 import { z } from 'zod'
 import {
+  defaultMaxBodyBytes,
   actorRoles,
   AsasError,
   base,
@@ -18,6 +19,7 @@ import {
   defaultGlobalFields,
   defaultGlobalOperations,
   defaultJoinLimit,
+  defaultJsonMaxBytes,
   defaultLimit,
   defaultMaxLimit,
   defaultOperations,
@@ -136,7 +138,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const memos = language.defineKayan({
     name: 'memos',
     schemaName: 'tenant_scope',
-    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
+    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, meta: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: {} } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
     // `read: true` for an editor: the broadest answer a row gives.
     // A reader's answer is a filter, so under `tenant: 'mine'` its organizations take a branch of their own.
     access: language.rows({ editor: { create: true, read: true, update: true, delete: true }, reader: { read: { title: { not_equals: 'hidden' } } }, staff: { read: true } } as never),
@@ -359,7 +361,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, secret: 'tenant-scope-a-local-auth-test-secret' }),
     targets: { service: { operations: { ...defaultOperations, ...localAuthOperations } } },
   }
-  return language.buildAsas({ http: [fetchHttp()], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
 type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
@@ -553,6 +555,26 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     // A membership whose roles cannot read adds nothing, and one with none at all is no reach.
     const lone = await actorOf({ active: 'org1', orgs: { org1: [], org2: [] } })
     assert.equal((await refusal(memos().find({}, { actor: lone, tenant: 'mine' }))).status, 403)
+  })
+
+  // The memory store reads no path into a json value; the scope it is ANDed beside is the same either way.
+  if (postgres) test('a filter along a json path reads the active organization alone, and a reader without the field\'s key is refused it, under tenant: \'mine\' too', async () => {
+    const meta = { stage: 'probe', tags: ['x'] }
+    const mine = await memos().create({ title: 'json one', meta }, { actor: one })
+    await memos().create({ title: 'json two', meta }, { actor: two })
+    for (const where of [{ 'meta.stage': { equals: 'probe' } }, { 'meta.tags': { in: ['x'] } }, { meta: { contains: 'probe' } }]) {
+      assert.deepEqual((await memos().find({ where }, { actor: one })).docs.map((row: { id: string }) => row.id), [mine.id], JSON.stringify(where))
+      assert.equal((await memos().count({ where }, { actor: one })).totalDocs, 1)
+    }
+    // `meta` is no key of the reader's, so no path into it, nor `exists`, tells a reader what it holds.
+    const reader = await actorOf({ active: 'org1', orgs: { org1: ['reader'] } })
+    for (const where of [{ 'meta.stage': { equals: 'probe' } }, { 'meta.tags': { exists: true } }, { meta: { like: 'probe' } }, { or: [{ title: { equals: 'x' } }, { 'meta.stage': { equals: 'probe' } }] }]) {
+      const refused = await refusal(memos().find({ where }, { actor: reader }))
+      assert.equal(refused.status, 403, JSON.stringify(where))
+      assert.equal(refused.key, 'error.forbidden.field_read')
+    }
+    const both = await actorOf({ active: 'org1', orgs: { org1: ['editor'], org2: ['reader'] } })
+    assert.equal((await refusal(memos().find({ where: { 'meta.stage': { equals: 'probe' } } }, { actor: both, tenant: 'mine' }))).status, 403)
   })
 
   test('tenant: \'all\' is backoffice staff in the backoffice app alone, and a write takes no tenant', async () => {
@@ -1106,7 +1128,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
 
   test('the HTTP read route takes ?tenant= on both plugs, and a write route refuses it', async () => {
     const actor = await actorOf({ active: 'org1', orgs: { org1: ['editor'], org2: ['reader'] } })
-    for (const plug of [fetchHttp()(built.operations as never), orpcHttp()(built.operations as never)]) {
+    for (const plug of [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })(built.operations as never), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes })(built.operations as never)]) {
       const call = async (path: string, body: unknown) => {
         const response = (await plug.handle(new Request(`http://test/api/memos/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), async () => actor))!
         return { status: response.status, body: (await response.json()) as { docs?: { firmId: string }[] } }
@@ -1164,7 +1186,7 @@ test('a language with no tenant target hands every step ctx.tenant undefined', a
       },
     },
   }
-  const built = language.buildAsas({ http: [fetchHttp()], kayan: [notes] } as never) as unknown as { kayan: { notes: { operations: Record<'create' | 'find', (input: object) => Promise<unknown>> } } }
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] } as never) as unknown as { kayan: { notes: { operations: Record<'create' | 'find', (input: object) => Promise<unknown>> } } }
   seenTenants.length = 0
   await built.kayan.notes.operations.create({ title: 'shared' })
   await built.kayan.notes.operations.find({})

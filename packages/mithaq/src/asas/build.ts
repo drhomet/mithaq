@@ -10,6 +10,7 @@ import { combineWhere } from '../mithaq/where.ts'
 import type { ReaderMap } from './runner/read.ts'
 import { bulk, read as readers, write, type ServiceTarget } from '../service/index.ts'
 import { invalid } from './runner/errors.ts'
+import { boundedBody, defaultMaxBodyBytes } from './http/fetch.ts'
 import { fieldlessOperation, keepOperationKeys } from '../rbac/steps.ts'
 import { resolvedKayans, type ActorBoundAccess, type AdminAccess, type Kayan, type RuntimeField, type ResolvedKayan, type ServiceOf } from '../mithaq/types.ts'
 import { accessTargetOf, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceKeys, serviceTargetOf, type Language, type Store } from '../mithaq/language.ts'
@@ -491,7 +492,7 @@ export const buildAsas = <
     auth?: Auth
     /**
      * The HTTP plugs, asked in order, so the order decides who owns a prefix two claim. Required:
-     * `fetchHttp()` takes no dependency; `orpcHttp()` first gives `asas.router` its typed client.
+     * `fetchHttp` takes no dependency; `orpcHttp` first gives `asas.router` its typed client.
      */
     http: readonly [
       (operations: OperationTable<Procedures<KayanList, GlobalList, Declared<KayanList, GlobalList>, L>>) => Http,
@@ -512,7 +513,7 @@ export const buildAsas = <
   // Refused before any work: core picks no plug of its own.
   if (!http?.length) {
     throw new Error(
-      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp()], or http: [orpcHttp(), fetchHttp()] for the typed client.',
+      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], or http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes }), fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] for the typed client.',
     )
   }
   const globals = (global ?? []) as readonly Kayan[]
@@ -1060,7 +1061,7 @@ export const buildAsas = <
     statements: statements as Readonly<Record<string, readonly string[]>>,
     /** Every built operation, flat. Its `procedures` view is a type, keyed by kayan then operation. */
     operations: operationTable as OperationTable<Procedures<KayanList, GlobalList, All, L>>,
-    /** The router the first plug built, which a typed client is built from; `undefined` for `fetchHttp()`. */
+    /** The router the first plug built, which a typed client is built from; `undefined` for `fetchHttp`. */
     router: plugs[0]?.router as Http['router'],
     /** Every target as the language passed it, so `asas.targets.drizzle.db` is drizzle. A screen also carries its projection under `client`. */
     targets: Object.fromEntries(
@@ -1097,13 +1098,8 @@ export const buildAsas = <
           // Read here first, so a client that goes away mid-body is answered 499 here rather than
           // logged by the provider as its own 500.
           if (!request.body) return strategy.handler(request)
-          let body: ArrayBuffer
-          try {
-            body = await request.arrayBuffer()
-          } catch (thrown) {
-            if (request.signal.aborted) return new Response(null, { status: 499 })
-            throw thrown
-          }
+          const body = await boundedBody(request, defaultMaxBodyBytes)
+          if (body instanceof Response) return body
           return strategy.handler(new Request(request.url, { method: request.method, headers: request.headers, body, signal: request.signal }))
         }
       }

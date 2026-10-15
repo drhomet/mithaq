@@ -61,6 +61,11 @@ The service target's own keys (`beforeSteps`, `authorize`, `softDelete`,
 `store`, `schema` and the rest) are refused at the root, by name, and so is
 `operations`: each kayan declares its own.
 
+A caller's `where` lists at most 1000 values in one `in` or `not_in`, and
+holds at most 200 fields, `and`s and `or`s however nested; past either it is
+refused 400 before the store is asked. An access callback's `where` is the
+project's own and is not held to them.
+
 ### What it returns
 
 `defineMithaq` returns the language's own keys (`locales`, `kinds`, `rules`,
@@ -193,6 +198,66 @@ From `base` (`packages/mithaq/src/base/kinds.ts` `defaultKinds`):
 - `join`: the rows of another kayan whose `on` relationship points back at
   this row. It builds no column; a read populates it through the child kayan's
   own access.
+- `json`: any JSON value, Payload's json field. It is a `jsonb` column holding
+  the value itself, so a row Payload wrote reads back unchanged and Payload
+  reads what mithaq writes; Postgres keeps no key order and one copy of a
+  repeated key. Its rules are `required`, `defaultValue` and `providedBy`.
+  Every json field names `maxBytes`, the most UTF-8 bytes its value's JSON
+  text may hold: `defaultJsonMaxBytes` (1,000,000 bytes) or a number of its
+  own.
+  `jsonSchema` checks each written value against a JSON Schema, as Payload's
+  does:
+
+  ```ts
+  meta: {
+    kind: 'json',
+    label: { en: 'Metadata', ar: 'البيانات الوصفية' },
+    maxBytes: defaultJsonMaxBytes,
+    jsonSchema: {
+      uri: 'a://b/meta.json',
+      fileMatch: ['a://b/meta.json'],
+      schema: { type: 'object', properties: { size: { type: 'integer', minimum: 0 } }, required: ['size'] },
+    },
+  },
+  ```
+
+  A value JSON cannot say (`undefined`, `NaN`, a `Date`, a function, a cycle),
+  one nested past 64 levels, and a string or key holding a NUL or half a
+  surrogate pair, which Postgres cannot store, are refused 400. The schema is
+  held in the field and never fetched from its `uri`. It is checked with Ajv,
+  as draft 2020-12, or as draft-07 where `$schema` names it, with or without
+  its trailing `#`. A keyword, a format or a reference Ajv cannot check is
+  refused at build rather than skipped, and so is a `defaultValue` the
+  field's own schema or `maxBytes` refuses. Rows stored before a schema was
+  added still read; their next save is held to it.
+
+  A schema's `pattern` runs as JavaScript's own `RegExp`, on the server, over
+  each value a writer sends. A pattern that backtracks without end on some
+  input, such as `^(a+)+$`, holds the server for as long as it runs, so write
+  patterns that cannot.
+
+  A query names a path into the value with dots, `{ 'meta.size': { equals: 3 } }`,
+  each segment a key, and a list met at any segment, a list inside a list
+  included, is matched by any of its entries, as Payload's `$.a[*].b[*]` is.
+  It takes `equals`, `not_equals`, `in`, `not_in`, `exists`, `like` and
+  `contains`, each compared with a string, a number, a boolean or `null`. The
+  field's read access covers every path into it, and a path that reaches a
+  json field across a relationship is refused. Nothing orders by one. The
+  admin draws it as a left-to-right JSON text box, and a row's cell as one
+  line of it.
+
+  Where mithaq departs from Payload:
+
+  - A JSON `null` is no value, as a missing key is: `exists: false` and
+    `equals: null` match both, where Payload's `exists` finds a `null`.
+  - `not_equals` and `not_in` hold where the path holds a value and no entry
+    of it equals one named, so a list holding the value does not match.
+    Payload's holds where any entry differs.
+  - An empty `{}` or `[]` is checked against the schema; Payload skips it.
+  - A draft-04 schema is refused at build; Payload reads one.
+  - `contains` is a substring and `like` every word of it, both ignoring
+    case, over each entry as text: a string without its quotes, and an object
+    or a list as its JSON. Payload's `like` is a regular expression.
 
 From the other arkan:
 
@@ -208,8 +273,8 @@ From `base` (`packages/mithaq/src/base/rules.ts` `defaultRules`):
 - `unique`: no two rows hold the same value. On a per-organization kayan that
   means within the organization; see [Tenancy](src/asas/runner/README.md).
 - `index`: the column is indexed.
-- `defaultValue`: a literal, or a reference such as `user.id` to the actor's
-  value. Excludes `defaultNow`.
+- `defaultValue`: a literal, JSON for a `json` field, or a reference such as
+  `user.id` to the actor's value. Excludes `defaultNow`.
 - `defaultNow`: the moment of the write, on create.
 - `nowOnUpdate`: the moment of the write, on every update.
 - `providedBy`: who supplies the value on `create` and on `update`: `client`,
@@ -473,7 +538,7 @@ checks everything, and returns the runtime.
 export const asas = buildAsas({
   kayan: [...betterAuth.core, ...betterAuth.organization, roles, memberRoles, tags, courses],
   global: [settings],
-  http: [orpcHttp({ /* ... */ }), fetchHttp({ context: requestContext })],
+  http: [orpcHttp({ /* ... */ }), fetchHttp({ context: requestContext, maxBodyBytes: defaultMaxBodyBytes })],
   statements: { ...providerStatements },
   auth: { admin: { kayan: user, access: superAdmin }, onError: (error) => console.error(error) },
 })
@@ -489,14 +554,19 @@ Core never falls back to a behaviour of its own. Each default is a named
 every behaviour it might change. `buildAsas` refuses a config that leaves a
 required one out:
 
-- `http`: at least one plug, such as `fetchHttp()`.
+- `http`: at least one plug, such as `fetchHttp({ maxBodyBytes:
+  defaultMaxBodyBytes })`. Each plug requires its `maxBodyBytes`, the largest
+  request body it reads, and answers one past it with 413 before it reads the
+  rest; the template names `defaultMaxBodyBytes` (4 MiB) on both, and an auth
+  route holds every body to it. Files are never sent this way.
 - `auth.onError`, once any kayan carries auth.
 - On the service target: `authorize` (`defaultAuthorize`), `depth`
   (`defaultDepth`, 8), `defaultLimit` (10), `maxLimit` (100), `joinLimit` (10),
   `bulkLimit` (1000), `store` and `schema`. An `audit` step needs an `audit`
   sink.
 - On the storage config: `secret`, `adapters`, `adapter`, `fileSize`
-  (`defaultFileSize`), `onError`, and the functions `key`, `verify`,
+  (`defaultFileSize`), `maxBodyBytes` (`defaultMaxBodyBytes`), which bounds
+  the instructions request as a plug's bounds a call, `onError`, and the functions `key`, `verify`,
   `disposition`, `sweep`, `instructions`, `uploaded`, `removed` and `serve`.
 
 A default that holds policy or talks to the outside world, such as the storage
