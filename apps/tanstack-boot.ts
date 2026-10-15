@@ -2341,8 +2341,9 @@ test('68. every dashboard create and edit page and Settings reads cleanly in bot
       if (path.endsWith('/new') || path === '/settings') assert.match(html, sentence, `${at} draws its kayan's sentence under the title`)
       else assert.doesNotMatch(html, sentence, `${at} draws no sentence of its kayan's on a page of one row`)
       assert.equal(/type="(?:date|datetime-local)"/.test(html), false, `${at} draws no browser date box`)
-      // A picker's search box is no value of the row, so only the boxes a field's text is typed into are read.
-      for (const box of html.match(/<input[^>]*type="text"[^>]*>|<textarea[^>]*>/g) ?? []) if (!box.includes('role="combobox"')) assert.match(box, /dir="auto"/, `${at}: a text box follows its text: ${box}`)
+      // A picker's search box is no value of the row, and a time's spin boxes are digits inside a left-to-right span,
+      // so only the boxes a field's text is typed into are read.
+      for (const box of html.match(/<input[^>]*type="text"[^>]*>|<textarea[^>]*>/g) ?? []) if (!/role="(?:combobox|spinbutton)"/.test(box)) assert.match(box, /dir="auto"/, `${at}: a text box follows its text: ${box}`)
       // A list's own page box is no value of the row either.
       for (const box of html.match(/<input[^>]*type="(?:email|number)"[^>]*>/g) ?? []) if (!box.includes('id="base-ui-')) assert.match(box, /dir="ltr"/, `${at}: an email or a number reads left to right: ${box}`)
       if (path.endsWith('/new')) assert.equal(html.includes('-archived"'), false, `${at} draws no Archived`)
