@@ -81,7 +81,7 @@ export const widget = defineKayan({
   await write('src/features/widget/index.ts', "import { widget } from './widget/widget.ts'\nexport const kayan = [widget] as const\n")
   await write(
     'src/asas.ts',
-    `import { fetchHttp } from 'mithaq'
+    `import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import { buildAsas } from './mithaq.ts'
 import { flatKayan } from './kayan/flat-kayan.ts'
 import * as widget from './features/widget/index.ts'
@@ -159,7 +159,7 @@ export const widget = defineKayan({
   await write('packages/asas/src/mithaq.ts', "export { defineKayan, generate, locales, targets } from '@fixture/mithaq'\n")
   await write(
     'packages/asas/src/asas.ts',
-    `import { fetchHttp } from 'mithaq'
+    `import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import { buildAsas } from '@fixture/mithaq'
 import * as widget from '@fixture/widget'
 export const asas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [...widget.kayan] })
