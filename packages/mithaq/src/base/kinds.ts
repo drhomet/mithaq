@@ -55,8 +55,8 @@ export const isStorableText = (text: string) => !text.includes('\u0000') && text
 /**
  * Plain JSON, nested at most `jsonDepth` deep: no `undefined`, no number that is
  * not finite, no `Date`, class instance or function, no cycle, and no string or key
- * Postgres cannot store. A store would
- * otherwise drop, rewrite or refuse it on the way in, and read back something else.
+ * Postgres cannot store. A store would otherwise drop, rewrite or refuse it on the
+ * way in, and read back something else.
  */
 export const isJson = (value: unknown, open: object[] = []): value is Json => {
   if (typeof value === 'string') return isStorableText(value)
@@ -152,8 +152,8 @@ export const defaultKinds = {
     // `set null` or `cascade` to let it go.
     onDelete: 'restrict',
   }),
-  // Payload's `json` field: any JSON value, stored as it is written, with no wrapping.
-  // Its paths are queried with dot notation, and nothing orders by one.
+  // Payload's `json` field, unwrapped, so each reads a row the other wrote. Nothing orders by one:
+  // jsonb's order is no order a person reads.
   json: kind<Json>(isJson)({
     label: { en: 'JSON', ar: 'JSON' },
     message: { en: 'This is not JSON this field takes.', ar: 'هذه ليست بيانات JSON يقبلها هذا الحقل.' },

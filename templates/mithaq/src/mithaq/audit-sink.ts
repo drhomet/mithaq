@@ -10,18 +10,21 @@ import { same } from 'mithaq/admin'
 export const auditLogName = 'auditLog'
 
 /**
- * One changed column: what it held before the write and what it holds after. `truncated` marks a
- * change one side of which was too long to keep whole, and is kept as the start of its JSON.
+ * One changed column: what it held before the write and what it holds after. A change one side of
+ * which was too long to keep whole is `truncated`: both sides are JSON text, the long one cut short.
  */
 export type Change = { from: unknown; to: unknown; truncated?: true }
 
 /** How many characters of one side of a change an entry keeps: one large json value never swells the log. */
 export const keptLength = 2000
 
-const kept = (value: unknown) => {
-  const text = JSON.stringify(value) ?? ''
-  return text.length > keptLength ? `${text.slice(0, keptLength)}…` : value
+const textOf = (value: unknown) => {
+  if (value === null) return null
+  // By code point, so the cut never leaves half of a surrogate pair, which Postgres refuses.
+  const points = [...JSON.stringify(value)]
+  return points.length > keptLength ? `${points.slice(0, keptLength).join('')}…` : points.join('')
 }
+const tooLong = (value: unknown) => (JSON.stringify(value)?.length ?? 0) > keptLength
 
 /**
  * What the Activity panel draws as a dash: absent, `null`, an empty string or
@@ -41,8 +44,8 @@ export const changesOf = (before: Readonly<Record<string, unknown>>, after: Read
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
     if (same(before[key], after[key]) || (empty(before[key]) && empty(after[key]))) continue
     const [from, to] = [before[key] ?? null, after[key] ?? null]
-    const [keptFrom, keptTo] = [kept(from), kept(to)]
-    changes[key] = keptFrom === from && keptTo === to ? { from, to } : { from: keptFrom, to: keptTo, truncated: true }
+    // Both sides as JSON text where either is cut, so the panel reads a cut change one way.
+    changes[key] = tooLong(from) || tooLong(to) ? { from: textOf(from), to: textOf(to), truncated: true } : { from, to }
   }
   return changes
 }

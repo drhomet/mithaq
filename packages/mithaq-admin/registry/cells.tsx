@@ -17,7 +17,7 @@ function Moment({ value, locale }: { value: unknown; locale: string }): ReactNod
   return text === undefined ? plain(value) : <time dateTime={new Date(value as string).toISOString()} suppressHydrationWarning>{text}</time>
 }
 
-/** How many characters of a json value a row draws. */
+// About a column's width in a row.
 const previewLength = 60
 
 const plain = (value: unknown) => (value === null || value === undefined ? '' : String(value))
@@ -62,12 +62,13 @@ export const cells: Cells = {
   date: ({ value, locale }) => formatDate({ value, locale, day: true }) ?? plain(value),
   textArray: ({ field, value, locale }) => (Array.isArray(value) ? listed(value.map((one) => worded(field, one, locale)), locale) : plain(value)),
   uuid: ({ value }) => <span className="font-mono text-xs">{plain(value)}</span>,
-  // One line of the JSON in a row and all of it on a record page, left to right in any page.
+  // Left to right in an Arabic page too, since JSON's syntax reads that way.
   json: ({ value, whole }) => {
     if (value === null || value === undefined) return ''
     if (whole) return <pre dir="ltr" className="font-mono text-xs whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
-    const text = JSON.stringify(value)
-    return <code dir="ltr" className="font-mono text-xs">{text.length > previewLength ? `${text.slice(0, previewLength)}…` : text}</code>
+    // By code point, so the cut never leaves half of a character a surrogate pair holds.
+    const points = [...JSON.stringify(value)]
+    return <code dir="ltr" className="font-mono text-xs">{points.length > previewLength ? `${points.slice(0, previewLength).join('')}…` : points.join('')}</code>
   },
   relationship: RelationshipCell,
   // Nothing where the read carried no join: an absent key means the read did not ask, an empty array means no children, and a count of zero would say both.

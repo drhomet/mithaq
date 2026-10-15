@@ -115,9 +115,9 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
     <ol className="grid gap-4 text-sm">
       {entries.map((entry) => {
         const kayan = one ?? kayans?.[entry.kayan ?? '']
-        // A side the sink cut is the start of its JSON, which no cell of the field's kind reads.
+        // A cut change holds JSON text, which no cell of the field's kind reads.
         const drawn = (field: ClientField, value: unknown, change: Change): ReactNode =>
-          empty(value) ? '—' : change.truncated && typeof value === 'string' && value.endsWith('…')
+          empty(value) ? '—' : change.truncated
             ? <code dir="ltr" className="break-all font-mono">{value}</code>
             : cellFor({ cells, field })({ kayan: kayan!, field, value, t, locale, titles })
         const at = new Date(entry.createdAt)

@@ -105,7 +105,7 @@ const checkOperatorValue = (said: string, field: string, operator: string, value
 
 // A second segment is a locale or a related field, never both: `resolve` refuses
 // `localized` beside `relationTo` on the field itself, whatever the kind is named.
-// A json field's path goes on into its value, a key per segment, as Payload's does.
+// A json field's path may run past two segments: its keys are no columns, and Payload names them so.
 const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; said: string }) => {
   const parts = key.split('.')
   const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments, or a key at each segment after a json field.`

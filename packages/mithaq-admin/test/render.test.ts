@@ -1665,6 +1665,8 @@ test('178a. a json field is a monospace text area that reads left to right in an
   assert.equal(cell(null), '', 'and nothing at all is no cell')
   assert.match(cell('text'), /&quot;text&quot;/, 'a string reads as JSON, quoted, so it is told from a number')
   assert.equal(cell({ a: 1 }).includes('…'), false, 'a short value is drawn whole')
+  const emoji = cell({ e: '😀'.repeat(100) }).replaceAll('&quot;', '"')
+  assert.ok(emoji.isWellFormed() && emoji.includes(`{"e":"${'😀'.repeat(54)}…`), `a cut never splits a character in two: ${emoji}`)
   const { brokenRule } = await import('../registry/form-rules.tsx')
   assert.equal(brokenRule(field, value), undefined)
   assert.equal(brokenRule(field, Symbol('unparsable')), 'invalid', 'what the box reports for text that is no JSON is refused before a save')
@@ -1757,7 +1759,7 @@ test('170b. a changed value too long to keep whole is kept as the start of its J
   assert.deepEqual(changes.title, { from: 'Old', to: 'New' }, 'a short change is kept whole, with no note')
   assert.equal(changes.meta!.truncated, true)
   assert.equal(changes.meta!.from, `${JSON.stringify(large).slice(0, keptLength)}…`, 'the long side is the start of its JSON')
-  assert.deepEqual(changes.meta!.to, { rows: [] }, 'and the short side of the same change is kept as it is')
+  assert.equal(changes.meta!.to, '{"rows":[]}', 'and the short side of the same change is its JSON whole, so the panel reads both sides one way')
   assert.ok(JSON.stringify(changes).length < keptLength * 2, 'so the entry stays small however large the value')
   const meta = fieldOf({ name: 'meta', kind: 'json' })
   const kayan = { ...courses, fields: [...courses.fields, meta] }
@@ -1767,6 +1769,7 @@ test('170b. a changed value too long to keep whole is kept as the start of its J
     const line = /<li[^>]*data-change="meta"[\s\S]*?<\/li>/.exec(html)?.[0] ?? ''
     assert.ok(line.includes(note), `${locale} says the value was cut: ${line.slice(0, 300)}`)
     assert.ok(line.includes('{&quot;rows&quot;:[{&quot;index&quot;:0'), `and draws its start as text: ${line.slice(0, 300)}`)
+    assert.match(line, /<span data-to="true"><code[^>]*>\{&quot;rows&quot;:\[\]\}<\/code>/, `and the short side as its JSON: ${line.slice(-300)}`)
   }
 })
 
