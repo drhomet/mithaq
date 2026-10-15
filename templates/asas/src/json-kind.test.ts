@@ -160,10 +160,12 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
   const strict = buildAsas({ http: [fetchHttp()], kayan: [settingsKayan(defineKayan, { schema: { required: ['foo'], minimum: 3, properties: { foo: { format: 'email' } } } })] }).kayan.blobs.operations
   for (const data of [{ old: 1 }, 1, { foo: 'not an email' }]) await assert.rejects(() => strict.create({ data } as never), refused, JSON.stringify(data))
   for (const data of [{ foo: 'a@b.co' }, 4, 'text']) await strict.create({ id: crypto.randomUUID(), data })
-  // Payload writes a schema it fetched as draft-07, and one written so reads as draft-07.
-  const draft = buildAsas({ http: [fetchHttp()], kayan: [settingsKayan(defineKayan, { schema: { $schema: 'http://json-schema.org/draft-07/schema#', items: [{ type: 'string' }] } })] }).kayan.blobs.operations
-  await assert.rejects(() => draft.create({ data: [1] }), refused)
-  await draft.create({ id: crypto.randomUUID(), data: ['one', 2] })
+  // Payload writes a schema it fetched as draft-07, and one written so reads as draft-07, with or without the `#`.
+  for (const $schema of ['http://json-schema.org/draft-07/schema#', 'http://json-schema.org/draft-07/schema']) {
+    const draft = buildAsas({ http: [fetchHttp()], kayan: [settingsKayan(defineKayan, { schema: { $schema, items: [{ type: 'string' }] } })] }).kayan.blobs.operations
+    await assert.rejects(() => draft.create({ data: [1] }), refused, $schema)
+    await draft.create({ id: crypto.randomUUID(), data: ['one', 2] })
+  }
 
   const build = (field: Record<string, unknown>, schemaTarget: typeof zodTarget | typeof plainTarget = zodTarget) => () => {
     const { defineKayan, buildAsas } = language(schemaTarget)

@@ -7,7 +7,6 @@ import { Ajv2020 } from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
 import type { ResolvedField } from '../mithaq/types.ts'
 
-const draft07 = 'http://json-schema.org/draft-07/schema#'
 // One compile per schema, though a schema target shapes each field more than once.
 const compiled = new WeakMap<object, (value: unknown) => boolean>()
 
@@ -23,7 +22,7 @@ export const jsonSchemaCheck = (field: ResolvedField): ((value: unknown) => bool
   const { schema } = jsonSchema
   // `strictTypes` and `strictTuples` only ask a schema to say more than JSON Schema requires.
   const options = { strictTypes: false, strictTuples: false } as const
-  const ajv = typeof schema === 'object' && schema.$schema === draft07 ? new Ajv(options) : new Ajv2020(options)
+  const ajv = typeof schema === 'object' && /^http:\/\/json-schema\.org\/draft-07\/schema#?$/.test(String(schema.$schema)) ? new Ajv(options) : new Ajv2020(options)
   addFormats.default(ajv)
   let validate: (value: unknown) => unknown
   try {
