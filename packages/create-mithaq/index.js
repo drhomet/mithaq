@@ -160,11 +160,18 @@ const textsUnder = (folder) =>
     .map((file) => join(folder, file))
 
 /**
- * Whether a package's `exports` names `sub` (`''` for the package itself): a key equal to it, or a `*` pattern it lies
- * under, as Node resolves one.
+ * Whether a package's `exports` names `sub` (`''` for the package itself) as Node resolves it: the key equal to it, else
+ * the longest `*` pattern it lies under, and not where that key's value is `null`, an exclusion. A `.` or `..` segment
+ * names nothing, since it would climb out of what the key exports.
  */
-export const exportsPath = (exports, sub) =>
-  Object.keys(exports ?? {}).some((key) => (key.endsWith('*') ? `.${sub}`.startsWith(key.slice(0, -1)) : key === (sub === '' ? '.' : `.${sub}`)))
+export const exportsPath = (exports, sub) => {
+  if (sub.split('/').some((segment) => segment === '.' || segment === '..')) return false
+  const asked = sub === '' ? '.' : `.${sub}`
+  const [, value] = Object.entries(exports ?? {})
+    .filter(([key]) => (key.endsWith('*') ? asked.startsWith(key.slice(0, -1)) : key === asked))
+    .sort(([a], [b]) => (b === asked) - (a === asked) || b.length - a.length)[0] ?? [, null]
+  return value !== null
+}
 
 /**
  * Folds the monorepo into one package at `project`: the language's and the asas's `src/` side by side, each feature

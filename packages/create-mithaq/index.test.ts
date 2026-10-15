@@ -307,4 +307,8 @@ test('in one package an import of a feature resolves only where that feature exp
   assert.equal(exportsPath(read('tags'), '/tags/ui/anything.tsx'), false, 'a feature exporting no ui/ admits none')
   assert.equal(exportsPath(read('courses'), '/courses/ui/fee-cell.tsx'), false, 'nor one exporting another path')
   assert.equal(exportsPath(read('roles'), '/roles/roles.ts'), false, 'and a pattern admits only what lies under it')
+  for (const sub of ['/roles/ui/../roles.ts', '/roles/ui/./role-form.tsx', '/roles/ui/../../index.ts']) assert.equal(exportsPath(read('roles'), sub), false, `a dot segment climbs nowhere: ${sub}`)
+  const excluding = { '.': './index.ts', './ui/*': './ui/*', './ui/private/*': null }
+  assert.equal(exportsPath(excluding, '/ui/open.tsx'), true, 'a path under a pattern is admitted')
+  assert.equal(exportsPath(excluding, '/ui/private/secret.tsx'), false, 'unless a more specific key excludes it with null, as Node does')
 })
