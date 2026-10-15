@@ -627,7 +627,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
   test('a raw write in a step naming a versions table or a join table is refused, so another organization\'s snapshots and join rows stay out of reach', async () => {
     const papers = built.kayan.papers.operations
     const notes = built.kayan.notes.operations
-    const theirs = await papers.create({ title: 'theirs', _status: 'published' }, { actor: two })
+    const theirs = await papers.create({ title: 'theirs', memo: null, _status: 'published' }, { actor: two })
     const theirNote = await notes.create({ title: 'their note', memo: null, memoSet: [ids.org2], tag: null, cover: null }, { actor: two })
     const snapshots = async () => (await store.find({ kayan: '_papers_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { parent: { equals: theirs.id } } } })).docs
     const held = await snapshots()
@@ -653,8 +653,8 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
 
   test('the operation\'s own row keeps its version while a raw write in its step reaches a sibling, which saves none', async () => {
     const papers = built.kayan.papers.operations
-    const own = await papers.create({ title: 'own', _status: 'published' }, { actor: one })
-    const sibling = await papers.create({ title: 'sibling', _status: 'published' }, { actor: one })
+    const own = await papers.create({ title: 'own', memo: null, _status: 'published' }, { actor: one })
+    const sibling = await papers.create({ title: 'sibling', memo: null, _status: 'published' }, { actor: one })
     const count = async (id: string) => (await papers.findVersions({ where: { parent: { equals: id } } }, { actor: one })).totalDocs
     const before = { own: await count(own.id), sibling: await count(sibling.id) }
     Object.assign(aimed, { kayan: 'papers', id: sibling.id, data: { title: 'sibling raw' } })
@@ -668,7 +668,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
   // Postgres answers a uuid in lowercase whatever case it was asked in; the memory store keeps the case it was given.
   test('a step naming its own row as the store answered it, while the caller sent the id in capitals, still saves the row\'s version', { skip: !postgres }, async () => {
     const papers = built.kayan.papers.operations
-    const own = await papers.create({ title: 'own', _status: 'published' }, { actor: one })
+    const own = await papers.create({ title: 'own', memo: null, _status: 'published' }, { actor: one })
     const count = async () => (await papers.findVersions({ where: { parent: { equals: own.id } } }, { actor: one })).totalDocs
     const before = await count()
     Object.assign(aimed, { kayan: 'papers', id: own.id, data: { title: 'by the step' } })
