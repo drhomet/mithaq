@@ -116,6 +116,8 @@ const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; s
   if (!resolved.target) throw new Error(unsupported)
   const target = resolved.target.fields[path]
   if (!target) throw new Error(`${said} path "${key}" names unknown related field.`)
+  // A path into json across a hop would be a third segment, and a json value compared whole has no store answer.
+  if (target.kind === 'json') throw new Error(`${said} path "${key}" reaches json field "${path}" across a relationship, and a json field is filtered on its own kayan alone.`)
   return { field, key, kind: target.kind, operators: target.operators }
 }
 

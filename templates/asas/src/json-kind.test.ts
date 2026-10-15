@@ -121,6 +121,20 @@ test('every plug refuses a request body past its maxBodyBytes as a 413 before re
   assert.equal((await send(orpcHttp(), JSON.stringify({ data: 'x'.repeat(defaultMaxBodyBytes) })))!.status, 413)
 })
 
+test('a path that crosses a relationship onto a json field, one row or a set, is the caller\'s 400', async () => {
+  const { defineKayan, buildAsas } = language()
+  const notes = defineKayan({
+    name: 'notes',
+    access: allowAccess,
+    fields: { ...defaultFields, owner: { kind: 'relationship', relationTo: 'blobs' }, owners: { kind: 'relationship', relationTo: 'blobs', hasMany: true } },
+    targets: { service: { operations: defaultOperations } },
+  })
+  const operations = buildAsas({ http: [fetchHttp()], kayan: [settingsKayan(defineKayan), notes] }).kayan.notes.operations
+  for (const key of ['owner.data', 'owners.data', 'owner.data.x']) {
+    await assert.rejects(() => operations.find({ where: { [key]: { exists: true } } as never }), (error: unknown) => refused(error) && /json/.test((error as Error).message), key)
+  }
+})
+
 test('a json field with a jsonSchema refuses a value its schema refuses through both schema targets, keeps a value it takes as written, and is refused at build where the schema cannot be held to', async () => {
   const schema = {
     uri: 'a://b/foo.json',
