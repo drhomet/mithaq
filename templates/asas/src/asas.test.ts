@@ -1350,10 +1350,14 @@ test('0q. an invitation the server accepts for a sign-up is held to the rule the
 test('0u. with one organization its name lives in code: the row takes it on the first request a process serves, and nobody renames it over HTTP', async () => {
   const [one] = await modeRows('select id from organization')
   await db.execute(`update organization set name = 'Drifted', names = null where id = '${one!.id}'`)
+  // A second organization, as a project that held many has: only the first, the one organization, takes the name.
+  await db.execute(`insert into organization (id, name, names, slug, created_at) values ('second-0u', 'Second 0u', '{"en":"Second 0u"}', 'second-0u', now() + interval '1 minute')`)
   const school = modeServer({ ...schoolSettings, organizationName: { en: 'Synced 0u', ar: 'متزامنة 0u' } })
   const owner = await ownerOf(school)
   const [synced] = await modeRows(`select name, names from organization where id = '${one!.id}'`)
   assert.deepEqual([synced!.name, JSON.parse(String(synced!.names))], ['Synced 0u', { en: 'Synced 0u', ar: 'متزامنة 0u' }], 'the row is written from code')
+  assert.deepEqual(await modeRows(`select name, names from organization where id = 'second-0u'`), [{ name: 'Second 0u', names: '{"en":"Second 0u"}' }], 'and any other organization keeps its own name')
+  await db.execute(`delete from organization where id = 'second-0u'`)
   assert.deepEqual(await answerOf(await askedOf(school, '/organization/update', { data: { name: 'Renamed' }, organizationId: owner.organization }, { cookie: owner.headers.get('cookie')! })), [403, 'ORGANIZATION_NAME_IN_CODE'], 'a rename is refused, naming where the name lives')
   assert.deepEqual(await answerOf(await askedOf(school, '/organization/update', { data: { names: JSON.stringify({ en: 'Renamed' }) }, organizationId: owner.organization }, { cookie: owner.headers.get('cookie')! })), [403, 'ORGANIZATION_NAME_IN_CODE'], 'in any locale')
   assert.equal((await modeRows(`select name from organization where id = '${one!.id}'`))[0]!.name, 'Synced 0u', 'and nothing was renamed')

@@ -1140,7 +1140,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   const users = store.tables.user as { role: unknown }
   const administered = async (db: Executes) =>
     (await db.execute(sql`select 1 from ${users} where ${users.role} <> 'user' and exists (select 1 from unnest(string_to_array(${users.role}, ',')) as one where btrim(one, E' \\t\\n\\r\\f\\x0b') in ${Object.keys(backofficeRoles)}) limit 1`)).rows.length > 0
-  const organizationTable = store.tables.organization as { name: unknown; names: unknown }
+  const organizationTable = store.tables.organization as { id: unknown; createdAt: unknown; name: unknown; names: unknown }
   const organized = async (db: Executes) => (await db.execute(sql`select 1 from ${organizationTable} limit 1`)).rows.length > 0
   const oneOrganization = settings.organizations !== 'many'
   // With one organization its name lives in code, and the row takes it on the first request this process serves,
@@ -1148,7 +1148,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   let synced: Promise<void> | undefined
   const syncName = async () => {
     const { name, names } = namesOf(settings.organizationName)
-    await (store.db as Executes).execute(sql`update ${organizationTable} set ${sql.identifier('name')} = ${name}, ${sql.identifier('names')} = ${names} where ${organizationTable.name} is distinct from ${name} or ${organizationTable.names} is distinct from ${names}`)
+    // The oldest row alone, the one `joinOpen` joins: a project that held many keeps every other's own name.
+    const one = sql`(select ${organizationTable.id} from ${organizationTable} order by ${organizationTable.createdAt}, ${organizationTable.id} limit 1)`
+    await (store.db as Executes).execute(sql`update ${organizationTable} set ${sql.identifier('name')} = ${name}, ${sql.identifier('names')} = ${names} where ${organizationTable.id} = ${one} and (${organizationTable.name} is distinct from ${name} or ${organizationTable.names} is distinct from ${names})`)
   }
   const namedInCode = {
     id: 'named-in-code',
