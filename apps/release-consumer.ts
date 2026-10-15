@@ -370,8 +370,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       // The owner adds a person in one request, and the link that chooses the password goes to that person's mailbox.
       const person = `added-${stamp}@example.com`
       const added = await post('organization/add-person', { name: 'Added', email: person }, { cookie: cookieOf(signedIn) })
-      assert.equal(added.status, 200, `${await added.text()}\n${output}`)
-      const addedId = ((await added.clone().json()) as { user?: { id?: string } }).user?.id
+      // Read once: the assertion's message is built before it is judged, so it reads the body even when it passes.
+      const addedText = await added.text()
+      assert.equal(added.status, 200, `${addedText}\n${output}`)
+      const addedId = (JSON.parse(addedText) as { user?: { id?: string } }).user?.id
       const chosen = await post('reset-password', { token: (await linkMailed(person)).searchParams.get('token'), newPassword: 'release-test-password' })
       assert.equal(chosen.status, 200, `the added person chooses their password from the mailed link: ${await chosen.text()}`)
       assert.equal((await post('sign-in/email', { email: person, password: 'release-test-password' })).status, 200, 'and signs in')
