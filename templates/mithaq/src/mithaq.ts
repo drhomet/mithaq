@@ -305,6 +305,8 @@ export const backofficeUi = folderOf(new URL('ui-backoffice/', asasSource))
 // add-on: courses
 /** Every screen's provider of course titles for a session's label, which the courses feature draws. */
 const sessionLabels = folderOf(new URL('courses/enrollments/ui/', featuresFolder))('session-labels.tsx#SessionLabels')
+/** The portal's own look, which the courses feature draws for its students. */
+const coursesPortal = folderOf(new URL('courses/portal/ui/', featuresFolder))
 // end add-on: courses
 
 /**
@@ -348,12 +350,27 @@ export const portalScreen = screenTarget({
     sessionLabels,
     // end add-on: courses
   ],
-  pages: { home: { path: '/', component: portalUi('home.tsx#Home') } },
-  // Its own top shell, which draws no link to the backoffice app: staff reach it
-  // from the dashboard alone. Every portal page is that shell over one of its
-  // layouts: its own single column, or the dashboard's record layout, which a
-  // course's edit page draws.
-  layouts: { top: ui('top-shell.tsx#PortalTopShell'), page: portalUi('page.tsx#Page'), record: shared.layouts.record },
+  pages: {
+    // add-on: courses
+    // A greeting, the viewer's next session, and courses it can join.
+    home: { path: '/', component: portalUi('courses-home.tsx#Home') },
+    // end add-on: courses
+    // without add-on: courses
+    // home: { path: '/', component: portalUi('home.tsx#Home') },
+    // end without add-on: courses
+  },
+  // Its own shell, which draws no link to the backoffice app: staff reach it from
+  // the dashboard alone. Every page a tree draws is that shell over the portal's
+  // single column; the courses example's pages draw it whole.
+  layouts: {
+    // add-on: courses
+    top: coursesPortal('portal-shell.tsx#PortalShell'),
+    // end add-on: courses
+    // without add-on: courses
+    // top: ui('top-shell.tsx#PortalTopShell'),
+    // end without add-on: courses
+    page: portalUi('page.tsx#Page'),
+  },
   components: {},
 })
 

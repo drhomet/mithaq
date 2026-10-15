@@ -1,10 +1,10 @@
 import { defaultFields, draftFields, folderOf, invalid, type Ctx, type ReadTools, type WriteTools } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '@asas/mithaq'
-import { activity, appPage, danger, backofficeList, backofficeRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { sessions } from '../sessions/sessions.ts'
-import { onOffer } from '../domain/on-offer.ts'
+import { seatsTaken } from '../domain/seats.ts'
 import { expectedUpdatedAt } from '@asas/mithaq/steps/expected-updated-at.ts'
 import { archivedRow, marks, notArchived, reason, reasonInput, unarchived } from '../domain/archive.ts'
 
@@ -13,6 +13,8 @@ import { archivedRow, marks, notArchived, reason, reasonInput, unarchived } from
  * through `ui`, `dashboardUi` and `portalUi` from `../mithaq.ts`.
  */
 const ui = folderOf(new URL('./ui/', import.meta.url))
+/** The portal's pages, which the courses feature draws for its students. */
+const portalUi = folderOf(new URL('../portal/ui/', import.meta.url))
 /** What a fee column draws on every screen. */
 const feeCell = ui('fee-cell.tsx#FeeCell')
 /** What the list's Status column draws. */
@@ -50,7 +52,7 @@ const archivedToArchivers = ({ user }: { user: unknown }) =>
 const details = [
   { section: 'about', label: { en: 'About the course', ar: 'عن الدورة' }, fields: ['title', 'summary', 'cover', 'details'] },
   { section: 'pricing', label: { en: 'Pricing', ar: 'التسعير' }, fields: [{ row: ['fee', 'currency'] }] },
-  { section: 'teaching', label: { en: 'Teaching', ar: 'التدريس' }, fields: ['delivery', { field: 'accessCode', when: live }, 'notifications'] },
+  { section: 'teaching', label: { en: 'Teaching', ar: 'التدريس' }, fields: ['delivery', { field: 'accessCode', when: live }, 'notifications', { field: 'selfEnroll', component: 'switch' }] },
 ] as const
 const catalogue = { section: 'catalogue', label: { en: 'Catalogue', ar: 'الدليل' }, fields: ['tags'] } as const
 /**
@@ -96,11 +98,19 @@ const createSessions = async (
   return ctx
 }
 
-/** What `findWithSessions` puts on the course, one entry per session it may read. */
+/**
+ * What `findWithSessions` puts on the course, one entry per session it may
+ * read, with the seats it has left: `null` where it holds any number. A reader
+ * who sees only its own seats, a student, could not count the others'.
+ */
 const sessionRow = z.object({
   id: z.guid(),
   startsAt: z.date(),
   capacity: z.number().nullable(),
+  venue: z.string().nullish(),
+  format: z.string().nullish(),
+  archived: z.boolean().nullish(),
+  seatsLeft: z.number().nullable(),
 })
 
 /**
@@ -118,7 +128,13 @@ const attachSessions = async (ctx: Ctx, tools: ReadTools): Promise<Ctx> => {
     where: { course: { equals: course.id } },
     limit: 0,
   })
-  return { ...ctx, data: { ...course, sessions: found.docs } }
+  // Each session was read under the reader's access, so only the seats of a session it may read are counted.
+  // ponytail: one count per session, a grouped count when a course holds many sessions.
+  const counted = await Promise.all(found.docs.map(async (one) => ({
+    ...one,
+    seatsLeft: typeof one.capacity === 'number' ? Math.max(0, one.capacity - (await seatsTaken({ session: one.id }))) : null,
+  })))
+  return { ...ctx, data: { ...course, sessions: counted } }
 }
 
 export const courses = defineKayan({
@@ -230,9 +246,8 @@ export const courses = defineKayan({
           // What a screen's button asks for beyond the row's id, said as fields: the
           // dialog draws `reason` through the control every text field uses and keys
           // its label `courses.operations.archive.reason`. `buildAsas` refuses a
-          // field it names no key for. The portal declares the same box, because a
-          // screen that declares none has no dialog, sends no reason and is refused.
-          targets: { dashboard: { fields: { reason } }, portal: { fields: { reason } } },
+          // field it names no key for. A screen that declares none has no dialog.
+          targets: { dashboard: { fields: { reason } } },
           input: () => reasonInput('courses.operations.archive'),
           steps: ({ steps }) => [marks(true), steps.update],
         },
@@ -405,62 +420,16 @@ export const courses = defineKayan({
       },
     },
     /**
-     * A shorter list and form than the dashboard's: `currency` as `radio` where
-     * the dashboard draws `select`, and `audience` as a row of buttons, from the
-     * one declaration of each field. Its row archive asks for a reason as the
-     * dashboard's does, and its edit page's archive is a component of the
-     * portal's own. It lists the courses on offer alone: an archived course is
-     * left out of its list and its home's count, and its page opens for no
-     * student or instructor.
+     * The students' own pages, each drawn whole by the courses feature's portal: the catalogue of what is on
+     * offer, and a course's page with its sessions and, where the course lets students enroll themselves, the
+     * seats they take. Both read the courses that are published and not archived alone.
      */
     portal: {
       useAsTitle: 'title',
-      baseFilter: onOffer,
       description: { en: 'The courses on offer.', ar: 'الدورات المعروضة.' },
       pages: {
-        list: {
-          path: '/courses',
-          // Opens by title and 25 to a page, which the URL overrides, with
-          // the same archive on each row not archived yet.
-          page: topPage([{ layout: 'page', main: [{ list: {
-            columns: ['title', 'fee'],
-            filters: ['title'],
-            search: ['title'],
-            empty: ui('no-courses-on-offer.tsx#NoCourses'),
-            sort: 'title',
-            limit: 25,
-            row: [{
-              button: 'archive',
-              when: unarchived,
-              label: { en: 'Archive', ar: 'أرشفة' },
-              fields: ['reason'],
-            }],
-          } }] }]),
-        },
-        // The dashboard's record layout: the form's fields in sections, and the
-        // archive in the danger zone under it, only over a row not archived yet,
-        // drawn by the portal's own button, which writes the reason in the viewer's locale.
-        edit: {
-          path: '/courses/:id',
-          page: topPage([{
-            layout: 'record',
-            main: [{ form: [
-              { section: 'about', label: { en: 'About the course', ar: 'عن الدورة' }, fields: ['title', 'summary', 'cover', 'details'] },
-              { section: 'pricing', label: { en: 'Pricing', ar: 'التسعير' }, fields: [{ row: ['fee', 'currency'] }, { field: 'audience', component: 'buttonGroup' }] },
-              { section: 'teaching', label: { en: 'Teaching', ar: 'التدريس' }, fields: ['delivery', { field: 'accessCode', when: live }, 'opensOn'] },
-            ] }],
-            // Drawn only for a viewer who may archive, so a danger zone with
-            // nothing in it is not drawn at all.
-            danger: [{
-              button: 'archive',
-              when: { and: [unarchived, { '$user.collections.courses.operations.archive': { equals: true } }] },
-              label: { en: 'Archive', ar: 'أرشفة' },
-              reload: true,
-              component: ui('archive-button.tsx#ArchiveButton'),
-              confirm: { title: { en: 'Archive this course?', ar: 'أرشفة هذه الدورة؟' }, body: { en: 'Students stop seeing it.', ar: 'يتوقف الطلاب عن رؤيتها.' } },
-            }],
-          }]),
-        },
+        list: { path: '/courses', component: portalUi('catalogue.tsx#Catalogue') },
+        view: { path: '/courses/:id', component: portalUi('course.tsx#Course') },
       },
     },
   },
@@ -620,5 +589,12 @@ export const courses = defineKayan({
     // deleted while a course points at it, since an upload restricts. Declared
     // last, for the same column order.
     cover: { kind: 'upload', relationTo: 'media', label: { en: 'Cover image', ar: 'صورة الغلاف' } },
+    // Whether a student takes a seat in this course's sessions from the portal. Off, staff enroll each student.
+    // Declared last, for the same column order.
+    selfEnroll: {
+      kind: 'checkbox',
+      label: { en: 'Students may enroll themselves', ar: 'يسجّل الطلاب أنفسهم' },
+      rules: { defaultValue: false },
+    },
   },
 })

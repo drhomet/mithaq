@@ -94,8 +94,8 @@ export const addOns = {
   // details are rich text and a course's cover is one of the media.
   courses: {
     needs: ['media', 'roles', 'audit-log', 'rich-text'],
-    files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', ...['courses', 'sessions', 'enrollments'].map((one) => `packages/asas/src/messages/${one}.json`)],
-    without: ['packages/asas/src/ui-dashboard/home.tsx'],
+    files: ['packages/features/courses', 'packages/asas/src/ui-dashboard/dashboard.tsx', 'packages/asas/src/ui-portal/courses-home.tsx', ...['courses', 'sessions', 'enrollments'].map((one) => `packages/asas/src/messages/${one}.json`)],
+    without: ['packages/asas/src/ui-dashboard/home.tsx', 'packages/asas/src/ui-portal/home.tsx'],
     packages: [],
     copy: [],
     tables: true,
@@ -208,11 +208,12 @@ const foldIntoOnePackage = (project) => {
     dependencies: own(Object.assign({}, language.dependencies, ...ofFeatures.map((one) => one.dependencies), asas.dependencies, app.dependencies)),
     devDependencies: own(Object.assign({}, language.devDependencies, ...ofFeatures.map((one) => one.devDependencies), asas.devDependencies, app.devDependencies, root.devDependencies)),
   })
-  // A feature is reached through its index, or its browser-safe `domain/`, as its `exports` say.
+  // A feature is reached through its index, or a folder its `exports` open, such as its browser-safe `domain/`.
+  const opened = Object.fromEntries(features.map((one, index) => [one, Object.keys(ofFeatures[index].exports ?? {}).filter((key) => key.endsWith('/*')).map((key) => key.slice(1, -1))]))
   const targetOf = (name, sub) => {
     if (name === 'mithaq') return sub === '' ? 'src/mithaq.ts' : sub === '/auth' ? 'src/mithaq/auth/index.ts' : ['/auth/backoffice-roles', '/auth/organizations'].includes(sub) ? `src/mithaq${sub}.ts` : `src${sub}`
     if (sub === '') return `src/features/${name}/index.ts`
-    if (sub.startsWith('/domain/')) return `src/features/${name}${sub}`
+    if (opened[name]?.some((folder) => sub.startsWith(folder))) return `src/features/${name}${sub}`
     throw new Error(`@asas/${name}${sub} reaches past the feature's exports.`)
   }
   for (const file of textsUnder(at('src')).filter((one) => /\.tsx?$/.test(one))) {

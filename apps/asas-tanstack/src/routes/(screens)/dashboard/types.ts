@@ -24,6 +24,7 @@ export type CoursesValues = {
   _status: 'draft' | 'published' | null
   details: { root: Record<string, unknown> } | null
   cover: string | null
+  selfEnroll: boolean | null
 }
 export type SessionsValues = {
   id: string
@@ -92,7 +93,6 @@ export type SettingsValues = {
   updatedAt: Date
   createdAt: Date
   organization: string
-  siteTitle: string
   maintenance: boolean | null
   contactEmail: string | null
   globalType: string

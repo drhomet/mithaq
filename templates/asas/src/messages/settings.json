@@ -32,8 +32,8 @@
     "en": "Maintenance"
   },
   "maintenance.description": {
-    "ar": "ما دام هذا مفعلا، يخبر الموقع زواره بأنه مغلق للصيانة.",
-    "en": "While this is on, the site tells visitors it is closed for maintenance."
+    "ar": "ما دام هذا مفعلا، تخبر البوابة الطلاب بأنها مغلقة للصيانة. ويواصل الموظفون عملهم.",
+    "en": "While this is on, the portal tells students it is closed for maintenance. Staff keep working."
   },
   "maintenance.invalid": {
     "ar": "يجاب على هذا بنعم أو لا.",
@@ -46,21 +46,5 @@
   "organization": {
     "ar": "المؤسسة",
     "en": "Organization"
-  },
-  "siteTitle": {
-    "ar": "عنوان الموقع",
-    "en": "Site title"
-  },
-  "siteTitle.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "siteTitle.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "siteTitle.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
   }
 }

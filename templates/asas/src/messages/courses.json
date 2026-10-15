@@ -179,6 +179,18 @@
     "ar": "الجلسات المجدولة",
     "en": "Scheduled sessions"
   },
+  "selfEnroll": {
+    "ar": "يسجّل الطلاب أنفسهم",
+    "en": "Students may enroll themselves"
+  },
+  "selfEnroll.invalid": {
+    "ar": "يجاب على هذا بنعم أو لا.",
+    "en": "This is answered yes or no."
+  },
+  "selfEnroll.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
   "singular": {
     "ar": "دورة",
     "en": "Course"

@@ -7,7 +7,7 @@
   "pages": {
     "home": {
       "path": "/",
-      "component": "./src/ui-portal/home.tsx#Home"
+      "component": "./src/ui-portal/courses-home.tsx#Home"
     }
   },
   "nav": [
@@ -25,9 +25,8 @@
     }
   ],
   "layouts": {
-    "top": "@asas/mithaq:./src/ui/top-shell.tsx#PortalTopShell",
-    "page": "./src/ui-portal/page.tsx#Page",
-    "record": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage"
+    "top": "@asas/courses:./portal/ui/portal-shell.tsx#PortalShell",
+    "page": "./src/ui-portal/page.tsx#Page"
   },
   "components": {},
   "controls": {
@@ -530,6 +529,19 @@
           "relationTo": "media",
           "component": "upload",
           "cell": "upload"
+        },
+        {
+          "name": "selfEnroll",
+          "kind": "checkbox",
+          "label": {
+            "en": "Students may enroll themselves",
+            "ar": "يسجّل الطلاب أنفسهم"
+          },
+          "rules": {
+            "required": false
+          },
+          "component": "checkbox",
+          "cell": "checkbox"
         }
       ],
       "operations": [
@@ -580,23 +592,7 @@
         },
         {
           "name": "archive",
-          "effect": "update",
-          "fields": [
-            {
-              "name": "reason",
-              "kind": "text",
-              "label": {
-                "en": "Reason",
-                "ar": "السبب"
-              },
-              "rules": {
-                "required": true,
-                "maxLength": 200
-              },
-              "component": "text",
-              "cell": "text"
-            }
-          ]
+          "effect": "update"
         },
         {
           "name": "unarchive",
@@ -616,20 +612,6 @@
         "en": "The courses on offer.",
         "ar": "الدورات المعروضة."
       },
-      "baseFilter": {
-        "or": [
-          {
-            "archived": {
-              "exists": false
-            }
-          },
-          {
-            "archived": {
-              "equals": false
-            }
-          }
-        ]
-      },
       "drafts": {
         "autosave": {
           "interval": 2000
@@ -638,234 +620,11 @@
       "pages": {
         "list": {
           "path": "/courses",
-          "page": {
-            "shell": "@asas/mithaq:./src/ui/top-shell.tsx#PortalTopShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
-            "nav": [
-              {
-                "nav": {}
-              }
-            ],
-            "main": [
-              {
-                "layout": "./src/ui-portal/page.tsx#Page",
-                "main": [
-                  {
-                    "list": {
-                      "columns": [
-                        {
-                          "field": "title",
-                          "cell": "text",
-                          "decided": "table"
-                        },
-                        {
-                          "field": "fee",
-                          "cell": "@asas/courses:./courses/ui/fee-cell.tsx#FeeCell",
-                          "decided": "field"
-                        }
-                      ],
-                      "filters": [
-                        "title"
-                      ],
-                      "search": [
-                        "title"
-                      ],
-                      "empty": "@asas/courses:./courses/ui/no-courses-on-offer.tsx#NoCourses",
-                      "row": [
-                        {
-                          "button": "archive",
-                          "label": {
-                            "en": "Archive",
-                            "ar": "أرشفة"
-                          },
-                          "fields": [
-                            "reason"
-                          ],
-                          "when": {
-                            "or": [
-                              {
-                                "record.archived": {
-                                  "exists": false
-                                }
-                              },
-                              {
-                                "record.archived": {
-                                  "equals": false
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      ],
-                      "sort": "title",
-                      "limit": 25
-                    }
-                  }
-                ]
-              }
-            ]
-          }
+          "component": "@asas/courses:./portal/ui/catalogue.tsx#Catalogue"
         },
-        "edit": {
+        "view": {
           "path": "/courses/:id",
-          "page": {
-            "shell": "@asas/mithaq:./src/ui/top-shell.tsx#PortalTopShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
-            "nav": [
-              {
-                "nav": {}
-              }
-            ],
-            "main": [
-              {
-                "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
-                "main": [
-                  {
-                    "form": [
-                      {
-                        "section": "about",
-                        "label": {
-                          "en": "About the course",
-                          "ar": "عن الدورة"
-                        },
-                        "fields": [
-                          {
-                            "field": "title",
-                            "component": "text",
-                            "decided": "table"
-                          },
-                          {
-                            "field": "summary",
-                            "component": "text",
-                            "decided": "table"
-                          },
-                          {
-                            "field": "cover",
-                            "component": "upload",
-                            "decided": "table"
-                          },
-                          {
-                            "field": "details",
-                            "component": "richText",
-                            "decided": "table"
-                          }
-                        ]
-                      },
-                      {
-                        "section": "pricing",
-                        "label": {
-                          "en": "Pricing",
-                          "ar": "التسعير"
-                        },
-                        "fields": [
-                          {
-                            "row": [
-                              {
-                                "field": "fee",
-                                "component": "number",
-                                "decided": "table"
-                              },
-                              {
-                                "field": "currency",
-                                "component": "radio",
-                                "decided": "field"
-                              }
-                            ]
-                          },
-                          {
-                            "field": "audience",
-                            "component": "buttonGroup",
-                            "decided": "leaf"
-                          }
-                        ]
-                      },
-                      {
-                        "section": "teaching",
-                        "label": {
-                          "en": "Teaching",
-                          "ar": "التدريس"
-                        },
-                        "fields": [
-                          {
-                            "field": "delivery",
-                            "component": "radio",
-                            "decided": "field"
-                          },
-                          {
-                            "field": "accessCode",
-                            "component": "text",
-                            "decided": "table",
-                            "when": {
-                              "delivery": {
-                                "equals": "live"
-                              }
-                            }
-                          },
-                          {
-                            "field": "opensOn",
-                            "component": "date",
-                            "decided": "table"
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ],
-                "danger": [
-                  {
-                    "button": "archive",
-                    "label": {
-                      "en": "Archive",
-                      "ar": "أرشفة"
-                    },
-                    "reload": true,
-                    "component": "@asas/courses:./courses/ui/archive-button.tsx#ArchiveButton",
-                    "confirm": {
-                      "title": {
-                        "en": "Archive this course?",
-                        "ar": "أرشفة هذه الدورة؟"
-                      },
-                      "body": {
-                        "en": "Students stop seeing it.",
-                        "ar": "يتوقف الطلاب عن رؤيتها."
-                      }
-                    },
-                    "when": {
-                      "and": [
-                        {
-                          "or": [
-                            {
-                              "record.archived": {
-                                "exists": false
-                              }
-                            },
-                            {
-                              "record.archived": {
-                                "equals": false
-                              }
-                            }
-                          ]
-                        },
-                        {
-                          "$user.collections.courses.operations.archive": {
-                            "equals": true
-                          }
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            ]
-          }
+          "component": "@asas/courses:./portal/ui/course.tsx#Course"
         }
       }
     },
@@ -1033,55 +792,15 @@
       "pages": {
         "list": {
           "path": "/enrollments",
-          "page": {
-            "shell": "@asas/mithaq:./src/ui/top-shell.tsx#PortalTopShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
-            "nav": [
-              {
-                "nav": {}
-              }
-            ],
-            "main": [
-              {
-                "layout": "./src/ui-portal/page.tsx#Page",
-                "main": [
-                  {
-                    "list": {
-                      "columns": [
-                        {
-                          "field": "session",
-                          "cell": "@asas/courses:./enrollments/ui/session-cell.tsx#SessionCell",
-                          "decided": "field"
-                        },
-                        {
-                          "field": "createdAt",
-                          "cell": "datetime",
-                          "decided": "table"
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            ]
-          }
+          "component": "@asas/courses:./portal/ui/enrollments.tsx#Enrollments"
         },
         "create": {
           "path": "/enrollments/new",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/top-shell.tsx#PortalTopShell",
+            "shell": "@asas/courses:./portal/ui/portal-shell.tsx#PortalShell",
             "header": [
               {
                 "title": {}
-              }
-            ],
-            "nav": [
-              {
-                "nav": {}
               }
             ],
             "main": [
@@ -1105,21 +824,15 @@
                 ]
               }
             ]
-          },
-          "mode": "drawer"
+          }
         },
         "edit": {
           "path": "/enrollments/:id",
           "page": {
-            "shell": "@asas/mithaq:./src/ui/top-shell.tsx#PortalTopShell",
+            "shell": "@asas/courses:./portal/ui/portal-shell.tsx#PortalShell",
             "header": [
               {
                 "title": {}
-              }
-            ],
-            "nav": [
-              {
-                "nav": {}
               }
             ],
             "main": [

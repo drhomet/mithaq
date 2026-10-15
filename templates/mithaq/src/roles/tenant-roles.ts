@@ -20,6 +20,25 @@ const sessionColumns = [
   'sessions.fields.details',
 ] as const
 
+/**
+ * What the portal's catalogue and course page read beside a course's own columns, for its roles alike: the
+ * sessions with the seats each has left, and the names of the tags it carries.
+ */
+const catalogueReads = [
+  'courses.findWithSessions',
+  'courses.fields.tags',
+  'courses.fields.selfEnroll',
+  'tags.find',
+  'tags.findByID',
+  'tags.fields.id',
+  'tags.fields.name',
+] as const
+
+// add-on: settings
+/** Whether the portal is closed for maintenance, and where to write, which the portal's foot reads for its roles alike. */
+const portalSettings = ['settings.findOne', 'settings.fields.maintenance', 'settings.fields.contactEmail'] as const
+// end add-on: settings
+
 /** A course's cover, read and never changed, which the portal's roles read alike. */
 const coverReads = [
   'media.find',
@@ -108,6 +127,7 @@ export const tenantRoles = {
       'courses.fields.organization',
       'courses.fields.title',
       'courses.fields.updatedAt',
+      'courses.fields.selfEnroll',
       // Whether a course is a draft, its versions and the restore of one: the
       // registrar edits the catalogue, so it reads a course's history and puts
       // an older copy back.
@@ -188,10 +208,14 @@ export const tenantRoles = {
       'courses.fields.cover',
       'courses.fields.details',
       'courses.fields.id',
-      'courses.fields.tags',
       'courses.fields.organization',
       'courses.fields.title',
       'courses.fields.updatedAt',
+      // What the portal's catalogue draws on a course's card and its page.
+      'courses.fields.summary',
+      'courses.fields.fee',
+      'courses.fields.currency',
+      'courses.fields.delivery',
       // It reads published courses alone, and whether one is published with them.
       'courses.fields._status',
       'enrollments.create',
@@ -221,6 +245,10 @@ export const tenantRoles = {
       'user.fields.id',
       'user.fields.name',
       ...coverReads,
+      ...catalogueReads,
+      // add-on: settings
+      ...portalSettings,
+      // end add-on: settings
     ],
   },
   /**
@@ -233,8 +261,9 @@ export const tenantRoles = {
    * alone would hand a student every other student's seat. The enrollments'
    * own access narrows them to the student's own seats, since it holds no
    * `enrollments.others`, and the sessions' to those of the courses it reads.
-   * It reads no seat's `student`, which is itself on every row it reads, and
-   * writes no enrollment.
+   * It takes a seat for itself alone, in a course that lets its students enroll
+   * themselves and before the session starts, and gives one back before then:
+   * the enrollments' own steps hold it to that. It changes no seat.
    */
   student: {
     label: { ar: 'طالب', en: 'Student' },
@@ -262,11 +291,15 @@ export const tenantRoles = {
       'enrollments.find',
       'enrollments.count',
       'enrollments.findByID',
+      'enrollments.create',
+      'enrollments.delete',
       'enrollments.fields.id',
       'enrollments.fields.createdAt',
       'enrollments.fields.updatedAt',
       'enrollments.fields.organization',
       'enrollments.fields.session',
+      // Itself, which its own create fills and every seat it reads names.
+      'enrollments.fields.student',
       // The sessions its seats name, which the enrollment's session cell draws
       // by course and start.
       'sessions.find',
@@ -274,6 +307,10 @@ export const tenantRoles = {
       'sessions.findByID',
       ...sessionColumns,
       ...coverReads,
+      ...catalogueReads,
+      // add-on: settings
+      ...portalSettings,
+      // end add-on: settings
     ],
   },
   // end add-on: courses

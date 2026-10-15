@@ -974,7 +974,7 @@ type WithSessions = NonNullable<Awaited<ReturnType<typeof asas.kayan.courses.ope
 type CarriesTitle = Expect<Equal<WithSessions['title'], string>>
 type CarriesFee = Expect<Equal<WithSessions['fee'], number | null>>
 type CarriesSessions = Expect<
-  Equal<WithSessions['sessions'], { id: string; startsAt: Date; capacity: number | null }[]>
+  Equal<WithSessions['sessions'], { id: string; startsAt: Date; capacity: number | null; venue?: string | null | undefined; format?: string | null | undefined; archived?: boolean | null | undefined; seatsLeft: number | null }[]>
 >
 // A relationship's value type needs the kayan it points at, which `derive` cannot see, so it is
 // `unknown` in every derived shape. `buildAsas` has the registry and types the same column on the
@@ -1916,13 +1916,13 @@ export const rowProbes = {
 
 type GlobalRow = Awaited<ReturnType<typeof asas.global.settings.operations.findOne>>
 type GlobalFindOneIsNullable = Expect<Equal<Extract<GlobalRow, null>, null>>
-type GlobalSiteTitle = Expect<Equal<NonNullable<GlobalRow>['siteTitle'], string>>
+type GlobalContactEmail = Expect<Equal<NonNullable<GlobalRow>['contactEmail'], string | null>>
 type GlobalMaintenance = Expect<Equal<NonNullable<GlobalRow>['maintenance'], boolean | null>>
 type GlobalTypeColumn = Expect<Equal<NonNullable<GlobalRow>['globalType'], string>>
 
 type GlobalUpdateData = NonNullable<Parameters<typeof asas.global.settings.operations.update>[0]>
 type GlobalUpdateIsPartial = Expect<Equal<{} extends GlobalUpdateData ? true : false, true>>
-type GlobalUpdateTitle = Expect<Equal<GlobalUpdateData['siteTitle'], string | undefined>>
+type GlobalUpdateContactEmail = Expect<Equal<GlobalUpdateData['contactEmail'], string | null | undefined>>
 type GlobalUpdateMaintenance = Expect<Equal<GlobalUpdateData['maintenance'], boolean | null | undefined>>
 type GlobalUpdateHasNoId = Expect<Equal<'id' extends keyof GlobalUpdateData ? true : false, false>>
 type GlobalReadInput = Expect<Equal<Parameters<typeof asas.global.settings.operations.findOne>[0], { depth?: number } | undefined>>
@@ -1981,11 +1981,11 @@ defineGlobal({
 
 export type GlobalProbes = [
   GlobalFindOneIsNullable,
-  GlobalSiteTitle,
+  GlobalContactEmail,
   GlobalMaintenance,
   GlobalTypeColumn,
   GlobalUpdateIsPartial,
-  GlobalUpdateTitle,
+  GlobalUpdateContactEmail,
   GlobalUpdateMaintenance,
   GlobalUpdateHasNoId,
   GlobalName,
@@ -2021,7 +2021,7 @@ type ProcedureArchiveInput = Expect<
 type ProcedureFindWithSessions = Expect<
   Equal<
     NonNullable<Awaited<ReturnType<Procedures['courses']['findWithSessions']>>>['sessions'],
-    { id: string; startsAt: Date; capacity: number | null }[]
+    { id: string; startsAt: Date; capacity: number | null; venue?: string | null | undefined; format?: string | null | undefined; archived?: boolean | null | undefined; seatsLeft: number | null }[]
   >
 >
 type CountProcedure = Expect<Equal<Awaited<ReturnType<Procedures['courses']['count']>>, { totalDocs: number }>>
@@ -2029,9 +2029,9 @@ type ProcedureGlobalUpdateInput = Parameters<Procedures['settings']['update']>[0
 type ProcedureGlobalUpdateHasNoId = Expect<
   Equal<'id' extends keyof ProcedureGlobalUpdateInput ? true : false, false>
 >
-type ProcedureGlobalUpdateTitle = Expect<Equal<ProcedureGlobalUpdateInput['siteTitle'], string | undefined>>
+type ProcedureGlobalUpdateContactEmail = Expect<Equal<ProcedureGlobalUpdateInput['contactEmail'], string | null | undefined>>
 type ProcedureGlobalFindOne = Expect<
-  Equal<NonNullable<Awaited<ReturnType<Procedures['settings']['findOne']>>>['siteTitle'], string>
+  Equal<NonNullable<Awaited<ReturnType<Procedures['settings']['findOne']>>>['contactEmail'], string | null>
 >
 // @ts-expect-error a global runs findOne and update alone
 type NoGlobalDeleteProcedure = Procedures['settings']['delete']
@@ -2069,7 +2069,7 @@ export type ProcedureProbes = [
   ProcedureArchiveInput,
   ProcedureFindWithSessions,
   ProcedureGlobalUpdateHasNoId,
-  ProcedureGlobalUpdateTitle,
+  ProcedureGlobalUpdateContactEmail,
   ProcedureGlobalFindOne,
   ClientCreateTakesTitle,
   ClientCreateAnswersRow,

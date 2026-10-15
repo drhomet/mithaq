@@ -363,8 +363,11 @@ test('the template builds three screens, and generate screens holds each project
   const courses = (screen: 'dashboard' | 'portal') => asas.targets[screen].client.kayan.courses!
   const currency = (screen: 'dashboard' | 'portal') => courses(screen).fields.find((field) => field.name === 'currency')!
   assert.equal(currency('dashboard').component, 'select')
-  const form = JSON.stringify(courses('portal').pages.edit)
-  assert.ok(form.includes(JSON.stringify({ row: [{ field: 'fee', component: 'number', decided: 'table' }, { field: 'currency', component: 'radio', decided: 'field' }] })), 'the portal draws the same field as radio')
+  assert.equal(currency('portal').component, 'radio', 'the portal draws the same field as radio')
+  assert.deepEqual(courses('portal').pages, {
+    list: { path: '/courses', component: '@asas/courses:./portal/ui/catalogue.tsx#Catalogue' },
+    view: { path: '/courses/:id', component: '@asas/courses:./portal/ui/course.tsx#Course' },
+  }, 'and its catalogue and course page are its own, each drawn whole')
   assert.deepEqual(currency('dashboard').options, currency('portal').options)
 })
 
@@ -393,7 +396,7 @@ test('the template screens share their controls and layouts through one const, r
     assert.deepEqual(named(client), Object.values(client.layouts).sort(), `${client.path} registers exactly the layouts its pages name`)
   }
   assert.equal(dashboard.layouts.top, '@asas/mithaq:./src/ui/top-shell.tsx#TopShell')
-  assert.equal(portal.layouts.top, '@asas/mithaq:./src/ui/top-shell.tsx#PortalTopShell', 'top is one file, and the portal names its own shell in it')
+  assert.equal(portal.layouts.top, '@asas/courses:./portal/ui/portal-shell.tsx#PortalShell', 'the portal draws its own shell, the courses example\'s')
   assert.deepEqual(dashboard.controls, portal.controls, 'and so is what draws each kind')
   const shells = (client: typeof dashboard) => new Set(Object.values(client.kayan).flatMap((kayan) => Object.values(kayan.pages).flatMap((page) => ('page' in page ? [page.page.shell] : []))))
   assert.deepEqual([...shells(dashboard)].sort(), [dashboard.layouts.app, dashboard.layouts.top].sort(), 'the dashboard roots its pages at both shells')

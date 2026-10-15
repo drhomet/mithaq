@@ -950,7 +950,7 @@ test('42. the dashboard draws the session, tag and settings controls, a role\'s 
   assert.match(settings, /role="switch"/, 'switch')
 })
 
-test('43. a session\'s edit is a page of its own in the editor layout, and a create opens as the full-page drawer over the dashboard list and over the portal list', async () => {
+test('43. a session\'s edit is a page of its own in the editor layout, a create opens as the full-page drawer over the dashboard list, and the portal\'s enrollment create is a page of its own in the portal\'s shell', async () => {
   const page = await screenHtml(`/dashboard/sessions/${screenSession}`)
   assert.ok(!page.includes('data-record-mode='), 'no dialog over the list')
   assert.match(page, /data-layout="record" data-page="\/sessions\/:id"/, 'the record layout')
@@ -958,23 +958,20 @@ test('43. a session\'s edit is a page of its own in the editor layout, and a cre
   const tag = await screenHtml('/dashboard/tags/new')
   assert.match(tag, /data-record-mode="drawer"/, 'a drawer')
   assert.match(tag, /data-layout="table" data-page="\/tags"/, 'over the tags list')
-  const drawer = await screenHtml('/portal/enrollments/new')
-  assert.match(drawer, /data-record-mode="drawer"/, 'a drawer')
-  assert.match(drawer, /data-layout="page" data-page="\/enrollments"/, 'over the portal enrollments list')
+  const made = await screenHtml('/portal/enrollments/new')
+  assert.ok(!made.includes('data-record-mode='), 'no drawer, since the portal\'s list is drawn whole')
+  assert.match(made, /data-portal=""[\s\S]*data-layout="page" data-page="\/enrollments\/new"/, 'a page of its own in the portal\'s shell')
 })
 
-test('44. the portal draws its own shorter list, and currency as radio where the dashboard draws select, from one field', async () => {
+test('44. the portal draws its catalogue and a course\'s page whole, in its own look and with no admin table or form', async () => {
   const list = await screenHtml('/portal/courses')
-  assert.match(list, /data-layout="page" data-page="\/courses"/, 'the portal layout')
-  assert.ok(list.includes('>Title<') && list.includes('>Fee<') && !list.includes('>Opens on<'), 'two columns, not the dashboard\'s four')
-  assert.ok(list.includes(`href="/portal/courses/${screenCourse}"`), 'a row links to the portal edit')
-  const edit = await screenHtml(`/portal/courses/${screenCourse}`)
-  assert.match(edit, /for="courses-currency"[^]*?role="radiogroup"[^]*?Saudi riyal/, 'currency is radio here')
-  assert.ok(!edit.includes('data-slot="select-trigger"'), 'and no select')
-  assert.match(edit, /data-slot="button-group"/, 'buttonGroup')
-  assert.match(edit, /<button[^>]*id="courses-opensOn"/, 'date, the registry\'s date picker')
-  assert.match(edit, new RegExp(`data-archive-button="archive" data-row="${screenCourse}"`), 'the button a registered component draws, handed the row')
-  assert.ok(!edit.includes('id="courses-level"'), 'and nothing the portal names nowhere')
+  assert.match(list, /data-portal=""/, 'the portal\'s own shell')
+  assert.match(list, /<input[^>]*type="search"/, 'with the catalogue\'s search')
+  assert.ok(!list.includes('<table') && !list.includes('<form'), 'and no table or form')
+  const view = await screenHtml(`/portal/courses/${screenCourse}`)
+  assert.ok(view.includes(screenTitle), 'a course\'s page names it from the first paint')
+  assert.match(view, /aria-label="Back to courses"/, 'with the way back to the catalogue')
+  assert.ok(!view.includes('<form') && !view.includes('data-region="danger"'), 'and no form or danger zone')
 })
 
 test('45. a user who switches organization keeps it: no screen load sets it back', async () => {
@@ -1590,7 +1587,7 @@ test('52. a when decides what each screen draws: the access code follows the del
   })
 })
 
-test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads to the same rows, the list node\'s sort and limit are defaults the URL overrides, a hostile URL reads nothing, and each row carries its menu', async () => {
+test('53. the dashboard\'s list is its qs URL: a filtered, sorted page two reloads to the same rows, the list node\'s sort and limit are defaults the URL overrides, a hostile URL reads nothing, and each row carries its menu', async () => {
   // Twelve rows under one prefix, the oldest archived, so a page of this run's own rows is known.
   const prefix = `Listed ${Date.now()}`
   const ids: string[] = []
@@ -1607,13 +1604,13 @@ test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads
   const rows = (html: string) => [...body(html).matchAll(new RegExp(`>(${prefix} \\d\\d)<`, 'g'))].map((one) => one[1])
   const rowOf = (html: string, name: string) => [...body(html).matchAll(/<tr[\s\S]*?<\/tr>/g)].map((one) => one[0]).find((one) => one.includes(`>${name}<`)) ?? ''
   const where = `where[title][like]=${encodeURIComponent(prefix)}`
-  for (const screen of ['dashboard', 'portal']) {
+  // The portal's catalogue is drawn whole and reads its courses in the browser, so the dashboard's list alone is a URL.
+  for (const screen of ['dashboard']) {
     // The dashboard's All tab, since its list opens on Active, which leaves the archived row out.
-    const all = screen === 'dashboard' ? '&tab=all' : ''
+    const all = '&tab=all'
     const url = `/${screen}/courses?${where}&sort=-fee&page=2&limit=10${all}`
     const first = await screenHtml(url)
-    // The portal lists the courses on offer alone, so the archived row is not on its page.
-    const two = screen === 'portal' ? [`${prefix} 01`] : [`${prefix} 01`, `${prefix} 00`]
+    const two = [`${prefix} 01`, `${prefix} 00`]
     assert.deepEqual(rows(first), two, `the ${screen} serves page two of the filter, by fee descending, ten to a page`)
     assert.deepEqual(rows(await screenHtml(url)), rows(first), `and a reload of the same URL lands on the same list`)
 
@@ -1634,10 +1631,7 @@ test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads
   assert.deepEqual([active.length, active.includes(`${prefix} 00`)], [11, false], 'the dashboard opens on Active, the archived row out of the way')
   assert.deepEqual(rows(await screenHtml(`/dashboard/courses?${where}&tab=archived`)), [`${prefix} 00`], 'and its Archived tab holds that row alone')
 
-  // The portal's list opens by title, 25 to a page, and the URL overrides both; the dashboard names neither, so it opens newest first, ten to a page.
-  const portal = await screenHtml(`/portal/courses?${where}`)
-  assert.deepEqual(rows(portal), Array.from({ length: 11 }, (_, at) => `${prefix} ${String(at + 1).padStart(2, '0')}`), 'the portal opens by title, all eleven on offer on its page of 25')
-  assert.deepEqual(rows(await screenHtml(`/portal/courses?${where}&sort=-title&limit=10`)).slice(0, 2), [`${prefix} 11`, `${prefix} 10`], 'and the URL overrides both')
+  // The dashboard's list names no sort or limit, so it opens newest first, ten to a page.
   const screen = await screenHtml(`/dashboard/courses?${where}`)
   assert.deepEqual(rows(screen).slice(0, 2), [`${prefix} 11`, `${prefix} 10`], 'the dashboard opens newest first')
   assert.equal(rows(screen).length, 10, 'ten to a page')
@@ -1661,8 +1655,7 @@ test('53. each screen\'s list is its qs URL: a filtered, sorted page two reloads
   }
   assert.ok(screen.includes('Select every row on this page'), 'the dashboard draws its boxes')
   assert.ok(!screen.includes('data-mithaq-selected') && hidden !== -1 && end > hidden && inside('>Delete<') && inside('>Update<'), 'and the bulk buttons only inside a wrapper hidden by its attribute, over a selection of none')
-  assert.ok(!portal.includes('Select every row on this page'), 'the portal draws none')
-  assert.ok(!screen.includes('>Create</button>') && !portal.includes('>Create</button>'), 'no screen draws a second Create')
+  assert.ok(!screen.includes('>Create</button>'), 'and draws no second Create')
 })
 
 test('54. / is a real landing page, not a redirect: 200 with the hero and a sign-in link for a visitor, and a working dashboard link for the boot admin', async () => {
@@ -2033,7 +2026,7 @@ test('61. each dashboard edit page draws the record\'s activity beside its form 
   // A student reads no archived course, so a link to one in the portal opens the not-found state and no record.
   await holding('student', async () => {
     const page = await (await fetch(`${origin}/portal/courses/${course.id}`, { headers: { cookie: `${cookie}; locale=en` } })).text()
-    assert.ok(page.includes('That page does not exist.') && !page.includes('data-record="row"'), 'a student opening an archived course is drawn not-found')
+    assert.ok(page.includes('That page does not exist.') && !page.includes(String(course.title)), 'a student opening an archived course is drawn not-found')
   })
   for (const body of [{ where: { changes: { contains: '"fee"' } } }, { where: { or: [{ record: { equals: course.id } }, { changes: { like: 'fee' } }] } }, { sort: 'changes' }]) {
     assert.equal((await post('/api/auditLog/find', body, { cookie })).response.status, 400, `the log refuses ${JSON.stringify(body)}`)
@@ -2500,10 +2493,11 @@ test('70. every page names itself and its app in the browser tab in both locales
   }
 
   const currentOf = async (path: string) => [...(await html(origin, path, cookie)).matchAll(/<a\b[^>]*>/g)].map((one) => one[0]).filter((one) => one.includes('aria-current="page"')).map((one) => /href="([^"]*)"/.exec(one)?.[1])
-  assert.deepEqual(await currentOf('/portal'), ['/portal'], 'Home is current on the portal\'s home')
-  assert.deepEqual(await currentOf('/portal/courses'), ['/portal/courses'], 'Courses on the courses list')
-  assert.deepEqual(await currentOf(`/portal/courses/${screenCourse}`), ['/portal/courses'], 'and on a course')
-  assert.deepEqual(await currentOf('/portal/enrollments'), ['/portal/enrollments'], 'Enrollments on the enrollments list')
+  // Twice each: the portal's nav across the top from md up, and its tab bar at the foot of a phone.
+  assert.deepEqual(await currentOf('/portal'), ['/portal', '/portal'], 'Home is current on the portal\'s home')
+  assert.deepEqual(await currentOf('/portal/courses'), ['/portal/courses', '/portal/courses'], 'Courses on the courses list')
+  assert.deepEqual(await currentOf(`/portal/courses/${screenCourse}`), ['/portal/courses', '/portal/courses'], 'and on a course')
+  assert.deepEqual(await currentOf('/portal/enrollments'), ['/portal/enrollments', '/portal/enrollments'], 'Enrollments on the enrollments list')
 })
 
 test('71. a tab names the page then the app, the app alone where the page names nothing, and the page alone where the route context has no app', async () => {
@@ -2514,33 +2508,10 @@ test('71. a tab names the page then the app, the app alone where the page names 
   assert.equal(title(documentHead({ locale: 'en', app: undefined as never })), '', 'and nothing at all where neither is named')
 })
 
-test('72. the portal holds what its viewer may do: its home counts each list, the courses on offer alone, greets in each locale\'s own words, a course page is the record layout with its archive in the danger zone and no sentence of its kayan, an enrollment\'s session reads by its start, and an instructor reads a course as values and its enrollments as rows', async () => {
-  // An archived course is left out of the portal's list and its count, and stays in the dashboard's.
-  const shelved = `Shelved ${Date.now()}`
-  const made = await post('/api/courses/create', { title: shelved, fee: 5 }, { cookie })
-  assert.equal(made.response.status, 200, JSON.stringify(made.body))
-  const shelf = (made.body as { id: string }).id
-  assert.equal((await post('/api/courses/archive', { id: shelf, reason: 'Retired' }, { cookie })).response.status, 200, 'the course is archived')
-  const offered = { or: [{ archived: { exists: false } }, { archived: { equals: false } }] }
-  const [all, onOffer] = await Promise.all([post('/api/courses/count', {}, { cookie }), post('/api/courses/count', { where: offered }, { cookie })])
-  assert.ok((all.body.totalDocs as number) > (onOffer.body.totalDocs as number), 'the organization holds an archived course')
-  const home = await screenHtml('/portal')
-  const figure = (html: string, kayan: string) => /<div[^>]*data-slot="card-title"[^>]*>([^<]+)</.exec(html.slice(html.indexOf(`data-kpi="${kayan}"`)))?.[1]
-  // As the list reads them: this viewer holds `findVersions`, so the list is the latest draft of every course on offer,
-  // a draft nobody has published among them, which `count` leaves out.
-  const listed = await post('/api/courses/find?draft=true', { where: offered, limit: 1 }, { cookie })
-  assert.equal(figure(home, 'courses'), String(listed.body.totalDocs), 'the home counts the courses on offer this viewer may read, as the list reads them')
-  const searched = `?search=${encodeURIComponent(shelved)}`
-  assert.ok(!(await screenHtml(`/portal/courses${searched}`)).includes(`data-row="${shelf}"`), 'the portal does not list the archived course')
-  assert.ok((await screenHtml(`/dashboard/courses${searched}&tab=archived`)).includes(`data-row="${shelf}"`), 'and the dashboard still does, under its Archived tab')
-  assert.equal(figure(home, 'enrollments'), String((await post('/api/enrollments/count', {}, { cookie })).body.totalDocs), 'and the enrollments')
+test('72. the portal holds what its viewer may do: its home greets in each locale\'s own words, an enrollment\'s session reads by its start, and an instructor reads the course\'s page with no form and every seat as a table', async () => {
   const arabic = await (await fetch(`${origin}/portal`, { headers: { cookie: `${cookie}; locale=ar` } })).text()
   assert.match(arabic, new RegExp(`<h1[^>]*>مرحبا، ${actorName}</h1>`), 'the Arabic greeting takes the Arabic comma')
-
-  const edit = await screenHtml(`/portal/courses/${screenCourse}`)
-  assert.match(edit, /data-layout="record" data-page="\/courses\/:id"/, 'a course page is the record layout')
-  assert.match(edit.slice(edit.indexOf('data-region="danger"')), /^[^]*?data-archive-button="archive"/, 'with the archive in its danger zone')
-  assert.doesNotMatch(edit, /<header class="max-w-3xl"><p/, 'and no sentence of its kayan, which is about every course and not this one')
+  assert.match(arabic, /data-dashboard="portal"/, 'on the portal\'s own home')
 
   // An enrollment's session reads by its start. The control resolves the title in the browser through the portal's
   // projection of `sessions` and a read as the viewer; the first paint holds the id until then, which no fetch here
@@ -2555,13 +2526,8 @@ test('72. the portal holds what its viewer may do: its home counts each list, th
 
   await holding('instructor', async () => {
     const view = await screenHtml(`/portal/courses/${screenCourse}`)
-    assert.ok(view.includes('data-field-value="title"') && view.includes(screenTitle), 'an instructor reads the course title as a value')
-    assert.ok(!view.includes('<form') && !view.includes('id="courses-title"'), 'and no form of boxes it may not change')
-    assert.ok(!view.includes('data-region="danger"'), 'nor a danger zone with nothing in it')
-    // The instructor reads each enrollment's columns, so the list draws its rows rather than none.
-    const enrollments = await screenHtml('/portal/enrollments')
-    assert.ok(!enrollments.includes(noColumns), 'an instructor is shown the enrollment columns')
-    assert.match(enrollments, /<tr[^>]*data-row="[0-9a-f-]{36}"[^>]*>/, 'and a row per enrollment')
+    assert.ok(view.includes(screenTitle), 'an instructor reads the course\'s page')
+    assert.ok(!view.includes('<form') && !view.includes('data-region="danger"'), 'with no form of boxes it may not change, nor a danger zone')
   })
 })
 
@@ -2744,11 +2710,17 @@ test('74. every template role signs in to the first screen it enters, the landin
     await holding(role, async () => {
       assert.equal(await landsOn(), landing, `a ${role} lands on ${landing}`)
       const home = await page(landing)
-      assert.match(home, /data-kpi="courses"[\s\S]*?data-slot="card-title"[^>]*>[1-9][0-9,]*</, `which counts the courses a ${role} reads`)
+      if (screen === 'dashboard') assert.match(home, /data-kpi="courses"[\s\S]*?data-slot="card-title"[^>]*>[1-9][0-9,]*</, `which counts the courses a ${role} reads`)
+      else assert.match(home, /data-dashboard="portal"/, `which is the portal's own home to a ${role}`)
       const named = scopes.marketing!.openScreen!.en!.replace('{screen}', scopes.screens![screen]!.en!)
       assert.match(await page('/'), new RegExp(`<a href="${landing}"><button[^>]*>\\s*${named}`), `the landing page's button says "${named}" to a ${role}`)
+      // The portal's lists are drawn whole and read their rows in the browser; the server draws their shell.
       for (const list of lists) {
         const html = await page(list)
+        if (screen === 'portal') {
+          assert.match(html, /data-portal=""/, `${list} draws the portal for a ${role}`)
+          continue
+        }
         assert.ok(!html.includes(noColumns), `${list} shows a ${role} its columns`)
         assert.ok(rowsOf(html).length > 0, `and draws its rows`)
       }
@@ -2766,20 +2738,18 @@ test('74. every template role signs in to the first screen it enters, the landin
   await holding('student', async () => {
     const course = await page(`/portal/courses/${screenCourse}`)
     assert.ok(course.includes(screenTitle), 'a student opens a course page')
-    assert.ok(!course.includes('data-field-value="accessCode"'), 'without its access code')
     const seats = await post('/api/enrollments/find', { limit: 100 }, { cookie })
     assert.equal(seats.response.status, 200, JSON.stringify(seats.body))
     const seen = (seats.body.docs as { id: string }[]).map((one) => one.id)
     assert.ok(seen.includes(ownSeat.id) && !seen.includes(classmateSeat.id), 'the server reads a student its own seats and not a classmate\'s')
-    const listed = rowsOf(await page('/portal/enrollments'))
-    assert.ok(listed.includes(ownSeat.id) && !listed.includes(classmateSeat.id), 'and so does its portal list')
     assert.equal((await post('/api/enrollments/findByID', { id: classmateSeat.id }, { cookie })).response.status, 404, 'a classmate\'s seat by id answers 404')
-    assert.equal((await post('/api/enrollments/create', { session: screenSession }, { cookie })).response.status, 403, 'and the student enrolls no one, itself included')
+    const self = await post('/api/enrollments/create', { session: screenSession }, { cookie })
+    assert.equal(self.response.status, 400, `the student enrolls itself only where the course lets students do so: ${JSON.stringify(self.body)}`)
+    assert.equal((self.body.data as { key?: string }).key, 'error.invalid.enrollment_closed')
     const read = await post('/api/courses/findByID', { id: screenCourse }, { cookie })
     assert.equal(read.response.status, 200, JSON.stringify(read.body))
     assert.equal(read.body.title, screenTitle, 'a student reads a course by its id')
     for (const field of ['accessCode', 'archiveReason', 'notifications']) assert.ok(!(field in read.body), `and is answered no ${field}`)
-    assert.match(await page('/portal'), /data-kpi="enrollments"[\s\S]*?data-slot="card-title"[^>]*>[1-9][0-9,]*</, 'and the portal home counts its seats')
   })
   const idle = await post('/api/roles/create', { name: 'idle', label: { en: 'Idle', ar: 'خامل' }, permissions: [] }, { cookie })
   assert.equal(idle.response.status, 200, JSON.stringify(idle.body))

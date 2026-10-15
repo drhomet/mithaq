@@ -55,6 +55,7 @@ export type CoursesValues = {
   _status: 'draft' | 'published' | null
   details: { root: Record<string, unknown> } | null
   cover: unknown
+  selfEnroll: boolean | null
 }
 export type SessionsValues = {
   id: string
