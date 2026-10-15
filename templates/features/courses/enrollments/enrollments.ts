@@ -90,6 +90,9 @@ const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Pr
   if (!(await tools.of(sessions).findByID({ id }).catch(() => null))) return ctx
   const session = await sessionHeld({ tx: ctx.tx, session: id })
   if (!session) return ctx
+  // The stored id from here on: a uuid matches in any case, and the lock, the count and the comparison below must not
+  // tell `A0EE…` from `a0ee…`.
+  const held = session.id
   if (session.archived || session.courseArchived) {
     throw invalid({
       message: 'This session is archived, or its course is, so it takes no new seat.',
@@ -97,7 +100,7 @@ const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Pr
       params: { kayan: 'enrollments', field: 'session' },
     })
   }
-  if (id === ctx.dataBefore?.session) return ctx
+  if (held === ctx.dataBefore?.session) return ctx
   if (ownSeatsOnly(ctx.user)) {
     if (session.selfEnroll !== true) {
       throw invalid({
@@ -111,8 +114,8 @@ const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Pr
     }
   }
   if (session.capacity !== null) {
-    await holdSeats({ tx: ctx.tx, session: id })
-    if ((await seatsTaken({ session: id, tx: ctx.tx })) >= session.capacity) {
+    await holdSeats({ tx: ctx.tx, session: held })
+    if ((await seatsTaken({ session: held, tx: ctx.tx })) >= session.capacity) {
       throw conflict({ message: 'Every seat of this session is taken.', key: 'error.conflict.session_full', params: { kayan: 'enrollments', field: 'session' } })
     }
   }
@@ -143,6 +146,7 @@ const leavesBeforeStart = async (ctx: Ctx): Promise<Ctx> => {
  * settings are read in the write's own transaction, since a student reads them
  * as itself and a role might not.
  */
+// The table and column are written out, as `sessionHeld`'s are; R7g fails on a rename.
 const portalOpen = async (ctx: Ctx): Promise<Ctx> => {
   if (!ownSeatsOnly(ctx.user) || !ctx.tenant) return ctx
   const [held] = (await (ctx.tx as NodePgDatabase).execute<{ maintenance: boolean | null }>(sql`select maintenance from settings where organization_id = ${ctx.tenant}`)).rows
@@ -292,11 +296,11 @@ export const enrollments = defineKayan({
       pages: {
         // The viewer's seats, upcoming first, drawn whole by the courses feature's portal.
         list: { path: '/enrollments', component: portalUi('enrollments.tsx#Enrollments') },
-        // The list's New enrollment, which only staff are offered. The student is
-        // drawn for whoever may change a seat, which staff may and a student may
-        // not, so an instructor picks whom it enrolls; a student who opens the
-        // page by its address is drawn the session alone, and its create names itself.
-        create: { path: '/enrollments/new', page: portalPage([{ form: ['session', { field: 'student', when: { '$user.collections.enrollments.operations.update': { equals: true } } }] }]) },
+        // The list's New enrollment, which only staff are offered, with the
+        // student as the dashboard draws it, so an instructor picks whom it
+        // enrolls. A student who opens it by its address and names another is
+        // refused by `namesAnother`; one who names nobody enrolls itself.
+        create: { path: '/enrollments/new', page: portalPage([{ form: ['session', 'student'] }]) },
         edit: { path: '/enrollments/:id', page: portalPage([{ form: ['session'] }]) },
       },
     },

@@ -18394,6 +18394,13 @@ test('R7b. a session takes no seat past its capacity, whoever writes, even when 
   assert.equal((await tenant.as('admin', 'enrollments/delete', { id: seated.body.id })).status, 200)
   const waiting = students[answers.findIndex((one) => one.status !== 200)]!
   assert.equal((await waiting('enrollments/create', { session: session.id })).status, 200, 'a seat given back is a seat again')
+  // A session's id in another case is the same session, which Postgres matches as one uuid: one lock, one count.
+  const last = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 7 * 864e5), capacity: 1 }, tenant.options)
+  const cased = await Promise.all([students[1]!('enrollments/create', { session: last.id }), students[2]!('enrollments/create', { session: last.id.toUpperCase() })])
+  assert.deepEqual(cased.map((one) => one.status).sort(), [200, 409], `one seat, whatever case either id is sent in: ${cased.map((one) => JSON.stringify(one.body)).join(', ')}`)
+  const kept = cased.find((one) => one.status === 200)!
+  const same = await tenant.as('instructor', 'enrollments/update', { id: kept.body.id, session: last.id.toUpperCase() })
+  assert.equal(same.status, 200, `a seat kept in its session, named in another case, takes no new one: ${JSON.stringify(same.body)}`)
   const elsewhere = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 8 * 864e5) }, tenant.options)
   const parked = await tenant.as('instructor', 'enrollments/create', { session: elsewhere.id, student: tenant.people.registrar.id })
   assert.equal(parked.status, 200, JSON.stringify(parked.body))

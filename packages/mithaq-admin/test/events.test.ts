@@ -7358,6 +7358,18 @@ test('233r. a course that lets students enroll themselves offers the sessions wi
   assert.match(closed.textContent ?? '', /Ask your school to enroll you\./)
 })
 
+test('233t. an instructor\'s new enrollment on the portal draws the student it enrolls beside the session', async () => {
+  const { PortalShell } = await import('../../../templates/features/courses/portal/ui/portal-shell.tsx')
+  const { Page } = await import('../../../templates/asas/src/ui-portal/page.tsx')
+  const kayan = portalScreen.kayan.enrollments!
+  const page = kayan.pages.create! as Extract<PageClient, { page: unknown }>
+  const refs = { [portalScreen.layouts.top!]: PortalShell, [portalScreen.layouts.page!]: Page } as never
+  const form = createElement(Form, { kayan, screen: { refs, kayan, page }, client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })
+  const host = await drawPortal(form, { access: instructor, client: portalClient(portalRows()), kayan })
+  assert.ok(host.querySelector('#enrollments-session'), 'the session')
+  assert.ok(host.querySelector('#enrollments-student'), 'and the student, whom an instructor picks')
+})
+
 test('233s. a student reads its own seats as cards, upcoming first, each giving its seat back; an instructor reads every seat as a table with the student, named only where it may read them', async () => {
   const { Enrollments } = await import('../../../templates/features/courses/portal/ui/enrollments.tsx')
   const rows = portalRows()

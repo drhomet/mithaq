@@ -28,9 +28,12 @@ export const holdSeats = async ({ tx, session }: { tx: unknown; session: string 
 /**
  * What a seat is judged by, read off the columns in the write's transaction rather than through the actor's
  * projection: a role shown no capacity, start or archived mark would otherwise read none and skip each rule. A
- * caller reads the session under the actor's access first, so this reads only a session the actor may reach.
+ * caller reads the session under the actor's access first, so this reads only a session the actor may reach. Its
+ * `id` is the stored one, the same in every case the caller wrote it.
+ *
+ * The tables and columns are written out, as the drizzle target names them; a rename fails R7a, R7b and R7f.
  */
 export const sessionHeld = async ({ tx, session }: { tx: unknown; session: string }) =>
-  (await txOf(tx).execute<{ capacity: number | null; startsAt: Date; archived: boolean | null; courseArchived: boolean | null; selfEnroll: boolean | null }>(sql`
-    select s.capacity::float8 as capacity, s.starts_at as "startsAt", s.archived, c.archived as "courseArchived", c.self_enroll as "selfEnroll"
+  (await txOf(tx).execute<{ id: string; capacity: number | null; startsAt: Date; archived: boolean | null; courseArchived: boolean | null; selfEnroll: boolean | null }>(sql`
+    select s.id, s.capacity::float8 as capacity, s.starts_at as "startsAt", s.archived, c.archived as "courseArchived", c.self_enroll as "selfEnroll"
     from course_sessions s join courses c on c.id = s.course_id where s.id = ${session}`)).rows[0]
