@@ -776,6 +776,17 @@ const addedMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganizat
   }))
 }
 
+// The first administrator is made with no proof of the address, the setup code standing in for it, so the address
+// is told once: whoever set the app up and typed it wrong notices the mail that never came.
+const adminMadeMail = ({ mailer, email, at }: { mailer: Mailer; email: string; at: string }) =>
+  mailer.send(letter({
+    to: email,
+    subject: 'Your administrator account · حساب المسؤول',
+    en: 'An administrator account was made with this address. Sign in at the link below. If you did not expect this, ignore this message and tell whoever set up this app.',
+    ar: 'أُنشئ حساب مسؤول بهذا العنوان. سجّل الدخول من الرابط أدناه. إن لم تكن تتوقع هذا، فتجاهل هذه الرسالة وأخبر من أعدّ هذا التطبيق.',
+    link: new URL('/auth/sign-in', at).href,
+  }))
+
 const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: string }; token: string }) =>
   mailer.send(letter({
     to: user.email,
@@ -1072,6 +1083,11 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   const organizationTable = store.tables.organization
   const organized = async (db: Executes) => (await db.execute(sql`select 1 from ${organizationTable} limit 1`)).rows.length > 0
   const oneOrganization = settings.organizations !== 'many'
+  // After the answer, and never failing it: the account is made and committed whatever the mailer says.
+  const toldAdmin = async ({ ctx, email, at }: { ctx: HookContext; email: string; at: string }) => {
+    if (!settings.mailer) return
+    await ctx.context.runInBackgroundOrAwait(adminMadeMail({ mailer: settings.mailer, email, at }).catch((error: unknown) => console.error('The first administrator\'s mail was not sent:', error)))
+  }
   // The tenant's first-run, in one organization: the first owner and the one organization,
   // which nothing else makes, under the lock first-register takes and the setup code. It makes
   // the owner backoffice staff too while the backoffice app is served and has none, so one person
@@ -1095,7 +1111,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         }
         const named = settings.showOrganization ? (typeof organization === 'string' ? organization.trim() : '') : 'Main'
         if (!named || named.length > 100) throw new APIError('BAD_REQUEST', { message: 'The organization has a name of 1 to 100 characters.' })
-        return ctx.json(await store.transaction(async (tx) => {
+        const made = await store.transaction(async (tx) => {
           await (tx as Executes).execute(sql`set transaction isolation level read committed`)
           await (tx as Executes).execute(setupLock)
           if (await organized(tx as Executes)) throw firstRunClosed()
@@ -1111,7 +1127,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
             authAudit({ action: 'first-run', user: user.id, organization: made.id, backoffice: staff })
             return { user: { id: user.id }, organization: { id: made.id } }
           }))
-        }))
+        })
+        await toldAdmin({ ctx, email, at: tenantURL })
+        return ctx.json(made)
       }),
     },
     rateLimit: [{ pathMatcher: (path: string) => path === '/first-run', window: 60, max: 3 }],
@@ -1520,7 +1538,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof password !== 'string' || password.length < min || password.length > max) {
           throw new APIError('BAD_REQUEST', { message: `A name, an email and a password of ${min} to ${max} characters are required.` })
         }
-        return ctx.json(await store.transaction(async (tx) => {
+        const made = await store.transaction(async (tx) => {
           // Read committed whatever the database's default, so the read below sees an
           // administrator another call committed while this one waited on the lock.
           await (tx as Executes).execute(sql`set transaction isolation level read committed`)
@@ -1539,7 +1557,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
           // Verified, as first-run's owner is: the setup code is the proof, and staff are never
           // asked to verify an address.
           return runWithAdapter(adapter, () => firstRegistering.run(true, () => bound.api.createUser({ body: { name, email, password, role: 'super_admin' as never, data: { emailVerified: true } } })))
-        }))
+        })
+        await toldAdmin({ ctx, email, at: backofficeURL })
+        return ctx.json(made)
       }),
     },
     // Production limits every route; this one to three tries a minute from one address, as the

@@ -861,7 +861,8 @@ test('0a. with one organization and none made yet, every sign-up is refused, and
 
 test('0b. the takeover race: five first-runs at once with the setup code make one owner of one organization, and the other four are refused alike', async () => {
   const coded = await codedProvider()
-  const school = modeServer({ organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true }, coded)
+  const mail = keptMail()
+  const school = modeServer({ organizations: 'one', signUp: 'invite', joinRole: 'student', verifyEmail: true, mailer: mail.mailer }, coded)
   const runs = await Promise.all([0, 1, 2, 3, 4].map(async (at) => [at, await answerOf(await askedOf(school, '/first-run', { name: `Racer ${at}`, email: `racer-${at}@example.com`, password: modePassword, organization: `School ${at}`, code: setupCode }))] as const))
   const won = runs.filter(([, [status]]) => status === 200)
   assert.equal(won.length, 1, 'exactly one first-run wins')
@@ -875,6 +876,9 @@ test('0b. the takeover race: five first-runs at once with the setup code make on
   assert.deepEqual(await modeRows(`select user_id, role from member where organization_id = '${organization!.id}'`), [{ user_id: user!.id, role: 'owner' }], 'and the organization\'s one member, its owner')
   assert.deepEqual(await modeRows(`select role from member_roles where organization_id = '${organization!.id}' and user_id = '${user!.id}'`), [{ role: 'administrator' }], 'who holds administrator')
   assert.equal((await modeRows(`select id from "user" where email like 'racer-%'`)).length, 1, 'and no loser has an account')
+  await coded.backgroundSettled()
+  assert.deepEqual(mail.sent.map((one) => one.to), [`racer-${winner}@example.com`], 'the owner alone is mailed, so an address typed wrong is noticed by the mail that never came')
+  assert.match(mail.sent[0]!.text, /administrator account[\s\S]*http:\/\/localhost:5173\/auth\/sign-in/, `the mail says an administrator account was made and where to sign in: ${mail.sent[0]!.text}`)
   assert.deepEqual(await (await askedOf(school, '/first-run/state')).json(), { open: false }, 'first-run is closed')
   assert.deepEqual(await answerOf(await askedOf(school, '/first-run', { name: 'Late', email: 'late@example.com', password: modePassword, organization: 'Late', code: setupCode })), [403, 'FIRST_RUN_CLOSED'], 'and stays closed to the code')
   if (backofficeApp) assert.deepEqual(await (await coded.asBackoffice(() => askedOf(school, '/init'))).json(), { initialized: true }, 'and so is the backoffice\'s first-register, whose administrator first-run made')
@@ -13143,6 +13147,23 @@ test('142l. while no one holds a backoffice role, first-register in the backoffi
     }
     assert.ok(!JSON.stringify(closed.body).includes('first-142l'), 'which names nobody')
     assert.deepEqual(await backofficeStaff(), [{ email: 'first-142l@example.com', role: 'super_admin' }], 'and no second administrator was made')
+  })
+})
+
+test('142q. the backoffice\'s first administrator is mailed that the account was made, after the answer, so an address typed wrong is noticed', async () => {
+  const provider = await providerUnder({ NODE_ENV: 'development' })
+  const mail = keptMail()
+  const slow = { send: async (one: { to: string; text: string }) => { await setTimeout(800); await mail.mailer.send(one) } }
+  const built = provider.serverFor({ ...provider.authSettings, mailer: slow })({ drizzle: asas.targets.drizzle as never }, unreferenced)
+  const backoffice = firstRegisterAt((request) => provider.asBackoffice(() => built.handler(request)), `${provider.backofficeURL}/api/auth`)
+  await withoutBackofficeStaff(async () => {
+    const started = performance.now()
+    const made = await backoffice.register({ name: 'First 142q', email: 'first-142q@example.com', password: 'a-long-enough-password' })
+    assert.equal(made.status, 200, await made.clone().text())
+    assert.ok(performance.now() - started < 600, 'the answer waits on no mailer')
+    await provider.backgroundSettled()
+    assert.deepEqual(mail.sent.map((one) => one.to), ['first-142q@example.com'], 'and the administrator is mailed once')
+    assert.match(mail.sent[0]!.text, /administrator account[\s\S]*http:\/\/localhost:5174\/auth\/sign-in/, `saying the account was made and where to sign in: ${mail.sent[0]!.text}`)
   })
 })
 
