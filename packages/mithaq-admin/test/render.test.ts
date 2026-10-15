@@ -266,12 +266,12 @@ test('5. a field whose kind has no writable control renders read-only, so nothin
   assert.ok(html.includes('0f1d8c2e-0000-4000-8000-000000000001'), 'and it still shows the value it is read-only about')
 })
 
-test('6. a refusal renders the key the server sent, resolved as copy, so a project translates its own refusals', () => {
-  const html = formMarkup({ error: { data: { key: 'error.invalid.value', params: {} } } })
-  assert.ok(html.includes('That value will not do.'), 'the key from the error\'s data.key is resolved through t')
-  const unknown = formMarkup({ error: { data: { key: 'error.nothing.translates.this' } } })
-  assert.ok(unknown.includes('error.nothing.translates.this'), 'an untranslated refusal key is shown as the key')
-  assert.ok(!formMarkup({ error: new Error('boom') }).includes('undefined'), 'a plain error renders no key')
+test('6. a refusal\'s toast says the key the server sent, resolved as copy, so a project translates its own refusals', async () => {
+  const { failedWords } = await import('../registry/form-rules.tsx')
+  assert.equal(failedWords({ copy, thrown: { data: { key: 'error.invalid.value', params: {} } } }), 'That value will not do.', 'the key from the error\'s data.key is resolved through t')
+  assert.equal(failedWords({ copy, thrown: { data: { key: 'error.nothing.translates.this' } } }), 'error.nothing.translates.this', 'an untranslated refusal key is said as the key')
+  assert.equal(failedWords({ copy, thrown: new Error('boom') }), 'Something went wrong, so nothing was saved. Try again.', 'a plain error says the request failed, never undefined')
+  assert.ok(!formMarkup({ error: { data: { key: 'error.conflict', params: {} } } }).includes('role="alert"'), 'and the form draws none of it')
 })
 
 test('7. a field the client is not the provider of on the operation being rendered is read-only, so no form submits it', () => {
@@ -471,6 +471,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-node-groups',
       'mithaq-default-nodes',
       'mithaq-form-types',
+      'mithaq-toast',
       'mithaq-form-rules',
       'mithaq-form-context',
       'mithaq-field-value',
@@ -524,7 +525,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the ninety-three items this file knows about',
+    'the registry declares the ninety-four items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`

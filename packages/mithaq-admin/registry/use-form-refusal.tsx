@@ -19,7 +19,8 @@ export const useFormRefusal = ({ copy, error, form, kayan }: { copy: Copy; error
   // a custom shape that writes none of our keys sends.
   const sentences: Record<string, string> = Object.create(null)
   for (const [name, issue] of Object.entries(issues)) sentences[name] = t(issue, issue) ?? issue
-  const banner = shown
+  // Only over fields: a refusal naming none is the toast's to say.
+  const banner = shown && Object.keys(issues).length
     ? refusalWords({
         kayan: kayan.name,
         shown,

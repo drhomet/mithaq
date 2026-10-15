@@ -28,7 +28,7 @@ export function List(props: ListProps): ReactElement {
   const { access, api, client, edit, href, kayan, locale, onQuery, operations, page, query, reads, run, screen, t } = props
   const copy: Copy = { t, locale }
   const node = props.node ?? listOf(screen)
-  const { refine, running, refusal, setRefused, runOnRow, selected, setSelected, rowIds, ticked, done, setDone } = useListState({ docs: page.docs, kayan, onQuery, query, run })
+  const { refine, running, refusal, setRefused, runOnRow, selected, setSelected, rowIds, ticked, done, setDone } = useListState({ copy, docs: page.docs, kayan, onQuery, query, run })
   /** The row being edited in place, `null` for a row being added, and nothing while no form is open. */
   const [editing, setEditing] = useState<Row | null | undefined>(undefined)
   const edits = edit && node

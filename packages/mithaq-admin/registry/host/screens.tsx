@@ -26,6 +26,7 @@ import { ScreenForm } from './screen-form.tsx'
 import { ScreenList, askedFor, readsDrafts, rowReadsDrafts, rowsKey } from './screen-list.tsx'
 import { screenNamed } from './screen-names.ts'
 import { slide } from './slide.ts'
+import { Toaster } from 'mithaq-admin/toast.tsx'
 import { useCopy } from './routes/__root.tsx'
 
 /**
@@ -598,6 +599,8 @@ export function ScreenFrame({ files, data, children }: { files: Files; data: Scr
         <>
           <ScreenBar user={data.user} />
           {children}
+          {/* The one place every write's toast is drawn, kept across the screen's pages. */}
+          <Toaster />
         </>,
       )}
     </Suspense>

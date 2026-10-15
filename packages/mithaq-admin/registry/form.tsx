@@ -11,7 +11,7 @@ import { FormButton } from 'mithaq-admin/form-button.tsx'
 import { FormChrome } from 'mithaq-admin/form-chrome.tsx'
 import { KayanForm } from 'mithaq-admin/form-context.tsx'
 import { FormLayout } from 'mithaq-admin/form-layout.tsx'
-import { brokenRule } from 'mithaq-admin/form-rules.tsx'
+import { brokenRule, doneWords, failedWords, issuesOf } from 'mithaq-admin/form-rules.tsx'
 import type { FormProps } from 'mithaq-admin/form-types.tsx'
 import { LeafControl } from 'mithaq-admin/leaf-control.tsx'
 import { NavLinks } from 'mithaq-admin/nav-links.tsx'
@@ -25,6 +25,7 @@ import { useDraftView } from 'mithaq-admin/use-draft-view.tsx'
 import { useFormRefusal } from 'mithaq-admin/use-form-refusal.tsx'
 import { useFormSave } from 'mithaq-admin/use-form-save.tsx'
 import { useFormSeed } from 'mithaq-admin/use-form-seed.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 
 /**
  * The form screen over one kayan's `create`, `update` and `delete`, holding its values in TanStack Form.
@@ -48,6 +49,11 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const [revision, setRevision] = useState(0)
   const { seed, setSeed, seeded, form, values, dirty } = useFormSeed({ kayan, value, status: drafts?.status, onDirty: props.onDirty })
   const { held, shown, issues, sentences, banner, setRefused, forget } = useFormRefusal({ copy, error: props.error, form, kayan })
+  // A refusal naming a field is drawn at that field; any other, a request that failed, is said in a red toast.
+  const refuse = (thrown: unknown) => {
+    setRefused(thrown)
+    if (thrown && !Object.keys(issuesOf(thrown)).length) toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
+  }
   // The access report a node's `when` reads as `$user`; none outside a screen.
   const access = useContext(ScreenContext)?.access
   const byName = new Map(kayan.fields.map((field) => [field.name, field]))
@@ -59,16 +65,16 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // access denied); it decides both the disabled control and whether the field is in the write.
   const owned = (field: ClientField) => readOnlyField(field, on) || (writes ? !writes(field.name, on) : false)
   const status = drafts && seed.status
-  const { viewing, showing, choose, forget: forgetPublished } = useDraftView({ client, id, kayan, refuse: setRefused, status, values })
+  const { viewing, showing, choose, forget: forgetPublished } = useDraftView({ client, id, kayan, refuse, status, values })
   // A screen's page names every field it draws; a form handed no page draws every field in declared
   // order, and no join, whose rows are another kayan's.
   const tree = nodes ?? (screen && nodesOf(screen.page))
-  const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse: setRefused, seed, seeded, setSeed, status, tree, values, onWritten: forgetPublished })
+  const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse, seed, seeded, setSeed, status, tree, values, onWritten: forgetPublished, done: (landed) => doneWords({ kayan, copy, ...landed }) })
   const { busy, run, save, readAt, asking, setAsking, leaving } = saving
   // Never while a discard question is open, which says the change is unsaved, nor once a write was refused because
   // the row changed since this form read it: every autosave after it would be refused the same way.
   const interval = viewing || asking || blocked || leaving || shown === 'error.conflict.stale' ? undefined : drafts?.autosave
-  const autosaved = useAutosave({ ...props, ...saving, client, form, id, interval, owned, readAt: () => readAt(props.expectedUpdatedAt), refuse: setRefused, seed, seeded, setSeed, values })
+  const autosaved = useAutosave({ ...props, ...saving, client, form, id, interval, owned, readAt: () => readAt(props.expectedUpdatedAt), refuse, seed, seeded, setSeed, values })
 
   const setValue = (name: string, next: unknown) => {
     const field = byName.get(name)
@@ -108,7 +114,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   }
   // A kayan's own operation can change anything the row touches, children included, so the panels are remounted after it.
   const runOperation = (operation: PageButton) => async (input: Record<string, unknown>, refuse: (thrown: unknown) => void) => {
-    const landed = await run({ write: () => client.run!(operation.name, input), effect: operation.effect, refuse })
+    const landed = await run({ write: () => client.run!(operation.name, input), effect: operation.effect, operation, refuse })
     if (landed) setRevision((already) => already + 1)
     return landed
   }
@@ -137,7 +143,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
       const button = id && client.run && !viewing ? pageButtonOf({ kayan, node, allowed: operations }) : undefined
       if (!button) return null
       const onDelete = (refuse: (thrown: unknown) => void) => run({ write: () => client.delete({ id }), effect: 'delete', refuse })
-      return <FormButton key={button.name} {...{ api, busy, copy, id, kayan, kayans, onDelete, screen, value }} operation={button} run={runOperation(button)} refuse={setRefused} />
+      return <FormButton key={button.name} {...{ api, busy, copy, id, kayan, kayans, onDelete, screen, value }} operation={button} run={runOperation(button)} refuse={refuse} />
     },
     // The page's one <form>, so a list of another kayan beside it, with forms of its own, is never inside it;
     // a leaf elsewhere on the page is still this form's value. A page with a controls node draws the actions there.
@@ -181,7 +187,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
       t={t}
       draft={status === 'changed' ? {
         busy: busy || autosaved === 'saving',
-        onRestore: operations?.restoreVersion === true && client.run ? () => void run({ write: () => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), effect: 'update', next: 'published' }) : undefined,
+        onRestore: operations?.restoreVersion === true && client.run ? () => void run({ write: () => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), effect: 'update', operation: { name: 'restoreVersion' }, next: 'published' }) : undefined,
         onViewPublished: client.findByID ? () => void choose('published') : undefined,
         viewing,
       } : undefined}

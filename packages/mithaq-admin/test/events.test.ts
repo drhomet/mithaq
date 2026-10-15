@@ -305,6 +305,18 @@ const render = async (element: ReactElement, over: Partial<ScreenState> = {}) =>
   return host
 }
 
+// Round 3: forms and feedback. Each check reads the copy the app ships, in English.
+const { Toaster, toast } = await import('../registry/toast.tsx')
+const { translator: appCopy } = await import('../../../apps/asas-tanstack/src/copy.ts')
+const english = appCopy('en')
+/** Every toast on screen, as `type: words`, cleared for the next check. */
+const toasted = async () => {
+  const said = [...window.document.querySelectorAll('[data-toast]')].map((one) => `${one.getAttribute('data-toast')}: ${one.textContent}`)
+  await act(async () => void toast.dismiss())
+  return said
+}
+const withToaster = (element: ReactElement) => createElement('div', null, element, createElement(Toaster))
+
 /** What an open popover shows; its content is portaled to the document body, not the host. */
 const opened = () => window.document.querySelector('[data-slot="combobox-content"]')
 
@@ -4030,15 +4042,16 @@ test('171a. a controls node draws the form\'s controls where it sits, the course
   assert.ok(plain.querySelector('form button[type="submit"]'), 'and keeps its save in the form')
 })
 
-test('171c. a publish pressed in the header from another tab, refused over no field, draws its sentence in the header, outside every tab panel', async () => {
+test('171c. a publish pressed in the header from another tab, refused over no field, says its sentence in a red toast, seen from any tab, and draws nothing in the page', async () => {
   // The in-form banner sits in the Details panel, so a refusal naming no field must not be drawn on a tab nobody is looking at.
+  await toasted()
   const refusal = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict', params: {} } })
   let failing = true
   const client = draftClient([], async () => {
     if (failing) throw refusal
     return {}
   })
-  const host = await render(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client, value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } }), { record: draftRow })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client, value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })), { record: draftRow })
   const sessionsTab = [...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.trim() === 'Sessions')!
   await act(async () => {
     click(sessionsTab)
@@ -4046,20 +4059,16 @@ test('171c. a publish pressed in the header from another tab, refused over no fi
   await act(async () => {
     click(host.querySelector('[data-node="controls"] [data-button="publish"]')!)
   })
-  const alerts = [...host.querySelectorAll('[role="alert"]')]
-  assert.ok(alerts.some((one) => !one.closest('[data-slot="tabs-content"]')), 'the refusal is drawn outside the tab panels')
-  assert.equal(alerts.filter((one) => one.closest('[data-region="header"]')).length, 1, 'once, in the header')
-  const alert = alerts.find((one) => one.closest('[data-region="header"]'))!
-  assert.ok(alert.className.split(' ').includes('line-clamp-2') && !alert.className.split(' ').includes('truncate'), 'the sentence wraps to two lines where it would be cut')
-  assert.ok(!alert.hasAttribute('title'), 'with no tooltip, which a touch screen never shows')
-  assert.ok(['min-w-24', 'flex-1'].every((one) => alert.className.split(' ').includes(one)), 'and takes the row\'s leftover width with a readable floor, so a 375px screen still reads it')
+  assert.deepEqual(await toasted(), ['error: error.conflict'], 'the refusal is said once, in a toast outside every tab panel')
+  assert.equal(host.querySelectorAll('[role="alert"]').length, 0, 'and nothing is drawn in the header or a tab')
 
-  // The next Publish clears it.
+  // The next Publish says it landed.
   failing = false
   await act(async () => {
     click(host.querySelector('[data-node="controls"] [data-button="publish"]')!)
   })
-  assert.equal(host.querySelectorAll('[role="alert"]').length, 0, 'a Publish that succeeds leaves no alert')
+  assert.deepEqual(await toasted(), ['success: courses published'], 'a Publish that succeeds says so, and leaves no alert')
+  assert.equal(host.querySelectorAll('[role="alert"]').length, 0)
 })
 
 test('171d. a refusal naming a field, on a page with a controls node, draws under its box, badges the Details tab, and also draws in the header', async () => {
@@ -4689,13 +4698,14 @@ test('171p. the previous version is never offered before it is known, so a pick 
   assert.equal(items(), 4, 'once it is read the select offers the previous version once and every other')
 })
 
-test('132g. a field-less refusal banner disappears after a later autosave succeeds', async () => {
-  // A save refused with no field named (a conflict, not a bad value) leaves `refused` set until something clears it; an autosave that lands afterwards must clear it, or the banner sits over a row that just saved.
+test('132g. a field-less refusal is said once in a toast and leaves no banner over the form, and a later autosave still lands', async () => {
+  // A save refused with no field named (a conflict, not a bad value) is the toast's to say, so no banner sits over a row a later autosave saved.
+  await toasted()
   const calls: DraftCall[] = []
   let answer: (call: DraftCall) => Promise<unknown> = async () => {
     throw Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.rowChanged' } })
   }
-  const host = await render(createElement(Form, { kayan: courses, client: draftClient(calls, (call) => answer(call)), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 200 } }))
+  const host = await render(withToaster(createElement(Form, { kayan: courses, client: draftClient(calls, (call) => answer(call)), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 200 } })))
   const title = () => host.querySelector('#courses-title')!
   await act(async () => {
     typeInto(title(), 'Tajweed I')
@@ -4703,14 +4713,15 @@ test('132g. a field-less refusal banner disappears after a later autosave succee
   await act(async () => {
     click(buttonNamed(host, 'Publish changes')!)
   })
-  assert.ok(host.querySelector('[role="alert"]')?.textContent?.includes('error.rowChanged'), 'the refusal banner shows, naming no field')
+  assert.deepEqual(await toasted(), ['error: error.rowChanged'], 'the refusal is a toast, naming no field')
+  assert.ok(!host.querySelector('[role="alert"]'), 'and no banner')
   answer = async () => ({})
   await act(async () => {
     typeInto(title(), 'Tajweed II')
   })
   await act(async () => sleep(300))
   assert.ok(host.querySelector('[data-autosave]')?.textContent?.includes('Saved'), 'the autosave that follows lands')
-  assert.ok(!host.querySelector('[role="alert"]'), 'and the stale banner is gone')
+  assert.ok(!host.querySelector('[role="alert"]'), 'and no banner came back')
 })
 
 test('132h. the versions panel re-reads once a save lands, an autosave included, since a draft save never moves the row\'s own updatedAt', async () => {
@@ -5357,16 +5368,20 @@ test('228g. a delete refused because rows still use it says how many, names the 
 test('228h. a refusal a kayan words itself, a unique pair taken, is said in the kayan\'s words, and in the shared ones where the kayan words none', async () => {
   const words: Record<string, string> = { 'courses.conflict.unique': 'Another course already holds this.', 'error.conflict.unique': 'Another row already holds that value.' }
   const said = async (kayan: string) => {
-    const host = await render(createElement(Form, {
+    await toasted()
+    const host = await render(withToaster(createElement(Form, {
       kayan: courses,
-      client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+      client: { create: async () => ({}), update: async () => {
+        throw Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.unique', params: { kayan } } })
+      }, delete: async () => ({}) },
       value: { id: 'a-row', title: 'Tajweed' },
-      error: Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.unique', params: { kayan } } }),
       t: (key: string, fallback?: string) => words[key] ?? fallback,
       locale: 'en',
       onDone: () => {},
-    }))
-    return [...host.querySelectorAll('[role="alert"]')].map((one) => one.textContent).join(' ')
+    })))
+    await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed II'))
+    await act(async () => fire(host.querySelector('form')!, 'submit'))
+    return (await toasted()).join(' ')
   }
   assert.ok((await said('courses')).includes('Another course already holds this.'), 'the kayan\'s own words')
   delete words['courses.conflict.unique']
@@ -5494,7 +5509,7 @@ test('176a. a list never widens the page: its table scrolls inside its own frame
   assert.equal(classesOf(toolbar).includes('flex-wrap'), true, 'the toolbar\'s buttons wrap rather than push the card wider')
 })
 
-test('176b. below sm the header keeps the trigger, the title and the pill, the form\'s actions, its autosave note and its refusal sit in a bar fixed to the bottom, and its switch tops the form; sm and up keep one header row', async () => {
+test('176b. below sm the header keeps the trigger, the title and the pill, the form\'s actions and its autosave note sit in a bar fixed to the bottom, and its switch tops the form; sm and up keep one header row', async () => {
   const refusal = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict', params: {} } })
   let failing = false
   const client = { ...publishedClient([], []), update: async () => {
@@ -5532,9 +5547,8 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
   await act(async () => {
     click(bar.querySelector('[data-button="publish"]')!)
   })
-  const alert = controls.querySelector('[role="alert"]')
-  assert.equal(bar.contains(alert), true, 'the header\'s refusal is in the bar')
-  assert.equal(classesOf(alert).includes('sm:-order-1') && classesOf(alert).includes('max-sm:basis-full'), true, 'first on the header row at sm and up, a line of its own in the bar')
+  assert.equal(controls.querySelector('[role="alert"]'), null, 'a refusal takes no room in the bar, where a toast says it')
+  await toasted()
 })
 
 test('176c. the record layout puts main, then side, then the danger zone in the document, and places the danger zone back under the form from lg up', async () => {
@@ -7227,7 +7241,8 @@ test('223a. on a kayan that keeps drafts and whose update takes expectedUpdatedA
   const calls: DraftCall[] = []
   let answered = 0
   let answer = async (call: DraftCall): Promise<unknown> => ({ ...call.input, _status: 'draft', updatedAt: `2026-10-09T10:00:0${++answered}.000Z` })
-  const host = await render(createElement(Form, {
+  await toasted()
+  const host = await render(withToaster(createElement(Form, {
     kayan: courses,
     client: draftClient(calls, (call) => answer(call)),
     value: { ...draftRow, updatedAt: '2026-10-09T09:00:00.000Z' },
@@ -7236,7 +7251,7 @@ test('223a. on a kayan that keeps drafts and whose update takes expectedUpdatedA
     onDone: () => {},
     drafts: { status: 'published', autosave: 100 },
     expectedUpdatedAt: true,
-  }))
+  })))
   const title = () => host.querySelector('#courses-title')!
   const type = async (words: string) => {
     await act(async () => {
@@ -7266,7 +7281,7 @@ test('223a. on a kayan that keeps drafts and whose update takes expectedUpdatedA
   }
   await type('Tajweed IV')
   assert.equal(calls.length, 4, 'the stale autosave was asked once')
-  assert.ok([...host.querySelectorAll('[role="alert"]')].some((one) => one.textContent?.includes('error.conflict.stale')), 'and the person is told why')
+  assert.ok((await toasted()).includes('error: error.conflict.stale'), 'and the person is told why')
   await type('Tajweed V')
   await type('Tajweed VI')
   assert.equal(calls.length, 4, 'and nothing autosaves after it, whatever is typed')
@@ -7364,6 +7379,130 @@ test('223f. a restore from the Versions tab sends the instant of the latest vers
       mounted = undefined
     }
   } finally {
+    Object.defineProperty(window.location, 'reload', { configurable: true, value: reload })
+  }
+})
+
+test('240a. a save, a create, a publish, a draft save, a delete and a kayan\'s own operation each say in a green toast that they landed, in the kayan\'s words', async () => {
+  await toasted()
+  const calls: DraftCall[] = []
+  const draw = (props: Record<string, unknown>) => render(withToaster(createElement(Form, { kayan: courses, client: draftClient(calls, async (call) => ({ id: 'a-row', ...call.input })), t: english, locale: 'en', onDone: () => {}, value: draftRow, ...props })))
+  let host = await draw({})
+  await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed II'))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(await toasted(), ['success: Course saved'], 'a plain save')
+  host = await draw({ value: null })
+  await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(await toasted(), ['success: Course created'], 'a create')
+  host = await draw({ drafts: { status: 'draft' } })
+  await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed III'))
+  await act(async () => click(host.querySelector('[data-button="save-draft"]')!))
+  assert.deepEqual(await toasted(), ['success: Draft saved'], 'a draft save')
+  await act(async () => click(host.querySelector('[data-button="publish"]')!))
+  assert.deepEqual(await toasted(), ['success: Course published'], 'a publish')
+
+  const ran: string[] = []
+  const operations = { delete: true, archive: true }
+  host = await render(withToaster(createElement(Form, {
+    kayan: courses,
+    screen: screenOf(courses.pages.edit!),
+    client: { ...draftClient([]), delete: async () => ({}), run: async (operation: string) => (ran.push(operation), { id: 'a-row' }) },
+    value: draftRow,
+    t: english,
+    locale: 'en',
+    onDone: () => {},
+    operations,
+  })), { record: draftRow })
+  await act(async () => click(buttonNamed(host, 'Archive')!))
+  await act(async () => typeInto(window.document.querySelector('[data-slot="alert-dialog-content"] form :is(textarea, input)') as unknown as Element, 'Retired'))
+  await act(async () => fire(window.document.querySelector('[data-slot="alert-dialog-content"] form') as unknown as Element, 'submit'))
+  assert.deepEqual(ran, ['archive'])
+  assert.deepEqual(await toasted(), ['success: Course archived'], 'a kayan\'s own operation, in its own words')
+  await act(async () => click(host.querySelector('[data-button="delete"]')!))
+  await act(async () => click(dialogButton('Delete this course')!))
+  assert.deepEqual(await toasted(), ['success: Course deleted'], 'a delete')
+})
+
+test('240b. a save the server refuses over no field, or that never reaches it, says why in a red toast and draws nothing in the page header', async () => {
+  await toasted()
+  const refusal = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.stale', params: {} } })
+  let thrown: unknown = refusal
+  const client = draftClient([], async () => {
+    throw thrown
+  })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client, value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })), { record: draftRow })
+  await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
+  assert.deepEqual(await toasted(), [`error: ${english('error.conflict.stale')}`], 'the refusal\'s own sentence, in red')
+  assert.equal(host.querySelectorAll('[role="alert"]').length, 0, 'and no alert on the page, in the header or the form')
+  thrown = new TypeError('Failed to fetch')
+  await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
+  assert.deepEqual(await toasted(), ['error: Something went wrong, so nothing was saved. Try again.'], 'a request that never answered says so, where it said nothing before')
+})
+
+test('240c. the members page says in a green toast that an invitation went, an invitation was cancelled, roles were saved, a member was removed and a person was added, and reads the page again rather than reloading it', async (t) => {
+  await toasted()
+  const { Members, AddPerson } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  let answer: [number, unknown] = [200, { id: 'i2', email: 'new@example.com', expiresAt: '2026-10-20T00:00:00.000Z' }]
+  t.mock.method(globalThis, 'fetch', async () => Response.json(answer[1], { status: answer[0] }))
+  const member = { userId: 'u1', name: 'Layla', email: 'layla@example.com', joined: '2026-10-01', owner: false, roles: [] }
+  const loaderData = { members: [member], roles: [{ name: 'teacher', fixed: false, permissions: ['courses.find'] }], invites: [{ id: 'i1', email: 'old@example.com', expiresAt: '2026-10-14T00:00:00.000Z' }] }
+  const host = await render(withToaster(createElement(Members, { loaderData })), {
+    t: english,
+    client: async () => ({ id: 'r1' }),
+    access: { permissions: ['memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'invitation.create', 'invitation.cancel', 'member.delete', 'courses.find'], collections: { memberRoles: { create: true, delete: true } } } as never,
+  })
+  const dialog = (selector: string) => {
+    const one = host.querySelector(selector) as unknown as HTMLDialogElement
+    ;(one as unknown as { showModal: () => void }).showModal = () => one.setAttribute('open', '')
+    ;(one as unknown as { close: () => void }).close = () => (one.removeAttribute('open'), one.dispatchEvent(new window.Event('close') as unknown as Event))
+    return one
+  }
+  const invite = dialog('[data-invite-sheet]')
+  await act(async () => click(host.querySelector('[data-invite]')!))
+  await act(async () => typeInto(invite.querySelector('input[name="email"]')!, 'new@example.com'))
+  await act(async () => fire(invite.querySelector('form')!, 'submit'))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Invitation sent to new@example.com'], 'an invitation')
+  answer = [200, {}]
+  await act(async () => click(host.querySelector('[data-cancel-invite="i1"]')!))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Invitation cancelled'], 'a cancelled invitation')
+
+  const sheet = dialog('[data-member-sheet]')
+  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
+  await act(async () => click(sheet.querySelector('[data-role="teacher"] .font-medium')!))
+  await act(async () => click([...sheet.querySelectorAll('button')].find((one) => one.textContent === 'Save')!))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Roles saved for Layla'], 'a role change')
+  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
+  await act(async () => click(sheet.querySelector('[data-button="remove-member"]')!))
+  await act(async () => click(sheet.querySelector('[data-button="confirm-remove"]')!))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Layla removed'], 'a removal')
+
+  const reload = window.location.reload
+  let reloaded = 0
+  let refreshed = 0
+  const refresh = () => void refreshed++
+  window.addEventListener('mithaq:refresh', refresh)
+  Object.defineProperty(window.location, 'reload', { configurable: true, value: () => void reloaded++ })
+  try {
+    const adding = await render(withToaster(createElement(AddPerson, { roles: [], onInvited: () => {} })), { t: english })
+    const add = adding.querySelector('[data-add-person-sheet]') as unknown as HTMLDialogElement
+    ;(add as unknown as { showModal: () => void }).showModal = () => add.setAttribute('open', '')
+    ;(add as unknown as { close: () => void }).close = () => (add.removeAttribute('open'), add.dispatchEvent(new window.Event('close') as unknown as Event))
+    await act(async () => click(adding.querySelector('[data-add-person]')!))
+    const [name, email] = [...add.querySelectorAll('input')] as unknown as Element[]
+    await act(async () => typeInto(name!, 'Omar'))
+    await act(async () => typeInto(email!, 'omar@example.com'))
+    answer = [200, { added: true }]
+    await act(async () => fire(add.querySelector('form')!, 'submit'))
+    await act(async () => sleep(10))
+    assert.deepEqual(await toasted(), ['success: Omar added. A link to choose a password was sent to omar@example.com.'], 'a person added, and where the link went')
+    assert.deepEqual([reloaded, refreshed, add.hasAttribute('open')], [0, 1, false], 'the page is read again in place, so the toast stays, and the sheet closes')
+  } finally {
+    window.removeEventListener('mithaq:refresh', refresh)
     Object.defineProperty(window.location, 'reload', { configurable: true, value: reload })
   }
 })

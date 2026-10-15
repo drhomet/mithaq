@@ -636,6 +636,19 @@
       ]
     },
     {
+      "name": "mithaq-toast",
+      "type": "registry:component",
+      "title": "Mithaq toast",
+      "description": "Sonner's toast call, `toast.success` and `toast.error`, and the one Toaster the host mounts, which says each write that landed or failed.",
+      "files": [
+        {
+          "path": "registry/toast.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/toast.tsx"
+        }
+      ]
+    },
+    {
       "name": "mithaq-form-rules",
       "type": "registry:component",
       "title": "Mithaq form rules",

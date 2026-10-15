@@ -26,6 +26,7 @@ import { ScreenForm } from './screen-form.tsx'
 import { ScreenList, askedFor, readsDrafts, rowReadsDrafts, rowsKey } from './screen-list.tsx'
 import { screenNamed } from './screen-names.ts'
 import { slide } from './slide.ts'
+import { Toaster } from 'mithaq-admin/toast.tsx'
 import { useCopy } from './routes/__root.tsx'
 
 /**
@@ -598,6 +599,8 @@ export function ScreenFrame({ files, data, children }: { files: Files; data: Scr
         <>
           <ScreenBar user={data.user} />
           {children}
+          {/* The one place every write's toast is drawn, kept across the screen's pages. */}
+          <Toaster />
         </>,
       )}
     </Suspense>
@@ -873,4 +876,4 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   }
   return form
 }
-// mithaq-admin 0.0.0 c0b33bbc7318856b9c592c055f7066c7149dd76d663ffe7ba4f8d45ac4165af1
+// mithaq-admin 0.0.0 83573d26ec0f4de0db5f0ce2ba70f880ca57d02439162249242a9dd164cd068b

@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react'
 import type { ClientKayan } from 'mithaq/admin'
 import { useScreen } from 'mithaq/admin/react'
 import { refined, remember, remembered, type ListQuery } from 'mithaq-admin/list-query.ts'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { doneWords } from 'mithaq-admin/form-rules.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
+import { toast } from 'mithaq-admin/toast.tsx'
 
 /**
  * A list's own state: the query it asks next, its runs and the refusal the last answered with, the ticked rows and
  * what the last bulk did, and the limit and columns remembered for this viewer.
  */
-export const useListState = ({ docs, kayan, onQuery, query, run }: {
+export const useListState = ({ copy, docs, kayan, onQuery, query, run }: {
+  copy: Copy
   kayan: ClientKayan
   query: ListQuery
   onQuery: (query: ListQuery) => void
@@ -27,6 +31,8 @@ export const useListState = ({ docs, kayan, onQuery, query, run }: {
     setRefused(undefined)
     try {
       await run!(operation, input)
+      const declared = kayan.operations.find((one) => one.name === operation)
+      toast.success(declared?.effect === 'delete' ? doneWords({ kayan, copy, effect: 'delete' }) : doneWords({ kayan, copy, operation: { name: operation } }))
       return true
     } catch (thrown) {
       refuse(thrown)
