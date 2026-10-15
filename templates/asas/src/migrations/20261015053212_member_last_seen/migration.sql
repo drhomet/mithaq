@@ -1,0 +1,1 @@
+ALTER TABLE "member" ADD COLUMN "last_seen_at" timestamp(3) with time zone;

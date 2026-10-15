@@ -62,7 +62,7 @@ const once = (text, from, to, count = 1) => {
 export const addOns = {
   roles: {
     needs: [],
-    files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
+    files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/ui-dashboard/members-card.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
     without: ['packages/mithaq/src/roles/default-member-roles.ts', 'packages/mithaq/src/roles/member-access.ts'],
     packages: [],
     copy: [],
@@ -160,6 +160,20 @@ const textsUnder = (folder) =>
     .map((file) => join(folder, file))
 
 /**
+ * Whether a package's `exports` names `sub` (`''` for the package itself) as Node resolves it: the key equal to it, else
+ * the longest `*` pattern it lies under, and not where that key's value is `null`, an exclusion. A `.` or `..` segment
+ * names nothing, since it would climb out of what the key exports.
+ */
+export const exportsPath = (exports, sub) => {
+  if (sub.split('/').some((segment) => segment === '.' || segment === '..')) return false
+  const asked = sub === '' ? '.' : `.${sub}`
+  const [, value] = Object.entries(exports ?? {})
+    .filter(([key]) => (key.endsWith('*') ? asked.startsWith(key.slice(0, -1)) : key === asked))
+    .sort(([a], [b]) => (b === asked) - (a === asked) || b.length - a.length)[0] ?? [, null]
+  return value !== null
+}
+
+/**
  * Folds the monorepo into one package at `project`: the language's and the asas's `src/` side by side, each feature
  * under `src/features/`, and the tenant app, whose `src/` holds no file of the same name as theirs. The package keeps
  * the name `asas`, because the screen host imports it by that name and a package reaches itself through its own
@@ -208,12 +222,13 @@ const foldIntoOnePackage = (project) => {
     dependencies: own(Object.assign({}, language.dependencies, ...ofFeatures.map((one) => one.dependencies), asas.dependencies, app.dependencies)),
     devDependencies: own(Object.assign({}, language.devDependencies, ...ofFeatures.map((one) => one.devDependencies), asas.devDependencies, app.devDependencies, root.devDependencies)),
   })
-  // A feature is reached through its index, or its browser-safe `domain/`, as its `exports` say.
+  const exportsOf = Object.fromEntries(ofFeatures.map((one) => [one.name.slice('@asas/'.length), one.exports]))
+  // A feature is reached through what its `exports` say, as it was while it was a package.
   const targetOf = (name, sub) => {
     if (name === 'mithaq') return sub === '' ? 'src/mithaq.ts' : sub === '/auth' ? 'src/mithaq/auth/index.ts' : ['/auth/backoffice-roles', '/auth/organizations'].includes(sub) ? `src/mithaq${sub}.ts` : `src${sub}`
     if (sub === '') return `src/features/${name}/index.ts`
-    if (sub.startsWith('/domain/')) return `src/features/${name}${sub}`
-    throw new Error(`@asas/${name}${sub} reaches past the feature's exports.`)
+    if (!exportsPath(exportsOf[name], sub)) throw new Error(`@asas/${name}${sub} reaches past the feature's exports.`)
+    return `src/features/${name}${sub}`
   }
   for (const file of textsUnder(at('src')).filter((one) => /\.tsx?$/.test(one))) {
     edit(file, (text) =>

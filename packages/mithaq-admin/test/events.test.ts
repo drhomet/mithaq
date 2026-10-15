@@ -1087,194 +1087,283 @@ test('218c. an image lists by its thumbnail and its size in kilobytes or megabyt
   assert.deepEqual(went, ['/dashboard/media'], 'and closing it goes back to the list')
 })
 
-test('218d. a member who may invite invites by email through the provider\'s own route, as a member, and the invitation is listed as pending', async (t) => {
+/** One element anywhere on the page, a portal's among them. */
+const onPage = (selector: string) => window.document.querySelector(selector) as unknown as Element | null
+/** The Members page as a viewer holding `permissions` draws it, its dialogs made openable under happy-dom. */
+const membersPage = async ({ loaderData, permissions, collections = {}, over = {} }: { loaderData: Record<string, unknown>; permissions: string[] | '*'; collections?: Record<string, unknown>; over?: Partial<ScreenState> }) => {
   const { Members } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
-  const sent: { path: string; body: Record<string, unknown> }[] = []
-  t.mock.method(globalThis, 'fetch', async (url: unknown, init: { body: string }) => {
-    sent.push({ path: String(url), body: JSON.parse(init.body) as Record<string, unknown> })
-    return Response.json({ id: 'i2', email: 'new@example.com', role: 'member', status: 'pending', expiresAt: '2026-10-15T00:00:00.000Z' })
-  })
-  const loaderData = { members: [], roles: [], invites: [{ id: 'i1', email: 'old@example.com', expiresAt: '2026-10-14T00:00:00.000Z' }] }
-  const none = await render(createElement(Members, { loaderData: { ...loaderData, invites: undefined } }), { access: { permissions: ['memberRoles.find'] } })
-  assert.equal(none.querySelector('[data-invite]'), null, 'no Invite for a viewer who may not invite')
-  assert.equal(none.querySelector('[data-pending]'), null, 'nor the invitations')
-  const host = await render(createElement(Members, { loaderData }), { access: { permissions: ['memberRoles.find', 'invitation.create'] } })
-  const pending = () => [...host.querySelectorAll('[data-invite-row]')].map((one) => one.getAttribute('data-invite-row'))
-  assert.deepEqual(pending(), ['old@example.com'], 'the invitations not yet accepted are listed')
-  const sheet = host.querySelector('[data-invite-sheet]') as unknown as HTMLDialogElement
-  ;(sheet as unknown as { showModal: () => void }).showModal = () => sheet.setAttribute('open', '')
-  ;(sheet as unknown as { close: () => void }).close = () => sheet.removeAttribute('open')
-  await act(async () => click(host.querySelector('[data-invite]')!))
-  assert.equal(sheet.hasAttribute('open'), true, 'Invite opens its dialog')
-  await act(async () => typeInto(sheet.querySelector('input[name="email"]')!, ' new@example.com '))
-  await act(async () => fire(sheet.querySelector('form')!, 'submit'))
-  await act(async () => sleep(10))
-  assert.deepEqual(sent, [{ path: '/api/auth/user/organization/invite-member', body: { email: 'new@example.com', role: 'member' } }], 'the provider\'s own route, as a member')
-  assert.deepEqual(pending(), ['old@example.com', 'new@example.com'], 'and the invitation joins the pending list')
-  assert.equal(sheet.hasAttribute('open'), false, 'and the dialog closes')
+  const host = await render(withToaster(createElement(Members, { loaderData } as never)), { t: english, access: { permissions, collections } as never, ...over })
+  for (const one of host.querySelectorAll('dialog')) {
+    ;(one as unknown as { showModal: () => void }).showModal = () => one.setAttribute('open', '')
+    // A real dialog fires `close` however it is closed, which is what empties it.
+    ;(one as unknown as { close: () => void }).close = () => (one.removeAttribute('open'), one.dispatchEvent(new window.Event('close') as unknown as Event))
+  }
+  const rows = (table = 0) => [...host.querySelectorAll('[data-members] table')[table]!.querySelectorAll('tbody tr')].map((one) => one.getAttribute('data-row'))
+  const menu = async (id: string) => {
+    await act(async () => click(host.querySelector(`[data-row-menu="${id}"]`)!))
+    return [...window.document.querySelectorAll('[data-row-action]')].map((one) => one.getAttribute('data-row-action'))
+  }
+  const item = async (id: string, action: string) => {
+    await menu(id)
+    await act(async () => click(onPage(`[data-row-action="${action}"]`)!))
+    await act(async () => sleep(10))
+  }
+  return { host, rows, menu, item }
+}
+const layla = { userId: 'u1', name: 'Layla', email: 'layla@example.com', joined: '2026-10-01T00:00:00.000Z', lastSeen: '2026-10-14T00:00:00.000Z', owner: false, roles: [{ id: 'a1', role: 'teacher' }] }
+const omar = { userId: 'u2', name: 'Omar', email: 'omar@example.com', joined: '2026-10-02T00:00:00.000Z', owner: false, roles: [] }
+const teacher = { name: 'teacher', label: { en: 'Teacher', ar: 'معلم' }, fixed: false, permissions: ['courses.find', 'courses.fields.title'] }
+const administrator = { name: 'administrator', label: { en: 'Administrator', ar: 'مدير' }, fixed: true, permissions: ['*'] }
+const pendingInvite = { id: 'i1', email: 'old@example.com', role: 'member', inviter: 'Layla', expiresAt: '2099-10-14T00:00:00.000Z', expired: false }
+const lapsedInvite = { id: 'i2', email: 'late@example.com', role: 'member', expiresAt: '2000-10-14T00:00:00.000Z', expired: true }
+
+test('218d. the members page is the list table: Members · N, a person with their address, roles, joined and last seen, searched and filtered by role, and last seen only to a viewer holding its key', async () => {
+  const loaderData = { members: [layla, omar], roles: [administrator, teacher] }
+  const { host, rows } = await membersPage({ loaderData, permissions: ['member.find', 'memberRoles.find', 'member.fields.lastSeenAt'] })
+  assert.equal(host.querySelector('h1')?.textContent, 'Members · 2', 'the heading counts the members')
+  assert.ok(host.querySelector('[data-members] [data-slot="card"] table'), 'drawn on the list table, inside the list\'s card')
+  assert.deepEqual([...host.querySelectorAll('[data-members] thead th')].map((one) => one.textContent), ['Name', 'Roles', 'Joined', 'Last seen', 'Actions'])
+  const first = host.querySelector('tbody tr[data-row="u1"]')!
+  assert.equal(first.querySelector('td')!.textContent, 'Laylalayla@example.com', 'the first column is the name with the address under it')
+  assert.ok(first.textContent!.includes('Teacher'), 'a role by its label')
+  assert.ok(host.querySelector('tbody tr[data-row="u2"]')!.textContent!.includes('—'), 'never seen is a dash')
+  const search = host.querySelector('input[type="search"]')!
+  assert.equal(search.getAttribute('aria-label'), 'Search', 'the search box is named')
+  await act(async () => typeInto(search, 'omar@'))
+  await debounced()
+  assert.deepEqual(rows(), ['u2'], 'the search runs over the name and the address')
+  await act(async () => typeInto(search, ''))
+  await debounced()
+  const filter = host.querySelector('[data-role-filter]') as unknown as HTMLSelectElement
+  assert.equal(host.querySelector(`label[for="${filter.id}"]`)?.textContent, 'Role', 'the role filter is named')
+  filter.value = 'teacher'
+  await act(async () => void fire(filter as unknown as Element, 'change'))
+  assert.deepEqual(rows(), ['u1'], 'and the role filter keeps the members holding the role')
+  filter.value = 'administrator'
+  await act(async () => void fire(filter as unknown as Element, 'change'))
+  assert.equal(host.querySelector('[data-list-message]')?.textContent?.includes('No rows match this filter.'), true, 'a filter matching nobody says so, with a way to clear it')
+
+  const hidden = await membersPage({ loaderData, permissions: ['member.find', 'memberRoles.find'] })
+  assert.ok(![...hidden.host.querySelectorAll('thead th')].some((one) => one.textContent === 'Last seen'), 'without member.fields.lastSeenAt there is no Last seen column')
+  assert.equal(hidden.host.querySelector('[data-members-tab]'), null, 'and to a viewer who may not invite, no Invitations tab')
+  assert.equal(hidden.host.querySelector('[data-invite]'), null, 'nor Invite')
+  assert.equal(hidden.host.querySelector('[data-row-menu]'), null, 'and a viewer who may change nothing gets no row menu')
 })
 
-test('216c. on a phone a member\'s name is the button that opens the role sheet, named for what it does, since the row\'s own button drops', async () => {
-  const { Members } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
-  const member = { userId: 'u1', name: 'Layla', email: 'layla@example.com', joined: '2026-10-01', owner: false, roles: [] }
-  const loaderData = { members: [member], roles: [] }
-  const reader = await render(createElement(Members, { loaderData }), { access: { permissions: ['memberRoles.find'] } })
-  assert.equal(reader.querySelector('[data-open-member]'), null, 'a viewer who changes no role gets no button, only the name')
-  const host = await render(createElement(Members, { loaderData }), { access: { permissions: ['memberRoles.find', 'memberRoles.create'], collections: { memberRoles: { create: true } } } as never })
-  const sheet = host.querySelector('[data-member-sheet]') as unknown as HTMLDialogElement
-  ;(sheet as unknown as { showModal: () => void }).showModal = () => sheet.setAttribute('open', '')
-  const name = host.querySelector('[data-open-member="u1"]')!
-  assert.equal(name.getAttribute('aria-label'), 'Edit roles: Layla', 'the name says what pressing it does')
-  // Below lg, so the table fits a tablet's 768 px too.
-  assert.equal(name.className.split(' ').includes('lg:hidden') && host.querySelector('[data-edit-roles="u1"]')!.closest('td')!.className.includes('max-lg:hidden'), true, 'it stands in for the row\'s own button, which drops below lg')
-  await act(async () => click(name))
-  assert.equal(sheet.hasAttribute('open') && sheet.getAttribute('data-member-sheet'), 'u1', 'and opens the sheet on that member')
-})
-
-test('229c. the members page refuses an empty or malformed address before sending, words each invite refusal by its code, empties its dialog on close, cancels a pending invitation, and keeps Save off until a role changes', async (t) => {
-  const { Members } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+test('229c. invitations: a tab counting them, Email, Role, Sent by and Expires, one run out greyed, and a row menu that copies, sends again and cancels, each said in a green toast; the invite dialog refuses an empty or malformed address and empties on close', async (t) => {
+  await toasted()
   let answer: [number, unknown] = [400, { code: 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION', message: 'User is already a member of this organization' }]
   const sent: { path: string; body: Record<string, unknown> }[] = []
   t.mock.method(globalThis, 'fetch', async (url: unknown, init: { body: string }) => {
     sent.push({ path: String(url), body: JSON.parse(init.body) as Record<string, unknown> })
     return Response.json(answer[1], { status: answer[0] })
   })
-  const member = { userId: 'u1', name: 'Layla', email: 'layla@example.com', joined: '2026-10-01', owner: false, roles: [] }
-  const loaderData = { members: [member], roles: [{ name: 'teacher', fixed: false, permissions: ['courses.find'] }], invites: [{ id: 'i1', email: 'old@example.com', expiresAt: '2026-10-14T00:00:00.000Z' }] }
-  // The app's own copy, which is where a refusal's code is worded.
-  const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
-  const host = await render(createElement(Members, { loaderData }), {
-    t: translator('en'),
-    access: { permissions: ['memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'invitation.create', 'invitation.cancel', 'member.delete', 'courses.find'], collections: { memberRoles: { create: true, delete: true } } } as never,
-  })
-  const dialog = (selector: string) => {
-    const one = host.querySelector(selector) as unknown as HTMLDialogElement
-    ;(one as unknown as { showModal: () => void }).showModal = () => one.setAttribute('open', '')
-    // A real dialog fires `close` however it is closed, which is what empties it.
-    ;(one as unknown as { close: () => void }).close = () => (one.removeAttribute('open'), one.dispatchEvent(new window.Event('close') as unknown as Event))
-    return one
-  }
-  const invite = dialog('[data-invite-sheet]')
+  const copied: string[] = []
+  Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void copied.push(text) } })
+  const { host, rows, menu, item } = await membersPage({ loaderData: { members: [layla], roles: [teacher], invites: [pendingInvite, lapsedInvite] }, permissions: ['member.find', 'invitation.create', 'invitation.cancel'] })
+  assert.deepEqual([...host.querySelectorAll('[data-members-tab]')].map((one) => one.textContent), ['Members', 'Invitations (2)'])
+  assert.deepEqual([...host.querySelectorAll('[data-members] table')[1]!.querySelectorAll('thead th')].map((one) => one.textContent), ['Email', 'Role', 'Sent by', 'Expires', 'Actions'])
+  assert.deepEqual(rows(1), ['i1', 'i2'])
+  const lapsed = host.querySelector('tr[data-row="i2"]')!
+  assert.ok(lapsed.querySelector('[data-expired]')?.textContent?.startsWith('Expired'), 'one run out says so')
+  assert.ok([...lapsed.querySelectorAll('td')].slice(0, 4).every((one) => one.firstElementChild?.className.includes('text-muted-foreground')), 'and is greyed')
+  assert.equal(host.querySelector('tr[data-row="i1"]')!.textContent!.includes('MemberLayla'), true, 'the role by its word and who sent it')
+  assert.equal(host.querySelector('[data-row-menu="i1"]')?.getAttribute('aria-label'), 'Actions for ⁨old@example.com⁩', 'each menu names its invitation')
+  assert.deepEqual(await menu('i2'), ['resend', 'cancel'], 'a link run out is sent again, never copied')
+  await act(async () => press(window.document.activeElement as unknown as Element, 'Escape'))
+
+  answer = [200, { id: 'i1', email: 'old@example.com', role: 'member', expiresAt: '2099-11-01T00:00:00.000Z' }]
+  await item('i1', 'copy-link')
+  assert.deepEqual(copied, ['http://localhost/auth/accept-invitation?id=i1'], 'Copy link copies the link the invitee opens')
+  await item('i1', 'resend')
+  assert.deepEqual(sent.at(-1), { path: '/api/auth/user/organization/invite-member', body: { email: 'old@example.com', role: 'member', resend: true } }, 'Resend asks the provider to send it again')
+  assert.deepEqual(await toasted(), ['success: Link copied', 'success: Invitation sent again to old@example.com'], 'each said in green')
+  answer = [200, { id: 'i9', email: 'late@example.com', role: 'member', expiresAt: '2099-11-01T00:00:00.000Z' }]
+  await item('i2', 'resend')
+  assert.deepEqual(rows(1), ['i1', 'i9'], 'one run out and sent again as a new invitation is listed once, live')
+  answer = [200, {}]
+  await item('i9', 'cancel')
+  assert.deepEqual(sent.at(-1), { path: '/api/auth/user/organization/cancel-invitation', body: { invitationId: 'i9' } }, 'Cancel withdraws it')
+  assert.deepEqual(rows(1), ['i1'], 'and it leaves the list')
+  assert.deepEqual(await toasted(), ['success: Invitation sent again to late@example.com', 'success: Invitation cancelled'])
+
+  sent.length = 0
+  answer = [400, { code: 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION' }]
+  const invite = host.querySelector('[data-invite-sheet]')!
   const box = () => invite.querySelector('input[name="email"]')!
   await act(async () => click(host.querySelector('[data-invite]')!))
-  assert.equal(box().getAttribute('aria-required'), 'true', 'the address says it is required')
+  assert.equal(invite.hasAttribute('open'), true, 'Invite opens its dialog')
   await act(async () => fire(invite.querySelector('form')!, 'submit'))
   assert.equal(invite.querySelector(`#${box().id}-error`)?.textContent, 'This field is required.', 'an empty address is refused under the box')
-  assert.equal(box().getAttribute('aria-invalid'), 'true', 'which marks itself')
   await act(async () => typeInto(box(), 'not-an-email'))
-  assert.equal(invite.querySelector(`#${box().id}-error`)?.textContent, 'Invalid email', 'and one that is no address says so as it is typed, once left')
   await act(async () => fire(invite.querySelector('form')!, 'submit'))
+  assert.equal(invite.querySelector(`#${box().id}-error`)?.textContent, 'Invalid email', 'and one that is no address')
   assert.deepEqual(sent, [], 'neither is sent')
-
   await act(async () => typeInto(box(), 'layla@example.com'))
   await act(async () => fire(invite.querySelector('form')!, 'submit'))
   await act(async () => sleep(10))
   assert.equal(invite.querySelector('[role="alert"]')?.textContent, 'This person is already a member of this organization.', 'the provider\'s refusal is worded by its code')
   await act(async () => click([...invite.querySelectorAll('button')].find((one) => one.textContent === 'Cancel')!))
   await act(async () => click(host.querySelector('[data-invite]')!))
-  assert.deepEqual([(box() as HTMLInputElement).value, invite.querySelector('[role="alert"]'), invite.querySelector('[data-slot="field-error"]')], ['', null, null], 'and the dialog is empty when opened again')
-
-  sent.length = 0
-  answer = [200, {}]
-  assert.equal(host.querySelector('[data-copy-invite="i1"]')?.getAttribute('aria-label'), 'Copy link: old@example.com', 'in every environment the link is offered to copy, for an address the mail does not reach')
-  assert.equal(host.querySelector('[data-cancel-invite="i1"]')?.getAttribute('aria-label'), 'Cancel invitation: old@example.com', 'each Cancel names its invitation')
-  await act(async () => click(host.querySelector('[data-cancel-invite="i1"]')!))
+  assert.deepEqual([(box() as HTMLInputElement).value, invite.querySelector('[role="alert"]')], ['', null], 'and the dialog is empty when opened again')
+  answer = [200, { id: 'i3', email: 'new@example.com', role: 'member', expiresAt: '2099-10-20T00:00:00.000Z' }]
+  await act(async () => typeInto(box(), ' new@example.com '))
+  await act(async () => fire(invite.querySelector('form')!, 'submit'))
   await act(async () => sleep(10))
-  assert.deepEqual(sent, [{ path: '/api/auth/user/organization/cancel-invitation', body: { invitationId: 'i1' } }], 'Cancel withdraws it through the provider\'s route')
-  assert.equal(host.querySelector('[data-invite-row]'), null, 'and it leaves the list')
-
-  const sheet = dialog('[data-member-sheet]')
-  assert.equal(host.querySelector('[data-edit-roles="u1"]')?.getAttribute('aria-label'), 'Edit roles: Layla', 'the desktop button names its member')
-  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
-  const save = () => [...sheet.querySelectorAll('button')].find((one) => one.textContent === 'Save')!
-  assert.equal(save().hasAttribute('disabled'), true, 'Save is off while nothing changed')
-  await act(async () => click(sheet.querySelector('[data-role="teacher"] .font-medium')!))
-  assert.equal(save().hasAttribute('disabled'), false, 'and on once a role is ticked')
-  await act(async () => click(sheet.querySelector('[data-role="teacher"] .font-medium')!))
-  assert.equal(save().hasAttribute('disabled'), true, 'and off again when it is unticked')
-
-  answer = [400, { code: 'YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER', message: 'You cannot leave the organization as the only owner' }]
-  sent.length = 0
-  await act(async () => click(sheet.querySelector('[data-button="remove-member"]')!))
-  assert.deepEqual(sent, [], 'the first press of Remove only asks')
-  await act(async () => click(sheet.querySelector('[data-button="confirm-remove"]')!))
-  await act(async () => sleep(10))
-  assert.deepEqual(sent, [{ path: '/api/auth/user/organization/remove-member', body: { memberIdOrEmail: 'layla@example.com' } }], 'the second removes through the provider\'s route')
-  assert.equal(sheet.querySelector('[role="alert"]')?.textContent, 'The organization\'s only owner cannot be removed.', 'and the last owner\'s refusal is worded')
-  answer = [200, {}]
-  await act(async () => click(sheet.querySelector('[data-button="remove-member"]')!))
-  await act(async () => click(sheet.querySelector('[data-button="confirm-remove"]')!))
-  await act(async () => sleep(10))
-  assert.equal(host.querySelector('[data-member="u1"]'), null, 'a member removed leaves the table')
+  assert.deepEqual(sent.at(-1), { path: '/api/auth/user/organization/invite-member', body: { email: 'new@example.com', role: 'member' } }, 'an invitation goes through the provider\'s own route, as a member')
+  assert.deepEqual([rows(1), invite.hasAttribute('open')], [['i1', 'i3'], false], 'joins the list, and the dialog closes')
+  assert.deepEqual(await toasted(), ['success: Invitation sent to new@example.com'])
 })
 
-test('229d. a locked role dims its box and name and never its reason, and a role\'s delete names a holder it may not read as a member, never by id', async () => {
-  const { Members } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
-  const owner = { userId: 'u1', name: 'Owner', email: 'owner@example.com', joined: '2026-10-01', owner: true, roles: [{ id: 'a1', role: 'administrator' }] }
-  const host = await render(createElement(Members, { loaderData: { members: [owner], roles: [{ name: 'administrator', fixed: true, permissions: ['*'] }] } }), {
-    access: { permissions: ['memberRoles.find', 'memberRoles.create'], collections: { memberRoles: { create: true } } } as never,
+test('216c. Edit roles opens the full-page drawer listing every role with what it grants, grouped by kayan and screen; a role the viewer may not hand over is disabled with its reason, the owner\'s administrator is locked and only its name dimmed, and Save writes through the assignment kayan', async () => {
+  await toasted()
+  const written: string[] = []
+  const client: ScreenState['client'] = async ({ kayan, operation, input }) => (written.push(`${kayan}.${operation} ${String(input.id ?? input.role)}`), { id: 'r9' })
+  const owner = { ...omar, owner: true }
+  const { host, item } = await membersPage({
+    loaderData: { members: [layla, owner], roles: [administrator, teacher] },
+    permissions: ['member.find', 'memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'courses.find', 'courses.fields.title'],
+    collections: { memberRoles: { create: true, delete: true } },
+    over: { client },
   })
-  ;(host.querySelector('[data-member-sheet]') as unknown as { showModal: () => void }).showModal = () => {}
-  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
-  const row = host.querySelector('[data-role="administrator"]')!
-  const dimmed = (element: Element | null) => (element?.className ?? '').split(' ').some((one) => one.includes('opacity-50'))
-  assert.equal(dimmed(row), false, 'the row itself is not dimmed')
-  assert.equal(dimmed(row.querySelector('[data-owner]')), false, 'nor the reason it is locked')
-  assert.equal(dimmed(row.querySelector('.font-medium')), true, 'only the name, beside the disabled box')
+  await item('u1', 'edit-roles')
+  const drawer = onPage('[data-document-drawer]')!
+  assert.equal(drawer.getAttribute('data-mithaq-inline-edit'), 'u1', 'the full-page drawer, on that member')
+  const role = (name: string) => drawer.querySelector(`[data-role="${name}"]`)!
+  assert.equal(role('teacher').querySelector('[data-permissions] [data-group="courses"]') !== null, true, 'a role lists what it grants, grouped by kayan')
+  assert.equal(role('administrator').textContent!.includes('Every permission'), true, 'and the administrator, every permission')
+  assert.equal(role('administrator').getAttribute('data-disabled'), 'true', 'a role holding keys the viewer lacks is disabled')
+  assert.ok(role('administrator').querySelector('[data-locked]'), 'and says why')
+  const save = () => [...drawer.querySelectorAll('button')].find((one) => one.textContent === 'Save')!
+  assert.equal(save().hasAttribute('disabled'), true, 'Save is off while nothing changed')
+  await act(async () => click(role('teacher').querySelector('.font-medium')!))
+  assert.equal(save().hasAttribute('disabled'), false, 'and on once a role is unticked')
+  await act(async () => click(save()))
+  await act(async () => sleep(10))
+  assert.deepEqual(written, ['memberRoles.delete a1'], 'unticking removes the assignment through its own kayan')
+  assert.equal(onPage('[data-document-drawer]'), null, 'the drawer closes')
+  assert.deepEqual(await toasted(), ['success: Roles saved for Layla'])
 
+  await item('u2', 'edit-roles')
+  const admin = onPage('[data-document-drawer] [data-role="administrator"]')!
+  const dimmed = (element: Element | null) => (element?.className ?? '').split(' ').some((one) => one.includes('opacity-50'))
+  assert.ok(admin.querySelector('[data-owner]'), 'the owner always holds administrator, and says so')
+  assert.deepEqual([dimmed(admin), dimmed(admin.querySelector('[data-owner]')), dimmed(admin.querySelector('.font-medium'))], [false, false, true], 'only the name beside the disabled box is dimmed')
+})
+
+test('229g. Remove is offered only where the viewer may take every role the member holds, asks in a dialog, and takes each role through the assignment kayan before the membership; one refused part way keeps the member', async (t) => {
+  await toasted()
+  const sent: string[] = []
+  t.mock.method(globalThis, 'fetch', async (url: unknown) => (sent.push(String(url)), Response.json({})))
+  const boss = { userId: 'u3', name: 'Boss', email: 'boss@example.com', joined: '2026-10-01', owner: false, roles: [{ id: 'a3', role: 'administrator' }] }
+  const aide = { name: 'aide', fixed: false, permissions: ['courses.find'] }
+  const both = { userId: 'u4', name: 'Both', email: 'both@example.com', joined: '2026-10-01', owner: false, roles: [{ id: 'b1', role: 'teacher' }, { id: 'b2', role: 'aide' }] }
+  const client: ScreenState['client'] = async ({ kayan, operation, input }) => {
+    if (input.id === 'b2') throw Object.assign(new Error('refused'), { data: { key: 'error.forbidden.assign' } })
+    sent.push(`${kayan}.${operation} ${String(input.id)}`)
+    return {}
+  }
+  const { host, menu, item, rows } = await membersPage({
+    loaderData: { members: [layla, boss, both], roles: [administrator, teacher, aide] },
+    permissions: ['member.find', 'memberRoles.find', 'memberRoles.delete', 'member.delete', 'courses.find', 'courses.fields.title'],
+    collections: { memberRoles: { delete: true } },
+    over: { client },
+  })
+  assert.ok(!(await menu('u3')).includes('remove'), 'no Remove for an administrator whose every key the viewer does not hold')
+  await act(async () => press(window.document.activeElement as unknown as Element, 'Escape'))
+  await item('u1', 'remove')
+  assert.deepEqual(sent, [], 'Remove only asks')
+  assert.ok(onPage('[data-remove-member]')?.textContent?.includes('Remove Layla?'), 'naming the member')
+  await act(async () => click(onPage('[data-button="confirm-remove"]')!))
+  await act(async () => sleep(10))
+  assert.deepEqual(sent, ['memberRoles.delete a1', '/api/auth/user/organization/remove-member'], 'the role is taken through its kayan, then the membership')
+  assert.ok(!rows().includes('u1'), 'and the member leaves the table')
+  await item('u4', 'remove')
+  await act(async () => click(onPage('[data-button="confirm-remove"]')!))
+  await act(async () => sleep(10))
+  assert.ok(rows().includes('u4'), 'a removal refused part way keeps the member')
+  assert.ok(!host.querySelector('tr[data-row="u4"]')!.textContent!.includes('Teacher'), 'holding only what was not taken')
+  assert.deepEqual(await toasted(), ['success: Layla removed', `error: ${english('error.forbidden.assign')}`], 'each said in a toast')
+})
+
+test('240c. Add person says in a green toast who was added and where the link went, and reads the page again in place rather than reloading it', async (t) => {
+  await toasted()
+  const { AddPerson } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ added: true }))
+  const reload = window.location.reload
+  let reloaded = 0
+  let refreshed = 0
+  const refresh = () => void refreshed++
+  window.addEventListener('mithaq:refresh', refresh)
+  Object.defineProperty(window.location, 'reload', { configurable: true, value: () => void reloaded++ })
+  try {
+    const sheet = { current: null as HTMLDialogElement | null }
+    const adding = await render(withToaster(createElement(AddPerson, { sheet, roles: [], onInvited: () => {} })), { t: english })
+    const add = adding.querySelector('[data-add-person-sheet]') as unknown as HTMLDialogElement
+    ;(add as unknown as { showModal: () => void }).showModal = () => add.setAttribute('open', '')
+    ;(add as unknown as { close: () => void }).close = () => (add.removeAttribute('open'), add.dispatchEvent(new window.Event('close') as unknown as Event))
+    sheet.current!.showModal()
+    const [name, email] = [...add.querySelectorAll('input')] as unknown as Element[]
+    await act(async () => typeInto(name!, 'Omar'))
+    await act(async () => typeInto(email!, 'omar@example.com'))
+    await act(async () => fire(add.querySelector('form')!, 'submit'))
+    await act(async () => sleep(10))
+    assert.deepEqual(await toasted(), ['success: Omar added. A link to choose a password was sent to omar@example.com.'], 'a person added, and where the link went')
+    assert.deepEqual([reloaded, refreshed, add.hasAttribute('open')], [0, 1, false], 'the page is read again in place, so the toast stays, and the sheet closes')
+  } finally {
+    window.removeEventListener('mithaq:refresh', refresh)
+    Object.defineProperty(window.location, 'reload', { configurable: true, value: reload })
+  }
+})
+
+test('240j. the dashboard\'s Members card counts the members and, to a reader of the assignments, how many hold each role, an owner holding administrator, and links the page; a viewer who may not list members is drawn none', async () => {
+  const { membersFigures, MembersCard } = await import('../../../templates/asas/src/ui-dashboard/members-card.tsx')
+  const listed = [
+    { userId: 'u1', role: 'owner', createdAt: '2026-01-01T00:00:00.000Z', user: { name: 'Sana', email: 'sana@example.com' } },
+    { userId: 'u2', role: 'member', createdAt: '2026-01-02T00:00:00.000Z', user: { name: 'Omar', email: 'omar@example.com' } },
+    { userId: 'u3', role: 'member', createdAt: '2026-01-03T00:00:00.000Z', user: { name: 'Huda', email: 'huda@example.com' } },
+  ]
+  const asked: string[] = []
+  const tools = (permissions: string[]) => ({
+    access: { permissions } as never,
+    maxLimit: 100,
+    request: async (path: string) => (asked.push(path), Response.json({ members: listed, total: listed.length })),
+    client: (async ({ kayan }: { kayan: string }) => (kayan === 'memberRoles' ? { docs: [{ id: 'a', user: 'u2', role: 'student' }, { id: 'b', user: 'u3', role: 'student' }], totalDocs: 2 } : { docs: [] })) as never,
+  })
+  assert.equal(await membersFigures(tools(['memberRoles.find'])), undefined, 'nothing to a viewer without member.find')
+  assert.deepEqual(asked, [], 'and nobody is asked')
+  assert.deepEqual(await membersFigures(tools(['member.find'])), { total: 3 }, 'the total alone to one who may not read the assignments')
+  const figures = (await membersFigures(tools(['member.find', 'memberRoles.find'])))!
+  assert.deepEqual(figures.held?.map((one) => [one.role, one.count]), [['administrator', 1], ['student', 2]], 'each role by how many hold it, the owner holding administrator')
+  const card = await render(createElement(MembersCard, { figures, href: '/dashboard/members' }), { t: english })
+  assert.equal(card.querySelector('[data-kpi="members"] [data-members-held]')?.textContent, '1 Administrator · 2 Student')
+  assert.equal(card.querySelector('[data-kpi="members"] a')?.getAttribute('href'), '/dashboard/members', 'and links the page')
+  const arabic = await render(createElement(MembersCard, { figures, href: '/dashboard/members' }), { t: appCopy('ar'), locale: 'ar', dir: 'rtl' })
+  assert.equal(arabic.querySelector('[data-members-held]')?.textContent, `${new Intl.NumberFormat('ar').format(1)} مدير · ${new Intl.NumberFormat('ar').format(2)} طالب`, 'in Arabic, in its own digits')
+})
+
+test('240z. the members page reads in Arabic: its heading, tabs, columns, filter and menus', async () => {
+  const { host, menu } = await membersPage({
+    loaderData: { members: [layla], roles: [teacher], invites: [pendingInvite] },
+    permissions: ['member.find', 'memberRoles.find', 'invitation.create', 'invitation.cancel'],
+    collections: { memberRoles: { create: true } },
+    over: { t: appCopy('ar'), locale: 'ar', dir: 'rtl' },
+  })
+  assert.equal(host.querySelector('h1')?.textContent, `الأعضاء · ${new Intl.NumberFormat('ar').format(1)}`)
+  assert.deepEqual([...host.querySelectorAll('[data-members-tab]')].map((one) => one.textContent), ['الأعضاء', `الدعوات (${new Intl.NumberFormat('ar').format(1)})`])
+  assert.deepEqual([...host.querySelectorAll('[data-members] table')[0]!.querySelectorAll('thead th')].map((one) => one.textContent), ['الاسم', 'الأدوار', 'تاريخ الانضمام', 'الإجراءات'])
+  assert.equal(host.querySelector('[data-role-filter] option')?.textContent, 'كل الأدوار')
+  assert.deepEqual(await menu('u1'), ['edit-roles'])
+  assert.equal(onPage('[data-row-action="edit-roles"]')?.textContent, 'تعديل الأدوار')
+})
+
+test('229d. a role\'s delete names a holder it may not read as a member, never by id', async () => {
   const client: ScreenState['client'] = async ({ kayan }) => (kayan === 'memberRoles' ? { docs: [{ user: 'u-unread' }] } : Promise.reject(new Error('forbidden')))
   const deleting = await render(createElement(DeleteRole, { run: async () => {}, busy: false } as never), { record: { id: 'r1', name: 'teacher' }, client })
   await act(async () => click(deleting.querySelector('[data-button="delete"]') as Element))
   const holders = [...window.document.querySelectorAll('[data-holders] a')]
   assert.deepEqual(holders.map((one) => one.textContent), ['A member'], 'a holder the viewer may not read is a member')
   assert.equal(holders[0]?.getAttribute('href')?.endsWith('?member=u-unread'), true, 'and the link still opens their roles')
-})
-
-test('229g. Remove is offered only where the viewer may take every role the member holds, and takes each through the assignment kayan before the membership', async (t) => {
-  const { Members } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
-  const sent: string[] = []
-  t.mock.method(globalThis, 'fetch', async (url: unknown) => (sent.push(String(url)), Response.json({})))
-  const boss = { userId: 'u1', name: 'Boss', email: 'boss@example.com', joined: '2026-10-01', owner: false, roles: [{ id: 'a1', role: 'administrator' }] }
-  const teacher = { userId: 'u2', name: 'Teacher', email: 'teacher@example.com', joined: '2026-10-01', owner: false, roles: [{ id: 'a2', role: 'teacher' }] }
-  const roles = [{ name: 'administrator', fixed: true, permissions: ['*'] }, { name: 'teacher', fixed: false, permissions: ['courses.find'] }]
-  const client: ScreenState['client'] = async ({ kayan, operation, input }) => (sent.push(`${kayan}.${operation} ${String(input.id)}`), {})
-  const host = await render(createElement(Members, { loaderData: { members: [boss, teacher], roles } }), {
-    client,
-    access: { permissions: ['memberRoles.find', 'memberRoles.delete', 'member.delete', 'courses.find'], collections: { memberRoles: { delete: true } } } as never,
-  })
-  const sheet = host.querySelector('[data-member-sheet]') as unknown as HTMLDialogElement
-  ;(sheet as unknown as { showModal: () => void }).showModal = () => sheet.setAttribute('open', '')
-  ;(sheet as unknown as { close: () => void }).close = () => sheet.removeAttribute('open')
-  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
-  assert.equal(sheet.querySelector('[data-button="remove-member"]'), null, 'no Remove for an administrator whose every key the viewer does not hold')
-  await act(async () => click(host.querySelector('[data-edit-roles="u2"]')!))
-  await act(async () => click(sheet.querySelector('[data-button="remove-member"]')!))
-  await act(async () => click(sheet.querySelector('[data-button="confirm-remove"]')!))
-  await act(async () => sleep(10))
-  assert.deepEqual(sent, ['memberRoles.delete a2', '/api/auth/user/organization/remove-member'], 'the role is taken through its kayan, then the membership')
-  assert.equal(host.querySelector('[data-member="u2"]'), null, 'and the member leaves the table')
-
-  // A removal that stops part way leaves the boxes as the member stands and Save off, so nothing taken is written back.
-  const two = { userId: 'u3', name: 'Two', email: 'two@example.com', joined: '2026-10-01', owner: false, roles: [{ id: 'b1', role: 'teacher' }, { id: 'b2', role: 'aide' }] }
-  const both = [...roles, { name: 'aide', fixed: false, permissions: ['courses.find'] }]
-  const failing: ScreenState['client'] = async ({ input }) => {
-    if (input.id === 'b2') throw Object.assign(new Error('refused'), { data: { key: 'error.forbidden.assign' } })
-    return {}
-  }
-  const partly = await render(createElement(Members, { loaderData: { members: [two], roles: both } }), {
-    client: failing,
-    access: { permissions: ['memberRoles.find', 'memberRoles.delete', 'member.delete', 'courses.find'], collections: { memberRoles: { delete: true } } } as never,
-  })
-  const partSheet = partly.querySelector('[data-member-sheet]') as unknown as HTMLDialogElement
-  ;(partSheet as unknown as { showModal: () => void }).showModal = () => partSheet.setAttribute('open', '')
-  await act(async () => click(partly.querySelector('[data-edit-roles="u3"]')!))
-  await act(async () => click(partSheet.querySelector('[data-button="remove-member"]')!))
-  await act(async () => click(partSheet.querySelector('[data-button="confirm-remove"]')!))
-  await act(async () => sleep(10))
-  const ticked = (role: string) => partSheet.querySelector(`[data-role="${role}"] [role="checkbox"]`)?.getAttribute('aria-checked')
-  assert.deepEqual([ticked('teacher'), ticked('aide')], ['false', 'true'], 'the role taken is unticked and the one refused stays')
-  assert.equal([...partSheet.querySelectorAll('button')].find((one) => one.textContent === 'Save')?.hasAttribute('disabled'), true, 'and Save is off')
-  assert.equal(partly.querySelector('[data-member="u3"]') !== null, true, 'and the member stays')
 })
 
 test('229f. a role\'s form refused on save marks its name and both labels required and refused, each with its sentence under it, and its permissions group refused where the server names it', async () => {
@@ -3588,6 +3677,11 @@ test('the dashboard\'s loader counts the courses, sums the fees of those not arc
     assert.equal(value('enrollments'), '7', 'every enrollment, counted')
     assert.equal(value('recent'), '2', 'and the two of the range')
     assert.ok(host.querySelector('[data-chart-card="enrollments"] [data-slot="chart"]'), 'drawn as an area chart')
+    assert.equal(host.querySelector('[data-kpi="members"]'), null, 'and no Members card to a viewer who may not list members')
+    const listing = async () => Response.json({ members: [{ userId: 'u1', role: 'owner', createdAt: '2026-01-01T00:00:00.000Z', user: { name: 'Sana', email: 'sana@example.com' } }], total: 1 })
+    const staffed = await render(createElement(Dashboard, { loaderData: await dashboardLoader({ client, access: { ...access, permissions: ['member.find'] } as never, request: listing, maxLimit: screen.maxLimit }) }), { kayan: undefined })
+    assert.equal(staffed.querySelector('[data-kpi="members"] [data-slot="card-title"]')?.textContent, '1', 'while one who may is drawn how many work here')
+    assert.equal(staffed.querySelector('[data-kpi="members"] a')?.getAttribute('href'), '/dashboard/members', 'with a link to the Members page')
 
     // An actor the report does not let read enrollments is asked nothing about them and shown neither figure nor chart.
     asked.length = 0
@@ -7480,73 +7574,6 @@ test('240b. a save the server refuses over no field, or that never reaches it, s
   thrown = new TypeError('Failed to fetch')
   await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
   assert.deepEqual(await toasted(), ['error: Something went wrong, so nothing was saved. Try again.'], 'a request that never answered says so, where it said nothing before')
-})
-
-test('240c. the members page says in a green toast that an invitation went, an invitation was cancelled, roles were saved, a member was removed and a person was added, and reads the page again rather than reloading it', async (t) => {
-  await toasted()
-  const { Members, AddPerson } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
-  let answer: [number, unknown] = [200, { id: 'i2', email: 'new@example.com', expiresAt: '2026-10-20T00:00:00.000Z' }]
-  t.mock.method(globalThis, 'fetch', async () => Response.json(answer[1], { status: answer[0] }))
-  const member = { userId: 'u1', name: 'Layla', email: 'layla@example.com', joined: '2026-10-01', owner: false, roles: [] }
-  const loaderData = { members: [member], roles: [{ name: 'teacher', fixed: false, permissions: ['courses.find'] }], invites: [{ id: 'i1', email: 'old@example.com', expiresAt: '2026-10-14T00:00:00.000Z' }] }
-  const host = await render(withToaster(createElement(Members, { loaderData })), {
-    t: english,
-    client: async () => ({ id: 'r1' }),
-    access: { permissions: ['memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'invitation.create', 'invitation.cancel', 'member.delete', 'courses.find'], collections: { memberRoles: { create: true, delete: true } } } as never,
-  })
-  const dialog = (selector: string) => {
-    const one = host.querySelector(selector) as unknown as HTMLDialogElement
-    ;(one as unknown as { showModal: () => void }).showModal = () => one.setAttribute('open', '')
-    ;(one as unknown as { close: () => void }).close = () => (one.removeAttribute('open'), one.dispatchEvent(new window.Event('close') as unknown as Event))
-    return one
-  }
-  const invite = dialog('[data-invite-sheet]')
-  await act(async () => click(host.querySelector('[data-invite]')!))
-  await act(async () => typeInto(invite.querySelector('input[name="email"]')!, 'new@example.com'))
-  await act(async () => fire(invite.querySelector('form')!, 'submit'))
-  await act(async () => sleep(10))
-  assert.deepEqual(await toasted(), ['success: Invitation sent to new@example.com'], 'an invitation')
-  answer = [200, {}]
-  await act(async () => click(host.querySelector('[data-cancel-invite="i1"]')!))
-  await act(async () => sleep(10))
-  assert.deepEqual(await toasted(), ['success: Invitation cancelled'], 'a cancelled invitation')
-
-  const sheet = dialog('[data-member-sheet]')
-  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
-  await act(async () => click(sheet.querySelector('[data-role="teacher"] .font-medium')!))
-  await act(async () => click([...sheet.querySelectorAll('button')].find((one) => one.textContent === 'Save')!))
-  await act(async () => sleep(10))
-  assert.deepEqual(await toasted(), ['success: Roles saved for Layla'], 'a role change')
-  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
-  await act(async () => click(sheet.querySelector('[data-button="remove-member"]')!))
-  await act(async () => click(sheet.querySelector('[data-button="confirm-remove"]')!))
-  await act(async () => sleep(10))
-  assert.deepEqual(await toasted(), ['success: Layla removed'], 'a removal')
-
-  const reload = window.location.reload
-  let reloaded = 0
-  let refreshed = 0
-  const refresh = () => void refreshed++
-  window.addEventListener('mithaq:refresh', refresh)
-  Object.defineProperty(window.location, 'reload', { configurable: true, value: () => void reloaded++ })
-  try {
-    const adding = await render(withToaster(createElement(AddPerson, { roles: [], onInvited: () => {} })), { t: english })
-    const add = adding.querySelector('[data-add-person-sheet]') as unknown as HTMLDialogElement
-    ;(add as unknown as { showModal: () => void }).showModal = () => add.setAttribute('open', '')
-    ;(add as unknown as { close: () => void }).close = () => (add.removeAttribute('open'), add.dispatchEvent(new window.Event('close') as unknown as Event))
-    await act(async () => click(adding.querySelector('[data-add-person]')!))
-    const [name, email] = [...add.querySelectorAll('input')] as unknown as Element[]
-    await act(async () => typeInto(name!, 'Omar'))
-    await act(async () => typeInto(email!, 'omar@example.com'))
-    answer = [200, { added: true }]
-    await act(async () => fire(add.querySelector('form')!, 'submit'))
-    await act(async () => sleep(10))
-    assert.deepEqual(await toasted(), ['success: Omar added. A link to choose a password was sent to omar@example.com.'], 'a person added, and where the link went')
-    assert.deepEqual([reloaded, refreshed, add.hasAttribute('open')], [0, 1, false], 'the page is read again in place, so the toast stays, and the sheet closes')
-  } finally {
-    window.removeEventListener('mithaq:refresh', refresh)
-    Object.defineProperty(window.location, 'reload', { configurable: true, value: reload })
-  }
 })
 
 test('240d. a save refused over fields lists each in a summary at the top of the form, which takes the focus from any tab, and each line is a link that opens its tab and focuses its box', async () => {
