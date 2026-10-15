@@ -1,4 +1,4 @@
-import { compareDecimals, decimalDigits, isDecimal, type ClientField, type ClientKayan } from 'mithaq/admin'
+import { compareDecimals, decimalDigits, isDecimal, isJson, type ClientField, type ClientKayan } from 'mithaq/admin'
 import type { Copy } from 'mithaq-admin/copy.ts'
 import { counted, listed } from 'mithaq-admin/format.tsx'
 
@@ -43,6 +43,8 @@ export const brokenRule = (field: ClientField, held: unknown): string | undefine
     if (typeof rules.maxRows === 'number' && value.length > rules.maxRows) return 'maxRows'
   }
   if (empty(value)) return rules.required === true ? 'required' : undefined
+  // The server holds a value to its jsonSchema; the browser holds no schema check.
+  if (field.kind === 'json') return isJson(value) ? undefined : 'invalid'
   if (field.kind === 'integer' && !(Number.isInteger(value) && (value as number) >= -2147483648 && (value as number) <= 2147483647)) return 'invalid'
   if (field.kind === 'decimal') {
     if (!isDecimal(value)) return 'invalid'

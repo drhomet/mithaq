@@ -42,7 +42,7 @@ export const uniqueRuleIndexes = new WeakSet<object>()
 
 export const isPlainIdentifier = (value: string) => value.length <= 63 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value)
 
-const fixed = new Set(['access', 'column', 'custom', 'dbName', 'description', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
+const fixed = new Set(['access', 'column', 'custom', 'dbName', 'description', 'jsonSchema', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
 
 // Every list holds exactly one store or managed read step, and none of the three
 // the runner owns; the effect is read off that one step, so it is never declared.
@@ -681,6 +681,19 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       }
     }
   }
+  const jsonSchemaNamed = (where: string, field: RuntimeField) => {
+    const { jsonSchema } = field
+    if (jsonSchema === undefined) return
+    if (field.kind !== 'json') throw new Error(`${where} has a jsonSchema, and kind "${field.kind}" takes none; only a json field does.`)
+    const schema = (jsonSchema as { schema?: unknown } | null)?.schema
+    if (typeof schema !== 'boolean' && (!schema || typeof schema !== 'object' || Array.isArray(schema))) {
+      throw new Error(`${where} jsonSchema names no "schema"; a schema is held in the field and never fetched from its "uri".`)
+    }
+    const { uri, fileMatch } = jsonSchema
+    if ((uri !== undefined && typeof uri !== 'string') || (fileMatch !== undefined && !(Array.isArray(fileMatch) && fileMatch.every((one) => typeof one === 'string')))) {
+      throw new Error(`${where} jsonSchema "fileMatch" is a list of strings and "uri" a string.`)
+    }
+  }
   const declaredTargets = (where: string, wrote: Record<string, unknown> | undefined, known = targetNames) => {
     for (const name of Object.keys(wrote ?? {})) {
       if (known.has(name)) continue
@@ -813,6 +826,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       }
       optionsNamed(where, field.kind, field)
       affixesNamed(where, field.kind, field)
+      jsonSchemaNamed(where, field)
       for (const [screen, block] of Object.entries(field.targets ?? {})) {
         if (!isScreen(language.targets[screen])) continue
         const drawn = block as ScreenField

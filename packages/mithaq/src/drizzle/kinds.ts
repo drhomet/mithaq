@@ -1,4 +1,4 @@
-import { boolean, date, integer, numeric, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { boolean, date, integer, jsonb, numeric, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 import type { ResolvedField } from '../mithaq/types.ts'
 import { defaultKinds } from '../base/kinds.ts'
 import type { ColumnBuilder } from './index.ts'
@@ -56,5 +56,7 @@ export const kinds = {
       `Field "${field.name}" is a join, whose rows are held by kayan "${field.target?.name}", so this store builds no column for it.`,
     )
   },
+  // `jsonb`, as Payload's Postgres adapter stores a json field, so either reads what the other wrote.
+  json: (field) => jsonb(field.column),
   relationship,
 } satisfies Record<keyof typeof defaultKinds, ColumnBuilder>

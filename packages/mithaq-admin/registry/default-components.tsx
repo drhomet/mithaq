@@ -7,7 +7,7 @@ import { defaultNodes } from 'mithaq-admin/default-nodes.tsx'
 import { IntegerControl, NumberControl, SliderControl } from 'mithaq-admin/number-control.tsx'
 import { RelationshipControl } from 'mithaq-admin/relationship-control.tsx'
 import { DecimalControl, EmailControl, OtpControl, ReadOnlyControl, TextControl } from 'mithaq-admin/text-control.tsx'
-import { TextArrayControl, TextareaControl } from 'mithaq-admin/textarea-control.tsx'
+import { JsonControl, TextArrayControl, TextareaControl } from 'mithaq-admin/textarea-control.tsx'
 
 // Apart from the provider, so a control that reads the map imports no other control. Rich text and files are not
 // here: `richTextComponents` and `uploadComponents` are spread in by a language that holds their kinds.
@@ -33,6 +33,7 @@ export const defaultComponents: Components = {
     checkbox: CheckboxControl,
     textArray: TextArrayControl,
     uuid: ReadOnlyControl,
+    json: JsonControl,
     relationship: RelationshipControl,
     textarea: TextareaControl,
     toggle: ToggleControl,

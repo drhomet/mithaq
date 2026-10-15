@@ -17,6 +17,9 @@ function Moment({ value, locale }: { value: unknown; locale: string }): ReactNod
   return text === undefined ? plain(value) : <time dateTime={new Date(value as string).toISOString()} suppressHydrationWarning>{text}</time>
 }
 
+/** How many characters of a json value a row draws. */
+const previewLength = 60
+
 const plain = (value: unknown) => (value === null || value === undefined ? '' : String(value))
 
 const worded = (field: ClientField, value: unknown, locale: string) => {
@@ -59,6 +62,13 @@ export const cells: Cells = {
   date: ({ value, locale }) => formatDate({ value, locale, day: true }) ?? plain(value),
   textArray: ({ field, value, locale }) => (Array.isArray(value) ? listed(value.map((one) => worded(field, one, locale)), locale) : plain(value)),
   uuid: ({ value }) => <span className="font-mono text-xs">{plain(value)}</span>,
+  // One line of the JSON in a row and all of it on a record page, left to right in any page.
+  json: ({ value, whole }) => {
+    if (value === null || value === undefined) return ''
+    if (whole) return <pre dir="ltr" className="font-mono text-xs whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+    const text = JSON.stringify(value)
+    return <code dir="ltr" className="font-mono text-xs">{text.length > previewLength ? `${text.slice(0, previewLength)}…` : text}</code>
+  },
   relationship: RelationshipCell,
   // Nothing where the read carried no join: an absent key means the read did not ask, an empty array means no children, and a count of zero would say both.
   join: ({ value, locale }) => (Array.isArray(value) ? value.length.toLocaleString(locale) : ''),

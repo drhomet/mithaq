@@ -1,6 +1,6 @@
 import { isRef, type Ref } from '../mithaq/user.ts'
 import type { Localized } from '../mithaq/types.ts'
-import type { OnDelete } from './kinds.ts'
+import { isJson, type Json, type OnDelete } from './kinds.ts'
 
 export type Rule<Value = unknown> = {
   /** Compile-time value carried by a binding; never read at runtime. */
@@ -45,10 +45,10 @@ export const defaultRules = {
   required: rule<boolean>({ accepts: isBoolean, message: { en: 'This field is required.', ar: 'هذا الحقل مطلوب.' } }),
   unique: boolean,
   index: boolean,
-  /** A literal, or `user.<key>` for the actor's value. Each row gets its own copy. */
-  defaultValue: rule<Date | Ref | boolean | number | string | readonly unknown[]>({
-    accepts: (value): value is Date | Ref | boolean | number | string | readonly unknown[] =>
-      value instanceof Date || isRef(value) || Array.isArray(value) || ['boolean', 'number', 'string'].includes(typeof value),
+  /** A literal, JSON for a `json` field, or `user.<key>` for the actor's value. Each row gets its own copy. */
+  defaultValue: rule<Date | Ref | Json | readonly unknown[]>({
+    accepts: (value): value is Date | Ref | Json | readonly unknown[] =>
+      value instanceof Date || isRef(value) || Array.isArray(value) || (value !== null && isJson(value)),
     excludes: ['defaultNow'],
   }),
   /** The moment of the write, on create. */

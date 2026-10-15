@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import type { ResolvedField } from '../mithaq/types.ts'
-import { defaultKinds } from '../base/kinds.ts'
+import { defaultKinds, isJson, type Json } from '../base/kinds.ts'
 import { isDecimal } from '../base/decimal.ts'
+import { jsonSchemaCheck } from '../base/json-schema.ts'
 import type { ZodShape } from './index.ts'
 
 // A missing key, or a `null` on a required field, is the `required` rule refusing;
@@ -57,6 +58,12 @@ export const kinds = {
     field.hasMany
       ? z.array(idShape(field.target!.fields.id!.kind, errorOf(field, true)), { error: errorOf(field) })
       : idShape(field.target!.fields.id!.kind, errorOf(field)),
+  // Only what JSON can say, so a value reads back as it was written; `z.json()` lets a cycle through.
+  // A `jsonSchema` only judges: what is stored is the value as sent.
+  json: (field?: ResolvedField) => {
+    const shape = z.custom<Json>((value) => isJson(value), { error: errorOf(field) })
+    return field?.jsonSchema ? shape.refine(jsonSchemaCheck(field), { error: errorOf(field) }) : shape
+  },
   // Left loose: the child's row shape may not be derived yet, and the child's own read already parsed the rows.
   join: (field?: ResolvedField) => z.array(z.record(z.string(), z.unknown()), { error: errorOf(field) }),
 } satisfies Record<keyof typeof defaultKinds, ZodShape>

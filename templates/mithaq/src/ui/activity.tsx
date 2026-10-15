@@ -7,7 +7,7 @@
 import { useContext, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan, ComponentProps, Row } from 'mithaq/admin'
 import { FormContext, useAccess, useClient, useKayan, useLocale, useRecord, useScreen, useUser } from 'mithaq/admin/react'
-import { empty } from '../mithaq/audit-sink.ts'
+import { empty, type Change } from '../mithaq/audit-sink.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,9 +59,9 @@ const recordField = (kayan: string) => ({ name: `record:${kayan}`, kind: 'relati
  */
 const commandOf = /^(.+?) \((.+)\)$/
 
-const changesOf = (entry: Entry): [string, { from: unknown; to: unknown }][] => {
+const changesOf = (entry: Entry): [string, Change][] => {
   try {
-    return Object.entries(JSON.parse(entry.changes) as Record<string, { from: unknown; to: unknown }>)
+    return Object.entries(JSON.parse(entry.changes) as Record<string, Change>)
   } catch {
     return []
   }
@@ -115,8 +115,11 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
     <ol className="grid gap-4 text-sm">
       {entries.map((entry) => {
         const kayan = one ?? kayans?.[entry.kayan ?? '']
-        const drawn = (field: ClientField, value: unknown): ReactNode =>
-          empty(value) ? '—' : cellFor({ cells, field })({ kayan: kayan!, field, value, t, locale, titles })
+        // A side the sink cut is the start of its JSON, which no cell of the field's kind reads.
+        const drawn = (field: ClientField, value: unknown, change: Change): ReactNode =>
+          empty(value) ? '—' : change.truncated && typeof value === 'string' && value.endsWith('…')
+            ? <code dir="ltr" className="break-all font-mono">{value}</code>
+            : cellFor({ cells, field })({ kayan: kayan!, field, value, t, locale, titles })
         const at = new Date(entry.createdAt)
         // Every operation has its words in the log's own scope, in the past
         // tense the sentence reads in, and one a project adds before it
@@ -158,11 +161,12 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
                       {': '}
                       {made ? null : (
                         <>
-                          <span data-from>{drawn(field, change.from)}</span>
+                          <span data-from>{drawn(field, change.from, change)}</span>
                           <span aria-hidden className="mx-1 inline-block rtl:rotate-180">→</span>
                         </>
                       )}
-                      <span data-to>{drawn(field, change.to)}</span>
+                      <span data-to>{drawn(field, change.to, change)}</span>
+                      {change.truncated ? <span data-truncated className="block">{t('auditLog.truncated', 'Too long to keep whole; its start is shown.')}</span> : null}
                     </li>
                   ))}
                 </ul>

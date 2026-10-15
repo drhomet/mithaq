@@ -37,6 +37,27 @@ export const kind = <Value>(accepts: (value: unknown) => value is Value) =>
       & ({} extends Targets ? unknown : { targets: Targets })
       & (PointsAtRow extends true ? { pointsAtRow: true } : unknown)
 
+/** A value `JSON.parse` could hand back. */
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
+
+/**
+ * Plain JSON, nested to any depth: no `undefined`, no number that is not finite,
+ * no `Date`, class instance or function, and no cycle. A store would otherwise
+ * drop, rewrite or refuse it on the way in, and read back something else.
+ */
+export const isJson = (value: unknown, open: Set<object> = new Set()): value is Json => {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (typeof value !== 'object' || open.has(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return false
+  open.add(value)
+  // `Object.values` skips a hole, which `JSON.stringify` would write as `null`, so the length is checked too.
+  const plain = (!Array.isArray(value) || Object.keys(value).length === value.length) && Object.values(value).every((one) => isJson(one, open))
+  open.delete(value)
+  return plain
+}
+
 /** What the database does to this row when the row it points at is deleted. */
 export type OnDelete = 'cascade' | 'restrict' | 'set null'
 
@@ -115,6 +136,15 @@ export const defaultKinds = {
     // A row another still names is never deleted from under it, its drafts included; a field says
     // `set null` or `cascade` to let it go.
     onDelete: 'restrict',
+  }),
+  // Payload's `json` field: any JSON value, stored as it is written, with no wrapping.
+  // Its paths are queried with dot notation, and nothing orders by one.
+  json: kind<Json>(isJson)({
+    label: { en: 'JSON', ar: 'JSON' },
+    message: { en: 'This is not JSON this field takes.', ar: 'هذه ليست بيانات JSON يقبلها هذا الحقل.' },
+    rules: ['providedBy', 'required', 'defaultValue'],
+    operators: ['equals', 'not_equals', 'in', 'not_in', 'exists', 'like', 'contains'],
+    sortable: false,
   }),
   // The rows of another kayan whose `on` relationship points at this one. It builds
   // no column: the id lives on the child, and a read populates it through the child's access.

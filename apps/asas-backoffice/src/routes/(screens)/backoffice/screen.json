@@ -130,6 +130,10 @@
       "control": "relationship",
       "cell": "relationship"
     },
+    "json": {
+      "control": "json",
+      "cell": "json"
+    },
     "join": {
       "control": "join",
       "cell": "join"

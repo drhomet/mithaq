@@ -102,14 +102,16 @@ const checkOperatorValue = (said: string, field: string, operator: string, value
 
 // A second segment is a locale or a related field, never both: `resolve` refuses
 // `localized` beside `relationTo` on the field itself, whatever the kind is named.
+// A json field's path goes on into its value, a key per segment, as Payload's does.
 const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; said: string }) => {
   const parts = key.split('.')
-  const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments.`
-  if (parts.length > 2 || parts.some((part) => !part)) throw new Error(unsupported)
+  const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments, or a key at each segment after a json field.`
   const field = parts[0]!
-  const path = parts[1]
   const resolved = kayan.fields[field]
+  if ((parts.length > 2 && resolved?.kind !== 'json') || parts.some((part) => !part)) throw new Error(unsupported)
+  const path = parts[1]
   if (!resolved) throw new Error(`${said} names unknown field "${key}".`)
+  if (resolved.kind === 'json') return { field, key, kind: resolved.kind, operators: resolved.operators }
   if (!path || resolved.locales?.includes(path)) return { field, key, kind: resolved.kind, operators: resolved.operators }
   if (!resolved.target) throw new Error(unsupported)
   const target = resolved.target.fields[path]

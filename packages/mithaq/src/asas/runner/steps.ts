@@ -449,8 +449,8 @@ export const audit = seal('audit', async (ctx: Ctx, tools?: Tools) => {
 // A row's filter and a default read the same reference off the same actor, so they agree.
 const defaultOf = (field: ResolvedField, ctx: Ctx, tools: Pick<WriteTools, 'kind' | 'operation'>) => {
   const value = field.rules?.defaultValue
-  // Copied, so a step pushing onto one row's list never changes the next row's default.
-  if (!isRef(value)) return Array.isArray(value) ? [...value] : value
+  // Copied whole, so a step changing one row's list or object never changes the next row's default.
+  if (!isRef(value)) return typeof value === 'object' && value !== null ? structuredClone(value) : value
   if (!ctx.user) {
     throw new Error(
       `Kayan "${ctx.kayan.name}" operation "${tools.operation}" field "${field.name}" defaults to "user.${value.$user}", and this write was given no actor. Pass one: create(data, { actor }).`,

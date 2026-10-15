@@ -9,8 +9,19 @@ import { same } from 'mithaq/admin'
  */
 export const auditLogName = 'auditLog'
 
-/** One changed column: what it held before the write and what it holds after. */
-export type Change = { from: unknown; to: unknown }
+/**
+ * One changed column: what it held before the write and what it holds after. `truncated` marks a
+ * change one side of which was too long to keep whole, and is kept as the start of its JSON.
+ */
+export type Change = { from: unknown; to: unknown; truncated?: true }
+
+/** How many characters of one side of a change an entry keeps: one large json value never swells the log. */
+export const keptLength = 2000
+
+const kept = (value: unknown) => {
+  const text = JSON.stringify(value) ?? ''
+  return text.length > keptLength ? `${text.slice(0, keptLength)}…` : value
+}
 
 /**
  * What the Activity panel draws as a dash: absent, `null`, an empty string or
@@ -22,12 +33,16 @@ export const empty = (value: unknown) => value === undefined || value === null |
 /**
  * The columns whose value differs, each with its value on both sides and
  * `null` for a side that held none. A column empty on both sides is no change,
- * so a create lists only what it set and a delete only what the row held.
+ * so a create lists only what it set and a delete only what the row held. A
+ * side longer than `keptLength` is kept as the start of its JSON.
  */
 export const changesOf = (before: Readonly<Record<string, unknown>>, after: Readonly<Record<string, unknown>>) => {
   const changes: Record<string, Change> = {}
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
-    if (!same(before[key], after[key]) && !(empty(before[key]) && empty(after[key]))) changes[key] = { from: before[key] ?? null, to: after[key] ?? null }
+    if (same(before[key], after[key]) || (empty(before[key]) && empty(after[key]))) continue
+    const [from, to] = [before[key] ?? null, after[key] ?? null]
+    const [keptFrom, keptTo] = [kept(from), kept(to)]
+    changes[key] = keptFrom === from && keptTo === to ? { from, to } : { from: keptFrom, to: keptTo, truncated: true }
   }
   return changes
 }
@@ -83,10 +98,10 @@ export const auditSink: AuditHandler = async ({ effect, kayan, operation, dataBe
     operation: operation === 'update' && changes._status?.to === 'published' ? 'publish' : operation,
     actor: stringOf(actor?.id) ?? (typeof actor?.command === 'string' ? `${actor.command} (${String(actor.osUser)})` : null),
     impersonatedBy: stringOf(actor?.impersonatedBy),
-    // JSON in a text column, because the language ships no json kind. The log
-    // is never ordered by it, and searched by it only within the kayan its
-    // reader reads whole (`reachOf`), since a match in any other column would
-    // tell a value its reader may not read.
+    // JSON in a text column, the one it has been since before the language
+    // had a json kind. The log is never ordered by it, and searched by it only
+    // within the kayan its reader reads whole (`reachOf`), since a match in
+    // any other column would tell a value its reader may not read.
     changes: JSON.stringify(changes),
     // Each name between two spaces, so a search of one never matches part of another.
     changed: ` ${Object.keys(changes).join(' ')} `,

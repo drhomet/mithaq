@@ -1016,7 +1016,7 @@ test("the project's own resolver rides on buildAsas, is called with nothing, and
     messages: (...args: unknown[]) => {
       handed = args
       return {
-        kinds: { text: t('kind.text'), email: t('kind.email'), number: t('kind.number'), integer: t('kind.integer'), decimal: t('kind.decimal'), checkbox: t('kind.checkbox'), datetime: t('kind.datetime'), date: t('kind.date'), textArray: t('kind.text_list'), uuid: t('kind.uuid'), relationship: t('kind.relationship'), upload: t('kind.upload'), richText: t('kind.rich_text'), join: t('kind.join') },
+        kinds: { text: t('kind.text'), email: t('kind.email'), number: t('kind.number'), integer: t('kind.integer'), decimal: t('kind.decimal'), checkbox: t('kind.checkbox'), datetime: t('kind.datetime'), date: t('kind.date'), textArray: t('kind.text_list'), uuid: t('kind.uuid'), relationship: t('kind.relationship'), json: t('kind.json'), upload: t('kind.upload'), richText: t('kind.rich_text'), join: t('kind.join') },
         fields: { id: t('field.id'), updatedAt: t('field.updated'), createdAt: t('field.created'), tenant: t('field.tenant') },
         globalType: t('field.global_type'),
       }
@@ -1236,7 +1236,7 @@ test('the messages registry is assembled when it is read, not when the project i
     messages: () => {
       called += 1
       return {
-        kinds: { text: 'Text', email: 'Email', number: 'Number', integer: 'Integer', decimal: 'Decimal', checkbox: 'Checkbox', datetime: 'Date and time', date: 'Date', textArray: 'Text list', uuid: 'UUID', relationship: 'Relationship', upload: 'Upload', richText: 'Rich text', join: 'Related rows' },
+        kinds: { text: 'Text', email: 'Email', number: 'Number', integer: 'Integer', decimal: 'Decimal', checkbox: 'Checkbox', datetime: 'Date and time', date: 'Date', textArray: 'Text list', uuid: 'UUID', relationship: 'Relationship', json: 'JSON', upload: 'Upload', richText: 'Rich text', join: 'Related rows' },
         fields: { id: 'ID', updatedAt: 'Updated', createdAt: 'Created', tenant: 'Tenant' },
         globalType: 'Global type',
       }

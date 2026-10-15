@@ -283,6 +283,10 @@
     "ar": "إلى",
     "en": "To"
   },
+  "truncated": {
+    "ar": "أطول من أن يُحفظ كاملا؛ تظهر بدايته.",
+    "en": "Too long to keep whole; its start is shown."
+  },
   "type": {
     "ar": "نوع السجل",
     "en": "Record type"

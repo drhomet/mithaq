@@ -236,6 +236,8 @@ export const auditLog = defineKayan({
     you: { en: 'You', ar: 'أنت' },
     eventYou: { en: '{action} by You', ar: '{action} بواسطتك' },
     none: { en: 'No field you may read changed.', ar: 'لم يتغير حقل يمكنك قراءته.' },
+    // Beside a change the sink cut to the start of its JSON, which a large json value is.
+    truncated: { en: 'Too long to keep whole; its start is shown.', ar: 'أطول من أن يُحفظ كاملا؛ تظهر بدايته.' },
     // The panel's link to the rest of a record's entries, and the Activity page and tab.
     all: { en: 'All activity', ar: 'كل النشاط' },
     about: { en: 'Every change in this organization, newest first.', ar: 'كل تغيير في هذه المؤسسة، الأحدث أولا.' },

@@ -458,6 +458,29 @@ test('26. no control reports a change while it is read-only, and every writable 
   }
 })
 
+test('26b. a json box reports what its text parses to, nothing for an emptied box, and text that is no JSON as a value no save takes, keeping the text as typed', async () => {
+  const reported: unknown[] = []
+  const Probe = () => {
+    const [value, setValue] = useState<unknown>({ a: 1 })
+    return createElement(controls.json!, {
+      values: {}, setValue: () => {}, field: { name: 'meta', kind: 'json', rules: {} } as never, kayan: courses, id: 'meta', t, value, readOnly: false,
+      onChange: (next: unknown) => (reported.push(next), setValue(next)),
+    })
+  }
+  const host = await render(createElement(Probe))
+  const box = host.querySelector('textarea')!
+  await act(async () => typeInto(box, '{"a": [1, "two", null]}'))
+  assert.deepEqual(reported.at(-1), { a: [1, 'two', null] })
+  assert.equal(box.value, '{"a": [1, "two", null]}', 'text that parses is left as typed, not rewritten under the caret')
+  await act(async () => typeInto(box, '{"a": '))
+  assert.equal(typeof reported.at(-1), 'symbol', 'no JSON value, so a save is refused and a draft\'s sends no key')
+  assert.equal(box.value, '{"a": ', 'and the text stays for the person to finish')
+  await act(async () => typeInto(box, '  '))
+  assert.equal(reported.at(-1), null)
+  await act(async () => typeInto(box, '"text"'))
+  assert.equal(reported.at(-1), 'text')
+})
+
 test('178d. a date picks off the calendar in the viewer\'s locale and writes the day the column holds; a moment keeps its time when its day changes and its day when its time does', async () => {
   const picker = async (kind: string, value: unknown, locale = 'en') => {
     const reported: unknown[] = []

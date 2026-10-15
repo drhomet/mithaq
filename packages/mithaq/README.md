@@ -193,6 +193,36 @@ From `base` (`packages/mithaq/src/base/kinds.ts` `defaultKinds`):
 - `join`: the rows of another kayan whose `on` relationship points back at
   this row. It builds no column; a read populates it through the child kayan's
   own access.
+- `json`: any JSON value, Payload's json field. It is a `jsonb` column holding
+  the value itself, so a row Payload wrote reads back unchanged and Payload
+  reads what mithaq writes; Postgres keeps no key order and one copy of a
+  repeated key. A value JSON cannot say (`undefined`, `NaN`, a `Date`, a
+  function, a cycle) is refused. Its rules are `required`, `defaultValue` and
+  `providedBy`. `jsonSchema` checks each written value against a JSON Schema,
+  as Payload's does:
+
+  ```ts
+  meta: {
+    kind: 'json',
+    label: { en: 'Metadata', ar: 'البيانات الوصفية' },
+    jsonSchema: {
+      uri: 'a://b/meta.json',
+      fileMatch: ['a://b/meta.json'],
+      schema: { type: 'object', properties: { size: { type: 'integer', minimum: 0 } }, required: ['size'] },
+    },
+  },
+  ```
+
+  The schema is held in the field and never fetched from its `uri`. It is
+  checked with Ajv, draft 2020-12 or draft-07 where `$schema` names it, and a
+  keyword, a format or a reference Ajv cannot check is refused at build rather
+  than skipped. Rows stored before a schema was added still read. A query
+  names a path into the value with dots, `{ 'meta.size': { equals: 3 } }`, each
+  segment a key, and a list on the way is matched by any of its entries; it
+  takes `equals`, `not_equals`, `in`, `not_in`, `exists`, `like` and
+  `contains`, and the field's read access covers every path into it. Nothing
+  orders by one. The admin draws it as a left-to-right JSON text box, and a
+  row's cell as one line of it.
 
 From the other arkan:
 
@@ -208,8 +238,8 @@ From `base` (`packages/mithaq/src/base/rules.ts` `defaultRules`):
 - `unique`: no two rows hold the same value. On a per-organization kayan that
   means within the organization; see [Tenancy](src/asas/runner/README.md).
 - `index`: the column is indexed.
-- `defaultValue`: a literal, or a reference such as `user.id` to the actor's
-  value. Excludes `defaultNow`.
+- `defaultValue`: a literal, JSON for a `json` field, or a reference such as
+  `user.id` to the actor's value. Excludes `defaultNow`.
 - `defaultNow`: the moment of the write, on create.
 - `nowOnUpdate`: the moment of the write, on every update.
 - `providedBy`: who supplies the value on `create` and on `update`: `client`,

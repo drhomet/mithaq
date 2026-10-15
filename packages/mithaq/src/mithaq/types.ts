@@ -56,6 +56,13 @@ export type ServiceOf<L> = L extends { targets: infer Targets }
   ? Extract<Targets[keyof Targets], { capability: 'service' }>
   : never
 
+/**
+ * Payload's `jsonSchema`: `schema` is what a value is checked against. `uri` and `fileMatch` name it
+ * for an editor; it is never fetched from its `uri`, which would be a request the server makes on a
+ * writer's behalf.
+ */
+export type JsonSchema = { schema: Record<string, unknown> | boolean; uri?: string; fileMatch?: readonly string[] }
+
 type Named<Locale extends string = string> = {
   access?: { create?: StoredFieldAccess; read?: StoredFieldAccess; update?: StoredFieldAccess }
   /** One string per locale the language declares, every one required. */
@@ -68,6 +75,8 @@ type Named<Locale extends string = string> = {
   suffix?: Localized<Locale>
   /** The closed list a text field's value is one of. */
   options?: readonly { readonly value: string; readonly label: Localized<Locale> }[]
+  /** A `json` field only: the JSON Schema its value is checked against, as Payload's field takes it. */
+  jsonSchema?: JsonSchema
   /** The column name. A relationship without one gets `<snake_case name>_id`. */
   dbName?: string
   /**

@@ -130,7 +130,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const memos = language.defineKayan({
     name: 'memos',
     schemaName: 'tenant_scope',
-    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
+    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, meta: { kind: 'json', rules: { defaultValue: {} } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
     // `read: true` for an editor: the broadest answer a row gives.
     // A reader's answer is a filter, so under `tenant: 'mine'` its organizations take a branch of their own.
     access: language.rows({ editor: { create: true, read: true, update: true, delete: true }, reader: { read: { title: { not_equals: 'hidden' } } }, staff: { read: true } } as never),
@@ -532,6 +532,26 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     // A membership whose roles cannot read adds nothing, and one with none at all is no reach.
     const lone = await actorOf({ active: 'org1', orgs: { org1: [], org2: [] } })
     assert.equal((await refusal(memos().find({}, { actor: lone, tenant: 'mine' }))).status, 403)
+  })
+
+  // The memory store reads no path into a json value; the scope it is ANDed beside is the same either way.
+  if (postgres) test('a filter along a json path reads the active organization alone, and a reader without the field\'s key is refused it, under tenant: \'mine\' too', async () => {
+    const meta = { stage: 'probe', tags: ['x'] }
+    const mine = await memos().create({ title: 'json one', meta }, { actor: one })
+    await memos().create({ title: 'json two', meta }, { actor: two })
+    for (const where of [{ 'meta.stage': { equals: 'probe' } }, { 'meta.tags': { in: ['x'] } }, { meta: { contains: 'probe' } }]) {
+      assert.deepEqual((await memos().find({ where }, { actor: one })).docs.map((row: { id: string }) => row.id), [mine.id], JSON.stringify(where))
+      assert.equal((await memos().count({ where }, { actor: one })).totalDocs, 1)
+    }
+    // `meta` is no key of the reader's, so no path into it, nor `exists`, tells a reader what it holds.
+    const reader = await actorOf({ active: 'org1', orgs: { org1: ['reader'] } })
+    for (const where of [{ 'meta.stage': { equals: 'probe' } }, { 'meta.tags': { exists: true } }, { meta: { like: 'probe' } }, { or: [{ title: { equals: 'x' } }, { 'meta.stage': { equals: 'probe' } }] }]) {
+      const refused = await refusal(memos().find({ where }, { actor: reader }))
+      assert.equal(refused.status, 403, JSON.stringify(where))
+      assert.equal(refused.key, 'error.forbidden.field_read')
+    }
+    const both = await actorOf({ active: 'org1', orgs: { org1: ['editor'], org2: ['reader'] } })
+    assert.equal((await refusal(memos().find({ where: { 'meta.stage': { equals: 'probe' } } }, { actor: both, tenant: 'mine' }))).status, 403)
   })
 
   test('tenant: \'all\' is backoffice staff in the backoffice app alone, and a write takes no tenant', async () => {

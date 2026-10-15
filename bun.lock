@@ -138,6 +138,8 @@
       },
       "dependencies": {
         "@babel/helper-validator-identifier": "^8.0.4",
+        "ajv": "^8.20.0",
+        "ajv-formats": "^3.0.1",
         "drizzle-kit": "1.0.0-rc.4",
         "drizzle-orm": "1.0.0-rc.4",
         "jose": "6.2.12",
