@@ -1048,12 +1048,16 @@ test('0g. links to one address are mailed at most once in five minutes, never wa
   assert.equal(await mailCount(mail), 2, 'and the next request is mailed')
 })
 
-test('0s. the page that chooses a password reads the account\'s address off a live link alone, and answers a spent, expired or made-up one with one refusal', async () => {
+test('0s. the page that chooses a password reads the account\'s address off a live link alone, in process and never over HTTP, and answers a spent, expired or made-up one with one refusal', async () => {
   const mail = keptMail()
   const open = modeServer({ organizations: 'one', signUp: 'open', joinRole: null, verifyEmail: true, allowedDomains: [], mailer: mail.mailer })
   assert.equal((await askedOf(open, '/sign-up/email', { name: 'Reader', email: 'reader-0s@example.com' })).status, 200)
   const token = (await tokenMailed(mail, 'reader-0s@example.com'))!
-  const stateOf = async (asked: string) => answered(await askedOf(open, `/set-password/state?token=${encodeURIComponent(asked)}`))
+  for (const asked of [askedOf(open, `/set-password/state?token=${encodeURIComponent(token)}`), askedOf(open, '/set-password/state', { token })]) {
+    assert.equal((await asked).status, 404, 'no request reads it, so no access log holds the token in a query')
+  }
+  type Reads = { setPasswordState(args: { query: { token: string } }): Promise<{ email: string }> }
+  const stateOf = (asked: string) => (open.api as unknown as Reads).setPasswordState({ query: { token: asked } }).then((body) => ({ status: 200, body: body as Record<string, unknown> }), (thrown: { statusCode: number; body: Record<string, unknown> }) => ({ status: thrown.statusCode, body: thrown.body }))
   assert.deepEqual(await stateOf(token), { status: 200, body: { email: 'reader-0s@example.com' } }, 'a live link reads its address, to show it as the account it chooses for')
   const refused = await stateOf('not-a-token')
   assert.equal(refused.status, 400)

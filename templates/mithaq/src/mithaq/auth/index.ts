@@ -1545,11 +1545,12 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     }] },
   }
   // The address a live set-password link is for, which the page shows as the account it chooses a password of. The
-  // token is the proof, as it is for choosing the password itself; anything else is one refusal.
+  // token is the proof, as it is for choosing the password itself; anything else is one refusal. The page reads it in
+  // process alone: over HTTP the token would sit in a query string, which access logs keep.
   const setPasswordState = {
     id: 'set-password-state',
     endpoints: {
-      setPasswordState: createAuthEndpoint('/set-password/state', { method: 'GET' }, async (ctx) => {
+      setPasswordState: createAuthEndpoint('/set-password/state', { method: 'GET', metadata: { SERVER_ONLY: true } }, async (ctx) => {
         const { token } = (ctx.query ?? {}) as { token?: unknown }
         const { internalAdapter } = ctx.context
         const link = typeof token === 'string' && token ? await internalAdapter.findVerificationValue(`reset-password:${token}`) : null
