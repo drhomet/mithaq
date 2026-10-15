@@ -563,7 +563,8 @@ required one out:
   `bulkLimit` (1000), `store` and `schema`. An `audit` step needs an `audit`
   sink.
 - On the storage config: `secret`, `adapters`, `adapter`, `fileSize`
-  (`defaultFileSize`), `onError`, and the functions `key`, `verify`,
+  (`defaultFileSize`), `maxBodyBytes` (`defaultMaxBodyBytes`), which bounds
+  the instructions request as a plug's bounds a call, `onError`, and the functions `key`, `verify`,
   `disposition`, `sweep`, `instructions`, `uploaded`, `removed` and `serve`.
 
 A default that holds policy or talks to the outside world, such as the storage

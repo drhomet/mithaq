@@ -8,7 +8,7 @@
 // `mithaq-storage` registry item and owned by the project: `mithaq upgrade
 // --check` reports one that was edited, and an edit is merged by hand.
 import { randomBytes } from 'node:crypto'
-import { defaultFileSize, type StorageConfig } from 'mithaq'
+import { defaultFileSize, defaultMaxBodyBytes, type StorageConfig } from 'mithaq'
 import {
   defaultDisposition,
   defaultKey,
@@ -81,6 +81,8 @@ export const storageConfig: StorageConfig = {
   adapter,
   // The largest file a kayan holds when its targets.storage names no fileSize.
   fileSize: defaultFileSize,
+  // The largest instructions request read; files themselves never come this way.
+  maxBodyBytes: defaultMaxBodyBytes,
   key: defaultKey,
   verify: defaultVerify,
   disposition: defaultDisposition,

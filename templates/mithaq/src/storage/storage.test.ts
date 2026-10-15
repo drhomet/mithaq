@@ -55,6 +55,7 @@ const secret = 'a-test-secret-of-at-least-thirty-two-characters'
 /** The project's own storage functions, and the file size it names. */
 const functions = {
   fileSize: named.fileSize,
+  maxBodyBytes: named.maxBodyBytes,
   key: named.key,
   verify: named.verify,
   disposition: named.disposition,
@@ -386,6 +387,16 @@ test('186d. instructions refuse a type the kayan does not hold, a file over its 
   await rm(named1000.dir, { recursive: true, force: true })
 })
 
+test('186d2. instructions answer a body past the storage\'s maxBodyBytes with 413 before reading the rest or asking who sent it', async () => {
+  const built = await project({ storage: { maxBodyBytes: 100 } })
+  // Never closed, so a reader that waits for the end never answers.
+  const body = new ReadableStream({ start: (controller) => controller.enqueue(new TextEncoder().encode(`{"filename":"${'a'.repeat(200)}`)) })
+  const answered = await built.asas.handler(new Request('http://test/api/files/uploadInstructions', { method: 'POST', headers: { 'content-type': 'application/json' }, body, duplex: 'half' } as RequestInit))
+  assert.equal(answered.status, 413)
+  assert.match(((await answered.json()) as { message: string }).message, /at most 100 bytes/)
+  await rm(built.dir, { recursive: true, force: true })
+})
+
 test('186e. an SVG is taken only where it is listed, and is never served inline, whatever the disposition function says', async () => {
   const built = await project({
     files: { storage: { mimeTypes: ['image/svg+xml'] } },
@@ -476,6 +487,7 @@ test('186h. the build refuses a storage that names no function, a kayan that can
     await assert.rejects(project({ storage: { [missing]: undefined }, files: { service: { operations } } }), new RegExp(`storage names no "${missing}" function`), missing)
   }
   await assert.rejects(project({ storage: { fileSize: undefined } }), /storage names no "fileSize", the largest file in bytes/)
+  await assert.rejects(project({ storage: { maxBodyBytes: undefined } }), /storage names no "maxBodyBytes", the largest request body/)
   for (const fileSize of [0, 1.5, '10']) {
     await assert.rejects(project({ storage: { fileSize: fileSize as never } }), new RegExp(`storage.fileSize is ${JSON.stringify(fileSize)}, and it is a whole number of bytes above 0`), String(fileSize))
   }
