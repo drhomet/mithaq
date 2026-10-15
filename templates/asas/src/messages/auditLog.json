@@ -151,6 +151,10 @@
     "ar": "تصفية النشاط",
     "en": "Filter the activity"
   },
+  "found": {
+    "ar": "السجلات المطابقة: {count}",
+    "en": "Entries found: {count}"
+  },
   "from": {
     "ar": "من",
     "en": "From"
@@ -258,6 +262,10 @@
   "searchChanges": {
     "ar": "القيم المتغيرة",
     "en": "changed values"
+  },
+  "searchLimited": {
+    "ar": "يشمل البحث السجلات التي يمكنك قراءة كل حقولها.",
+    "en": "The search covers the records whose every field you may read."
   },
   "singular": {
     "ar": "سجل تدقيق",

@@ -3,7 +3,7 @@
 // the kayan the viewer lists. A file of its own beside `activity.tsx`, since the
 // shell it draws in holds the app's own pieces.
 import { useEffect, useState } from 'react'
-import { useLocale } from 'mithaq/admin/react'
+import { useAccess, useLocale } from 'mithaq/admin/react'
 import { ActivityLog, filtersOf, type ActivityQuery } from './activity.tsx'
 import { AppShell } from './app-shell.tsx'
 
@@ -14,8 +14,9 @@ import { AppShell } from './app-shell.tsx'
  */
 export function ActivityPage() {
   const { t } = useLocale()
+  const people = useAccess().collections?.user?.read === true
   const [query, setQuery] = useState<ActivityQuery>()
-  useEffect(() => setQuery(filtersOf(window.location.search)), [])
+  useEffect(() => setQuery(filtersOf({ search: window.location.search, people })), [])
   return (
     <AppShell
       regions={{

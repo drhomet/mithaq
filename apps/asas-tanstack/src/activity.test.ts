@@ -157,10 +157,12 @@ test('the Activity\'s filters are one `where` the log reads: a search of the val
     { createdAt: { less_than: new Date(2026, 9, 3).toISOString() } },
   ] })
   assert.deepEqual(whereOf({ action: 'constructor', from: 'nonsense' }), undefined, 'an action it does not know, and a day that is none, filter nothing')
-  assert.deepEqual(filtersOf('?kayan=courses&record=c1&page=x&limit=20&secret=1'), { kayan: 'courses', record: 'c1', page: 1, limit: 20 }, 'a link carries the filters it names and nothing else')
+  assert.deepEqual(filtersOf({ search: '?kayan=courses&record=c1&page=x&limit=20&secret=1', people: true }), { kayan: 'courses', record: 'c1', page: 1, limit: 20 }, 'a link carries the filters it names and nothing else')
+  assert.deepEqual(filtersOf({ search: '?actor=u1&kayan=courses', people: true }), { actor: 'u1', kayan: 'courses', page: 1, limit: 10 }, 'a person to a reader of the people')
+  assert.deepEqual(filtersOf({ search: '?actor=u1&kayan=courses', people: false }), { kayan: 'courses', page: 1, limit: 10 }, 'and no person to a reader of none, whose read would be refused for it')
 })
 
-const drawLog = async ({ locale, query, fixed }: { locale: Locale; query: Record<string, unknown>; fixed?: boolean }) => {
+const drawLog = async ({ locale, query, fixed, permissions }: { locale: Locale; query: Record<string, unknown>; fixed?: boolean; permissions?: '*' | string[] }) => {
   const asked: { kayan: string; input: Record<string, unknown> }[] = []
   const client: ScreenState['client'] = async ({ kayan, input }) => {
     asked.push({ kayan, input })
@@ -170,7 +172,7 @@ const drawLog = async ({ locale, query, fixed }: { locale: Locale; query: Record
     if (kayan === 'courses') return { docs: [{ id: 'c1', title: 'Tajweed' }], hasNextPage: false, nextPage: null }
     return { docs: [], hasNextPage: false, nextPage: null }
   }
-  const state: ScreenState = { t: translator(locale), locale, dir: dirOf(locale), screen, access: { collections: { user: { read: true } } } as never, user: { id: 'u0', name: 'Admin', email: 'admin@example.com' }, client }
+  const state: ScreenState = { t: translator(locale), locale, dir: dirOf(locale), screen, access: { ...(permissions && { permissions }), collections: { user: { read: true } } } as never, user: { id: 'u0', name: 'Admin', email: 'admin@example.com' }, client }
   const host = mount()
   const root = createRoot(host)
   const queries: Record<string, unknown>[] = []
@@ -216,4 +218,18 @@ test('the Activity tab reads one record\'s entries whatever its filters say, off
   assert.deepEqual([...host.querySelectorAll('[role="group"] label[for]')].map((one) => text(one)), ['الشخص', 'الحقل', 'الإجراء', 'من', 'إلى'], 'no kayan filter, each label in Arabic')
   assert.equal(host.querySelector('[data-record]'), null, 'and no entry names its record, which is this one')
   await unmount()
+})
+
+test('the Activity says what it found in one short live line, apart from the list, and says its search is limited for a reader graded column by column', async () => {
+  const { host, unmount } = await drawLog({ locale: 'en', query: {}, permissions: ['auditLog.find'] })
+  const live = [...host.querySelectorAll('[aria-live]')]
+  assert.equal(live.length, 1, 'one live region')
+  assert.equal(text(live[0]), 'Entries found: 2', 'saying the count')
+  assert.equal(live[0]!.querySelector('ol'), null, 'and never the list itself')
+  assert.equal(text(host.querySelector('[data-search-limited]')), 'The search covers the records whose every field you may read.')
+  await unmount()
+  const whole = await drawLog({ locale: 'ar', query: {}, permissions: '*' })
+  assert.equal(whole.host.querySelector('[data-search-limited]'), null, 'a reader of every column is told nothing more')
+  assert.equal(text(whole.host.querySelector('[aria-live]')), 'السجلات المطابقة: 2', 'in Arabic, its digits as every count of the app draws them')
+  await whole.unmount()
 })

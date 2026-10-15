@@ -230,9 +230,13 @@ export const whereOf = (filters: ActivityFilters) => {
   return parts.length ? { and: parts } : undefined
 }
 
-/** The filters a link carries, each the key it is named by, and anything else left out. */
-export const filtersOf = (search: string): ActivityQuery => {
+/**
+ * The filters a link carries, each the key it is named by, and anything else left out. A person
+ * is left out for a reader of no people, whose read of the log refuses any filter by one.
+ */
+export const filtersOf = ({ search, people }: { search: string; people: boolean }): ActivityQuery => {
   const params = new URLSearchParams(search)
+  if (!people) params.delete('actor')
   const page = Number.parseInt(params.get('page') ?? '', 10)
   const limit = Number.parseInt(params.get('limit') ?? '', 10)
   return {
@@ -430,6 +434,10 @@ export function ActivityLog({ kayan: fixed, record, query, onQuery, refresh = 0 
     <section data-activity-log className="grid min-w-0 gap-4">
       <div role="group" aria-label={t('auditLog.filters', 'Filter the activity') ?? 'Filter the activity'} className="grid gap-3">
         <Search value={query.search} fields={[t('auditLog.searchChanges', 'changed values') ?? 'changed values']} locale={locale} t={t} onSearch={(search) => refine({ search })} />
+        {/* The server searches a change's text only in the kayan whose every column the reader reads,
+            and a reader graded column by column may read some kayan in part: the page holds no list of
+            the columns it does not read, so it says so rather than guessing which. */}
+        {Array.isArray(access.permissions) ? <p data-search-limited className="text-muted-foreground text-xs">{t('auditLog.searchLimited', 'The search covers the records whose every field you may read.')}</p> : null}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {people && screen.kayan.auditLog ? (
             <Labelled id={ids.person} label={t('auditLog.person', 'Person') ?? 'Person'}>
@@ -476,17 +484,17 @@ export function ActivityLog({ kayan: fixed, record, query, onQuery, refresh = 0 
           </div>
         ) : null}
       </div>
-      <div aria-live="polite">
-        {shown === undefined ? (
-          <p className="text-muted-foreground text-sm">{t('auditLog.loading', 'Loading activity…')}</p>
-        ) : 'failed' in shown ? (
-          <p className="text-destructive text-sm">{t('auditLog.failed', 'The activity could not be read.')}</p>
-        ) : !entries.length ? (
-          <p className="text-muted-foreground text-sm">{filtered ? t('auditLog.nothing', 'No activity matches these filters.') : t('auditLog.empty', 'Nothing has changed here yet.')}</p>
-        ) : (
-          <ActivityEntries entries={entries} kayan={fixed} kayans={screen.kayan} record={fixed ? undefined : recordOf} titles={titles} t={t} locale={locale} viewer={viewer} people={people} />
-        )}
-      </div>
+      {/* One short line a screen reader hears as a read lands, never the whole list. */}
+      <p aria-live="polite" className={`text-sm ${shown && 'failed' in shown ? 'text-destructive' : 'text-muted-foreground'}`}>
+        {shown === undefined
+          ? t('auditLog.loading', 'Loading activity…')
+          : 'failed' in shown
+            ? t('auditLog.failed', 'The activity could not be read.')
+            : !entries.length
+              ? filtered ? t('auditLog.nothing', 'No activity matches these filters.') : t('auditLog.empty', 'Nothing has changed here yet.')
+              : (t('auditLog.found', 'Entries found: {count}') ?? 'Entries found: {count}').replace('{count}', () => shown.page.totalDocs.toLocaleString(locale))}
+      </p>
+      {entries.length ? <ActivityEntries entries={entries} kayan={fixed} kayans={screen.kayan} record={fixed ? undefined : recordOf} titles={titles} t={t} locale={locale} viewer={viewer} people={people} /> : null}
       {shown && 'page' in shown && shown.page.totalDocs > 0 ? (
         <Pagination page={shown.page} t={t} locale={locale} onPage={(page) => onQuery({ ...query, page })} onLimit={(limit) => onQuery({ ...query, limit, page: 1 })} />
       ) : null}

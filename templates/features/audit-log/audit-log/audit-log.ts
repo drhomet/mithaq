@@ -259,6 +259,8 @@ export const auditLog = defineKayan({
     clear: { en: 'Clear filters', ar: 'مسح عوامل التصفية' },
     nothing: { en: 'No activity matches these filters.', ar: 'لا نشاط يطابق عوامل التصفية هذه.' },
     oneRecord: { en: 'One record\'s activity.', ar: 'نشاط سجل واحد.' },
+    found: { en: 'Entries found: {count}', ar: 'السجلات المطابقة: {count}' },
+    searchLimited: { en: 'The search covers the records whose every field you may read.', ar: 'يشمل البحث السجلات التي يمكنك قراءة كل حقولها.' },
   },
   access: { ...auditLogAccess, read: readableKayans },
   targets: {
