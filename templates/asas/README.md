@@ -288,6 +288,7 @@ my-app/
   README.md           this guide
   AGENTS.md           the rules for a coding agent working in the project
   CLAUDE.md           one line, @AGENTS.md, so Claude Code reads the same rules
+  .claude/skills/     workflow skills for a coding agent: add a kayan, add a field, eject a piece, upgrade mithaq
   package.json        workspaces packages/mithaq, packages/features/*, packages/asas and apps/*; no scripts
   tsconfig.json       one strict config over every package's .ts and apps/*/src
   .gitignore          node_modules, .env, dist, .storage/

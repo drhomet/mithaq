@@ -67,6 +67,13 @@ test('no guide teaches a retired name outside the notes on upgrading', () => {
   assert.deepEqual(stale, [])
 })
 
+test('every skill opens with the frontmatter Claude Code reads: its folder\'s name and a description', () => {
+  for (const { file, lines } of guides.filter(({ file }) => file.endsWith('/SKILL.md'))) {
+    const name = /\/skills\/([^/]+)\/SKILL\.md$/.exec(file)![1]
+    assert.deepEqual([lines[0], lines[1], /^description: \S/.test(lines[2]!) || lines[2] === 'description: >'], ['---', `name: ${name}`, true], file)
+  }
+})
+
 test('each snippet a guide marks as copied from a file still appears in that file, line by line in order', () => {
   const drifted: string[] = []
   for (const { file, lines } of guides) {

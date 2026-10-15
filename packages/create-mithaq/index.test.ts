@@ -72,6 +72,8 @@ test('a monorepo holds its guide and agent files at the root, where an agent sta
   assert.deepEqual(['AGENTS.md', 'CLAUDE.md', 'README.md'].filter((file) => existsSync(join(scratch, 'my-app', file))), ['AGENTS.md', 'CLAUDE.md', 'README.md'])
   assert.deepEqual(['AGENTS.md', 'CLAUDE.md', 'README.md'].filter((file) => existsSync(join(scratch, 'my-app/packages/asas', file))), [], 'and none is left in packages/asas')
   assert.equal(read('my-app/CLAUDE.md'), '@AGENTS.md\n')
+  assert.deepEqual(readdirSync(join(scratch, 'my-app/.claude/skills')).sort(), ['add-field', 'add-kayan', 'eject-admin-piece', 'upgrade-mithaq'], 'the workflow skills, where Claude Code finds them')
+  assert.ok(!existsSync(join(scratch, 'my-app/packages/asas/.claude')))
   assert.match(read('my-app/AGENTS.md'), /`README\.md` beside this file/)
   assert.doesNotMatch(read('my-app/README.md'), /<!-- from: /, 'the guide names no file of the mithaq repository its snippets are checked against')
 })
@@ -134,7 +136,7 @@ test('without the backoffice console, its app and its .env are left out, and gen
 test('a single package holds the language, its features, the asas and the tenant app, reaching itself by the name asas and every other part by path', () => {
   create({ name: 'one', cwd: scratch, template, version: '1.2.3', layout: 'single', addOns: every.filter((one) => one !== 'backoffice') })
   const at = join(scratch, 'one')
-  assert.deepEqual(readdirSync(at).sort(), ['.env', '.env.example', '.gitignore', '.yarnrc.yml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
+  assert.deepEqual(readdirSync(at).sort(), ['.claude', '.env', '.env.example', '.gitignore', '.yarnrc.yml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'components.json', 'mithaq.hints.json', 'package.json', 'pnpm-workspace.yaml', 'public', 'src', 'tsconfig.json', 'vite.config.ts'])
   const manifest = json('one/package.json')
   assert.equal(manifest.name, 'asas', 'the screen host imports the language as asas')
   assert.equal(manifest.workspaces, undefined)

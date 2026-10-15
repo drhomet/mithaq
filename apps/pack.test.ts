@@ -21,3 +21,10 @@ test('the mithaq package ships each user guide as the repository holds it, and e
   }
   assert.ok((JSON.parse(readFileSync(join(staged, 'package.json'), 'utf8')) as { files: string[] }).files.includes('docs'), 'and npm packs them')
 })
+
+test('the mithaq package ships the workflow skills a created project carries in .claude/skills, at that version', () => {
+  const skills = join(root, 'templates/asas/.claude/skills')
+  assert.deepEqual(readdirSync(join(staged, 'skills')).sort(), readdirSync(skills).sort())
+  for (const skill of readdirSync(skills)) assert.equal(readFileSync(join(staged, 'skills', skill, 'SKILL.md'), 'utf8'), readFileSync(join(skills, skill, 'SKILL.md'), 'utf8'), skill)
+  assert.ok((JSON.parse(readFileSync(join(staged, 'package.json'), 'utf8')) as { files: string[] }).files.includes('skills'), 'and npm packs them')
+})

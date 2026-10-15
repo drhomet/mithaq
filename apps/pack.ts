@@ -52,6 +52,8 @@ cpSync(join(root, 'README.md'), join(staged, 'README.md'))
 for (const guide of ['packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']) {
   cpSync(join(root, guide), join(staged, 'docs', guide))
 }
+// The workflow skills a created project carries in `.claude/skills/`, at this version, for an upgrade to copy again.
+cpSync(join(root, 'templates/asas/.claude/skills'), join(staged, 'skills'), { recursive: true })
 cpSync(join(root, 'LICENSE'), join(staged, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(staged, 'LICENSES'), { recursive: true })
 console.log(`staged ${staged}`)

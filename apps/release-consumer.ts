@@ -188,7 +188,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const features = single ? [] : readdirSync(join(consumer, 'packages/features')).map((one) => `packages/features/${one}`)
     const workspaces = single ? [''] : ['packages/mithaq', ...features, 'packages/asas', 'apps/asas-tanstack', ...(backoffice ? ['apps/asas-backoffice'] : [])]
     assert.deepEqual(['templates', 'packages', 'apps/asas-backoffice'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : backoffice ? ['packages', 'apps/asas-backoffice'] : ['packages'])
-    for (const file of ['AGENTS.md', 'CLAUDE.md', 'README.md']) assert.ok(existsSync(join(consumer, file)) && !existsSync(join(consumer, 'packages/asas', file)), `${file} sits at the project's root`)
+    for (const file of ['AGENTS.md', 'CLAUDE.md', 'README.md', '.claude/skills/add-kayan/SKILL.md']) assert.ok(existsSync(join(consumer, file)) && !existsSync(join(consumer, 'packages/asas', file)), `${file} sits at the project's root`)
     // Each package that draws or ejects a piece names mithaq-admin; one that holds only kayan or the auth setup's server side need not.
     const drawing = workspaces.filter((workspace) => (JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }).dependencies?.['mithaq-admin'] !== undefined)
     assert.ok(['packages/mithaq', 'packages/asas', 'apps/asas-tanstack'].every((one) => single || drawing.includes(one)), `${drawing.join(', ')} name mithaq-admin`)
@@ -204,6 +204,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     assert.equal((JSON.parse(readFileSync(join(mithaq, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq')
     // The guides the project's AGENTS.md sends an agent to, at the installed version.
     for (const guide of ['packages/mithaq/README.md', 'packages/mithaq/src/asas/runner/README.md', 'templates/asas/README.md']) assert.ok(existsSync(join(mithaq, 'docs', guide)), `the installed mithaq ships docs/${guide}`)
+    assert.ok(existsSync(join(mithaq, 'skills/upgrade-mithaq/SKILL.md')), 'and the skills upgrade-mithaq copies again')
     const admin = realpathSync(installed(app, 'mithaq-admin'))
     assert.equal((JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8')) as { name: string }).name, '@drhomet/mithaq-admin')
     assert.ok(!existsSync(join(app, 'src/components/mithaq')), 'the app holds no piece: each is drawn from the package')
