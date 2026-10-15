@@ -1336,9 +1336,53 @@ test('0r. sending an invitation again asks invitation.create in the active organ
   assert.equal(await counted(), before, 'and a refused invitation spends none of the organization\'s day')
 })
 
-test('0p. with many organizations nobody adds a person: the route is one organization\'s alone', async () => {
+test('0p. with many organizations nobody adds a person or sends one a password link: both routes are one organization\'s alone', async () => {
   const many = modeServer({ ...manySettings, mailer: keptMail().mailer })
   assert.equal((await askedOf(many, '/organization/add-person', { name: 'Nobody', email: 'nobody-0p@example.com' })).status, 404)
+  assert.equal((await askedOf(many, '/organization/send-password-link', { userId: 'nobody' })).status, 404)
+})
+
+test('0v. with one organization a holder of member.create sends a member a new link to choose their password, mailed to them and never answered with a mailer, once in five minutes; nobody outside the organization, no staff member, and no caller without the key', async () => {
+  const mail = keptMail()
+  const school = modeServer({ ...schoolSettings, mailer: mail.mailer })
+  const gated = betterAuthStrategy({ server: school, collection: 'user', assigned: accessResolve as never, onError: console.error })
+  const owner = await ownerOf(school)
+  const send = (userId: string, cookie = owner.headers.get('cookie')!, on = gated) =>
+    on.handler(new Request('http://test/api/auth/user/organization/send-password-link', { method: 'POST', headers: { cookie, 'content-type': 'application/json', origin: tenantOrigin }, body: JSON.stringify({ userId }) }))
+  const context = await school.$context
+  const account = async ({ email, member = true }: { email: string; member?: boolean }) => {
+    const id = `${email.split('@')[0]}-id`
+    await db.execute(`insert into "user" (id, name, email, email_verified, created_at, updated_at) values ('${id}', '${email}', '${email}', true, now(), now())`)
+    await db.execute(`insert into account (id, account_id, provider_id, user_id, password, created_at, updated_at) values ('${id}-account', '${id}', 'credential', '${id}', '${await context.password.hash(modePassword)}', now(), now())`)
+    if (member) await school.api.addMember({ body: { userId: id, organizationId: owner.organization, role: 'member' } })
+    return id
+  }
+  const pupil = await account({ email: 'pupil-0s@example.com' })
+  const sent = await send(pupil)
+  assert.equal(sent.status, 200, await sent.clone().text())
+  assert.equal(((await sent.json()) as { link?: string }).link, undefined, 'with a mailer the link is mailed, never answered')
+  const token = (await tokenMailed(mail, 'pupil-0s@example.com'))!
+  assert.match(mail.linkTo('pupil-0s@example.com')!, /^http:\/\/localhost:5173\/auth\/set-password\?token=/, 'the member is mailed a link to choose their password')
+  assert.equal((await askedOf(school, '/sign-in/email', { email: 'pupil-0s@example.com', password: modePassword })).status, 200, 'which changes nothing until they open it')
+  const mailed = await mailCount(mail)
+  assert.equal((await send(pupil)).status, 200, 'asked again within five minutes it answers alike')
+  assert.equal(await mailCount(mail), mailed, 'and mails nothing, so nobody fills a mailbox')
+  assert.equal((await askedOf(school, '/reset-password', { token, newPassword: 'the-pupil-chose-this' })).status, 200, 'the link chooses the password')
+
+  const stranger = await account({ email: 'stranger-0s@example.com', member: false })
+  const missing = await send(stranger)
+  assert.equal(missing.status, 404, 'a person outside the organization is nobody to send a link to')
+  assert.equal(await missing.text(), await (await send('no-such-person')).text(), 'answered as a person who does not exist')
+  const staff = await account({ email: 'staff-0s@example.com' })
+  await db.execute(`update "user" set role = 'support' where id = '${staff}'`)
+  assert.equal((await send(staff)).status, 403, 'a staff member\'s sign-in is never a tenant\'s to touch')
+  const plain = cookieOf(await askedOf(school, '/sign-in/email', { email: 'pupil-0s@example.com', password: 'the-pupil-chose-this' }))
+  assert.equal((await send(pupil, plain)).status, 403, 'a member without member.create sends nobody a link')
+  assert.equal((await mailCount(mail)), mailed, 'and none of the refusals mailed anything')
+
+  // Without a mailer the link is the administrator's to hand over, on this machine alone.
+  const unmailed = betterAuthStrategy({ server: modeServer({ ...schoolSettings, mailer: undefined }), collection: 'user', assigned: accessResolve as never, onError: console.error })
+  assert.match(((await (await send(pupil, owner.headers.get('cookie')!, unmailed)).json()) as { link?: string }).link ?? '', /^http:\/\/localhost:5173\/auth\/set-password\?token=/, 'without a mailer the link is answered to copy')
 })
 
 test('0q. an invitation the server accepts for a sign-up is held to the rule the accept route keeps: a role value with whitespace around a name joins nobody', async () => {
@@ -7412,6 +7456,40 @@ test('226e. over asas.handler the provider\'s member reads answer people only to
   const opened = await read(`get-invitation?id=${invitation}`, invitee.headers)
   assert.equal(opened.status, 200, opened.text)
   assert.doesNotMatch(opened.text, /owner-226e@example\.com/, 'the inviter\'s address is not handed to the invitee')
+})
+
+test('226i. a member is last seen where a session of theirs opens or refreshes in that organization alone, never by an impersonation, and the provider\'s member reads answer it only to a caller holding member.fields.lastSeenAt', async () => {
+  const owner = await signedUp('owner-226i')
+  const a = (await server.api.createOrganization({ body: { name: 'Seen 226i', slug: 'seen-226i' }, headers: owner.headers }))!.id as string
+  const b = (await server.api.createOrganization({ body: { name: 'Elsewhere 226i', slug: 'elsewhere-226i' }, headers: (await signedUp('other-226i')).headers }))!.id as string
+  const person = await signedUp('person-226i')
+  await server.api.addMember({ body: { userId: person.id, organizationId: a, role: 'member' } })
+  await server.api.addMember({ body: { userId: person.id, organizationId: b, role: 'member' } })
+  const seen = async () => Object.fromEntries((await db.execute(`select organization_id, last_seen_at from member where user_id = '${person.id}'`)).rows.map((row) => [row.organization_id, row.last_seen_at])) as Record<string, string | null>
+  assert.deepEqual(await seen(), { [a]: null, [b]: null }, 'nobody is seen before a session of theirs opens in the organization')
+  const context = (await servedProvider.$context) as { internalAdapter: { createSession(user: string, dontRemember?: boolean, override?: Record<string, unknown>): Promise<{ token: string }>; updateSession(token: string, data: Record<string, unknown>): Promise<unknown> } }
+  await context.internalAdapter.createSession(person.id, false, { activeOrganizationId: a, impersonatedBy: owner.id })
+  assert.deepEqual(await seen(), { [a]: null, [b]: null }, 'an impersonation is not the person being seen')
+  const session = await context.internalAdapter.createSession(person.id, false, { activeOrganizationId: a })
+  assert.ok((await seen())[a], 'a session opened in an organization marks the person seen there')
+  assert.equal((await seen())[b], null, 'and in no other organization of theirs')
+  await db.execute(`update member set last_seen_at = null where user_id = '${person.id}'`)
+  await context.internalAdapter.updateSession(session.token, { activeOrganizationId: b })
+  assert.ok((await seen())[b], 'a session refreshed or moved marks them seen where it now is')
+  assert.equal((await seen())[a], null, 'and only there')
+
+  const read = async (path: string, headers: Headers) => (await (await asas.handler(new Request(`http://test/api/auth/user/organization/${path}`, { headers: { cookie: headers.get('cookie') ?? '', origin: 'http://localhost:5173' } }))).json()) as { members: Record<string, unknown>[] }
+  await db.execute(`update member set last_seen_at = now() where organization_id = '${a}'`)
+  assert.ok((await read('list-members', owner.headers)).members.every((one) => typeof one.lastSeenAt === 'string'), 'the administrator reads when each member was last seen')
+  await seedRoleRow(a, 'lister-226i', ['screen.dashboard', 'member.find'])
+  const lister = await signedUp('lister-226i')
+  await server.api.addMember({ body: { userId: lister.id, organizationId: a, role: 'member' } })
+  await server.api.setActiveOrganization({ body: { organizationId: a }, headers: lister.headers })
+  await assignRole(a, lister.id, 'lister-226i')
+  const listed = await read('list-members', lister.headers)
+  assert.equal(listed.members.length, 3, 'a holder of member.find without the column\'s key still lists every member')
+  assert.ok(listed.members.every((one) => !('lastSeenAt' in one)), 'and reads nobody\'s last seen')
+  assert.ok((await read('get-full-organization', lister.headers)).members.every((one) => !('lastSeenAt' in one)), 'nor through the full organization')
 })
 
 test('226f. over asas.handler a person founds organizations only while they belong to fewer than five', async () => {

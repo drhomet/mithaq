@@ -727,6 +727,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     role: { en: 'Membership role', ar: 'دور العضوية' },
     createdAt: { en: 'Created at', ar: 'تاريخ الإنشاء' },
     updatedAt: { en: 'Updated at', ar: 'تاريخ التعديل' },
+    lastSeenAt: { en: 'Last seen', ar: 'آخر ظهور' },
   },
   // add-on: settings
   settings: {
