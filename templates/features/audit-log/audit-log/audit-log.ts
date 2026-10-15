@@ -78,6 +78,9 @@ const queryable = new Set(['kayan', 'record', 'createdAt', 'operation', 'actor']
 const searched = new Set(['changes', 'changed'])
 
 /** One column's name between the spaces `changed` holds each in, which is all a search of it may ask. */
+// ponytail: `contains` is the store's ILIKE, so ` title ` also finds a kayan's ` Title `; harmless
+// while no kayan holds two columns differing in case alone, which none does. A case-sensitive
+// operator in the where language is the upgrade.
 const oneColumn = /^ ([A-Za-z_][A-Za-z0-9_]*) $/
 
 const namedIn = (where: unknown): string[] => {

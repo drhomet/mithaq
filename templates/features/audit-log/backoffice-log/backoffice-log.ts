@@ -12,7 +12,7 @@ const actions = [
   { value: 'unban', label: { en: 'Lifted the ban', ar: 'رفع الحظر' } },
 ] as const
 
-const text = (en: string, ar: string) => ({ kind: 'text', label: { en, ar } }) as const
+const text = (label: { en: string; ar: string }) => ({ kind: 'text', label }) as const
 
 /**
  * The staff history: one row per impersonation started or stopped, backoffice
@@ -41,7 +41,6 @@ export const backofficeLog = defineKayan({
     service: {
       operations: { find: defaultOperations.find, findByID: defaultOperations.findByID, count: defaultOperations.count },
     },
-    // Newest first, read-only, as every backoffice list.
     backoffice: {
       pages: {
         ...backofficeList('/history', {
@@ -57,12 +56,12 @@ export const backofficeLog = defineKayan({
     id: defaultFields.id,
     createdAt: defaultFields.createdAt,
     action: { kind: 'text', label: { en: 'Action', ar: 'الإجراء' }, options: actions, rules: { required: true } },
-    actor: text('Staff member', 'عضو الطاقم'),
-    actorEmail: text('Staff member\'s email', 'بريد عضو الطاقم'),
-    target: text('Person', 'الشخص'),
-    targetEmail: text('Person\'s email', 'بريد الشخص'),
-    previousRole: text('Role before', 'الدور السابق'),
-    role: text('Role after', 'الدور الجديد'),
-    reason: text('Reason', 'السبب'),
+    actor: text({ en: 'Staff member', ar: 'عضو الطاقم' }),
+    actorEmail: text({ en: 'Staff member\'s email', ar: 'بريد عضو الطاقم' }),
+    target: text({ en: 'Person', ar: 'الشخص' }),
+    targetEmail: text({ en: 'Person\'s email', ar: 'بريد الشخص' }),
+    previousRole: text({ en: 'Role before', ar: 'الدور السابق' }),
+    role: text({ en: 'Role after', ar: 'الدور الجديد' }),
+    reason: text({ en: 'Reason', ar: 'السبب' }),
   },
 })

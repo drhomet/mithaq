@@ -59,8 +59,8 @@ const grants: string[] = [
 ]
 
 /**
- * The staff history: who impersonated whom, set whose backoffice role and banned whom. Only a role
- * that reads the whole backoffice reads it, never one that does the impersonating.
+ * The staff history: who impersonated whom, set whose backoffice role and banned whom. `super_admin`
+ * reads it by its `'*'` and `explorer` by these keys; never support, whose impersonations it records.
  */
 const history: string[] = [
   // add-on: audit-log

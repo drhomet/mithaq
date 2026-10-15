@@ -15397,6 +15397,25 @@ test('142g3. the staff history keeps who impersonated whom, each backoffice role
   assert.equal((await history.count({}, { actor: explorer.actor }).catch(() => ({ totalDocs: -1 }))).totalDocs, -1, 'a count outside the backoffice app is refused even to the explorer')
 })
 
+test('142g4. an impersonation the staff history cannot record answers an error, with no link into the tenant app and no cookie, so nobody uses it', async () => {
+  const support = await staffOn('support-142g4', 'support')
+  const person = await signedUp('person-142g4')
+  // The history's table out of reach, so its row is refused.
+  await db.execute('alter table backoffice_log rename to backoffice_log_142g4')
+  try {
+    const started = await asBackoffice(async () => asas.handler(new Request('http://test/api/auth/user/admin/impersonate-user', {
+      method: 'POST',
+      headers: new Headers([...(await onBackoffice(support.headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
+      body: JSON.stringify({ userId: person.id }),
+    })))
+    assert.equal(started.status, 500, 'the route answers an error')
+    assert.deepEqual(started.headers.getSetCookie(), [], 'and sets no cookie')
+    assert.ok(!(await started.text()).includes('token='), 'and hands off no link')
+  } finally {
+    await db.execute('alter table backoffice_log_142g4 rename to backoffice_log')
+  }
+})
+
 test('151a. on the backoffice every tenant kayan is read across every organization by the keys a backoffice role holds, and every write to one is refused by the server, a super admin\'s included', async () => {
   const [a, b] = await twoTenants('151a')
   const tenants = [a!.organization, b!.organization]

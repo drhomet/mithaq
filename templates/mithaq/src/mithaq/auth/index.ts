@@ -723,8 +723,10 @@ const historyOf = async (ctx: HookContext, caller: Caller): Promise<BackofficeEn
 
 /**
  * The hooks that audit the backoffice's routes. `record` writes each row of the staff history,
- * where the project keeps one: it runs before an impersonation hands off, so an impersonation no
- * row records is one nobody can use, and its failure answers the route an error.
+ * where the project keeps one, and its failure answers the route an error. Only an impersonation
+ * fails closed: its row is written before the hand-off, so one no row records is one nobody can
+ * use. A stop, a role set and a ban or its lifting are already committed by the provider when the
+ * row fails; the route still answers an error and the line above stays the record of them.
  */
 export const backofficeAuditOf = (record?: (entry: BackofficeEntry) => Promise<unknown>) => ({
   before: createAuthMiddleware(auditBefore),
