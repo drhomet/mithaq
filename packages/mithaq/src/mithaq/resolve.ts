@@ -711,7 +711,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
   const jsonDefaultNamed = (where: string, field: ResolvedField) => {
     const value = field.rules?.defaultValue
     if (field.kind !== 'json' || value === undefined || isRef(value)) return
-    if (JSON.stringify(value).length > field.maxBytes! || (field.jsonSchema && !jsonSchemaCheck(field)(value))) {
+    if (new TextEncoder().encode(JSON.stringify(value)).length > field.maxBytes! || (field.jsonSchema && !jsonSchemaCheck(field)(value))) {
       throw new Error(`${where} defaultValue is refused by its own jsonSchema or maxBytes.`)
     }
   }

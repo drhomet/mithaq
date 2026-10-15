@@ -202,8 +202,9 @@ From `base` (`packages/mithaq/src/base/kinds.ts` `defaultKinds`):
   the value itself, so a row Payload wrote reads back unchanged and Payload
   reads what mithaq writes; Postgres keeps no key order and one copy of a
   repeated key. Its rules are `required`, `defaultValue` and `providedBy`.
-  Every json field names `maxBytes`, the longest JSON text its value may be:
-  `defaultJsonMaxBytes` (1,000,000 characters) or a number of its own.
+  Every json field names `maxBytes`, the most UTF-8 bytes its value's JSON
+  text may hold: `defaultJsonMaxBytes` (1,000,000 bytes) or a number of its
+  own.
   `jsonSchema` checks each written value against a JSON Schema, as Payload's
   does:
 

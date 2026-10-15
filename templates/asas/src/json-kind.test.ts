@@ -91,6 +91,8 @@ test('a json field names its byte cap, defaultJsonMaxBytes or its own, and a val
   const operations = build({ maxBytes: 20 }).kayan.blobs.operations
   await operations.create({ id: crypto.randomUUID(), data: { a: '123456789012' } })
   await assert.rejects(() => operations.create({ data: { a: '1234567890123' } }), refused, 'one character past')
+  // Bytes, not characters: `"éééééééééé"` is 12 characters and 22 bytes.
+  await assert.rejects(() => operations.create({ data: 'é'.repeat(10) }), refused, 'past in bytes while under in characters')
   const roomy = build({ maxBytes: defaultJsonMaxBytes }).kayan.blobs.operations
   await roomy.create({ id: crypto.randomUUID(), data: 'x'.repeat(defaultJsonMaxBytes - 2) })
   await assert.rejects(() => roomy.create({ data: 'x'.repeat(defaultJsonMaxBytes - 1) }), refused)
@@ -208,6 +210,7 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
   // A default the field's own schema or cap refuses would make every create that leaves the field out a refusal.
   assert.throws(build({ rules: { defaultValue: { size: -1 } }, jsonSchema: { schema: { properties: { size: { minimum: 0 } } } } }), /field "data" defaultValue is refused by its own jsonSchema or maxBytes\./)
   assert.throws(build({ maxBytes: 5, rules: { defaultValue: { size: 1 } } }), /field "data" defaultValue is refused by its own jsonSchema or maxBytes\./)
+  assert.throws(build({ maxBytes: 5, rules: { defaultValue: 'éé' } }), /field "data" defaultValue is refused by its own jsonSchema or maxBytes\./, 'four characters, six bytes')
   assert.doesNotThrow(build({ rules: { defaultValue: { size: 1 } }, jsonSchema: { schema: { properties: { size: { minimum: 0 } } } } }))
   assert.throws(build({ jsonSchema: { uri: 'https://example.com/schema.json' } }), /field "data" jsonSchema names no "schema"; a schema is held in the field and never fetched from its "uri"\./)
   assert.throws(build({ jsonSchema: { schema: 'object' } }), /field "data" jsonSchema names no "schema"/)

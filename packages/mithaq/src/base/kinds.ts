@@ -41,7 +41,7 @@ export const kind = <Value>(accepts: (value: unknown) => value is Value) =>
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 
 /**
- * The longest JSON text a json field holds, which a field names as its `maxBytes`, so one write
+ * The most UTF-8 bytes of JSON text a json field holds, which a field names as its `maxBytes`, so one write
  * never stores a value every read of the row then carries.
  */
 export const defaultJsonMaxBytes = 1_000_000

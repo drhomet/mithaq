@@ -131,7 +131,7 @@ export const kinds = {
   // Held to its `jsonSchema` by core's own check, the one the zod target calls.
   json: (field: ResolvedField) => {
     const check = field.jsonSchema ? jsonSchemaCheck(field) : () => true
-    const fits = (value: unknown) => !field.maxBytes || JSON.stringify(value).length <= field.maxBytes
+    const fits = (value: unknown) => !field.maxBytes || new TextEncoder().encode(JSON.stringify(value)).length <= field.maxBytes
     return also(typed('JSON', (value) => isJson(value)), (value) => (fits(value) && check(value) ? undefined : optionsInvalid(field)))
   },
   // The child's rows, checked as a list and no further: the child kayan's own
