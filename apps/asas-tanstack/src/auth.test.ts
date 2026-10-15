@@ -295,14 +295,17 @@ test('a signed-in person reads the invitation and accepts it with one press, and
     try {
       await act(async () => {})
       if (accepted) await act(async () => click(host.querySelector('[data-button="accept-invitation"]')!))
-      return { text: host.textContent ?? '', alert: host.querySelector('[role="alert"]')?.textContent, sent }
+      const home = host.querySelector('[data-home]')
+      return { text: host.textContent ?? '', alert: host.querySelector('[role="alert"]')?.textContent, sent, home: home && [home.getAttribute('href'), home.textContent] }
     } finally {
       globalThis.fetch = fetched
       await unmount()
     }
   }
   for (const locale of ['en', 'ar']) {
-    assert.equal((await opened(locale, [400, { message: 'Invitation not found!' }])).alert, copy.invitationGone![locale], `a spent invitation in ${locale}`)
+    const spent = await opened(locale, [400, { message: 'Invitation not found!' }])
+    assert.equal(spent.alert, copy.invitationGone![locale], `a spent invitation in ${locale}`)
+    assert.deepEqual(spent.home, ['/dashboard', scopes.marketing!.openScreen![locale]!.replace('{screen}', scopes.screens?.dashboard?.[locale] ?? 'dashboard')], `with the way to the person's own first screen, in ${locale}`)
     assert.equal((await opened(locale, [403, { code: 'YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION', message: 'You are not the recipient of the invitation' }])).alert, copy.invitationNotYours![locale], `another address's in ${locale}`)
     assert.equal((await opened(locale, [400, { code: 'INVITER_IS_NO_LONGER_A_MEMBER_OF_THE_ORGANIZATION', message: 'Inviter is no longer a member of the organization' }])).alert, copy.invitationInviterGone![locale], `an inviter who left in ${locale}`)
   }

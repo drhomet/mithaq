@@ -3,7 +3,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
-import { AuthFrame, authGate, useRefusal } from '../auth-frame.tsx'
+import { AuthFrame, authGate, useHomeLabel, useRefusal } from '../auth-frame.tsx'
 import { useCopy } from './__root.tsx'
 
 // Accepting is a POST the person presses, so following a link alone joins nobody to anything.
@@ -21,7 +21,8 @@ function AcceptInvitation() {
   const navigate = useNavigate()
   const refused = useRefusal()
   const { id } = Route.useSearch()
-  const { signedIn } = Route.useRouteContext()
+  const { signedIn, home } = Route.useRouteContext()
+  const homeLabel = useHomeLabel()
   const [organization, setOrganization] = useState<string>()
   const [gone, setGone] = useState<string>()
   const [pending, setPending] = useState(false)
@@ -75,6 +76,11 @@ function AcceptInvitation() {
           <p role="alert" data-invitation-gone="" className="text-sm">
             {gone}
           </p>
+          {/* A spent invitation is no dead end for someone already in: the way to their own first screen. An anchor,
+              because the path is the screen's own data, not a route the router knows. */}
+          <Button nativeButton={false} render={<a href={home.path} data-home="" />}>
+            {homeLabel(home, 'marketing.openScreen')}
+          </Button>
           {/* The invitation may be another address's, which signing out and in again reaches. */}
           <Button type="button" variant="outline" onClick={() => void authArm('sign-out').then(() => window.location.reload())}>
             {t('admin.signOut', 'Sign out')}
