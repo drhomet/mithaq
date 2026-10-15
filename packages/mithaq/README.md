@@ -540,7 +540,7 @@ export const asas = buildAsas({
   global: [settings],
   http: [orpcHttp({ /* ... */ }), fetchHttp({ context: requestContext, maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   statements: { ...providerStatements },
-  auth: { admin: { kayan: user, access: superAdmin }, onError: (error) => console.error(error) },
+  auth: { admin: { kayan: user, access: superAdmin }, onError: (error) => console.error(error), maxBodyBytes: defaultMaxBodyBytes },
 })
 ```
 
