@@ -3545,7 +3545,7 @@ test('the app shell lists the dashboard and every nav entry in the sidebar, name
     const host = await render(createElement(AppShell, { regions: { header: createElement('h1', null, 'Courses'), main: createElement('p', null, 'rows') } }), { kayan: undefined, user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'o1', name: 'Acme School' }], activeOrganizationId: 'o1' } })
     await act(async () => sleep(0))
     const hrefs = [...host.querySelectorAll('[data-slot="sidebar"] nav[aria-label="Navigation"] [data-slot="sidebar-content"] a')].map((one) => one.getAttribute('href'))
-    assert.deepEqual(hrefs, ['/dashboard', '/dashboard/members', ...screen.nav.filter((one) => one.kayan).map((one) => `/dashboard${one.path}`)], 'the dashboard, the screen\'s own page, then every kayan, as tanstack-business orders its shell and entity items')
+    assert.deepEqual(hrefs, ['/dashboard', '/dashboard/members', '/dashboard/activity', ...screen.nav.filter((one) => one.kayan).map((one) => `/dashboard${one.path}`)], 'the dashboard, the screen\'s own pages, then every kayan, as tanstack-business orders its shell and entity items')
     assert.equal(host.querySelector('[data-slot="sidebar"][data-side]')?.getAttribute('data-side'), 'left', 'on the left in a left-to-right document')
     assert.match(host.querySelector('[data-slot="sidebar-header"]')!.textContent!, /Acme School/, 'the switcher names the organization the session holds active')
     assert.match(host.querySelector('[data-region="header"]')!.textContent!, /Courses/, 'the page title sits in the site header')

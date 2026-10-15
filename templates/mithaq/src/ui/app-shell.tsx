@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarDays,
   ClipboardList,
+  History,
   LayoutDashboard,
   Settings2,
   ShieldCheck,
@@ -58,6 +59,8 @@ const icons: Record<string, LucideIcon> = {
   '/roles': ShieldCheck,
   '/member-roles': UserCog,
   '/settings': Settings2,
+  '/activity': History,
+  '/history': History,
 }
 export const iconOf = (path: string) => (Object.hasOwn(icons, path) ? icons[path]! : Table2)
 

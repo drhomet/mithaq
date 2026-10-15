@@ -520,14 +520,18 @@ const adminOptions = {
 // The backoffice screen's actions are the admin plugin's own routes, not this project's operations,
 // so the audit step never sees them. Every `/admin/` route is audited here: one JSON line per
 // successful call naming the actor, the real person behind an impersonated session, the route, the
-// target and the role, never a password or other body field. The template keeps no audit table, so
-// operators must retain this output.
+// target and the role, never a password or other body field. With the audit-log add-on the
+// impersonations, backoffice roles set and bans are rows of its staff history too
+// (`recordBackoffice`); every other route is this output alone, so operators must retain it.
 //
 // The caller is read before the route runs because stopping an impersonation deletes the session
 // that made the request.
 const audited = (path: string) => path.startsWith('/admin/') || path === '/sign-out'
-type Caller = { user: { id: string; role?: unknown }; session: Record<string, unknown> } | null
+type Caller = { user: { id: string; email?: string; role?: unknown }; session: Record<string, unknown> } | null
 const callers = new WeakMap<object, Caller>()
+/** The person a route acts on, as they stood before it ran, which the history row names the role they held by. */
+type Target = ({ email?: string; role?: string | null } & Record<string, unknown>) | null
+const targets = new WeakMap<object, Target>()
 /** The role a call writes, on `set-role` and `create-user` as `role` and on `update-user` and `create-user` as `data.role`. */
 const roleOf = (body: { role?: unknown; data?: { role?: unknown } }) => body.role ?? body.data?.role
 /** Whether a provider `member.role` names the owner, matched exactly as the provider matches it. */
@@ -670,7 +674,8 @@ const auditBefore = async (ctx: HookContext) => {
   const userId = String(body.userId)
   if (userId === caller.user.id) throw new APIError('FORBIDDEN', { message: 'Nobody acts on their own row on the backoffice.' })
   // The admin plugin's own `role` column, which the core user type does not name.
-  const target = (await ctx.context.internalAdapter.findUserById(userId)) as ({ role?: string | null } & Record<string, unknown>) | null
+  const target = (await ctx.context.internalAdapter.findUserById(userId)) as Target
+  targets.set(ctx.context, target)
   if (holdsRole(target?.role, (one) => Object.hasOwn(backofficeRoles, one)) && !grants) {
     throw new APIError('FORBIDDEN', { message: 'Only a backoffice administrator acts on a staff member.' })
   }
@@ -678,7 +683,58 @@ const auditBefore = async (ctx: HookContext) => {
   // for it.
   if (ctx.path === '/admin/set-role' && target && [body.role].flat().join(',') === (target.role ?? 'user')) return ctx.json({ user: target })
 }
-export const backofficeAudit = {
+/**
+ * One row of the staff history: an impersonation started or stopped, a backoffice role set and a
+ * ban set or lifted, each person by id and by the address they had then.
+ */
+export type BackofficeEntry = {
+  action: 'impersonate' | 'stopImpersonating' | 'setRole' | 'ban' | 'unban'
+  actor: string | null
+  actorEmail: string | null
+  target: string | null
+  targetEmail: string | null
+  previousRole?: string | null
+  role?: string | null
+  banReason?: string | null
+}
+
+const textOf = (value: unknown) => (typeof value === 'string' ? value : null)
+
+/** The history rows one successful admin route or impersonation-ending sign-out makes, none for any other. */
+const historyOf = async (ctx: HookContext, caller: Caller): Promise<BackofficeEntry[]> => {
+  if (!caller) return []
+  const body = (ctx.body ?? {}) as Parameters<typeof roleOf>[0] & { userId?: unknown; banReason?: unknown; data?: { banned?: unknown; banReason?: unknown } }
+  const before = targets.get(ctx.context)
+  const made = (ctx.context.returned as { user?: { id?: unknown; email?: unknown } } | undefined)?.user
+  const staff = { actor: caller.user.id, actorEmail: caller.user.email ?? null }
+  const person = { target: textOf(body.userId) ?? textOf(made?.id), targetEmail: textOf(before?.email) ?? textOf(made?.email) }
+  if (ctx.path === '/admin/impersonate-user') return [{ action: 'impersonate', ...staff, ...person }]
+  // Ended from inside the impersonated session, whose person is the member: the staff member is the
+  // one the session names as behind it.
+  if (ctx.path === '/sign-out' || ctx.path === '/admin/stop-impersonating') {
+    const behind = textOf(caller.session.impersonatedBy)
+    if (!behind) return []
+    const found = (await ctx.context.internalAdapter.findUserById(behind)) as Target
+    return [{ action: 'stopImpersonating', actor: behind, actorEmail: textOf(found?.email), target: caller.user.id, targetEmail: caller.user.email ?? null }]
+  }
+  const entries: BackofficeEntry[] = []
+  const role = roleOf(body)
+  const previousRole = before?.role ?? null
+  if (role !== undefined && [role].flat().join(',') !== (previousRole ?? 'user')) entries.push({ action: 'setRole', ...staff, ...person, previousRole, role: [role].flat().join(',') })
+  const banned = ctx.path === '/admin/ban-user' ? true : ctx.path === '/admin/unban-user' ? false : body.data?.banned
+  if (banned === true) entries.push({ action: 'ban', ...staff, ...person, banReason: textOf(ctx.path === '/admin/ban-user' ? body.banReason : body.data?.banReason) })
+  if (banned === false && (ctx.path === '/admin/unban-user' || before?.banned === true)) entries.push({ action: 'unban', ...staff, ...person })
+  return entries
+}
+
+/**
+ * The hooks that audit the backoffice's routes. `record` writes each row of the staff history,
+ * where the project keeps one, and its failure answers the route an error. Only an impersonation
+ * fails closed: its row is written before the hand-off, so one no row records is one nobody can
+ * use. A stop, a role set and a ban or its lifting are already committed by the provider when the
+ * row fails; the route still answers an error and the line above stays the record of them.
+ */
+export const backofficeAuditOf = (record?: (entry: BackofficeEntry) => Promise<unknown>) => ({
   before: createAuthMiddleware(auditBefore),
   after: createAuthMiddleware(async (ctx) => {
     // `get-full-organization` also answers members and invitations, addresses among them, to any
@@ -726,13 +782,14 @@ export const backofficeAudit = {
       ...(role === undefined ? {} : { role }),
       at: new Date().toISOString(),
     }))
+    if (record) for (const entry of await historyOf(ctx, caller ?? null)) await record(entry)
     if (ctx.path === '/admin/impersonate-user' && ctx.context.newSession) return handOff(ctx)
     // Ending an impersonation sends the staff member back to the backoffice, whose session is still
     // theirs, not to the tenant's sign-in. The answer keeps the provider's `success` and the
     // cookies it cleared.
     if (ctx.path === '/sign-out') return ctx.json({ success: true, url: backofficeApp ? backofficeURL : tenantURL })
   }),
-}
+})
 
 // The backoffice never writes the tenant app's cookie (two origins, two cookies), so an impersonation
 // answers a one-time link into the tenant app, which trades it for the session under its own
@@ -792,6 +849,8 @@ export type StoreHooks = {
   beforeRemoveMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
   beforeAcceptInvitation?: (data: Joining & { invitation: { role: string } & Record<string, unknown>; user: { id: string } & Record<string, unknown> }) => Promise<void>
   beforeAddMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
+  /** Writes one row of the staff history, which the audit-log add-on keeps. */
+  recordBackoffice?: (entry: BackofficeEntry) => Promise<unknown>
 }
 
 /**
@@ -940,7 +999,7 @@ export const optionsFor = (settings: AuthSettings) => ({
   // How an impersonation crosses from the backoffice app into the tenant app (`handOff`). The plugin
   // adds no table, and no client may mint a token over HTTP.
   plugins: [admin(adminOptions), organization(organizationOptionsFor(settings)), oneTimeToken({ disableClientRequest: true })],
-  hooks: backofficeAudit,
+  hooks: backofficeAuditOf(),
   // The active organization, set where the session is made. Every row this project reads is keyed
   // on it and the provider sets it only when an organization is created, so a user who signed in
   // held none and was refused every read. The user's oldest membership becomes active on a session
@@ -1002,6 +1061,8 @@ export const authOptions = (hooks: StoreHooks = {}, settings: AuthSettings = aut
   return {
     options: {
       ...options,
+      // The same audit, writing each row of the staff history where the project keeps one.
+      hooks: backofficeAuditOf(hooks.recordBackoffice),
       plugins: [
         // The same object as in `options`, so the schema `mithaq generate auth` reads is the schema
         // the runtime builds. Leaving it out of the rebuilt list would drop five columns from the
@@ -1130,6 +1191,13 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     beforeAcceptInvitation: ({ user, organization }) => clearsLeftRoles({ organization: organization.id, user: user.id }),
     beforeAddMember: ({ member, organization }) => clearsLeftRoles({ organization: organization.id, user: member.userId }),
     // end add-on: roles
+    // add-on: audit-log
+    // The staff history, straight through the store: the kayan declares no write a caller could run.
+    recordBackoffice: (entry) => {
+      const row = { kayan: 'backofficeLog', data: { createdAt: new Date(), ...entry } }
+      return tx === undefined ? store.transaction((own) => store.insert({ tx: own, ...row })) : store.insert({ tx, ...row })
+    },
+    // end add-on: audit-log
   })
   const built = authOptions(storeHooks(), settings).options
   // `transaction: true` makes the provider's own transaction helper open a real transaction

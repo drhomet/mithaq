@@ -78,12 +78,17 @@ export const auditSink: AuditHandler = async ({ effect, kayan, operation, dataBe
     organization: stringOf(after?.[owner] ?? before[owner]),
     kayan: kayan.name,
     record: String(record),
-    operation,
+    // An update that took a draft to published is named a publish, as Payload's
+    // own history says it, so the Activity filters it apart from an edit.
+    operation: operation === 'update' && changes._status?.to === 'published' ? 'publish' : operation,
     actor: stringOf(actor?.id) ?? (typeof actor?.command === 'string' ? `${actor.command} (${String(actor.osUser)})` : null),
     impersonatedBy: stringOf(actor?.impersonatedBy),
     // JSON in a text column, because the language ships no json kind. The log
-    // refuses any filter or sort on it, since a `contains` over the text would
-    // read a value its reader may not.
+    // is never ordered by it, and searched by it only within the kayan its
+    // reader reads whole (`reachOf`), since a match in any other column would
+    // tell a value its reader may not read.
     changes: JSON.stringify(changes),
+    // Each name between two spaces, so a search of one never matches part of another.
+    changed: ` ${Object.keys(changes).join(' ')} `,
   } })
 }
