@@ -746,7 +746,7 @@ A kayan lists it after the store step: `create: { input: ({ create }) => create.
 Choose how a step reaches data, in this order:
 
 1. **`tools.of(kayan)`** for another kayan. It runs that kayan's own operation: its access for the same actor, its steps, its validation and the audit, inside the same transaction. A failure rolls the whole write back. Prefer it.
-2. **`tools.store`** for a raw insert, update or remove that should skip the other kayan's operation list. It skips that kayan's access, steps, validation and audit, but it is still sealed to the active organization; see [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md#what-core-enforces).
+2. **`tools.store`** for a raw insert, update or remove that should skip the other kayan's operation list. It writes exactly the id it names, of this kayan or another. It skips that kayan's access, steps, validation and audit, but it is still sealed to the active organization; see [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md#what-core-enforces).
 3. **`ctx.tx`** for raw SQL. It is the project's own privileged path: nothing scopes it, checks it or audits it. Use it only for what no kayan models, and scope it yourself.
 
 Where a step goes:
