@@ -265,6 +265,28 @@ test('the organization settings refuse every combination that would mean nothing
   assert.equal(settingsProblems({ settings: { ...school, joinRole: 'student' }, deployed: false, joinRoles: null }).length, 1, 'without the roles add-on a join role is refused')
 })
 
+test('with one organization its name in code holds the default locale\'s name, one line of at most 100 characters each, in the project\'s locales alone', () => {
+  for (const [name, organizationName] of [
+    ['no default', { ar: 'مدرسة' }],
+    ['an empty default', { en: '  ', ar: 'مدرسة' }],
+    ['a stray locale', { en: 'School', fr: 'École' }],
+    ['one past 100', { en: 'School', ar: 'x'.repeat(101) }],
+  ] as const) assert.match(problems({ ...school, organizationName }).join('\n'), /organizationName/, name)
+  assert.deepEqual(problems({ ...school, organizationName: { en: 'School' } }), [], 'the default alone is enough: the others fall back to it')
+})
+
+test('the auth setup loads with one organization, whose settings it checks as it loads', async () => {
+  const { spawnSync } = await import('node:child_process')
+  // The project's own `organizations.ts`, read as one organization, open to anyone.
+  const asOne = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'
+registerHooks({ load: (url, context, next) => {
+  const loaded = next(url, context)
+  return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace("= 'many'", "= 'one'") } : loaded
+} })`)}`
+  const loaded = spawnSync(process.execPath, ['--import', asOne, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./index.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, NODE_ENV: 'development' } })
+  assert.equal(loaded.status, 0, loaded.stderr)
+})
+
 test('in production every mode needs a mailer: an open sign-up proves addresses by mail, invitations and resets are mailed, and many proves every address', () => {
   const open = { ...school, signUp: 'open' as const }
   for (const [name, settings] of [['one, open', open], ['one, by invitation', school], ['many', authSettings]] as const) {

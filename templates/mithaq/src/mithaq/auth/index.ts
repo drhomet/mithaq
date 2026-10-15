@@ -256,6 +256,59 @@ export const domainAllowed = (email: string, allowed: readonly string[]) => {
 }
 
 /**
+ * An organization's name as it is kept: one line of 1 to 100 characters. Anyone founds one with many
+ * organizations, and its name goes into the plain text of every mail that names it, where a line
+ * break would be the founder's own line.
+ */
+// Control characters (NEL among them), the line and paragraph separators, and the direction
+// overrides and isolates, which would make a name read as other words than it holds.
+export const oneLine = /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]+/gu
+const asLine = (name: unknown) => (typeof name === 'string' ? name.replace(oneLine, ' ').replace(/ {2,}/g, ' ').trim() : '')
+const badName = (message: string) => new APIError('BAD_REQUEST', { code: 'ORGANIZATION_NAME', message })
+const oneLineName = (name: unknown) => {
+  const line = asLine(name)
+  if (!line || line.length > 100) throw badName('An organization has a name of 1 to 100 characters on one line.')
+  return line
+}
+/** The locales an organization is named in: the project's own, as `organizationName` lists them. */
+const nameLocales = Object.keys(organizationName)
+/** Why `names` is no organization's names in every locale, the default's required, or nothing. */
+const namesProblem = (names: Readonly<Record<string, unknown>>) => {
+  const stray = Object.keys(names).filter((locale) => !nameLocales.includes(locale))
+  if (stray.length) return `names ${stray.join(', ')}, which is none of the project's locales: ${nameLocales.join(', ')}.`
+  if (!asLine(names[defaultLocale])) return `holds no name in ${defaultLocale}, the locale every other falls back to.`
+  const long = Object.entries(names).find(([, one]) => asLine(one).length > 100)
+  return long ? `holds a name in ${long[0]} past 100 characters.` : undefined
+}
+/**
+ * An organization's names as they are kept: the JSON of one line of 1 to 100 characters per locale it is named in,
+ * the default locale's required and the others left out where empty, and `name`, the default locale's. `written` is
+ * the JSON a client sends, or the names themselves.
+ */
+export const namesOf = (written: unknown) => {
+  let names: unknown = written
+  if (typeof written === 'string') {
+    try {
+      names = JSON.parse(written)
+    } catch {
+      throw badName('An organization\'s names are a JSON object, one name per locale.')
+    }
+  }
+  if (!names || typeof names !== 'object' || Array.isArray(names)) throw badName('An organization\'s names are a JSON object, one name per locale.')
+  const problem = namesProblem(names as Record<string, unknown>)
+  if (problem) throw badName(`An organization's names ${problem}`)
+  const kept = Object.fromEntries(Object.entries(names).map(([locale, one]) => [locale, asLine(one)]).filter(([, one]) => one))
+  return { name: kept[defaultLocale]!, names: JSON.stringify(kept) }
+}
+/** The names a create or a rename writes: from `names` where it carries them, else `name` as the default locale's. */
+const named = (data: { name?: unknown; names?: unknown }) => {
+  if (data.names !== undefined && data.names !== null) return namesOf(data.names)
+  const name = oneLineName(data.name)
+  return { name, names: JSON.stringify({ [defaultLocale]: name }) }
+}
+const nameInCode = () => new APIError('FORBIDDEN', { code: 'ORGANIZATION_NAME_IN_CODE', message: 'With one organization its name lives in code: organizationName in src/mithaq/auth/organizations.ts.' })
+
+/**
  * A key no stranger who signs up is given: one that gives a role, writes a role, invites, or changes
  * the people or the organization. Reading them is not one.
  */
@@ -342,58 +395,6 @@ const invitationMail = ({ mailer, organizations, showOrganization }: { mailer: M
   }))
 }
 
-/**
- * An organization's name as it is kept: one line of 1 to 100 characters. Anyone founds one with many
- * organizations, and its name goes into the plain text of every mail that names it, where a line
- * break would be the founder's own line.
- */
-// Control characters (NEL among them), the line and paragraph separators, and the direction
-// overrides and isolates, which would make a name read as other words than it holds.
-export const oneLine = /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]+/gu
-const asLine = (name: unknown) => (typeof name === 'string' ? name.replace(oneLine, ' ').replace(/ {2,}/g, ' ').trim() : '')
-const badName = (message: string) => new APIError('BAD_REQUEST', { code: 'ORGANIZATION_NAME', message })
-const oneLineName = (name: unknown) => {
-  const line = asLine(name)
-  if (!line || line.length > 100) throw badName('An organization has a name of 1 to 100 characters on one line.')
-  return line
-}
-/** The locales an organization is named in: the project's own, as `organizationName` lists them. */
-const nameLocales = Object.keys(organizationName)
-/** Why `names` is no organization's names in every locale, the default's required, or nothing. */
-const namesProblem = (names: Readonly<Record<string, unknown>>) => {
-  const stray = Object.keys(names).filter((locale) => !nameLocales.includes(locale))
-  if (stray.length) return `names ${stray.join(', ')}, which is none of the project's locales: ${nameLocales.join(', ')}.`
-  if (!asLine(names[defaultLocale])) return `holds no name in ${defaultLocale}, the locale every other falls back to.`
-  const long = Object.entries(names).find(([, one]) => asLine(one).length > 100)
-  return long ? `holds a name in ${long[0]} past 100 characters.` : undefined
-}
-/**
- * An organization's names as they are kept: the JSON of one line of 1 to 100 characters per locale it is named in,
- * the default locale's required and the others left out where empty, and `name`, the default locale's. `written` is
- * the JSON a client sends, or the names themselves.
- */
-export const namesOf = (written: unknown) => {
-  let names: unknown = written
-  if (typeof written === 'string') {
-    try {
-      names = JSON.parse(written)
-    } catch {
-      throw badName('An organization\'s names are a JSON object, one name per locale.')
-    }
-  }
-  if (!names || typeof names !== 'object' || Array.isArray(names)) throw badName('An organization\'s names are a JSON object, one name per locale.')
-  const problem = namesProblem(names as Record<string, unknown>)
-  if (problem) throw badName(`An organization's names ${problem}`)
-  const kept = Object.fromEntries(Object.entries(names).map(([locale, one]) => [locale, asLine(one)]).filter(([, one]) => one))
-  return { name: kept[defaultLocale]!, names: JSON.stringify(kept) }
-}
-/** The names a create or a rename writes: from `names` where it carries them, else `name` as the default locale's. */
-const named = (data: { name?: unknown; names?: unknown }) => {
-  if (data.names !== undefined && data.names !== null) return namesOf(data.names)
-  const name = oneLineName(data.name)
-  return { name, names: JSON.stringify({ [defaultLocale]: name }) }
-}
-const nameInCode = () => new APIError('FORBIDDEN', { code: 'ORGANIZATION_NAME_IN_CODE', message: 'With one organization its name lives in code: organizationName in src/mithaq/auth/organizations.ts.' })
 
 /**
  * How many invitations one organization makes, whoever makes them, so no organization turns the
