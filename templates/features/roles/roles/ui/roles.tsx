@@ -79,18 +79,29 @@ export function RolesTable() {
             ))}
             {page.docs.map((row) => {
               const id = String(row.id)
-              const held = Array.isArray(row.permissions) ? (row.permissions as string[]) : []
+              const label = labelOf(row, locale)
+              const open = (
+                <a href={href(id)} className="text-primary justify-self-start text-sm underline underline-offset-4 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
+                  {(t('dashboard.rolesOpen', 'Open {role}') ?? 'Open {role}').replace('{role}', () => label)}
+                </a>
+              )
               return (
                 <TableRow key={id} data-row={id} data-fixed="false">
                   <TableCell className="whitespace-normal">
-                    <Grants label={<span className="font-medium">{labelOf(row, locale)}</span>} held={held}>
-                      <div className="grid gap-2">
-                        <a href={href(id)} className="text-primary justify-self-start text-sm underline underline-offset-4 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
-                          {t('dashboard.rolesOpen', 'Open this role')}
-                        </a>
-                        <PermissionBadges held={held} />
+                    {/* A role whose keys the viewer may not read comes without them, so it is named and linked and counts nothing. */}
+                    {Array.isArray(row.permissions) ? (
+                      <Grants label={<span className="font-medium">{label}</span>} held={row.permissions as string[]}>
+                        <div className="grid gap-2">
+                          {open}
+                          <PermissionBadges held={row.permissions as string[]} />
+                        </div>
+                      </Grants>
+                    ) : (
+                      <div className="grid gap-1">
+                        <span className="font-medium">{label}</span>
+                        {open}
                       </div>
-                    </Grants>
+                    )}
                   </TableCell>
                   <TableCell className="align-top">
                     <Badge variant="outline">{t('dashboard.rolesCustom', 'Custom')}</Badge>

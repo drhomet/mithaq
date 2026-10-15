@@ -57,11 +57,16 @@ const useGroups = (): Group[] => {
 
 /**
  * A role's or a group's keys behind a row that names them and counts what they grant, closed at
- * first so a page of roles reads as a list of names. The panel stays mounted, so every key is in
- * the first paint and in a find on the page. Every permission has nothing to open, so it is said.
+ * first so a page of roles reads as a list of names; `defaultOpen` where the keys are the page's
+ * work. A closed panel is `hidden="until-found"` once the page runs, so it is in the first paint
+ * and a find on the page opens it. `named` names a row that draws no label of its own, so a reader
+ * of the screen hears whose keys it opens. Every permission has nothing to open, so it is said.
  */
-export function Grants({ label, held, heading, children, ...root }: { label?: ReactNode; held: readonly string[]; heading?: boolean; children: ReactNode } & ElementProps<'div'>) {
+export function Grants({ label, named, held, heading, defaultOpen, children, ...root }: { label?: ReactNode; named?: string; held: readonly string[]; heading?: boolean; defaultOpen?: boolean; children: ReactNode } & ElementProps<'div'>) {
   const { locale, t } = useLocale()
+  const count = held.length === 1
+    ? t('dashboard.permissionsCountOne', '1 permission')
+    : (t('dashboard.permissionsCount', '{count} permissions') ?? '{count} permissions').replace('{count}', () => new Intl.NumberFormat(locale).format(held.length))
   if (held.includes('*')) {
     return (
       <div {...root} className="flex items-center gap-2">
@@ -73,26 +78,23 @@ export function Grants({ label, held, heading, children, ...root }: { label?: Re
     )
   }
   const trigger = (
-    <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-2 text-start max-sm:min-h-11">
+    <CollapsibleTrigger aria-label={named && `${named}: ${count}`} className="group flex w-full cursor-pointer items-center gap-2 text-start max-sm:min-h-11">
       <ChevronDown aria-hidden="true" className="text-muted-foreground size-4 shrink-0 transition-transform group-data-[panel-open]:rotate-180" />
       {label}
-      <span className="text-muted-foreground text-xs font-normal">
-        {held.length === 1
-          ? t('dashboard.permissionsCountOne', '1 permission')
-          : (t('dashboard.permissionsCount', '{count} permissions') ?? '{count} permissions').replace('{count}', () => new Intl.NumberFormat(locale).format(held.length))}
-      </span>
+      <span className="text-muted-foreground text-xs font-normal">{count}</span>
     </CollapsibleTrigger>
   )
   return (
-    <Collapsible {...root}>
+    <Collapsible {...root} defaultOpen={defaultOpen}>
       {heading ? <h3 className="text-sm font-medium">{trigger}</h3> : trigger}
-      <CollapsibleContent keepMounted className="ps-6 pt-2">{children}</CollapsibleContent>
+      <CollapsibleContent hiddenUntilFound className="ps-6 pt-2">{children}</CollapsibleContent>
     </Collapsible>
   )
 }
 
 /**
- * The keys a role holds as badges, grouped by screen and kayan, each group closed behind its count. With `onChange`
+ * The keys a role holds as badges, grouped by screen and kayan, each group behind its count: closed where they are
+ * read, open in the editor, whose work they are. With `onChange`
  * each badge is a toggle, a key the viewer may not hand over disabled; without it
  * only the keys held are drawn. A key no group names stays, under "Other", so a
  * save never drops one.
@@ -155,7 +157,7 @@ export function PermissionBadges({ held, onChange, busy }: { held: readonly stri
         const fields = badges(group.fields)
         const keys = [...group.operations, ...group.fields].map((one) => one.key)
         return operations || fields ? (
-          <Grants key={group.name} data-group={group.name} heading label={<span>{group.label}</span>} held={held.filter((key) => keys.includes(key))}>
+          <Grants key={group.name} data-group={group.name} heading defaultOpen={Boolean(onChange)} label={<span>{group.label}</span>} held={held.filter((key) => keys.includes(key))}>
             <div className="grid gap-1.5">
               {operations}
               {fields ? (
@@ -169,7 +171,7 @@ export function PermissionBadges({ held, onChange, busy }: { held: readonly stri
         ) : null
       })}
       {other.length ? (
-        <Grants data-group="" heading label={<span>{t('dashboard.permissionsOther', 'Other')}</span>} held={other}>
+        <Grants data-group="" heading defaultOpen={Boolean(onChange)} label={<span>{t('dashboard.permissionsOther', 'Other')}</span>} held={other}>
           {badges(other.map((key) => ({ key, label: otherLabel(key) })))}
         </Grants>
       ) : null}

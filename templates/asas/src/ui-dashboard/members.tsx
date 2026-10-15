@@ -289,7 +289,7 @@ function RolesDrawer({ member, roles, onClose, onHeld }: { member: Member; roles
             )}
           </span>
         </label>
-        {role.permissions ? <div className="ps-7"><Grants held={role.permissions}><PermissionBadges held={role.permissions} /></Grants></div> : null}
+        {role.permissions ? <div className="ps-7"><Grants named={role.label?.[locale] ?? role.name} held={role.permissions}><PermissionBadges held={role.permissions} /></Grants></div> : null}
       </div>
     )
   }

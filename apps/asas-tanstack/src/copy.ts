@@ -651,7 +651,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     rolesKind: { en: 'Kind', ar: 'النوع' },
     rolesFixed: { en: 'Fixed', ar: 'ثابت' },
     rolesCustom: { en: 'Custom', ar: 'مخصص' },
-    rolesOpen: { en: 'Open this role', ar: 'فتح هذا الدور' },
+    rolesOpen: { en: 'Open {role}', ar: 'فتح {role}' },
     rolesFixedAbout: {
       en: 'This role ships with the project. What it holds is code, so it cannot be edited or deleted here.',
       ar: 'يأتي هذا الدور مع المشروع. ما يمنحه مكتوب في الشيفرة، لذا لا يمكن تعديله أو حذفه هنا.',
