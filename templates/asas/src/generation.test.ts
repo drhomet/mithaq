@@ -122,7 +122,7 @@ test('generateAuth maps Better Auth modelName and fieldName to its Drizzle schem
     assert.match(session, /export const session = defineKayan\({\n  name: 'logins'/)
     assert.match(
       session,
-      /personAPI: \{ kind: 'relationship', relationTo: \(\) => user, dbName: 'person_api', rules: \{ required: true, onDelete: 'cascade' \} \}/,
+      /personAPI: \{ kind: 'relationship', relationTo: \(\) => user, dbName: 'person_api', rules: \{ required: true, index: true, onDelete: 'cascade' \} \}/,
     )
 
     await writeFile(new URL('mithaq.ts', root), 'export const defineKayan = (kayan) => kayan\n')
@@ -166,6 +166,23 @@ test('generateAuth spreads the shipped operations onto every generated kayan, na
     const read = async (file: string) => readFile(new URL(file, directory), 'utf8')
     assert.match(await read('team.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \} \},\n/)
     assert.match(await read('ticket.ts'), /\n  targets: \{ service: \{ operations: defaultOperations \} \},\n/)
+  } finally {
+    await rm(root, { recursive: true })
+  }
+})
+
+test('generateAuth keeps each index Better Auth asks of a field, so the next migrate never drops it', async () => {
+  const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-auth-'))}/`)
+  const directory = new URL('kayan/auth/', root)
+  try {
+    await generateAuth({ language: '../../../mithaq.ts', options, directory })
+    const read = async (file: string) => readFile(new URL(file, directory), 'utf8')
+    assert.match(await read('session.ts'), /userId: \{ kind: 'relationship', relationTo: \(\) => user, dbName: 'user_id', rules: \{ required: true, index: true, onDelete: 'cascade' \} \}/)
+    assert.match(await read('account.ts'), /userId: \{ kind: 'relationship', [^\n]*rules: \{ required: true, index: true, onDelete: 'cascade' \} \}/)
+    assert.match(await read('verification.ts'), /identifier: \{ kind: 'text', rules: \{ required: true, index: true \} \}/)
+    assert.doesNotMatch(await read('user.ts'), /index: true/)
+    // Unique already, so its constraint is the index.
+    assert.match(await read('organization.ts'), /slug: \{ kind: 'text', rules: \{ required: true, unique: true \} \}/)
   } finally {
     await rm(root, { recursive: true })
   }

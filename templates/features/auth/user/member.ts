@@ -17,8 +17,8 @@ export const member = defineKayan({
   fields: {
     ...defaultFields,
     id: { kind: 'text' },
-    organizationId: { kind: 'relationship', relationTo: () => organization, dbName: 'organization_id', rules: { required: true, onDelete: 'cascade' } },
-    userId: { kind: 'relationship', relationTo: () => user, dbName: 'user_id', rules: { required: true, onDelete: 'cascade' } },
+    organizationId: { kind: 'relationship', relationTo: () => organization, dbName: 'organization_id', rules: { required: true, index: true, onDelete: 'cascade' } },
+    userId: { kind: 'relationship', relationTo: () => user, dbName: 'user_id', rules: { required: true, index: true, onDelete: 'cascade' } },
     role: { kind: 'text', rules: { required: true } },
     createdAt: { kind: 'datetime', rules: { required: true } },
     lastSeenAt: { kind: 'datetime' },

@@ -19,6 +19,7 @@ type AuthField = {
   fieldName?: string
   required?: boolean
   unique?: boolean
+  index?: boolean
   onUpdate?: () => unknown
   references?: { model: string }
 }
@@ -49,6 +50,9 @@ const fieldSource = (name: string, field: AuthField) => {
   const keys = [
     field.required ? 'required: true' : '',
     field.unique ? 'unique: true' : '',
+    // Better Auth's own migrations build it, so leaving it out would have the next migrate drop it.
+    // A unique column's constraint is already its index.
+    field.index && !field.unique ? 'index: true' : '',
     field.onUpdate && field.type === 'date' ? 'nowOnUpdate: true' : '',
     field.onUpdate ? "providedBy: { update: 'application' }" : '',
   ]
