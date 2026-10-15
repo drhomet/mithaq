@@ -809,12 +809,12 @@ test('mithaq screens prints every screen of the project as its tree', async () =
   const bin = new URL('../../mithaq/src/asas/cli/mithaq.ts', import.meta.url)
   const { studioText, studioTree } = await import('mithaq/admin')
   const { stdout } = await promisify(execFile)(process.execPath, [bin.pathname, 'screens'], { cwd: new URL('../../../templates/asas/', import.meta.url).pathname })
-  const expected = (['dashboard', 'portal', 'platform'] as const).map((name) => studioText(studioTree(name, asas.targets[name].client))).join('\n\n')
+  const expected = (['dashboard', 'portal', 'backoffice'] as const).map((name) => studioText(studioTree(name, asas.targets[name].client))).join('\n\n')
   assert.equal(stdout, `${expected}\n`)
 })
 
-test('a person\'s platform actions draw on no viewer\'s own row and on a staff row for a super admin alone, and each asks first in a dialog naming the person, a ban with a reason and an end, a role only when it changed', async (t) => {
-  const { UserButtons } = (await import(new URL('../../../templates/asas/src/ui-platform/user-actions.tsx', import.meta.url).href)) as { UserButtons: () => ReactElement }
+test('a person\'s backoffice actions draw on no viewer\'s own row and on a staff row for a super admin alone, and each asks first in a dialog naming the person, a ban with a reason and an end, a role only when it changed', async (t) => {
+  const { UserButtons } = (await import(new URL('../../../templates/asas/src/ui-backoffice/user-actions.tsx', import.meta.url).href)) as { UserButtons: () => ReactElement }
   const sent: { path: string; body: Record<string, unknown> }[] = []
   let gate: Promise<void> = Promise.resolve()
   let refusal: { code: string } | undefined
@@ -861,7 +861,7 @@ test('a person\'s platform actions draw on no viewer\'s own row and on a staff r
   assert.equal(document.querySelector('[role="alert"]')?.textContent, 'This person is banned, so they cannot be impersonated.', 'a refusal the file knows by its code is said as its own sentence')
   refusal = { code: 'SOMETHING_ELSE' }
   await act(async () => click(confirm()!))
-  assert.equal(document.querySelector('[role="alert"]')?.textContent, 'The platform refused that action.', 'and any other refusal by the general one')
+  assert.equal(document.querySelector('[role="alert"]')?.textContent, 'The backoffice refused that action.', 'and any other refusal by the general one')
   refusal = undefined
   sent.length = 0
   await act(async () => click(confirm()!))
@@ -902,7 +902,7 @@ test('a person\'s platform actions draw on no viewer\'s own row and on a staff r
   assert.ok(dialog()?.textContent?.includes('Layla $&') && dialog()?.textContent?.includes('Explorer'), 'the dialog names the person and the new role')
   await act(async () => click(confirm()!))
   assert.deepEqual(sent.map((one) => [one.path, one.body]), [['/api/auth/user/admin/set-role', { userId: 'p1', role: 'explorer' }]], 'and the answer sets it')
-  assert.equal(dialog()?.textContent?.includes('Layla $& now holds the platform role "Explorer".'), true, 'the role says it landed')
+  assert.equal(dialog()?.textContent?.includes('Layla $& now holds the backoffice role "Explorer".'), true, 'the role says it landed')
 
   sent.length = 0
   host = await cell(person, 'user', support)

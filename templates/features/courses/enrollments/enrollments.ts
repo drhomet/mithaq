@@ -1,7 +1,7 @@
 import { defaultOperations, folderOf, invalid, type Ctx, type FilterOptions, type WriteTools } from 'mithaq'
 import { defineKayan, organization, serverTargets } from '@asas/mithaq'
 import { currentOrganization, readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
-import { activity, appPage, danger, platformList, platformRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, appPage, danger, backofficeList, backofficeRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
 import { sessions } from '../sessions/sessions.ts'
 import { courses } from '../courses/courses.ts'
 
@@ -12,7 +12,7 @@ const enrollment = [{ section: 'enrollment', label: { en: 'Enrollment', ar: 'ا�
 /**
  * The seats an actor reads, edits and deletes, inside its active organization:
  * every seat of its organization for an actor holding
- * `enrollments.others` and for platform staff, its own seats alone for anyone
+ * `enrollments.others` and for backoffice staff, its own seats alone for anyone
  * else. That is the student, whose enrollment keys would otherwise reach every
  * other student's seat, and a custom role a tenant writes without the key.
  * Another's seat answers 404, as a missing row does.
@@ -113,7 +113,7 @@ export const enrollments = defineKayan({
       kind: 'relationship', label: { en: 'Session', ar: 'الحصة' }, relationTo: () => sessions,
       filterOptions: openSessions,
       rules: { required: true },
-      targets: { dashboard: { cell: sessionCell }, portal: { cell: sessionCell }, platform: { cell: sessionCell } },
+      targets: { dashboard: { cell: sessionCell }, portal: { cell: sessionCell }, backoffice: { cell: sessionCell } },
     },
     // A create that names no student enrolls the person making it: the runner's
     // defaults step fills it from the actor, and a field with a default is one a
@@ -145,14 +145,14 @@ export const enrollments = defineKayan({
     },
   }),
   targets: {
-    // Every organization's rows on the platform, read-only, and each row's
+    // Every organization's rows on the backoffice, read-only, and each row's
     // record, which only reads. A record is titled by its student, a person the
-    // platform reads, where a session is titled only by its start.
-    platform: {
+    // backoffice reads, where a session is titled only by its start.
+    backoffice: {
       useAsTitle: 'student',
       pages: {
-        ...platformList('/enrollments', { columns: ['session', 'student', 'organization', 'createdAt'], filters: ['organization', 'session', 'student'], sort: '-createdAt' }),
-        ...platformRecord({
+        ...backofficeList('/enrollments', { columns: ['session', 'student', 'organization', 'createdAt'], filters: ['organization', 'session', 'student'], sort: '-createdAt' }),
+        ...backofficeRecord({
           path: '/enrollments/:id',
           main: [{ section: 'enrollment', label: { en: 'Enrollment', ar: 'التسجيل' }, fields: ['session', 'student', 'deletedAt'] }],
         }),
@@ -166,7 +166,7 @@ export const enrollments = defineKayan({
       },
     },
     // Both screens list enrollments; the portal's create opens as a drawer over
-    // its list. Titled by the student on the dashboard, as on the platform, so a
+    // its list. Titled by the student on the dashboard, as on the backoffice, so a
     // tab and a heading tell one seat from another; on the portal, where the
     // student is most often the viewer, by the session.
     dashboard: {

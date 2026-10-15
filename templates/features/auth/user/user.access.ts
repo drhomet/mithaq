@@ -4,17 +4,17 @@
 // shares.
 //
 // A person is written through no managed operation: Better Auth writes it
-// through its own adapter. The two sides of the platform line read it
+// through its own adapter. The two sides of the backoffice line read it
 // differently, and neither row reaches the other's side. In the tenant app a
 // member reads its active organization's members by their id and their name
 // alone, so a relationship to a person shows a name in the dashboard's cell and
 // picker, and no email, role or ban reaches a tenant. Which members: all of them
-// to a holder of `member.find`, otherwise itself and its roles' `peopleAudience`. In the platform app a
-// platform role reads every person, each column where it holds that column's key.
+// to a holder of `member.find`, otherwise itself and its roles' `peopleAudience`. In the backoffice app a
+// backoffice role reads every person, each column where it holds that column's key.
 //
 // The id and the name are held by `namesInTenant` rather than by a field list
 // on the `'*'` row, because every actor with a role takes the `'*'` row, the
-// platform's included, and a column one row's list leaves out is hidden
+// backoffice's included, and a column one row's list leaves out is hidden
 // whatever the other rows say.
 //
 // The `'*'` row reads every person, and `membersOf` narrows it to the active
@@ -22,9 +22,9 @@
 // reaches one relationship hop from the kayan's own fields, which `user` has
 // none of toward `member`.
 import { rows, serverTargets } from '@asas/mithaq'
-import { membersOf, namesInTenant, platformReads } from '@asas/mithaq/roles/tenant-access.ts'
+import { membersOf, namesInTenant, backofficeReads } from '@asas/mithaq/roles/tenant-access.ts'
 
 export const access = {
-  ...rows({ '*': { read: true }, ...platformReads }, { holds: namesInTenant('user') }),
+  ...rows({ '*': { read: true }, ...backofficeReads }, { holds: namesInTenant('user') }),
   read: membersOf(serverTargets.drizzle),
 }

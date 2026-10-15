@@ -18,6 +18,9 @@ export default defineConfig({
     tanstackStart({ router: { routeFileIgnorePattern: '^(files|types)\\.ts$' } }),
     viteReact(),
   ],
+  // Behind the proxy that routes by Host: bound to the loopback address it targets, and answering
+  // the public name in BETTER_AUTH_URL, which Vite refuses in a Host header unless named here.
+  preview: { host: '127.0.0.1', allowedHosts: process.env.BETTER_AUTH_URL ? [new URL(process.env.BETTER_AUTH_URL).hostname] : [] },
   environments: {
     ssr: {
       // `asas` and `mithaq` stay external: the drizzle adapter imports `drizzle-kit/api-postgres`

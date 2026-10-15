@@ -60,10 +60,10 @@ const roles = {
   scribe: { label: label('Scribe'), permissions: ['notes.create', 'notes.fields.id', 'notes.fields.title', 'notes.fields.memo'] },
 } as const
 
-/** Who holds which roles in which organization, and who is platform staff, read by the access target below. */
+/** Who holds which roles in which organization, and who is backoffice staff, read by the access target below. */
 const assignments = new Map<string, string[]>()
 const staff = new Set<string>()
-let platformApp = false
+let backofficeApp = false
 
 const keysOf = (slugs: readonly string[]) =>
   slugs.includes('editor') ? '*' as const : [...new Set(slugs.flatMap((slug) => roles[slug as keyof typeof roles]?.permissions as readonly string[] ?? []))]
@@ -120,7 +120,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       zod: zodTarget,
       rbac: access,
       versions: versionsTarget({ max: 100 }),
-      tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', organizations: 'many', platform: ({ user }) => platformApp && staff.has((user as { id: string }).id) }),
+      tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', organizations: 'many', backoffice: ({ user }) => backofficeApp && staff.has((user as { id: string }).id) }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize }),
     } as {},
   })
@@ -345,11 +345,11 @@ type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count'
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
-const actorOf = async ({ active, orgs = active ? { [active]: ['editor'] } : {}, platform = false, collection = 'user' }: { active?: string | null; orgs?: Record<string, string[]>; platform?: boolean; collection?: string }) => {
+const actorOf = async ({ active, orgs = active ? { [active]: ['editor'] } : {}, backoffice = false, collection = 'user' }: { active?: string | null; orgs?: Record<string, string[]>; backoffice?: boolean; collection?: string }) => {
   const id = `person-${(members += 1)}`
   sessions.set(id, { active, orgs: Object.keys(orgs) })
   for (const [org, slugs] of Object.entries(orgs)) assignments.set(`${org}:${id}`, slugs)
-  if (platform) staff.add(id)
+  if (backoffice) staff.add(id)
   const strategy = betterAuthStrategy({
     server: {
       api: {
@@ -415,7 +415,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const noActive = await actorOf({ active: null, orgs: { org1: ['editor'] } })
     const unmarked = { id: 'x', strategy: 'better-auth', activeOrganizationId: 'org1', organizations: [{ id: 'org1' }], roles: ['editor'], permissions: '*' }
     // A session of another Better Auth instance, whose organizations are no rows of the tenant kayan.
-    const elsewhere = await actorOf({ active: 'org1', collection: 'platformUser' })
+    const elsewhere = await actorOf({ active: 'org1', collection: 'backofficeUser' })
     for (const actor of [undefined, unmarked, nonMember, noActive, elsewhere]) {
       for (const call of [() => memos().find({}, { actor }), () => memos().count({}, { actor }), () => memos().findByID({ id: ids.org1 }, { actor }), () => memos().guarded({ title: 'no' }, { actor }), () => memos().update({ id: ids.org1, title: 'no' }, { actor }), () => memos().delete({ id: ids.org1 }, { actor })]) {
         assert.equal((await refusal(call())).status, 403)
@@ -452,14 +452,14 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     await memos().peekNested({}, { actor: one })
     await memos().peekNested({}, { actor: one, tenant: 'mine' })
     assert.deepEqual(seenTenants, ['org1', undefined, undefined, undefined, 'org1', undefined])
-    const operator = await actorOf({ active: null, platform: true })
-    platformApp = true
+    const operator = await actorOf({ active: null, backoffice: true })
+    backofficeApp = true
     try {
       seenTenants.length = 0
       await memos().peek({}, { actor: operator, tenant: 'all' })
       assert.deepEqual(seenTenants, [undefined])
     } finally {
-      platformApp = false
+      backofficeApp = false
     }
   })
 
@@ -534,14 +534,14 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await refusal(memos().find({}, { actor: lone, tenant: 'mine' }))).status, 403)
   })
 
-  test('tenant: \'all\' is platform staff in the platform app alone, and a write takes no tenant', async () => {
-    const operator = await actorOf({ active: null, platform: true })
-    assert.equal((await refusal(memos().find({}, { actor: operator, tenant: 'all' }))).status, 403, 'outside the platform app')
-    platformApp = true
+  test('tenant: \'all\' is backoffice staff in the backoffice app alone, and a write takes no tenant', async () => {
+    const operator = await actorOf({ active: null, backoffice: true })
+    assert.equal((await refusal(memos().find({}, { actor: operator, tenant: 'all' }))).status, 403, 'outside the backoffice app')
+    backofficeApp = true
     try {
       const page = await memos().find({ limit: 0 }, { actor: operator, tenant: 'all' })
       assert.deepEqual([...new Set(page.docs.map((row: { firmId: string }) => row.firmId))].sort(), ['org1', 'org2', 'org3'])
-      assert.equal((await refusal(memos().find({}, { actor: one, tenant: 'all' }))).status, 403, 'a member is no platform staff')
+      assert.equal((await refusal(memos().find({}, { actor: one, tenant: 'all' }))).status, 403, 'a member is no backoffice staff')
       for (const reach of ['all', 'mine']) {
         for (const call of [() => memos().create({ title: 'w' }, { actor: one, tenant: reach }), () => memos().update({ id: ids.org1, title: 'w' }, { actor: one, tenant: reach }), () => memos().delete({ id: ids.org1 }, { actor: one, tenant: reach }), () => memos().updateMany({ where: { title: { equals: 'one' } }, data: { title: 'w' } }, { actor: one, tenant: reach })]) {
           const refused = await refusal(call())
@@ -550,7 +550,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
         }
       }
     } finally {
-      platformApp = false
+      backofficeApp = false
     }
     assert.equal((await refusal(memos().find({}, { actor: one, tenant: 'every' }))).status, 400)
   })

@@ -20,7 +20,7 @@
     "test:release": "node apps/release-consumer.ts",
     "pack": "node apps/pack.ts",
     "lint:args": "node apps/lint-args.ts",
-    "typecheck": "tsc -p tsconfig.json && tsc -p packages/mithaq-admin && tsc -p apps/asas-tanstack && tsc -p apps/asas-platform"
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/mithaq-admin && tsc -p apps/asas-tanstack && tsc -p apps/asas-backoffice"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

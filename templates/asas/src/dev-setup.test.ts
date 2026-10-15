@@ -55,7 +55,7 @@ test('dev:setup pushes the schema, makes a verified super admin who owns an orga
   try {
     // Each refusal makes nothing, which the run after them proves: it would refuse a database holding a user.
     assert.match(refused({ DATABASE_URL: fresh, ...deployed, BETTER_AUTH_URL: 'https://app.example' }), /Refusing dev:setup: BETTER_AUTH_URL names https:\/\/app\.example, which is not this machine\./)
-    assert.match(refused({ DATABASE_URL: fresh, ...deployed, PLATFORM_URL: 'https://platform.example' }), /Refusing dev:setup: PLATFORM_URL names https:\/\/platform\.example, which is not this machine\./)
+    assert.match(refused({ DATABASE_URL: fresh, ...deployed, BACKOFFICE_URL: 'https://backoffice.example' }), /Refusing dev:setup: BACKOFFICE_URL names https:\/\/backoffice\.example, which is not this machine\./)
     assert.match(refused({ DATABASE_URL: fresh, DEV_ADMIN_PASSWORD: 'x' }), /Refusing dev:setup: DEV_ADMIN_PASSWORD holds 8 to 128 characters\./)
 
     const done = run({ DATABASE_URL: fresh }, ['--seed'])
@@ -63,23 +63,23 @@ test('dev:setup pushes the schema, makes a verified super admin who owns an orga
     // The credentials stay in .env: the output names their variables alone.
     const said = `${done.stdout}${done.stderr}`.toLowerCase()
     assert.ok(!said.includes(admin.DEV_ADMIN_EMAIL.toLowerCase()) && !said.includes(admin.DEV_ADMIN_PASSWORD), done.stdout)
-    assert.match(done.stdout, /Made the dev admin, owner of "Dev admin's workspace" and platform super_admin\./)
+    assert.match(done.stdout, /Made the dev admin, owner of "Dev admin's workspace" and backoffice super_admin\./)
     assert.match(done.stdout, /DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD/)
     assert.match(done.stdout, /Seeding the organization "Dev admin's workspace"/)
     assert.match(done.stdout, /"totals":\{"tags":6,/)
 
     const held = JSON.parse(script(fresh, `
-      const { asPlatform } = await import('@asas/mithaq/auth')
+      const { asBackoffice } = await import('@asas/mithaq/auth')
       const server = asas.auth.strategies.find((one) => one.name === 'user').server
       const body = { email: '${admin.DEV_ADMIN_EMAIL}', password: '${admin.DEV_ADMIN_PASSWORD}' }
       const tenant = await server.api.signInEmail({ body, asResponse: true })
-      const platform = await asPlatform(() => server.api.signInEmail({ body, asResponse: true }))
+      const backoffice = await asBackoffice(() => server.api.signInEmail({ body, asResponse: true }))
       // The seed's students are users and members too, so the admin is read by its address.
       const { rows: [user] } = await ${client}.query("select role, email_verified from \\"user\\" where email = lower($1)", [body.email])
       const { rows: owned } = await ${client}.query("select organization.name, member.role from member join organization on organization.id = member.organization_id join \\"user\\" on \\"user\\".id = member.user_id where \\"user\\".email = lower($1)", [body.email])
-      console.log(JSON.stringify({ tenant: tenant.status, platform: platform.status, user, owned }))
+      console.log(JSON.stringify({ tenant: tenant.status, backoffice: backoffice.status, user, owned }))
     `).trim().split('\n').at(-1)!)
-    assert.deepEqual(held, { tenant: 200, platform: 200, user: { role: 'super_admin', email_verified: true }, owned: [{ name: "Dev admin's workspace", role: 'owner' }] })
+    assert.deepEqual(held, { tenant: 200, backoffice: 200, user: { role: 'super_admin', email_verified: true }, owned: [{ name: "Dev admin's workspace", role: 'owner' }] })
 
     const again = run({ DATABASE_URL: fresh })
     assert.equal(again.status, 1, again.stdout)

@@ -64,7 +64,7 @@ bunx mithaq generate messages --check --no-data-scan
 
 ## `generate screens`
 
-Writes the files each screen target needs into the host app: `screen.json`, `types.ts`, `files.ts` and the route files. A screen is one admin area, such as the dashboard. The folders come from `generate.screens` in `src/mithaq.ts`, either one folder for every screen or one per screen. Each folder must be inside a TanStack Router `routes` folder. The template writes the dashboard and the portal into `apps/asas-tanstack/src/routes/(screens)/`, and the platform into `apps/asas-platform/src/routes/(screens)/`.
+Writes the files each screen target needs into the host app: `screen.json`, `types.ts`, `files.ts` and the route files. A screen is one admin area, such as the dashboard. The folders come from `generate.screens` in `src/mithaq.ts`, either one folder for every screen or one per screen. Each folder must be inside a TanStack Router `routes` folder. The template writes the dashboard and the portal into `apps/asas-tanstack/src/routes/(screens)/`, and the backoffice into `apps/asas-backoffice/src/routes/(screens)/`.
 
 Run it after you change a kayan's pages, a screen's `kayan` list, or a screen's pages and components. It never overwrites a file it did not write, and it deletes generated files that no screen needs any more.
 
@@ -182,7 +182,7 @@ The admin's pieces are imported from the installed `mithaq-admin` package as `mi
 
 Restart the dev server after an eject or a prune.
 
-Both read `components.json` in the current folder for where files go, so run them in the app: `apps/asas-tanstack` or `apps/asas-platform`.
+Both read `components.json` in the current folder for where files go, so run them in the app: `apps/asas-tanstack` or `apps/asas-backoffice`.
 
 ```sh
 cd apps/asas-tanstack && bunx mithaq eject list-table
@@ -198,7 +198,7 @@ A project holds the files it ejected and the ones that are always its own: the s
 - outside: the path resolves outside the project or the package, so it was not read;
 - removed: the package no longer has the item, so delete the file.
 
-It reads `components.json` in the current folder, so run it in each folder that has one: `packages/mithaq`, `apps/asas-tanstack` and `apps/asas-platform`. It never writes. `--check` is required.
+It reads `components.json` in the current folder, so run it in each folder that has one: `packages/mithaq`, `apps/asas-tanstack` and `apps/asas-backoffice`. It never writes. `--check` is required.
 
 Exit codes: 0 when nothing differs or there is nothing to check, and 1 when any file differs.
 

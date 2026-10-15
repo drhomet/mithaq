@@ -99,9 +99,9 @@ import { adminAc, defaultStatements as adminStatements, userAc } from 'better-au
 import { asas } from './asas.ts'
 import { pushInput } from '../../../packages/mithaq/src/drizzle/index.ts'
 import { storageConfig as templateStorage } from '../../mithaq/src/storage/index.ts'
-import { accessTarget, dashboardScreen, dashboardUi, organization, platformScreen, portalScreen, portalUi, serverTargets as projectTargets, targets as languageTargets } from '../../mithaq/src/mithaq.ts'
-import { asPlatform, authOptions, authSettings, backgroundSettled, options, platformApp, platformRoles, platformURL, providers, serverFor, type AuthSettings } from '@asas/mithaq/auth'
-import { secret, superAdminOnly } from '@asas/mithaq/auth/platform-roles'
+import { accessTarget, dashboardScreen, dashboardUi, organization, backofficeScreen, portalScreen, portalUi, serverTargets as projectTargets, targets as languageTargets } from '../../mithaq/src/mithaq.ts'
+import { asBackoffice, authOptions, authSettings, backgroundSettled, options, backofficeApp, backofficeRoles, backofficeURL, providers, serverFor, type AuthSettings } from '@asas/mithaq/auth'
+import { secret, superAdminOnly } from '@asas/mithaq/auth/backoffice-roles'
 import { localUsers } from '../../features/auth/local-users/local-users.ts'
 import { kayan as mediaKayan } from '../../features/media/index.ts'
 import { coverReads } from '../../features/courses/index.ts'
@@ -664,7 +664,7 @@ const onScreen = (...kayan: string[]) =>
       ...projectTargets,
       rbac: accessTarget(roles as typeof systemRoles),
       dashboard: screen([...kayan, 'roles', 'memberRoles', 'user', 'organization']),
-      platform: { ...platformScreen, kayan: ['roles', 'memberRoles', 'user', 'organization', 'member'] },
+      backoffice: { ...backofficeScreen, kayan: ['roles', 'memberRoles', 'user', 'organization', 'member'] },
       portal: { ...portalScreen, kayan: ['user'] },
     },
   }))
@@ -871,13 +871,13 @@ test('0b. the takeover race: five first-runs at once with the setup code make on
   assert.equal((await modeRows('select id from organization')).length, 1, 'one organization exists')
   assert.equal(organization!.name, `School ${winner}`, 'named by the winner')
   const [user] = await modeRows(`select id, role, email_verified from "user" where email = 'racer-${winner}@example.com'`)
-  assert.deepEqual([user!.role, user!.email_verified], [platformApp ? 'super_admin' : 'user', true], 'the winner is verified, and platform staff only where the platform app is served')
+  assert.deepEqual([user!.role, user!.email_verified], [backofficeApp ? 'super_admin' : 'user', true], 'the winner is verified, and backoffice staff only where the backoffice app is served')
   assert.deepEqual(await modeRows(`select user_id, role from member where organization_id = '${organization!.id}'`), [{ user_id: user!.id, role: 'owner' }], 'and the organization\'s one member, its owner')
   assert.deepEqual(await modeRows(`select role from member_roles where organization_id = '${organization!.id}' and user_id = '${user!.id}'`), [{ role: 'administrator' }], 'who holds administrator')
   assert.equal((await modeRows(`select id from "user" where email like 'racer-%'`)).length, 1, 'and no loser has an account')
   assert.deepEqual(await (await askedOf(school, '/first-run/state')).json(), { open: false }, 'first-run is closed')
   assert.deepEqual(await answerOf(await askedOf(school, '/first-run', { name: 'Late', email: 'late@example.com', password: modePassword, organization: 'Late', code: setupCode })), [403, 'FIRST_RUN_CLOSED'], 'and stays closed to the code')
-  if (platformApp) assert.deepEqual(await (await coded.asPlatform(() => askedOf(school, '/init'))).json(), { initialized: true }, 'and so is the platform\'s first-register, whose administrator first-run made')
+  if (backofficeApp) assert.deepEqual(await (await coded.asBackoffice(() => askedOf(school, '/init'))).json(), { initialized: true }, 'and so is the backoffice\'s first-register, whose administrator first-run made')
   const signedIn = await askedOf(school, '/sign-in/email', { email: `racer-${winner}@example.com`, password: modePassword })
   assert.equal(signedIn.status, 200, 'the owner signs in')
   const session = await (await askedOf(school, '/get-session', undefined, { cookie: signedIn.headers.getSetCookie().map((one) => one.split(';')[0]).join('; ') })).json() as { session: { activeOrganizationId: string } }
@@ -1216,7 +1216,7 @@ test('0m. with one organization an administrator adds a person: account, members
   const allowed = (await modeRows(`select id from "user" where email = 'allowed-0m@example.com'`))[0]!.id
   assert.deepEqual(await modeRows(`select identifier from verification where identifier = 'joined-open:${allowed}'`), [{ identifier: `joined-open:${allowed}` }], 'a person added has joined once, so removed they never join again by an open sign-up')
 
-  // Staff hold the platform: their account is never handed to a mailbox from a tenant, proved or not.
+  // Staff hold the backoffice: their account is never handed to a mailbox from a tenant, proved or not.
   const staff = await madeAccount({ email: 'staff-0m@example.com', verified: false, password: 'the-staff-password' })
   await db.execute(`update "user" set role = 'support' where id = '${staff}'`)
   const staffAdded = await add({ name: 'Staff', email: 'staff-0m@example.com' })
@@ -7124,14 +7124,14 @@ test('226a. over asas.handler no organization is deleted: the route answers 404 
     assert.equal((JSON.parse(text) as { code?: string }).code, 'ORGANIZATION_DELETION_DISABLED', `and is told the route is off, for ${said}`)
   }
   await assert.rejects(server.api.deleteOrganization({ body: { organizationId: id }, headers: owner.headers }), (thrown: { body?: { code?: string } }) => thrown.body?.code === 'ORGANIZATION_DELETION_DISABLED', 'server.api refuses the delete too')
-  const onPlatformApp = await asPlatform(() =>
+  const onBackofficeApp = await asBackoffice(() =>
     asas.handler(new Request('http://test/api/auth/user/organization/delete', {
       method: 'POST',
       headers: { cookie: owner.headers.get('cookie') ?? '', 'content-type': 'application/json', origin: 'http://localhost:5174' },
       body: JSON.stringify({ organizationId: id }),
     })),
   )
-  assert.equal(onPlatformApp.status, 404, `and the platform instance answers 404: ${await onPlatformApp.clone().text()}`)
+  assert.equal(onBackofficeApp.status, 404, `and the backoffice instance answers 404: ${await onBackofficeApp.clone().text()}`)
   await db.execute(`delete from member_roles where organization_id = '${id}'`)
   assert.equal((await remove(owner.headers)).status, 404, 'an organization holding no row of its own is not deleted either')
   assert.deepEqual(await standing(), [1, 1, 1], 'the organization, its member and its invitation stand')
@@ -7549,7 +7549,7 @@ test('67. GET /access answers for whatever actor the strategy loop resolved, so 
   assert.equal(
     answer.canAccessAdmin,
     false,
-    'the admin answer is this project\'s `superAdmin`, which is true in the platform app alone, so a tenant member reads false',
+    'the admin answer is this project\'s `superAdmin`, which is true in the backoffice app alone, so a tenant member reads false',
   )
   assert.equal(
     (await asas.kayan.courses.operations.find({}, { actor: actor as never })).docs !== undefined,
@@ -7560,7 +7560,7 @@ test('67. GET /access answers for whatever actor the strategy loop resolved, so 
   // The same route with no session is the same shape, answered for no actor: the tenancy
   // row selects no role, so every tenant kayan is refused. It is never a 401.
   // `localUsers.create` answers `true` for no actor by design, but the report lists only a
-  // kayan the caller may read, and `localUsers.read` answers a super admin in the platform
+  // kayan the caller may read, and `localUsers.read` answers a super admin in the backoffice
   // app alone.
   const anonymous = await asas.handler(new Request('http://test/api/access'))
   assert.equal(anonymous.status, 200, 'an anonymous caller is answered rather than refused')
@@ -11810,19 +11810,19 @@ const cookieHeader = (response: Response) => {
 }
 
 /**
- * The same person signed in to the platform app, which answers a cookie of its own name
- * signed under its own secret, so a tenant cookie is never a platform credential under
+ * The same person signed in to the backoffice app, which answers a cookie of its own name
+ * signed under its own secret, so a tenant cookie is never a backoffice credential under
  * either name. The person is read off the tenant session's own row, and every account
  * these tests make shares one password. Every call that reads the answer runs inside
- * `asPlatform`, as the platform app runs every request it serves.
+ * `asBackoffice`, as the backoffice app runs every request it serves.
  */
-const onPlatform = async (headers: Headers) => {
+const onBackoffice = async (headers: Headers) => {
   const token = decodeURIComponent(/better-auth\.session_token=([^;]+)/.exec(headers.get('cookie') ?? '')?.[1] ?? '').split('.')[0] ?? ''
   const { rows } = (await db.execute(`select u.email from "session" s join "user" u on u.id = s.user_id where s.token = '${token.replaceAll("'", "''")}'`)) as { rows: { email?: string }[] }
   if (!rows[0]?.email) return new Headers()
-  // Someone who holds no platform role is refused a platform session, and calls with none.
+  // Someone who holds no backoffice role is refused a backoffice session, and calls with none.
   // Any other refusal is a failure of the test and is thrown.
-  const signedIn = await asPlatform(() => server.api.signInEmail({ body: { email: rows[0]!.email, password: 'a-long-enough-password' }, returnHeaders: true })).catch((error: { body?: { code?: string } }) => {
+  const signedIn = await asBackoffice(() => server.api.signInEmail({ body: { email: rows[0]!.email, password: 'a-long-enough-password' }, returnHeaders: true })).catch((error: { body?: { code?: string } }) => {
     if (error.body?.code !== 'INVALID_EMAIL_OR_PASSWORD') throw error
     return null
   })
@@ -11831,22 +11831,22 @@ const onPlatform = async (headers: Headers) => {
 }
 
 /**
- * An impersonation as staff make one: the provider's route in the platform app, which
+ * An impersonation as staff make one: the provider's route in the backoffice app, which
  * keeps no cookie and answers a one-time link into the tenant app, and the tenant app's
  * trade of that link's token for the impersonated session under its own cookie.
  */
 const impersonate = async (headers: Headers, userId: string) => {
-  const started = await asPlatform(async () =>
+  const started = await asBackoffice(async () =>
     asas.handler(
       new Request('http://test/api/auth/user/admin/impersonate-user', {
         method: 'POST',
-        headers: new Headers([...(await onPlatform(headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
+        headers: new Headers([...(await onBackoffice(headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
         body: JSON.stringify({ userId }),
       }),
     ),
   )
   assert.equal(started.status, 200, 'the impersonation route answered')
-  assert.deepEqual(started.headers.getSetCookie(), [], 'and set no cookie in the platform app')
+  assert.deepEqual(started.headers.getSetCookie(), [], 'and set no cookie in the backoffice app')
   const { url } = (await started.json()) as { url: string }
   const response = await asas.handler(
     new Request('http://test/api/auth/user/one-time-token/verify', {
@@ -11897,12 +11897,12 @@ test('126. the admin plugin adds its five columns to the generated kayan and to 
   assert.equal(session.rows.length, 1, 'and the session column beside them')
 })
 
-test('127. the provider\'s own admin routes answer in the platform app alone: a super_admin reaches them there, an ordinary member is refused there, and the tenant app answers neither', async () => {
-  const platform = await server.api.signUpEmail({
-    body: { name: 'Platform Person', email: 'platform@example.com', password: 'a-long-enough-password' },
+test('127. the provider\'s own admin routes answer in the backoffice app alone: a super_admin reaches them there, an ordinary member is refused there, and the tenant app answers neither', async () => {
+  const backoffice = await server.api.signUpEmail({
+    body: { name: 'Backoffice Person', email: 'backoffice@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
   })
-  const platformHeaders = new Headers({ cookie: platform.headers.get('set-cookie') ?? '' })
+  const backofficeHeaders = new Headers({ cookie: backoffice.headers.get('set-cookie') ?? '' })
   const ordinary = await server.api.signUpEmail({
     body: { name: 'Ordinary', email: 'ordinary@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
@@ -11910,7 +11910,7 @@ test('127. the provider\'s own admin routes answer in the platform app alone: a 
   const ordinaryHeaders = new Headers({ cookie: ordinary.headers.get('set-cookie') ?? '' })
 
   // The plugin's own default for a new user, which is what `adminRoles` is
-  // measured against: nobody is a platform administrator by signing up.
+  // measured against: nobody is a backoffice administrator by signing up.
   const listUsers = (headers: Headers) =>
     asas.handler(
       new Request(
@@ -11918,37 +11918,37 @@ test('127. the provider\'s own admin routes answer in the platform app alone: a 
         { headers },
       ),
     )
-  assert.equal((await asPlatform(async () => listUsers((await onPlatform(ordinaryHeaders))))).status, 401, 'a member signs in to no platform session, so the provider refuses the route as signed out')
+  assert.equal((await asBackoffice(async () => listUsers((await onBackoffice(ordinaryHeaders))))).status, 401, 'a member signs in to no backoffice session, so the provider refuses the route as signed out')
 
   // The bypass is a row: one column on the user, written here the way a repair
   // script would write it, because no route of this project hands it out.
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.response.user.id}'`)
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.response.user.id}'`)
 
-  // The tenant app's instance serves no admin route at all, to the platform administrator's
+  // The tenant app's instance serves no admin route at all, to the backoffice administrator's
   // own tenant cookie as to anyone's.
-  for (const headers of [platformHeaders, ordinaryHeaders]) assert.equal((await listUsers(headers)).status, 404, 'the tenant app answers the route 404')
-  assert.equal(await asPlatform(() => asas.auth.actor(platformHeaders)), null, 'a tenant session is no actor in the platform app')
-  assert.equal((await asPlatform(() => listUsers(platformHeaders))).status, 401, 'and the platform route refuses it as signed out')
+  for (const headers of [backofficeHeaders, ordinaryHeaders]) assert.equal((await listUsers(headers)).status, 404, 'the tenant app answers the route 404')
+  assert.equal(await asBackoffice(() => asas.auth.actor(backofficeHeaders)), null, 'a tenant session is no actor in the backoffice app')
+  assert.equal((await asBackoffice(() => listUsers(backofficeHeaders))).status, 401, 'and the backoffice route refuses it as signed out')
 
-  const listed = await asPlatform(async () => listUsers((await onPlatform(platformHeaders))))
-  assert.equal(listed.status, 200, 'the platform role reads the list in the platform app')
+  const listed = await asBackoffice(async () => listUsers((await onBackoffice(backofficeHeaders))))
+  assert.equal(listed.status, 200, 'the backoffice role reads the list in the backoffice app')
   const answer = (await listed.json()) as { users: { email: string }[] }
   assert.deepEqual(
     answer.users.map((one) => one.email),
     ['ordinary@example.com'],
-    'which reads people of the platform rather than members of one tenant',
+    'which reads people of the backoffice rather than members of one tenant',
   )
 
-  const { headers: impersonated } = await impersonate(platformHeaders, ordinary.response.user.id)
+  const { headers: impersonated } = await impersonate(backofficeHeaders, ordinary.response.user.id)
   const actor = await asas.auth.actor(impersonated)
   assert.ok(actor, 'the impersonated cookie answers an actor in the tenant app')
   assert.equal((actor as { id?: string }).id, ordinary.response.user.id, 'who is the person being mimicked')
   assert.equal(
     (actor as { impersonatedBy?: unknown }).impersonatedBy,
-    platform.response.user.id,
+    backoffice.response.user.id,
     'and who carries the real person off the session snapshot',
   )
-  assert.ok(await asPlatform(async () => asas.auth.actor((await onPlatform(platformHeaders)))), 'whose own session is untouched')
+  assert.ok(await asBackoffice(async () => asas.auth.actor((await onBackoffice(backofficeHeaders)))), 'whose own session is untouched')
 })
 
 test('128. an impersonated write audits the real person beside the actor it was made as', async () => {
@@ -11988,7 +11988,7 @@ test('128. an impersonated write audits the real person beside the actor it was 
     const supportHeaders = new Headers({ cookie: support.headers.get('set-cookie') ?? '' })
 
     // The support engineer mimics the tenant's administrator and acts inside
-    // that tenant, which is the whole point of the platform role: the keys are
+    // that tenant, which is the whole point of the backoffice role: the keys are
     // the person's own, and the name on the entry is the engineer's.
     const { headers } = await impersonate(supportHeaders, owner.response.user.id)
     await server.api.setActiveOrganization({ body: { organizationId: organization!.id }, headers })
@@ -12009,32 +12009,32 @@ test('128. an impersonated write audits the real person beside the actor it was 
   }
 })
 
-test('129. a super admin takes the platform\'s read-only row on every tenant table: every tenant\'s rows are read, and the tenancy filter is never resolved beside it', async () => {
-  const platform = await server.api.signUpEmail({
+test('129. a super admin takes the backoffice\'s read-only row on every tenant table: every tenant\'s rows are read, and the tenancy filter is never resolved beside it', async () => {
+  const backoffice = await server.api.signUpEmail({
     body: { name: 'Reader', email: 'reader@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
   })
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.response.user.id}'`)
-  const headers = new Headers({ cookie: platform.headers.get('set-cookie') ?? '' })
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.response.user.id}'`)
+  const headers = new Headers({ cookie: backoffice.headers.get('set-cookie') ?? '' })
   const elsewhere = await asas.auth.actor(headers)
   assert.ok(elsewhere)
   assert.deepEqual(assignedRoles(elsewhere as never), [], 'in the tenant app, an actor in no organization is assigned nothing')
   assert.deepEqual([...(actorPermissions(elsewhere) as ReadonlySet<string>)], [], 'and holds no key')
-  const actor = await asPlatform(async () => asas.auth.actor((await onPlatform(headers))))
+  const actor = await asBackoffice(async () => asas.auth.actor((await onBackoffice(headers))))
   assert.ok(actor)
   assert.deepEqual(
-    asPlatform(() => assignedRoles(actor as never)),
+    asBackoffice(() => assignedRoles(actor as never)),
     ['super_admin'],
-    'the platform slug is what the platform app answers, and it comes off the trusted snapshot of user.role',
+    'the backoffice slug is what the backoffice app answers, and it comes off the trusted snapshot of user.role',
   )
   assert.deepEqual(
-    asPlatform(() => assignedRoles({ activeOrganizationId: 'org-none', role: 'super_admin' } as never)),
+    asBackoffice(() => assignedRoles({ activeOrganizationId: 'org-none', role: 'super_admin' } as never)),
     [],
     'while an unmarked object claiming the column for itself is assigned nothing',
   )
 
   // The bypass, read at the layer it is written in: the role tables answer `true` for the
-  // platform row, which is every tenant's rows and the shipped ones, and the tenancy row's
+  // backoffice row, which is every tenant's rows and the shipped ones, and the tenancy row's
   // own filter is never resolved beside it. The compiled rows are the declaration's, which
   // is where every access callback lives: a built kayan publishes no declaration metadata.
   const declared = { courses: coursesDeclaration, memberRoles, roles }
@@ -12043,21 +12043,21 @@ test('129. a super admin takes the platform\'s read-only row on every tenant tab
       slug: name,
       user,
     })
-  assert.equal(await asPlatform(() => answers('roles', actor)), true, 'the role rows of every tenant are readable')
-  assert.equal(await asPlatform(() => answers('memberRoles', actor)), true, 'and so are the assignments of every tenant')
+  assert.equal(await asBackoffice(() => answers('roles', actor)), true, 'the role rows of every tenant are readable')
+  assert.equal(await asBackoffice(() => answers('memberRoles', actor)), true, 'and so are the assignments of every tenant')
 
   // An actor in no organization reads across them all with `tenant: 'all'`, which the runner
-  // grants platform staff in the platform app alone.
-  assert.equal(await asPlatform(() => answers('courses', actor)), true, 'the business rows of every tenant are readable')
-  await asPlatform(() => asas.kayan.courses.operations.find({}, { actor: actor as never, tenant: 'all' }))
+  // grants backoffice staff in the backoffice app alone.
+  assert.equal(await asBackoffice(() => answers('courses', actor)), true, 'the business rows of every tenant are readable')
+  await asBackoffice(() => asas.kayan.courses.operations.find({}, { actor: actor as never, tenant: 'all' }))
 
   // And the operation door opens on the same two tables: the access target reads the
-  // platform slug `assignedRoles` answers off `user.role` as an assignment, so the keys
+  // backoffice slug `assignedRoles` answers off `user.role` as an assignment, so the keys
   // `systemRoles.super_admin` lists are held through that column. Two tenants, each with a
-  // custom role and a member assigned it, and the platform administrator a member of
+  // custom role and a member assigned it, and the backoffice administrator a member of
   // neither.
   const tenants: string[] = []
-  for (const slug of ['platform-read-a', 'platform-read-b']) {
+  for (const slug of ['backoffice-read-a', 'backoffice-read-b']) {
     const signUp = await server.api.signUpEmail({
       body: { name: slug, email: `${slug}@example.com`, password: 'a-long-enough-password' },
       returnHeaders: true,
@@ -12069,16 +12069,16 @@ test('129. a super admin takes the platform\'s read-only row on every tenant tab
     await seedRoleRow(organization!.id, `${slug}-role`, ['courses.find'])
     tenants.push(organization!.id)
   }
-  assert.equal(actorPermissions(actor), true, 'the platform administrator holds every key, and the rows keep every write closed')
-  const custom = await asPlatform(() => asas.kayan.roles.operations.find({
-    where: { name: { in: ['platform-read-a-role', 'platform-read-b-role'] } },
+  assert.equal(actorPermissions(actor), true, 'the backoffice administrator holds every key, and the rows keep every write closed')
+  const custom = await asBackoffice(() => asas.kayan.roles.operations.find({
+    where: { name: { in: ['backoffice-read-a-role', 'backoffice-read-b-role'] } },
   }, { actor: actor as never, tenant: 'all' }))
   assert.deepEqual(
     custom.docs.map((row) => row.organization).sort(),
     [...tenants].sort(),
     'the managed read answers the role rows of both tenants',
   )
-  const assignments = await asPlatform(() => asas.kayan.memberRoles.operations.find({ where: { organization: { in: tenants } } }, { actor: actor as never, tenant: 'all' }))
+  const assignments = await asBackoffice(() => asas.kayan.memberRoles.operations.find({ where: { organization: { in: tenants } } }, { actor: actor as never, tenant: 'all' }))
   assert.deepEqual(
     assignments.docs.map((row) => `${String(row.organization)}:${String(row.role)}`).sort(),
     tenants.map((tenant) => `${tenant}:administrator`).sort(),
@@ -12086,7 +12086,7 @@ test('129. a super admin takes the platform\'s read-only row on every tenant tab
   )
 })
 
-test('129b. a platform administrator has only the membership keys and rows in the tenant app, and only the platform\'s in the platform app, whichever tenant is active', async () => {
+test('129b. a backoffice administrator has only the membership keys and rows in the tenant app, and only the backoffice\'s in the backoffice app, whichever tenant is active', async () => {
   const owner = await server.api.signUpEmail({
     body: { name: 'Owner 129b', email: 'owner-129b@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
@@ -12095,15 +12095,15 @@ test('129b. a platform administrator has only the membership keys and rows in th
   const organization = await server.api.createOrganization({
     body: { name: 'Tenant 129b', slug: 'tenant-129b' }, headers: ownerHeaders,
   })
-  const platform = await server.api.signUpEmail({
-    body: { name: 'Platform 129b', email: 'platform-129b@example.com', password: 'a-long-enough-password' },
+  const backoffice = await server.api.signUpEmail({
+    body: { name: 'Backoffice 129b', email: 'backoffice-129b@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
   })
-  const headers = new Headers({ cookie: platform.headers.get('set-cookie') ?? '' })
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.response.user.id}'`)
-  await server.api.addMember({ body: { userId: platform.response.user.id, organizationId: organization!.id, role: 'member' }, headers: ownerHeaders })
+  const headers = new Headers({ cookie: backoffice.headers.get('set-cookie') ?? '' })
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.response.user.id}'`)
+  await server.api.addMember({ body: { userId: backoffice.response.user.id, organizationId: organization!.id, role: 'member' }, headers: ownerHeaders })
   await server.api.setActiveOrganization({ body: { organizationId: organization!.id }, headers })
-  await assignRole(organization!.id, platform.response.user.id, 'registrar')
+  await assignRole(organization!.id, backoffice.response.user.id, 'registrar')
   const ownerActor = await asas.auth.actor(ownerHeaders)
   assert.ok(ownerActor)
   const known = await courses.operations.create({ title: 'Known 129b', fee: 7 }, { actor: ownerActor as never })
@@ -12119,30 +12119,30 @@ test('129b. a platform administrator has only the membership keys and rows in th
   assert.equal(report.collections.courses.read, true)
   assert.equal(report.collections.roles?.read ?? false, false)
 
-  // The same person in the platform app, with the same organization still active: the
-  // platform slug and nothing of the membership.
-  const onScreen = await asPlatform(async () => asas.auth.actor((await onPlatform(headers))))
+  // The same person in the backoffice app, with the same organization still active: the
+  // backoffice slug and nothing of the membership.
+  const onScreen = await asBackoffice(async () => asas.auth.actor((await onBackoffice(headers))))
   assert.ok(onScreen)
-  assert.deepEqual(asPlatform(() => assignedRoles(onScreen as never)), ['super_admin'])
+  assert.deepEqual(asBackoffice(() => assignedRoles(onScreen as never)), ['super_admin'])
   assert.equal(actorPermissions(onScreen), true)
   // There it reads every tenant's business and writes none of it.
-  assert.ok((await asPlatform(() => courses.operations.find({}, { actor: onScreen as never }))).docs.some((row) => row.id === known.id))
-  const write = await asPlatform(() => courses.operations.update({ id: known.id as string, fee: 8 }, { actor: onScreen as never })).catch((thrown: unknown) => thrown)
+  assert.ok((await asBackoffice(() => courses.operations.find({}, { actor: onScreen as never }))).docs.some((row) => row.id === known.id))
+  const write = await asBackoffice(() => courses.operations.update({ id: known.id as string, fee: 8 }, { actor: onScreen as never })).catch((thrown: unknown) => thrown)
   assert.ok(write instanceof AsasError)
   assert.equal(write.status, 403)
   assert.equal(write.key, 'error.forbidden.operation')
 })
 
 /**
- * One of the admin plugin's own routes, posted as a browser in the platform app
+ * One of the admin plugin's own routes, posted as a browser in the backoffice app
  * posts it, the only app that serves them.
  */
 const adminRoute = (path: string, headers: Headers, body: Record<string, unknown>, served: { handler: (request: Request) => Promise<Response> } = asas) =>
-  asPlatform(async () =>
+  asBackoffice(async () =>
     served.handler(
       new Request(`http://test/api/auth/user/admin/${path}`, {
         method: 'POST',
-        headers: new Headers([...(await onPlatform(headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
+        headers: new Headers([...(await onBackoffice(headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
         body: JSON.stringify(body),
       }),
     ),
@@ -12174,24 +12174,24 @@ test('142z. a session whose active organization is not one of its memberships ho
   assert.deepEqual(report.screens ?? [], [], 'so no screen.* key opens a screen')
 })
 
-test('142a. a super admin who owns an organization holds exactly the owner\'s role in the tenant app and the platform\'s in the platform app, with no sign-out between', async () => {
-  const platform = await signedUp('owner-142a')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
-  const organization = await server.api.createOrganization({ body: { name: 'Admin org 142a', slug: 'admin-org-142a' }, headers: platform.headers })
+test('142a. a super admin who owns an organization holds exactly the owner\'s role in the tenant app and the backoffice\'s in the backoffice app, with no sign-out between', async () => {
+  const backoffice = await signedUp('owner-142a')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
+  const organization = await server.api.createOrganization({ body: { name: 'Admin org 142a', slug: 'admin-org-142a' }, headers: backoffice.headers })
 
-  const inside = await asas.auth.actor(platform.headers)
+  const inside = await asas.auth.actor(backoffice.headers)
   assert.ok(inside)
   assert.equal((inside as { activeOrganizationId?: string }).activeOrganizationId, organization!.id)
-  assert.deepEqual(assignedRoles(inside as never), ['administrator'], 'the owner\'s assignment and no platform slug beside it')
+  assert.deepEqual(assignedRoles(inside as never), ['administrator'], 'the owner\'s assignment and no backoffice slug beside it')
   assert.deepEqual((inside as { roles?: readonly string[] }).roles, ['administrator'])
   assert.equal(actorPermissions(inside), true, 'which is the owner\'s every key')
-  const onScreen = await asPlatform(async () => asas.auth.actor((await onPlatform(platform.headers))))
+  const onScreen = await asBackoffice(async () => asas.auth.actor((await onBackoffice(backoffice.headers))))
   assert.ok(onScreen)
   assert.equal((onScreen as { activeOrganizationId?: string }).activeOrganizationId, organization!.id, 'the same organization is still active')
-  assert.deepEqual(asPlatform(() => assignedRoles(onScreen as never)), ['super_admin'], 'and the platform app answers the platform role alone')
+  assert.deepEqual(asBackoffice(() => assignedRoles(onScreen as never)), ['super_admin'], 'and the backoffice app answers the backoffice role alone')
 })
 
-test('142b. support and explorer hold their keys in the platform app alone, and in the tenant app only their membership\'s', async () => {
+test('142b. support and explorer hold their keys in the backoffice app alone, and in the tenant app only their membership\'s', async () => {
   const owner = await signedUp('owner-142b')
   const organization = await server.api.createOrganization({ body: { name: 'Tenant 142b', slug: 'tenant-142b' }, headers: owner.headers })
   const registrar = [...(systemRoles.registrar.permissions as readonly string[])].sort()
@@ -12210,12 +12210,12 @@ test('142b. support and explorer hold their keys in the platform app alone, and 
     const report = (await (await asas.handler(new Request('http://test/api/access', { headers: person.headers }))).json()) as AccessReport
     assert.equal(report.collections?.user?.read ?? false, false, 'the users are not read inside the tenant')
 
-    await asPlatform(async () => {
-      const onScreen = await asas.auth.actor((await onPlatform(person.headers)))
-      assert.deepEqual(assignedRoles(onScreen as never), [slug], `the platform app answers ${slug} alone`)
+    await asBackoffice(async () => {
+      const onScreen = await asas.auth.actor((await onBackoffice(person.headers)))
+      assert.deepEqual(assignedRoles(onScreen as never), [slug], `the backoffice app answers ${slug} alone`)
       assert.deepEqual(
         [...(actorPermissions(onScreen) as ReadonlySet<string>)].sort(),
-        [...platformRoles[slug].permissions].sort(),
+        [...backofficeRoles[slug].permissions].sort(),
         `and ${slug} holds exactly its own keys there, none of the registrar's`,
       )
       const business = await courses.operations.create({ title: `Written by ${slug}`, fee: 1 }, { actor: onScreen as never }).catch((thrown: unknown) => thrown)
@@ -12223,19 +12223,19 @@ test('142b. support and explorer hold their keys in the platform app alone, and 
     })
   }
 
-  // Several platform roles, comma-separated as the admin plugin writes them,
+  // Several backoffice roles, comma-separated as the admin plugin writes them,
   // hold the union of their keys.
   await db.execute(`update "user" set role = 'support,explorer' where id = '${staff.support!.id}'`)
-  const both = await asPlatform(async () => asas.auth.actor((await onPlatform(staff.support!.headers))))
-  assert.deepEqual(asPlatform(() => assignedRoles(both as never)), ['support', 'explorer'])
+  const both = await asBackoffice(async () => asas.auth.actor((await onBackoffice(staff.support!.headers))))
+  assert.deepEqual(asBackoffice(() => assignedRoles(both as never)), ['support', 'explorer'])
   assert.deepEqual(
     [...(actorPermissions(both) as ReadonlySet<string>)].sort(),
-    [...new Set([...platformRoles.support.permissions, ...platformRoles.explorer.permissions])].sort(),
+    [...new Set([...backofficeRoles.support.permissions, ...backofficeRoles.explorer.permissions])].sort(),
   )
   await db.execute(`update "user" set role = 'support' where id = '${staff.support!.id}'`)
 
   const tenantUser = await signedUp('tenant-user-142b')
-  const administrator = await signedUp('platform-142b')
+  const administrator = await signedUp('backoffice-142b')
   await db.execute(`update "user" set role = 'super_admin' where id = '${administrator.id}'`)
   assert.equal((await adminRoute('impersonate-user', staff.support!.headers, { userId: tenantUser.id })).status, 200, 'support impersonates a tenant\'s user')
   assert.equal((await adminRoute('impersonate-user', staff.support!.headers, { userId: administrator.id })).status, 403, 'and never a super_admin')
@@ -12245,7 +12245,7 @@ test('142b. support and explorer hold their keys in the platform app alone, and 
   assert.equal((await adminRoute('impersonate-user', staff.explorer!.headers, { userId: tenantUser.id })).status, 403, 'explorer impersonates no one')
 })
 
-test('142c. only a super admin grants a platform role, and a tenant administrator can grant none', async () => {
+test('142c. only a super admin grants a backoffice role, and a tenant administrator can grant none', async () => {
   const owner = await signedUp('owner-142c')
   const organization = await server.api.createOrganization({ body: { name: 'Tenant 142c', slug: 'tenant-142c' }, headers: owner.headers })
   const member = await signedUp('member-142c')
@@ -12253,100 +12253,100 @@ test('142c. only a super admin grants a platform role, and a tenant administrato
   const administrator = await asas.auth.actor(owner.headers)
   assert.equal(actorPermissions(administrator), true, 'the tenant administrator holds every key of its tenant')
 
-  for (const role of Object.keys(platformRoles)) {
+  for (const role of Object.keys(backofficeRoles)) {
     const refused = await asas.kayan.memberRoles.operations.create({ role, user: member.id }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
     assert.ok(refused instanceof AsasError && refused.status === 400 && refused.key === 'error.invalid.role', `"${role}" is no role an assignment may name`)
   }
-  assert.equal((await adminRoute('set-role', owner.headers, { userId: member.id, role: 'support' })).status, 401, 'the platform refuses the tenant administrator, who holds no session there')
+  assert.equal((await adminRoute('set-role', owner.headers, { userId: member.id, role: 'support' })).status, 401, 'the backoffice refuses the tenant administrator, who holds no session there')
 
-  const platform = await signedUp('platform-142c')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
-  const staffOf = () => asPlatform(async () => assignedRoles((await asas.auth.actor((await onPlatform(member.headers)))) as never))
-  assert.equal((await adminRoute('set-role', platform.headers, { userId: member.id, role: 'support' })).status, 200)
-  assert.deepEqual(await staffOf(), ['support'], 'the member is support in the platform app')
-  assert.equal((await adminRoute('set-role', platform.headers, { userId: member.id, role: 'user' })).status, 200)
+  const backoffice = await signedUp('backoffice-142c')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
+  const staffOf = () => asBackoffice(async () => assignedRoles((await asas.auth.actor((await onBackoffice(member.headers)))) as never))
+  assert.equal((await adminRoute('set-role', backoffice.headers, { userId: member.id, role: 'support' })).status, 200)
+  assert.deepEqual(await staffOf(), ['support'], 'the member is support in the backoffice app')
+  assert.equal((await adminRoute('set-role', backoffice.headers, { userId: member.id, role: 'user' })).status, 200)
   assert.deepEqual(await staffOf(), [], 'and nothing once it is taken back')
 })
 
-test('142d. screen.platform on a tenant role is refused by name, and no role a tenant holds reaches the platform app', async () => {
+test('142d. screen.backoffice on a tenant role is refused by name, and no role a tenant holds reaches the backoffice app', async () => {
   const owner = await signedUp('owner-142d')
   await server.api.createOrganization({ body: { name: 'Tenant 142d', slug: 'tenant-142d' }, headers: owner.headers })
   const administrator = await asas.auth.actor(owner.headers)
-  for (const permissions of [['screen.platform'], ['courses.find', 'screen.platform']]) {
-    const refused = await asas.kayan.roles.operations.create({ name: 'platform-claim-142d', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
+  for (const permissions of [['screen.backoffice'], ['courses.find', 'screen.backoffice']]) {
+    const refused = await asas.kayan.roles.operations.create({ name: 'backoffice-claim-142d', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
     assert.ok(refused instanceof AsasError, 'a refusal the caller caused')
     assert.equal(refused.status, 403)
-    assert.equal(refused.key, 'error.forbidden.platform_key')
+    assert.equal(refused.key, 'error.forbidden.backoffice_key')
   }
   const kept = await asas.kayan.roles.operations.create({ name: 'tenant-claim-142d', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: ['courses.find', 'courses.fields.title'] }, { actor: administrator as never })
-  const moved = await asas.kayan.roles.operations.update({ id: kept.id as string, permissions: ['screen.platform'] }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
-  assert.ok(moved instanceof AsasError && moved.key === 'error.forbidden.platform_key', 'and so is an update that adds it')
+  const moved = await asas.kayan.roles.operations.update({ id: kept.id as string, permissions: ['screen.backoffice'] }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
+  assert.ok(moved instanceof AsasError && moved.key === 'error.forbidden.backoffice_key', 'and so is an update that adds it')
 
   for (const [slug, role] of Object.entries(tenantRoles)) {
-    assert.ok(role.permissions === '*' || !(role.permissions as readonly string[]).includes('screen.platform'), `the shipped tenant role "${slug}" lists no platform key`)
+    assert.ok(role.permissions === '*' || !(role.permissions as readonly string[]).includes('screen.backoffice'), `the shipped tenant role "${slug}" lists no backoffice key`)
   }
-  // The root granter's `'*'` is its tenant's, and the platform app answers no membership
+  // The root granter's `'*'` is its tenant's, and the backoffice app answers no membership
   // role at all and gives a tenant administrator no session there.
-  await asPlatform(async () => {
-    assert.equal(await asas.auth.actor(await onPlatform(owner.headers)), null, 'a tenant administrator signs in to no platform session')
+  await asBackoffice(async () => {
+    assert.equal(await asas.auth.actor(await onBackoffice(owner.headers)), null, 'a tenant administrator signs in to no backoffice session')
     assert.deepEqual(assignedRoles(administrator as never), [], 'and its tenant session answers no role there')
   })
 })
 
 /**
- * The platform slugs a row table does not name. A table keyed on `'*'` hands that row to
- * every slug it leaves out, and a platform slug is answered in the platform app whichever
+ * The backoffice slugs a row table does not name. A table keyed on `'*'` hands that row to
+ * every slug it leaves out, and a backoffice slug is answered in the backoffice app whichever
  * organization is active, so a table that forgot one would filter that slug by the active
  * organization: a `super_admin` who is a viewer in one tenant would hold `'*'` over that
  * tenant's rows there.
  */
-const unnamedPlatformSlugs = (table: Readonly<Record<string, unknown>>) =>
-  Object.hasOwn(table, '*') ? Object.keys(platformRoles).filter((slug) => !Object.hasOwn(table, slug)) : []
+const unnamedBackofficeSlugs = (table: Readonly<Record<string, unknown>>) =>
+  Object.hasOwn(table, '*') ? Object.keys(backofficeRoles).filter((slug) => !Object.hasOwn(table, slug)) : []
 
-test('142e. every row table of this project names every platform role, so no platform slug ever takes a tenant\'s \'*\' row', () => {
+test('142e. every row table of this project names every backoffice role, so no backoffice slug ever takes a tenant\'s \'*\' row', () => {
   const tables = new Set(
     Object.values(resolvedKayans.get(asas) ?? {})
       .map((one) => rowsOf((one as { access?: unknown }).access)?.rows as Readonly<Record<string, unknown>> | undefined)
       .filter((one) => one !== undefined),
   )
   assert.ok(tables.size >= 3, 'the tenancy row and the two role tables are among them')
-  for (const table of tables) assert.deepEqual(unnamedPlatformSlugs(table), [], `a table keyed on ${Object.keys(table).join(', ')} names every platform role`)
+  for (const table of tables) assert.deepEqual(unnamedBackofficeSlugs(table), [], `a table keyed on ${Object.keys(table).join(', ')} names every backoffice role`)
   const { support: _left, ...forgot } = tenantAccess
-  assert.deepEqual(unnamedPlatformSlugs(forgot), ['support'])
+  assert.deepEqual(unnamedBackofficeSlugs(forgot), ['support'])
 })
 
 /**
- * The columns of the kayan the platform lists that no staff role reads and no one named
+ * The columns of the kayan the backoffice lists that no staff role reads and no one named
  * secret. The staff reads are written by hand, closed by default, so a column a kayan
  * gains is hidden from staff until someone decides it; this makes that decision one
- * someone has to write down: read it, or name it in `secret`. Staff is every platform
+ * someone has to write down: read it, or name it in `secret`. Staff is every backoffice
  * role that lists its keys; one holding `'*'` reads every column and so decides none.
  */
-const staffReads = new Set<string>(Object.values(platformRoles).flatMap((role) => (role.permissions === '*' ? [] : role.permissions)))
+const staffReads = new Set<string>(Object.values(backofficeRoles).flatMap((role) => (role.permissions === '*' ? [] : role.permissions)))
 const undecidedColumns = (columns: readonly string[]) =>
   columns.filter((key) => !staffReads.has(key) && !(secret as readonly string[]).includes(key))
 
-test('156a. every column of a kayan the platform lists is read by a staff role, or named secret, and a secret column is a real one staff reads nowhere', () => {
+test('156a. every column of a kayan the backoffice lists is read by a staff role, or named secret, and a secret column is a real one staff reads nowhere', () => {
   // A kayan no staff role reads at all is decided whole: staff hold no key of it, and only
   // a super admin's '*' lists it.
   for (const name of superAdminOnly) {
-    assert.ok((platformScreen.kayan as readonly string[]).includes(name), `"${name}" is a kayan the platform lists`)
+    assert.ok((backofficeScreen.kayan as readonly string[]).includes(name), `"${name}" is a kayan the backoffice lists`)
     assert.deepEqual([...staffReads].filter((key) => key.startsWith(`${name}.`)), [], `and no staff role holds a key of "${name}"`)
   }
-  const columns = platformScreen.kayan
+  const columns = backofficeScreen.kayan
     .filter((name) => !(superAdminOnly as readonly string[]).includes(name))
     .flatMap((name) => Object.keys(asas.kayan[name as keyof typeof asas.kayan]!.fields).map((field) => `${name}.fields.${field}`))
   assert.ok(columns.includes('courses.fields.accessCode'), 'the columns are read off the build, the secret one among them')
-  assert.deepEqual(undecidedColumns(columns), [], 'no column of a platform-listed kayan is left undecided')
+  assert.deepEqual(undecidedColumns(columns), [], 'no column of a backoffice-listed kayan is left undecided')
   for (const key of secret) {
-    assert.ok(columns.includes(key), `the secret "${key}" is a column of a kayan the platform lists`)
+    assert.ok(columns.includes(key), `the secret "${key}" is a column of a kayan the backoffice lists`)
     assert.deepEqual(undecidedColumns([key]), [], `and "${key}" is decided`)
     assert.ok(!staffReads.has(key), `and no staff role reads "${key}"`)
   }
   assert.deepEqual(undecidedColumns([...columns, 'courses.fields.discountCode']), ['courses.fields.discountCode'])
 })
 
-test('142f. in the platform app a platform role lists the people and the organizations by its keys, and no tenant role lists them in the platform app', async () => {
+test('142f. in the backoffice app a backoffice role lists the people and the organizations by its keys, and no tenant role lists them in the backoffice app', async () => {
   const owner = await signedUp('owner-142f')
   const organization = await server.api.createOrganization({ body: { name: 'Tenant 142f', slug: 'tenant-142f' }, headers: owner.headers })
   const support = await signedUp('support-142f')
@@ -12356,23 +12356,23 @@ test('142f. in the platform app a platform role lists the people and the organiz
     headers: new Headers([...headers, ['content-type', 'application/json']]),
     body: JSON.stringify({ where }),
   }))
-  const onPlatformList = (kayan: string, headers: Headers, where: unknown) => asPlatform(async () => list(kayan, await onPlatform(headers), where))
+  const onBackofficeList = (kayan: string, headers: Headers, where: unknown) => asBackoffice(async () => list(kayan, await onBackoffice(headers), where))
 
-  const people = await onPlatformList('user', support.headers, { id: { equals: owner.id } })
+  const people = await onBackofficeList('user', support.headers, { id: { equals: owner.id } })
   assert.equal(people.status, 200)
   const [found] = ((await people.json()) as { docs: Record<string, unknown>[] }).docs
   assert.deepEqual({ name: found!.name, email: found!.email, banned: found!.banned }, { name: 'owner-142f', email: 'owner-142f@example.com', banned: false }, 'support lists the people')
-  const tenants = ((await (await onPlatformList('organization', support.headers, { id: { equals: organization!.id } })).json()) as { docs: Record<string, unknown>[] }).docs
+  const tenants = ((await (await onBackofficeList('organization', support.headers, { id: { equals: organization!.id } })).json()) as { docs: Record<string, unknown>[] }).docs
   assert.deepEqual(tenants.map((one) => [one.name, one.slug]), [['Tenant 142f', 'tenant-142f']], 'and the organizations')
-  const report = (await (await asPlatform(async () => asas.handler(new Request('http://test/api/access', { headers: (await onPlatform(support.headers)) })))).json()) as AccessReport
-  assert.deepEqual([...(report.permissions as readonly string[])].sort(), [...platformRoles.support.permissions].sort(), 'the report names the keys it holds there')
+  const report = (await (await asBackoffice(async () => asas.handler(new Request('http://test/api/access', { headers: (await onBackoffice(support.headers)) })))).json()) as AccessReport
+  assert.deepEqual([...(report.permissions as readonly string[])].sort(), [...backofficeRoles.support.permissions].sort(), 'the report names the keys it holds there')
 
   for (const kayan of ['user', 'organization']) {
-    const refused = await onPlatformList(kayan, owner.headers, { id: { exists: true } })
-    assert.equal(refused.status, 403, `a tenant administrator lists no ${kayan} in the platform app`)
+    const refused = await onBackofficeList(kayan, owner.headers, { id: { exists: true } })
+    assert.equal(refused.status, 403, `a tenant administrator lists no ${kayan} in the backoffice app`)
   }
   await db.execute(`update "user" set role = 'none-142f' where id = '${support.id}'`)
-  assert.equal((await onPlatformList('user', support.headers, { id: { exists: true } })).status, 403)
+  assert.equal((await onBackofficeList('user', support.headers, { id: { exists: true } })).status, 403)
   const administrator = await asas.auth.actor(owner.headers)
   const managed = await asas.kayan.user.operations.find({}, { actor: administrator as never })
   assert.deepEqual(managed.docs, [{ id: owner.id, name: 'owner-142f' }])
@@ -12383,13 +12383,13 @@ test('142f. in the platform app a platform role lists the people and the organiz
  * one `localAuthFields` closes on read.
  */
 const protectedLocal = ['hash', 'salt', 'sessions', 'loginAttempts', 'lockUntil', 'resetPasswordToken', 'resetPasswordAttempts', 'resetPasswordExpiration', '_verificationToken'] as const
-const localUsersCall = async (operation: string, body: unknown, headers: Headers, platform: boolean) => {
+const localUsersCall = async (operation: string, body: unknown, headers: Headers, backoffice: boolean) => {
   const send = async () => asas.handler(new Request(`http://test/api/localUsers/${operation}`, {
     method: 'POST',
-    headers: new Headers([...(platform ? await onPlatform(headers) : headers), ['content-type', 'application/json']]),
+    headers: new Headers([...(backoffice ? await onBackoffice(headers) : headers), ['content-type', 'application/json']]),
     body: JSON.stringify(body),
   }))
-  return platform ? asPlatform(send) : send()
+  return backoffice ? asBackoffice(send) : send()
 }
 const localSignUp = async (email: string) => {
   const made = await asas.handler(new Request('http://test/api/localUsers/create', {
@@ -12408,26 +12408,26 @@ const holdsNoProtected = (row: Record<string, unknown>, said: string) => {
   for (const name of protectedLocal) assert.equal(Object.hasOwn(row, name), false, `${said} carries no "${name}"`)
 }
 
-test('203a. a super admin lists a local sign-up in the platform app and verifies it, and it then logs in, with no protected column in any answer', async () => {
+test('203a. a super admin lists a local sign-up in the backoffice app and verifies it, and it then logs in, with no protected column in any answer', async () => {
   const signUp = await localSignUp('signup-203a@example.com')
   assert.equal(signUp._verified, false)
   assert.equal((await localLogin('signup-203a@example.com')).status, 403, 'an unverified sign-up logs in nowhere')
 
-  const platform = await signedUp('super-203a')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const backoffice = await signedUp('super-203a')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
 
-  const listed = await localUsersCall('find', { where: { email: { equals: 'signup-203a@example.com' } } }, platform.headers, true)
+  const listed = await localUsersCall('find', { where: { email: { equals: 'signup-203a@example.com' } } }, backoffice.headers, true)
   assert.equal(listed.status, 200, await listed.clone().text())
   const [row] = ((await listed.json()) as { docs: Record<string, unknown>[] }).docs
   assert.ok(row)
   assert.deepEqual({ email: row.email, verified: row._verified, created: typeof row.createdAt }, { email: 'signup-203a@example.com', verified: false, created: 'string' }, 'the list reads the email, the verified state and the date it was made')
   holdsNoProtected(row, 'a row of the list')
 
-  const one = await localUsersCall('findByID', { id: signUp.id }, platform.headers, true)
+  const one = await localUsersCall('findByID', { id: signUp.id }, backoffice.headers, true)
   assert.equal(one.status, 200)
   holdsNoProtected((await one.json()) as Record<string, unknown>, 'the record')
 
-  const verified = await localUsersCall('update', { id: signUp.id, _verified: true }, platform.headers, true)
+  const verified = await localUsersCall('update', { id: signUp.id, _verified: true }, backoffice.headers, true)
   assert.equal(verified.status, 200, await verified.clone().text())
   const answered = (await verified.json()) as Record<string, unknown>
   assert.equal(answered._verified, true)
@@ -12436,7 +12436,7 @@ test('203a. a super admin lists a local sign-up in the platform app and verifies
   assert.equal((await localLogin('signup-203a@example.com')).status, 200, 'and the account it verified logs in')
 })
 
-test('203b. everyone but a super admin in the platform app reads and writes local accounts exactly as before, and a local user cannot set its own verified flag', async () => {
+test('203b. everyone but a super admin in the backoffice app reads and writes local accounts exactly as before, and a local user cannot set its own verified flag', async () => {
   const pending = await localSignUp('pending-203b@example.com')
   const self = await localSignUp('self-203b@example.com')
   await db.execute(`update local_users set _verified = true where email = 'self-203b@example.com'`)
@@ -12445,30 +12445,30 @@ test('203b. everyone but a super admin in the platform app reads and writes loca
   const local = new Headers({ cookie: loggedIn.headers.get('set-cookie') ?? '' })
 
   // A tenant's owner, who holds every key of its tenant, and a super admin who owns one:
-  // both are a tenant's administrator in the tenant app and nothing of the platform.
+  // both are a tenant's administrator in the tenant app and nothing of the backoffice.
   const owner = await signedUp('owner-203b')
   await server.api.createOrganization({ body: { name: 'Tenant 203b', slug: 'tenant-203b' }, headers: owner.headers })
-  const platform = await signedUp('super-203b')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
-  await server.api.createOrganization({ body: { name: 'Admin 203b', slug: 'admin-203b' }, headers: platform.headers })
+  const backoffice = await signedUp('super-203b')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
+  await server.api.createOrganization({ body: { name: 'Admin 203b', slug: 'admin-203b' }, headers: backoffice.headers })
   const support = await signedUp('support-203b')
   await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
 
   const callers = [
-    { who: 'an anonymous caller in the tenant app', headers: new Headers(), platform: false },
-    { who: 'an anonymous caller in the platform app', headers: new Headers(), platform: true },
-    { who: 'a tenant\'s owner', headers: owner.headers, platform: false },
-    { who: 'a super admin in the tenant app', headers: platform.headers, platform: false },
-    { who: 'support in the platform app', headers: support.headers, platform: true },
-    { who: 'a local user', headers: local, platform: false },
+    { who: 'an anonymous caller in the tenant app', headers: new Headers(), backoffice: false },
+    { who: 'an anonymous caller in the backoffice app', headers: new Headers(), backoffice: true },
+    { who: 'a tenant\'s owner', headers: owner.headers, backoffice: false },
+    { who: 'a super admin in the tenant app', headers: backoffice.headers, backoffice: false },
+    { who: 'support in the backoffice app', headers: support.headers, backoffice: true },
+    { who: 'a local user', headers: local, backoffice: false },
   ]
-  for (const { who, headers, platform: onPlatformApp } of callers) {
+  for (const { who, headers, backoffice: onBackofficeApp } of callers) {
     for (const [operation, body, key] of [
       ['find', {}, 'error.forbidden.read'],
       ['findByID', { id: pending.id }, 'error.forbidden.read'],
       ['update', { id: pending.id, _verified: true }, 'error.forbidden.operation'],
     ] as const) {
-      const answer = await localUsersCall(operation, body, headers, onPlatformApp)
+      const answer = await localUsersCall(operation, body, headers, onBackofficeApp)
       assert.equal(answer.status, 403, `${who} is refused ${operation}`)
       assert.equal(((await answer.json()) as { data?: { key?: string } }).data?.key, key, `${who} is refused ${operation} as before`)
     }
@@ -12482,14 +12482,14 @@ test('203b. everyone but a super admin in the platform app reads and writes loca
   assert.equal((await localLogin('pending-203b@example.com')).status, 403, 'so the sign-up still logs in nowhere')
 })
 
-test('203c. a super admin, the build\'s administrator in the platform app, reads none of the tables Better Auth alone writes', async () => {
-  const platform = await signedUp('super-203c')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
-  const headers = await onPlatform(platform.headers)
-  const report = (await (await asPlatform(async () => asas.handler(new Request('http://test/api/access', { headers })))).json()) as AccessReport & { canAccessAdmin: boolean }
-  assert.equal(report.canAccessAdmin, true, 'the super admin is the build\'s administrator in the platform app')
+test('203c. a super admin, the build\'s administrator in the backoffice app, reads none of the tables Better Auth alone writes', async () => {
+  const backoffice = await signedUp('super-203c')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
+  const headers = await onBackoffice(backoffice.headers)
+  const report = (await (await asBackoffice(async () => asas.handler(new Request('http://test/api/access', { headers })))).json()) as AccessReport & { canAccessAdmin: boolean }
+  assert.equal(report.canAccessAdmin, true, 'the super admin is the build\'s administrator in the backoffice app')
   for (const kayan of ['session', 'account', 'verification', 'invitation', 'organizationRole']) {
-    const answer = await asPlatform(async () => asas.handler(new Request(`http://test/api/${kayan}/find`, {
+    const answer = await asBackoffice(async () => asas.handler(new Request(`http://test/api/${kayan}/find`, {
       method: 'POST',
       headers: new Headers([...headers, ['content-type', 'application/json']]),
       body: '{}',
@@ -12501,14 +12501,14 @@ test('203c. a super admin, the build\'s administrator in the platform app, reads
 test('203e. a super admin writes `_verified` and nothing else of a local account: a password or an email is refused, one row or many, and the old password still logs in', async () => {
   const one = await localSignUp('held-203e@example.com')
   const other = await localSignUp('bulk-203e@example.com')
-  const platform = await signedUp('super-203e')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const backoffice = await signedUp('super-203e')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
   const login = (email: string, password: string) => asas.handler(new Request('http://test/api/auth/local/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   }))
 
-  assert.equal((await localUsersCall('update', { id: one.id, _verified: true }, platform.headers, true)).status, 200, '`_verified` alone is written')
+  assert.equal((await localUsersCall('update', { id: one.id, _verified: true }, backoffice.headers, true)).status, 200, '`_verified` alone is written')
   assert.equal((await login('held-203e@example.com', 'a-long-enough-password')).status, 200)
 
   for (const [said, body] of [
@@ -12516,10 +12516,10 @@ test('203e. a super admin writes `_verified` and nothing else of a local account
     ['an email', { id: one.id, email: 'taken-203e@example.com' }],
     ['a password beside `_verified`', { id: one.id, _verified: true, password: 'a-password-the-super-admin-chose' }],
   ] as const) {
-    const answer = await localUsersCall('update', body, platform.headers, true)
+    const answer = await localUsersCall('update', body, backoffice.headers, true)
     assert.equal(answer.status, 403, `${said} is refused`)
   }
-  const bulk = await localUsersCall('updateMany', { where: { email: { in: ['held-203e@example.com', 'bulk-203e@example.com'] } }, data: { password: 'a-password-the-super-admin-chose' } }, platform.headers, true)
+  const bulk = await localUsersCall('updateMany', { where: { email: { in: ['held-203e@example.com', 'bulk-203e@example.com'] } }, data: { password: 'a-password-the-super-admin-chose' } }, backoffice.headers, true)
   assert.equal(bulk.status, 403, 'and a password across many rows is refused')
 
   const { rows } = (await db.execute(`select email from local_users where id = '${one.id}'`)) as { rows: { email: string }[] }
@@ -12527,7 +12527,7 @@ test('203e. a super admin writes `_verified` and nothing else of a local account
   assert.equal((await login('held-203e@example.com', 'a-long-enough-password')).status, 200, 'the old password still logs in')
   assert.notEqual((await login('held-203e@example.com', 'a-password-the-super-admin-chose')).status, 200, 'and the one the super admin sent does not')
 
-  const verified = await localUsersCall('updateMany', { where: { email: { equals: 'bulk-203e@example.com' } }, data: { _verified: true } }, platform.headers, true)
+  const verified = await localUsersCall('updateMany', { where: { email: { equals: 'bulk-203e@example.com' } }, data: { _verified: true } }, backoffice.headers, true)
   assert.equal(verified.status, 200, `\`_verified\` alone is written across many rows: ${await verified.clone().text()}`)
   assert.equal((await login('bulk-203e@example.com', 'a-long-enough-password')).status, 200)
   assert.equal(other._verified, false)
@@ -12543,10 +12543,10 @@ const namedFields = (tree: unknown): string[] =>
           ? value.flatMap((one) => (typeof one === 'string' ? [one] : one && typeof one === 'object' && 'field' in one ? [String(one.field)] : namedFields(one)))
           : key === 'field' && typeof value === 'string' ? [value] : namedFields(value))
 
-test('203f. the platform lists local accounts for a super admin alone, by email, verified state and created date, its edit page draws the verified toggle under the account\'s email and date, read-only, and no protected column is named, drawn or offered', async () => {
-  const client = asas.targets.platform.client
+test('203f. the backoffice lists local accounts for a super admin alone, by email, verified state and created date, its edit page draws the verified toggle under the account\'s email and date, read-only, and no protected column is named, drawn or offered', async () => {
+  const client = asas.targets.backoffice.client
   const kayan = client.kayan.localUsers
-  assert.ok(kayan, 'the platform screen lists localUsers')
+  assert.ok(kayan, 'the backoffice screen lists localUsers')
   assert.deepEqual(client.nav.find((entry) => entry.kayan === 'localUsers'), { path: '/local-users', page: 'list', kayan: 'localUsers', permission: 'localUsers.find' })
   const list = namedFields(kayan.pages.list)
   assert.deepEqual(list.filter((name, at) => list.indexOf(name) === at), ['email', '_verified', 'createdAt'], 'the list shows the email, the verified state and the date it was made')
@@ -12568,7 +12568,7 @@ test('203f. the platform lists local accounts for a super admin alone, by email,
   const explorer = await signedUp('explorer-203f')
   await db.execute(`update "user" set role = 'explorer' where id = '${explorer.id}'`)
   const report = async (headers: Headers) =>
-    (await (await asPlatform(async () => asas.handler(new Request('http://test/api/access', { headers: await onPlatform(headers) })))).json()) as AccessReport
+    (await (await asBackoffice(async () => asas.handler(new Request('http://test/api/access', { headers: await onBackoffice(headers) })))).json()) as AccessReport
 
   const held = await report(superAdmin.headers)
   assert.ok(navOf(client, held).some((entry) => entry.kayan === 'localUsers'), 'a super admin finds the page in the nav')
@@ -12582,27 +12582,27 @@ test('203f. the platform lists local accounts for a super admin alone, by email,
 })
 
 test('218e. a super admin verifies a local sign-up from the list\'s Verify, which writes the flag and nothing else, and everyone else is refused it', async () => {
-  const button = JSON.stringify(asas.targets.platform.client.kayan.localUsers!.pages.list)
+  const button = JSON.stringify(asas.targets.backoffice.client.kayan.localUsers!.pages.list)
   assert.ok(button.includes('"row":[{"button":"verify"'), 'the list offers Verify on its rows')
   const pending = await localSignUp('pending-218e@example.com')
-  const platform = await signedUp('super-218e')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const backoffice = await signedUp('super-218e')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
   const support = await signedUp('support-218e')
   await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
-  const report = (await (await asPlatform(async () => asas.handler(new Request('http://test/api/access', { headers: await onPlatform(platform.headers) })))).json()) as AccessReport
+  const report = (await (await asBackoffice(async () => asas.handler(new Request('http://test/api/access', { headers: await onBackoffice(backoffice.headers) })))).json()) as AccessReport
   assert.equal(report.collections?.localUsers?.operations?.verify, true, 'the report lets the super admin verify, so the row offers it')
 
-  for (const [who, headers, onPlatformApp] of [['support in the platform app', support.headers, true], ['a super admin in the tenant app', platform.headers, false]] as const) {
-    assert.equal((await localUsersCall('verify', { id: pending.id }, headers, onPlatformApp)).status, 403, `${who} is refused`)
+  for (const [who, headers, onBackofficeApp] of [['support in the backoffice app', support.headers, true], ['a super admin in the tenant app', backoffice.headers, false]] as const) {
+    assert.equal((await localUsersCall('verify', { id: pending.id }, headers, onBackofficeApp)).status, 403, `${who} is refused`)
   }
   for (const [said, beside] of [['a password', { password: 'a-password-the-super-admin-chose' }], ['an email', { email: 'taken-218e@example.com' }]] as const) {
-    const sneaked = await localUsersCall('verify', { id: pending.id, ...beside }, platform.headers, true)
+    const sneaked = await localUsersCall('verify', { id: pending.id, ...beside }, backoffice.headers, true)
     assert.equal(sneaked.status, 403, `${said} sent beside it is refused as an update's would be`)
   }
   assert.equal(((await db.execute(`select email from local_users where id = '${pending.id}'`)).rows[0] as { email: string }).email, 'pending-218e@example.com', 'and the email is unchanged')
   assert.equal((await localLogin('pending-218e@example.com')).status, 403, 'so the sign-up still logs in nowhere')
 
-  const verified = await localUsersCall('verify', { id: pending.id }, platform.headers, true)
+  const verified = await localUsersCall('verify', { id: pending.id }, backoffice.headers, true)
   assert.equal(verified.status, 200, await verified.clone().text())
   const answered = (await verified.json()) as Record<string, unknown>
   assert.equal(answered._verified, true, 'the row is verified')
@@ -12610,22 +12610,22 @@ test('218e. a super admin verifies a local sign-up from the list\'s Verify, whic
   assert.equal((await localLogin('pending-218e@example.com')).status, 200, 'and it logs in with the password it chose')
 })
 
-test('142g. every platform action on a person is audited once it succeeds, and an impersonation names the real person and ends by signing out in the tenant app', async (t) => {
+test('142g. every backoffice action on a person is audited once it succeeds, and an impersonation names the real person and ends by signing out in the tenant app', async (t) => {
   const lines: Record<string, unknown>[] = []
   const log = t.mock.method(console, 'log', (line: unknown) => {
-    if (typeof line === 'string' && line.startsWith('{"audit":"platform"')) lines.push(JSON.parse(line))
+    if (typeof line === 'string' && line.startsWith('{"audit":"backoffice"')) lines.push(JSON.parse(line))
   })
-  const platform = await signedUp('platform-142g')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const backoffice = await signedUp('backoffice-142g')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
   const person = await signedUp('person-142g')
   const support = await signedUp('support-142g')
   await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
 
   assert.equal((await adminRoute('ban-user', support.headers, { userId: person.id, banReason: 'Spam' })).status, 403)
   assert.deepEqual(lines, [], 'a refused action writes no line')
-  assert.equal((await adminRoute('set-role', platform.headers, { userId: person.id, role: 'explorer' })).status, 200)
-  assert.equal((await adminRoute('ban-user', platform.headers, { userId: person.id, banReason: 'Spam' })).status, 200)
-  assert.equal((await adminRoute('unban-user', platform.headers, { userId: person.id })).status, 200)
+  assert.equal((await adminRoute('set-role', backoffice.headers, { userId: person.id, role: 'explorer' })).status, 200)
+  assert.equal((await adminRoute('ban-user', backoffice.headers, { userId: person.id, banReason: 'Spam' })).status, 200)
+  assert.equal((await adminRoute('unban-user', backoffice.headers, { userId: person.id })).status, 200)
   await db.execute(`update "user" set role = 'user' where id = '${person.id}'`)
   const { headers: impersonated } = await impersonate(support.headers, person.id)
   // The tenant app ends it by signing out: its instance serves no stop route,
@@ -12634,29 +12634,29 @@ test('142g. every platform action on a person is audited once it succeeds, and a
   assert.equal((await asas.handler(stop)).status, 404, 'the tenant app serves no stop route')
   const signedOut = await asas.handler(new Request('http://test/api/auth/user/sign-out', { method: 'POST', headers: new Headers([...impersonated, ['content-type', 'application/json'], ['origin', 'http://localhost:5173']]), body: '{}' }))
   assert.equal(signedOut.status, 200)
-  // The staff member goes back to the platform, whose session is still theirs, and not to
+  // The staff member goes back to the backoffice, whose session is still theirs, and not to
   // the tenant's sign-in.
-  assert.equal(((await signedOut.json()) as { url?: string }).url, platformURL, 'the sign-out that ends an impersonation answers the platform')
+  assert.equal(((await signedOut.json()) as { url?: string }).url, backofficeURL, 'the sign-out that ends an impersonation answers the backoffice')
   const ordinary = await asas.handler(new Request('http://test/api/auth/user/sign-out', { method: 'POST', headers: new Headers([...person.headers, ['content-type', 'application/json'], ['origin', 'http://localhost:5173']]), body: '{}' }))
   assert.equal(((await ordinary.json()) as { url?: string }).url, undefined, 'an ordinary sign-out answers no link')
   log.mock.restore()
   assert.deepEqual(
     lines.map((line) => Object.fromEntries(Object.entries(line).filter(([key]) => key !== 'at'))),
     [
-      { audit: 'platform', action: '/admin/set-role', actor: platform.id, impersonatedBy: null, target: person.id, role: 'explorer' },
-      { audit: 'platform', action: '/admin/ban-user', actor: platform.id, impersonatedBy: null, target: person.id },
-      { audit: 'platform', action: '/admin/unban-user', actor: platform.id, impersonatedBy: null, target: person.id },
-      { audit: 'platform', action: '/admin/impersonate-user', actor: support.id, impersonatedBy: null, target: person.id },
-      { audit: 'platform', action: '/sign-out', actor: person.id, impersonatedBy: support.id },
+      { audit: 'backoffice', action: '/admin/set-role', actor: backoffice.id, impersonatedBy: null, target: person.id, role: 'explorer' },
+      { audit: 'backoffice', action: '/admin/ban-user', actor: backoffice.id, impersonatedBy: null, target: person.id },
+      { audit: 'backoffice', action: '/admin/unban-user', actor: backoffice.id, impersonatedBy: null, target: person.id },
+      { audit: 'backoffice', action: '/admin/impersonate-user', actor: support.id, impersonatedBy: null, target: person.id },
+      { audit: 'backoffice', action: '/sign-out', actor: person.id, impersonatedBy: support.id },
     ],
   )
   // Better Auth's own record of the impersonation, which it keeps whatever the line says.
   const recorded = await db.execute(`select impersonated_by from session where user_id = '${person.id}' and impersonated_by is not null`)
   assert.equal(recorded.rows.length, 0, 'the impersonated session is gone once it is signed out')
-  assert.ok(await asPlatform(async () => asas.auth.actor((await onPlatform(support.headers)))), 'support is still signed in to the platform app')
+  assert.ok(await asBackoffice(async () => asas.auth.actor((await onBackoffice(support.headers)))), 'support is still signed in to the backoffice app')
 })
 
-test('142g2. a platform role without a route\'s permission is answered 403 before its input is judged, whatever it sends, and nothing is written', async () => {
+test('142g2. a backoffice role without a route\'s permission is answered 403 before its input is judged, whatever it sends, and nothing is written', async () => {
   const person = await signedUp('person-142g2')
   const support = await signedUp('support-142g2')
   await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
@@ -12676,36 +12676,36 @@ test('142g2. a platform role without a route\'s permission is answered 403 befor
   assert.equal((await db.execute(`select 1 from "user" where email = 'made-142g2@example.com'`)).rows.length, 0, 'and no one was made')
 })
 
-test('142h. the two apps keep two session cookies, and a one-time link is spent once and never in the platform app', async () => {
+test('142h. the two apps keep two session cookies, and a one-time link is spent once and never in the backoffice app', async () => {
   const person = await signedUp('person-142h')
-  // Someone both apps sign in, which in the platform app is staff alone.
+  // Someone both apps sign in, which in the backoffice app is staff alone.
   const staff = await signedUp('staff-142h')
   await db.execute(`update "user" set role = 'explorer' where id = '${staff.id}'`)
-  const signIn = (inPlatform: boolean) => {
+  const signIn = (inBackoffice: boolean) => {
     const call = () => asas.handler(new Request('http://test/api/auth/user/sign-in/email', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin: inPlatform ? 'http://localhost:5174' : 'http://localhost:5173' },
+      headers: { 'content-type': 'application/json', origin: inBackoffice ? 'http://localhost:5174' : 'http://localhost:5173' },
       body: JSON.stringify({ email: 'staff-142h@example.com', password: 'a-long-enough-password' }),
     }))
-    return inPlatform ? asPlatform(call) : call()
+    return inBackoffice ? asBackoffice(call) : call()
   }
   const names = async (answer: Promise<Response>) => (await answer).headers.getSetCookie().map((line) => line.slice(0, line.indexOf('=')))
   assert.deepEqual(await names(signIn(false)), ['better-auth.session_token'], 'the tenant app sets its own cookie')
-  assert.deepEqual(await names(signIn(true)), ['mithaq-platform.session_token'], 'and the platform app a cookie of another name')
+  assert.deepEqual(await names(signIn(true)), ['mithaq-backoffice.session_token'], 'and the backoffice app a cookie of another name')
   // A cookie of one app renamed to the other's is no session there: each app signs under
   // its own secret.
   const tenantCookie = (await signIn(false)).headers.getSetCookie().map((line) => line.split(';')[0]).join('; ')
-  const platformCookie = (await signIn(true)).headers.getSetCookie().map((line) => line.split(';')[0]).join('; ')
+  const backofficeCookie = (await signIn(true)).headers.getSetCookie().map((line) => line.split(';')[0]).join('; ')
   assert.ok(await asas.auth.actor(new Headers({ cookie: tenantCookie })), 'the tenant cookie is a session in the tenant app')
-  assert.ok(await asPlatform(() => asas.auth.actor(new Headers({ cookie: platformCookie }))), 'the platform cookie is one in the platform app')
-  assert.equal(await asPlatform(() => asas.auth.actor(new Headers({ cookie: tenantCookie.replace('better-auth.', 'mithaq-platform.') }))), null, 'a tenant cookie under the platform\'s name is refused there')
-  assert.equal(await asas.auth.actor(new Headers({ cookie: platformCookie.replace('mithaq-platform.', 'better-auth.') })), null, 'and a platform cookie under the tenant\'s name is refused in the tenant app')
-  const crossed = await asPlatform(() => asas.handler(new Request('http://test/api/auth/user/sign-in/email', {
+  assert.ok(await asBackoffice(() => asas.auth.actor(new Headers({ cookie: backofficeCookie }))), 'the backoffice cookie is one in the backoffice app')
+  assert.equal(await asBackoffice(() => asas.auth.actor(new Headers({ cookie: tenantCookie.replace('better-auth.', 'mithaq-backoffice.') }))), null, 'a tenant cookie under the backoffice\'s name is refused there')
+  assert.equal(await asas.auth.actor(new Headers({ cookie: backofficeCookie.replace('mithaq-backoffice.', 'better-auth.') })), null, 'and a backoffice cookie under the tenant\'s name is refused in the tenant app')
+  const crossed = await asBackoffice(() => asas.handler(new Request('http://test/api/auth/user/sign-in/email', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: 'http://localhost:5173' },
     body: JSON.stringify({ email: 'staff-142h@example.com', password: 'a-long-enough-password' }),
   })))
-  assert.equal(crossed.status, 403, 'the platform instance trusts no origin of the tenant app')
+  assert.equal(crossed.status, 403, 'the backoffice instance trusts no origin of the tenant app')
 
   const support = await signedUp('support-142h')
   await db.execute(`update "user" set role = 'support' where id = '${support.id}'`)
@@ -12716,70 +12716,70 @@ test('142h. the two apps keep two session cookies, and a one-time link is spent 
     body: JSON.stringify({ token: new URL(url).searchParams.get('token') }),
   }))
   assert.equal((await verify()).status, 400, 'a spent link sets nothing')
-  const second = await asPlatform(async () =>
+  const second = await asBackoffice(async () =>
     asas.handler(new Request('http://test/api/auth/user/admin/impersonate-user', {
       method: 'POST',
-      headers: new Headers([...(await onPlatform(support.headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
+      headers: new Headers([...(await onBackoffice(support.headers)), ['content-type', 'application/json'], ['origin', 'http://localhost:5174']]),
       body: JSON.stringify({ userId: person.id }),
     })),
   )
   const token = new URL(((await second.json()) as { url: string }).url).searchParams.get('token')
-  const inPlatform = await asPlatform(() => asas.handler(new Request('http://test/api/auth/user/one-time-token/verify', {
+  const inBackoffice = await asBackoffice(() => asas.handler(new Request('http://test/api/auth/user/one-time-token/verify', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: 'http://localhost:5174' },
     body: JSON.stringify({ token }),
   })))
-  assert.equal(inPlatform.status, 404, 'the platform app serves no verify, so an impersonation never becomes a platform session')
+  assert.equal(inBackoffice.status, 404, 'the backoffice app serves no verify, so an impersonation never becomes a backoffice session')
   const generated = await asas.handler(new Request('http://test/api/auth/user/one-time-token/generate', { headers: person.headers }))
   assert.equal(generated.status, 400, 'and no client mints a token of its own session')
 })
 
-test('179a. the platform app serves no password reset of its own, and a reset made through the tenant app ends the account\'s sessions in both apps', async () => {
-  const post = (inPlatform: boolean, path: string, body: unknown) => {
+test('179a. the backoffice app serves no password reset of its own, and a reset made through the tenant app ends the account\'s sessions in both apps', async () => {
+  const post = (inBackoffice: boolean, path: string, body: unknown) => {
     const call = () => asas.handler(new Request(`http://test/api/auth/user/${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin: inPlatform ? 'http://localhost:5174' : 'http://localhost:5173' },
+      headers: { 'content-type': 'application/json', origin: inBackoffice ? 'http://localhost:5174' : 'http://localhost:5173' },
       body: JSON.stringify(body),
     }))
-    return inPlatform ? asPlatform(call) : call()
+    return inBackoffice ? asBackoffice(call) : call()
   }
   for (const path of ['request-password-reset', 'reset-password']) {
-    assert.equal((await post(true, path, { email: 'person-179a@example.com', newPassword: 'x', token: 'x' })).status, 404, `the platform app serves no ${path}`)
+    assert.equal((await post(true, path, { email: 'person-179a@example.com', newPassword: 'x', token: 'x' })).status, 404, `the backoffice app serves no ${path}`)
   }
 
-  // Staff, so the platform app makes them a session too.
+  // Staff, so the backoffice app makes them a session too.
   const person = await signedUp('person-179a')
   await db.execute(`update "user" set role = 'explorer' where id = '${person.id}'`)
-  const inPlatform = await onPlatform(person.headers)
+  const inBackoffice = await onBackoffice(person.headers)
   assert.ok(await asas.auth.actor(person.headers), 'the tenant session resolves before the reset')
-  assert.ok(await asPlatform(() => asas.auth.actor(inPlatform)), 'and so does the platform one')
+  assert.ok(await asBackoffice(() => asas.auth.actor(inBackoffice)), 'and so does the backoffice one')
   // The token a reset link carries, stored the way the provider's own request stores it:
   // this run sets no `NODE_ENV`, so no link is logged.
   const token = `token-179a-${Date.now()}`
   await (await server.$context).internalAdapter.createVerificationValue({ value: person.id, identifier: `reset-password:${token}`, expiresAt: new Date(Date.now() + 60_000) })
   assert.equal((await post(false, 'reset-password', { newPassword: 'another-long-enough-password', token })).status, 200, 'the reset is made in the tenant app')
   assert.equal(await asas.auth.actor(person.headers), null, 'the tenant session no longer resolves')
-  assert.equal(await asPlatform(() => asas.auth.actor(inPlatform)), null, 'nor the platform one')
+  assert.equal(await asBackoffice(() => asas.auth.actor(inBackoffice)), null, 'nor the backoffice one')
 })
 
 test('142i. every admin route is audited once it succeeds, with no password in the line, and only a super admin writes a role through any of them', async (t) => {
   const lines: Record<string, unknown>[] = []
   const log = t.mock.method(console, 'log', (line: unknown) => {
-    if (typeof line === 'string' && line.startsWith('{"audit":"platform"')) lines.push(JSON.parse(line))
+    if (typeof line === 'string' && line.startsWith('{"audit":"backoffice"')) lines.push(JSON.parse(line))
   })
-  const platform = await signedUp('platform-142i')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const backoffice = await signedUp('backoffice-142i')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
   const person = await signedUp('person-142i')
   const roleOfPerson = async () => ((await db.execute(`select role from "user" where id = '${person.id}'`)) as { rows: { role: string | null }[] }).rows[0]?.role
 
   for (const slug of ['support', 'explorer'] as const) {
     const staff = await signedUp(`${slug}-142i`)
     await db.execute(`update "user" set role = '${slug}' where id = '${staff.id}'`)
-    assert.equal((await adminRoute('update-user', staff.headers, { userId: person.id, data: { role: 'super_admin' } })).status, 403, `${slug} grants no platform role through update-user`)
+    assert.equal((await adminRoute('update-user', staff.headers, { userId: person.id, data: { role: 'super_admin' } })).status, 403, `${slug} grants no backoffice role through update-user`)
     assert.equal((await adminRoute('update-user', staff.headers, { userId: person.id, data: { name: 'renamed' } })).status, 403, `and updates no one`)
     assert.equal((await adminRoute('create-user', staff.headers, { email: `made-by-${slug}-142i@example.com`, password: 'a-long-enough-password', name: 'x', role: 'super_admin' })).status, 403, 'nor creates a super admin')
   }
-  assert.equal(await roleOfPerson(), 'user', 'the person holds no platform role')
+  assert.equal(await roleOfPerson(), 'user', 'the person holds no backoffice role')
   assert.deepEqual(lines, [], 'and a refused call writes no line')
 
   // The three refusals above never reach the `before` hook's own rule: support and explorer
@@ -12805,22 +12805,22 @@ test('142i. every admin route is audited once it succeeds, with no password in t
   await db.execute(`update "user" set role = 'writer' where id = '${writer.response.user.id}'`)
   await assert.rejects(
     () => gatedRoles.api.adminUpdateUser({ body: { userId: person.id, data: { role: 'user' } }, headers: writerHeaders }),
-    /platform administrator/,
+    /backoffice administrator/,
     'a role the plugin grants user.update to still writes no role through data.role',
   )
   await assert.rejects(
     () => gatedRoles.api.setRole({ body: { userId: person.id, role: ['user', 'super_admin'] }, headers: writerHeaders }),
-    /platform administrator/,
+    /backoffice administrator/,
     'nor an array of roles',
   )
   await assert.rejects(
     () => gatedRoles.api.setRole({ body: { userId: person.id, role: 'user,super_admin' as never }, headers: writerHeaders }),
-    /platform administrator/,
+    /backoffice administrator/,
     'nor a comma-joined one',
   )
 
   const answered = async (path: string, body: Record<string, unknown>) => {
-    const response = await adminRoute(path, platform.headers, body)
+    const response = await adminRoute(path, backoffice.headers, body)
     assert.equal(response.status, 200, `${path}: ${await response.clone().text()}`)
     return response
   }
@@ -12834,17 +12834,17 @@ test('142i. every admin route is audited once it succeeds, with no password in t
   assert.deepEqual(
     lines.map((line) => Object.fromEntries(Object.entries(line).filter(([key]) => key !== 'at'))),
     [
-      { audit: 'platform', action: '/admin/update-user', actor: platform.id, impersonatedBy: null, target: person.id, role: 'explorer' },
-      { audit: 'platform', action: '/admin/set-user-password', actor: platform.id, impersonatedBy: null, target: person.id },
-      { audit: 'platform', action: '/admin/revoke-user-sessions', actor: platform.id, impersonatedBy: null, target: person.id },
-      { audit: 'platform', action: '/admin/create-user', actor: platform.id, impersonatedBy: null, target: made.user.id },
-      { audit: 'platform', action: '/admin/remove-user', actor: platform.id, impersonatedBy: null, target: made.user.id },
+      { audit: 'backoffice', action: '/admin/update-user', actor: backoffice.id, impersonatedBy: null, target: person.id, role: 'explorer' },
+      { audit: 'backoffice', action: '/admin/set-user-password', actor: backoffice.id, impersonatedBy: null, target: person.id },
+      { audit: 'backoffice', action: '/admin/revoke-user-sessions', actor: backoffice.id, impersonatedBy: null, target: person.id },
+      { audit: 'backoffice', action: '/admin/create-user', actor: backoffice.id, impersonatedBy: null, target: made.user.id },
+      { audit: 'backoffice', action: '/admin/remove-user', actor: backoffice.id, impersonatedBy: null, target: made.user.id },
     ],
   )
   assert.ok(!JSON.stringify(lines).includes('long-enough-password'), 'no line carries a password')
 
   // `/admin/has-permission` carries `role` to ask what that role may do, and writes
-  // nothing: a signed-in caller who is no platform administrator still gets an answer
+  // nothing: a signed-in caller who is no backoffice administrator still gets an answer
   // rather than the hook's refusal.
   const reader = await signedUp('reader-142i')
   await db.execute(`update "user" set role = 'explorer' where id = '${reader.id}'`)
@@ -12852,12 +12852,12 @@ test('142i. every admin route is audited once it succeeds, with no password in t
   assert.equal(checked.status, 200, 'a read carries no role write, so the hook stands aside for anyone signed in')
 })
 
-test('181a. no platform action lands on the actor\'s own row, none but a super admin\'s on a staff member\'s, an unchanged role writes nothing, and a ban carries a reason and may carry an end', async (t) => {
+test('181a. no backoffice action lands on the actor\'s own row, none but a super admin\'s on a staff member\'s, an unchanged role writes nothing, and a ban carries a reason and may carry an end', async (t) => {
   const lines: Record<string, unknown>[] = []
   const log = t.mock.method(console, 'log', (line: unknown) => {
-    if (typeof line === 'string' && line.startsWith('{"audit":"platform"')) lines.push(JSON.parse(line))
+    if (typeof line === 'string' && line.startsWith('{"audit":"backoffice"')) lines.push(JSON.parse(line))
   })
-  const administrator = await signedUp('platform-181a')
+  const administrator = await signedUp('backoffice-181a')
   await db.execute(`update "user" set role = 'super_admin' where id = '${administrator.id}'`)
   const person = await signedUp('person-181a')
   const peer = await signedUp('explorer-181a')
@@ -12895,7 +12895,7 @@ test('181a. no platform action lands on the actor\'s own row, none but a super a
   await assert.rejects(() => gated.api.banUser({ body: { userId: peer.id, banReason: 'Testing' }, headers: bannerHeaders }), /staff/, 'a role holding ban bans no staff member')
   assert.equal((await rowOf(peer.id)).banned, false, 'and the staff member stands')
   await gated.api.banUser({ body: { userId: person.id, banReason: 'Testing' }, headers: bannerHeaders })
-  assert.equal((await rowOf(person.id)).banned, true, 'while it still bans someone who holds no platform role')
+  assert.equal((await rowOf(person.id)).banned, true, 'while it still bans someone who holds no backoffice role')
   await db.execute(`update "user" set banned = false, ban_reason = null where id = '${person.id}'`)
   assert.equal((await adminRoute('set-role', administrator.headers, { userId: peer.id, role: 'support' })).status, 200, 'a super admin acts on a staff row')
   const signedOut = await Promise.all([peer.id, person.id].map(async (userId) => (await adminRoute('impersonate-user', new Headers(), { userId })).status))
@@ -12946,12 +12946,12 @@ test('181a. no platform action lands on the actor\'s own row, none but a super a
   )
 })
 
-test('181c. the platform app answers a person who holds no platform role exactly as a wrong password, and makes them no session, while staff still sign in', async () => {
+test('181c. the backoffice app answers a person who holds no backoffice role exactly as a wrong password, and makes them no session, while staff still sign in', async () => {
   const person = await signedUp('person-181c')
   const staff = await signedUp('support-181c')
   await db.execute(`update "user" set role = 'support' where id = '${staff.id}'`)
   const signIn = (email: string, password: string) =>
-    asPlatform(() => asas.handler(new Request('http://test/api/auth/user/sign-in/email', {
+    asBackoffice(() => asas.handler(new Request('http://test/api/auth/user/sign-in/email', {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: 'http://localhost:5174' },
       body: JSON.stringify({ email, password }),
@@ -12967,7 +12967,7 @@ test('181c. the platform app answers a person who holds no platform role exactly
   assert.equal(await sessionsOf(person.id), before, 'and no session row')
   const signedIn = await signIn('support-181c@example.com', 'a-long-enough-password')
   assert.equal(signedIn.status, 200, 'staff still sign in')
-  assert.deepEqual(signedIn.headers.getSetCookie().map((line) => line.slice(0, line.indexOf('='))), ['mithaq-platform.session_token'])
+  assert.deepEqual(signedIn.headers.getSetCookie().map((line) => line.slice(0, line.indexOf('='))), ['mithaq-backoffice.session_token'])
   const tenant = await asas.handler(new Request('http://test/api/auth/user/sign-in/email', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: 'http://localhost:5173' },
@@ -12979,61 +12979,76 @@ test('181c. the platform app answers a person who holds no platform role exactly
 /** A production start needs a mailer; nothing here mails, and the discard port refuses what would. */
 const mailerEnv: Record<string, string> = { RESEND_API_KEY: 're_never_sent', MAIL_FROM: 'mail@example.com', RESEND_BASE_URL: 'http://127.0.0.1:9' }
 
-test('142j. a production boot is refused without PLATFORM_URL, BETTER_AUTH_URL or BETTER_AUTH_SECRET, and a live host with no secret set is refused whatever NODE_ENV says', async () => {
+test('142j. a production boot is refused without BACKOFFICE_URL, BETTER_AUTH_URL or BETTER_AUTH_SECRET, a live host with no secret set is refused whatever NODE_ENV says, and so are the two apps on one origin', async () => {
   const provider = new URL('../../mithaq/src/mithaq/auth/index.ts', import.meta.url).href
   const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const { PLATFORM_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
-    execFile(process.execPath, ['--input-type=module', '-e', `const { platformOrigins, platformURL, tenantURL, options } = await import(${JSON.stringify(provider)}); console.log(JSON.stringify({ platformOrigins, platformURL, tenantURL, trustedOrigins: options.trustedOrigins }))`], {
+    const { BACKOFFICE_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
+    execFile(process.execPath, ['--input-type=module', '-e', `const { backofficeOrigins, backofficeURL, tenantURL, options } = await import(${JSON.stringify(provider)}); console.log(JSON.stringify({ backofficeOrigins, backofficeURL, tenantURL, trustedOrigins: options.trustedOrigins }))`], {
       env: { ...rest, ...mailerEnv, ...env } as NodeJS.ProcessEnv,
     }, (error: unknown, stdout: string, stderr: string) => resolve({ code: error && typeof error === 'object' && 'code' in error ? Number(error.code) : 0, stdout, stderr }))
   })
   for (const env of [
     { NODE_ENV: 'production' },
     { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret' },
-    { NODE_ENV: 'production', PLATFORM_URL: 'https://platform.example.com' },
-    { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret', PLATFORM_URL: 'https://platform.example.com' },
+    { NODE_ENV: 'production', BACKOFFICE_URL: 'https://backoffice.example.com' },
+    { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret', BACKOFFICE_URL: 'https://backoffice.example.com' },
   ] as Record<string, string>[]) {
     const refused = await boot(env)
     assert.notEqual(refused.code, 0, `refused with ${JSON.stringify(env)}`)
-    assert.match(refused.stderr, /A production boot needs PLATFORM_URL/)
+    assert.match(refused.stderr, /A production boot needs BACKOFFICE_URL/)
   }
   // A deploy run with plain `node` or `bun` sets no `NODE_ENV` at all: the
   // check above never fires, so a live host with no secret is refused on its
   // own rather than falling through to a public secret.
-  for (const env of [{ PLATFORM_URL: 'https://platform.example.com' }, { BETTER_AUTH_URL: 'https://app.example.com' }] as Record<string, string>[]) {
+  for (const env of [{ BACKOFFICE_URL: 'https://backoffice.example.com' }, { BETTER_AUTH_URL: 'https://app.example.com' }] as Record<string, string>[]) {
     const refused = await boot(env)
     assert.notEqual(refused.code, 0, `refused with no NODE_ENV and ${JSON.stringify(env)}`)
     assert.match(refused.stderr, /BETTER_AUTH_SECRET must be set/)
   }
+  // Two apps on one origin share what a browser isolates, so a script flaw in
+  // the customer app would reach staff sessions; a path or a port spelled out
+  // as the default is still the same origin. Cookies follow the host whatever
+  // the port, so another port of a live host is refused too.
+  for (const [backoffice, tenant] of [
+    ['https://example.com/backoffice', 'https://example.com'],
+    ['https://EXAMPLE.com:443/admin', 'https://example.com/'],
+    ['https://example.com:8443', 'https://example.com'],
+  ]) {
+    for (const env of [{ NODE_ENV: 'production' }, {}] as Record<string, string>[]) {
+      const refused = await boot({ ...env, BETTER_AUTH_SECRET: 'a-production-secret', BACKOFFICE_URL: backoffice!, BETTER_AUTH_URL: tenant! })
+      assert.notEqual(refused.code, 0, `refused with ${backoffice} beside ${tenant}`)
+      assert.match(refused.stderr, /BACKOFFICE_URL \(.*\) and BETTER_AUTH_URL \(.*\) are served on one host, example\.com\..*host of its own.*backoffice\.example\.com.*script flaw \(XSS\) in the customer app would reach staff sessions/)
+    }
+  }
   // The same boot, with the secret set, answers rather than refuses: this
   // guard is only ever about the secret, never about `NODE_ENV` itself.
-  const noNodeEnv = await boot({ PLATFORM_URL: 'https://platform.example.com', BETTER_AUTH_URL: 'https://app.example.com', BETTER_AUTH_SECRET: 'a-real-secret' })
+  const noNodeEnv = await boot({ BACKOFFICE_URL: 'https://backoffice.example.com', BETTER_AUTH_URL: 'https://app.example.com', BETTER_AUTH_SECRET: 'a-real-secret' })
   assert.equal(noNodeEnv.code, 0, noNodeEnv.stderr)
 
-  const booted = await boot({ NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret', PLATFORM_URL: 'https://platform.example.com', BETTER_AUTH_URL: 'https://app.example.com' })
+  const booted = await boot({ NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret', BACKOFFICE_URL: 'https://backoffice.example.com', BETTER_AUTH_URL: 'https://app.example.com' })
   assert.equal(booted.code, 0, booted.stderr)
   assert.deepEqual(JSON.parse(booted.stdout), {
-    platformOrigins: [],
-    platformURL: 'https://platform.example.com',
+    backofficeOrigins: [],
+    backofficeURL: 'https://backoffice.example.com',
     tenantURL: 'https://app.example.com',
     trustedOrigins: [],
   })
 })
 
-test('142k. a project that serves no platform console boots in production with BETTER_AUTH_URL and the secret alone', async (t) => {
-  // The provider as `create-mithaq` writes it without the platform add-on, beside the original so it resolves the same packages.
+test('142k. a project that serves no backoffice console boots in production with BETTER_AUTH_URL and the secret alone', async (t) => {
+  // The provider as `create-mithaq` writes it without the backoffice add-on, beside the original so it resolves the same packages.
   const source = new URL('../../mithaq/src/mithaq/auth/', import.meta.url)
-  const copy = new URL(`.no-platform-${process.pid}/`, source)
+  const copy = new URL(`.no-backoffice-${process.pid}/`, source)
   await mkdir(copy)
   t.after(() => rm(copy, { recursive: true, force: true }))
   const provider = await readFile(new URL('index.ts', source), 'utf8')
-  assert.ok(provider.includes('export const platformApp: boolean = true'), 'the provider says whether a platform app is served')
+  assert.ok(provider.includes('export const backofficeApp: boolean = true'), 'the provider says whether a backoffice app is served')
   // One folder deeper, so the copy reaches the mailer and the roles as the original does.
-  await writeFile(new URL('index.ts', copy), provider.replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false').replaceAll("from '../../", "from '../../../"))
-  for (const file of ['platform-roles.ts', 'organizations.ts']) await writeFile(new URL(file, copy), await readFile(new URL(file, source), 'utf8'))
+  await writeFile(new URL('index.ts', copy), provider.replace('export const backofficeApp: boolean = true', 'export const backofficeApp: boolean = false').replaceAll("from '../../", "from '../../../"))
+  for (const file of ['backoffice-roles.ts', 'organizations.ts']) await writeFile(new URL(file, copy), await readFile(new URL(file, source), 'utf8'))
   const boot = (env: Record<string, string>) => new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const { PLATFORM_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
-    execFile(process.execPath, ['--input-type=module', '-e', `const { platformApp } = await import(${JSON.stringify(new URL('index.ts', copy).href)}); console.log(platformApp)`], {
+    const { BACKOFFICE_URL: _url, BETTER_AUTH_SECRET: _secret, AUTH_SECRET: _other, BETTER_AUTH_URL: _tenant, NODE_ENV: _node, ...rest } = process.env
+    execFile(process.execPath, ['--input-type=module', '-e', `const { backofficeApp } = await import(${JSON.stringify(new URL('index.ts', copy).href)}); console.log(backofficeApp)`], {
       env: { ...rest, ...mailerEnv, ...env } as NodeJS.ProcessEnv,
     }, (error: unknown, stdout: string, stderr: string) => resolve({ code: error && typeof error === 'object' && 'code' in error ? Number(error.code) : 0, stdout, stderr }))
   })
@@ -13046,10 +13061,10 @@ test('142k. a project that serves no platform console boots in production with B
 })
 
 /**
- * Runs `run` on a platform no one administers yet: every platform role is taken off its holder
- * first, and given back after, while every account `run` made keeps no platform role.
+ * Runs `run` on a backoffice no one administers yet: every backoffice role is taken off its holder
+ * first, and given back after, while every account `run` made keeps no backoffice role.
  */
-const withoutPlatformStaff = async (run: () => Promise<void>) => {
+const withoutBackofficeStaff = async (run: () => Promise<void>) => {
   const { rows } = (await db.execute(`select id, role from "user" where role is not null and role <> 'user'`)) as { rows: { id: string; role: string }[] }
   await db.execute(`update "user" set role = 'user' where role is not null and role <> 'user'`)
   try {
@@ -13059,7 +13074,7 @@ const withoutPlatformStaff = async (run: () => Promise<void>) => {
     for (const row of rows) await db.execute(`update "user" set role = '${row.role.replaceAll("'", "''")}' where id = '${row.id.replaceAll("'", "''")}'`)
   }
 }
-const platformStaff = async () => ((await db.execute(`select email, role from "user" where role is not null and role <> 'user' order by email`)) as { rows: { email: string; role: string }[] }).rows
+const backofficeStaff = async () => ((await db.execute(`select email, role from "user" where role is not null and role <> 'user' order by email`)) as { rows: { email: string; role: string }[] }).rows
 const firstRegisterAt = (handler: (request: Request) => Promise<Response>, at: string) => ({
   init: () => handler(new Request(`${at}/init`)),
   register: (body: unknown, headers: Record<string, string> = {}) =>
@@ -13084,84 +13099,84 @@ const providerUnder = async (env: Record<string, string>) => {
     }
   }
 }
-/** The platform app's first-register of `provider`, served by an instance built over this file's store. */
+/** The backoffice app's first-register of `provider`, served by an instance built over this file's store. */
 const firstRegisterOf = (provider: typeof import('@asas/mithaq/auth')) => {
   const built = provider.providers.user.server({ drizzle: asas.targets.drizzle as unknown as Parameters<typeof providers.user.server>[0]['drizzle'] }, unreferenced)
-  return firstRegisterAt((request) => provider.asPlatform(() => built.handler(request)), `${provider.platformURL}/api/auth`)
+  return firstRegisterAt((request) => provider.asBackoffice(() => built.handler(request)), `${provider.backofficeURL}/api/auth`)
 }
-/** As `vite dev` runs the platform app, the one place no setup code is asked. */
+/** As `vite dev` runs the backoffice app, the one place no setup code is asked. */
 const developed = async () => firstRegisterOf(await providerUnder({ NODE_ENV: 'development' }))
 
-test('142l. while no one holds a platform role, first-register in the platform app makes one super_admin who signs in there; then it refuses everyone with one answer, and the tenant app serves neither route', async () => {
-  const platform = await developed()
+test('142l. while no one holds a backoffice role, first-register in the backoffice app makes one super_admin who signs in there; then it refuses everyone with one answer, and the tenant app serves neither route', async () => {
+  const backoffice = await developed()
   const tenant = firstRegisterAt((request) => asas.handler(request), 'http://localhost:5173/api/auth/user')
   const password = 'a-long-enough-password'
-  await withoutPlatformStaff(async () => {
-    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: false, code: 'none' } }, 'under vite dev on this machine no setup code is asked')
+  await withoutBackofficeStaff(async () => {
+    assert.deepEqual(await answered(await backoffice.init()), { status: 200, body: { initialized: false, code: 'none' } }, 'under vite dev on this machine no setup code is asked')
     assert.equal((await tenant.init()).status, 404, 'the tenant app has no init')
     assert.equal((await tenant.register({ name: 'Tenant 142l', email: 'tenant-142l@example.com', password })).status, 404, 'nor a first-register')
-    assert.equal((await platform.register({ name: 'Short 142l', email: 'short-142l@example.com', password: 'short' })).status, 400, 'a password under the provider\'s bound is refused')
-    assert.equal((await platform.register({ name: ' ', email: 'blank-142l@example.com', password })).status, 400, 'and so is a blank name')
-    assert.equal((await platform.register({ name: 'Foreign 142l', email: 'foreign-142l@example.com', password }, { origin: 'https://elsewhere.example' })).status, 403, 'and a post from another origin')
-    assert.deepEqual(await platformStaff(), [], 'and none of them made anyone')
+    assert.equal((await backoffice.register({ name: 'Short 142l', email: 'short-142l@example.com', password: 'short' })).status, 400, 'a password under the provider\'s bound is refused')
+    assert.equal((await backoffice.register({ name: ' ', email: 'blank-142l@example.com', password })).status, 400, 'and so is a blank name')
+    assert.equal((await backoffice.register({ name: 'Foreign 142l', email: 'foreign-142l@example.com', password }, { origin: 'https://elsewhere.example' })).status, 403, 'and a post from another origin')
+    assert.deepEqual(await backofficeStaff(), [], 'and none of them made anyone')
 
     // A role written with whitespace around it is still read as the role, as the provider reads it.
     const member = await signedUp('member-142l')
     await db.execute(`update "user" set role = E'\\tsuper_admin ' where id = '${member.id}'`)
-    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: true } }, 'so a tab before super_admin closes setup')
+    assert.deepEqual(await answered(await backoffice.init()), { status: 200, body: { initialized: true } }, 'so a tab before super_admin closes setup')
     await db.execute(`update "user" set role = 'user' where id = '${member.id}'`)
 
-    const made = await platform.register({ name: 'First 142l', email: 'first-142l@example.com', password })
+    const made = await backoffice.register({ name: 'First 142l', email: 'first-142l@example.com', password })
     assert.equal(made.status, 200, await made.clone().text())
-    assert.deepEqual(await platformStaff(), [{ email: 'first-142l@example.com', role: 'super_admin' }], 'the account holds super_admin')
-    const signedIn = await asPlatform(() => server.api.signInEmail({ body: { email: 'first-142l@example.com', password }, returnHeaders: true }))
+    assert.deepEqual(await backofficeStaff(), [{ email: 'first-142l@example.com', role: 'super_admin' }], 'the account holds super_admin')
+    const signedIn = await asBackoffice(() => server.api.signInEmail({ body: { email: 'first-142l@example.com', password }, returnHeaders: true }))
     const admin = new Headers({ cookie: (signedIn.headers as Headers).getSetCookie().map((line: string) => line.split(';')[0]).join('; ') })
-    const listed = await asPlatform(() => asas.handler(new Request('http://localhost:5174/api/auth/user/admin/list-users', { headers: admin })))
-    assert.equal(listed.status, 200, 'and signs in to the platform app, where it administers')
+    const listed = await asBackoffice(() => asas.handler(new Request('http://localhost:5174/api/auth/user/admin/list-users', { headers: admin })))
+    assert.equal(listed.status, 200, 'and signs in to the backoffice app, where it administers')
 
-    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: true } }, 'init says no more than that it is done')
-    const closed = await answered(await platform.register({ name: 'Second 142l', email: 'second-142l@example.com', password }))
+    assert.deepEqual(await answered(await backoffice.init()), { status: 200, body: { initialized: true } }, 'init says no more than that it is done')
+    const closed = await answered(await backoffice.register({ name: 'Second 142l', email: 'second-142l@example.com', password }))
     assert.equal(closed.status, 403)
     for (const [who, headers] of [['the administrator', admin], ['a tenant user', member.headers]] as const) {
-      const again = await answered(await platform.register({ name: 'Again 142l', email: 'again-142l@example.com', password }, { cookie: headers.get('cookie') ?? '' }))
+      const again = await answered(await backoffice.register({ name: 'Again 142l', email: 'again-142l@example.com', password }, { cookie: headers.get('cookie') ?? '' }))
       assert.deepEqual(again, closed, `${who} gets the same refusal as anyone`)
     }
     assert.ok(!JSON.stringify(closed.body).includes('first-142l'), 'which names nobody')
-    assert.deepEqual(await platformStaff(), [{ email: 'first-142l@example.com', role: 'super_admin' }], 'and no second administrator was made')
+    assert.deepEqual(await backofficeStaff(), [{ email: 'first-142l@example.com', role: 'super_admin' }], 'and no second administrator was made')
   })
 })
 
 test('142m. twelve first-registers at once, more than the pool\'s ten clients, all answer and make exactly one administrator', async () => {
-  const platform = await developed()
-  await withoutPlatformStaff(async () => {
-    const all = Promise.all(Array.from({ length: 12 }, (_, one) => platform.register({ name: `Race ${one}`, email: `race-${one}-142m@example.com`, password: 'a-long-enough-password' })))
+  const backoffice = await developed()
+  await withoutBackofficeStaff(async () => {
+    const all = Promise.all(Array.from({ length: 12 }, (_, one) => backoffice.register({ name: `Race ${one}`, email: `race-${one}-142m@example.com`, password: 'a-long-enough-password' })))
     const answers = await Promise.race([all, setTimeout(30_000, 'hung' as const)])
     assert.notEqual(answers, 'hung', 'no request waits on a pool its own transaction holds')
     assert.deepEqual((answers as Response[]).map((one) => one.status).sort(), [200, ...Array<number>(11).fill(403)])
-    assert.equal((await platformStaff()).length, 1)
+    assert.equal((await backofficeStaff()).length, 1)
   })
 })
 
 test('142p. a first-register whose account row fails leaves no user behind, and setup stays open', async (t) => {
-  const platform = await developed()
+  const backoffice = await developed()
   await db.execute(`create or replace function refuse_account_142p() returns trigger language plpgsql as $$ begin raise exception 'refused by 142p'; end $$;
     create trigger refuse_account_142p before insert on account for each row execute function refuse_account_142p()`)
   t.after(() => db.execute('drop trigger if exists refuse_account_142p on account; drop function if exists refuse_account_142p()'))
-  await withoutPlatformStaff(async () => {
-    const failed = await platform.register({ name: 'Half 142p', email: 'half-142p@example.com', password: 'a-long-enough-password' })
+  await withoutBackofficeStaff(async () => {
+    const failed = await backoffice.register({ name: 'Half 142p', email: 'half-142p@example.com', password: 'a-long-enough-password' })
     assert.equal(failed.status, 500, await failed.clone().text())
     assert.deepEqual((await db.execute(`select id from "user" where email = 'half-142p@example.com'`)).rows, [], 'the user row went with the account row')
-    assert.deepEqual(await answered(await platform.init()), { status: 200, body: { initialized: false, code: 'none' } }, 'so setup is still open')
+    assert.deepEqual(await answered(await backoffice.init()), { status: 200, body: { initialized: false, code: 'none' } }, 'so setup is still open')
   })
 })
 
-const deployed = { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret-of-at-least-32-characters', PLATFORM_URL: 'https://platform.example.com', BETTER_AUTH_URL: 'https://app.example.com', ...mailerEnv }
+const deployed = { NODE_ENV: 'production', BETTER_AUTH_SECRET: 'a-production-secret-of-at-least-32-characters', BACKOFFICE_URL: 'https://backoffice.example.com', BETTER_AUTH_URL: 'https://app.example.com', ...mailerEnv }
 
 test('142n. outside vite dev on this machine first-register asks for a SETUP_CODE of 32 characters at least: refused while it is unset or short, refused for a wrong code compared by timingSafeEqual on two equal-length digests, answered for the right one, and rate limited', async () => {
   const password = 'a-long-enough-password'
-  // This file's own provider: no NODE_ENV and no PLATFORM_URL, so localhost, and still a code is asked.
-  const plain = firstRegisterAt((request) => asPlatform(() => asas.handler(request)), 'http://localhost:5174/api/auth/user')
-  await withoutPlatformStaff(async () => {
+  // This file's own provider: no NODE_ENV and no BACKOFFICE_URL, so localhost, and still a code is asked.
+  const plain = firstRegisterAt((request) => asBackoffice(() => asas.handler(request)), 'http://localhost:5174/api/auth/user')
+  await withoutBackofficeStaff(async () => {
     assert.deepEqual(await answered(await plain.init()), { status: 200, body: { initialized: false, code: 'unset' } }, 'with NODE_ENV unset the code is asked even on localhost')
     const plainly = await answered(await plain.register({ name: 'Plain 142n', email: 'plain-142n@example.com', password }))
     assert.deepEqual([plainly.status, plainly.body?.code], [403, 'SETUP_CODE_UNSET'])
@@ -13190,11 +13205,11 @@ test('142n. outside vite dev on this machine first-register asks for a SETUP_COD
     assert.ok(compared.mock.calls.some(({ arguments: [given, expected] }) => (given as Buffer).length === 32 && (expected as Buffer).length === 32), 'by timingSafeEqual over two SHA-256 digests')
     const missing = await answered(await set.register({ name: 'Missing 142n', email: 'missing-142n@example.com', password }, { 'x-forwarded-for': '203.0.113.3' }))
     assert.deepEqual([missing.status, missing.body?.code], [403, 'SETUP_CODE_WRONG'], 'and so is none')
-    assert.deepEqual(await platformStaff(), [], 'and none made anyone')
+    assert.deepEqual(await backofficeStaff(), [], 'and none made anyone')
 
     const made = await set.register({ name: 'Right 142n', email: 'right-142n@example.com', password, code }, { 'x-forwarded-for': '203.0.113.4' })
     assert.equal(made.status, 200, await made.clone().text())
-    assert.deepEqual(await platformStaff(), [{ email: 'right-142n@example.com', role: 'super_admin' }], 'the right code makes the administrator')
+    assert.deepEqual(await backofficeStaff(), [{ email: 'right-142n@example.com', role: 'super_admin' }], 'the right code makes the administrator')
 
     const tries = []
     for (let one = 0; one < 4; one++) tries.push((await set.register({ name: 'Flood 142n', email: 'flood-142n@example.com', password, code }, { 'x-forwarded-for': '203.0.113.5' })).status)
@@ -13204,26 +13219,26 @@ test('142n. outside vite dev on this machine first-register asks for a SETUP_COD
 
 test('142q. with no TRUSTED_IP_HEADER an x-forwarded-for a caller writes buys no fresh tries: every caller shares ten a minute', async () => {
   const shared = firstRegisterOf(await providerUnder({ ...deployed, SETUP_CODE: 'a-setup-code-the-owner-chose-of-40-chars' }))
-  await withoutPlatformStaff(async () => {
+  await withoutBackofficeStaff(async () => {
     const tries = []
     for (let one = 0; one < 11; one++) tries.push((await shared.register({ name: 'Spoof 142q', email: 'spoof-142q@example.com', password: 'a-long-enough-password', code: 'wrong' }, { 'x-forwarded-for': `198.51.100.${one}` })).status)
     assert.deepEqual(tries, [...Array<number>(10).fill(403), 429])
   })
 })
 
-test('142o. a project with no platform console has no first-register and no init', async (t) => {
-  // The provider as `create-mithaq` writes it without the platform add-on, beside the original so it resolves the same packages.
+test('142o. a project with no backoffice console has no first-register and no init', async (t) => {
+  // The provider as `create-mithaq` writes it without the backoffice add-on, beside the original so it resolves the same packages.
   const source = new URL('../../mithaq/src/mithaq/auth/', import.meta.url)
-  const copy = new URL(`.no-platform-first-${process.pid}/`, source)
+  const copy = new URL(`.no-backoffice-first-${process.pid}/`, source)
   await mkdir(copy)
   t.after(() => rm(copy, { recursive: true, force: true }))
   // One folder deeper, so the copy reaches the mailer and the roles as the original does.
-  await writeFile(new URL('index.ts', copy), (await readFile(new URL('index.ts', source), 'utf8')).replace('export const platformApp: boolean = true', 'export const platformApp: boolean = false').replaceAll("from '../../", "from '../../../"))
-  for (const file of ['platform-roles.ts', 'organizations.ts']) await writeFile(new URL(file, copy), await readFile(new URL(file, source), 'utf8'))
+  await writeFile(new URL('index.ts', copy), (await readFile(new URL('index.ts', source), 'utf8')).replace('export const backofficeApp: boolean = true', 'export const backofficeApp: boolean = false').replaceAll("from '../../", "from '../../../"))
+  for (const file of ['backoffice-roles.ts', 'organizations.ts']) await writeFile(new URL(file, copy), await readFile(new URL(file, source), 'utf8'))
   const provider = (await import(new URL('index.ts', copy).href)) as typeof import('@asas/mithaq/auth')
-  assert.equal(provider.platformApp, false)
+  assert.equal(provider.backofficeApp, false)
   const routes = firstRegisterOf(provider)
-  await withoutPlatformStaff(async () => {
+  await withoutBackofficeStaff(async () => {
     assert.equal((await routes.init()).status, 404)
     assert.equal((await routes.register({ name: 'None 142o', email: 'none-142o@example.com', password: 'a-long-enough-password' })).status, 404)
   })
@@ -13297,9 +13312,9 @@ test('129e. mithaq rbac assign refuses an undeclared role and a nonmember by nam
   const unknown = await rbacCommand('--tenant', organization!.id, '--user', owner.response.user.id, '--role', 'not-declared-129e')
   assert.equal(unknown.code, 1)
   assert.match(unknown.stderr, /Role "not-declared-129e" is not declared/)
-  const platformRole = await rbacCommand('--tenant', organization!.id, '--user', owner.response.user.id, '--role', 'super_admin')
-  assert.equal(platformRole.code, 1)
-  assert.match(platformRole.stderr, /super_admin/)
+  const backofficeRole = await rbacCommand('--tenant', organization!.id, '--user', owner.response.user.id, '--role', 'super_admin')
+  assert.equal(backofficeRole.code, 1)
+  assert.match(backofficeRole.stderr, /super_admin/)
   const missingRole = await rbacCommand('--tenant', organization!.id, '--user', owner.response.user.id)
   assert.equal(missingRole.code, 1)
   assert.match(missingRole.stderr, /Missing --role/)
@@ -13310,7 +13325,7 @@ test('129e. mithaq rbac assign refuses an undeclared role and a nonmember by nam
   assert.equal(rows.rows.length, 0)
 })
 
-test('129a. the platform slug is Better Auth\'s column and no other provider\'s, and no role but the one the template declares reaches the provider\'s admin routes', async () => {
+test('129a. the backoffice slug is Better Auth\'s column and no other provider\'s, and no role but the one the template declares reaches the provider\'s admin routes', async () => {
   // The local provider spreads its own kayan row onto the actor and deletes only
   // `permissions` and `roles`, so a project whose local-auth kayan carries a `role` column
   // of its own hands that column to the actor. It is a real actor of a real provider,
@@ -13338,17 +13353,17 @@ test('129a. the platform slug is Better Auth\'s column and no other provider\'s,
     assert.deepEqual(
       assignedRoles(carrier as never),
       [],
-      'and it is assigned nothing, because the platform column is Better Auth\'s and no other provider\'s',
+      'and it is assigned nothing, because the backoffice column is Better Auth\'s and no other provider\'s',
     )
   } finally {
     await built.destroy()
   }
 
   // `adminRoles` is not the gate: the plugin's own `hasPermission` reads
-  // `options.roles`, so a name that record holds is a platform administrator
-  // whatever `adminRoles` says. The template's record holds the platform roles
+  // `options.roles`, so a name that record holds is a backoffice administrator
+  // whatever `adminRoles` says. The template's record holds the backoffice roles
   // and `user` alone, which is why the plugin's own `admin` is nobody here:
-  // the impostor holds `explorer` as well, so that they sign in to a platform
+  // the impostor holds `explorer` as well, so that they sign in to a backoffice
   // session, and the `admin` beside it must add no key to it.
   const impostor = await server.api.signUpEmail({
     body: { name: 'Impostor', email: 'impostor@example.com', password: 'a-long-enough-password' },
@@ -13357,16 +13372,16 @@ test('129a. the platform slug is Better Auth\'s column and no other provider\'s,
   await db.execute(`update "user" set role = 'explorer,admin' where id = '${impostor.response.user.id}'`)
   const victim = await server.api.signUpEmail({ body: { name: 'Victim', email: 'victim@example.com', password: 'a-long-enough-password' } })
   const banned = await adminRoute('ban-user', new Headers({ cookie: impostor.headers.get('set-cookie') ?? '' }), { userId: victim.user.id, banReason: 'Testing' })
-  assert.equal(banned.status, 403, 'the plugin\'s own default admin name opens no route that the platform roles do not, so explorer bans no one')
+  assert.equal(banned.status, 403, 'the plugin\'s own default admin name opens no route that the backoffice roles do not, so explorer bans no one')
 })
 
 test('130. a banned user\'s cookie answers no actor at all, and its reads are refused exactly as an anonymous one\'s are', async () => {
-  const platform = await server.api.signUpEmail({
+  const backoffice = await server.api.signUpEmail({
     body: { name: 'Banner', email: 'banner@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
   })
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.response.user.id}'`)
-  const platformHeaders = new Headers({ cookie: platform.headers.get('set-cookie') ?? '' })
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.response.user.id}'`)
+  const backofficeHeaders = new Headers({ cookie: backoffice.headers.get('set-cookie') ?? '' })
   const victim = await server.api.signUpEmail({
     body: { name: 'Banned Person', email: 'banned@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
@@ -13374,8 +13389,8 @@ test('130. a banned user\'s cookie answers no actor at all, and its reads are re
   const victimHeaders = new Headers({ cookie: victim.headers.get('set-cookie') ?? '' })
   assert.ok(await asas.auth.actor(victimHeaders), 'the cookie answers an actor while the person is not banned')
 
-  const banned = await adminRoute('ban-user', platformHeaders, { userId: victim.response.user.id, banReason: 'Testing' })
-  assert.equal(banned.status, 200, 'the ban route answered in the platform app')
+  const banned = await adminRoute('ban-user', backofficeHeaders, { userId: victim.response.user.id, banReason: 'Testing' })
+  assert.equal(banned.status, 200, 'the ban route answered in the backoffice app')
 
   const nobody = await asas.auth.actor(victimHeaders)
   assert.equal(nobody, null, 'and the cookie now answers nobody')
@@ -13453,7 +13468,7 @@ test('131. two Better Auth kayan are two servers and two /api/auth/<kayan>/* pre
   assert.equal(await built.auth.actor(new Headers()), null, 'and neither cookie is no actor at all')
 })
 
-test('132. the platform slug is read from the admin kayan\'s session alone, so a second Better Auth instance\'s user.role assigns nothing', async () => {
+test('132. the backoffice slug is read from the admin kayan\'s session alone, so a second Better Auth instance\'s user.role assigns nothing', async () => {
   const language = offline()
   // The same column, the same provider, the same marking: what differs is which kayan the
   // session belongs to. A second population signing itself up on its own instance would
@@ -13462,10 +13477,10 @@ test('132. the platform slug is read from the admin kayan\'s session alone, so a
     api: { getSession: async () => ({ user: { id, role: 'super_admin' } }) },
     handler: async () => new Response('ok'),
   })
-  const platform = language.defineKayan({
+  const backoffice = language.defineKayan({
     name: 'user',
     fields: { id: { kind: 'text' }, role: { kind: 'text' } },
-    auth: betterAuthProvider({ server: () => session('platform-1') }),
+    auth: betterAuthProvider({ server: () => session('backoffice-1') }),
     targets: { service: { operations: defaultOperations } },
   })
   const customers = language.defineKayan({
@@ -13474,17 +13489,17 @@ test('132. the platform slug is read from the admin kayan\'s session alone, so a
     auth: betterAuthProvider({ server: () => session('customer-1') }),
     targets: { service: { operations: defaultOperations } },
   })
-  const platformOnly = language.buildAsas({ http: [fetchHttp()], kayan: [platform] })
+  const backofficeOnly = language.buildAsas({ http: [fetchHttp()], kayan: [backoffice] })
   const customersOnly = language.buildAsas({ http: [fetchHttp()], kayan: [customers] })
 
-  const admin = await asPlatform(() => platformOnly.auth.actor(new Headers()))
+  const admin = await asBackoffice(() => backofficeOnly.auth.actor(new Headers()))
   assert.equal((admin as { strategy?: string } | null)?.strategy, 'better-auth')
-  assert.deepEqual(asPlatform(() => assignedRoles(admin as never)), ['super_admin'], 'the admin kayan\'s session carries the platform slug')
+  assert.deepEqual(asBackoffice(() => assignedRoles(admin as never)), ['super_admin'], 'the admin kayan\'s session carries the backoffice slug')
 
-  const shopper = await asPlatform(() => customersOnly.auth.actor(new Headers()))
+  const shopper = await asBackoffice(() => customersOnly.auth.actor(new Headers()))
   assert.equal((shopper as { role?: string } | null)?.role, 'super_admin', 'the column reaches the actor')
   assert.equal((shopper as { strategy?: string } | null)?.strategy, 'better-auth', 'from the same provider')
-  assert.deepEqual(asPlatform(() => assignedRoles(shopper as never)), [], 'and it is assigned nothing, because the session is another kayan\'s')
+  assert.deepEqual(asBackoffice(() => assignedRoles(shopper as never)), [], 'and it is assigned nothing, because the session is another kayan\'s')
 })
 
 test('134. every component name a field writes is checked by the screen that draws it, an operation\'s input field among them, and a targets key naming no target of the build is refused by name', () => {
@@ -13816,16 +13831,16 @@ test('137. a rule declares the rules it excludes on its own value, a field decla
 })
 
 /**
- * A platform administrator in the platform app, and a tenant it is no member of: its
+ * A backoffice administrator in the backoffice app, and a tenant it is no member of: its
  * creator is assigned `administrator` by the creation hook, and one more member is added
  * with an assignment to a custom role of that tenant.
  */
-const platformAndTenant = async (slug: string) => {
-  const platform = await server.api.signUpEmail({
-    body: { name: `${slug} platform`, email: `${slug}-platform@example.com`, password: 'a-long-enough-password' },
+const backofficeAndTenant = async (slug: string) => {
+  const backoffice = await server.api.signUpEmail({
+    body: { name: `${slug} backoffice`, email: `${slug}-backoffice@example.com`, password: 'a-long-enough-password' },
     returnHeaders: true,
   })
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.response.user.id}'`)
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.response.user.id}'`)
   const owner = await server.api.signUpEmail({
     body: { name: `${slug} owner`, email: `${slug}-owner@example.com`, password: 'a-long-enough-password' },
     returnHeaders: true,
@@ -13839,7 +13854,7 @@ const platformAndTenant = async (slug: string) => {
   await server.api.addMember({ body: { userId: member.response.user.id, organizationId: organization!.id, role: 'member' } })
   await seedRoleRow(organization!.id, `${slug}-reader`, ['memberRoles.find'])
   await assignRole(organization!.id, member.response.user.id, `${slug}-reader`)
-  const actor = await asPlatform(async () => asas.auth.actor((await onPlatform(new Headers({ cookie: platform.headers.get('set-cookie') ?? '' })))))
+  const actor = await asBackoffice(async () => asas.auth.actor((await onBackoffice(new Headers({ cookie: backoffice.headers.get('set-cookie') ?? '' })))))
   assert.ok(actor)
   return {
     actor,
@@ -13850,47 +13865,47 @@ const platformAndTenant = async (slug: string) => {
   }
 }
 
-test('138. a super admin in the platform app reads a tenant\'s assignments and repairs none of them: create, update and delete are refused, and the repair is mithaq rbac assign', async () => {
-  const { actor, member, tenant } = await platformAndTenant('platform-repair')
+test('138. a super admin in the backoffice app reads a tenant\'s assignments and repairs none of them: create, update and delete are refused, and the repair is mithaq rbac assign', async () => {
+  const { actor, member, tenant } = await backofficeAndTenant('backoffice-repair')
   const rowsOf = async () =>
     (await db.execute(`select role, organization_id as tenant from member_roles where user_id = '${member}' order by role`)).rows
 
   // The repair for a tenant that lost its administrator: hand it a new one. Every write on
-  // the two tables is refused on the platform: staff change a tenant's data only by
+  // the two tables is refused on the backoffice: staff change a tenant's data only by
   // impersonating, and an operator repairs a tenant with `mithaq rbac assign`. A create
   // naming the tenant is refused for naming it, and one naming none for reaching none.
   for (const [data, status, key] of [[{ role: 'administrator', user: member, organization: tenant }, 400, 'error.invalid.value'], [{ role: 'administrator', user: member }, 403, 'error.forbidden.create']] as const) {
-    const created = await asPlatform(() => asas.kayan.memberRoles.operations.create(data as never, { actor: actor as never })).catch((thrown: unknown) => thrown)
-    assert.ok(created instanceof AsasError, 'a platform create is a refusal the caller caused')
+    const created = await asBackoffice(() => asas.kayan.memberRoles.operations.create(data as never, { actor: actor as never })).catch((thrown: unknown) => thrown)
+    assert.ok(created instanceof AsasError, 'a backoffice create is a refusal the caller caused')
     assert.equal(created.status, status, 'never a 500')
     assert.equal(created.key, key)
   }
-  const invented = await asPlatform(() => asas.kayan.roles.operations.create({ name: 'platform-invented', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: [] }, { actor: actor as never }))
+  const invented = await asBackoffice(() => asas.kayan.roles.operations.create({ name: 'backoffice-invented', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: [] }, { actor: actor as never }))
     .catch((thrown: unknown) => thrown)
   assert.ok(invented instanceof AsasError, 'and so is a role row, which would otherwise carry no tenant')
   assert.equal(invented.key, 'error.forbidden.create', 'under the same key')
 
-  const [standing] = (await asPlatform(() => asas.kayan.memberRoles.operations.find({ where: { user: { equals: member } } }, { actor: actor as never, tenant: 'all' }))).docs
-  assert.equal(standing?.role, 'platform-repair-reader', 'the assignment reads across the tenant boundary')
+  const [standing] = (await asBackoffice(() => asas.kayan.memberRoles.operations.find({ where: { user: { equals: member } } }, { actor: actor as never, tenant: 'all' }))).docs
+  assert.equal(standing?.role, 'backoffice-repair-reader', 'the assignment reads across the tenant boundary')
 
   for (const write of [
     () => asas.kayan.memberRoles.operations.update({ id: standing!.id as string, role: 'administrator' }, { actor: actor as never }),
     () => asas.kayan.memberRoles.operations.delete({ id: standing!.id as string }, { actor: actor as never }),
   ]) {
-    const refused = await asPlatform(write).catch((thrown: unknown) => thrown)
-    assert.ok(refused instanceof AsasError && refused.status === 403 && refused.key === 'error.forbidden.operation', 'a platform write to an assignment is refused')
+    const refused = await asBackoffice(write).catch((thrown: unknown) => thrown)
+    assert.ok(refused instanceof AsasError && refused.status === 403 && refused.key === 'error.forbidden.operation', 'a backoffice write to an assignment is refused')
   }
-  assert.deepEqual(await rowsOf(), [{ role: 'platform-repair-reader', tenant }], 'and the assignment stands as its tenant wrote it')
+  assert.deepEqual(await rowsOf(), [{ role: 'backoffice-repair-reader', tenant }], 'and the assignment stands as its tenant wrote it')
 })
 
-test('139. a tenant administrator cannot assign a platform role, and a memberRoles row naming one assigns nothing: the member holds none of its keys and takes none of its rows', async () => {
-  const { member, memberHeaders, ownerHeaders, tenant } = await platformAndTenant('platform-row')
+test('139. a tenant administrator cannot assign a backoffice role, and a memberRoles row naming one assigns nothing: the member holds none of its keys and takes none of its rows', async () => {
+  const { member, memberHeaders, ownerHeaders, tenant } = await backofficeAndTenant('backoffice-row')
   await server.api.setActiveOrganization({ body: { organizationId: tenant }, headers: memberHeaders })
   const administrator = await asas.auth.actor(ownerHeaders)
   assert.ok(administrator)
-  // A tenant's administrator holds every key, and still cannot name a platform role: the
+  // A tenant's administrator holds every key, and still cannot name a backoffice role: the
   // guard is handed the tenant roles alone, so the slug is no role of this tenant.
-  for (const role of Object.keys(platformRoles)) {
+  for (const role of Object.keys(backofficeRoles)) {
     const named: unknown = await asas.kayan.memberRoles.operations.create({ role, user: member }, { actor: administrator as never }).catch((thrown: unknown) => thrown)
     assert.ok(named instanceof AsasError, `"${role}" is a refusal the caller caused`)
     assert.equal(named.status, 400)
@@ -13902,9 +13917,9 @@ test('139. a tenant administrator cannot assign a platform role, and a memberRol
 
   const assigned = await asas.auth.actor(memberHeaders)
   assert.ok(assigned)
-  assert.deepEqual(assignedRoles(assigned as never), ['platform-row-reader'], 'the row\'s slug is not among the member\'s roles')
+  assert.deepEqual(assignedRoles(assigned as never), ['backoffice-row-reader'], 'the row\'s slug is not among the member\'s roles')
   const held = actorPermissions(assigned) as ReadonlySet<string>
-  assert.deepEqual([...held], ['memberRoles.find'], 'and none of the platform role\'s keys is held through it')
+  assert.deepEqual([...held], ['memberRoles.find'], 'and none of the backoffice role\'s keys is held through it')
   const refused = await asas.kayan.roles.operations.find({}, { actor: assigned as never }).catch((thrown: unknown) => thrown)
   assert.ok(refused instanceof AsasError, 'the role table is refused to it')
   assert.equal(refused.status, 403, 'as a 403, never a 500')
@@ -13912,9 +13927,9 @@ test('139. a tenant administrator cannot assign a platform role, and a memberRol
 })
 
 test('140. assigning an undeclared prototype slug is refused with 400, while a standing row stays inert and removable', async () => {
-  const { member, memberHeaders, ownerHeaders, tenant } = await platformAndTenant('platform-proto')
+  const { member, memberHeaders, ownerHeaders, tenant } = await backofficeAndTenant('backoffice-proto')
   // The tenant's administrator, which holds `'*'` and every assignment of its tenant; the
-  // platform writes none.
+  // backoffice writes none.
   const actor = await asas.auth.actor(ownerHeaders)
   const [standing] = (await asas.kayan.memberRoles.operations.find({ where: { user: { equals: member } } }, { actor: actor as never })).docs
   assert.ok(standing)
@@ -13938,8 +13953,8 @@ test('140. assigning an undeclared prototype slug is refused with 400, while a s
   // reads the name as a custom role no row matches, not as a shipped one. A
   // second role of the tenant lets it read the assignment table whole.
   const listing = asas.catalog.filter((key) => key === 'memberRoles.find' || key.startsWith('memberRoles.fields.'))
-  await seedRoleRow(tenant, 'platform-proto-lister', listing)
-  await assignRole(tenant, member, 'platform-proto-lister')
+  await seedRoleRow(tenant, 'backoffice-proto-lister', listing)
+  await assignRole(tenant, member, 'backoffice-proto-lister')
   await server.api.setActiveOrganization({ body: { organizationId: tenant }, headers: memberHeaders })
   const carrier = await asas.auth.actor(memberHeaders)
   assert.deepEqual(
@@ -13968,7 +13983,7 @@ test('140. assigning an undeclared prototype slug is refused with 400, while a s
 })
 
 test('140a. an administrator cannot assign an undeclared slug, while a declared custom role works', async () => {
-  const { member, ownerHeaders, tenant } = await platformAndTenant('role-declaration')
+  const { member, ownerHeaders, tenant } = await backofficeAndTenant('role-declaration')
   const administrator = await asas.auth.actor(ownerHeaders)
   assert.ok(administrator)
   const refused = await asas.kayan.memberRoles.operations
@@ -13986,7 +14001,7 @@ test('140a. an administrator cannot assign an undeclared slug, while a declared 
 })
 
 test('140b. a role declared only in another tenant cannot be assigned here', async () => {
-  const { member, ownerHeaders } = await platformAndTenant('role-tenant-scope')
+  const { member, ownerHeaders } = await backofficeAndTenant('role-tenant-scope')
   const actor = await asas.auth.actor(ownerHeaders)
   const elsewhere = await server.api.signUpEmail({
     body: { name: 'Other tenant 140b', email: 'other-tenant-140b@example.com', password: 'a-long-enough-password' },
@@ -14007,10 +14022,10 @@ test('140b. a role declared only in another tenant cannot be assigned here', asy
   assert.equal((await db.execute(`select role from member_roles where id = '${standing.id as string}'`)).rows[0]?.role, 'role-tenant-scope-reader')
 })
 
-test('141. in a build graded by the template\'s own access target, a local-auth role column holds no key, a second Better Auth instance is refused beside a tenant-owned kayan, and the admin kayan\'s session holds the platform\'s', async () => {
+test('141. in a build graded by the template\'s own access target, a local-auth role column holds no key, a second Better Auth instance is refused beside a tenant-owned kayan, and the admin kayan\'s session holds the backoffice\'s', async () => {
   const localWithRole = defineTestKayan({
-    name: 'platformLocalUsers',
-    dbName: 'platform_local_users',
+    name: 'backofficeLocalUsers',
+    dbName: 'backoffice_local_users',
     access: allowAccess,
     fields: { ...localAuthFields, role: { kind: 'text' } },
     targets: { service: { operations: localOperations } },
@@ -14019,8 +14034,8 @@ test('141. in a build graded by the template\'s own access target, a local-auth 
   // whoever asks: the column is set, the provider is Better Auth, and the kayan
   // is not the one `auth.admin` names.
   const customers = defineTestKayan({
-    name: 'platformCustomers',
-    dbName: 'platform_customers',
+    name: 'backofficeCustomers',
+    dbName: 'backoffice_customers',
     access: allowAccess,
     fields: { id: { kind: 'text' }, role: { kind: 'text' } },
     auth: betterAuthProvider({
@@ -14035,31 +14050,31 @@ test('141. in a build graded by the template\'s own access target, a local-auth 
   // tenant-owned kayan, as the role kayan are, refuses it before its column could answer.
   assert.throws(
     () => buildTestAsas({ http: [fetchHttp()], kayan: [...accessKayan, customers] }),
-    /Kayan "user" and "platformCustomers" each carry Better Auth, and kayan "roles" belongs to the organization a session names/,
+    /Kayan "user" and "backofficeCustomers" each carry Better Auth, and kayan "roles" belongs to the organization a session names/,
   )
   const built = buildTestAsas({
     http: [fetchHttp()],
-    kayan: [...accessKayan, authenticating(localWithRole, local({ ...localRequired, secret: 'platform-local-secret-of-thirty-two-characters' }))],
+    kayan: [...accessKayan, authenticating(localWithRole, local({ ...localRequired, secret: 'backoffice-local-secret-of-thirty-two-characters' }))],
   })
   // The adapter is the one `asas` itself holds, so its pool is closed by the
   // file's own `after` and never here.
   await built.connect()
   const strategy = (name: string) => built.auth.strategies.find((one) => one.name === name)!
-  const { cookie } = await firstAccount(built, 'platform-local@example.com')
-  await db.execute(`update "platform_local_users" set role = 'super_admin' where email = 'platform-local@example.com'`)
-  const carrier = (await asPlatform(() => strategy('local').authenticate({ headers: new Headers({ cookie: cookie.split(';')[0]! }) }))).user
+  const { cookie } = await firstAccount(built, 'backoffice-local@example.com')
+  await db.execute(`update "backoffice_local_users" set role = 'super_admin' where email = 'backoffice-local@example.com'`)
+  const carrier = (await asBackoffice(() => strategy('local').authenticate({ headers: new Headers({ cookie: cookie.split(';')[0]! }) }))).user
   assert.equal((carrier as { role?: string }).role, 'super_admin', 'the local column reaches the actor')
   assert.deepEqual([...(actorPermissions(carrier) as ReadonlySet<string>)], [], 'and it holds no key')
 
   // The same build grades the admin kayan's session, so the empty set above is
   // the guard and not a build that grades nothing.
-  const platform = await server.api.signUpEmail({
-    body: { name: 'Graded', email: 'platform-graded@example.com', password: 'a-long-enough-password' },
+  const backoffice = await server.api.signUpEmail({
+    body: { name: 'Graded', email: 'backoffice-graded@example.com', password: 'a-long-enough-password' },
     returnHeaders: true,
   })
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.response.user.id}'`)
-  const admin = (await asPlatform(async () => strategy('user').authenticate({ headers: (await onPlatform(new Headers({ cookie: platform.headers.get('set-cookie') ?? '' }))) }))).user
-  assert.equal(actorPermissions(admin), true, 'the admin kayan\'s session holds the platform\'s keys in the platform app')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.response.user.id}'`)
+  const admin = (await asBackoffice(async () => strategy('user').authenticate({ headers: (await onBackoffice(new Headers({ cookie: backoffice.headers.get('set-cookie') ?? '' }))) }))).user
+  assert.equal(actorPermissions(admin), true, 'the admin kayan\'s session holds the backoffice\'s keys in the backoffice app')
 })
 
 test('143. the runner is a target: a build with none is refused naming the fix, a second is refused, one under another name is refused by that name, transport inside it is refused, and any of its ten keys left on the language root is refused by name', () => {
@@ -14689,7 +14704,7 @@ test('158. first-register drains the create\'s afterCommit once its transaction 
  * the data API does not ask.
  */
 test('159. a screen is entered only with its screen.<name> key: \'*\' enters both, a custom role holding screen.portal enters only the portal, the granter guard holds, and the data API never asks', async () => {
-  assert.deepEqual(asas.catalog.filter((key) => key.startsWith('screen.')), ['screen.dashboard', 'screen.portal', 'screen.platform'], 'one key per screen of the template and no other')
+  assert.deepEqual(asas.catalog.filter((key) => key.startsWith('screen.')), ['screen.dashboard', 'screen.portal', 'screen.backoffice'], 'one key per screen of the template and no other')
   const report = async (headers?: Headers) =>
     (await (await asas.handler(new Request('http://test/api/access', headers ? { headers } : {}))).json()) as { screens: string[] }
   assert.deepEqual((await report()).screens, [], 'an anonymous report names no screen')
@@ -14702,11 +14717,11 @@ test('159. a screen is entered only with its screen.<name> key: \'*\' enters bot
   const organization = await server.api.createOrganization({ body: { name: 'Gate Tenant', slug: 'gate-tenant' }, headers: ownerHeaders })
   const owner = await asas.auth.actor(ownerHeaders)
   assert.ok(owner)
-  // `'*'` is every key inside the tenant, the platform screen's among them, which the tenant
-  // app serves no route for; the platform app answers no membership role, so the same
+  // `'*'` is every key inside the tenant, the backoffice screen's among them, which the tenant
+  // app serves no route for; the backoffice app answers no membership role, so the same
   // person holds nothing there.
-  assert.deepEqual((await report(ownerHeaders)).screens, ['dashboard', 'portal', 'platform'], "the tenant's administrator holds '*' inside its tenant")
-  assert.deepEqual((await asPlatform(async () => report((await onPlatform(ownerHeaders))))).screens, [], 'and enters nothing in the platform app')
+  assert.deepEqual((await report(ownerHeaders)).screens, ['dashboard', 'portal', 'backoffice'], "the tenant's administrator holds '*' inside its tenant")
+  assert.deepEqual((await asBackoffice(async () => report((await onBackoffice(ownerHeaders))))).screens, [], 'and enters nothing in the backoffice app')
 
   const roleKeys = asas.catalog.filter((key) => key.startsWith('roles.'))
   await asas.kayan.roles.operations.create({ name: 'porter', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: ['screen.portal', 'courses.find', 'courses.fields.title', ...roleKeys] }, { actor: owner as never })
@@ -15212,12 +15227,12 @@ test('175. a tenant reads its own members and its own organization, by id, by li
   const report = await (await asas.handler(new Request('http://test/api/access', { headers: asma.headers }))).json()
   assert.deepEqual(Object.keys(report.collections.user.fields).sort(), ['id', 'name'], 'the access report reads the id and the name of a person and no other column')
 
-  // The same person as platform staff: the platform app reads every person, every column
+  // The same person as backoffice staff: the backoffice app reads every person, every column
   // included, and the tenant app still reads the members' names alone.
   await db.execute(`update "user" set role = 'super_admin' where id = '${asma.id}'`)
-  const staff = await asPlatform(async () => asas.auth.actor(await onPlatform(asma.headers)))
-  const everyone = await asPlatform(() => user.operations.find({ where: { id: { in: [amal.id, badr.id] } } }, { actor: staff as never }))
-  assert.deepEqual(everyone.docs.map((row: { email: string }) => row.email).sort(), ['amal-146@example.com', 'badr-146@example.com'], 'the platform app reads people of every organization, email included')
+  const staff = await asBackoffice(async () => asas.auth.actor(await onBackoffice(asma.headers)))
+  const everyone = await asBackoffice(() => user.operations.find({ where: { id: { in: [amal.id, badr.id] } } }, { actor: staff as never }))
+  assert.deepEqual(everyone.docs.map((row: { email: string }) => row.email).sort(), ['amal-146@example.com', 'badr-146@example.com'], 'the backoffice app reads people of every organization, email included')
   const inTenant = await user.operations.find({ limit: 100 }, { actor: (await asas.auth.actor(asma.headers)) as never })
   for (const row of inTenant.docs) assert.deepEqual(Object.keys(row).sort(), ['id', 'name'], 'while the tenant app reads the same person\'s members by id and name alone')
 })
@@ -15239,26 +15254,26 @@ const twoTenants = async (slug: string) => {
 const staffOn = async (slug: string, role: string) => {
   const person = await signedUp(slug)
   await db.execute(`update "user" set role = '${role}' where id = '${person.id}'`)
-  return { ...person, actor: await asPlatform(async () => asas.auth.actor(await onPlatform(person.headers))) }
+  return { ...person, actor: await asBackoffice(async () => asas.auth.actor(await onBackoffice(person.headers))) }
 }
 
-test('151a. on the platform every tenant kayan is read across every organization by the keys a platform role holds, and every write to one is refused by the server, a super admin\'s included', async () => {
+test('151a. on the backoffice every tenant kayan is read across every organization by the keys a backoffice role holds, and every write to one is refused by the server, a super admin\'s included', async () => {
   const [a, b] = await twoTenants('151a')
   const tenants = [a!.organization, b!.organization]
-  const administrator = await staffOn('platform-151a', 'super_admin')
+  const administrator = await staffOn('backoffice-151a', 'super_admin')
   const support = await staffOn('support-151a', 'support')
   const explorer = await staffOn('explorer-151a', 'explorer')
   const find = (kayan: string, options: Record<string, unknown>) =>
     (asas.kayan as unknown as Record<string, { operations: { find(input: unknown, options: unknown): Promise<{ docs: Record<string, unknown>[] }> } }>)[kayan]!.operations.find({ where: { organization: { in: tenants } }, limit: 0 }, options)
-  // Across every organization with `tenant: 'all'`, which the runner grants platform staff in the platform app alone.
-  const read = (kayan: string, actor: unknown) => asPlatform(() => find(kayan, { actor, tenant: 'all' }))
-  // A tenant's administrator holds `'*'` and is no platform staff, in either app.
+  // Across every organization with `tenant: 'all'`, which the runner grants backoffice staff in the backoffice app alone.
+  const read = (kayan: string, actor: unknown) => asBackoffice(() => find(kayan, { actor, tenant: 'all' }))
+  // A tenant's administrator holds `'*'` and is no backoffice staff, in either app.
   const owner = await asas.auth.actor(a!.owner.headers)
   for (const [where, call] of [
-    ['without tenant: \'all\'', () => asPlatform(() => find('courses', { actor: administrator.actor }))],
-    ['outside the platform app', () => find('courses', { actor: administrator.actor, tenant: 'all' })],
+    ['without tenant: \'all\'', () => asBackoffice(() => find('courses', { actor: administrator.actor }))],
+    ['outside the backoffice app', () => find('courses', { actor: administrator.actor, tenant: 'all' })],
     ['by a tenant\'s administrator in the tenant app', () => find('courses', { actor: owner, tenant: 'all' })],
-    ['by a tenant\'s administrator in the platform app', () => asPlatform(async () => find('courses', { actor: await asas.auth.actor(await onPlatform(a!.owner.headers)), tenant: 'all' }))],
+    ['by a tenant\'s administrator in the backoffice app', () => asBackoffice(async () => find('courses', { actor: await asas.auth.actor(await onBackoffice(a!.owner.headers)), tenant: 'all' }))],
   ] as const) {
     const refused = await call().catch((thrown: unknown) => thrown)
     assert.ok(refused instanceof AsasError && refused.status === 403, `a read across organizations ${where} is refused, reaching none: ${String(refused)}`)
@@ -15279,13 +15294,13 @@ test('151a. on the platform every tenant kayan is read across every organization
     const refused = await read(kayan, support.actor).catch((thrown: unknown) => thrown)
     assert.ok(refused instanceof AsasError && refused.status === 403 && refused.key === 'error.forbidden.permission', `support is refused ${kayan}`)
   }
-  const report = (await (await asPlatform(async () => asas.handler(new Request('http://test/api/access', { headers: await onPlatform(support.headers) })))).json()) as AccessReport
+  const report = (await (await asBackoffice(async () => asas.handler(new Request('http://test/api/access', { headers: await onBackoffice(support.headers) })))).json()) as AccessReport
   assert.equal(report.collections?.courses?.read, true, 'the report lists the courses for support')
   assert.equal(report.collections?.roles?.read ?? false, false, 'and not the roles')
 
   const as = { actor: administrator.actor as never }
   const writes: [string, string, Record<string, unknown>][] = [
-    ['courses', 'create', { title: 'Platform course', fee: 1 }],
+    ['courses', 'create', { title: 'Backoffice course', fee: 1 }],
     ['courses', 'update', { id: a!.course, title: 'Renamed' }],
     ['courses', 'archive', { id: a!.course, reason: 'no' }],
     ['courses', 'delete', { id: a!.course }],
@@ -15295,70 +15310,70 @@ test('151a. on the platform every tenant kayan is read across every organization
     ['sessions', 'update', { id: a!.session, capacity: 3 }],
     ['sessions', 'archiveMany', { where: { id: { in: [a!.session] } } }],
     ['sessions', 'delete', { id: a!.session }],
-    ['tags', 'create', { name: { en: 'Platform tag', ar: 'وسم' } }],
+    ['tags', 'create', { name: { en: 'Backoffice tag', ar: 'وسم' } }],
     ['tags', 'update', { id: a!.tag, name: { en: 'Renamed', ar: 'وسم' } }],
     ['tags', 'delete', { id: a!.tag }],
     ['enrollments', 'create', { session: a!.session, student: a!.owner.id }],
-    ['roles', 'create', { name: 'platform-role-151a', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: ['courses.find', 'courses.fields.title'] }],
+    ['roles', 'create', { name: 'backoffice-role-151a', label: { en: 'Test role', ar: 'دور تجريبي' }, permissions: ['courses.find', 'courses.fields.title'] }],
     ['memberRoles', 'create', { role: 'registrar', user: a!.owner.id }],
   ]
   for (const [kayan, operation, input] of writes) {
-    const refused = await asPlatform(() => (asas.kayan as unknown as Record<string, { operations: Record<string, (input: unknown, options: unknown) => Promise<unknown>> }>)[kayan]!.operations[operation]!(input, as)).catch((thrown: unknown) => thrown)
-    assert.ok(refused instanceof AsasError && refused.status === 403, `${kayan}.${operation} is refused on the platform: ${String(refused)}`)
+    const refused = await asBackoffice(() => (asas.kayan as unknown as Record<string, { operations: Record<string, (input: unknown, options: unknown) => Promise<unknown>> }>)[kayan]!.operations[operation]!(input, as)).catch((thrown: unknown) => thrown)
+    assert.ok(refused instanceof AsasError && refused.status === 403, `${kayan}.${operation} is refused on the backoffice: ${String(refused)}`)
   }
   const assignment = (await read('memberRoles', administrator.actor)).docs.find((row) => row.organization === a!.organization)!
   for (const [operation, input] of [['update', { id: assignment.id, role: 'registrar' }], ['delete', { id: assignment.id }]] as const) {
-    const refused = await asPlatform(() => (asas.kayan.memberRoles.operations[operation] as (input: unknown, options: unknown) => Promise<unknown>)(input, as)).catch((thrown: unknown) => thrown)
-    assert.ok(refused instanceof AsasError && refused.status === 403, `memberRoles.${operation} is refused on the platform`)
+    const refused = await asBackoffice(() => (asas.kayan.memberRoles.operations[operation] as (input: unknown, options: unknown) => Promise<unknown>)(input, as)).catch((thrown: unknown) => thrown)
+    assert.ok(refused instanceof AsasError && refused.status === 403, `memberRoles.${operation} is refused on the backoffice`)
   }
-  const settingsWrite = await asPlatform(() => asas.global.settings.operations.update({ siteTitle: 'Platform' } as never, as)).catch((thrown: unknown) => thrown)
+  const settingsWrite = await asBackoffice(() => asas.global.settings.operations.update({ siteTitle: 'Backoffice' } as never, as)).catch((thrown: unknown) => thrown)
   assert.ok(settingsWrite instanceof AsasError && settingsWrite.status === 403, 'and so is the settings global')
-  const served = await asPlatform(async () => asas.handler(new Request('http://test/api/courses/update', {
+  const served = await asBackoffice(async () => asas.handler(new Request('http://test/api/courses/update', {
     method: 'POST',
-    headers: new Headers([...(await onPlatform(administrator.headers)), ['content-type', 'application/json']]),
+    headers: new Headers([...(await onBackoffice(administrator.headers)), ['content-type', 'application/json']]),
     body: JSON.stringify({ id: a!.course, title: 'Served' }),
   })))
-  assert.equal(served.status, 403, 'a served write from the platform app is refused')
+  assert.equal(served.status, 403, 'a served write from the backoffice app is refused')
   assert.equal((await courses.operations.findByID({ id: a!.course }, { actor: (await asas.auth.actor(a!.owner.headers)) as never }))?.title, 'Course 151a a', 'and the row is as its tenant wrote it')
 
   await db.execute(`update "user" set role = 'none-151a' where id = '${support.id}'`)
-  const none = await asPlatform(async () => asas.auth.actor(await onPlatform(support.headers)))
+  const none = await asBackoffice(async () => asas.auth.actor(await onBackoffice(support.headers)))
   const nothing = await read('courses', none).catch((thrown: unknown) => thrown)
-  assert.ok(nothing instanceof AsasError && nothing.status === 403, 'a person with no platform role reads nothing on the platform')
+  assert.ok(nothing instanceof AsasError && nothing.status === 403, 'a person with no backoffice role reads nothing on the backoffice')
 })
 
-test('151b. on the platform the people, the organizations and their members are read across every organization, each column by its key, and in the tenant app nothing of it reaches a member', async () => {
+test('151b. on the backoffice the people, the organizations and their members are read across every organization, each column by its key, and in the tenant app nothing of it reaches a member', async () => {
   const [a, b] = await twoTenants('151b')
   const support = await staffOn('support-151b', 'support')
   const kayan = asas.kayan as unknown as Record<'user' | 'organization' | 'member', { operations: Record<string, (input: unknown, options: unknown) => Promise<any>> }>
-  const onPlatformRead = (name: 'user' | 'organization' | 'member', input: unknown, actor: unknown) => asPlatform(() => kayan[name].operations.find!(input, { actor }))
+  const onBackofficeRead = (name: 'user' | 'organization' | 'member', input: unknown, actor: unknown) => asBackoffice(() => kayan[name].operations.find!(input, { actor }))
 
-  const people = await onPlatformRead('user', { where: { id: { in: [a!.owner.id, b!.owner.id] } }, sort: 'email' }, support.actor)
+  const people = await onBackofficeRead('user', { where: { id: { in: [a!.owner.id, b!.owner.id] } }, sort: 'email' }, support.actor)
   assert.deepEqual(people.docs.map((row: { email: string }) => row.email), ['owner-151b-a@example.com', 'owner-151b-b@example.com'], 'support reads people of both organizations, by email')
   assert.ok(['role', 'banned', 'createdAt'].every((column) => column in people.docs[0]), 'and the columns its keys name')
-  const organizations = await onPlatformRead('organization', { where: { slug: { in: ['tenant-151b-a', 'tenant-151b-b'] } }, sort: 'slug' }, support.actor)
+  const organizations = await onBackofficeRead('organization', { where: { slug: { in: ['tenant-151b-a', 'tenant-151b-b'] } }, sort: 'slug' }, support.actor)
   assert.deepEqual(organizations.docs.map((row: { slug: string }) => row.slug), ['tenant-151b-a', 'tenant-151b-b'], 'and both organizations, by slug')
-  const members = await onPlatformRead('member', { where: { organizationId: { equals: a!.organization } } }, support.actor)
+  const members = await onBackofficeRead('member', { where: { organizationId: { equals: a!.organization } } }, support.actor)
   assert.deepEqual(members.docs.map((row: { userId: string }) => row.userId), [a!.owner.id], 'and one organization\'s members')
 
-  const administrator = await staffOn('platform-151b', 'super_admin')
+  const administrator = await staffOn('backoffice-151b', 'super_admin')
   for (const [name, operation, input] of [
     ['organization', 'update', { id: a!.organization, name: 'Renamed' }],
     ['user', 'update', { id: a!.owner.id, name: 'Renamed' }],
     ['member', 'delete', { id: members.docs[0].id }],
   ] as const) {
-    const refused = await asPlatform(() => kayan[name].operations[operation]!(input, { actor: administrator.actor })).catch((thrown: unknown) => thrown)
-    assert.ok(refused instanceof AsasError && refused.status === 403, `a managed ${name}.${operation} is refused on the platform`)
+    const refused = await asBackoffice(() => kayan[name].operations[operation]!(input, { actor: administrator.actor })).catch((thrown: unknown) => thrown)
+    assert.ok(refused instanceof AsasError && refused.status === 403, `a managed ${name}.${operation} is refused on the backoffice`)
   }
 
   const none = await staffOn('none-151b', 'none-151b')
   for (const name of ['user', 'organization', 'member'] as const) {
-    const refused = await onPlatformRead(name, {}, none.actor).catch((thrown: unknown) => thrown)
-    assert.ok(refused instanceof AsasError && refused.status === 403, `no platform role, no ${name}`)
+    const refused = await onBackofficeRead(name, {}, none.actor).catch((thrown: unknown) => thrown)
+    assert.ok(refused instanceof AsasError && refused.status === 403, `no backoffice role, no ${name}`)
   }
 
   // In the tenant app the same support person is its membership alone: no
-  // member row, and a person's id and name, whatever its platform role holds.
+  // member row, and a person's id and name, whatever its backoffice role holds.
   await server.api.addMember({ body: { userId: support.id, organizationId: a!.organization, role: 'member' } })
   await server.api.setActiveOrganization({ body: { organizationId: a!.organization }, headers: support.headers })
   await assignRole(a!.organization, support.id, 'administrator')
@@ -15369,32 +15384,32 @@ test('151b. on the platform the people, the organizations and their members are 
   assert.ok(tenantMembers instanceof AsasError && tenantMembers.status === 403, 'and no member row')
 })
 
-test('151c. the platform renames an organization and its slug through its own route, for a role holding organization.rename, audited once it succeeds and refused without the key, in the tenant app, or over a bad or taken slug', async (t) => {
+test('151c. the backoffice renames an organization and its slug through its own route, for a role holding organization.rename, audited once it succeeds and refused without the key, in the tenant app, or over a bad or taken slug', async (t) => {
   const lines: Record<string, unknown>[] = []
   t.mock.method(console, 'log', (line: unknown) => {
-    if (typeof line === 'string' && line.startsWith('{"audit":"platform"')) lines.push(JSON.parse(line))
+    if (typeof line === 'string' && line.startsWith('{"audit":"backoffice"')) lines.push(JSON.parse(line))
   })
   const [a, b] = await twoTenants('151c')
-  const administrator = await staffOn('platform-151c', 'super_admin')
+  const administrator = await staffOn('backoffice-151c', 'super_admin')
   const support = await staffOn('support-151c', 'support')
-  const rename = async (headers: Headers, body: unknown, platform = true) => {
-    const request = async () => asas.handler(new Request('http://test/api/platform/organizations/update', {
+  const rename = async (headers: Headers, body: unknown, backoffice = true) => {
+    const request = async () => asas.handler(new Request('http://test/api/backoffice/organizations/update', {
       method: 'POST',
-      headers: new Headers([...(platform ? await onPlatform(headers) : headers), ['content-type', 'application/json']]),
+      headers: new Headers([...(backoffice ? await onBackoffice(headers) : headers), ['content-type', 'application/json']]),
       body: JSON.stringify(body),
     }))
-    const response = await (platform ? asPlatform(request) : request())
+    const response = await (backoffice ? asBackoffice(request) : request())
     return { status: response.status, body: (await response.json()) as Record<string, any> }
   }
   const stored = async () => (await db.execute(`select name, slug from "organization" where id = '${a!.organization}'`)).rows[0]
 
-  assert.ok(platformRoles.super_admin.permissions === '*' && !(platformRoles.support.permissions as readonly string[]).includes('organization.rename') && !(platformRoles.explorer.permissions as readonly string[]).includes('organization.rename'), 'only a super admin holds organization.rename')
+  assert.ok(backofficeRoles.super_admin.permissions === '*' && !(backofficeRoles.support.permissions as readonly string[]).includes('organization.rename') && !(backofficeRoles.explorer.permissions as readonly string[]).includes('organization.rename'), 'only a super admin holds organization.rename')
   assert.ok(asas.catalog.includes('organization.rename'), 'which is a key of the catalog')
   const refused = await rename(support.headers, { id: a!.organization, name: 'By support', slug: 'by-support' })
   assert.equal(refused.status, 403, 'support holds no organization.rename')
   assert.equal(refused.body.data.key, 'error.forbidden.permission')
   const inTenant = await rename(administrator.headers, { id: a!.organization, name: 'In tenant', slug: 'in-tenant' }, false)
-  assert.equal(inTenant.status, 403, 'the tenant app refuses it to a super admin, whose platform role answers nothing there')
+  assert.equal(inTenant.status, 403, 'the tenant app refuses it to a super admin, whose backoffice role answers nothing there')
   for (const [body, status] of [
     [{ id: a!.organization, name: 'Bad', slug: 'Not A Slug' }, 400],
     [{ id: a!.organization, name: '  ', slug: 'blank-name' }, 400],
@@ -15418,13 +15433,13 @@ test('151c. the platform renames an organization and its slug through its own ro
   assert.deepEqual(renamed.body, { id: a!.organization, name: 'Renamed 151c', slug: 'renamed-151c' })
   assert.deepEqual(await stored(), { name: 'Renamed 151c', slug: 'renamed-151c' }, 'the organization is renamed')
   assert.equal(lines.length, 1, 'with one audit line')
-  assert.deepEqual(Object.assign({}, lines[0], { at: undefined }), { audit: 'platform', action: '/platform/organizations/update', actor: administrator.id, impersonatedBy: null, target: a!.organization, at: undefined })
+  assert.deepEqual(Object.assign({}, lines[0], { at: undefined }), { audit: 'backoffice', action: '/backoffice/organizations/update', actor: administrator.id, impersonatedBy: null, target: a!.organization, at: undefined })
   assert.ok(b, 'the other organization is untouched')
 })
 
-test('151d. the platform\'s people, organizations and members lists read their URL the way the host does, and a search, a filter, a sort and a page each narrow the read support makes there', async () => {
+test('151d. the backoffice\'s people, organizations and members lists read their URL the way the host does, and a search, a filter, a sort and a page each narrow the read support makes there', async () => {
   const { QueryRefused, findOf, readQuery, rulesOf, writeQuery } = await import('../../../packages/mithaq-admin/registry/list-query.ts')
-  const platform = asas.targets.platform.client
+  const backoffice = asas.targets.backoffice.client
   const nodeIn = (value: unknown): Parameters<typeof rulesOf>[0]['node'] => {
     if (!value || typeof value !== 'object') return undefined
     const list = (value as { list?: unknown }).list
@@ -15437,16 +15452,16 @@ test('151d. the platform\'s people, organizations and members lists read their U
   }
   const support = await staffOn('support-151d', 'support')
   const listed = async (name: 'user' | 'organization' | 'member', search: string) => {
-    const kayan = platform.kayan[name]!
+    const kayan = backoffice.kayan[name]!
     const node = nodeIn(kayan.pages.list)
-    const related = Object.values(platform.kayan).filter((one) => kayan.fields.some((field) => field.relationTo === one.name))
+    const related = Object.values(backoffice.kayan).filter((one) => kayan.fields.some((field) => field.relationTo === one.name))
     const input = findOf({
       kayan,
-      query: readQuery(new URLSearchParams(search), rulesOf({ kayan, node, maxLimit: platform.maxLimit, context: { client: related, locales: ['ar', 'en'] } })),
+      query: readQuery(new URLSearchParams(search), rulesOf({ kayan, node, maxLimit: backoffice.maxLimit, context: { client: related, locales: ['ar', 'en'] } })),
       node,
       locales: ['ar', 'en'],
     })
-    return asPlatform(() => (asas.kayan as unknown as Record<string, { operations: { find(input: unknown, options: unknown): Promise<{ docs: Record<string, any>[]; totalDocs: number; hasNextPage: boolean }> } }>)[name]!.operations.find(input, { actor: support.actor }))
+    return asBackoffice(() => (asas.kayan as unknown as Record<string, { operations: { find(input: unknown, options: unknown): Promise<{ docs: Record<string, any>[]; totalDocs: number; hasNextPage: boolean }> } }>)[name]!.operations.find(input, { actor: support.actor }))
   }
 
   const people: string[] = []
@@ -15526,35 +15541,35 @@ test('176. an enrollment\'s student is a member of the tenant\'s own organizatio
   assert.equal((await served.json()).data.key, 'error.invalid.reference', 'under the same key')
 })
 
-test('151e. the settings global is closed to every platform role, served or not, and still read by its own tenant', async () => {
+test('151e. the settings global is closed to every backoffice role, served or not, and still read by its own tenant', async () => {
   const [a] = await twoTenants('151e')
   const owner = { actor: (await asas.auth.actor(a!.owner.headers)) as never }
   await asas.global.settings.operations.update({ siteTitle: 'Tenant 151e' } as never, owner)
   assert.equal(((await asas.global.settings.operations.findOne({}, owner)) as { siteTitle?: string } | null)?.siteTitle, 'Tenant 151e', 'the tenant reads its own settings')
   for (const role of ['super_admin', 'support', 'explorer']) {
     const staff = await staffOn(`${role}-151e`, role)
-    const served = await asPlatform(async () => asas.handler(new Request('http://test/api/settings/findOne', {
+    const served = await asBackoffice(async () => asas.handler(new Request('http://test/api/settings/findOne', {
       method: 'POST',
-      headers: new Headers([...(await onPlatform(staff.headers)), ['content-type', 'application/json']]),
+      headers: new Headers([...(await onBackoffice(staff.headers)), ['content-type', 'application/json']]),
       body: '{}',
     })))
-    assert.equal(served.status, 403, `${role} is refused the settings on the platform, never a 500`)
+    assert.equal(served.status, 403, `${role} is refused the settings on the backoffice, never a 500`)
     assert.equal(((await served.json()) as { data: { key: string } }).data.key, 'error.forbidden.read')
   }
 })
 
-test('151f. no platform role reads a secret column of a tenant, a super admin included: a course\'s access code is hidden from all three, served or not, and is no filter', async () => {
+test('151f. no backoffice role reads a secret column of a tenant, a super admin included: a course\'s access code is hidden from all three, served or not, and is no filter', async () => {
   const [a] = await twoTenants('151f')
   await courses.operations.update({ id: a!.course, delivery: 'live', accessCode: 'SEC001' } as never, { actor: (await asas.auth.actor(a!.owner.headers)) as never })
   const served = (staff: { headers: Headers }, path: string, body: unknown) =>
-    asPlatform(async () => asas.handler(new Request(`http://test/api/courses/${path}?tenant=all`, {
+    asBackoffice(async () => asas.handler(new Request(`http://test/api/courses/${path}?tenant=all`, {
       method: 'POST',
-      headers: new Headers([...(await onPlatform(staff.headers)), ['content-type', 'application/json']]),
+      headers: new Headers([...(await onBackoffice(staff.headers)), ['content-type', 'application/json']]),
       body: JSON.stringify(body),
     })))
-  for (const role of Object.keys(platformRoles)) {
+  for (const role of Object.keys(backofficeRoles)) {
     const staff = await staffOn(`${role}-151f`, role)
-    const course = (await asPlatform(() => courses.operations.findByID({ id: a!.course }, { actor: staff.actor as never, tenant: 'all' }))) as Record<string, unknown>
+    const course = (await asBackoffice(() => courses.operations.findByID({ id: a!.course }, { actor: staff.actor as never, tenant: 'all' }))) as Record<string, unknown>
     assert.equal(course.title, 'Course 151f a', `${role} reads the course`)
     assert.ok(!('accessCode' in course), `and not its access code`)
     const view = await served(staff, 'findByID', { id: a!.course })
@@ -15752,7 +15767,7 @@ test('178. reverses #158 for localUsers: unset, LOCAL_AUTH_SECRET leaves every o
       console.log(JSON.stringify({
         strategies: asas.auth.strategies.map((one) => one.name),
         operations: Object.keys(asas.kayan.localUsers.operations),
-        screens: Object.fromEntries(['dashboard', 'portal', 'platform'].map((name) => [name, asas.targets[name].client])),
+        screens: Object.fromEntries(['dashboard', 'portal', 'backoffice'].map((name) => [name, asas.targets[name].client])),
         messages: asas.messages,
         answers,
       }))
@@ -17864,49 +17879,49 @@ test('227g. a role reads the people its audience names and itself, unless it hol
   await db.execute(`update member_roles set role = 'registrar' where user_id = '${tenant.people.registrar.id}'`)
 })
 
-test('227e. a person who holds a seat, a withdrawn one included, is not removed on the platform: the route answers 409 before anything goes, and their account and sessions stay', async () => {
+test('227e. a person who holds a seat, a withdrawn one included, is not removed on the backoffice: the route answers 409 before anything goes, and their account and sessions stay', async () => {
   const tenant = await roleTenant('seated-227e')
   const course = await courses.operations.create({ title: 'Seated 227e' }, tenant.options)
   const session = await sessions.operations.create({ course: course.id, startsAt: new Date('2027-04-01T09:00:00Z') }, tenant.options)
   const seat = await enrollments.operations.create({ session: session.id, student: tenant.people.student.id }, tenant.options)
   await enrollments.operations.delete({ id: seat.id }, tenant.options)
-  const platform = await signedUp('platform-227e')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const backoffice = await signedUp('backoffice-227e')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
   const held = async () => (await db.execute(`select (select count(*)::int from account where user_id = '${tenant.people.student.id}') as accounts, (select count(*)::int from session where user_id = '${tenant.people.student.id}') as sessions`)).rows[0]
   const before = await held()
-  const answer = await adminRoute('remove-user', platform.headers, { userId: tenant.people.student.id })
+  const answer = await adminRoute('remove-user', backoffice.headers, { userId: tenant.people.student.id })
   assert.equal(answer.status, 409, await answer.clone().text())
   assert.equal(((await answer.json()) as { code?: string }).code, 'error.conflict.referenced')
   assert.deepEqual(await held(), before, 'their account and sessions are all still there')
   // The route coerces `userId` to a string after the hooks run, so an id sent as a list is
   // the same person.
-  const listed = await adminRoute('remove-user', platform.headers, { userId: [tenant.people.student.id] })
+  const listed = await adminRoute('remove-user', backoffice.headers, { userId: [tenant.people.student.id] })
   assert.equal(listed.status, 409, await listed.clone().text())
   assert.deepEqual(await held(), before, 'and an id sent as a list leaves them untouched too')
   assert.ok(before!.accounts && before!.sessions, 'and there were some to lose')
   const removable = await signedUp('removable-227e')
-  assert.equal((await adminRoute('remove-user', platform.headers, { userId: removable.id })).status, 200, 'a person holding no seat is removed')
+  assert.equal((await adminRoute('remove-user', backoffice.headers, { userId: removable.id })).status, 200, 'a person holding no seat is removed')
 })
 
-test('227n. a person any row still names through a restricting relationship is not removed on the platform, whatever kayan names them: the route answers 409 before anything goes', async () => {
+test('227n. a person any row still names through a restricting relationship is not removed on the backoffice, whatever kayan names them: the route answers 409 before anything goes', async () => {
   const notes = notesAsas.kayan.probeNotes.operations as unknown as Record<'create' | 'delete', (input: unknown) => Promise<{ id: string }>>
   const person = await signedUp('noted-227n')
   // Written past the operation, which holds a reference to people its actor reads.
   const note = (await db.execute(`insert into probe_notes (id, author_id, created_at, updated_at) values (gen_random_uuid(), '${person.id}', now(), now()) returning id`)).rows[0] as { id: string }
-  const platform = await signedUp('platform-227n')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
+  const backoffice = await signedUp('backoffice-227n')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
   const held = async () => (await db.execute(`select (select count(*)::int from account where user_id = '${person.id}') as accounts, (select count(*)::int from session where user_id = '${person.id}') as sessions`)).rows[0]
   const before = await held()
-  const answer = await adminRoute('remove-user', platform.headers, { userId: person.id }, notesAsas)
+  const answer = await adminRoute('remove-user', backoffice.headers, { userId: person.id }, notesAsas)
   assert.equal(answer.status, 409, await answer.clone().text())
   assert.equal(((await answer.json()) as { code?: string }).code, 'error.conflict.referenced')
   assert.deepEqual(await held(), before, 'their account and sessions are all still there')
   assert.ok(before!.accounts && before!.sessions, 'and there were some to lose')
   await notes.delete({ id: note.id })
-  assert.equal((await adminRoute('remove-user', platform.headers, { userId: person.id }, notesAsas)).status, 200, 'once nothing names them, they are removed')
+  assert.equal((await adminRoute('remove-user', backoffice.headers, { userId: person.id }, notesAsas)).status, 200, 'once nothing names them, they are removed')
 })
 
-test('227o. a platform role without a route\'s permission is refused it before anything else is judged, so it learns nothing of the person it names', async () => {
+test('227o. a backoffice role without a route\'s permission is refused it before anything else is judged, so it learns nothing of the person it names', async () => {
   const owner = await signedUp('sole-owner-227o')
   await server.api.createOrganization({ body: { name: 'Sole 227o', slug: 'sole-227o' }, headers: owner.headers })
   const support = await signedUp('support-227o')
@@ -18020,12 +18035,12 @@ test('227j. a student holds one seat in a session: a second enrollment of the sa
   assert.equal(again.student, tenant.people.student.id, 'a student who withdrew takes a seat again')
 })
 
-test('227h. the only owner of an organization is not removed on the platform, nor by a delete of their own: the organization would be left with nobody who governs it; with a second owner they are', async () => {
+test('227h. the only owner of an organization is not removed on the backoffice, nor by a delete of their own: the organization would be left with nobody who governs it; with a second owner they are', async () => {
   const owner = await signedUp('sole-owner-227h')
   const made = (await server.api.createOrganization({ body: { name: 'Sole 227h', slug: 'sole-227h' }, headers: owner.headers }))!
-  const platform = await signedUp('platform-227h')
-  await db.execute(`update "user" set role = 'super_admin' where id = '${platform.id}'`)
-  const refused = await adminRoute('remove-user', platform.headers, { userId: owner.id })
+  const backoffice = await signedUp('backoffice-227h')
+  await db.execute(`update "user" set role = 'super_admin' where id = '${backoffice.id}'`)
+  const refused = await adminRoute('remove-user', backoffice.headers, { userId: owner.id })
   assert.equal(refused.status, 409, await refused.clone().text())
   assert.equal(((await refused.json()) as { code?: string }).code, 'error.conflict.sole_owner')
   assert.equal((await db.execute(`select id from "user" where id = '${owner.id}'`)).rows.length, 1, 'the owner is still there')
@@ -18035,7 +18050,7 @@ test('227h. the only owner of an organization is not removed on the platform, no
   await server.api.addMember({ body: { userId: second.id, organizationId: made.id, role: 'owner' } })
   // Their roles go first, as the Members page takes them before a removal.
   await db.execute(`delete from member_roles where user_id = '${owner.id}'`)
-  assert.equal((await adminRoute('remove-user', platform.headers, { userId: owner.id })).status, 200, 'with another owner, they are removed')
+  assert.equal((await adminRoute('remove-user', backoffice.headers, { userId: owner.id })).status, 200, 'with another owner, they are removed')
 })
 
 test('222a. a student reads its own enrollments alone, in its own tenant, over HTTP: find, count and findByID leave out another student\'s seat and another tenant\'s, writes are refused, and the instructor still reads every seat', async () => {

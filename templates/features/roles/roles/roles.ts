@@ -3,9 +3,9 @@ import { user as users } from '@asas/auth'
 import { assignedCount, managerRemains, memberRoles } from '../member-roles/member-roles.ts'
 import { managesRoles } from '@asas/mithaq/roles/grants.ts'
 import { defineKayan, rows, organization } from '@asas/mithaq'
-import { appPage, platformList, platformRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { systemRoles } from '@asas/mithaq/roles/system-roles.ts'
-import { platformReads } from '@asas/mithaq/roles/tenant-access.ts'
+import { backofficeReads } from '@asas/mithaq/roles/tenant-access.ts'
 
 const rolesUi = folderOf(new URL('./ui/', import.meta.url))
 
@@ -14,17 +14,17 @@ const rolesUi = folderOf(new URL('./ui/', import.meta.url))
  * a granter may not hand over a key it does not itself hold.
  */
 /**
- * A tenant's role never holds `screen.platform`, which only a platform role holds: a row naming it would be a tenant claiming the platform.
+ * A tenant's role never holds `screen.backoffice`, which only a backoffice role holds: a row naming it would be a tenant claiming the backoffice.
  * It is refused before the granter check, so a root granter holding `'*'` is refused too.
  */
-const PLATFORM_KEY = 'screen.platform'
+const BACKOFFICE_KEY = 'screen.backoffice'
 const tenantKeysOnly = (ctx: Ctx): Ctx => {
   const written = (ctx.data as Record<string, unknown>).permissions
-  if (!Array.isArray(written) || !written.includes(PLATFORM_KEY)) return ctx
+  if (!Array.isArray(written) || !written.includes(BACKOFFICE_KEY)) return ctx
   throw denied({
-    message: `Forbidden: a "${ctx.kayan.name}" row is a tenant's role, and "${PLATFORM_KEY}" is held only by a platform role.`,
-    key: 'error.forbidden.platform_key',
-    params: { kayan: ctx.kayan.name, permissions: [PLATFORM_KEY] },
+    message: `Forbidden: a "${ctx.kayan.name}" row is a tenant's role, and "${BACKOFFICE_KEY}" is held only by a backoffice role.`,
+    key: 'error.forbidden.backoffice_key',
+    params: { kayan: ctx.kayan.name, permissions: [BACKOFFICE_KEY] },
   })
 }
 
@@ -98,24 +98,24 @@ const keepsManagers = async (ctx: Ctx, tools: WriteTools): Promise<Ctx> => {
 const rolesAccess = rows({
   '*': { create: true, read: true, update: true, delete: true },
   /**
-   * Every platform role reads the role rows of every tenant, and writes none. A
+   * Every backoffice role reads the role rows of every tenant, and writes none. A
    * tenant that lost its administrator is repaired through `mithaq rbac assign`,
-   * never from the platform app.
+   * never from the backoffice app.
    */
-  ...platformReads,
+  ...backofficeReads,
 })
 
 export const roles = defineKayan({
   name: 'roles',
   targets: {
-    /** Every organization's rows on the platform, read-only. */
-    platform: {
+    /** Every organization's rows on the backoffice, read-only. */
+    backoffice: {
       useAsTitle: 'label',
       pages: {
         // A role by its label, never its slug, and its keys grouped as the
         // dashboard draws a fixed role's.
-        ...platformList('/roles', { columns: ['label', 'organization'], filters: ['organization'], search: ['label'] }),
-        ...platformRecord({
+        ...backofficeList('/roles', { columns: ['label', 'organization'], filters: ['organization'], search: ['label'] }),
+        ...backofficeRecord({
           path: '/roles/:id',
           main: [{ section: 'role', label: { en: 'Role', ar: 'الدور' }, fields: ['label', { field: 'permissions', cell: rolesUi('roles.tsx#Permissions') }] }],
         }),

@@ -8,26 +8,26 @@ import { use, type ReactNode } from 'react'
 import type { ShellProps } from 'mithaq/admin'
 import { ScreenContext, useLocale, useScreen } from 'mithaq/admin/react'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { PlatformLink, UserMenu, frame, headerBar, headerRow } from './app-shell.tsx'
+import { BackofficeLink, UserMenu, frame, headerBar, headerRow } from './app-shell.tsx'
 
 export const regions = ['header', 'nav', 'main'] as const
 
-/** The dashboard's top shell, whose header links the platform app for staff the way the app shell's does. */
+/** The dashboard's top shell, whose header links the backoffice app for staff the way the app shell's does. */
 export function TopShell(props: ShellProps<readonly ['header', 'nav', 'main'], ReactNode>) {
-  return <Top {...props} platform />
+  return <Top {...props} backoffice />
 }
 
 /**
- * The portal's, the same shell with no platform link: the portal is where a
- * tenant's people work, and staff reach the platform from the dashboard
+ * The portal's, the same shell with no backoffice link: the portal is where a
+ * tenant's people work, and staff reach the backoffice from the dashboard
  * alone. Which of the two a page draws is the shell its screen names under
  * `top`, never the URL.
  */
 export function PortalTopShell(props: ShellProps<readonly ['header', 'nav', 'main'], ReactNode>) {
-  return <Top {...props} platform={false} />
+  return <Top {...props} backoffice={false} />
 }
 
-function Top({ regions, platform }: ShellProps<readonly ['header', 'nav', 'main'], ReactNode> & { platform: boolean }) {
+function Top({ regions, backoffice }: ShellProps<readonly ['header', 'nav', 'main'], ReactNode> & { backoffice: boolean }) {
   const { t } = useLocale()
   const screen = useScreen()
   // Home is current on the screen's own home alone, whose path is the
@@ -45,7 +45,7 @@ function Top({ regions, platform }: ShellProps<readonly ['header', 'nav', 'main'
         <div className={headerRow}>
           {regions.header}
           <div className="ms-auto flex items-center gap-2">
-            {platform ? <PlatformLink /> : null}
+            {backoffice ? <BackofficeLink /> : null}
             {/* The avatar alone on a phone, the whole card from sm up, so the
                 title keeps the room it needs. */}
             <div className="w-12 sm:w-56">

@@ -4,7 +4,7 @@
 //
 //   bun run dev:setup [--seed]
 //
-// The dev admin owns an organization and, where the project serves the platform
+// The dev admin owns an organization and, where the project serves the backoffice
 // console, is its super_admin, with a proved address, so it signs in to both
 // apps at once. A development tool only: it refuses production, a database on
 // another machine, and a database that already holds a user.
@@ -37,13 +37,13 @@ if (!email || !password) refuse('set DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD in .
 Object.assign(process.env, { NODE_ENV: 'development' })
 
 const { asas } = await import('./asas.ts')
-const { isLocalHost, platformApp, platformURL, tenantURL } = await import('@asas/mithaq/auth')
+const { isLocalHost, backofficeApp, backofficeURL, tenantURL } = await import('@asas/mithaq/auth')
 // A deploy run with plain `node` sets no NODE_ENV and may hold its database on this machine; its address is what
 // tells it apart, as the auth setup reads it, so an app served elsewhere gets no dev admin.
-for (const [variable, url] of [['BETTER_AUTH_URL', tenantURL], ...(platformApp ? [['PLATFORM_URL', platformURL]] : [])] as const) {
+for (const [variable, url] of [['BETTER_AUTH_URL', tenantURL], ...(backofficeApp ? [['BACKOFFICE_URL', backofficeURL]] : [])] as const) {
   if (!isLocalHost(url)) refuse(`${variable} names ${url}, which is not this machine.`)
 }
-const signIn = `Sign in at ${tenantURL}${platformApp ? ` or ${platformURL}` : ''}`
+const signIn = `Sign in at ${tenantURL}${backofficeApp ? ` or ${backofficeURL}` : ''}`
 type Row = Record<string, unknown> & { id: string }
 const { db, tables } = asas.targets.drizzle as unknown as { db: { $client: { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }> } }; tables: Record<'user' | 'organization', PgTable> }
 const client = db.$client
@@ -85,18 +85,18 @@ try {
   await asas.connect()
   let organization: string
   if (mode === 'one') {
-    // First-run's own path: the owner, the one organization and, with the platform console, its super_admin.
+    // First-run's own path: the owner, the one organization and, with the backoffice console, its super_admin.
     organization = (await server.api.firstRun({ body: { name, email, password, organization: workspace } })).organization.id
   } else {
     // With many, an account proves its address by a mailed link and then founds its organization; the dev admin is
     // made proved, as first-run makes its owner, and its workspace made for it, as the page of someone in none would.
-    const user = await auth.internalAdapter.createUser({ name, email, emailVerified: true, ...(platformApp && { role: 'super_admin' }) })
+    const user = await auth.internalAdapter.createUser({ name, email, emailVerified: true, ...(backofficeApp && { role: 'super_admin' }) })
     await auth.internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password: await auth.password.hash(password) })
     organization = (await server.api.createOrganization({ body: { name: workspace, slug: 'dev-admin-workspace', userId: user.id } })).id
   }
   // Read back, since first-run names the organization Main where none is shown.
   const [made] = (await client.query(`select name from ${named(tables.organization)} where id = $1`, [organization])).rows
-  console.log(`Made the dev admin, owner of "${String(made!.name)}"${platformApp ? ' and platform super_admin' : ''}. ${signIn} with DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD from .env.`)
+  console.log(`Made the dev admin, owner of "${String(made!.name)}"${backofficeApp ? ' and backoffice super_admin' : ''}. ${signIn} with DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD from .env.`)
 } finally {
   await asas.destroy()
 }

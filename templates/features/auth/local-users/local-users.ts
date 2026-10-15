@@ -10,7 +10,7 @@ import {
   type Ctx,
 } from 'mithaq'
 import { defineKayan, requestContext } from '@asas/mithaq'
-import { appPage, platformList } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, backofficeList } from '@asas/mithaq/mithaq/pages.ts'
 import { superAdmin } from '@asas/mithaq/roles/tenant-access.ts'
 
 /**
@@ -62,7 +62,7 @@ export const localUsers = defineKayan({
   // would share one count; there, take the entry at the depth of the trusted proxies. A project served
   // bare passes its server's own address instead, such as Bun's `server.requestIP(request)`. No header
   // answers null, which leaves the request uncounted.
-  // No `email` is passed, so no mail is sent: a super admin verifies each sign-up in the platform app.
+  // No `email` is passed, so no mail is sent: a super admin verifies each sign-up in the backoffice app.
   auth: local({
     secret,
     withoutSecret: 'Local sign-in is off on this server: LOCAL_AUTH_SECRET is not set. Set it to a secret of 32 characters at least and restart the server.',
@@ -91,10 +91,10 @@ export const localUsers = defineKayan({
      * The form sends only what changed, so an unchanged toggle writes nothing and leaves `updatedAt`
      * alone. The protected columns are named by no page, so no list offers one as a column or a filter.
      */
-    platform: {
+    backoffice: {
       useAsTitle: 'email',
       pages: {
-        ...platformList('/local-users', {
+        ...backofficeList('/local-users', {
           columns: ['email', '_verified', 'createdAt'],
           filters: ['_verified'],
           search: ['email'],
@@ -121,7 +121,7 @@ export const localUsers = defineKayan({
       },
     },
   },
-  // Public sign-up stays open. A super admin, in the platform app alone, verifies an account by writing
+  // Public sign-up stays open. A super admin, in the backoffice app alone, verifies an account by writing
   // `_verified: true`, which the field's own write admits from the administrator and nobody else. The
   // super admin writes `_verified` and nothing else: a password or an email it set would be an account
   // it could then log in as, and no audit entry records a write to a kayan with no tenant. An

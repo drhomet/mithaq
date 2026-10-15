@@ -35,7 +35,7 @@ bun run test:next
 
 Before a release, `bun run pack` stages the three published packages in `.pack/`, and `bun run test:release` creates a project from them and runs it end to end.
 
-From `templates/asas/`, with `DATABASE_URL` exported, and then from `templates/mithaq/`, `apps/asas-tanstack/` and `apps/asas-platform/`, which hold files from mithaq-admin:
+From `templates/asas/`, with `DATABASE_URL` exported, and then from `templates/mithaq/`, `apps/asas-tanstack/` and `apps/asas-backoffice/`, which hold files from mithaq-admin:
 
 ```sh
 bunx mithaq generate --check   # in templates/asas
@@ -74,7 +74,7 @@ mithaq/
     features/         a package per feature, @asas/<feature>, each holding its kayan
     asas/             the asas that builds them, where every mithaq command runs
   apps/
-    asas-tanstack/  asas-platform/   the template's two apps
+    asas-tanstack/  asas-backoffice/   the template's two apps
     asas-next/        a Next.js app that mounts the same API, used to test mounting
     *.ts              repository tooling and cross-package tests
 ```

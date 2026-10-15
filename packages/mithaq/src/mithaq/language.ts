@@ -111,10 +111,10 @@ export type TenantTarget<RelationTo extends string = string> = {
   readonly organizations: 'one' | 'many'
   readonly field: TenantField<RelationTo>
   /**
-   * Whether this actor is platform staff in the trusted platform app, who may read every
+   * Whether this actor is backoffice staff in the trusted backoffice app, who may read every
    * tenant's rows with `tenant: 'all'` and never write through it. Absent, no one may.
    */
-  readonly platform?: (args: { user: unknown }) => boolean | Promise<boolean>
+  readonly backoffice?: (args: { user: unknown }) => boolean | Promise<boolean>
 }
 
 type RuntimeScreen = ScreenTarget

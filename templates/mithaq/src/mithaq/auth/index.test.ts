@@ -145,7 +145,7 @@ test('off a local host, or in production, the auth setup refuses to start withou
   assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
   const deploys = {
     'a real host with no NODE_ENV': { BETTER_AUTH_URL: 'https://app.example', BETTER_AUTH_SECRET: 'a-deploy-secret' },
-    'production on localhost': { NODE_ENV: 'production', BETTER_AUTH_URL: 'http://localhost:5173', PLATFORM_URL: 'http://localhost:5174', BETTER_AUTH_SECRET: 'a-deploy-secret' },
+    'production on localhost': { NODE_ENV: 'production', BETTER_AUTH_URL: 'http://localhost:5173', BACKOFFICE_URL: 'http://localhost:5174', BETTER_AUTH_SECRET: 'a-deploy-secret' },
   }
   for (const [deploy, env] of Object.entries(deploys)) {
     await assert.rejects(importedUnder(env), /needs a mailer in production[\s\S]*RESEND_API_KEY/, `${deploy}: refused without a mailer`)

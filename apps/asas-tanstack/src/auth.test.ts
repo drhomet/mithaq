@@ -20,7 +20,7 @@ const signIn = (await import('./routes/auth.sign-in.tsx')).Route.options.compone
 const forgot = (await import('./routes/auth.forgot-password.tsx')).Route.options.component!
 const reset = (await import('./routes/auth.reset-password.tsx')).Route.options.component!
 const accept = (await import('./routes/auth.accept-invitation.tsx')).Route.options.component!
-const platformSignIn = (await import('../../asas-platform/src/routes/auth.sign-in.tsx')).Route.options.component!
+const backofficeSignIn = (await import('../../asas-backoffice/src/routes/auth.sign-in.tsx')).Route.options.component!
 const { signedInAs } = await import('./auth-frame.tsx')
 const { scopes } = await import('./copy.ts')
 
@@ -162,8 +162,8 @@ test('the sign-in page says a refusal in this app\'s own words for the provider\
     assert.equal(await refusedWith('/auth/sign-in', signIn, locale, 400, { code: 'SOMETHING_ELSE', message: 'Some English' }, filled), copy.failed![locale], `a code this app has no words for reads as its own fallback in ${locale}`)
   }
   assert.notEqual(copy.invalidCredentials!.ar, copy.invalidCredentials!.en, 'and the Arabic is not the English')
-  assert.equal(await refusedWith('/auth/sign-in', platformSignIn, 'ar', 401, { code: 'INVALID_EMAIL_OR_PASSWORD', message: 'Invalid email or password' }, filled), copy.invalidCredentials!.ar, 'the platform\'s sign-in in Arabic')
-  assert.equal(await refusedWith('/auth/sign-in', platformSignIn, 'ar', 400, { code: 'SOMETHING_ELSE', message: 'Some English' }, filled), copy.failed!.ar, 'and its fallback is its own')
+  assert.equal(await refusedWith('/auth/sign-in', backofficeSignIn, 'ar', 401, { code: 'INVALID_EMAIL_OR_PASSWORD', message: 'Invalid email or password' }, filled), copy.invalidCredentials!.ar, 'the backoffice\'s sign-in in Arabic')
+  assert.equal(await refusedWith('/auth/sign-in', backofficeSignIn, 'ar', 400, { code: 'SOMETHING_ELSE', message: 'Some English' }, filled), copy.failed!.ar, 'and its fallback is its own')
 })
 
 test('the sign-up page says an email already taken in this app\'s own words, and flags an empty confirmation as required on submit', async () => {

@@ -174,7 +174,7 @@ export const rbacTarget = <const Roles extends SystemRoles, const Table extends 
           const user = values['--user']!
           const role = values['--role']!
           if (!Object.hasOwn(roles, role)) throw new Refusal(`Role "${role}" is not declared on the access target.`)
-          if (role === 'super_admin') throw new Refusal('Role "super_admin" is the platform role and cannot be assigned in a tenant.')
+          if (role === 'super_admin') throw new Refusal('Role "super_admin" is the backoffice role and cannot be assigned in a tenant.')
           const project = asas as typeof asas & { targets: Language['targets'] }
           const declarations = resolvedKayans.get(project) ?? {}
           const assignment = declarations[memberRoles]

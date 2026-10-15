@@ -625,7 +625,7 @@ The access target (`rbacTarget`) holds two kinds of role:
 
 - **System roles** are code: a slug, a label and the keys it holds (`'*'` for
   every key). The template's are `templates/mithaq/src/roles/system-roles.ts` `systemRoles`:
-  the platform's and the organizations' (`administrator`, `registrar`,
+  the backoffice's and the organizations' (`administrator`, `registrar`,
   `instructor`, `student`).
 - **Custom roles** are rows of the `roles` kayan, each organization's own:
   a `name` and a `permissions` list.

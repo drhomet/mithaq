@@ -263,10 +263,10 @@ test('a leaf naming no field and a button naming no operation are refused', () =
     /list search names "title\.name", and a search path crosses one relationship of this kayan to a text or email field of the kayan it points at\./,
   )
   const searches = (kayan: string) => {
-    const tree = asas.targets.platform.client.kayan[kayan]!.pages.list as unknown as { page: { main: { main: { list: { search?: string[] } }[] }[] } }
+    const tree = asas.targets.backoffice.client.kayan[kayan]!.pages.list as unknown as { page: { main: { main: { list: { search?: string[] } }[] }[] } }
     return tree.page.main[0]!.main[0]!.list.search
   }
-  assert.deepEqual(searches('member'), ['userId.name', 'userId.email'], 'the platform finds a membership by its person\'s name and email')
+  assert.deepEqual(searches('member'), ['userId.name', 'userId.email'], 'the backoffice finds a membership by its person\'s name and email')
   assert.deepEqual(searches('sessions'), ['venue', 'course.title'], 'a session by its venue and its course\'s title')
   assert.deepEqual(searches('roles'), ['label'], 'and a role by its name in every locale, never its slug')
   assert.throws(() => build(undefined, { useAsTitle: 'name' }), /Screen "portal" kayan "courses" useAsTitle names "name", which is not a field of this kayan\./)
@@ -356,7 +356,7 @@ test('a built-in on a kind it does not draw, a project kind with no controls row
 })
 
 test('the template builds three screens, and generate screens holds each projection verbatim as screen.json in the app that serves it', async () => {
-  for (const screen of ['dashboard', 'portal', 'platform'] as const) {
+  for (const screen of ['dashboard', 'portal', 'backoffice'] as const) {
     const client = asas.targets[screen].client
     assert.deepEqual(JSON.parse(await readFile(new URL(`${screen}/screen.json`, new URL(generate.screens[screen], new URL('../', import.meta.url))), 'utf8')), client)
   }
@@ -371,12 +371,12 @@ test('the template builds three screens, and generate screens holds each project
 test('the template screens share their controls and layouts through one const, register only the layouts their pages name, root pages at both shells, and between them use every node', () => {
   const dashboard = asas.targets.dashboard.client
   const portal = asas.targets.portal.client
-  const platform = asas.targets.platform.client
-  assert.equal(dashboard.layouts.table, platform.layouts.table, 'table is one file, registered once for the dashboard and the platform')
-  assert.deepEqual([dashboard.layouts.record, platform.layouts.record], ['@asas/mithaq:./src/ui/record-page.tsx#RecordPage', './src/ui-platform/record-page.tsx#PlatformRecordPage'], 'record is the dashboard\'s file, and the platform draws it under a link back')
-  assert.deepEqual([dashboard.layouts.app, platform.layouts.app], ['@asas/mithaq:./src/ui/app-shell.tsx#AppShell', '@asas/mithaq:./src/ui/app-shell.tsx#PlatformShell'], 'app is one file, its platform export the frame staff work in')
+  const backoffice = asas.targets.backoffice.client
+  assert.equal(dashboard.layouts.table, backoffice.layouts.table, 'table is one file, registered once for the dashboard and the backoffice')
+  assert.deepEqual([dashboard.layouts.record, backoffice.layouts.record], ['@asas/mithaq:./src/ui/record-page.tsx#RecordPage', './src/ui-backoffice/record-page.tsx#BackofficeRecordPage'], 'record is the dashboard\'s file, and the backoffice draws it under a link back')
+  assert.deepEqual([dashboard.layouts.app, backoffice.layouts.app], ['@asas/mithaq:./src/ui/app-shell.tsx#AppShell', '@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell'], 'app is one file, its backoffice export the frame staff work in')
   // A layout a screen registers is one a page of it names: the portal roots every
-  // page at its top shell, and the platform never draws the top shell.
+  // page at its top shell, and the backoffice never draws the top shell.
   const named = (client: typeof dashboard) => {
     const found = new Set<string>()
     const walk = (value: unknown): void => {
@@ -389,7 +389,7 @@ test('the template screens share their controls and layouts through one const, r
     walk([client.kayan, client.pages])
     return [...found].sort()
   }
-  for (const client of [dashboard, portal, platform]) {
+  for (const client of [dashboard, portal, backoffice]) {
     assert.deepEqual(named(client), Object.values(client.layouts).sort(), `${client.path} registers exactly the layouts its pages name`)
   }
   assert.equal(dashboard.layouts.top, '@asas/mithaq:./src/ui/top-shell.tsx#TopShell')

@@ -6,7 +6,7 @@
   "exports": {
     ".": "./src/mithaq.ts",
     "./auth": "./src/mithaq/auth/index.ts",
-    "./auth/platform-roles": "./src/mithaq/auth/platform-roles.ts",
+    "./auth/backoffice-roles": "./src/mithaq/auth/backoffice-roles.ts",
     "./auth/organizations": "./src/mithaq/auth/organizations.ts",
     "./*": "./src/*"
   },

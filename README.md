@@ -22,7 +22,7 @@ The name is Arabic for a covenant. The other words in the API are Arabic too, an
 bun create mithaq my-app --full
 ```
 
-This creates a Bun workspace of the template's three steps, the language (`packages/mithaq`), a package per feature (`packages/features/*`) and the asas that builds them (`packages/asas`), and two apps: the tenant app (`apps/asas-tanstack`), which serves the dashboard and the portal, and the platform console (`apps/asas-platform`), for staff who work across every organization. It writes a `.env` with fresh secrets and runs `bun install`. `--full` takes every add-on, the whole worked example; without it the project is minimal, auth and a `tags` example, and `--with roles,courses` picks add-ons.
+This creates a Bun workspace of the template's three steps, the language (`packages/mithaq`), a package per feature (`packages/features/*`) and the asas that builds them (`packages/asas`), and two apps: the tenant app (`apps/asas-tanstack`), which serves the dashboard and the portal, and the backoffice console (`apps/asas-backoffice`), for staff who work across every organization. It writes a `.env` with fresh secrets and runs `bun install`. `--full` takes every add-on, the whole worked example; without it the project is minimal, auth and a `tags` example, and `--with roles,courses` picks add-ons.
 
 Then, with PostgreSQL 15 or later serving the database that `DATABASE_URL` names in `packages/asas/.env`:
 
@@ -33,10 +33,10 @@ cd packages/asas
 bun run dev:setup --seed
 cd ../..
 bun run --cwd apps/asas-tanstack dev   # the tenant app, http://localhost:5173
-bun run --cwd apps/asas-platform dev   # in a second terminal: the platform console, http://localhost:5174
+bun run --cwd apps/asas-backoffice dev   # in a second terminal: the backoffice console, http://localhost:5174
 ```
 
-Sign in to both apps with `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` from `packages/asas/.env`: the dev admin owns "Dev admin's workspace", which `--seed` filled, and is the platform's `super_admin`.
+Sign in to both apps with `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` from `packages/asas/.env`: the dev admin owns "Dev admin's workspace", which `--seed` filled, and is the backoffice's `super_admin`.
 
 In production, `connect()` does not push the schema; it checks the migration files instead. [Running in production](https://github.com/drhomet/mithaq/blob/main/templates/asas/README.md#running-in-production) explains how to apply them.
 

@@ -1,7 +1,7 @@
 import { defaultFields } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '@asas/mithaq'
-import { appPage, danger, platformList, platformRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { expectedUpdatedAt } from '@asas/mithaq/steps/expected-updated-at.ts'
 
 const tag = [{ section: 'tag', label: { en: 'Tag', ar: 'الوسم' }, fields: ['name'] }] as const
@@ -21,13 +21,13 @@ export const tags = defineKayan({
   // What the picker on `courses.tags` shows for each row, and what its search
   // runs a `like` over. Without it every tag is a uuid.
   targets: {
-    // Every organization's rows on the platform, read-only, and each row's
+    // Every organization's rows on the backoffice, read-only, and each row's
     // record, which only reads.
-    platform: {
+    backoffice: {
       useAsTitle: 'name',
       pages: {
-        ...platformList('/tags', { columns: ['name', 'organization', 'createdAt'], filters: ['organization'], search: ['name'] }),
-        ...platformRecord({ path: '/tags/:id', main: [{ section: 'tag', label: { en: 'Tag', ar: 'الوسم' }, fields: ['name'] }] }),
+        ...backofficeList('/tags', { columns: ['name', 'organization', 'createdAt'], filters: ['organization'], search: ['name'] }),
+        ...backofficeRecord({ path: '/tags/:id', main: [{ section: 'tag', label: { en: 'Tag', ar: 'الوسم' }, fields: ['name'] }] }),
       },
     },
     // A create opens as a sheet over the list. The name is copy a screen shows

@@ -52,7 +52,7 @@ before(async () => {
     ...process.env,
     BETTER_AUTH_SECRET: 'asas-next-boot-test-secret',
     LOCAL_AUTH_SECRET: 'asas-next-boot-local-secret-of-32-characters',
-    PLATFORM_URL: 'http://127.0.0.1:4174',
+    BACKOFFICE_URL: 'http://127.0.0.1:4174',
     BETTER_AUTH_URL: 'http://127.0.0.1:3000',
     STORAGE_SECRET: 'asas-next-boot-storage-secret-of-32-characters',
     STORAGE_PREFIX: 'mithaq/asas',

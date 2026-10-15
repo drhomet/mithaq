@@ -1,0 +1,202 @@
+/* The owner's shadcn preset, `bunx --bun shadcn@latest init --preset b1Nt9T8mlk
+   --template start` (style `base-sera`), as it wrote this file, with RTL on for
+   Arabic and the two additions marked below. */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/noto-sans";
+@import "@fontsource-variable/figtree";
+/* Arabic, which the preset's two faces do not draw: the tenant app's own face
+   for it, listed first in `--font-sans` below so an Arabic page reads in it and
+   a Latin one falls through to the preset's. */
+@import "@fontsource/ibm-plex-sans-arabic";
+/* The admin's pieces in node_modules, which Tailwind never scans on its own. */
+@import "mithaq-admin/source.css";
+
+/* The project's own shells, pages and components, which the backoffice screen
+   loads, as the tenant app lists them (`apps/asas-tanstack/src/styles.css`).
+   Tailwind finds this app's own files, an ejected `src/components/mithaq`
+   among them, without one. */
+@source "../../../templates";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0.008 326);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0.008 326);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0.008 326);
+    --primary: oklch(0.491 0.27 292.581);
+    --primary-foreground: oklch(0.969 0.016 293.756);
+    --secondary: oklch(0.967 0.001 286.375);
+    --secondary-foreground: oklch(0.21 0.006 285.885);
+    --muted: oklch(0.96 0.003 325.6);
+    --muted-foreground: oklch(0.542 0.034 322.5);
+    --accent: oklch(0.96 0.003 325.6);
+    --accent-foreground: oklch(0.212 0.019 322.12);
+    /* Darker than the preset's red 600, which is 4.0:1 on the pale red fill the destructive button and menu item draw it on and 3.3:1 on its hover; this is 5.9:1 on the fill and 4.9:1 on the hover. */
+    --destructive: oklch(0.48 0.2 27.5);
+    --border: oklch(0.922 0.005 325.62);
+    --input: oklch(0.922 0.005 325.62);
+    --ring: oklch(0.711 0.019 323.02);
+    --chart-1: oklch(0.811 0.111 293.571);
+    --chart-2: oklch(0.606 0.25 292.717);
+    --chart-3: oklch(0.541 0.281 293.009);
+    --chart-4: oklch(0.491 0.27 292.581);
+    --chart-5: oklch(0.432 0.232 292.759);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0.008 326);
+    --sidebar-primary: oklch(0.541 0.281 293.009);
+    --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
+    --sidebar-accent: oklch(0.96 0.003 325.6);
+    --sidebar-accent-foreground: oklch(0.212 0.019 322.12);
+    --sidebar-border: oklch(0.922 0.005 325.62);
+    --sidebar-ring: oklch(0.711 0.019 323.02);
+}
+
+.dark {
+    --background: oklch(0.145 0.008 326);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.212 0.019 322.12);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.212 0.019 322.12);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.432 0.232 292.759);
+    --primary-foreground: oklch(0.969 0.016 293.756);
+    --secondary: oklch(0.274 0.006 286.033);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.263 0.024 320.12);
+    --muted-foreground: oklch(0.711 0.019 323.02);
+    --accent: oklch(0.263 0.024 320.12);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.542 0.034 322.5);
+    --chart-1: oklch(0.811 0.111 293.571);
+    --chart-2: oklch(0.606 0.25 292.717);
+    --chart-3: oklch(0.541 0.281 293.009);
+    --chart-4: oklch(0.491 0.27 292.581);
+    --chart-5: oklch(0.432 0.232 292.759);
+    --sidebar: oklch(0.212 0.019 322.12);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.606 0.25 292.717);
+    --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
+    --sidebar-accent: oklch(0.263 0.024 320.12);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.542 0.034 322.5);
+}
+
+@theme inline {
+    --font-sans: 'IBM Plex Sans Arabic', 'Noto Sans Variable', sans-serif;
+    --font-heading: 'Figtree Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+/* What the backoffice draws beyond the preset, each a rule over a marker the
+   shared pieces already carry, so the tenant app, which does not load this
+   file, is unchanged. */
+
+/* A role's keys as readable groups. The preset's badge is 10px, uppercase and
+   unframed, so a run of them read as one wall of letters; here each key is a
+   small framed word in the page's own case, and each group is a block. */
+[data-permissions] > section + section {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+[data-permissions] h3 {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+[data-permissions] [data-slot='badge'] {
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+/* A key the editor toggles (a button) is filled while it is on, which the
+   preset's badge shows by its text colour alone, and that the rule above
+   would otherwise have made the same as off. */
+[data-permissions] button[data-slot='badge'][aria-pressed='true'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* An empty field reads as a dash, in a list's cell and on a record page, as the
+   checkbox cell already draws a question never answered. */
+td[data-slot='table-cell']:empty::before,
+a[data-row-link]:empty::before,
+[data-field-value] > span:empty::before {
+  content: '—';
+  /* An empty alternative text, where it is understood, so a screen reader does not say "dash". */
+  content: '—' / '';
+  color: var(--muted-foreground);
+}
+
+/* The backoffice's cards are square, as its buttons, inputs and home cards are:
+   the section and form cards the registry draws with a rounded class of their
+   own, the frame a list's table sits in, the filter panel above it and the
+   danger region of a record page. */
+[data-slot='card'],
+:has(> [data-slot='table-container']),
+[data-mithaq-filters],
+[data-region='danger'] {
+  border-radius: 0;
+}

@@ -1,6 +1,6 @@
 import { defaultFields, defaultOperations, type Ctx, type Where } from 'mithaq'
 import { defineKayan, organization } from '@asas/mithaq'
-import { activity, appPage, danger, platformList, platformRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { courses, runsCatalogue } from '../courses/courses.ts'
 import { archivedRow, marks, reason, reasonInput, unarchived } from '../domain/archive.ts'
 
@@ -41,11 +41,11 @@ export const sessions = defineKayan({
   // one schema is a trap.
   dbName: 'course_sessions',
   targets: {
-    platform: {
+    backoffice: {
       useAsTitle: 'startsAt',
       pages: {
-        ...platformList('/sessions', { columns: ['startsAt', 'organization', 'course', 'capacity', 'venue'], filters: ['organization', 'course', 'venue', 'archived'], search: ['venue', 'course.title'], sort: '-startsAt' }),
-        ...platformRecord({
+        ...backofficeList('/sessions', { columns: ['startsAt', 'organization', 'course', 'capacity', 'venue'], filters: ['organization', 'course', 'venue', 'archived'], search: ['venue', 'course.title'], sort: '-startsAt' }),
+        ...backofficeRecord({
           path: '/sessions/:id',
           main: [{ tabs: [
             { tab: 'details', label: { en: 'Details', ar: 'التفاصيل' }, fields: [

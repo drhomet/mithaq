@@ -1,6 +1,6 @@
 import { defaultFields, defaultGlobalFields, defaultGlobalOperations } from 'mithaq'
 import { defineGlobal, organization, rows } from '@asas/mithaq'
-import { platformClosed, tenantAccess } from '@asas/mithaq/roles/tenant-access.ts'
+import { backofficeClosed, tenantAccess } from '@asas/mithaq/roles/tenant-access.ts'
 import { appPage } from '@asas/mithaq/mithaq/pages.ts'
 
 /**
@@ -40,11 +40,11 @@ export const settings = defineGlobal({
     // migrations still describe it.
     globalType: { ...defaultGlobalFields.globalType, rules: { required: true, defaultValue: 'settings' } },
   },
-  // Its own rows: the language's, and every platform role closed. The platform
+  // Its own rows: the language's, and every backoffice role closed. The backoffice
   // lists no global, since a list across tenants reads by `find` and a global
   // declares none, so it reads none, 403 `error.forbidden.read`. A global takes
   // read and update alone, and the other two the rows compile are never reached.
-  access: rows({ ...tenantAccess, ...platformClosed }) as Pick<ReturnType<typeof rows>, 'read' | 'update'>,
+  access: rows({ ...tenantAccess, ...backofficeClosed }) as Pick<ReturnType<typeof rows>, 'read' | 'update'>,
   targets: {
     service: { operations: defaultGlobalOperations },
     // A global is one row, so its page is a custom one with no id: its form

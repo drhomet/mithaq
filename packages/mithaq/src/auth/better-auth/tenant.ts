@@ -7,7 +7,7 @@ import type { TenantTarget } from '../../mithaq/language.ts'
 export const betterAuthTenant = <const RelationTo extends string>({
   relationTo,
   onDelete,
-  platform,
+  backoffice,
   organizations,
 }: {
   /** The kayan a row's tenant is, Better Auth's `organization`. */
@@ -15,10 +15,10 @@ export const betterAuthTenant = <const RelationTo extends string>({
   /** `restrict`: a tenant still holding a row is not deleted. */
   onDelete: 'restrict'
   /**
-   * Whether this actor is platform staff in the trusted platform app, who may read every
+   * Whether this actor is backoffice staff in the trusted backoffice app, who may read every
    * tenant with `tenant: 'all'`. The answer is the project's: it decides which app is trusted.
    */
-  platform?: (args: { user: unknown }) => boolean | Promise<boolean>
+  backoffice?: (args: { user: unknown }) => boolean | Promise<boolean>
   /**
    * How many organizations the project holds: `'one'` or `'many'`. Both keep the field and the
    * scope; in `'one'` a `connect()` refuses to start over more than one. Whether a project shows its
@@ -42,7 +42,7 @@ export const betterAuthTenant = <const RelationTo extends string>({
     relationTo,
     onDelete,
     organizations,
-    ...(platform && { platform }),
+    ...(backoffice && { backoffice }),
     field: {
       kind: 'relationship',
       relationTo,

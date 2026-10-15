@@ -116,7 +116,7 @@ test('the lock records the vocabulary alone, as plain data, and a lock read back
   assert.deepEqual((block as any).targets, {
     dashboard: 'screen',
     drizzle: 'store',
-    platform: 'screen',
+    backoffice: 'screen',
     portal: 'screen',
     rbac: 'access',
     service: 'service',
@@ -360,13 +360,14 @@ test('the #167 lock, kept as a fixture with `previous` and `restart` in its seal
   // A lock signed before the `versions`, `storage` and `tenant` targets, the
   // `richText`, `upload`, `integer` and `decimal` kinds, the `precision` and
   // `scale` rules and the arkan existed holds the language
-  // without any of them, its kinds and rules at the root.
+  // without any of them, its kinds and rules at the root, and names the
+  // backoffice target by its old name, `platform`.
   const { arkan: _arkan, ...root } = language
   const vocabulary = vocabularyOf({
     ...root,
     kinds: { ...defaultKinds, richText: undefined, upload: undefined, integer: undefined, decimal: undefined },
     rules: { ...defaultRules, precision: undefined, scale: undefined },
-    targets: { ...language.targets, versions: undefined, storage: undefined, tenant: undefined },
+    targets: { ...language.targets, backoffice: undefined, platform: language.targets.backoffice, versions: undefined, storage: undefined, tenant: undefined },
   })
   const { code, message } = checkLock(vocabulary, kept)
   assert.equal(code, 0, message)
@@ -464,7 +465,7 @@ test('a red lock stops every script that starts or builds an app, and an unlocke
   // `vite` is a stand-in on PATH that records it ran.
   const repository = new URL('../../../', import.meta.url)
   const bin = join(fileURLToPath(repository), 'packages/mithaq/src/asas/cli/mithaq.ts')
-  for (const app of ['asas-tanstack', 'asas-platform']) {
+  for (const app of ['asas-tanstack', 'asas-backoffice']) {
     const { scripts } = JSON.parse(await readFile(new URL(`apps/${app}/package.json`, repository), 'utf8')) as { scripts: Record<string, string> }
     for (const name of ['dev', 'build', 'preview']) {
       await t.test(`${app} ${name}`, async () => {

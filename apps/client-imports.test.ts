@@ -1,7 +1,7 @@
 // No module a browser loads may reach the language (it holds the storage config and its upload-signing secret),
 // the template's storage folder, core's storage target or `node:crypto`.
 // The walk follows static value imports and every file an `import.meta.glob` names. It skips dynamic `import()` (server
-// functions, compiled out of the client), `routeTree.gen.ts`, the platform's `server.ts` and a route whose options hold only
+// functions, compiled out of the client), `routeTree.gen.ts`, the backoffice's `server.ts` and a route whose options hold only
 // `server`; a route with `server` beside a `loader` or component runs in the browser and is walked whole.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -15,7 +15,7 @@ import { API } from 'typescript/unstable/sync'
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const trackedFiles = (root: string) =>
   execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter((file) => file && existsSync(join(root, file)))
-const apps = ['apps/asas-tanstack', 'apps/asas-platform']
+const apps = ['apps/asas-tanstack', 'apps/asas-backoffice']
 const forbidden = [
   (path: string) => path === 'templates/mithaq/src/mithaq.ts',
   (path: string) => path.startsWith('templates/mithaq/src/storage/'),
@@ -23,7 +23,7 @@ const forbidden = [
   (path: string) => path === 'node:crypto' || path === 'crypto',
 ]
 
-const code = trackedFiles(root).filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.d.ts') && /^(apps\/asas-(tanstack|platform)\/src|templates\/((mithaq|asas)\/src|features)|packages\/mithaq\/src)\//.test(file))
+const code = trackedFiles(root).filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.d.ts') && /^(apps\/asas-(tanstack|backoffice)\/src|templates\/((mithaq|asas)\/src|features)|packages\/mithaq\/src)\//.test(file))
 const routeFixture = (options: string) => `import { createFileRoute } from '@tanstack/react-router'
 import { arkan } from '../../../../templates/mithaq/src/mithaq.ts'
 export const Route = createFileRoute('/fixture')({ ${options} })

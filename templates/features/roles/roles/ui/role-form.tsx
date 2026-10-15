@@ -16,7 +16,7 @@ import { grantable } from '@asas/mithaq/roles/grants.ts'
 import { projectStatements } from '@asas/mithaq/roles/statements.ts'
 
 /** The key a tenant's role may never hold, which the role kayan refuses by name, so no badge offers it. */
-const PLATFORM_KEY = 'screen.platform'
+const BACKOFFICE_KEY = 'screen.backoffice'
 
 type Key = { key: string; label: string }
 type Group = { name: string; label: string; operations: Key[]; fields: Key[] }
@@ -31,7 +31,7 @@ const useGroups = (): Group[] => {
   const screen = useScreen()
   const access = useAccess()
   const { locale, t } = useLocale()
-  const screens = (access.screens ?? []).map((name) => `screen.${name}`).filter((key) => key !== PLATFORM_KEY)
+  const screens = (access.screens ?? []).map((name) => `screen.${name}`).filter((key) => key !== BACKOFFICE_KEY)
   return [
     {
       name: 'screen',
@@ -63,7 +63,7 @@ export function PermissionBadges({ held, onChange, busy }: { held: readonly stri
   const access = useAccess()
   const { t } = useLocale()
   // Read only, every screen the role enters is named, whichever the viewer
-  // enters: the platform reads a tenant's role, which holds `screen.dashboard`.
+  // enters: the backoffice reads a tenant's role, which holds `screen.dashboard`.
   const groups = useGroups().map((group) =>
     group.name === 'screen' && !onChange
       ? { ...group, operations: held.filter((key) => key.startsWith('screen.')).map((key) => ({ key, label: t(`screens.${key.slice('screen.'.length)}`) ?? key })) }
