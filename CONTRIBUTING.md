@@ -87,7 +87,7 @@ The `AGENTS.md` files hold the rules for a coding agent, each for the tree it si
 - `packages/mithaq/src/asas/runner/AGENTS.md`, for the runner and the tenant scope;
 - `packages/mithaq/src/drizzle/AGENTS.md`, for the drizzle store and migrations;
 - `packages/mithaq-admin/AGENTS.md`, for the admin package and the files projects hold from it;
-- `templates/asas/AGENTS.md`, with `templates/asas/CLAUDE.md` beside it, for working in a created project. Both ship with the template.
+- `templates/asas/AGENTS.md`, with `templates/asas/CLAUDE.md` beside it, for working in a created project. Both ship with the template, and `create-mithaq` lays them, with the project's `README.md`, at the project's root.
 
 The guides sit beside the code they describe, each as its folder's `README.md`:
 

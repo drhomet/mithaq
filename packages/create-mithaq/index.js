@@ -357,6 +357,9 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
     writeFileSync(join(project, '.env'), env, { mode: 0o600 })
   } else {
     for (const folder of ['packages/asas', 'apps/asas-tanstack', ...(backoffice ? ['apps/asas-backoffice'] : [])]) writeFileSync(join(project, folder, '.env'), env, { mode: 0o600 })
+    // An agent started at the root reads no file below it until it touches one, and the repository's page shows the
+    // root's README alone, so the guide and the agent files sit there, as a single package's do.
+    for (const file of ['AGENTS.md', 'CLAUDE.md', 'README.md']) renameSync(join(project, 'packages/asas', file), join(project, file))
     // The project's own scope, on each of its package names and every import of one.
     for (const file of textsUnder(project)) edit(file, (text) => text.replaceAll('@asas/', `@${name}/`))
     writeJson(join(project, 'tsconfig.json'), {

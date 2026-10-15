@@ -68,6 +68,13 @@ test('a project is a workspace every package manager reads, named for it, of the
   assert.deepEqual(json('my-app/tsconfig.json').exclude, ['apps/*/src/server.ts', 'apps/*/src/components.ts'], 'the server entries and the components maps are checked by each app\'s own config, which reads their .tsx')
 })
 
+test('a monorepo holds its guide and agent files at the root, where an agent started there and the repository page read them', () => {
+  assert.deepEqual(['AGENTS.md', 'CLAUDE.md', 'README.md'].filter((file) => existsSync(join(scratch, 'my-app', file))), ['AGENTS.md', 'CLAUDE.md', 'README.md'])
+  assert.deepEqual(['AGENTS.md', 'CLAUDE.md', 'README.md'].filter((file) => existsSync(join(scratch, 'my-app/packages/asas', file))), [], 'and none is left in packages/asas')
+  assert.equal(read('my-app/CLAUDE.md'), '@AGENTS.md\n')
+  assert.match(read('my-app/AGENTS.md'), /`README\.md` beside this file/)
+})
+
 test('the template and both apps get the same .env, with fresh secrets only their owner can read', () => {
   const env = read('my-app/packages/asas/.env')
   // One BETTER_AUTH_SECRET across the two apps, since each signs the sessions the other reads.

@@ -188,6 +188,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const features = single ? [] : readdirSync(join(consumer, 'packages/features')).map((one) => `packages/features/${one}`)
     const workspaces = single ? [''] : ['packages/mithaq', ...features, 'packages/asas', 'apps/asas-tanstack', ...(backoffice ? ['apps/asas-backoffice'] : [])]
     assert.deepEqual(['templates', 'packages', 'apps/asas-backoffice'].filter((folder) => existsSync(join(consumer, folder))), single ? [] : backoffice ? ['packages', 'apps/asas-backoffice'] : ['packages'])
+    for (const file of ['AGENTS.md', 'CLAUDE.md', 'README.md']) assert.ok(existsSync(join(consumer, file)) && !existsSync(join(consumer, 'packages/asas', file)), `${file} sits at the project's root`)
     // Each package that draws or ejects a piece names mithaq-admin; one that holds only kayan or the auth setup's server side need not.
     const drawing = workspaces.filter((workspace) => (JSON.parse(readFileSync(join(consumer, workspace, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }).dependencies?.['mithaq-admin'] !== undefined)
     assert.ok(['packages/mithaq', 'packages/asas', 'apps/asas-tanstack'].every((one) => single || drawing.includes(one)), `${drawing.join(', ')} name mithaq-admin`)

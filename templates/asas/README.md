@@ -285,6 +285,9 @@ This runs the lock check, every generator in check mode, and the migration check
 
 ```
 my-app/
+  README.md           this guide
+  AGENTS.md           the rules for a coding agent working in the project
+  CLAUDE.md           one line, @AGENTS.md, so Claude Code reads the same rules
   package.json        workspaces packages/mithaq, packages/features/*, packages/asas and apps/*; no scripts
   tsconfig.json       one strict config over every package's .ts and apps/*/src
   .gitignore          node_modules, .env, dist, .storage/
@@ -378,9 +381,6 @@ packages/asas/
   package.json        "asas": exports ".", "./messages/*", "./ui-dashboard/*"; script "seed"
   mithaq.hints.json   the project's answers to "is this a rename?" questions mithaq migrate asks
   mithaq.lock         the signed vocabulary, when the project keeps one
-  README.md           this guide
-  AGENTS.md           the rules for a coding agent working in the project
-  CLAUDE.md           one line, @AGENTS.md, so Claude Code reads the same rules
   .env.example
   src/
     asas.ts           buildAsas: every feature's kayan, globals, HTTP plugs, statements, auth
