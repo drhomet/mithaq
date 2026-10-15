@@ -27,7 +27,7 @@ const adoptSourceOf = (posts = '') => `import { defaultMaxBodyBytes, fetchHttp }
 import { buildAsas, defineKayan } from '${template}'
 
 export const asas = buildAsas({
-  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   kayan: [
     defineKayan({
       name: 'authors',

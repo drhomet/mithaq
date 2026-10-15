@@ -25,6 +25,14 @@ import { backofficeHttp } from './backoffice-http.ts'
 import { projectStatements } from '@asas/mithaq/roles/statements.ts'
 import { superAdmin } from '@asas/mithaq/roles/tenant-access.ts'
 
+/**
+ * Where a fault the build answers 500 to, or a strategy that threw, is reported: this project's
+ * log, the console. A project with an error tracker names it here. A `Notice` is expected, such
+ * as the build of a local auth kayan with no mailer, and prints as its one line; anything else
+ * prints with its stack.
+ */
+const report = (error: unknown) => console.error(error instanceof Notice ? error.message : error)
+
 export const asas = buildAsas({
   kayan: [
     ...auth.kayan,
@@ -67,13 +75,12 @@ export const asas = buildAsas({
   // bag whichever plug served it.
   // The backoffice's rename of an organization sits between them, before the
   // plain plug would read `/api/backoffice/*` as a kayan's route.
-  // A fault either plug answers 500 is written to this project's log, the
-  // console, as `fetchHttp`'s default does; the oRPC plug takes no default.
+  // A fault either plug answers 500 is handed to `report`; core reports none of its own.
   // A body past `maxBodyBytes` is answered 413 before it is read whole.
   http: [
-    orpcHttp({ context: (request, actor) => ({ actor, ...requestContext(request) }), onError: (error) => console.error(error), maxBodyBytes: defaultMaxBodyBytes }),
+    orpcHttp({ context: (request, actor) => ({ actor, ...requestContext(request) }), onError: report, maxBodyBytes: defaultMaxBodyBytes }),
     backofficeHttp(),
-    fetchHttp({ context: requestContext, maxBodyBytes: defaultMaxBodyBytes }),
+    fetchHttp({ context: requestContext, onError: report, maxBodyBytes: defaultMaxBodyBytes }),
   ],
   // Better Auth's own actions, which no declaration of this project derives.
   // They join the catalog under the resources they name, so a role holds
@@ -86,10 +93,7 @@ export const asas = buildAsas({
   // listed with the role form that offers them.
   statements: { ...providerStatements, organization: [...providerStatements.organization, 'rename'], ...projectStatements },
   // `onError` hears a strategy that threw and an access target that could not
-  // answer, which the build reports nowhere of its own. The console is this
-  // project's log; a project with an error tracker names it here. A `Notice`
-  // is expected, such as the build of a local auth kayan with no mailer, and
-  // prints as its one line; anything else prints with its stack.
+  // answer, which the build reports nowhere of its own.
   //
   // `admin.access` is the answer `/api/access` reports as `canAccessAdmin`:
   // `true` for a super admin in the backoffice app, `false` for every other
@@ -100,7 +104,7 @@ export const asas = buildAsas({
   // The administrator is a super admin in the backoffice app and nobody else: the
   // one who verifies a local sign-up. A kayan with no callback of its own falls
   // to this answer, so every table Better Auth alone writes closes itself.
-  auth: { admin: { kayan: auth.user, access: superAdmin }, onError: (error) => console.error(error instanceof Notice ? error.message : error) },
+  auth: { admin: { kayan: auth.user, access: superAdmin }, onError: report, maxBodyBytes: defaultMaxBodyBytes },
 })
 
 // The backoffice slug, the screen the backoffice app serves, the reader that

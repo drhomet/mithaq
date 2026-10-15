@@ -85,7 +85,7 @@ export const widget = defineKayan({
 import { buildAsas } from './mithaq.ts'
 import { flatKayan } from './kayan/flat-kayan.ts'
 import * as widget from './features/widget/index.ts'
-export const asas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [flatKayan, ...widget.kayan] })
+export const asas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [flatKayan, ...widget.kayan] })
 `,
   )
   return root
@@ -162,7 +162,7 @@ export const widget = defineKayan({
     `import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import { buildAsas } from '@fixture/mithaq'
 import * as widget from '@fixture/widget'
-export const asas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [...widget.kayan] })
+export const asas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [...widget.kayan] })
 `,
   )
   await write('packages/asas/src/ui/panel.tsx', 'export const Panel = () => null\n')

@@ -25,7 +25,7 @@ test('an integer is written and read as an int4, and a fraction, a value that is
     fields: { ...defaultFields, count: { kind: 'integer', label: { en: 'Count', ar: 'العدد' }, rules: { required: true } } },
     targets: { service: { operations: defaultOperations } },
   })
-  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [measures] }).kayan.measures.operations
+  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [measures] }).kayan.measures.operations
   for (const count of [-2147483648, 0, 2147483647]) {
     const row = await operations.create({ id: crypto.randomUUID(), count })
     assert.equal((await operations.findByID({ id: row.id }))?.count, count)
@@ -44,7 +44,7 @@ test('a decimal is written and read as its exact text, and text that is no decim
     fields: { ...defaultFields, amount: { kind: 'decimal', label: { en: 'Amount', ar: 'المبلغ' }, rules: { required: true, precision: 20, scale: 2 } } },
     targets: { service: { operations: defaultOperations } },
   })
-  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [prices] }).kayan.prices.operations
+  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [prices] }).kayan.prices.operations
   // 9007199254740993 is the first whole number a JS double cannot hold.
   for (const amount of ['9007199254740993.12', '-999999999999999999.99', '0.01', '0000.20']) {
     const row = await operations.create({ id: crypto.randomUUID(), amount })
@@ -60,7 +60,7 @@ test('a decimal field declares a precision and a scale or neither, and a scale n
   const { defineKayan, buildAsas } = language()
   const build = (rules: Record<string, unknown>) => () =>
     buildAsas({
-      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [defineKayan({ name: 'sized', fields: { ...defaultFields, amount: { kind: 'decimal', rules } as never }, targets: { service: { operations: defaultOperations } } })],
     })
   assert.throws(build({ precision: 7 }), /field "amount" declares precision and needs scale too, or neither/)
@@ -73,7 +73,7 @@ test('a decimal field declares a precision and a scale or neither, and a scale n
     assert.doesNotThrow(build(rules), JSON.stringify(rules))
   }
   assert.throws(
-    () => buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [defineKayan({ name: 'counted', fields: { ...defaultFields, count: { kind: 'integer', rules: { precision: 7 } } as never }, targets: { service: { operations: defaultOperations } } })] }),
+    () => buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [defineKayan({ name: 'counted', fields: { ...defaultFields, count: { kind: 'integer', rules: { precision: 7 } } as never }, targets: { service: { operations: defaultOperations } } })] }),
     /kind "integer" which does not accept nested rule "precision"/,
   )
 })
@@ -87,7 +87,7 @@ test('an unsized decimal holds any fixed-point text through both schema targets,
       fields: { ...defaultFields, balance: { kind: 'decimal', rules: { required: true, min: '-1' } } },
       targets: { service: { operations: defaultOperations } },
     })
-    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [ledger] }).kayan.ledger.operations
+    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [ledger] }).kayan.ledger.operations
     for (const balance of ['0', '1.234567890123456789012345678901234567890', '9007199254740993.123', '123456789012345678901234567890.5', '0.5']) {
       assert.equal((await operations.findByID({ id: (await operations.create({ id: crypto.randomUUID(), balance })).id }))?.balance, balance)
     }
@@ -109,14 +109,14 @@ test('a decimal bound is text compared as an exact value, negatives and digits p
     },
     targets: { service: { operations: defaultOperations } },
   })
-  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [bounded] }).kayan.boundedPrices.operations
+  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [bounded] }).kayan.boundedPrices.operations
   await operations.create({ id: crypto.randomUUID(), amount: '9.99', negative: '-9.99', exact: '9007199254740993.12', count: 10 })
   // '10.01' is above '10' and '9.99' below '10' as values, and the other way round as strings.
   for (const data of [{ amount: '1.99' }, { amount: '10.01' }, { negative: '-1.99' }, { negative: '-10.01' }, { exact: '9007199254740993.11' }, { exact: '9007199254740993.14' }, { count: 1 }, { count: 11 }]) {
     await assert.rejects(() => operations.create(data), refused, JSON.stringify(data))
   }
   const impossible = (rules: Record<string, unknown>, kind = 'decimal') => () =>
-    buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [defineKayan({ name: 'impossible', fields: { ...defaultFields, amount: { kind, rules } as never }, targets: { service: { operations: defaultOperations } } })] })
+    buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [defineKayan({ name: 'impossible', fields: { ...defaultFields, amount: { kind, rules } as never }, targets: { service: { operations: defaultOperations } } })] })
   // As text '9' is above '10'; as a value it is not, so this builds.
   assert.doesNotThrow(impossible({ precision: 7, scale: 2, min: '9', max: '10' }))
   assert.throws(impossible({ precision: 7, scale: 2, min: '10', max: '9.5' }), /declares "min" "10" and "max" "9.5", and no value is both at once/)
@@ -133,7 +133,7 @@ test('a where on an integer reads numeric text as a number and refuses a fractio
     fields: { ...defaultFields, quantity: { kind: 'integer' }, amount: { kind: 'decimal', rules: { precision: 7, scale: 2 } } },
     targets: { service: { operations: defaultOperations } },
   })
-  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [filtered] }).kayan.filteredMeasures.operations
+  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [filtered] }).kayan.filteredMeasures.operations
   for (const [quantity, amount] of [[2, '2.00'], [9, '9.99'], [10, '10.00']] as const) await operations.create({ id: crypto.randomUUID(), quantity, amount })
   assert.deepEqual((await operations.find({ where: { quantity: { greater_than: 2 } }, sort: '-quantity' })).docs.map((one) => one.quantity), [10, 9])
   assert.deepEqual((await operations.find({ where: { quantity: { in: ['2', '9'] } }, sort: 'quantity' } as never)).docs.map((one) => one.quantity), [2, 9])
@@ -161,7 +161,7 @@ test('the plain schema target refuses the same values of both kinds before stora
     fields: { ...defaultFields, quantity: { kind: 'integer' }, amount: { kind: 'decimal', rules: { precision: 7, scale: 2, min: '2', max: '10' } } },
     targets: { service: { operations: defaultOperations } },
   })
-  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [plain] }).kayan.plainMeasures.operations
+  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [plain] }).kayan.plainMeasures.operations
   assert.equal((await operations.create({ id: crypto.randomUUID(), quantity: 9, amount: '9.99' })).amount, '9.99')
   for (const data of [{ quantity: 1.5 }, { quantity: 2147483648 }, { amount: '1.234' }, { amount: '100000.00' }, { amount: '1.99' }, { amount: '10.01' }, { amount: 'NaN' }, { amount: 9.99 }]) {
     await assert.rejects(() => operations.create(data as never), refused, JSON.stringify(data))
@@ -171,7 +171,7 @@ test('the plain schema target refuses the same values of both kinds before stora
 test('a field of either kind seeds its refusals in Arabic and English, from the kinds\' and rules\' own sentences', () => {
   const { defineKayan, buildAsas } = language()
   const { messages } = buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [defineKayan({
       name: 'copied',
       access: allowAccess,
@@ -209,7 +209,7 @@ test('an access constraint comparing an integer or a decimal to a value its kind
       fields: { ...defaultFields, quantity: { kind: 'integer' }, amount: { kind: 'decimal', rules: { precision: 7, scale: 2 } } },
       targets: { service: { operations: defaultOperations } },
     })
-    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [guarded] }).kayan.guarded.operations
+    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [guarded] }).kayan.guarded.operations
     await assert.rejects(() => operations.find({}), new RegExp(`needs a value of kind "${kind}"`), JSON.stringify(constraint))
   }
   const { defineKayan, buildAsas } = language()
@@ -219,5 +219,5 @@ test('an access constraint comparing an integer or a decimal to a value its kind
     fields: { ...defaultFields, quantity: { kind: 'integer' }, amount: { kind: 'decimal', rules: { precision: 7, scale: 2 } } },
     targets: { service: { operations: defaultOperations } },
   })
-  assert.equal((await buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [open] }).kayan.open.operations.find({})).totalDocs, 0)
+  assert.equal((await buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [open] }).kayan.open.operations.find({})).totalDocs, 0)
 })

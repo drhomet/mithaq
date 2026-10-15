@@ -489,7 +489,7 @@ import { buildAsas, defineKayan } from '${template}'
 import { betterAuth } from './kayan/auth/user/index.ts'
 
 export const asas = buildAsas({
-  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   kayan: [
     ...betterAuth.core,
     ...betterAuth.organization,

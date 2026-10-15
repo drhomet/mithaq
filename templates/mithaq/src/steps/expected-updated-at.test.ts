@@ -39,7 +39,7 @@ const build = <Expected extends z.ZodType<Date | undefined>>(expected: Expected)
     },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), orpcHttp({ onError: console.error, maxBodyBytes: defaultMaxBodyBytes, api: '/api/orpc' })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',
@@ -108,7 +108,7 @@ test('a kayan with no updatedAt field that lists the step refuses every update a
     },
   })
   const built = mithaq.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       mithaq.defineKayan({
         name: 'notes',

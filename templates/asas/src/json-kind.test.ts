@@ -51,7 +51,7 @@ const settingsKayan = (defineKayan: ReturnType<typeof language>['defineKayan'], 
 test('a json field holds every JSON type through both schema targets and reads it back unchanged, and refuses what is no JSON', async () => {
   for (const schema of [zodTarget, plainTarget]) {
     const { defineKayan, buildAsas } = language(schema)
-    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(defineKayan)] }).kayan.blobs.operations
+    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan)] }).kayan.blobs.operations
     for (const data of everyJsonType) {
       const row = await operations.create({ id: crypto.randomUUID(), data: data as never })
       assert.deepEqual((await operations.findByID({ id: row.id }))?.data, data, JSON.stringify(data))
@@ -72,7 +72,7 @@ test('a json value nests at most 64 deep, and one deeper, however deep, is the c
   }
   for (const schema of [zodTarget, plainTarget]) {
     const { defineKayan, buildAsas } = language(schema)
-    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(defineKayan)] }).kayan.blobs.operations
+    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan)] }).kayan.blobs.operations
     const { id } = await operations.create({ id: crypto.randomUUID(), data: nested(64) as never })
     assert.deepEqual((await operations.findByID({ id }))?.data, nested(64))
     for (const depth of [65, 100_000]) await assert.rejects(() => operations.create({ data: nested(depth) } as never), refused, String(depth))
@@ -83,7 +83,7 @@ test('a json field names its byte cap, defaultJsonMaxBytes or its own, and a val
   assert.equal(defaultJsonMaxBytes, 1_000_000)
   const build = (field: Record<string, unknown>) => {
     const { defineKayan, buildAsas } = language()
-    return buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [defineKayan({ name: 'blobs', access: allowAccess, fields: { ...defaultFields, data: { kind: 'json', ...field } as never }, targets: { service: { operations: defaultOperations } } })] }) as unknown as { kayan: { blobs: { operations: Record<"create", (input: Record<string, unknown>) => Promise<unknown>> } } }
+    return buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [defineKayan({ name: 'blobs', access: allowAccess, fields: { ...defaultFields, data: { kind: 'json', ...field } as never }, targets: { service: { operations: defaultOperations } } })] }) as unknown as { kayan: { blobs: { operations: Record<"create", (input: Record<string, unknown>) => Promise<unknown>> } } }
   }
   assert.throws(() => build({}), /field "data" is json and names no maxBytes; name maxBytes: defaultJsonMaxBytes, or a whole number of its own\./)
   for (const maxBytes of [0, -1, 1.5, '10']) assert.throws(() => build({ maxBytes }), /names no maxBytes/, String(maxBytes))
@@ -106,7 +106,7 @@ test('every plug refuses a request body past its maxBodyBytes as a 413 before re
     return built.handler(new Request('http://test/api/blobs/create', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body }))
   }
   const small = JSON.stringify({ id: crypto.randomUUID(), data: { a: 1 } })
-  for (const plug of [() => fetchHttp({ maxBodyBytes: 200 }), () => orpcHttp({ maxBodyBytes: 200 })]) {
+  for (const plug of [() => fetchHttp({ onError: console.error, maxBodyBytes: 200 }), () => orpcHttp({ onError: console.error, maxBodyBytes: 200 })]) {
     assert.equal((await send(plug(), small))!.status, 200)
     const large = JSON.stringify({ data: 'x'.repeat(300) })
     const refusedBody = await send(plug(), large)
@@ -119,12 +119,12 @@ test('every plug refuses a request body past its maxBodyBytes as a 413 before re
     const lied = await built.handler(new Request('http://test/api/blobs/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: streamed, duplex: 'half' } as RequestInit))
     assert.equal(lied!.status, 413)
   }
-  assert.equal((await send(fetchHttp({ maxBodyBytes: defaultMaxBodyBytes }), JSON.stringify({ data: 'x'.repeat(defaultMaxBodyBytes) })))!.status, 413)
-  assert.equal((await send(orpcHttp({ maxBodyBytes: defaultMaxBodyBytes }), JSON.stringify({ data: 'x'.repeat(defaultMaxBodyBytes) })))!.status, 413)
+  assert.equal((await send(fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), JSON.stringify({ data: 'x'.repeat(defaultMaxBodyBytes) })))!.status, 413)
+  assert.equal((await send(orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), JSON.stringify({ data: 'x'.repeat(defaultMaxBodyBytes) })))!.status, 413)
 })
 
 test('every plug cancels a body whose content-length is past its limit, and answers 499 to a client that went away mid-body', async () => {
-  const plugs = [() => fetchHttp({ maxBodyBytes: 200 }), () => orpcHttp({ maxBodyBytes: 200 })]
+  const plugs = [() => fetchHttp({ onError: console.error, maxBodyBytes: 200 }), () => orpcHttp({ onError: console.error, maxBodyBytes: 200 })]
   for (const plug of plugs) {
     const { defineKayan, buildAsas } = language()
     const built = buildAsas({ http: [plug() as never], kayan: [settingsKayan(defineKayan)] })
@@ -150,7 +150,7 @@ test('every plug cancels a body whose content-length is past its limit, and answ
 test('a plug after oRPC reads the whole body of a route under /api that oRPC does not answer', async () => {
   const { defineKayan, buildAsas } = language()
   const echo = () => ({ name: 'echo', router: undefined, handle: async (request: Request) => new Response(await request.text()) })
-  const built = buildAsas({ http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes }), echo as never], kayan: [settingsKayan(defineKayan)] })
+  const built = buildAsas({ http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), echo as never], kayan: [settingsKayan(defineKayan)] })
   const answered = await built.handler(new Request('http://test/api/echo', { method: 'POST', body: 'held whole' }))
   assert.equal(await answered!.text(), 'held whole')
 })
@@ -163,7 +163,7 @@ test('a path that crosses a relationship onto a json field, one row or a set, is
     fields: { ...defaultFields, owner: { kind: 'relationship', relationTo: 'blobs' }, owners: { kind: 'relationship', relationTo: 'blobs', hasMany: true } },
     targets: { service: { operations: defaultOperations } },
   })
-  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(defineKayan), notes] }).kayan.notes.operations
+  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan), notes] }).kayan.notes.operations
   for (const key of ['owner.data', 'owners.data', 'owner.data.x']) {
     await assert.rejects(() => operations.find({ where: { [key]: { exists: true } } as never }), (error: unknown) => refused(error) && /json/.test((error as Error).message), key)
   }
@@ -177,7 +177,7 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
   }
   for (const schemaTarget of [zodTarget, plainTarget]) {
     const { defineKayan, buildAsas } = language(schemaTarget)
-    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(defineKayan, schema)] }).kayan.blobs.operations
+    const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan, schema)] }).kayan.blobs.operations
     // A key the schema does not name is kept, as JSON Schema leaves it open.
     const kept = { foo: 'bar', count: 2, extra: { left: true } }
     const row = await operations.create({ id: crypto.randomUUID(), data: kept })
@@ -191,19 +191,19 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
   // Held to the whole schema: `required` without `properties`, and a keyword beside no `type`,
   // which zod's converter passes over.
   const { defineKayan, buildAsas } = language()
-  const strict = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(defineKayan, { schema: { required: ['foo'], minimum: 3, properties: { foo: { format: 'email' } } } })] }).kayan.blobs.operations
+  const strict = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan, { schema: { required: ['foo'], minimum: 3, properties: { foo: { format: 'email' } } } })] }).kayan.blobs.operations
   for (const data of [{ old: 1 }, 1, { foo: 'not an email' }]) await assert.rejects(() => strict.create({ data } as never), refused, JSON.stringify(data))
   for (const data of [{ foo: 'a@b.co' }, 4, 'text']) await strict.create({ id: crypto.randomUUID(), data })
   // Payload writes a schema it fetched as draft-07, and one written so reads as draft-07, with or without the `#`.
   for (const $schema of ['http://json-schema.org/draft-07/schema#', 'http://json-schema.org/draft-07/schema']) {
-    const draft = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(defineKayan, { schema: { $schema, items: [{ type: 'string' }] } })] }).kayan.blobs.operations
+    const draft = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan, { schema: { $schema, items: [{ type: 'string' }] } })] }).kayan.blobs.operations
     await assert.rejects(() => draft.create({ data: [1] }), refused, $schema)
     await draft.create({ id: crypto.randomUUID(), data: ['one', 2] })
   }
 
   const build = (field: Record<string, unknown>, schemaTarget: typeof zodTarget | typeof plainTarget = zodTarget) => () => {
     const { defineKayan, buildAsas } = language(schemaTarget)
-    buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [defineKayan({ name: 'blobs', fields: { ...defaultFields, data: { kind: 'json', maxBytes: defaultJsonMaxBytes, ...field } as never }, targets: { service: { operations: defaultOperations } } })] })
+    buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [defineKayan({ name: 'blobs', fields: { ...defaultFields, data: { kind: 'json', maxBytes: defaultJsonMaxBytes, ...field } as never }, targets: { service: { operations: defaultOperations } } })] })
   }
   assert.throws(build({ kind: 'text', maxBytes: undefined, jsonSchema: { schema: {} } }), /field "data" has a jsonSchema, and kind "text" takes none; only a json field does\./)
   // Never fetched: a schema read off a URI at write time is a request the server makes on a caller's behalf.
@@ -224,10 +224,10 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
 test('a row stored before its field took a jsonSchema still reads, and its next save is held to the schema', async () => {
   const memory = memoryStore()
   const before = language(zodTarget, memory)
-  const loose = before.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(before.defineKayan)] }).kayan.blobs.operations
+  const loose = before.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(before.defineKayan)] }).kayan.blobs.operations
   const { id } = await loose.create({ id: crypto.randomUUID(), data: { old: true } })
   const after = language(zodTarget, memory)
-  const held = after.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [settingsKayan(after.defineKayan, { schema: { type: 'object', required: ['foo'] } })] }).kayan.blobs.operations
+  const held = after.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(after.defineKayan, { schema: { type: 'object', required: ['foo'] } })] }).kayan.blobs.operations
   assert.deepEqual((await held.findByID({ id }))?.data, { old: true })
   await assert.rejects(() => held.update({ id, data: { old: false } }), refused)
 })
@@ -240,12 +240,12 @@ test('a json default is JSON, and each row gets its own copy of it', async () =>
     fields: { ...defaultFields, data: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: { tags: ['a'], on: true } } } },
     targets: { service: { operations: defaultOperations } },
   })
-  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [blobs] }).kayan.blobs.operations
+  const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [blobs] }).kayan.blobs.operations
   const first = await operations.create({ id: crypto.randomUUID() })
   ;(first.data as { tags: string[] }).tags.push('b')
   assert.deepEqual((await operations.create({ id: crypto.randomUUID() })).data, { tags: ['a'], on: true })
   assert.throws(() => buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [defineKayan({ name: 'odd', fields: { ...defaultFields, data: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: { at: new Date() } as never } } }, targets: { service: { operations: defaultOperations } } })],
   }), /field "data" nested rule "defaultValue" (has an invalid value type|does not match kind "json")/)
 })
@@ -275,7 +275,7 @@ describe('postgres', () => {
     fields: { ...defaultFields, label: { kind: 'text' }, data: { kind: 'json', maxBytes: defaultJsonMaxBytes } },
     targets: { service: { operations: defaultOperations } },
   })
-  const built = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [blobs, pages] })
+  const built = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [blobs, pages] })
   const { db } = built.targets.drizzle
   const operations = built.kayan.blobs.operations
   const labels = async (where: unknown) => (await operations.find({ where: where as never, limit: 0, sort: 'label' })).docs.map((row) => row.label)
@@ -429,7 +429,7 @@ describe('postgres', () => {
     )) as { generateDrizzleJson(imports: Record<string, unknown>): Promise<unknown>; generateMigration(prev: unknown, cur: unknown): Promise<string[]> }
     const tablesOf = (fields: Record<string, unknown>) => {
       const kayan = defineKayan({ name: 'blobs', schemaName, access: allowAccess, fields: { ...defaultFields, label: { kind: 'text' }, ...fields } as never, targets: { service: { operations: defaultOperations } } })
-      const offline = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [kayan] })
+      const offline = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [kayan] })
       return pushInput({ tables: offline.targets.drizzle.tables as never, schemas: offline.targets.drizzle.schemas }).imports
     }
     const statements = await generateMigration(await generateDrizzleJson(tablesOf({})), await generateDrizzleJson(tablesOf({ data: { kind: 'json', maxBytes: defaultJsonMaxBytes }, settings: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { required: true, defaultValue: { theme: 'light' } } } })))

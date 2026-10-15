@@ -90,6 +90,7 @@ import {
 import type { CompoundIndex } from 'mithaq'
 import { richText } from 'mithaq/rich-text'
 import type { RouterClient } from '@orpc/server'
+import { orpcHttp } from 'mithaq/orpc'
 import type { FetchClient } from 'mithaq/admin'
 import { asas } from './asas.ts'
 import { type OrganizationActor } from '../../mithaq/src/roles/tenant-access.ts'
@@ -424,7 +425,7 @@ versionsTarget()
   const { drizzle: db, ...others } = arkanTargets
   const dbLanguage = defineMithaq({ targets: { ...others, db, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'db', schema: 'zod', authorize: defaultAuthorize }) }, arkan: [base] })
   const built = dbLanguage.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [dbLanguage.defineKayan({ name: 'columned', fields: { id: defaultFields.id, fee: { kind: 'number', targets: { db: textColumn('fee') } } }, targets: { service: { operations: defaultOperations } } })],
   })
   const fee: InferSelectModel<typeof built.targets.db.tables.columned>['fee'] = 'text'
@@ -433,7 +434,7 @@ versionsTarget()
 {
   const numericLanguage = defineMithaq({ targets: arkanTargets, arkan: [base] })
   const built = numericLanguage.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [numericLanguage.defineKayan({ name: 'measured', fields: { id: defaultFields.id, count: { kind: 'integer' }, amount: { kind: 'decimal', rules: { precision: 7, scale: 2 } } }, targets: { service: { operations: defaultOperations } } })],
   })
   type Row = InferSelectModel<typeof built.targets.drizzle.tables.measured>
@@ -495,7 +496,7 @@ slugs.defineKayan({ name: 'slugProbe', fields: { slug: { kind: 'slug', rules: { 
   })
   // @ts-expect-error a kind that does not point at a row names no kayan
   anchors.defineKayan({ name: 'unanchored', fields: { slug: { kind: 'slug', relationTo: () => anchored } }, targets: { service: { operations: defaultOperations } } })
-  const anchoredBuild = anchors.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [anchored, anchoring] })
+  const anchoredBuild = anchors.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [anchored, anchoring] })
   type AnchoringRow = NonNullable<Awaited<ReturnType<typeof anchoredBuild.kayan.anchoring.operations.findByID>>>
   type AnchorParent = Expect<Equal<AnchoringRow['parent'], string | null>>
   type AnchorMany = Expect<Equal<AnchoringRow['many'], string[] | null>>
@@ -593,7 +594,7 @@ const customKayan = customLanguage.defineKayan({
 })
 // A project-added rule is accepted by the bound build path, not only by the language's declaration
 // path.
-customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [customKayan] })
+customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [customKayan] })
 // @ts-expect-error the custom rule's value is boolean
 customLanguage.defineKayan({ name: 'probe', fields: { title: { kind: 'text', rules: { searchable: 'yes' } } }, targets: { service: { operations: defaultOperations } } })
 // @ts-expect-error the language names no `searchWeight` rule
@@ -672,7 +673,7 @@ customLanguage.defineKayan({
   },
 })
 
-const customOperationBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [typedCustomOperation] })
+const customOperationBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [typedCustomOperation] })
 customOperationBuilt.kayan.typedCustomOperation.operations.custom({ a: 'typed input' })
 // @ts-expect-error a custom operation's input is what its validate function returns
 customOperationBuilt.kayan.typedCustomOperation.operations.custom({ b: 1 })
@@ -734,14 +735,14 @@ const typedOverride = customLanguage.defineKayan({
     },
   },
 })
-const overrideBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [typedOverride] })
+const overrideBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [typedOverride] })
 const { create: _shippedCreate, ...withoutShippedCreate } = defaultOperations
 const withoutCreate = customLanguage.defineKayan({
   name: 'withoutCreate',
   fields: { id: { kind: 'number' }, title: { kind: 'text' } },
   targets: { service: { operations: { ...withoutShippedCreate, upload: defaultOperations.create } } },
 })
-const withoutCreateBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [withoutCreate] })
+const withoutCreateBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [withoutCreate] })
 withoutCreateBuilt.kayan.withoutCreate.operations.upload({ title: 'A' })
 // @ts-expect-error create was left out, so the client has none
 withoutCreateBuilt.kayan.withoutCreate.operations.create({ title: 'A' })
@@ -814,7 +815,7 @@ const countWritten = customLanguage.defineKayan({
   fields: { id: { kind: 'number' }, title: { kind: 'text' } },
   targets: { service: { operations: { ...defaultOperations, count: { steps: ({ steps }) => [steps.insert] } } } },
 })
-const countNamesBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [countPicked, countWritten] })
+const countNamesBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [countPicked, countWritten] })
 countNamesBuilt.kayan.countPicked.operations.count({ id: 1 })
 // @ts-expect-error the declared input requires the id
 countNamesBuilt.kayan.countPicked.operations.count({})
@@ -910,7 +911,7 @@ const plainKayan = plainLanguage.defineKayan({
     ignored: { kind: 'number', targets: { zod: z.string() } },
   },
 })
-const plainBuilt = plainLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [plainKayan] })
+const plainBuilt = plainLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [plainKayan] })
 type PlainRow = Awaited<ReturnType<typeof plainBuilt.kayan.plainKayan.operations.create>>
 type PlainOverrideOutput = Expect<Equal<PlainRow['code'], 'A' | 'B' | null>>
 plainBuilt.kayan.plainKayan.operations.create({ code: 'a' })
@@ -965,7 +966,7 @@ const zodInPlainLanguage = plainLanguage.defineKayan({
     code: { kind: 'text', targets: { zod: z.literal('A') } },
   },
 })
-const mismatchBuilt = plainLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [zodInPlainLanguage] })
+const mismatchBuilt = plainLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [zodInPlainLanguage] })
 type MismatchRow = Awaited<ReturnType<typeof mismatchBuilt.kayan.zodInPlainLanguage.operations.create>>
 type OverrideFallsBackToKind = Expect<Equal<MismatchRow['code'], string | null>>
 type OverrideInputFallsBackToKind = Expect<
@@ -1025,7 +1026,7 @@ type OfStringRelationship = Expect<Equal<NonNullable<Awaited<ReturnType<ReturnTy
 
 const registeredIdentity = defineKayan({ name: 'registeredIdentity', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })
 // @ts-expect-error duplicate literal kayan names are rejected before build
-buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [registeredIdentity, registeredIdentity] })
+buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [registeredIdentity, registeredIdentity] })
 const impostorIdentity = defineKayan({
   name: 'registeredIdentity',
   fields: { id: { kind: 'text' } },
@@ -1036,7 +1037,7 @@ const identityLink = defineKayan({
   fields: { identity: { kind: 'relationship', relationTo: () => impostorIdentity } },
   targets: { service: { operations: defaultOperations } },
 })
-const identityBuild = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [registeredIdentity, identityLink] })
+const identityBuild = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [registeredIdentity, identityLink] })
 identityBuild.kayan.identityLink.operations.create({ identity: '0e6c6f3e-8a0f-4a5f-9d2b-3d5f9a1c2e40' })
 // @ts-expect-error relationship value follows registered kayan ID, not unrelated thunk object
 identityBuild.kayan.identityLink.operations.create({ identity: 1 })
@@ -1048,7 +1049,7 @@ const transformedKayan = defineKayan({
   },
   targets: { service: { operations: defaultOperations } },
 })
-const transformedBuild = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [transformedKayan] })
+const transformedBuild = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [transformedKayan] })
 const transformedRow = transformedBuild.kayan.transformed.operations.create({ amount: '12' })
 // @ts-expect-error override input is z.input<string>, not its numeric output
 transformedBuild.kayan.transformed.operations.create({ amount: 12 })
@@ -1117,7 +1118,7 @@ const memoryOnly = secondStoreLanguage.defineKayan({
   },
   fields: { id: { kind: 'text' }, body: { kind: 'text' } },
 })
-const secondStoreBuilt = secondStoreLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [memoryOnly] })
+const secondStoreBuilt = secondStoreLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [memoryOnly] })
 // @ts-expect-error Drizzle did not build a table for a kayan stored in memory
 secondStoreBuilt.targets.drizzle.tables.memoryOnly
 
@@ -1164,7 +1165,7 @@ const wideRate = plainLanguage.defineKayan({
   dbName: wideName,
   fields: { id: { kind: 'number' }, appliesTo: { kind: 'relationship', relationTo: 'plainKayan', hasMany: true } },
 })
-const taxBuilt = plainLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [plainKayan, taxRate, undated, wideRate], global: [taxSettings] })
+const taxBuilt = plainLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [plainKayan, taxRate, undated, wideRate], global: [taxSettings] })
 type JoinUnderDbName = Expect<Equal<'tax_rates_applies_to' extends keyof TaxTables ? true : false, true>>
 type JoinNotUnderKayanName = Expect<Equal<'taxRate_applies_to' extends keyof TaxTables ? true : false, false>>
 type JoinWithoutDbName = Expect<Equal<'undated_applies_to' extends keyof TaxTables ? true : false, true>>
@@ -1174,9 +1175,9 @@ type WideJoinUnderKayanName = Expect<Equal<'wideRate_applies_to' extends keyof T
 type WideJoinNotUnderDbName = Expect<Equal<'wide_rates_applies_to' extends keyof TaxTables ? true : false, false>>
 
 const check = async () => {
-  await customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [customKayan] }).kayan.probe.operations.create({ budget: 10 })
+  await customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [customKayan] }).kayan.probe.operations.create({ budget: 10 })
   // @ts-expect-error money carries number, not an arbitrary object
-  await customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [customKayan] }).kayan.probe.operations.create({ budget: { amount: 10 } })
+  await customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [customKayan] }).kayan.probe.operations.create({ budget: { amount: 10 } })
   const read = await asas.targets.drizzle.db.select().from(asas.targets.drizzle.tables.courses!)
   const first: unknown = read[0]
   const readTitle: string = read[0]!.title
@@ -1200,21 +1201,21 @@ const check = async () => {
     authenticate: async (_args: { headers: Headers }) => ({ user: { id: 7 } as { id: number } | null }),
   }
   const probeCourses = defineKayan({ name: 'probeCourses', fields: courses.fields, auth: strategy, targets: { service: { operations: defaultOperations } } })
-  const many = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [probeCourses] })
+  const many = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [probeCourses] })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [courses],
     // @ts-expect-error buildAsas takes no auth.strategies: the kayan carries its strategy
     auth: { strategies: [strategy] },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [courses],
     // @ts-expect-error buildAsas takes no auth.local: the kayan it authenticates carries it
     auth: { local: { kayan: courses, secret: 'type-probe-local-secret' } },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [courses],
     // @ts-expect-error buildAsas takes no auth.betterAuth: the kayan it authenticates carries it
     auth: { betterAuth: { kayan: courses, server: () => ({}) } },
@@ -1261,7 +1262,7 @@ const check = async () => {
   // @ts-expect-error local() is refused a missing ip
   local({ ...localOptions, ip: undefined })
   const localTyped = defineKayan({ ...typedLocalUsers, auth: local(localOptions) })
-  const localOnly = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [localTyped] })
+  const localOnly = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [localTyped] })
   const localActor = await localOnly.auth.actor(new Headers())
   const localDirect = await localOnly.auth.strategies[0]!.authenticate({ headers: new Headers() })
   type LocalDirectUser = Expect<Equal<typeof localDirect.user, Awaited<ReturnType<typeof localOnly.auth.actor>>>>
@@ -1298,7 +1299,7 @@ const check = async () => {
   type _LocalDirectUser = LocalDirectUser
 
   const betterOnly = buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       defineKayan({
         name: 'betterCourses',
@@ -1339,7 +1340,7 @@ const check = async () => {
     }),
     targets: { service: { operations: defaultOperations } },
   })
-  const bothAuth = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [localTyped, betterTyped] })
+  const bothAuth = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [localTyped, betterTyped] })
   const bothActor = await bothAuth.auth.actor(new Headers())
   if (bothActor?.strategy === 'local') {
     const kayanName: 'typedLocalUsers' = bothActor.kayan
@@ -1362,9 +1363,10 @@ const check = async () => {
   const betterOnlyStrategy = { name: 'better-only', authenticate: async () => ({ user: null as BetterOnlyActor | null }) }
   const localOnlyStrategy = { name: 'local-only', authenticate: async () => ({ user: null as NonNullable<Awaited<ReturnType<typeof localOnly.auth.actor>>> | null }) }
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [localTyped],
     auth: {
+      maxBodyBytes: defaultMaxBodyBytes,
       admin: {
         kayan: localTyped,
         access: ({ user }: AdminAccessArgs<NonNullable<Awaited<ReturnType<typeof localOnly.auth.actor>>>>) => user.strategy === 'local',
@@ -1373,16 +1375,22 @@ const check = async () => {
     },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error admin access callbacks are checked against the configured actor
     kayan: [localTyped],
-    auth: { admin: { kayan: localTyped, access: (_args: AdminAccessArgs<BetterOnlyActor>) => true }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: localTyped, access: (_args: AdminAccessArgs<BetterOnlyActor>) => true }, onError: console.error },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error admin access must return a boolean or Promise<boolean>
     kayan: [localTyped],
-    auth: { admin: { kayan: localTyped, access: () => 'yes' }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: localTyped, access: () => 'yes' }, onError: console.error },
+  })
+  buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [localTyped],
+    // @ts-expect-error an auth names its maxBodyBytes, the largest body an auth route reads
+    auth: { onError: console.error },
   })
   type CourseRow = Awaited<ReturnType<typeof asas.kayan.courses.operations.create>>
   const derivedAccess = accessFor<BothActor>()({
@@ -1465,7 +1473,7 @@ const check = async () => {
     targets: { service: { operations: defaultOperations } },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error helper brand cannot hide the wrapped callback's narrower Better Auth user
     kayan: [wrongWrappedActor, defineKayan({ name: 'bothStrategyKayan', fields: { id: { kind: 'text' } }, auth: bothStrategy, targets: { service: { operations: defaultOperations } } })],
   })
@@ -1476,7 +1484,7 @@ const check = async () => {
     targets: { service: { operations: defaultOperations } },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error helper brand cannot hide a numeric id callback on a uuid-id kayan
     kayan: [wrongWrappedId, defineKayan({ name: 'bothStrategyId', fields: { id: { kind: 'text' } }, auth: bothStrategy, targets: { service: { operations: defaultOperations } } })],
   })
@@ -1487,7 +1495,7 @@ const check = async () => {
     targets: { service: { operations: defaultOperations } },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error auth kayan collection callbacks are checked against the configured local actor too
     kayan: [defineKayan({ ...wrongAuthCollectionUsers, auth: local(localOptions) }), betterTyped],
   })
@@ -1500,7 +1508,7 @@ const check = async () => {
     targets: { service: { operations: defaultOperations } },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error field callback doc/id belongs to courses, not typedCallbackKayan
     kayan: [localTyped, betterTyped, typedCallbackKayan],
   })
@@ -1516,7 +1524,7 @@ const check = async () => {
     },
     targets: { service: { operations: defaultOperations } },
   })
-  buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [{ ...callbackCourses, auth: bothStrategy }] })
+  buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ ...callbackCourses, auth: bothStrategy }] })
   const localFieldCourses = defineKayan({
     name: 'localFieldCourses',
     fields: {
@@ -1530,7 +1538,7 @@ const check = async () => {
   })
   const betterOnlyCarrier = defineKayan({ name: 'betterOnlyCarrier', fields: { id: { kind: 'text' } }, auth: betterOnlyStrategy, targets: { service: { operations: defaultOperations } } })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error field callbacks typed for local auth cannot be built with Better Auth only
     kayan: [localFieldCourses, betterOnlyCarrier],
   })
@@ -1542,9 +1550,9 @@ const check = async () => {
     }),
     targets: { service: { operations: defaultOperations } },
   })
-  buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [localOnlyBound, defineKayan({ name: 'localOnlyCarrier', fields: { id: { kind: 'text' } }, auth: localOnlyStrategy, targets: { service: { operations: defaultOperations } } })] })
+  buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [localOnlyBound, defineKayan({ name: 'localOnlyCarrier', fields: { id: { kind: 'text' } }, auth: localOnlyStrategy, targets: { service: { operations: defaultOperations } } })] })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error access callbacks typed for local auth cannot be built with Better Auth only
     kayan: [localOnlyBound, betterOnlyCarrier],
   })
@@ -1557,14 +1565,14 @@ const check = async () => {
     targets: { service: { operations: defaultOperations } },
   })
   buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error both-provider actors are not accepted by per-kayan provider-only callbacks
     kayan: [localOnlyBound, betterOnlyBound, defineKayan({ name: 'bothStrategyBound', fields: { id: { kind: 'text' } }, auth: bothStrategy, targets: { service: { operations: defaultOperations } } })],
   })
 
   // A build whose kayan carry no provider at all is driven by whatever actor its host resolves, so
   // its actor is open: the strategy loop answers `null` for it whatever the type says.
-  const disabledAuth = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [courses] })
+  const disabledAuth = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [courses] })
   type DisabledActor = Expect<Equal<Awaited<ReturnType<typeof disabledAuth.auth.actor>>, unknown>>
 
   const courseId = '0e6c6f3e-8a0f-4a5f-9d2b-3d5f9a1c2e40'
@@ -1703,7 +1711,7 @@ const check = async () => {
     },
     targets: { service: { operations: defaultOperations } },
   })
-  const privateAsas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [privateNotes] })
+  const privateAsas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [privateNotes] })
   const privateRow = await privateAsas.kayan.privateNotes.operations.create({ title: 'typed', secret: 'hidden' })
   const optionalSecret: string | null | undefined = privateRow.secret
   // @ts-expect-error read-protected fields are optional on public rows
@@ -1947,7 +1955,7 @@ const globalLink = defineKayan({
   fields: { settings: { kind: 'relationship', relationTo: () => settings } },
   targets: { service: { operations: defaultOperations } },
 })
-const globalLinkAsas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [globalLink], global: [settings] })
+const globalLinkAsas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [globalLink], global: [settings] })
 type GlobalRelationshipColumn = NonNullable<Parameters<typeof globalLinkAsas.kayan.globalLink.operations.create>[0]>['settings']
 type GlobalRelationshipIsTyped = Expect<Equal<GlobalRelationshipColumn, string | null | undefined>>
 
@@ -2277,7 +2285,7 @@ bilingual.defineKayan({
 })
 
 bilingual.buildAsas({
-  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
   kayan: [bilingual.defineKayan({ name: 'resolverShapeProbe', fields: { title: { kind: 'text', label: { ar: 'العنوان', en: 'Title' } } }, targets: { service: { operations: defaultOperations } } })],
   // @ts-expect-error the language names seven kinds and this object names one
   messages: () => ({ kinds: { text: 'Text' }, fields: { id: 'ID' }, globalType: 'Global type' }),
@@ -2940,7 +2948,7 @@ type OpenContextKey = Expect<Equal<CtxOf<typeof contextlessRunner>['context']['w
 
 // The keys a step reads typed are the keys its caller has to have sent, so a build whose runner
 // declared a context takes one on every call that opens a write or a read.
-const contextBuilt = contextLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [contextProbeKayan] })
+const contextBuilt = contextLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [contextProbeKayan] })
 contextBuilt.kayan.projectContextProbe.operations.create({ title: 'A' }, { context: { requestId: 'r-1' } })
 // @ts-expect-error this build's runner declared a context, so a caller sends one
 contextBuilt.kayan.projectContextProbe.operations.create({ title: 'A' })
@@ -2982,7 +2990,7 @@ const findInserts = customLanguage.defineKayan({
   fields: { id: { kind: 'number' }, title: { kind: 'text', rules: { required: true } } },
   targets: { service: { operations: { ...defaultOperations, find: { steps: ({ steps }) => [steps.insert] } } } },
 })
-const findInsertsBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [findInserts] })
+const findInsertsBuilt = customLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [findInserts] })
 findInsertsBuilt.kayan.findInserts.operations.find({ title: 'A' }, { actor: null })
 // @ts-expect-error the create shape requires the title
 findInsertsBuilt.kayan.findInserts.operations.find({}, { actor: null })
@@ -3244,7 +3252,7 @@ type ScreenFieldKeys = Expect<
   // @ts-expect-error a binding where the language lays down no tenant target
   noTenant.defineKayan({ name: 'tenantProbe', fields: { id: defaultFields.id, organizationId: { kind: 'relationship', relationTo: 'organization', targets: { tenant: true } } }, targets: ops })
 
-  const built = tenantLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [organization, owned, byHand] })
+  const built = tenantLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [organization, owned, byHand] })
   type OwnedRow = NonNullable<Awaited<ReturnType<typeof built.kayan.owned.operations.findByID>>>
   type ByHandRow = NonNullable<Awaited<ReturnType<typeof built.kayan.byHand.operations.findByID>>>
   type OwnedTenantIsString = Expect<Equal<OwnedRow['organizationId'], string>>
@@ -3254,4 +3262,14 @@ type ScreenFieldKeys = Expect<
   built.kayan.owned.operations.create({ title: 'A' })
   // @ts-expect-error nor does a caller name it
   built.kayan.owned.operations.create({ title: 'A', organizationId: 'org-1' })
+}
+
+// Each plug names its options, its body limit and its reporter among them; core holds neither.
+export const plugOptionsProbe = () => {
+  // @ts-expect-error a plug takes its options
+  fetchHttp()
+  // @ts-expect-error the oRPC plug takes its options too
+  orpcHttp()
+  // @ts-expect-error a plug names its onError
+  fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })
 }

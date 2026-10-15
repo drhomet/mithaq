@@ -35,7 +35,7 @@ const build = (table?: PgTable) => {
     arkan: [base],
   })
   return language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
       language.defineKayan({
         name: 'notes',

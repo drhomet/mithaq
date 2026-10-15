@@ -10,7 +10,7 @@ import { combineWhere } from '../mithaq/where.ts'
 import type { ReaderMap } from './runner/read.ts'
 import { bulk, read as readers, write, type ServiceTarget } from '../service/index.ts'
 import { invalid } from './runner/errors.ts'
-import { boundedBody, defaultMaxBodyBytes } from './http/fetch.ts'
+import { assertMaxBodyBytes, boundedBody } from './http/fetch.ts'
 import { fieldlessOperation, keepOperationKeys } from '../rbac/steps.ts'
 import { resolvedKayans, type ActorBoundAccess, type AdminAccess, type Kayan, type RuntimeField, type ResolvedKayan, type ServiceOf } from '../mithaq/types.ts'
 import { accessTargetOf, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceKeys, serviceTargetOf, type Language, type Store } from '../mithaq/language.ts'
@@ -167,6 +167,8 @@ export type AuthConfig = {
   admin?: { kayan: Kayan; access?: unknown }
   /** Handed a strategy that threw and an access target that could not answer, each as an `Error` with the cause. Required where any kayan carries auth. */
   onError: (error: unknown) => void
+  /** The largest body an auth route reads, answered 413 past it: `defaultMaxBodyBytes` or the project's own. Required where any kayan carries auth. */
+  maxBodyBytes: number
 }
 
 type PublicLocalUser<K extends Kayan, L extends Language, KayanList extends readonly Kayan[]> = Omit<
@@ -328,7 +330,7 @@ const operations = <Actor>(
       call: (given, { actor, context, draft, autosave, tenant }) => {
         if (contextDeclared && !context) {
           throw new Error(
-            `Kayan "${kayan.name}" operation "${name}" was served with no context, and this build's runner declares one. Give every http plug a context function: fetchHttp({ context }) or orpcHttp({ context }).`,
+            `Kayan "${kayan.name}" operation "${name}" was served with no context, and this build's runner declares one. Give every http plug a context function: fetchHttp({ context, maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), or orpcHttp with the same options.`,
           )
         }
         if (bounded && given && typeof given === 'object' && 'limit' in given) {
@@ -513,7 +515,7 @@ export const buildAsas = <
   // Refused before any work: core picks no plug of its own.
   if (!http?.length) {
     throw new Error(
-      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], or http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes }), fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] for the typed client.',
+      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], or orpcHttp with the same options first for the typed client.',
     )
   }
   const globals = (global ?? []) as readonly Kayan[]
@@ -943,9 +945,10 @@ export const buildAsas = <
   // Precedence is the order the build lists its kayan: the loop takes the first non-null actor.
   if (authenticating.length && typeof auth?.onError !== 'function') {
     throw new Error(
-      `buildAsas was handed no "auth.onError", and kayan "${authenticating[0]!.name}" carries auth. Core reports no failed strategy of its own: name the project's own, such as auth: { onError: console.error }.`,
+      `buildAsas was handed no "auth.onError", and kayan "${authenticating[0]!.name}" carries auth. Core reports no failed strategy of its own: name the project's own, such as auth: { onError: console.error, maxBodyBytes: defaultMaxBodyBytes }.`,
     )
   }
+  if (authenticating.length) assertMaxBodyBytes('auth', auth!.maxBodyBytes)
   const onError = (error: unknown) => auth!.onError(error)
   const strategies = (() => {
     const list: AuthStrategy[] = []
@@ -1098,7 +1101,7 @@ export const buildAsas = <
           // Read here first, so a client that goes away mid-body is answered 499 here rather than
           // logged by the provider as its own 500.
           if (!request.body) return strategy.handler(request)
-          const body = await boundedBody(request, defaultMaxBodyBytes)
+          const body = await boundedBody(request, auth!.maxBodyBytes)
           if (body instanceof Response) return body
           return strategy.handler(new Request(request.url, { method: request.method, headers: request.headers, body, signal: request.signal }))
         }
