@@ -371,9 +371,13 @@ describe('postgres', () => {
     assert.deepEqual(await labels({ 'data.n': { not_in: [1, null] } }), ['b', 'd'])
     assert.deepEqual(await labels({ 'data.n': { not_in: [] } }), ['a', 'b', 'd'])
     assert.deepEqual(await labels({ 'data.n': { in: [] } }), [])
+    const words = (count: number) => Array.from({ length: count }, () => 'a').join(' ')
+    assert.deepEqual(await labels({ label: { like: words(1000) } }), ['a'])
     const nested = (depth: number): unknown => (depth ? { or: [nested(depth - 1)] } : { label: { equals: 'a' } })
     for (const where of [
       { 'data.n': { in: [...many, 0] } },
+      { label: { like: words(1001) } },
+      { 'data.n': { like: words(1001) } },
       { label: { not_in: Array.from({ length: 1001 }, String) } },
       { or: Array.from({ length: 201 }, (_, index) => ({ label: { equals: String(index) } })) },
       nested(300),

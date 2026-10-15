@@ -160,6 +160,10 @@ export const assertFieldWhere = ({ said, key, kind, operators, value, valued = t
     if (!valued && Array.isArray(operand) && operand.length > whereLimits.values) {
       throw new Error(`${said} field "${key}" operator "${operator}" lists at most ${whereLimits.values} values.`)
     }
+    // Each word of a `like` is a pattern the store matches, so its words are held to the same count.
+    if (!valued && operator === 'like' && typeof operand === 'string' && operand.trim().split(/\s+/).length > whereLimits.values) {
+      throw new Error(`${said} field "${key}" operator "like" holds at most ${whereLimits.values} words.`)
+    }
     // A value an integer or decimal column cannot hold would reach Postgres as a 500.
     // A caller's own query skips this: its row shape refuses values with a path each.
     if (valued && (kind === 'integer' || kind === 'decimal') && operator !== 'exists') {
