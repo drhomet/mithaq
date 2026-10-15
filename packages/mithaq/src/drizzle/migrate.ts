@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import * as modules from 'node:module'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -16,6 +17,38 @@ import type { ResolvedField, ResolvedKayan } from '../mithaq/types.ts'
 // `bin.cjs` is not in drizzle-kit's `exports`, so it is resolved as the root entry's
 // sibling; resolved from this file, so a consumer gets its own `mithaq`'s copy.
 export const binary = fileURLToPath(new URL('bin.cjs', import.meta.resolve('drizzle-kit')))
+
+/**
+ * Resolves each drizzle-orm import made under `kit` from `from` instead. drizzle-kit imports
+ * drizzle-orm without declaring it, so on its own it loads whatever copy the project hoists,
+ * such as a 0.45 beside the one the tables were built with, and fails on it.
+ */
+export const holdKitOrm = ({ kit, from }: { kit: string; from: string }) =>
+  // Node's alone: a runtime without it resolves as it did.
+  modules.registerHooks?.({
+    resolve: (specifier, context, next) => {
+      if (!/^drizzle-orm($|\/)/.test(specifier) || !context.parentURL?.startsWith(kit)) return next(specifier, context)
+      // A require is resolved from the requiring file whatever parentURL says, so it is resolved here.
+      return context.conditions.includes('require')
+        ? { url: pathToFileURL(modules.createRequire(from).resolve(specifier)).href, shortCircuit: true }
+        : next(specifier, { ...context, parentURL: from })
+    },
+  })
+
+/** The drizzle-kit this mithaq installs, and the file its drizzle-orm resolves from. */
+export const ownKit = { kit: new URL('.', import.meta.resolve('drizzle-kit')).href, from: import.meta.url }
+
+let ownHeld: unknown
+/** Holds this mithaq's drizzle-kit to its own drizzle-orm in this process, once. */
+export const holdOwnKit = () => (ownHeld ??= holdKitOrm(ownKit) ?? true)
+
+/**
+ * A module to `--import` that holds `kit`'s drizzle-orm to `from`'s in a child process.
+ * ponytail: only the drizzle-kit mithaq starts is held; `drizzle-kit migrate` run by hand beside a
+ * second drizzle-orm still loads the hoisted one. Ship a `mithaq` word that applies migrations if that bites.
+ */
+export const kitOrm = (held: { kit: string; from: string }) =>
+  `data:text/javascript,${encodeURIComponent(`import { holdKitOrm } from ${JSON.stringify(import.meta.url)}\nholdKitOrm(${JSON.stringify(held)})\n`)}`
 
 const configName = 'drizzle.config.ts'
 const schemaName = 'schema.ts'
@@ -776,7 +809,7 @@ const kit = (cwd: string, argv: string[]) =>
   new Promise<{ code: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string }>((done, fail) => {
     // Node's 1 MB default `maxBuffer` kills a child past it, and the envelope grows with the
     // migration. Without an `error` listener a child that cannot spawn hangs the command.
-    const child = execFile(process.execPath, [binary, ...argv], { cwd, maxBuffer: 64 * 1024 * 1024 })
+    const child = execFile(process.execPath, ['--import', kitOrm(ownKit), binary, ...argv], { cwd, maxBuffer: 64 * 1024 * 1024 })
     let stdout = ''
     let stderr = ''
     // Decoded by the stream, so a multibyte character split across chunks stays whole.
