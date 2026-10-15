@@ -810,8 +810,11 @@ export const bootMigrations = async ({ db, prodMigrations }: { db: NodePgDatabas
 const kit = async (cwd: string, argv: string[]) => {
   const scratch = await mkdtemp(join(tmpdir(), 'mithaq-kit-'))
   const [out, err] = [join(scratch, 'stdout'), join(scratch, 'stderr')]
-  const [outFd, errFd] = [openSync(out, 'w'), openSync(err, 'w')]
+  // Opened inside the `try`, so one that fails to open leaves none behind.
+  const opened: number[] = []
   try {
+    for (const path of [out, err]) opened.push(openSync(path, 'w'))
+    const [outFd, errFd] = opened
     const { code, signal } = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((done, fail) => {
       const child = spawn(process.execPath, ['--import', kitOrm(ownKit), binary, ...argv], { cwd, stdio: ['ignore', outFd, errFd] })
       // Without an `error` listener a child that cannot spawn hangs the command.
@@ -821,8 +824,7 @@ const kit = async (cwd: string, argv: string[]) => {
     })
     return { code, signal, stdout: await readFile(out, 'utf8'), stderr: await readFile(err, 'utf8') }
   } finally {
-    closeSync(outFd)
-    closeSync(errFd)
+    for (const fd of opened) closeSync(fd)
     await rm(scratch, { recursive: true, force: true })
   }
 }
