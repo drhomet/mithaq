@@ -5,6 +5,7 @@ import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
 import { AuthFrame, authGate, useHomeLabel, useRefusal } from '../auth-frame.tsx'
 import { useCopy } from './__root.tsx'
+import { landing } from '../redirect.ts'
 
 // Accepting is a POST the person presses, so following a link alone joins nobody to anything.
 // The provider decides whether the invitation is theirs.
@@ -50,7 +51,7 @@ function AcceptInvitation() {
       return setRefusal(refused(answered, t('auth.invitationAcceptFailed', 'That invitation could not be accepted.')))
     }
     // The provider made the organization active as it accepted, so the first screen is read as a member.
-    await navigate({ to: (await authGate()).home.path })
+    await navigate({ href: landing({ asked: undefined, screens: (await authGate()).screens }) })
   }
 
   if (!id) return <AuthFrame title={title} description={t('auth.invitationMissing', 'This link names no invitation.')}>{null}</AuthFrame>

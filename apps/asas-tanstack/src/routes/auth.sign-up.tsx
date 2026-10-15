@@ -6,7 +6,7 @@ import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
 import { AuthBox, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
 import { firstRun } from '../first-run.ts'
-import { wanted } from '../redirect.ts'
+import { landing, wanted } from '../redirect.ts'
 import { useCopy } from './__root.tsx'
 
 export const Route = createFileRoute('/auth/sign-up')({
@@ -78,7 +78,7 @@ function SignUp() {
     // An account that proves its address first has no session yet, invited or not, so it is told to open its mail.
     if (verifies) return setSent(email)
     // The server accepted the invitation the sign-up carried, so its page would only say it is spent.
-    await navigate({ to: wanted({ asked: invited ? undefined : search.redirect, home: (await authGate()).home.path }) })
+    await navigate({ href: landing({ asked: invited ? undefined : search.redirect, screens: (await authGate()).screens }) })
   }
 
   const toSignIn = (

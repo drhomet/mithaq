@@ -18,3 +18,14 @@ export const wanted = ({ asked, home }: { asked: string | undefined; home: strin
     return home
   }
 }
+
+/**
+ * Where a signed-in person goes: the path asked for where it lies inside a screen they open, else the
+ * one screen they open, else `/unauthorized`, which asks which of several or says why there is none.
+ * A path in a screen they do not open is not followed, since there they would only be refused.
+ */
+export const landing = ({ asked, screens }: { asked: string | undefined; screens: readonly string[] }): string => {
+  const home = screens.length === 1 ? screens[0]! : '/unauthorized'
+  const path = wanted({ asked, home })
+  return screens.some((screen) => path.startsWith(screen) && (path.length === screen.length || '/?#'.includes(path[screen.length]!))) ? path : home
+}

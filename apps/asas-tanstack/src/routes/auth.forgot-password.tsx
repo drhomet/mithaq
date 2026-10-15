@@ -19,7 +19,7 @@ export const Route = createFileRoute('/auth/forgot-password')({
 function ForgotPassword() {
   const { t } = useCopy()
   const search = Route.useSearch()
-  const { signedIn, home } = Route.useRouteContext()
+  const { signedIn, home, screens } = Route.useRouteContext()
   const refused = useRefusal()
   const [email, setEmail] = useState('')
   const [left, setLeft] = useState(false)
@@ -47,7 +47,7 @@ function ForgotPassword() {
     setSent(true)
   }
 
-  if (signedIn) return <AlreadySignedIn redirect={search.redirect} home={home} />
+  if (signedIn) return <AlreadySignedIn redirect={search.redirect} home={home} screens={screens} />
   if (sent) {
     return (
       <AuthFrame

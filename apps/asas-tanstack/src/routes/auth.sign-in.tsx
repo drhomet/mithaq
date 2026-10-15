@@ -7,14 +7,14 @@ import { documentHead } from '../copy.ts'
 import { AuthBox, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
 import { firstRun } from '../first-run.ts'
 import { useCopy } from './__root.tsx'
-import { wanted } from '../redirect.ts'
+import { landing } from '../redirect.ts'
 
 // The password has no length rule here because the provider's sign-in has none: a wrong
 // password of any length is the one refusal it answers.
 
 export const Route = createFileRoute('/auth/sign-in')({
   head: ({ match }) => documentHead(match.context, (t) => t('auth.signIn')),
-  // The router hands `validateSearch` whatever the URL carried; `wanted` decides what is honoured.
+  // The router hands `validateSearch` whatever the URL carried; `landing` decides what is honoured.
   validateSearch: redirectSearch,
   // Nobody signs in to an app of one organization before its owner has set it up.
   beforeLoad: async ({ search }: { search: { redirect?: string } }) => {
@@ -64,7 +64,7 @@ function SignIn() {
     setPending(false)
 
     // The first screen this actor enters is read only once the session exists.
-    await navigate({ to: wanted({ asked: search.redirect, home: (await authGate()).home.path }) })
+    await navigate({ href: landing({ asked: search.redirect, screens: (await authGate()).screens }) })
   }
 
   return (
