@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react'
 import { Slider } from '@/components/ui/slider'
 import { useComponents } from 'mithaq-admin/components.tsx'
-import { changeOf, type ControlProps } from 'mithaq-admin/control-props.ts'
-import { labelFor } from 'mithaq-admin/copy.ts'
+import { changeOf, labelledBy, type ControlProps } from 'mithaq-admin/control-props.ts'
 import { typed } from 'mithaq-admin/text-control.tsx'
 
 // The write shape is `z.number()` with no coercion, so a reported string is a 400. `NaN` is reported as `undefined`,
@@ -40,7 +39,7 @@ export function SliderControl(props: ControlProps): ReactElement {
     max={max}
     onValueChange={change}
     disabled={props.readOnly}
-    aria-label={labelFor({ kayan: props.kayan, field: props.field, copy: { t: props.t, locale: props.locale ?? '' } })}
+    aria-labelledby={labelledBy(props)}
     aria-describedby={props.describedBy}
   />
 }

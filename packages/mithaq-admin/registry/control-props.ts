@@ -71,6 +71,12 @@ export type ControlProps = {
   locales?: readonly string[]
 }
 
+/**
+ * What names a control whose focusable element is not the box the shell's label points at (a switch, a checkbox, a
+ * radio group, a slider): the shell's label, by the id it derives from the control's own.
+ */
+export const labelledBy = ({ id }: Pick<ControlProps, 'id'>) => `${id}-label`
+
 /** A control, as the components map holds it. */
 export type Control = (props: ControlProps) => ReactElement
 

@@ -6,7 +6,7 @@ import { Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList } 
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ariaRequired, changeOf, checkboxSize, comboboxPhone, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { ariaRequired, changeOf, checkboxSize, comboboxPhone, labelledBy, type ControlProps } from 'mithaq-admin/control-props.ts'
 
 export function SelectControl(props: ControlProps): ReactElement {
   const options = props.field.options ?? []
@@ -26,21 +26,25 @@ export function ComboboxControl(props: ControlProps): ReactElement {
 }
 
 export function ToggleGroupControl(props: ControlProps): ReactElement {
-  return <ToggleGroup value={typeof props.value === 'string' ? [props.value] : []} onValueChange={(next) => changeOf(props)(next[0] ?? null)} disabled={props.readOnly} aria-describedby={props.describedBy} className="flex gap-1">
+  return <ToggleGroup value={typeof props.value === 'string' ? [props.value] : []} onValueChange={(next) => changeOf(props)(next[0] ?? null)} disabled={props.readOnly} aria-labelledby={labelledBy(props)} aria-describedby={props.describedBy} className="flex gap-1">
     {props.field.options?.map((option) => <ToggleGroupItem key={option.value} value={option.value}>{option.label[props.locale ?? ''] ?? option.value}</ToggleGroupItem>)}
   </ToggleGroup>
 }
 
 export function RadioControl(props: ControlProps): ReactElement {
-  return <RadioGroup name={props.field.name} value={typeof props.value === 'string' ? props.value : ''} onValueChange={changeOf(props)} disabled={props.readOnly} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} className="grid gap-2">
-    {props.field.options?.map((option) => <label key={option.value} className="flex items-center gap-2 text-sm">
-      <RadioGroupItem value={option.value} />{option.label[props.locale ?? ''] ?? option.value}
-    </label>)}
+  return <RadioGroup name={props.field.name} value={typeof props.value === 'string' ? props.value : ''} onValueChange={changeOf(props)} disabled={props.readOnly} aria-labelledby={labelledBy(props)} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} className="grid gap-2">
+    {props.field.options?.map((option) => {
+      const label = option.label[props.locale ?? ''] ?? option.value
+      // The wrapping label takes the click; only a native box takes its name, so the option says its own.
+      return <label key={option.value} className="flex items-center gap-2 text-sm">
+        <RadioGroupItem value={option.value} aria-label={label} />{label}
+      </label>
+    })}
   </RadioGroup>
 }
 
 export function ButtonGroupControl(props: ControlProps): ReactElement {
-  return <ButtonGroup aria-describedby={props.describedBy}>
+  return <ButtonGroup aria-labelledby={labelledBy(props)} aria-describedby={props.describedBy}>
     {props.field.options?.map((option) => <Button key={option.value} type="button" variant={props.value === option.value ? 'default' : 'outline'} aria-pressed={props.value === option.value} disabled={props.readOnly} onClick={() => changeOf(props)(option.value)}>
       {option.label[props.locale ?? ''] ?? option.value}
     </Button>)}
@@ -51,9 +55,9 @@ export function CheckboxGroupControl(props: ControlProps): ReactElement {
   const options = props.field.options ?? []
   const held = new Set(Array.isArray(props.value) ? props.value.map(String) : [])
   const change = changeOf(props)
-  return <div role="group" id={props.id} aria-describedby={props.describedBy} className="grid gap-2">
+  return <div role="group" id={props.id} aria-labelledby={labelledBy(props)} aria-describedby={props.describedBy} className="grid gap-2">
     {options.map((option) => <label key={option.value} className="flex items-center gap-2 text-sm">
-      <Checkbox className={checkboxSize} checked={held.has(option.value)} disabled={props.readOnly} onCheckedChange={(on) => {
+      <Checkbox className={checkboxSize} aria-label={option.label[props.locale ?? ''] ?? option.value} checked={held.has(option.value)} disabled={props.readOnly} onCheckedChange={(on) => {
         const next = options.map((one) => one.value).filter((value) => (value === option.value ? on === true : held.has(value)))
         change(next.length ? next : null)
       }} />

@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Toggle } from '@/components/ui/toggle'
-import { ariaRequired, changeOf, checkboxSize, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { ariaRequired, changeOf, checkboxSize, labelledBy, type ControlProps } from 'mithaq-admin/control-props.ts'
 import { labelFor } from 'mithaq-admin/copy.ts'
 
 export function CheckboxControl(props: ControlProps): ReactElement {
@@ -17,6 +17,7 @@ export function CheckboxControl(props: ControlProps): ReactElement {
       onCheckedChange={(next) => change(next === true)}
       className={checkboxSize}
       disabled={readOnly}
+      aria-labelledby={labelledBy(props)}
       aria-describedby={describedBy}
       aria-required={ariaRequired(field)}
     />
@@ -24,7 +25,7 @@ export function CheckboxControl(props: ControlProps): ReactElement {
 }
 
 export function SwitchControl(props: ControlProps): ReactElement {
-  return <Switch id={props.id} name={props.field.name} checked={props.value === true} onCheckedChange={changeOf(props)} disabled={props.readOnly} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} />
+  return <Switch id={props.id} name={props.field.name} checked={props.value === true} onCheckedChange={changeOf(props)} disabled={props.readOnly} aria-labelledby={labelledBy(props)} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} />
 }
 
 export function ToggleControl(props: ControlProps): ReactElement {
