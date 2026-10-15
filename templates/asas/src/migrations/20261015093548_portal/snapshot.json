@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "0317fa86-132b-4672-a406-de7a81cfa049",
+  "id": "1abcb405-1d73-4af0-8efc-8de195d6452a",
   "prevIds": [
-    "a8c7ed04-7324-4536-8f2f-0c37fe17be36"
+    "1ca60dfb-1804-4fae-8420-6e10f53563fc"
   ],
   "ddl": [
     {
@@ -742,7 +742,7 @@
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
-      "default": "false",
+      "default": null,
       "generated": null,
       "identity": null,
       "name": "self_enroll",
@@ -1422,6 +1422,19 @@
       "generated": null,
       "identity": null,
       "name": "role",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "member"
+    },
+    {
+      "type": "timestamp(3) with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_seen_at",
       "entityType": "columns",
       "schema": "public",
       "table": "member"
