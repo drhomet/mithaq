@@ -920,7 +920,7 @@ test('40. the dashboard edit page carries the row, a leaf read-only on this page
   const zone = html.slice(html.indexOf('data-region="danger"'))
   assert.ok(zone.indexOf('>Archive<') > 0 && zone.indexOf('data-button="delete"') > zone.indexOf('>Archive<'), 'the delete sits in the danger zone, after the archive')
   const header = html.slice(html.indexOf('data-region="header"'), html.indexOf('</header>'))
-  assert.ok(header.includes('>Publish changes<') && header.includes('>Cancel<') && header.includes('>Save draft<') && !header.includes('>Delete<'), 'and the controls hold Cancel, Save draft and Publish changes, and no delete')
+  assert.ok(header.includes('>Publish changes<') && header.includes('>Back to list<') && header.includes('>Save draft<') && !header.includes('>Delete<'), 'and the controls hold Back to list beside the autosaved draft, Save draft and Publish changes, and no delete')
   const form = html.slice(html.indexOf('<form'), html.indexOf('</form>'))
   assert.ok(!form.includes('type="submit"') && !form.includes('>Delete<'), 'while the form draws no save and no delete of its own')
   assert.ok(!html.includes('courseActivityPanel'), 'with no placeholder panel on the page')
@@ -950,14 +950,14 @@ test('42. the dashboard draws the session, tag and settings controls, a role\'s 
   assert.match(settings, /role="switch"/, 'switch')
 })
 
-test('43. a session\'s edit is a page of its own in the editor layout, and a create opens as a sheet over the dashboard list and as a drawer over the portal list', async () => {
+test('43. a session\'s edit is a page of its own in the editor layout, and a create opens as the full-page drawer over the dashboard list and over the portal list', async () => {
   const page = await screenHtml(`/dashboard/sessions/${screenSession}`)
   assert.ok(!page.includes('data-record-mode='), 'no dialog over the list')
   assert.match(page, /data-layout="record" data-page="\/sessions\/:id"/, 'the record layout')
   assert.match(page, /data-region="side"[\s\S]*id="sessions-course"/, 'the course in the side column')
-  const sheet = await screenHtml('/dashboard/tags/new')
-  assert.match(sheet, /data-record-mode="sheet"/, 'a sheet')
-  assert.match(sheet, /data-layout="table" data-page="\/tags"/, 'over the tags list')
+  const tag = await screenHtml('/dashboard/tags/new')
+  assert.match(tag, /data-record-mode="drawer"/, 'a drawer')
+  assert.match(tag, /data-layout="table" data-page="\/tags"/, 'over the tags list')
   const drawer = await screenHtml('/portal/enrollments/new')
   assert.match(drawer, /data-record-mode="drawer"/, 'a drawer')
   assert.match(drawer, /data-layout="page" data-page="\/enrollments"/, 'over the portal enrollments list')
@@ -1787,7 +1787,7 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
         for (const word of ['نشر التغييرات', 'حفظ المسودة', 'الحالة', 'منشور', 'الإصدارات', 'جارٍ تحميل الإصدارات…']) assert.ok(shown.includes(word), `the course page says ${word} in Arabic`)
         assert.ok(shown.some((text) => text.startsWith('تم التحديث ')), 'and says when it was last saved in Arabic')
       }
-      if (path === '/courses/new') assert.ok(shown.includes('حفظ المسودة') && shown.includes('نشر التغييرات'), 'the create page offers Save draft and Publish changes, in Arabic')
+      if (path === '/courses/new') assert.ok(shown.includes('حفظ المسودة') && shown.includes('نشر'), 'the create page offers Save draft and Publish, in Arabic')
       // The members page's sheet is a closed dialog in the first paint, so every word it shows is walked here.
       if (path === '/members') {
         assert.ok(html.includes('data-member-sheet') && html.includes('data-role="registrar"'), 'the members page draws its sheet, one box per role')
@@ -2192,7 +2192,7 @@ test('63. a course keeps drafts on its edit page: an actor holding findVersions 
 
 test('64. the course edit page draws its tabs at page level as the line bar, Details holding the record layout, and the form\'s controls in the sticky header on every tab, in both locales', async () => {
   const course = (await post('/api/courses/create', { title: `${title} controls`, fee: 10, delivery: 'live', currency: 'SAR' }, { cookie })).body
-  for (const [locale, words] of [['en', { publish: 'Publish changes', cancel: 'Cancel', published: 'Published', updated: 'Updated ' }], ['ar', { publish: 'نشر التغييرات', cancel: 'إلغاء', published: 'منشور', updated: 'تم التحديث ' }]] as const) {
+  for (const [locale, words] of [['en', { publish: 'Publish changes', cancel: 'Back to list', published: 'Published', updated: 'Updated ' }], ['ar', { publish: 'نشر التغييرات', cancel: 'العودة إلى القائمة', published: 'منشور', updated: 'تم التحديث ' }]] as const) {
     const page = await fetch(`${origin}/dashboard/courses/${course.id}`, { headers: { cookie: `${cookie}; locale=${locale}` } })
     assert.equal(page.status, 200)
     const html = await page.text()
@@ -2201,7 +2201,7 @@ test('64. the course edit page draws its tabs at page level as the line bar, Det
     assert.ok(header.includes('data-node="controls"'), `${locale}: the header holds the form's controls`)
     assert.match(header, new RegExp(`data-slot="badge"[^>]*data-status="published"[^>]*>${words.published}<|data-status="published"[^>]*data-slot="badge"[^>]*>${words.published}<`), `${locale}: where the row stands, as a pill`)
     assert.ok(header.includes(`>${words.updated}`), `${locale}: when it was last saved`)
-    assert.ok(header.includes(`>${words.cancel}<`), `${locale}: Cancel`)
+    assert.ok(header.includes(`>${words.cancel}<`), `${locale}: Back to list, beside a draft that saves itself`)
     const formId = html.match(/<form id="([^"]+)"/)?.[1]
     assert.ok(formId, 'the page holds one form')
     assert.match(header, new RegExp(`<button[^>]*type="submit"[^>]*form="${formId}"[^>]*data-button="publish"|<button[^>]*form="${formId}"[^>]*type="submit"`), `${locale}: and a submit naming the page's form by its id`)
@@ -2212,14 +2212,14 @@ test('64. the course edit page draws its tabs at page level as the line bar, Det
   }
 })
 
-test('66. a changed course draws its amber pill, the Draft and Published switch and the draft strip in both locales, the served plug answers Discard changes, and the create page offers Save draft beside Publish changes', async () => {
+test('66. a changed course draws its amber pill, the Draft and Published switch and the draft strip in both locales, the served plug answers Discard changes, and the create page offers Save draft beside Publish', async () => {
   // The switch, the strip's two buttons and the autosave on a create are the form's, driven in a DOM by registry tests;
   // here the page is read as the server renders it, and Discard changes is the request the form sends.
   const course = (await post('/api/courses/create', { title: `${title} discard`, fee: 10, delivery: 'live', currency: 'SAR' }, { cookie })).body
   await post('/api/courses/update?draft=true', { id: course.id, title: `${title} discard pending` }, { cookie })
   for (const [locale, words] of [
-    ['en', { changed: 'Changed', draft: 'Draft', published: 'Published', editing: 'You are editing a draft. The published version is different.', view: 'View published', discard: 'Discard changes', publish: 'Publish changes' }],
-    ['ar', { changed: 'تغييرات غير منشورة', draft: 'مسودة', published: 'منشور', editing: 'أنت تحرر مسودة. النسخة المنشورة مختلفة.', view: 'عرض النسخة المنشورة', discard: 'تجاهل التغييرات', publish: 'نشر التغييرات' }],
+    ['en', { changed: 'Changed', draft: 'Draft', published: 'Published', editing: 'You are editing a draft. The published version is different.', view: 'View published', discard: 'Discard changes', publish: 'Publish' }],
+    ['ar', { changed: 'تغييرات غير منشورة', draft: 'مسودة', published: 'منشور', editing: 'أنت تحرر مسودة. النسخة المنشورة مختلفة.', view: 'عرض النسخة المنشورة', discard: 'تجاهل التغييرات', publish: 'نشر' }],
   ] as const) {
     const html = await (await fetch(`${origin}/dashboard/courses/${course.id}`, { headers: { cookie: `${cookie}; locale=${locale}` } })).text()
     const header = html.slice(html.indexOf('data-region="header"'), html.indexOf('</header>'))
@@ -2235,7 +2235,7 @@ test('66. a changed course draws its amber pill, the Draft and Published switch 
       assert.deepEqual(english.filter((one) => html.includes(`>${one}<`) || html.includes(`aria-label="${one}"`) || html.includes(`title="${one}"`)), [], 'ar: the switch and the strip draw no English')
     }
     const create = await (await fetch(`${origin}/dashboard/courses/new`, { headers: { cookie: `${cookie}; locale=${locale}` } })).text()
-    assert.ok(create.includes(`>${words.publish}<`) && create.includes('data-button="save-draft"'), `${locale}: the create page offers Save draft beside Publish changes`)
+    assert.ok(create.includes(`>${words.publish}<`) && create.includes('data-button="save-draft"'), `${locale}: the create page offers Save draft beside Publish, as a course never published has no changes to publish`)
   }
   const discarded = await post('/api/courses/restoreVersion', { id: course.id }, { cookie })
   assert.equal(discarded.response.status, 200, JSON.stringify(discarded.body))
@@ -2592,11 +2592,11 @@ test('73. the backoffice reads by name in both locales: its sign-in is the tenan
     assert.ok(row.includes(`data-row-menu="${other.id}"`), 'and one menu, which holds the actions')
     assert.match(await page(`/backoffice/users/${other.id}`, 'en'), /data-person-actions="set-role ban impersonate"/, 'and the person\'s page offers every action this viewer may take')
 
-    // A person's record is titled by their name, reads their backoffice role by its label, an unticked box apart from an empty one, and no id.
+    // A person's record is titled by their name, reads their backoffice role by its label, an unticked box as the word No, and no id.
     const person = await page(`/backoffice/users/${me.user.id}`, 'en')
     assert.match(person, /<h1[^>]*data-node="title"[^>]*>Boot<\/h1>/, 'a person\'s record is titled by their name')
     assert.ok(person.includes('Backoffice administrator') && !/data-field-value="role"[\s\S]{0,400}>user</.test(person), 'and reads the backoffice role by its label')
-    assert.ok(/data-field-value="emailVerified"[\s\S]*?<span aria-hidden="true"[^>]*>✗<\/span>/.test(person), 'and an unticked box as a no')
+    assert.ok(/data-field-value="emailVerified"[^>]*>[\s\S]*?<span class="text-sm">No<\/span>/.test(person), 'and an unticked box as a no')
     assert.ok(!person.includes('data-field-value="id"'), 'and draws no id')
     // A tenant's own role, since the roles this project ships are code and never a row.
     const role = (await db.execute(`select id, name, label_en, label_ar from roles where permissions @> array['courses.find']::text[] order by created_at limit 1`)).rows[0] as { id: string; name: string; label_en: string; label_ar: string }
