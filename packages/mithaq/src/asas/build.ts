@@ -328,7 +328,7 @@ const operations = <Actor>(
       call: (given, { actor, context, draft, autosave, tenant }) => {
         if (contextDeclared && !context) {
           throw new Error(
-            `Kayan "${kayan.name}" operation "${name}" was served with no context, and this build's runner declares one. Give every http plug a context function: fetchHttp({ context }) or orpcHttp({ context }).`,
+            `Kayan "${kayan.name}" operation "${name}" was served with no context, and this build's runner declares one. Give every http plug a context function: fetchHttp({ context, maxBodyBytes: defaultMaxBodyBytes, onError: console.error }), or orpcHttp with the same options.`,
           )
         }
         if (bounded && given && typeof given === 'object' && 'limit' in given) {

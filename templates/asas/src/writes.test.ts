@@ -701,6 +701,8 @@ test('20a6. a served call through a listed plug given no context function, under
   assert.equal(reported.length, 2)
   for (const error of reported) {
     assert.match(String((error as Error).message), /Kayan "notes" operation "find" was served with no context, and this build's runner declares one/)
+    // The plug it names is one that builds, with every option a plug requires.
+    assert.match(String((error as Error).message), /fetchHttp\(\{ context, maxBodyBytes: defaultMaxBodyBytes, onError: console\.error \}\)/)
   }
 })
 
