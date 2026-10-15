@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -47,13 +47,16 @@ cpSync(join(root, 'LICENSES'), join(stagedAdmin, 'LICENSES'), { recursive: true 
 console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
 
 cpSync(join(root, 'README.md'), join(staged, 'README.md'))
+// Committed files only, as the template is staged, so nothing left in the working tree ships.
+const tracked = (...paths: string[]) => execFileSync('git', ['ls-files', '-z', ...paths], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
 // The user guides at their repository paths, so each relative link between them resolves as it does on GitHub, and a
 // project's agent reads the ones that match the version it installed. The contributor AGENTS.md files stay out.
-for (const guide of ['packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']) {
+for (const guide of tracked('packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md')) {
   cpSync(join(root, guide), join(staged, 'docs', guide))
 }
 // The workflow skills a created project carries in `.claude/skills/`, at this version, for an upgrade to copy again.
-cpSync(join(root, 'templates/asas/.claude/skills'), join(staged, 'skills'), { recursive: true })
+const skills = 'templates/asas/.claude/skills'
+for (const file of tracked(skills)) cpSync(join(root, file), join(staged, 'skills', relative(skills, file)))
 cpSync(join(root, 'LICENSE'), join(staged, 'LICENSE'))
 cpSync(join(root, 'LICENSES'), join(staged, 'LICENSES'), { recursive: true })
 console.log(`staged ${staged}`)

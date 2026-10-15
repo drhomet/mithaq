@@ -2,7 +2,7 @@
 // resolves inside `node_modules/mithaq/docs/`, where a project's agent reads the guides of the version it installed.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -27,4 +27,16 @@ test('the mithaq package ships the workflow skills a created project carries in 
   assert.deepEqual(readdirSync(join(staged, 'skills')).sort(), readdirSync(skills).sort())
   for (const skill of readdirSync(skills)) assert.equal(readFileSync(join(staged, 'skills', skill, 'SKILL.md'), 'utf8'), readFileSync(join(skills, skill, 'SKILL.md'), 'utf8'), skill)
   assert.ok((JSON.parse(readFileSync(join(staged, 'package.json'), 'utf8')) as { files: string[] }).files.includes('skills'), 'and npm packs them')
+})
+
+test('a file left untracked beside a skill never ships', () => {
+  // Beside an existing skill rather than as a folder of its own, so a test reading the skill folders meanwhile sees the same four.
+  const stray = join(root, 'templates/asas/.claude/skills/add-kayan/stray.md')
+  writeFileSync(stray, 'left in the working tree\n')
+  try {
+    execFileSync(process.execPath, ['apps/pack.ts'], { cwd: root, stdio: 'ignore' })
+    assert.ok(!existsSync(join(staged, 'skills/add-kayan/stray.md')))
+  } finally {
+    rmSync(stray)
+  }
 })
