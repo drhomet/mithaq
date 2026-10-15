@@ -40,21 +40,24 @@ export const kind = <Value>(accepts: (value: unknown) => value is Value) =>
 /** A value `JSON.parse` could hand back. */
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 
+/** How deep a json value nests: past it every reader that walks it, this check first, would run out of stack. */
+export const jsonDepth = 64
+
 /**
- * Plain JSON, nested to any depth: no `undefined`, no number that is not finite,
- * no `Date`, class instance or function, and no cycle. A store would otherwise
- * drop, rewrite or refuse it on the way in, and read back something else.
+ * Plain JSON, nested at most `jsonDepth` deep: no `undefined`, no number that is
+ * not finite, no `Date`, class instance or function, and no cycle. A store would
+ * otherwise drop, rewrite or refuse it on the way in, and read back something else.
  */
-export const isJson = (value: unknown, open: Set<object> = new Set()): value is Json => {
+export const isJson = (value: unknown, open: object[] = []): value is Json => {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
   if (typeof value === 'number') return Number.isFinite(value)
-  if (typeof value !== 'object' || open.has(value)) return false
+  if (typeof value !== 'object' || open.length >= jsonDepth || open.includes(value)) return false
   const prototype = Object.getPrototypeOf(value)
   if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return false
-  open.add(value)
+  open.push(value)
   // `Object.values` skips a hole, which `JSON.stringify` would write as `null`, so the length is checked too.
   const plain = (!Array.isArray(value) || Object.keys(value).length === value.length) && Object.values(value).every((one) => isJson(one, open))
-  open.delete(value)
+  open.pop()
   return plain
 }
 

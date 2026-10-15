@@ -63,6 +63,21 @@ test('a json field holds every JSON type through both schema targets and reads i
   }
 })
 
+test('a json value nests at most 64 deep, and one deeper, however deep, is the caller\'s 400 rather than a 500', async () => {
+  const nested = (depth: number): unknown => {
+    let value: unknown = 'leaf'
+    for (let level = 0; level < depth; level += 1) value = level % 2 ? { next: value } : [value]
+    return value
+  }
+  for (const schema of [zodTarget, plainTarget]) {
+    const { defineKayan, buildAsas } = language(schema)
+    const operations = buildAsas({ http: [fetchHttp()], kayan: [settingsKayan(defineKayan)] }).kayan.blobs.operations
+    const { id } = await operations.create({ id: crypto.randomUUID(), data: nested(64) as never })
+    assert.deepEqual((await operations.findByID({ id }))?.data, nested(64))
+    for (const depth of [65, 100_000]) await assert.rejects(() => operations.create({ data: nested(depth) } as never), refused, String(depth))
+  }
+})
+
 test('a json field with a jsonSchema refuses a value its schema refuses through both schema targets, keeps a value it takes as written, and is refused at build where the schema cannot be held to', async () => {
   const schema = {
     uri: 'a://b/foo.json',
