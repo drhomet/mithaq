@@ -3045,3 +3045,18 @@ test('78. behind a TLS proxy that routes by Host, each app answers its own publi
     }
   }
 })
+
+test('79. the backoffice hands a read\'s body on unread, so a body past the limit that never ends is answered 413 before any session is looked at', async () => {
+  const { port } = new URL(backofficeOrigin)
+  const answered = await new Promise<number>((resolve, reject) => {
+    const sent = httpRequest({ host: '127.0.0.1', port, method: 'POST', path: '/api/courses/find', headers: { origin: backofficeOrigin, 'content-type': 'application/json' } }, (response) => {
+      resolve(response.statusCode ?? 0)
+      response.resume()
+      sent.destroy()
+    })
+    sent.on('error', (error) => (sent.destroyed ? undefined : reject(error)))
+    // One byte past the 4 MiB the template names, and never ended.
+    sent.write(Buffer.alloc(4 * 1024 * 1024 + 1, 0x20))
+  })
+  assert.equal(answered, 413)
+})

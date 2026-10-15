@@ -8,12 +8,12 @@ import { asas, backofficeURL } from 'asas'
 // and asks for none.
 const reads = new Set(asas.operations.filter((one) => one.effect === 'read' && !one.single).map((one) => `/api/${one.kayan}/${one.name}`))
 
-const acrossTenants = async (request: Request) => {
+// The body is handed on unread, so the plug that answers bounds it before any session is looked at.
+const acrossTenants = (request: Request) => {
   const url = new URL(request.url)
   if (!reads.has(url.pathname)) return request
   url.searchParams.set('tenant', 'all')
-  const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text()
-  return new Request(url, { method: request.method, headers: request.headers, body })
+  return new Request(url, { method: request.method, headers: request.headers, body: request.body, signal: request.signal, duplex: 'half' } as RequestInit)
 }
 
 // A write whose `Origin` is not BACKOFFICE_URL's is refused: the data plug checks no origin and leans on
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/api/$')({
     handlers: {
       ANY: async ({ request }) =>
         request.method === 'GET' || request.method === 'HEAD' || request.headers.get('origin') === origin
-          ? asas.handler(await acrossTenants(request))
+          ? asas.handler(acrossTenants(request))
           : new Response('Forbidden', { status: 403 }),
     },
   },
