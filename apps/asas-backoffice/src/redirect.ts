@@ -1,1 +1,1 @@
-export { landing, wanted } from '../../asas-tanstack/src/redirect.ts'
+export { landing } from '../../asas-tanstack/src/redirect.ts'
