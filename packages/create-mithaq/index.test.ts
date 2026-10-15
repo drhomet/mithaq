@@ -73,6 +73,7 @@ test('a monorepo holds its guide and agent files at the root, where an agent sta
   assert.deepEqual(['AGENTS.md', 'CLAUDE.md', 'README.md'].filter((file) => existsSync(join(scratch, 'my-app/packages/asas', file))), [], 'and none is left in packages/asas')
   assert.equal(read('my-app/CLAUDE.md'), '@AGENTS.md\n')
   assert.match(read('my-app/AGENTS.md'), /`README\.md` beside this file/)
+  assert.doesNotMatch(read('my-app/README.md'), /<!-- from: /, 'the guide names no file of the mithaq repository its snippets are checked against')
 })
 
 test('the template and both apps get the same .env, with fresh secrets only their owner can read', () => {

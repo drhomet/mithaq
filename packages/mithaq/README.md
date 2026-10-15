@@ -154,6 +154,7 @@ A kind is what a field holds: its value's type, the label and message a person
 reads, and the rules it accepts. A rule is a constraint or a behaviour a field
 switches on in `rules`.
 
+<!-- from: templates/features/courses/courses/courses.ts -->
 ```ts
 title: {
   kind: 'text',
@@ -234,12 +235,26 @@ error on the field.
 A kayan is declared once, as data, and every target derives its part from that
 declaration: the table, the validation shapes, the operations and the screens.
 
+<!-- from: templates/features/tags/tags/tags.ts -->
 ```ts
 export const tags = defineKayan({
   name: 'tags',
   messages: {
     singular: { en: 'Tag', ar: 'وسم' },
     plural: { en: 'Tags', ar: 'الوسوم' },
+  },
+  targets: {
+    // ...
+    dashboard: {
+      useAsTitle: 'name',
+      // ...
+    },
+    service: {
+      operations: ({ defaults }) => ({
+        ...defaults,
+        // ...
+      }),
+    },
   },
   fields: {
     ...defaultFields,
@@ -249,10 +264,6 @@ export const tags = defineKayan({
       label: { en: 'Name', ar: 'الاسم' },
       rules: { localized: true, required: true, trim: true, maxLength: 60, index: true },
     },
-  },
-  targets: {
-    service: { operations: { ...defaultOperations } },
-    dashboard: { useAsTitle: 'name', pages: { /* ... */ } },
   },
 })
 ```
@@ -637,13 +648,19 @@ role's keys from code and each custom role's keys from that organization's
 --tenant <id> --user <id> --role <slug>` writes one assignment from the
 command line.
 
+<!-- from: templates/mithaq/src/mithaq.ts -->
 ```ts
-rbac: rbacTarget({
+const accessOptions = {
   roles: systemRoles,
   rolesOf: assignedRoles,
   access: tenantAccess,
   kayan: { roles: 'roles', memberRoles: 'memberRoles' },
-}),
+} as const
+
+export const accessTarget = (roles: typeof systemRoles = systemRoles) => {
+  const target = rbacTarget({ ...accessOptions, roles })
+  // ...
+}
 ```
 
 Where it lives: `packages/mithaq/src/rbac/index.ts` `rbacTarget`.
@@ -678,15 +695,39 @@ each kind (`screenKinds` and the project's own), its providers, its own pages,
 and the shells, layouts and components its pages name. A kayan says what the
 screen draws of it under `targets.<screen>`.
 
+<!-- from: templates/mithaq/src/mithaq.ts -->
 ```ts
-export const dashboardScreen = screenTarget({
-  path: '/dashboard',
-  kayan: ['courses', 'tags', 'settings'],
+const shared = {
   controls: screenKinds,
-  providers: [ui('rich-text-nodes.tsx#RichTextNodes')],
-  pages: { dashboard: { path: '/', component: dashboardUi('dashboard.tsx#Dashboard'), permission: 'courses.find' } },
-  layouts: { app: ui('app-shell.tsx#AppShell'), record: ui('record-page.tsx#RecordPage'), table: ui('table-page.tsx#TablePage') },
-  components: {},
+  layouts: {
+    app: ui('app-shell.tsx#AppShell'),
+    record: ui('record-page.tsx#RecordPage'),
+    table: ui('table-page.tsx#TablePage'),
+  },
+}
+
+export const dashboardScreen = screenTarget({
+  ...shared,
+  layouts: { ...shared.layouts, top: ui('top-shell.tsx#TopShell') },
+  path: '/dashboard',
+  kayan: [
+    'courses',
+    // ...
+    'tags',
+    // ...
+    'settings',
+    // ...
+  ],
+  providers: [
+    dashboardUi('theme-provider.tsx#ThemeProvider'),
+    ui('rich-text-nodes.tsx#RichTextNodes'),
+    // ...
+  ],
+  pages: {
+    dashboard: { path: '/', component: dashboardUi('dashboard.tsx#Dashboard'), permission: 'courses.find' },
+    // ...
+  },
+  // ...
 })
 ```
 

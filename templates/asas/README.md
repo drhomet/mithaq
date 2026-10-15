@@ -14,7 +14,7 @@ You need Bun 1.3, Node.js 24 or later, and PostgreSQL 15 or later. Docker is the
 bun create mithaq my-app
 ```
 
-This copies the template into `my-app`, pins `mithaq` to the published package, and runs `bun install`. If it was not started by Bun, it skips the install and tells you to run `bun install` yourself. Install with Bun only: the admin screens find their files through Bun's isolated installer, and npm, pnpm and yarn lay `node_modules` out differently.
+This copies the template into `my-app`, pins `mithaq` to the published package, and installs with the package manager that ran it (`npm create mithaq my-app` works too). A project installs with npm, pnpm 10.6 or later, Yarn 1 or Bun 1.3; Yarn 2 and later install a copy of mithaq for each workspace of a monorepo, which the build refuses. Started by any other, it skips the install and tells you to run it yourself.
 
 A project starts minimal: the language, the asas, the `auth` feature and the `tags` example. `--full` adds every add-on, the whole worked example this guide walks through, and `--with roles,settings` picks some, each with the add-ons it needs. Asked with neither, it offers minimal, full or pick.
 
@@ -795,6 +795,7 @@ A pushed database has no migration history, so it is never a production database
 
 Each app connects once before it serves any request. Both `apps/asas-tanstack/src/server.ts` and `apps/asas-backoffice/src/server.ts` do this:
 
+<!-- from: apps/asas-tanstack/src/server.ts -->
 ```ts
 const { env } = process
 if (env.NODE_ENV === 'production') {
@@ -807,6 +808,7 @@ if (env.NODE_ENV === 'production') {
 
 In production, `connect()` does not push. It checks the migrations instead, as `prodMigrations` on `drizzleAdapter` says. Without `prodMigrations`, a production `connect()` refuses to start. The template sets it in `packages/mithaq/src/mithaq.ts`:
 
+<!-- from: templates/mithaq/src/mithaq.ts -->
 ```ts
 const drizzleStore = drizzleAdapter({
   connectionString,

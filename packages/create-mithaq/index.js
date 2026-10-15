@@ -335,6 +335,8 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   // project holds them in `packages/`, and every relative path an app names into them follows.
   renameSync(join(project, 'templates'), join(project, 'packages'))
   for (const file of textsUnder(project)) edit(file, (text) => text.replaceAll(/((?:\.\.\/)+)templates(?=[/'"])/g, '$1packages'))
+  // A snippet's marker names the repository file the docs test checks it against, a path no project holds.
+  for (const file of textsUnder(project).filter((one) => one.endsWith('.md'))) edit(file, (text) => text.replaceAll(/^[ \t]*<!-- from: \S+ -->\n/gm, ''))
   const files = readdirSync(project, { recursive: true })
   // npm drops every `.gitignore` from a published package, so the stage keeps
   // each as `gitignore`.

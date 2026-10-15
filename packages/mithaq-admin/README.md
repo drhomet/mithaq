@@ -92,10 +92,23 @@ Every screen draws a field's control, and a list or a read-only value its
 cell, from the components map the app hands `ComponentsProvider`. The app keeps the map in `src/components.ts`,
 typed against the project's language, and mounts it around every route in `src/router.tsx`:
 
+<!-- from: apps/asas-tanstack/src/components.ts -->
+```ts
+export const components: ComponentsOf<Language> = {
+  ...defaultComponents,
+  controls: {
+    ...defaultComponents.controls,
+    // ...
+  },
+  cells: {
+    ...defaultComponents.cells,
+    // ...
+  },
+}
+```
+
+<!-- from: apps/asas-tanstack/src/router.tsx -->
 ```tsx
-// src/components.ts
-export const components: ComponentsOf<Language> = defaultComponents
-// src/router.tsx
 Wrap: ({ children }) => <ComponentsProvider components={components}>{children}</ComponentsProvider>,
 ```
 

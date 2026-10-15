@@ -134,7 +134,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 | File | What it does |
 |---|---|
 | `lint-args.ts` | `bun run lint:args`: fails an exported function, constructor, method or function type with three or more positional parameters, over `packages/mithaq/src`, the registry and the template's packages. `lint-args.test.ts` and `lint-args.fixture.ts` test it. |
-| `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package), `.pack/mithaq-admin/` (the pieces as source, at the same version) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
+| `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package and the user guides under `docs/`; `pack.test.ts` checks the guides), `.pack/mithaq-admin/` (the pieces as source, at the same version) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
 | `release.ts` | `node apps/release.ts <version>` commits the version and tags it; `--publish` is release.yml's publish step. `release.test.ts` tests it. |
 | `release-consumer.ts` | `bun run test:release`: makes projects from the staged packages as `bun create mithaq` does, full, minimal and with add-ons picked, then typechecks, migrates, builds, boots and seeds each and runs `mithaq generate --check`. |
 | `tanstack-boot.ts`, `next-boot.ts` | `bun run test:tanstack` and `bun run test:next`: build and boot the apps and test them over a real socket. |
@@ -142,6 +142,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 | `client-imports.test.ts` | Checks that no module a browser loads reaches the language, the storage config or `node:crypto`. |
 | `screens-host.test.ts` | Checks that each app is exactly the host item, the generated screen files and a skeleton with no screen code. |
 | `mounts.test.ts` | Checks that the Next and TanStack routes hand requests to `asas.handler` alike. |
+| `docs.test.ts` | Checks the Markdown: links, retired names and marked snippets (see [Docs](#docs)). |
 
 ### Where tests and generated files go in the repository
 
@@ -149,6 +150,14 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 - Package tests sit beside their source in `packages/mithaq/src`, in `packages/mithaq-admin/test/`, and in `packages/create-mithaq/index.test.ts`. App tests sit in `apps/asas-tanstack/src`.
 - `bun run test` runs `lint:args` and every `*.test.ts`. `bun run typecheck` runs the root config and the configs of `packages/mithaq-admin` and both apps.
 - Generated files in the template and apps are committed, as they are in a project. Build output is not: `.pack/` and `node_modules/` are ignored.
+
+## Docs
+
+`apps/docs.test.ts`, part of `bun run test`, checks every tracked `.md` file:
+
+- **Links.** Every relative link, every `#anchor`, and every link to `https://github.com/drhomet/mithaq/blob/main/...` resolves to a tracked file and, for a Markdown file, one of its headings.
+- **Retired names.** A name the project dropped, such as the backoffice console's old one, appears in no guide. The commit that renames something adds the old name to `retired` in the test. A guide's "Upgrading" section may name them, to say what each became.
+- **Copied snippets.** A snippet copied from a file of the repository is marked by the line `<!-- from: <path from the repository root> -->` right above its fence. The test reads each of its lines, trimmed of indentation, in order in that file, so an excerpt may leave lines out, and a line `// ...` says where it does. A snippet that no longer matches is fixed in the guide, never by changing the code to fit it. `create-mithaq` removes the marker from a created project's guide, whose paths differ. A snippet written for the guide alone, such as a kayan the template does not hold, carries no marker.
 
 ## Release
 
