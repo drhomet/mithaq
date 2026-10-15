@@ -61,15 +61,11 @@ export type OrpcRouter<View> = {
  * The oRPC plug: one procedure per operation, served over both the typed RPC protocol
  * and plain HTTP. Needs `@orpc/server` and `@orpc/openapi`.
  */
-export const orpcHttp = ({
-  rpc = '/api/rpc',
-  api = '/api',
-  context,
-  onError,
-  maxBodyBytes,
-}: OrpcHttpOptions = {} as OrpcHttpOptions) => {
-  assertMaxBodyBytes('orpcHttp', maxBodyBytes)
-  assertOnError('orpcHttp', onError)
+export const orpcHttp = (options: OrpcHttpOptions) => {
+  // Read off `options?`, since a JavaScript caller may hand nothing, and is refused by name.
+  assertMaxBodyBytes('orpcHttp', options?.maxBodyBytes)
+  assertOnError('orpcHttp', options.onError)
+  const { rpc = '/api/rpc', api = '/api', context, onError, maxBodyBytes } = options
   return <View>(operations: OperationTable<View>) => {
     // A reporter that throws must not replace the error the host has to see.
     const report = (thrown: unknown) => {

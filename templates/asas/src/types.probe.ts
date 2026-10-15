@@ -90,6 +90,7 @@ import {
 import type { CompoundIndex } from 'mithaq'
 import { richText } from 'mithaq/rich-text'
 import type { RouterClient } from '@orpc/server'
+import { orpcHttp } from 'mithaq/orpc'
 import type { FetchClient } from 'mithaq/admin'
 import { asas } from './asas.ts'
 import { type OrganizationActor } from '../../mithaq/src/roles/tenant-access.ts'
@@ -1384,6 +1385,12 @@ const check = async () => {
     // @ts-expect-error admin access must return a boolean or Promise<boolean>
     kayan: [localTyped],
     auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: localTyped, access: () => 'yes' }, onError: console.error },
+  })
+  buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [localTyped],
+    // @ts-expect-error an auth names its maxBodyBytes, the largest body an auth route reads
+    auth: { onError: console.error },
   })
   type CourseRow = Awaited<ReturnType<typeof asas.kayan.courses.operations.create>>
   const derivedAccess = accessFor<BothActor>()({
@@ -3255,4 +3262,14 @@ type ScreenFieldKeys = Expect<
   built.kayan.owned.operations.create({ title: 'A' })
   // @ts-expect-error nor does a caller name it
   built.kayan.owned.operations.create({ title: 'A', organizationId: 'org-1' })
+}
+
+// Each plug names its options, its body limit and its reporter among them; core holds neither.
+export const plugOptionsProbe = () => {
+  // @ts-expect-error a plug takes its options
+  fetchHttp()
+  // @ts-expect-error the oRPC plug takes its options too
+  orpcHttp()
+  // @ts-expect-error a plug names its onError
+  fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })
 }
