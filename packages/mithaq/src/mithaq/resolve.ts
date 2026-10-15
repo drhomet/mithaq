@@ -1,5 +1,6 @@
 import { admissions, rowsOf, rowsOfField } from './rows.ts'
 import { isRef, refuseLiteral } from './user.ts'
+import { jsonSchemaCheck } from '../base/json-schema.ts'
 import {
   bulkSeals,
   defaultGlobalOperations,
@@ -18,7 +19,7 @@ import {
   type ResolvedOperation,
   type Seal,
 } from '../asas/runner/steps.ts'
-import { kayanServiceKeys, unsortable, type CompoundIndex, type Kayan, type KayanService, type RuntimeField, type LabelFunction, type Localized, type MessageMap, type MessageTree, type ResolvedKayan } from './types.ts'
+import { kayanServiceKeys, unsortable, type CompoundIndex, type Kayan, type KayanService, type RuntimeField, type LabelFunction, type Localized, type MessageMap, type MessageTree, type ResolvedField, type ResolvedKayan } from './types.ts'
 import { defaultKinds } from '../base/kinds.ts'
 import { compareDecimals } from '../base/decimal.ts'
 import type { ScreenField } from '../screen/index.ts'
@@ -706,6 +707,14 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       throw new Error(`${where} jsonSchema "fileMatch" is a list of strings and "uri" a string.`)
     }
   }
+  // Else every create that leaves the field out would be refused for a value it never sent.
+  const jsonDefaultNamed = (where: string, field: ResolvedField) => {
+    const value = field.rules?.defaultValue
+    if (field.kind !== 'json' || value === undefined || isRef(value)) return
+    if (JSON.stringify(value).length > field.maxBytes! || (field.jsonSchema && !jsonSchemaCheck(field)(value))) {
+      throw new Error(`${where} defaultValue is refused by its own jsonSchema or maxBytes.`)
+    }
+  }
   const declaredTargets = (where: string, wrote: Record<string, unknown> | undefined, known = targetNames) => {
     for (const name of Object.keys(wrote ?? {})) {
       if (known.has(name)) continue
@@ -839,6 +848,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       optionsNamed(where, field.kind, field)
       affixesNamed(where, field.kind, field)
       jsonSchemaNamed(where, field)
+      jsonDefaultNamed(where, field)
       for (const [screen, block] of Object.entries(field.targets ?? {})) {
         if (!isScreen(language.targets[screen])) continue
         const drawn = block as ScreenField

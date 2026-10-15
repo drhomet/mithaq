@@ -171,6 +171,10 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
   }
   assert.throws(build({ kind: 'text', maxBytes: undefined, jsonSchema: { schema: {} } }), /field "data" has a jsonSchema, and kind "text" takes none; only a json field does\./)
   // Never fetched: a schema read off a URI at write time is a request the server makes on a caller's behalf.
+  // A default the field's own schema or cap refuses would make every create that leaves the field out a refusal.
+  assert.throws(build({ rules: { defaultValue: { size: -1 } }, jsonSchema: { schema: { properties: { size: { minimum: 0 } } } } }), /field "data" defaultValue is refused by its own jsonSchema or maxBytes\./)
+  assert.throws(build({ maxBytes: 5, rules: { defaultValue: { size: 1 } } }), /field "data" defaultValue is refused by its own jsonSchema or maxBytes\./)
+  assert.doesNotThrow(build({ rules: { defaultValue: { size: 1 } }, jsonSchema: { schema: { properties: { size: { minimum: 0 } } } } }))
   assert.throws(build({ jsonSchema: { uri: 'https://example.com/schema.json' } }), /field "data" jsonSchema names no "schema"; a schema is held in the field and never fetched from its "uri"\./)
   assert.throws(build({ jsonSchema: { schema: 'object' } }), /field "data" jsonSchema names no "schema"/)
   assert.throws(build({ jsonSchema: { schema: {}, fileMatch: 'x' } }), /field "data" jsonSchema "fileMatch" is a list of strings and "uri" a string\./)
