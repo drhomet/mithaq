@@ -423,8 +423,8 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'أنشئ حسابا بالبريد الإلكتروني الذي أُرسلت إليه الدعوة.',
     },
     haveAccount: { en: 'Already have an account?', ar: 'لديك حساب بالفعل؟' },
-    unauthorized: { en: 'Not for your role', ar: 'ليست لدورك' },
-    unauthorizedDescription: { en: 'Your role does not open that screen. These are the screens it opens:', ar: 'دورك لا يفتح تلك الشاشة. هذه هي الشاشات التي يفتحها:' },
+    unauthorized: { en: 'Choose where to go', ar: 'اختر وجهتك' },
+    unauthorizedDescription: { en: 'This page isn\'t part of your account. Where would you like to go?', ar: 'هذه الصفحة ليست ضمن حسابك. إلى أين تريد الذهاب؟' },
     unauthorizedPage: { en: 'Your role does not open that page: {page}.', ar: 'دورك لا يفتح تلك الصفحة: {page}.' },
     noAccess: { en: 'Your account has no access yet', ar: 'لا يملك حسابك أي وصول بعد' },
     noAccessDescription: {

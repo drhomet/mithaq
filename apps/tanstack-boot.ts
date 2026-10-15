@@ -1233,14 +1233,15 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
     assert.ok(refusal.includes('unauthorized'), `the instructor's call answers the refusal: ${refusal.slice(0, 300)}`)
     assert.ok(!refusal.includes('courses') && !refusal.includes('"kayan"'), 'and carries no kayan of the screen it refused')
 
-    const page = await fetch(`${origin}/unauthorized`, { headers: { cookie } })
-    assert.equal(page.status, 200, '/unauthorized is served to a signed-in member')
-    const html = await page.text()
-    assert.ok(html.includes('href="/portal"'), 'it links the portal the instructor enters')
-    assert.ok(!html.includes('href="/dashboard"'), 'and not the dashboard it does not')
-    assert.ok(html.includes('>Sign out<'), 'and offers sign-out')
-    assert.ok(!/name:"[^"]+",single:/.test(html), 'and crosses no kayan of any screen')
+    assert.equal(await sentTo('/unauthorized', cookie), '/portal', 'an instructor, whose role opens the portal alone, is sent straight there with no page to read')
   })
+  // The tenant administrator opens both screens, so is asked where to go.
+  const page = await fetch(`${origin}/unauthorized`, { headers: { cookie } })
+  assert.equal(page.status, 200, '/unauthorized is served to a signed-in member who opens several screens')
+  const html = await page.text()
+  assert.ok(html.includes('href="/portal"') && html.includes('href="/dashboard"'), 'it offers each screen the role opens')
+  assert.ok(html.includes('>Sign out<'), 'and offers sign-out')
+  assert.ok(!/name:"[^"]+",single:/.test(html), 'and crosses no kayan of any screen')
   // A visitor with no session is sent to sign-in, and the redirect names /unauthorized so signing in lands back there.
   const toSignIn = await fetch(`${origin}/unauthorized`, { redirect: 'manual' })
   assert.equal(toSignIn.status, 307)

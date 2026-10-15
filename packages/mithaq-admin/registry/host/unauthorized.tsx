@@ -8,6 +8,13 @@ import { NoOrganization } from '../no-organization.tsx'
 import { ImpersonationBar, loadEnterable } from '../screens.tsx'
 import { useCopy } from './__root.tsx'
 
+/**
+ * Where someone sent here from a screen their role does not open goes without being asked: the one screen it does
+ * open. A page refused inside that screen is said instead, and so is an impersonation, whose bar is the way out.
+ */
+export const onwardOf = ({ screens, refused, impersonating }: { screens: readonly { path: string }[]; refused?: unknown; impersonating?: unknown }) =>
+  !refused && !impersonating && screens.length === 1 ? screens[0]!.path : undefined
+
 export const Route = createFileRoute('/unauthorized')({
   // The path a screen refused; the server only matches it against the build's pages.
   validateSearch: (search: Record<string, unknown>): { from?: string } => (typeof search.from === 'string' ? { from: search.from } : {}),
@@ -16,6 +23,8 @@ export const Route = createFileRoute('/unauthorized')({
     const entered = await loadEnterable({ data: { from: deps.from, locale: context.locale } })
     // Carries this page's own path so a visitor whose session expired lands back here after signing in.
     if (!entered) throw redirect({ to: '/auth/sign-in', search: { redirect: '/unauthorized' } })
+    const onward = onwardOf(entered)
+    if (onward) throw redirect({ href: onward })
     return entered
   },
   // After the loader, so its data's type is inferred before this reads it.
@@ -55,13 +64,13 @@ function Unauthorized() {
   const screenName = (name: string) => t(`screens.${name}`, name) ?? name
   return (
     <AuthFrame
-      title={screens.length ? t('auth.unauthorized', 'Not for your role') : t('auth.noAccess', 'Your account has no access yet')}
+      title={screens.length ? t('auth.unauthorized', 'Choose where to go') : t('auth.noAccess', 'Your account has no access yet')}
       description={
         <span data-no-access={screens.length ? undefined : ''}>
           {refused
             ? said(t('auth.unauthorizedPage', 'Your role does not open that page: {page}.'))
             : screens.length
-              ? t('auth.unauthorizedDescription', 'Your role does not open that screen. These are the screens it opens:')
+              ? t('auth.unauthorizedDescription', 'This page isn\'t part of your account. Where would you like to go?')
               : organizations.length
                 ? said(t('auth.noAccessDescription', '{email} is a member of {organization} and holds no role that opens a screen here. Ask an administrator of {organization} to give you one.'))
                 : said(t('auth.noOrganization', '{email} belongs to no organization yet.'))}
@@ -76,16 +85,14 @@ function Unauthorized() {
             {(t('auth.backTo', 'Back to {screen}') ?? 'Back to {screen}').replace('{screen}', () => screenName(refused.screen.name))}
           </a>
         ) : screens.length ? (
-          <ul className="grid gap-2">
+          <div className="grid gap-2">
             {screens.map((screen) => (
-              <li key={screen.name}>
-                {/* An anchor: the path is the screen's own data, not a route the router knows. */}
-                <a className={link} href={screen.path}>
-                  {screenName(screen.name)}
-                </a>
-              </li>
+              // An anchor: the path is the screen's own data, not a route the router knows.
+              <Button key={screen.name} nativeButton={false} className="max-sm:h-11" render={<a href={screen.path} />}>
+                {screenName(screen.name)}
+              </Button>
             ))}
-          </ul>
+          </div>
         ) : unplaced ? (
           <NoOrganization email={email} />
         ) : null}
