@@ -67,13 +67,19 @@ export const boundedBody = async (request: Request, limit: number): Promise<Blob
   if (Number(request.headers.get('content-length')) > limit) return undefined
   const chunks: Uint8Array[] = []
   let size = 0
-  for await (const chunk of (request.body ?? []) as AsyncIterable<Uint8Array>) {
-    size += chunk.byteLength
-    // Leaving the loop cancels the stream.
-    if (size > limit) return undefined
-    chunks.push(chunk)
+  const reader = request.body?.getReader()
+  for (;;) {
+    const { done, value } = (await reader?.read()) ?? { done: true }
+    if (done) return new Blob(chunks as BlobPart[])
+    size += value.byteLength
+    if (size > limit) {
+      // Not awaited: a clone's cancel settles only once its twin is cancelled too, which the
+      // caller does after this returns.
+      reader!.cancel().catch(() => {})
+      return undefined
+    }
+    chunks.push(value)
   }
-  return new Blob(chunks as BlobPart[])
 }
 
 export const tooLarge = (limit: number) =>
