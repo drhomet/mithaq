@@ -967,6 +967,9 @@ export const write = <Actor = unknown>({
         // The audit sink writes through the same three, so only the kayan's own writes save versions.
         const versioned = versions ? kayan as ResolvedKayan & { versions: NonNullable<typeof versions> } : undefined
         const own = (name: string) => versioned && name === kayan.name ? versioned : undefined
+        // The row this write authorized, which alone takes its access, versions and soft delete. A
+        // step naming any other id writes that row, never this one in its place.
+        const ownRow = (name: string, id: unknown) => kind !== 'insert' && name === kayan.name && id === targetId
         const protectedStore: WriteTools<unknown, Actor>['store'] = Object.freeze({
           insert: async ({ tx: heldTx, kayan: name, data: values }) => {
             const row = await tools.store.insert({ tx: heldTx, kayan: name, data: values })
@@ -974,14 +977,17 @@ export const write = <Actor = unknown>({
             if (kept) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row, autosave: autosaving })
             return row
           },
-          update: async ({ tx: heldTx, kayan: name, id, data: values }) => {
+          update: async (args) => {
+            const { tx: heldTx, kayan: name, id, data: values } = args
+            // Any other row is the step's own raw write, held by the tenant seal alone.
+            if (!ownRow(name, id)) return tools.store.update(args)
             const kept = own(name)
             if (drafting && kept) {
               const draft = { ...base, ...values, id: targetId }
               await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row: draft, autosave: autosaving })
               return draft
             }
-            const row = await tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: values, where: writeWhere })
+            const row = await tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: values, where: writeWhere })
             // A never-published row is its own draft, so the draft appended below is its one version.
             if (kept && !(pending && status === 'draft')) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row, autosave: false })
             // Appended after the row's own, so the draft stays the latest.
@@ -990,12 +996,13 @@ export const write = <Actor = unknown>({
           },
           // A soft delete keeps the `remove` seal, so the effect, the access answer and the 404 stay
           // the delete's; the mark is refused as a field any caller supplies.
-
-          remove: async ({ tx: heldTx, kayan: name, id }) => {
-            if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
+          remove: async (args) => {
+            const { tx: heldTx, kayan: name, id } = args
+            if (!ownRow(name, id)) return tools.store.remove(args)
+            if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
             // A marked row is kept, so only a delete that removes it answers to the rows naming it.
-            if (name === kayan.name && pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
-            return tools.store.remove({ tx: heldTx, kayan: name, id: targetId ?? id, where: writeWhere })
+            if (pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
+            return tools.store.remove({ tx: heldTx, kayan: name, id: targetId, where: writeWhere })
           },
         })
         // Its absence is a build fault: the partial update shape would make a row without its required fields.
