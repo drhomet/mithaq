@@ -31,7 +31,7 @@ export const superAdminOnly = ['localUsers'] as const
 const people = [
   ...reads('user', [...stamps, 'name', 'email', 'emailVerified', 'image', 'role', 'banned', 'banReason', 'banExpires']),
   ...reads('organization', [...stamps, 'name', 'names', 'slug', 'logo', 'metadata']),
-  ...reads('member', [...stamps, 'organizationId', 'userId', 'role']),
+  ...reads('member', [...stamps, 'organizationId', 'userId', 'role', 'lastSeenAt']),
 ]
 
 /** Each tenant's business, across every organization. */
