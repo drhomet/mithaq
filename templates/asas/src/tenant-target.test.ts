@@ -147,7 +147,7 @@ test('a global carrying a bound field is one row per organization: the field uni
 test('buildAsas refuses a second Better Auth kayan beside a tenant-owned kayan, whose organizations one instance alone holds', () => {
   const server = () => ({ api: { getSession: async () => null }, handler: async () => new Response(null) })
   const instance = (name: string): Kayan => ({ name, fields: { id: { kind: 'text' } }, auth: betterAuth({ server: server as never }), targets: operations } as Kayan)
-  const twice = { http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [organization, instance('staff'), instance('shoppers')], auth: { onError: () => {} } }
+  const twice = { http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [organization, instance('staff'), instance('shoppers')], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: () => {} } }
   const owned = { ...twice, kayan: [...twice.kayan, notes({ organizationId: tenant.field })] }
   assert.throws(() => tenanted.buildAsas(owned as never), /Kayan "staff" and "shoppers" each carry Better Auth, and kayan "notes" belongs to the organization a session names\./)
   assert.doesNotThrow(() => tenanted.buildAsas(twice as never), 'a build with no tenant-owned kayan keeps both')

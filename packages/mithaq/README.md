@@ -558,10 +558,10 @@ required one out:
   defaultMaxBodyBytes, onError: console.error })`. Each plug requires its
   `maxBodyBytes`, the largest request body it reads, and answers one past it
   with 413 before it reads the rest; the template names `defaultMaxBodyBytes`
-  (4 MiB) on both, and an auth route holds every body to it. Files are never
-  sent this way. Each plug requires its `onError` too, handed every fault it
-  answers 500.
-- `auth.onError`, once any kayan carries auth.
+  (4 MiB) on both. Files are never sent this way. Each plug requires its
+  `onError` too, handed every fault it answers 500.
+- `auth.onError` and `auth.maxBodyBytes`, the largest body an auth route
+  reads, once any kayan carries auth.
 - On the service target: `authorize` (`defaultAuthorize`), `depth`
   (`defaultDepth`, 8), `defaultLimit` (10), `maxLimit` (100), `joinLimit` (10),
   `bulkLimit` (1000), `store` and `schema`. An `audit` step needs an `audit`

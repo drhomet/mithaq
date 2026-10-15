@@ -104,7 +104,7 @@ export const asas = buildAsas({
   // The administrator is a super admin in the backoffice app and nobody else: the
   // one who verifies a local sign-up. A kayan with no callback of its own falls
   // to this answer, so every table Better Auth alone writes closes itself.
-  auth: { admin: { kayan: auth.user, access: superAdmin }, onError: report },
+  auth: { admin: { kayan: auth.user, access: superAdmin }, onError: report, maxBodyBytes: defaultMaxBodyBytes },
 })
 
 // The backoffice slug, the screen the backoffice app serves, the reader that

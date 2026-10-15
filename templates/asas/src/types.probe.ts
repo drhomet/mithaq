@@ -1365,6 +1365,7 @@ const check = async () => {
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [localTyped],
     auth: {
+      maxBodyBytes: defaultMaxBodyBytes,
       admin: {
         kayan: localTyped,
         access: ({ user }: AdminAccessArgs<NonNullable<Awaited<ReturnType<typeof localOnly.auth.actor>>>>) => user.strategy === 'local',
@@ -1376,13 +1377,13 @@ const check = async () => {
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error admin access callbacks are checked against the configured actor
     kayan: [localTyped],
-    auth: { admin: { kayan: localTyped, access: (_args: AdminAccessArgs<BetterOnlyActor>) => true }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: localTyped, access: (_args: AdminAccessArgs<BetterOnlyActor>) => true }, onError: console.error },
   })
   buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     // @ts-expect-error admin access must return a boolean or Promise<boolean>
     kayan: [localTyped],
-    auth: { admin: { kayan: localTyped, access: () => 'yes' }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: localTyped, access: () => 'yes' }, onError: console.error },
   })
   type CourseRow = Awaited<ReturnType<typeof asas.kayan.courses.operations.create>>
   const derivedAccess = accessFor<BothActor>()({

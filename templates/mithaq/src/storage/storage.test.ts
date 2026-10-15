@@ -154,7 +154,7 @@ const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, 
   // The same kayan on both schema targets, the zod one and the template's own.
   const notes = noteOf('notes', 'zod')
   const plainNotes = noteOf('plainNotes', 'plain')
-  const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [fileKayan, notes, plainNotes], auth: { onError: console.error } } as never) as unknown as {
+  const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [fileKayan, notes, plainNotes], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error } } as never) as unknown as {
     handler(request: Request): Promise<Response>
     targets: { storage: { commands: { sweep(input: { asas: unknown; flags: readonly string[] }): Promise<number> } }; memory: { rows: Map<string, Record<string, unknown>[]> } }
     destroy(): Promise<void>

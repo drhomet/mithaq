@@ -2171,7 +2171,7 @@ test('58. the access report answers per operation name beside the four effects, 
   const asas = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [{ ...courses, auth: { name: 'fixture', authenticate: () => ({ user: member }) } }, ...accessKayan],
-    auth: { onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error },
   })
   const answer = (await (await asas.handler(new Request('http://test/api/access'))).json()) as {
     collections: Record<string, { operations: Record<string, boolean>; update: boolean }>

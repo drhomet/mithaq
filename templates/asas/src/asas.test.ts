@@ -643,7 +643,7 @@ const offlineTargets = (
 
 const reporting = <L extends { buildAsas: (args: never) => unknown }>(language: L): L => ({
   ...language,
-  buildAsas: ((args: { auth?: object }) => language.buildAsas({ ...args, auth: { onError: console.error, ...args.auth } } as never)) as L['buildAsas'],
+  buildAsas: ((args: { auth?: object }) => language.buildAsas({ ...args, auth: { onError: console.error, maxBodyBytes: defaultMaxBodyBytes, ...args.auth } } as never)) as L['buildAsas'],
 })
 
 const offline = (kinds?: Record<string, ColumnBuilder>, shapes?: Record<string, ZodShape>, rules?: Record<string, ColumnRule>) =>
@@ -787,7 +787,7 @@ const localAuthProject = async (
   const built = language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticated],
-    auth: { onError, ...(admin && { admin: { kayan: authenticated, access: admin.access } }) },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, onError, ...(admin && { admin: { kayan: authenticated, access: admin.access } }) },
   })
   await built.connect()
   return { built, kayan }
@@ -1532,7 +1532,7 @@ test('admin update of a generated Better Auth row bumps updatedAt through the ka
   const adminAsas = buildTestAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: accessKayan.map((one) => (one.name === 'session' ? { ...one, access: undefined } : one)),
-    auth: { admin: { kayan: authKayan.core[0]!, access: () => true }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: authKayan.core[0]!, access: () => true }, onError: console.error },
   })
   const actor = await adminAsas.auth.actor(signedIn)
   assert.ok(actor)
@@ -3902,7 +3902,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
   // refusals are its.
   const authenticated = authenticating(users, local({ ...localRequired, secret: 'admin-identity-secret-of-thirty-two-characters' }))
   assert.throws(
-    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], auth: { admin: { kayan: authenticated }, onError: console.error } }),
+    () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: authenticated }, onError: console.error } }),
     /auth\.admin\.kayan "users" is not in the buildAsas kayan list/,
   )
   assert.throws(
@@ -3910,7 +3910,7 @@ test('19. buildAsas collects a provider from every kayan that carries one, and a
       language.buildAsas({
         http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [authenticated],
-        auth: { admin: { kayan: authenticating(language.defineKayan({ name: 'users', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }), local(localRequired)) }, onError: console.error },
+        auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: authenticating(language.defineKayan({ name: 'users', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } }), local(localRequired)) }, onError: console.error },
       }),
     /auth\.admin\.kayan "users" is not the registered kayan object/,
   )
@@ -4053,7 +4053,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
       language.buildAsas({
         http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [adminUser, authenticating(defaultAdminAccess, betterAuthProvider({ server: () => fakeBetterAuth }))],
-        auth: { admin: { kayan: adminUser }, onError: console.error },
+        auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: adminUser }, onError: console.error },
       }),
     /auth\.admin names kayan "adminUser", which carries no auth\./,
   )
@@ -4067,7 +4067,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
       language.buildAsas({
         http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
         kayan: [probeAdmin, defaultAdminAccess],
-        auth: { admin: { kayan: probeAdmin }, onError: console.error },
+        auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: probeAdmin }, onError: console.error },
       }),
     /auth\.admin names kayan "adminUser", whose auth is a strategy this project wrote\./,
   )
@@ -4075,7 +4075,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   const mappedAdminBuilt = language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [betterAdminUser, defaultAdminAccess],
-    auth: { admin: { kayan: betterAdminUser }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: betterAdminUser }, onError: console.error },
   })
   const mappedActor = await mappedAdminBuilt.auth.actor(new Headers())
   assert.equal((mappedActor as { collection?: string } | null)?.collection, 'adminUser')
@@ -4086,7 +4086,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   const adminAllowedBuilt = language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [betterAdminUser, defaultAdminAccess],
-    auth: { admin: { kayan: betterAdminUser, access: async ({ user }: AdminAccessArgs<{ id: string }>) => user.id === 'admin-1' }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: betterAdminUser, access: async ({ user }: AdminAccessArgs<{ id: string }>) => user.id === 'admin-1' }, onError: console.error },
   })
   const allowedActor = await adminAllowedBuilt.auth.actor(new Headers())
   await adminAllowedBuilt.kayan.defaultAdminAccess.operations.create({ title: 'Admin default allowed' }, { actor: allowedActor! })
@@ -4095,7 +4095,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   const adminDeniedBuilt = language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [betterAdminUser, defaultAdminAccess],
-    auth: { admin: { kayan: betterAdminUser, access: () => false }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: betterAdminUser, access: () => false }, onError: console.error },
   })
   await assert.rejects(
     async () => adminDeniedBuilt.kayan.defaultAdminAccess.operations.create({ title: 'Admin callback denied' }, { actor: (await adminDeniedBuilt.auth.actor(new Headers()))! }),
@@ -4113,7 +4113,7 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   const customerBuilt = language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [customerAdminUser, defaultAdminAccess],
-    auth: { admin: { kayan: customerAdminUser, access: ({ user }: AdminAccessArgs<{ id: string }>) => user.id === 'admin-1' }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: customerAdminUser, access: ({ user }: AdminAccessArgs<{ id: string }>) => user.id === 'admin-1' }, onError: console.error },
   })
   await assert.rejects(
     async () => customerBuilt.kayan.defaultAdminAccess.operations.create({ title: 'Shared collection customer denied' }, { actor: (await customerBuilt.auth.actor(new Headers()))! }),
@@ -4915,11 +4915,11 @@ test('21b. first registration hands every step the context local()\'s own functi
     targets: { service: { operations: localOperations } },
   })
   assert.throws(
-    () => language.buildAsas({ auth: { onError: console.error }, http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, secret: 'context-local-secret-of-thirty-two-characters' }))] }),
+    () => language.buildAsas({ auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error }, http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, secret: 'context-local-secret-of-thirty-two-characters' }))] }),
     /kayan "contextLocalUsers" carries auth: local\(\.\.\.\) with no context function, and this build's runner declares a context/,
   )
   const built = language.buildAsas({
-    auth: { onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error },
     kayan: [authenticating(users, local({
       ...localRequired,
       secret: 'context-local-secret-of-thirty-two-characters',
@@ -5109,7 +5109,7 @@ test('24. local auth requires an explicit secret unless development is opted in'
   const unsigned = language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(users, local({ ...localRequired, withoutSecret: 'No secret here: set MY_SECRET.' }))],
-    auth: { onError: (error: unknown) => notices.push(error) },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => notices.push(error) },
   })
   assert.ok(notices.some((one) => String(one).includes('has no local({ secret })') && String(one).includes('set MY_SECRET')), 'the build says so once')
   const refused = await unsigned.handler(new Request('http://test/api/auth/local/login', { method: 'POST', body: '{}' }))
@@ -5228,6 +5228,18 @@ test('24b. a build whose kayan carry auth names its own auth.onError, which hear
     () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, development: true }))] }),
     /buildAsas was handed no "auth\.onError", and kayan "users" carries auth\./,
   )
+  // The auth arm reads a body as a plug does, held to the project's own limit.
+  for (const maxBodyBytes of [undefined, 0]) {
+    assert.throws(
+      () => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, development: true }))], auth: { onError: console.error, maxBodyBytes } as never }),
+      /auth names no "maxBodyBytes", the largest request body/,
+      String(maxBodyBytes),
+    )
+  }
+  const limited = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(users, local({ ...localRequired, development: true }))], auth: { onError: console.error, maxBodyBytes: 100 } })
+  const long = await limited.handler(new Request('http://test/api/auth/local/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: `${'a'.repeat(100)}@example.com`, password: 'x' }) }))
+  assert.equal(long.status, 413)
+  assert.match(((await long.json()) as { message: string }).message, /at most 100 bytes/)
 
   // A strategy that throws is the next one's turn and no actor, and the project's own
   // function is told, never the console.
@@ -5239,7 +5251,7 @@ test('24b. a build whose kayan carry auth names its own auth.onError, which hear
     targets: { service: { operations: defaultOperations } },
   })
   const heard: unknown[] = []
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [failing], auth: { onError: (error) => void heard.push(error) } })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [failing], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error) => void heard.push(error) } })
   assert.equal(await built.auth.actor(new Headers()), null)
   assert.equal(heard.length, 1, 'told once')
   assert.match((heard[0] as Error).message, /Auth strategy "failing" failed\./)
@@ -5283,7 +5295,7 @@ test('24a. a store carrying the drizzle marker without db or tables fails the bu
   })
   const impostorUsers = impostorLanguage.defineKayan({ name: 'probeUsers', fields: localAuthFields, targets: { service: { operations: localOperations } } })
   assert.throws(
-    () => impostorLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(impostorUsers, local({ ...localRequired, development: true }))], auth: { onError: console.error } }),
+    () => impostorLanguage.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticating(impostorUsers, local({ ...localRequired, development: true }))], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error } }),
     { message: 'kayan "probeUsers" carries auth: local(...) and must use a store declaring sql: "drizzle" with db and tables.' },
   )
 
@@ -8763,7 +8775,7 @@ test('82. a kayan the access target reads carrying the soft-delete mark is refus
       targets: { service: { operations: defaultOperations } },
     })
     return language.buildAsas({
-      auth: { onError: console.error },
+      auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error },
       http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
       kayan: [
         made('refusedRoles', 'refused_roles', { name: { kind: 'text' }, permissions: { kind: 'textArray' } }),
@@ -10011,7 +10023,7 @@ test('98a. one create makes a local account for an administrator and for a publi
   const built = language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [users],
-    auth: { admin: { kayan: users, access: ({ user }: { user: unknown }) => (user as { user: { email: string } }).user.email === 'admin@example.com' }, onError: console.error },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: users, access: ({ user }: { user: unknown }) => (user as { user: { email: string } }).user.email === 'admin@example.com' }, onError: console.error },
   })
   await built.connect()
   const table = built.targets.drizzle.tables.accountLocalUsers!
@@ -11409,7 +11421,7 @@ test('116. the access target answers for a local actor too, under no organizatio
   })
   const heard: unknown[] = []
   const built = language.buildAsas({
-    auth: { onError: (error) => void heard.push(error) },
+    auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error) => void heard.push(error) },
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [authenticating(accounts, local({ ...localRequired, secret: 'local-tenant-secret-of-thirty-two-characters' })), notes, roleRows, assignments],
   })
@@ -15054,7 +15066,7 @@ test('160. without an access target, only the auth.admin actor its access admits
   })
   let admitted = true
   const authenticated = authenticating(kayan, local({ ...localRequired, secret: 'screen-local-secret-of-thirty-two-characters' }))
-  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticated], auth: { admin: { kayan: authenticated, access: () => admitted }, onError: console.error } })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [authenticated], auth: { maxBodyBytes: defaultMaxBodyBytes, admin: { kayan: authenticated, access: () => admitted }, onError: console.error } })
   await built.connect()
   try {
     const screens = async (cookie?: string) =>

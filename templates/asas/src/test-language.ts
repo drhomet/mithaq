@@ -2,7 +2,7 @@
 // A screen lists the kayan it draws by name and refuses a build missing one, and a test builds a kayan or two at a time,
 // so the dashboard screen here draws only the two role kayan every such build holds and the two provider kayan
 // their assignments point at, whose own declarations write `targets.dashboard`.
-import { defineMithaq, type SystemRoles } from 'mithaq'
+import { defaultMaxBodyBytes, defineMithaq, type SystemRoles } from 'mithaq'
 import { accessTarget, arkan, dashboardScreen, backofficeScreen, portalScreen, serverTargets } from '../../mithaq/src/mithaq.ts'
 import { systemRoles } from '../../mithaq/src/roles/system-roles.ts'
 
@@ -66,7 +66,7 @@ export const narrowed = <D extends { targets: object; buildAsas: (args: never) =
     ) as SystemRoles
     // The template reports to the console, and so do the tests,
     // unless one names its own.
-    const auth = { onError: console.error, ...(args as { auth?: object }).auth }
+    const auth = { onError: console.error, maxBodyBytes: defaultMaxBodyBytes, ...(args as { auth?: object }).auth }
     return languageOf(roles).buildAsas({ ...args, auth } as never)
   }
   return { ...language, buildAsas } as D
