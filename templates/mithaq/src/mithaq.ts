@@ -387,8 +387,8 @@ export const dashboardScreen = screenTarget({
     'user',
     'organization',
     // add-on: audit-log
-    // `auditLog` is listed for its access report alone, which the edit pages'
-    // activity panel is drawn by.
+    // `auditLog` is listed for its access report, which the edit pages' activity
+    // and the Activity page are drawn by, and for the person filter's own field.
     'auditLog',
     // end add-on: audit-log
   ],
@@ -422,6 +422,16 @@ export const dashboardScreen = screenTarget({
       permission: 'member.find',
     },
     // end add-on: roles
+    // add-on: audit-log
+    // Every change in the organization, filtered and paged, for an actor holding the log's key,
+    // which reads the entries of the kayan it lists alone. Read-only, as the log is.
+    activity: {
+      path: '/activity',
+      component: ui('activity-page.tsx#ActivityPage'),
+      nav: { label: { en: 'Activity', ar: 'النشاط' } },
+      permission: 'auditLog.find',
+    },
+    // end add-on: audit-log
   },
   // A piece only one kayan draws is named by `ui()` in that kayan's file; these
   // are drawn by name from many.
@@ -429,6 +439,8 @@ export const dashboardScreen = screenTarget({
     // add-on: audit-log
     // A record's own audit entries, which each edit page draws in its side column.
     activity: ui('activity.tsx#Activity'),
+    // A record's whole history, filtered and paged, which an edit page draws in a tab beside Versions.
+    activityLog: ui('activity.tsx#ActivityTab'),
     // end add-on: audit-log
     // A row's versions, with their restore, which the edit page of a kayan that
     // keeps drafts draws in a tab of its own.
@@ -468,6 +480,10 @@ export const backofficeScreen = screenTarget({
     'memberRoles',
     // end add-on: roles
     'localUsers',
+    // add-on: audit-log
+    // Who impersonated whom, set whose backoffice role and banned whom, for the roles that read it.
+    'backofficeLog',
+    // end add-on: audit-log
   ],
   providers: [
     dashboardUi('theme-provider.tsx#ThemeProvider'),

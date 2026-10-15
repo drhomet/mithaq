@@ -415,8 +415,10 @@ test('the template screens share their controls and layouts through one const, r
   // component of the project's own (the Roles list). No real page holds the other
   // two, so the test below builds one that does.
   assert.deepEqual([...kinds].sort(), ['button', 'button confirm', 'component', 'controls', 'field', 'form', 'form component', 'layout', 'list', 'list component', 'nav', 'row', 'section', 'shell', 'tabs', 'title'].sort())
-  assert.deepEqual(Object.keys(dashboard.pages), ['dashboard', 'members'], 'a dashboard and one page that belongs to no kayan')
-  assert.deepEqual(dashboard.nav.at(-1), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find' }, 'listed in the nav behind its own key')
+  assert.deepEqual(Object.keys(dashboard.pages), ['dashboard', 'members', 'activity'], 'a dashboard and the pages that belong to no kayan: the members and the organization\'s activity')
+  assert.deepEqual(dashboard.pages.activity, { path: '/activity', component: '@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage', nav: { label: { en: 'Activity', ar: 'النشاط' } }, permission: 'auditLog.find' }, 'which the log\'s key serves')
+  assert.deepEqual(dashboard.nav.at(-2), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find' }, 'listed in the nav behind its own key')
+  assert.deepEqual(dashboard.nav.at(-1), { path: '/activity', page: 'activity', label: { en: 'Activity', ar: 'النشاط' }, permission: 'auditLog.find' }, 'and the activity behind the log\'s')
 })
 
 test('a screen with no page at / is refused, and so are folder, shell and dashboard, which left the screen', () => {
@@ -975,8 +977,8 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   assert.deepEqual(page('list').header, [{ title: {} }], 'while a page holding no form has no controls')
   const [tabs, ...rest] = edit.main as { tabs: { tab: string; fields: Record<string, any>[] }[] }[]
   assert.deepEqual(rest, [], 'the edit page\'s main region holds its tabs and nothing else')
-  assert.deepEqual(tabs!.tabs.map((tab) => tab.tab), ['details', 'sessions', 'versions'])
-  const [details, sessions, versions] = tabs!.tabs
+  assert.deepEqual(tabs!.tabs.map((tab) => tab.tab), ['details', 'sessions', 'versions', 'activity'])
+  const [details, sessions, versions, activity] = tabs!.tabs
   assert.equal(details!.fields.length, 1)
   const layout = details!.fields[0]!
   assert.equal(layout.layout, dashboard.layouts.record, 'Details holds the record layout')
@@ -988,6 +990,7 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   assert.deepEqual(layout.danger.map((node: { button: string }) => node.button), ['unpublish', 'archive', 'unarchive', 'delete'], 'and its danger zone')
   assert.deepEqual(sessions!.fields.map((node) => Object.keys(node)), [['list']], 'Sessions holds its list alone, at the full width')
   assert.deepEqual(versions!.fields.map((node) => node.component), [dashboard.components.versions], 'and Versions its panel alone')
+  assert.deepEqual(activity!.fields, [{ component: dashboard.components.activityLog, when: { '$user.collections.auditLog.operations.find': { equals: true } } }], 'and Activity the record\'s whole history, for a reader of the log alone')
 
   const create = (page('create').main as Record<string, any>[])[0]!
   assert.equal(create.layout, dashboard.layouts.record, 'the create page draws the record layout with no tab')

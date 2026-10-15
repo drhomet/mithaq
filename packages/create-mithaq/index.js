@@ -70,7 +70,7 @@ export const addOns = {
   },
   'audit-log': {
     needs: [],
-    files: ['packages/features/audit-log', 'packages/mithaq/src/mithaq/audit-sink.ts', 'packages/mithaq/src/ui/activity.tsx', 'packages/asas/src/messages/auditLog.json'],
+    files: ['packages/features/audit-log', 'packages/mithaq/src/mithaq/audit-sink.ts', 'packages/mithaq/src/ui/activity.tsx', 'packages/mithaq/src/ui/activity-page.tsx', 'packages/asas/src/messages/auditLog.json', 'packages/asas/src/messages/backofficeLog.json'],
     without: [],
     packages: [],
     copy: [],

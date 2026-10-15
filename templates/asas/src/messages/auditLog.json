@@ -1,4 +1,8 @@
 {
+  "about": {
+    "ar": "كل تغيير في هذه المؤسسة، الأحدث أولا.",
+    "en": "Every change in this organization, newest first."
+  },
   "action.archive": {
     "ar": "أُرشف",
     "en": "Archived"
@@ -18,6 +22,10 @@
   "action.deleteMany": {
     "ar": "حُذف",
     "en": "Deleted"
+  },
+  "action.publish": {
+    "ar": "نُشر",
+    "en": "Published"
   },
   "action.restoreVersion": {
     "ar": "استُعيد إصدار",
@@ -39,6 +47,10 @@
     "ar": "حُدِّث",
     "en": "Updated"
   },
+  "actionFilter": {
+    "ar": "الإجراء",
+    "en": "Action"
+  },
   "activity": {
     "ar": "النشاط",
     "en": "Activity"
@@ -55,6 +67,26 @@
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
   },
+  "all": {
+    "ar": "كل النشاط",
+    "en": "All activity"
+  },
+  "any": {
+    "ar": "الكل",
+    "en": "Any"
+  },
+  "changed": {
+    "ar": "الحقول المتغيرة",
+    "en": "Changed columns"
+  },
+  "changed.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "changed.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
   "changes": {
     "ar": "التغييرات",
     "en": "Changes"
@@ -66,6 +98,10 @@
   "changes.required": {
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
+  },
+  "clear": {
+    "ar": "مسح عوامل التصفية",
+    "en": "Clear filters"
   },
   "command": {
     "ar": "الأمر {command} ({user})",
@@ -86,6 +122,42 @@
   "failed": {
     "ar": "تعذرت قراءة النشاط.",
     "en": "The activity could not be read."
+  },
+  "field": {
+    "ar": "الحقل",
+    "en": "Field"
+  },
+  "filter.created": {
+    "ar": "أُنشئ",
+    "en": "Created"
+  },
+  "filter.deleted": {
+    "ar": "حُذف",
+    "en": "Deleted"
+  },
+  "filter.published": {
+    "ar": "نُشر",
+    "en": "Published"
+  },
+  "filter.restored": {
+    "ar": "استُعيد",
+    "en": "Restored"
+  },
+  "filter.updated": {
+    "ar": "حُدِّث",
+    "en": "Updated"
+  },
+  "filters": {
+    "ar": "تصفية النشاط",
+    "en": "Filter the activity"
+  },
+  "found": {
+    "ar": "السجلات المطابقة: {count}",
+    "en": "Entries found: {count}"
+  },
+  "from": {
+    "ar": "من",
+    "en": "From"
   },
   "id.invalid": {
     "ar": "هذا ليس معرفا فريدا.",
@@ -139,6 +211,14 @@
     "ar": "لم يتغير حقل يمكنك قراءته.",
     "en": "No field you may read changed."
   },
+  "nothing": {
+    "ar": "لا نشاط يطابق عوامل التصفية هذه.",
+    "en": "No activity matches these filters."
+  },
+  "oneRecord": {
+    "ar": "نشاط سجل واحد.",
+    "en": "One record's activity."
+  },
   "operation": {
     "ar": "العملية",
     "en": "Operation"
@@ -159,6 +239,10 @@
     "ar": "المؤسسة",
     "en": "Organization"
   },
+  "person": {
+    "ar": "الشخص",
+    "en": "Person"
+  },
   "plural": {
     "ar": "سجل التدقيق",
     "en": "Audit log"
@@ -175,6 +259,14 @@
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
   },
+  "searchChanges": {
+    "ar": "القيم المتغيرة",
+    "en": "changed values"
+  },
+  "searchLimited": {
+    "ar": "يشمل البحث السجلات التي يمكنك قراءة كل حقولها.",
+    "en": "The search covers the records whose every field you may read."
+  },
   "singular": {
     "ar": "سجل تدقيق",
     "en": "Audit entry"
@@ -186,6 +278,14 @@
   "system": {
     "ar": "النظام",
     "en": "The system"
+  },
+  "to": {
+    "ar": "إلى",
+    "en": "To"
+  },
+  "type": {
+    "ar": "نوع السجل",
+    "en": "Record type"
   },
   "you": {
     "ar": "أنت",

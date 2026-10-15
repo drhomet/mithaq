@@ -21,7 +21,7 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | Add-on | What it brings |
 | --- | --- |
 | `roles` | Roles a tenant writes itself (`roles`), who holds which (`memberRoles`) and the Members page. Without it, a member holds what Better Auth's own `member.role` names: `owner` and `admin` every key, `member` what `packages/mithaq/src/roles/default-member-roles.ts` lists. |
-| `audit-log` | The `auditLog` kayan, the `audit` step that writes one row per change, and the activity panel on each edit page. |
+| `audit-log` | The `auditLog` kayan, the `audit` step that writes one row per change, the activity panel on each edit page, the course's Activity tab, the dashboard's Activity page (searched by text, person and field, filtered by kayan, action and day, for a holder of `auditLog.find`: the page asks the same key as the panel, and the log's read, scoped to the active organization and to the kayan the reader lists, is the boundary), and the backoffice's staff history (`backofficeLog`: impersonations, backoffice roles set and bans, read by `super_admin` and `explorer`). Without it the backoffice writes those as server log lines alone. |
 | `settings` | The `settings` global, one row per organization. |
 | `rich-text` | The `richText` kind, its Lexical nodes (`packages/mithaq/src/mithaq/rich-text-nodes.ts`) and the editor. Without it, no Lexical is installed. |
 | `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`). Without it, no storage setting is read. |
@@ -547,7 +547,7 @@ The vocabulary of `defineMithaq` is frozen. It is the locales, each kind's label
 - **A list's states are tabs.** A list node's `tabs` names each one with its `where`, and the list opens on the first, as the courses list opens on Active, keeping archived courses out of the way. A tab narrows what the read answers and never widens it.
 - **A row leaves and comes back through operations of its own.** A course is archived and unarchived, each with its reason, and unpublished back to a draft, as Payload's Unpublish does; a session is archived and unarchived the same way. Each is a line of the activity; `archived` is never set by a create, and on a course by no plain update either.
 - **One row per organization is a global.** Write `defineGlobal` with the `organization` field required and unique, as `packages/features/settings/settings/settings.ts` does.
-- **A column some reader may not see is never filterable, sortable or searchable.** A served `find` takes a `where` on any column the actor reads, so a filter on such a column answers yes or no about values the reader cannot see. Refuse it in a step before the store, as `queriedByQueryable` does in `packages/features/audit-log/audit-log/audit-log.ts`.
+- **A column some reader may not see is never filterable, sortable or searchable.** A served `find` takes a `where` on any column the actor reads, so a filter on such a column answers yes or no about values the reader cannot see. Refuse it in a step before the store, or narrow it to the rows whose columns the reader may be told of, as `queriedByQueryable` does in `packages/features/audit-log/audit-log/audit-log.ts`: a search of a change's text reaches only the kayan the reader reads whole.
 
 ### Add a kayan
 
