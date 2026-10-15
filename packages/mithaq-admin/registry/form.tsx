@@ -2,7 +2,7 @@ import { useContext, useId, useState, type FormEvent, type ReactElement } from '
 import type { ClientField, LeafClient } from 'mithaq/admin'
 import { FormContext, ScreenContext } from 'mithaq/admin/react'
 import { Card, CardContent } from '@/components/ui/card'
-import { descriptionOf, titleOf } from 'mithaq-admin/copy.ts'
+import { descriptionOf, labelFor, titleOf } from 'mithaq-admin/copy.ts'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
 import { BoundField, FieldValue } from 'mithaq-admin/field-value.tsx'
 import { readOnlyField } from 'mithaq-admin/field-values.ts'
@@ -48,11 +48,15 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // Bumped to remount every control and panel, so a panel reads what it shows afresh.
   const [revision, setRevision] = useState(0)
   const { seed, setSeed, seeded, form, values, dirty } = useFormSeed({ kayan, value, status: drafts?.status, onDirty: props.onDirty })
-  const { held, shown, issues, sentences, banner, setRefused, forget } = useFormRefusal({ copy, error: props.error, form, kayan })
-  // A refusal naming a field is drawn at that field; any other, a request that failed, is said in a red toast.
+  const { held, shown, issues, sentences, setRefused, forget } = useFormRefusal({ copy, error: props.error, form })
+  // How many writes were refused over fields, which moves the focus to the summary on each.
+  const [refusals, setRefusals] = useState(0)
+  // A refusal naming a field is drawn at that field and in the summary; any other, a request that failed, is said in a red toast.
   const refuse = (thrown: unknown) => {
     setRefused(thrown)
-    if (thrown && !Object.keys(issuesOf(thrown)).length) toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
+    if (!thrown) return
+    if (Object.keys(issuesOf(thrown)).length) setRefusals((already) => already + 1)
+    else toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
   }
   // The access report a node's `when` reads as `$user`; none outside a screen.
   const access = useContext(ScreenContext)?.access
@@ -174,7 +178,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // the top of the form (`chrome`), so it is never in the phone's fixed bar.
   const views = status === 'changed' && client.findByID ? { viewing, choose } : undefined
   const actionsOf = (header: boolean) => (
-    <FormActions {...{ autosaved, banner, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
+    <FormActions {...{ autosaved, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
   )
   // On a screen's page the title is the page's own `title` node, so the form keeps only the sentence under it.
   const chrome = (
@@ -182,7 +186,11 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
       headed={headed}
       title={screen ? undefined : titleOf({ kayan, copy })}
       about={about}
-      banner={controlled ? undefined : banner}
+      problems={Object.entries(sentences).map(([name, sentence]) => {
+        const field = byName.get(name)
+        return { id: `${kayan.name}-${name}`, label: field ? labelFor({ kayan, field, copy }) : name, sentence }
+      })}
+      refused={refusals}
       views={controlled ? views : undefined}
       t={t}
       draft={status === 'changed' ? {

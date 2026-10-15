@@ -30,6 +30,23 @@ export const groupCopy = ({
 })
 
 /**
+ * How many of a group's fields a refusal named, as Payload's `ErrorPill` says it on a tab or a collapsible: a red
+ * count, named for a screen reader, drawn on a group that holds at least one.
+ */
+export function ErrorPill({ count, t }: { count: number; t: Copy['t'] }): ReactElement | null {
+  if (!count) return null
+  const label = (t('admin.invalidFields', 'Fields needing attention: {count}') ?? 'Fields needing attention: {count}').replace('{count}', String(count))
+  return (
+    <Badge variant="destructive" aria-label={label} title={label} data-mithaq-invalid={count}>
+      {count}
+    </Badge>
+  )
+}
+
+/** How many of these nodes' fields, at any depth, the refusal names. */
+const invalidIn = (nodes: Parameters<typeof leavesOf>[0], draw: NodeProps<'tabs'>['draw']) => leavesOf(nodes).filter((name) => draw.issues[name] !== undefined).length
+
+/**
  * One tab strip. `keepMounted` renders every panel, hiding the inactive ones, so a field on a tab nobody opened
  * still holds its value; base-ui unmounts a hidden panel otherwise.
  */
@@ -38,7 +55,7 @@ function TabGroup({
   tabs,
 }: {
   line: boolean
-  tabs: readonly { key: string; label: string; description?: string; invalid: number; invalidLabel: string; body: ReactNode }[]
+  tabs: readonly { key: string; label: string; description?: string; invalid: ReactNode; body: ReactNode }[]
 }): ReactElement {
   return (
     <Tabs defaultValue={tabs[0]?.key} data-node="tabs" className={line ? 'gap-4' : 'overflow-hidden rounded-lg border'}>
@@ -48,11 +65,7 @@ function TabGroup({
             {tab.label}
             {/* How many of this tab's fields the refusal named, so a save refused over a field on a tab
                 nobody opened says so on the tab. */}
-            {tab.invalid > 0 ? (
-              <Badge variant="destructive" aria-label={tab.invalidLabel} title={tab.invalidLabel} data-mithaq-invalid={tab.invalid}>
-                {tab.invalid}
-              </Badge>
-            ) : null}
+            {tab.invalid}
           </TabsTrigger>
         ))}
       </TabsList>
@@ -75,14 +88,10 @@ export function TabsNode({ node, draw }: NodeProps<'tabs'>): ReactElement {
       tabs={node.tabs.filter((tab) => tab.fields.some((one) => shown(one, draw.scope))).map((tab) => {
         // Counted over the fields this tab holds at any depth, so a
         // refused field inside a row inside a tab is counted on the tab.
-        const invalid = leavesOf(tab.fields).filter((name) => draw.issues[name] !== undefined).length
         return {
           key: tab.tab,
           ...groupCopy({ kayan: draw.kayan, name: tab.tab, group: tab, copy: draw.copy }),
-          invalid,
-          invalidLabel: (
-            draw.copy.t('admin.invalidFields', 'Fields needing attention: {count}') ?? 'Fields needing attention: {count}'
-          ).replace('{count}', String(invalid)),
+          invalid: <ErrorPill count={invalidIn(tab.fields, draw)} t={draw.copy.t} />,
           body: <div className="flex flex-col gap-4">{carded(tab.fields, draw)}</div>,
         }
       })}
@@ -96,7 +105,7 @@ export function AccordionNode({ node, draw }: NodeProps<'accordion'>): ReactElem
       {node.accordion.map((item) => {
         const { label, description } = groupCopy({ kayan: draw.kayan, name: item.item, group: item, copy: draw.copy })
         return <AccordionItem key={item.item} value={item.item} className="border-b last:border-b-0">
-          <AccordionHeader><AccordionTrigger>{label}<ChevronDown aria-hidden="true" className="size-4" /></AccordionTrigger></AccordionHeader>
+          <AccordionHeader><AccordionTrigger>{label}<ErrorPill count={invalidIn(item.fields, draw)} t={draw.copy.t} /><ChevronDown aria-hidden="true" className="size-4" /></AccordionTrigger></AccordionHeader>
           <AccordionPanel className="flex flex-col gap-4 p-4">
             {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
             {drawNodes({ nodes: item.fields, draw: { ...draw, inCard: true } })}
@@ -119,7 +128,10 @@ export function SectionNode({ node, draw, inRow }: NodeProps<'section'>): ReactE
           <CardTitle>
             <h2 className="text-base font-medium">
               <CollapsibleTrigger className="group flex w-full cursor-pointer items-center justify-between gap-2 text-start max-sm:min-h-11">
-                {label}
+                <span className="flex items-center gap-2">
+                  {label}
+                  <ErrorPill count={invalidIn(node.fields, draw)} t={draw.copy.t} />
+                </span>
                 <ChevronDown
                   aria-hidden="true"
                   className="text-muted-foreground size-4 transition-transform group-data-[panel-open]:rotate-180"

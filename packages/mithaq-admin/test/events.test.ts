@@ -4071,7 +4071,7 @@ test('171c. a publish pressed in the header from another tab, refused over no fi
   assert.equal(host.querySelectorAll('[role="alert"]').length, 0)
 })
 
-test('171d. a refusal naming a field, on a page with a controls node, draws under its box, badges the Details tab, and also draws in the header', async () => {
+test('171d. a refusal naming a field, on a page with a controls node, draws under its box, badges the Details tab, and lists it in the form\'s summary, never in the header', async () => {
   const refusal = Object.assign(new Error('Bad Request'), { status: 400, data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'A published course needs a title.' }] } } })
   const host = await render(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client: draftClient([], async () => {
     throw refusal
@@ -4084,7 +4084,8 @@ test('171d. a refusal naming a field, on a page with a controls node, draws unde
   assert.ok(box.textContent?.includes('A published course needs a title.'), 'the sentence is under the title box')
   const details = [...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.includes('Details'))!
   assert.equal(details.querySelector('[data-mithaq-invalid]')?.getAttribute('data-mithaq-invalid'), '1', 'the Details tab counts the refused field')
-  assert.equal(host.querySelectorAll('[data-region="header"] [role="alert"]').length, 1, 'and the header alert shows too, visible from any tab')
+  assert.equal(host.querySelectorAll('[data-region="header"] [role="alert"]').length, 0, 'the header says nothing of it')
+  assert.ok(host.querySelector('form [data-error-summary]')?.textContent?.includes('A published course needs a title.'), 'the summary at the top of the form names it')
 })
 
 test('171b. Save draft is offered on a kayan that keeps drafts, whether or not it autosaves, and never to an actor without the key', async () => {
@@ -7505,4 +7506,61 @@ test('240c. the members page says in a green toast that an invitation went, an i
     window.removeEventListener('mithaq:refresh', refresh)
     Object.defineProperty(window.location, 'reload', { configurable: true, value: reload })
   }
+})
+
+test('240d. a save refused over fields lists each in a summary at the top of the form, which takes the focus from any tab, and each line is a link that opens its tab and focuses its box', async () => {
+  await toasted()
+  const refusal = Object.assign(new Error('Bad Request'), { status: 400, data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'A published course needs a title.' }] } } })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client: draftClient([], async () => {
+    throw refusal
+  }), value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })), { record: draftRow })
+  const tab = (words: string) => [...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.includes(words))!
+  await act(async () => click(tab('Sessions')))
+  await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
+  await act(async () => sleep(10))
+  assert.equal(host.querySelectorAll('[data-region="header"] [role="alert"]').length, 0, 'the header says nothing of it')
+  assert.deepEqual(await toasted(), [], 'nor does a toast, since the fields are named where they are')
+  const summary = host.querySelector('form [data-error-summary]') as HTMLElement | null
+  assert.ok(summary, 'a summary is drawn inside the form')
+  assert.deepEqual([...summary!.querySelectorAll('a')].map((one) => [one.textContent, one.getAttribute('href')]), [['Title: A published course needs a title.', '#courses-title']], 'one line per field, its label and its sentence, a link to its box')
+  assert.equal(window.document.activeElement === (summary as unknown), true, 'and the focus moves to it')
+  assert.equal(tab('Details').getAttribute('aria-selected'), 'true', 'which opened the tab it sits on')
+  await act(async () => click(tab('Sessions')))
+  await act(async () => click(summary!.querySelector('a')!))
+  await act(async () => sleep(10))
+  assert.equal(window.document.activeElement?.id, 'courses-title', 'a line focuses its box, opening its tab first')
+  assert.ok(host.querySelector('#courses-title')!.closest('[data-slot="field"]')?.textContent?.includes('A published course needs a title.'), 'and the sentence stays under the box')
+})
+
+test('240e. a section and an accordion holding a refused field each show a red count, as a tab does', async () => {
+  const refusal = { data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'A course needs a title.' }, { path: 'summary', message: 'Too long.' }] } } }
+  const fields = [{ field: 'title' }, { field: 'summary' }]
+  for (const group of [{ section: 'about', fields }, { accordion: [{ item: 'about', fields }] }]) {
+    const host = await render(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: [group] }])), client: recording().client, value: draftRow, error: refusal, t: english, locale: 'en', onDone: () => {} }))
+    const pill = host.querySelector(`[data-node="${'section' in group ? 'section' : 'accordion'}"] [data-mithaq-invalid]`)
+    assert.equal(pill?.getAttribute('data-mithaq-invalid'), '2', `the ${'section' in group ? 'section' : 'accordion item'} counts its two refused fields`)
+    assert.equal(pill?.getAttribute('aria-label'), 'Fields needing attention: 2')
+  }
+})
+
+test('240f. a box is told it is wrong only once the person leaves its field: never while the focus moves inside it, or into a popup it opened', async () => {
+  const host = await render(createElement(Form, {
+    kayan: sessions, screen: screenOf(recordPage([{ form: [{ field: 'startsAt' }, { field: 'capacity' }] }], '/sessions/new'), sessions), client: recording().client, value: null, t: english, locale: 'en', onDone: () => {},
+  }))
+  const day = host.querySelector('button#sessions-startsAt')!
+  const leave = (to: Element | null) => day.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true, relatedTarget: to as never }) as unknown as Event)
+  const inside = day.closest('[data-slot="field"]')!.querySelector(':is(input, button):not(#sessions-startsAt)')
+  assert.ok(inside, 'the moment has a second box in its field, the time')
+  await act(async () => void leave(inside))
+  assert.equal(host.querySelector('#sessions-startsAt-error'), null, 'from the day to the time is no leaving')
+  const popup = window.document.createElement('div')
+  popup.setAttribute('data-slot', 'popover-content')
+  const pick = window.document.createElement('button')
+  popup.append(pick)
+  window.document.body.append(popup)
+  await act(async () => void leave(pick as unknown as Element))
+  assert.equal(host.querySelector('#sessions-startsAt-error'), null, 'nor into the calendar it opened')
+  popup.remove()
+  await act(async () => void leave(host.querySelector('#sessions-capacity')))
+  assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'leaving for another field marks it')
 })

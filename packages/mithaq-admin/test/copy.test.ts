@@ -98,7 +98,7 @@ test('217b. a counting sentence takes its locale\'s own plural form, so one row 
   assert.equal(counted({ t: () => undefined, locale: 'en', key, count: 4, fallback: 'Four is {count}' }), 'Four is 4', 'a key nothing answers is the fallback')
 })
 
-test('217c. the banner over a refused save names the fields it refused, by their labels and counted, in either locale', () => {
+test('217c. an operation\'s banner names the fields it refused, by their labels and counted, in either locale, and a form\'s summary lists each by its label and sentence', () => {
   for (const locale of ['en', 'ar'] as const) {
     const copy = copyOf(locale)
     assert.equal(refusalWords({ shown: 'error.invalid.value', labels: ['Title'], copy }), scopes.error!['invalid.fields_one']![locale]!.replace('{fields}', 'Title'))
@@ -107,7 +107,7 @@ test('217c. the banner over a refused save names the fields it refused, by their
     assert.equal(refusalWords({ shown: 'error.forbidden.update', labels: ['Title'], copy }), scopes.error!['forbidden.update']![locale], 'and so does any other refusal')
   }
   const html = staticMarkup(createElement(Form, { kayan: courses, client, value: { id: 'c1', title: 'Tajweed' }, ...copyOf('en'), onDone: () => {}, error: { data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'courses.title.required' }] } } } }))
-  assert.ok(textOf(html).includes('The following field is invalid: Title'), 'the form draws it')
+  assert.ok(textOf(html).includes('Check these fields: Title: This field is required.'), 'the form lists it in its summary')
   assert.equal(textOf(html).includes('That value will not do.'), false, 'in place of the sentence that names nothing')
 })
 

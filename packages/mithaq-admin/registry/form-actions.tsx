@@ -15,8 +15,6 @@ export type FormActionsProps = {
   header: boolean
   t: Translate
   locale: string
-  /** The sentence over a refused save, drawn in the header row. */
-  banner?: string
   status?: DraftStatus
   /** The draft or published switch, on a changed row whose host can read the published copy. */
   views?: Views
@@ -112,7 +110,6 @@ export function ViewSwitch({ className, phone = false, viewing, choose, t }: { c
 // logical, so the row mirrors in Arabic.
 export function FormActions({
   autosaved,
-  banner,
   busy,
   dirty,
   drafts,
@@ -133,13 +130,6 @@ export function FormActions({
   const tall = header ? 'max-sm:h-11' : ''
   const actions = (
     <>
-      {/* A refusal naming no field, drawn here and not in the form: the form sits in the Details panel, and a
-          Publish pressed from another tab would be refused where nobody is looking. */}
-      {header && banner !== undefined ? (
-        <p role="alert" className="text-destructive line-clamp-2 min-w-24 flex-1 text-sm max-sm:basis-full sm:-order-1">
-          {banner}
-        </p>
-      ) : null}
       {status && !header ? (
         <span data-status={status} className={`me-auto rounded-md px-2 py-0.5 text-sm ${pills[status]}`}>
           {t('version.status', 'Status')}: {t(`version.${status}`, { draft: 'Draft', published: 'Published', changed: 'Changed' }[status])}

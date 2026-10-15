@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from 'react'
+import type { FocusEvent, ReactElement, ReactNode } from 'react'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 
 /** The ids a control points `aria-describedby` at: its description, its error, both, or none. The shell derives the same ids from the same `id`. */
@@ -24,6 +24,18 @@ export type FieldShellProps = {
   onBlur?: () => void
 }
 
+/** The popups a control opens, which a portal draws outside its field: focus moving into one is not leaving the field. */
+const popups = '[data-slot=popover-content],[data-slot=select-content],[data-slot=combobox-content],[data-slot=dropdown-menu-content]'
+
+/**
+ * Whether focus left the field for good: not to another box of the same field (a moment's day and time), nor into a
+ * popup it opened. Focus going nowhere, as a test's or a closed window's, counts as leaving.
+ */
+const left = (event: FocusEvent<HTMLElement>) => {
+  const to = event.relatedTarget
+  return !(to instanceof Element) || (!event.currentTarget.contains(to) && !to.closest(popups))
+}
+
 export function FieldShell({ beside, children, control, description, error, id, label, onBlur, width }: FieldShellProps): ReactElement {
   const words = (
     <>
@@ -33,7 +45,7 @@ export function FieldShell({ beside, children, control, description, error, id, 
     </>
   )
   return (
-    <Field data-control={control} onBlur={onBlur} orientation={beside ? 'horizontal' : 'vertical'} style={width ? { width } : undefined}>
+    <Field data-control={control} onBlur={onBlur && ((event) => left(event) && onBlur())} orientation={beside ? 'horizontal' : 'vertical'} style={width ? { width } : undefined}>
       {beside ? (
         <>
           {children}
