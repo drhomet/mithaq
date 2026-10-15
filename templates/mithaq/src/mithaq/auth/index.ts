@@ -750,6 +750,9 @@ const onLocalHost = !production && isLocalHost(tenantURL)
 // page's link, which ends every session and marks the address verified. Proving it never keeps a
 // password somebody else typed at sign-up, so whoever signed up first with another's address never
 // signs in once its owner proves it.
+// A first password is chosen on a page of its own, which names the account it is for; a forgotten one on the reset
+// page. Both send the same token to the same route.
+const setPasswordLink = (token: string) => new URL(`/auth/set-password?token=${encodeURIComponent(token)}`, tenantURL).href
 // A link that also accepts an invitation names the organization, so opening it is the word to join.
 const confirmMail = (mailer: Mailer) => async ({ email, token, joining }: { email: string; token: string; joining?: string }) =>
   mailer.send(letter({
@@ -761,7 +764,7 @@ const confirmMail = (mailer: Mailer) => async ({ email, token, joining }: { emai
     ar: joining === undefined
       ? 'أنشأ أحدهم حسابا بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.'
       : `أنشأ أحدهم حسابا بهذا العنوان للانضمام إلى ${joining}. إن كنت أنت، فافتح الرابط أدناه خلال ساعة لتأكيده واختيار كلمة المرور والانضمام. وإلا فتجاهل هذه الرسالة: الحساب الذي لا يؤكده أحد لا يسجل الدخول أبدا.`,
-    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+    link: setPasswordLink(token),
   }))
 
 // The set-password link of a person an administrator added, which they open to choose their password.
@@ -772,7 +775,7 @@ const addedMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganizat
     subject: 'Your account · حسابك',
     en: `An administrator added you to ${en}. Open the link below to choose your password; it lasts 48 hours.`,
     ar: `أضافك أحد المسؤولين إلى ${ar}. افتح الرابط أدناه لاختيار كلمة المرور؛ وهو صالح 48 ساعة.`,
-    link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
+    link: setPasswordLink(token),
   }))
 }
 
@@ -1434,11 +1437,36 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         const token = randomBytes(24).toString('base64url')
         await internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) })
         authAudit({ action: 'add-person', actor: ctx.context.session?.user.id ?? null, user: user.id, organization, role: role ?? null })
-        if (!settings.mailer) return ctx.json({ added: true, user: { id: user.id }, link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href })
+        if (!settings.mailer) return ctx.json({ added: true, user: { id: user.id }, link: setPasswordLink(token) })
         const named = (await adapter.findOne<{ name: string }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
         await ctx.context.runInBackgroundOrAwait(addedMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email, organization: named, token }))
         await mailedFor(organization)
         return ctx.json({ added: true, user: { id: user.id } })
+      }),
+    },
+  }
+  // Where a sign-up proves its address, the password is chosen once, from the mailed link, so the sign-up asks none:
+  // whatever one carries is replaced by one nobody knows, and whoever signs up with another's address never holds a
+  // password to it.
+  const chosenLater = {
+    id: 'chosen-later',
+    hooks: { before: [{
+      matcher: (ctx: { path?: string }) => ctx.path === '/sign-up/email',
+      handler: createAuthMiddleware(async (ctx) => ({ context: { body: { ...(ctx.body as object | undefined), password: randomBytes(32).toString('base64url') } } })),
+    }] },
+  }
+  // The address a live set-password link is for, which the page shows as the account it chooses a password of. The
+  // token is the proof, as it is for choosing the password itself; anything else is one refusal.
+  const setPasswordState = {
+    id: 'set-password-state',
+    endpoints: {
+      setPasswordState: createAuthEndpoint('/set-password/state', { method: 'GET' }, async (ctx) => {
+        const { token } = (ctx.query ?? {}) as { token?: unknown }
+        const { internalAdapter } = ctx.context
+        const link = typeof token === 'string' && token ? await internalAdapter.findVerificationValue(`reset-password:${token}`) : null
+        const user = link && new Date(link.expiresAt) > new Date() ? await internalAdapter.findUserById(link.value) : null
+        if (!user) throw APIError.from('BAD_REQUEST', BASE_ERROR_CODES.INVALID_TOKEN)
+        return ctx.json({ email: user.email })
       }),
     },
   }
@@ -1487,6 +1515,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       // end add-on: roles
       keepsPerson,
       invitationLimit,
+      setPasswordState,
+      ...(verifying ? [chosenLater] : []),
       ...(oneOrganization ? [firstRun, signUpGate, addPerson] : []),
     ],
     // In one organization, nobody founds another or leaves the one: leaving would leave the

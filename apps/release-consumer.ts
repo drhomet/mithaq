@@ -381,7 +381,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       }
     } else {
       const email = `release-${stamp}@example.com`
-      const signUp = await post('sign-up/email', { name: 'Release', email, password: 'typed-at-sign-up' })
+      const signUp = await post('sign-up/email', { name: 'Release', email })
       assert.equal(signUp.status, 200, `${await signUp.text()}\n${output}`)
       assert.equal(cookieOf(signUp).includes('session_token'), false, 'the sign-up opens no session before its address is proved')
       const chosen = await post('reset-password', { token: (await linkMailed(email)).searchParams.get('token'), newPassword: 'release-test-password' })
@@ -399,10 +399,12 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
         const joined = await fetch(`${origin}/api/auth/user/sign-up/email`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', origin },
-          body: JSON.stringify({ name: 'Staff', email, password: 'release-test-password' }),
+          body: JSON.stringify({ name: 'Staff', email }),
           signal: AbortSignal.timeout(10_000),
         })
         assert.equal(joined.status, 200, `${await joined.text()}\n${output}`)
+        // No password is typed at sign-up: the staff member chooses theirs from the mailed link, as anyone does.
+        assert.equal((await post('reset-password', { token: (await linkMailed(email)).searchParams.get('token'), newPassword: 'release-test-password' })).status, 200)
         command(process.execPath, ['--input-type=module', '-e', `import { asas } from './src/asas.ts'; await asas.targets.drizzle.db.execute("update \\"user\\" set role = 'super_admin' where email = '${email}'"); await asas.destroy()`], template)
         const staff = await fetch(`${backofficeOrigin}/api/auth/user/sign-in/email`, {
           method: 'POST',

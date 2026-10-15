@@ -19,16 +19,17 @@ const signUp = (await import('./routes/auth.sign-up.tsx')).Route.options.compone
 const signIn = (await import('./routes/auth.sign-in.tsx')).Route.options.component!
 const forgot = (await import('./routes/auth.forgot-password.tsx')).Route.options.component!
 const reset = (await import('./routes/auth.reset-password.tsx')).Route.options.component!
+const setPassword = (await import('./routes/auth.set-password.tsx')).Route.options.component!
 const accept = (await import('./routes/auth.accept-invitation.tsx')).Route.options.component!
 const backofficeSignIn = (await import('../../asas-backoffice/src/routes/auth.sign-in.tsx')).Route.options.component!
 const { signedInAs } = await import('./auth-frame.tsx')
 const { scopes } = await import('./copy.ts')
 
-const start = async (path: string, component: typeof signUp, { locale = 'en', signedIn = false, home = { path: '/dashboard', name: 'dashboard' } as { path: string; name?: string } } = {}) => {
+const start = async (path: string, component: typeof signUp, { locale = 'en', signedIn = false, home = { path: '/dashboard', name: 'dashboard' } as { path: string; name?: string }, context = {} as Record<string, unknown> } = {}) => {
   const root = createRootRoute({ beforeLoad: () => ({ dir: locale === 'ar' ? 'rtl' : 'ltr', locale, app: 'marketing.brand' }), component: () => createElement(Outlet) })
   const router = createRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
-    routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: path.split('?')[0]!, beforeLoad: () => ({ signedIn, home, password: { min: 8, max: 128 } }), component })]),
+    routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: path.split('?')[0]!, beforeLoad: () => ({ signedIn, home, password: { min: 8, max: 128 }, ...context }), component })]),
   })
   const host = mount()
   const mounted = createRoot(host)
@@ -39,8 +40,8 @@ const start = async (path: string, component: typeof signUp, { locale = 'en', si
   return { host, unmount: () => act(async () => mounted.unmount()) }
 }
 
-test('the sign-up page says a short password is short once the box is left, and not before', async () => {
-  const { host, unmount } = await start('/auth/sign-up', signUp)
+test('the page that chooses a password says a short password is short once the box is left, and not before', async () => {
+  const { host, unmount } = await start('/auth/set-password?token=t', setPassword, { context: { email: 'someone@example.com' } })
   const errorOf = (name: string) => host.querySelector(`#${name}-error`)?.textContent
   assert.equal(errorOf('password'), undefined, 'a box nobody has been in says nothing')
 
@@ -48,15 +49,10 @@ test('the sign-up page says a short password is short once the box is left, and 
   assert.equal(errorOf('password'), undefined, 'nor does a box still being typed into')
   await act(async () => fire(host.querySelector('#password')!, 'focusout'))
   assert.equal(errorOf('password'), 'Password too short', 'five characters, left, say the provider\'s sentence under the box')
-  assert.equal(errorOf('email'), undefined, 'and a box nobody entered still says nothing')
+  assert.equal(errorOf('confirmation'), undefined, 'and a box nobody entered still says nothing')
 
   await act(async () => typeInto(host.querySelector('#password')!, 'abcdefgh'))
   assert.equal(errorOf('password'), undefined, 'eight characters clear it at once')
-
-  await act(async () => fire(host.querySelector('#email')!, 'focusout'))
-  assert.equal(errorOf('email'), 'This field is required.', 'an email box left empty says it is required')
-  await act(async () => typeInto(host.querySelector('#email')!, 'not-an-address'))
-  assert.equal(errorOf('email'), 'Invalid email', 'and one that is not an address says the provider\'s sentence for it')
 
   await act(async () => typeInto(host.querySelector('#confirmation')!, 'abcdefgx'))
   await act(async () => fire(host.querySelector('#confirmation')!, 'focusout'))
@@ -76,7 +72,8 @@ test('the sign-up page checks every box on submit, and sends nothing while one i
     await act(async () => fire(host.querySelector('form')!, 'submit'))
     assert.deepEqual(sent, [], 'an empty form sends nothing')
     assert.equal(host.querySelector('#name-error')?.textContent, 'This field is required.', 'and every box says why, left or not')
-    assert.equal(host.querySelector('#password-error')?.textContent, 'This field is required.', 'the password among them')
+    assert.equal(host.querySelector('#email-error')?.textContent, 'This field is required.', 'the email among them')
+    assert.equal(host.querySelector('#password'), null, 'and no password is asked: it is chosen from the mailed link')
   } finally {
     globalThis.fetch = fetched
     await unmount()
@@ -214,15 +211,15 @@ test('the sign-in page says a refusal in this app\'s own words for the provider\
   assert.equal(await refusedWith('/auth/sign-in', backofficeSignIn, 'ar', 400, { code: 'SOMETHING_ELSE', message: 'Some English' }, filled), copy.failed!.ar, 'and its fallback is its own')
 })
 
-test('the sign-up page says an email already taken in this app\'s own words, and flags an empty confirmation as required on submit', async () => {
+test('the sign-up page says a refusal in this app\'s own words, and the page that chooses a password flags an empty confirmation as required on submit', async () => {
   const copy = scopes.auth!
   const filled = (host: HTMLElement) => {
-    for (const [id, value] of [['name', 'Someone'], ['email', 'someone@example.com'], ['password', 'a-long-enough-password'], ['confirmation', 'a-long-enough-password']]) typeInto(host.querySelector(`#${id}`)!, value!)
+    for (const [id, value] of [['name', 'Someone'], ['email', 'someone@example.com']]) typeInto(host.querySelector(`#${id}`)!, value!)
   }
   for (const locale of ['en', 'ar']) {
-    assert.equal(await refusedWith('/auth/sign-up', signUp, locale, 422, { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', message: 'User already exists. Use another email.' }, filled), copy.userExists![locale], `in ${locale}`)
+    assert.equal(await refusedWith('/auth/sign-up', signUp, locale, 403, { code: 'SIGN_UP_DOMAIN', message: 'This address is not at a domain that may sign up here.' }, filled), copy.outsideDomains![locale], `in ${locale}`)
   }
-  const { host, unmount } = await start('/auth/sign-up', signUp)
+  const { host, unmount } = await start('/auth/set-password?token=t', setPassword, { context: { email: 'someone@example.com' } })
   await act(async () => typeInto(host.querySelector('#password')!, 'a-long-enough-password'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(host.querySelector('#confirmation-error')?.textContent, 'This field is required.', 'an empty confirmation is required, like every other box')
@@ -273,7 +270,7 @@ test('sign-up opened from an invitation draws no organization box, says so, and 
     assert.equal(host.querySelector('#organization'), null, 'no organization box')
     assert.equal(host.textContent?.includes(scopes.auth!.signUpInvitedDescription!.en!), true, 'and the page says which address to use')
     await act(async () => {
-      for (const [id, value] of [['name', 'Invitee'], ['email', 'invitee@example.com'], ['password', 'a-long-enough-password'], ['confirmation', 'a-long-enough-password']]) typeInto(host.querySelector(`#${id}`)!, value!)
+      for (const [id, value] of [['name', 'Invitee'], ['email', 'invitee@example.com']]) typeInto(host.querySelector(`#${id}`)!, value!)
     })
     await act(async () => fire(host.querySelector('form')!, 'submit'))
     assert.deepEqual(sent, ['/api/auth/user/sign-up/email'], 'the form is sent with no organization named, so none is asked for')
@@ -284,25 +281,72 @@ test('sign-up opened from an invitation draws no organization box, says so, and 
   }
 })
 
-test('with many organizations a sign-up asks a name, an address and a password, sends the sign-up alone and says to open the mailed link', async () => {
+test('with many organizations a sign-up asks a name and an address alone, sends the sign-up alone and says to open the mailed link, where the password is chosen', async () => {
   const { host, unmount } = await start('/auth/sign-up?redirect=%2Fdashboard', signUp)
   const sent: string[] = []
   const fetched = globalThis.fetch
-  globalThis.fetch = (async (url: string) => {
+  const bodies: unknown[] = []
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
     sent.push(String(url))
+    bodies.push(JSON.parse(String(init?.body)))
     return new Response(JSON.stringify({ token: null, user: {} }), { headers: { 'content-type': 'application/json' } })
   }) as typeof fetch
   try {
     assert.equal(host.querySelector('#organization'), null, 'no organization box: an organization is made once the address is proved')
-    assert.deepEqual([...host.querySelectorAll('input')].map((one) => one.id), ['name', 'email', 'password', 'confirmation'])
+    assert.deepEqual([...host.querySelectorAll('input')].map((one) => one.id), ['name', 'email'])
     await act(async () => {
-      for (const [id, value] of [['name', 'Founder'], ['email', 'founder@example.com'], ['password', 'a-long-enough-password'], ['confirmation', 'a-long-enough-password']]) typeInto(host.querySelector(`#${id}`)!, value!)
+      for (const [id, value] of [['name', 'Founder'], ['email', 'founder@example.com']]) typeInto(host.querySelector(`#${id}`)!, value!)
     })
     await act(async () => fire(host.querySelector('form')!, 'submit'))
     assert.deepEqual(sent, ['/api/auth/user/sign-up/email'], 'the sign-up alone, never a second call that could leave an account half made')
+    assert.deepEqual(bodies, [{ name: 'Founder', email: 'founder@example.com' }], 'with no password, which nobody types twice')
     assert.equal(host.textContent?.includes(scopes.auth!.verifySent!.en!), true, 'and the page says to open the mailed link')
   } finally {
     globalThis.fetch = fetched
+    await unmount()
+  }
+})
+
+test('a first-time link opens a page that chooses the password of the account it names, shown and not editable, then signs the person in through the ordinary sign-in, in either locale', async () => {
+  for (const locale of ['en', 'ar']) {
+    const sent: { url: string; body: unknown }[] = []
+    const fetched = globalThis.fetch
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      sent.push({ url: String(url), body: JSON.parse(String(init?.body ?? 'null')) })
+      return new Response('{}', { headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+    const { host, unmount } = await start('/auth/set-password?token=the-token', setPassword, { locale, context: { email: 'chosen@example.com' } })
+    try {
+      assert.equal(host.querySelector('h1')?.textContent, scopes.auth!.setPassword![locale], `titled for a first password in ${locale}`)
+      assert.equal(scopes.auth!.setPassword!.en, 'Choose your password')
+      const account = host.querySelector('#email') as HTMLInputElement
+      assert.equal(account.value, 'chosen@example.com', 'the account it chooses for is shown')
+      assert.equal(account.readOnly, true, 'and cannot be changed')
+      assert.equal(account.getAttribute('autocomplete'), 'username', 'so a password manager saves the password under it')
+      assert.equal(host.querySelector('button[type=submit]')?.textContent, scopes.auth!.setPasswordSubmit![locale], `under a button that says what it does in ${locale}`)
+      await act(async () => {
+        typeInto(host.querySelector('#password')!, 'the-chosen-password')
+        typeInto(host.querySelector('#confirmation')!, 'the-chosen-password')
+      })
+      await act(async () => fire(host.querySelector('form')!, 'submit'))
+      await act(async () => new Promise((done) => setTimeout(done, 20)))
+      assert.deepEqual(sent.slice(0, 2), [
+        { url: '/api/auth/user/reset-password', body: { newPassword: 'the-chosen-password', token: 'the-token' } },
+        { url: '/api/auth/user/sign-in/email', body: { email: 'chosen@example.com', password: 'the-chosen-password' } },
+      ], 'the password is set, then signed in with through the ordinary sign-in, so every rule of a sign-in still holds')
+    } finally {
+      globalThis.fetch = fetched
+      await unmount()
+    }
+  }
+})
+
+test('a link that names no live account is said at once, with the way to ask for another, in either locale', async () => {
+  for (const locale of ['en', 'ar']) {
+    const { host, unmount } = await start('/auth/set-password?token=spent', setPassword, { locale, context: { email: null } })
+    assert.equal(host.querySelector('form'), null, 'no form to fill for nothing')
+    assert.ok(host.textContent?.includes(scopes.auth!.tokenInvalid![locale]!), `it says the link is no good in ${locale}`)
+    assert.equal(host.querySelector('a[href="/auth/forgot-password"]')?.textContent, scopes.auth!.forgotPassword![locale], 'and offers to ask for another')
     await unmount()
   }
 })

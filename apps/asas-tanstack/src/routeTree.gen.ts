@@ -19,6 +19,7 @@ import { Route as AuthFirstRunRouteImport } from './routes/auth.first-run'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth.forgot-password'
 import { Route as AuthHandoffRouteImport } from './routes/auth.handoff'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
+import { Route as AuthSetPasswordRouteImport } from './routes/auth.set-password'
 import { Route as AuthSignInRouteImport } from './routes/auth.sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/auth.sign-up'
 import { Route as screensDashboardIndexRouteImport } from './routes/(screens)/dashboard.index'
@@ -76,6 +77,11 @@ const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
   path: '/auth/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthSetPasswordRoute = AuthSetPasswordRouteImport.update({
+  id: '/auth/set-password',
+  path: '/auth/set-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthSignInRoute = AuthSignInRouteImport.update({
   id: '/auth/sign-in',
   path: '/auth/sign-in',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/handoff': typeof AuthHandoffRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/set-password': typeof AuthSetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/dashboard/$': typeof screensDashboardSplatRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/handoff': typeof AuthHandoffRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/set-password': typeof AuthSetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/dashboard/$': typeof screensDashboardSplatRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/handoff': typeof AuthHandoffRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/auth/set-password': typeof AuthSetPasswordRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/(screens)/dashboard/$': typeof screensDashboardSplatRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/auth/forgot-password'
     | '/auth/handoff'
     | '/auth/reset-password'
+    | '/auth/set-password'
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/dashboard/$'
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/auth/forgot-password'
     | '/auth/handoff'
     | '/auth/reset-password'
+    | '/auth/set-password'
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/dashboard/$'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/auth/forgot-password'
     | '/auth/handoff'
     | '/auth/reset-password'
+    | '/auth/set-password'
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/(screens)/dashboard/$'
@@ -226,6 +238,7 @@ export interface RootRouteChildren {
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthHandoffRoute: typeof AuthHandoffRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  AuthSetPasswordRoute: typeof AuthSetPasswordRoute
   AuthSignInRoute: typeof AuthSignInRoute
   AuthSignUpRoute: typeof AuthSignUpRoute
 }
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/reset-password'
       fullPath: '/auth/reset-password'
       preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/set-password': {
+      id: '/auth/set-password'
+      path: '/auth/set-password'
+      fullPath: '/auth/set-password'
+      preLoaderRoute: typeof AuthSetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/sign-in': {
@@ -385,6 +405,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthHandoffRoute: AuthHandoffRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
+  AuthSetPasswordRoute: AuthSetPasswordRoute,
   AuthSignInRoute: AuthSignInRoute,
   AuthSignUpRoute: AuthSignUpRoute,
 }
