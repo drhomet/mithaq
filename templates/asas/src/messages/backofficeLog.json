@@ -35,6 +35,18 @@
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
   },
+  "banReason": {
+    "ar": "سبب الحظر",
+    "en": "Ban reason"
+  },
+  "banReason.invalid": {
+    "ar": "هذا ليس نصا.",
+    "en": "This is not text."
+  },
+  "banReason.required": {
+    "ar": "هذا الحقل مطلوب.",
+    "en": "This field is required."
+  },
   "id.invalid": {
     "ar": "هذا ليس معرفا فريدا.",
     "en": "This is not a unique identifier."
@@ -56,18 +68,6 @@
     "en": "This is not text."
   },
   "previousRole.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "reason": {
-    "ar": "السبب",
-    "en": "Reason"
-  },
-  "reason.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "reason.required": {
     "ar": "هذا الحقل مطلوب.",
     "en": "This field is required."
   },

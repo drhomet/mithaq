@@ -4,7 +4,7 @@ import { act, createElement } from 'react'
 import { asas } from 'asas'
 import { FormContext, ScreenContext, type ScreenState } from 'mithaq/admin/react'
 import '../../../packages/mithaq-admin/test/tsx.ts'
-import { click, mount } from '../../../packages/mithaq-admin/test/dom.ts'
+import { click, mount, type } from '../../../packages/mithaq-admin/test/dom.ts'
 import { dirOf, translator, type Locale } from './copy.ts'
 
 const { createRoot } = await import('react-dom/client')
@@ -200,12 +200,11 @@ test('the Activity page reads the log by its filters, names each control, and na
   assert.equal(records[1]!.querySelector('a'), null, 'and links nothing')
   assert.ok(host.querySelector('[data-mithaq-range]'), 'and the log is paged')
 
-  const from = host.querySelector('input[type="date"]') as unknown as HTMLInputElement
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(from), 'value')!.set!.call(from, '2026-10-01')
-    from.dispatchEvent(new (from.ownerDocument.defaultView as unknown as typeof globalThis).Event('input', { bubbles: true }))
-  })
-  assert.deepEqual(queries.at(-1), { page: 1, limit: 10, action: 'updated', kayan: 'courses', from: '2026-10-01' }, 'a filter changed reads from the first page')
+  assert.equal(host.querySelector('input[type="date"]'), null, 'each day is the project\'s date picker, never the browser\'s box')
+  assert.equal(text(host.querySelector(`[id="${host.querySelectorAll('[role="group"] label[for]')[4]!.getAttribute('for')}"]`)), 'Pick a date', 'which the From label names')
+  await act(async () => type(host.querySelector('input[type="search"]')!, 'Tajweed'))
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 350)))
+  assert.deepEqual(queries.at(-1), { page: 1, limit: 10, action: 'updated', kayan: 'courses', search: 'Tajweed' }, 'a filter changed reads from the first page')
   await act(async () => click([...host.querySelectorAll('button')].find((one) => one.textContent === 'Clear filters') as unknown as Element))
   assert.deepEqual(queries.at(-1), { page: 1, limit: 10 }, 'and clearing them keeps the page size alone')
   await unmount()

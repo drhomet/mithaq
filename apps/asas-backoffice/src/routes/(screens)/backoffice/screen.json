@@ -3833,11 +3833,11 @@
           "cell": "text"
         },
         {
-          "name": "reason",
+          "name": "banReason",
           "kind": "text",
           "label": {
-            "en": "Reason",
-            "ar": "السبب"
+            "en": "Ban reason",
+            "ar": "سبب الحظر"
           },
           "rules": {
             "required": false
@@ -3908,7 +3908,7 @@
                           "decided": "table"
                         },
                         {
-                          "field": "reason",
+                          "field": "banReason",
                           "cell": "text",
                           "decided": "table"
                         }

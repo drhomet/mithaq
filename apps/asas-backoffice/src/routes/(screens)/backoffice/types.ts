@@ -130,7 +130,7 @@ export type BackofficeLogValues = {
   targetEmail: string | null
   previousRole: string | null
   role: string | null
-  reason: string | null
+  banReason: string | null
 }
 export type Values = {
   user: UserValues

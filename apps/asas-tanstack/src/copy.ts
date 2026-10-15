@@ -5,6 +5,7 @@ import organization from 'asas/messages/organization.json' with { type: 'json' }
 import tags from 'asas/messages/tags.json' with { type: 'json' }
 // add-on: audit-log
 import auditLog from 'asas/messages/auditLog.json' with { type: 'json' }
+import backofficeLog from 'asas/messages/backofficeLog.json' with { type: 'json' }
 // end add-on: audit-log
 // add-on: courses
 import courses from 'asas/messages/courses.json' with { type: 'json' }
@@ -802,6 +803,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   localUsers: { ...localUsers, none: { en: 'No local accounts yet.', ar: 'لا توجد حسابات محلية بعد.' } },
   // add-on: audit-log
   auditLog,
+  backofficeLog: { ...backofficeLog, none: { en: 'No staff action yet.', ar: 'لا يوجد إجراء للطاقم بعد.' } },
   // end add-on: audit-log
   // add-on: roles
   memberRoles: {

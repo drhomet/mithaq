@@ -64,7 +64,7 @@ const grants: string[] = [
  */
 const history: string[] = [
   // add-on: audit-log
-  ...reads('backofficeLog', ['id', 'createdAt', 'action', 'actor', 'actorEmail', 'target', 'targetEmail', 'previousRole', 'role', 'reason']),
+  ...reads('backofficeLog', ['id', 'createdAt', 'action', 'actor', 'actorEmail', 'target', 'targetEmail', 'previousRole', 'role', 'banReason']),
   // end add-on: audit-log
 ]
 

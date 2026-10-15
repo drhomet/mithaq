@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "fc092899-d6c9-4d8e-a305-d09f2f9a5893",
+  "id": "8adc629f-5d4c-4d1a-8acf-5b1cb63e9281",
   "prevIds": [
     "a8c7ed04-7324-4536-8f2f-0c37fe17be36"
   ],
@@ -634,7 +634,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "reason",
+      "name": "ban_reason",
       "entityType": "columns",
       "schema": "public",
       "table": "backoffice_log"

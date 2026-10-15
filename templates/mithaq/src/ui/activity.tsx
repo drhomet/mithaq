@@ -11,10 +11,10 @@ import { empty } from '../mithaq/audit-sink.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
+import { DatePicker } from 'mithaq-admin/date-control.tsx'
 import { missingRow, type FindApi, type FoundPage, type RelationshipTitles } from 'mithaq-admin/control-props.ts'
 import { labelFor, operationLabelFor, titleOf, type Translate } from 'mithaq-admin/copy.ts'
 import { formatDate } from 'mithaq-admin/format.tsx'
@@ -468,12 +468,22 @@ export function ActivityLog({ kayan: fixed, record, query, onQuery, refresh = 0 
           <Labelled id={ids.action} label={t('auditLog.actionFilter', 'Action') ?? 'Action'}>
             <Choice id={ids.action} value={query.action} any={any} options={Object.keys(actionWheres).map((name) => ({ value: name, label: t(`auditLog.filter.${name}`, name) ?? name }))} onChange={(action) => refine({ action })} />
           </Labelled>
-          <Labelled id={ids.from} label={t('auditLog.from', 'From') ?? 'From'}>
-            <Input id={ids.from} type="date" className="max-sm:h-11" value={query.from ?? ''} max={query.to} onChange={(event) => refine({ from: event.target.value || undefined })} />
-          </Labelled>
-          <Labelled id={ids.to} label={t('auditLog.to', 'To') ?? 'To'}>
-            <Input id={ids.to} type="date" className="max-sm:h-11" value={query.to ?? ''} min={query.from} onChange={(event) => refine({ to: event.target.value || undefined })} />
-          </Labelled>
+          {(['from', 'to'] as const).map((edge) => (
+            <Labelled key={edge} id={ids[edge]} label={t(`auditLog.${edge}`, edge) ?? edge}>
+              <DatePicker
+                id={ids[edge]}
+                field={{ name: edge, kind: 'date', label: { [locale]: t(`auditLog.${edge}`, edge) ?? edge }, rules: {} } as unknown as ClientField}
+                kayan={screen.kayan.auditLog!}
+                value={query[edge] ?? null}
+                values={{}}
+                setValue={() => {}}
+                onChange={(day) => refine({ [edge]: typeof day === 'string' ? day : undefined })}
+                readOnly={false}
+                t={t}
+                locale={locale}
+              />
+            </Labelled>
+          ))}
         </div>
         {filtered ? (
           <div className="flex flex-wrap items-center gap-2">

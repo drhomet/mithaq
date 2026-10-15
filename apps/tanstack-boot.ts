@@ -2036,9 +2036,12 @@ test('61. each dashboard edit page draws the record\'s activity beside its form 
     const page = await (await fetch(`${origin}/portal/courses/${course.id}`, { headers: { cookie: `${cookie}; locale=en` } })).text()
     assert.ok(page.includes('That page does not exist.') && !page.includes('data-record="row"'), 'a student opening an archived course is drawn not-found')
   })
-  for (const body of [{ where: { changes: { contains: '"fee"' } } }, { where: { or: [{ record: { equals: course.id } }, { changes: { like: 'fee' } }] } }, { sort: 'changes' }]) {
+  // A change is searched by one `contains` alone, which the server narrows to the kayan its reader reads whole.
+  for (const body of [{ where: { changes: { equals: '"fee"' } } }, { where: { or: [{ record: { equals: course.id } }, { changes: { like: 'fee' } }] } }, { where: { changed: { contains: 'fee' } } }, { sort: 'changes' }, { sort: 'changed' }]) {
     assert.equal((await post('/api/auditLog/find', body, { cookie })).response.status, 400, `the log refuses ${JSON.stringify(body)}`)
   }
+  assert.equal((await post('/api/auditLog/find', { where: { changes: { contains: '"fee"' } } }, { cookie })).response.status, 200, 'and answers a search of a change\'s text')
+  assert.equal((await post('/api/auditLog/find?tenant=mine', { where: { record: { equals: course.id } } }, { cookie })).response.status, 403, 'and no read widened past the active organization')
 })
 
 test('62. a member\'s roles are changed on the members page: its sheet offers every role of the tenant and no backoffice role, an administrator adds and removes one through the assignment kayan, a role the actor may not grant is offered disabled and refused anyway, and the Roles page locks each fixed role and counts a custom one\'s holders', async () => {

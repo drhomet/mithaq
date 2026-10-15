@@ -44,7 +44,7 @@ export const backofficeLog = defineKayan({
     backoffice: {
       pages: {
         ...backofficeList('/history', {
-          columns: ['createdAt', 'action', 'actorEmail', 'targetEmail', 'previousRole', 'role', 'reason'],
+          columns: ['createdAt', 'action', 'actorEmail', 'targetEmail', 'previousRole', 'role', 'banReason'],
           filters: ['action', 'actorEmail', 'targetEmail', 'createdAt'],
           search: ['actorEmail', 'targetEmail'],
           sort: '-createdAt',
@@ -62,6 +62,6 @@ export const backofficeLog = defineKayan({
     targetEmail: text({ en: 'Person\'s email', ar: 'بريد الشخص' }),
     previousRole: text({ en: 'Role before', ar: 'الدور السابق' }),
     role: text({ en: 'Role after', ar: 'الدور الجديد' }),
-    reason: text({ en: 'Reason', ar: 'السبب' }),
+    banReason: text({ en: 'Ban reason', ar: 'سبب الحظر' }),
   },
 })

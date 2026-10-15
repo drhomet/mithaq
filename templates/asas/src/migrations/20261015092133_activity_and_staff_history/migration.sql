@@ -7,7 +7,7 @@ CREATE TABLE "backoffice_log" (
 	"target_email" text,
 	"previous_role" text,
 	"role" text,
-	"reason" text,
+	"ban_reason" text,
 	"created_at" timestamp(3) with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

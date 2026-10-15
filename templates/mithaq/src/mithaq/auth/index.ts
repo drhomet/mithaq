@@ -689,7 +689,7 @@ export type BackofficeEntry = {
   targetEmail: string | null
   previousRole?: string | null
   role?: string | null
-  reason?: string | null
+  banReason?: string | null
 }
 
 const textOf = (value: unknown) => (typeof value === 'string' ? value : null)
@@ -716,7 +716,7 @@ const historyOf = async (ctx: HookContext, caller: Caller): Promise<BackofficeEn
   const previousRole = before?.role ?? null
   if (role !== undefined && [role].flat().join(',') !== (previousRole ?? 'user')) entries.push({ action: 'setRole', ...staff, ...person, previousRole, role: [role].flat().join(',') })
   const banned = ctx.path === '/admin/ban-user' ? true : ctx.path === '/admin/unban-user' ? false : body.data?.banned
-  if (banned === true) entries.push({ action: 'ban', ...staff, ...person, reason: textOf(ctx.path === '/admin/ban-user' ? body.banReason : body.data?.banReason) })
+  if (banned === true) entries.push({ action: 'ban', ...staff, ...person, banReason: textOf(ctx.path === '/admin/ban-user' ? body.banReason : body.data?.banReason) })
   if (banned === false && (ctx.path === '/admin/unban-user' || before?.banned === true)) entries.push({ action: 'unban', ...staff, ...person })
   return entries
 }
