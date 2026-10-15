@@ -10,7 +10,8 @@ export type Mailer = { send(mail: Mail): Promise<void> }
  */
 export const logMailer: Mailer = {
   send: async ({ to, subject, text }) => {
-    console.log(`[asas mail] To ${to}: ${subject}\n${text}`)
+    // The log reads as an inbox, so nobody waits for a message that never left.
+    console.log(`[asas mail] Development: emails print here instead of being sent.\nTo ${to}: ${subject}\n${text}`)
   },
 }
 
