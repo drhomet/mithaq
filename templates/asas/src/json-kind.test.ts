@@ -248,6 +248,27 @@ describe('postgres', () => {
     }
   })
 
+  test('in and not_in read a long list in one pass with nulls split off, and a list or a where past its cap is the caller\'s 400 on any kind', async () => {
+    await db.execute(`delete from ${schemaName}.blobs`)
+    for (const [label, data] of [['a', { n: 1 }], ['b', { n: 2 }], ['c', {}], ['d', { n: 'x' }]] as const) await operations.create({ label, data })
+    const many = Array.from({ length: 1000 }, (_, index) => index + 2)
+    assert.deepEqual(await labels({ 'data.n': { in: many } }), ['b'])
+    assert.deepEqual(await labels({ 'data.n': { in: [1, null] } }), ['a', 'c'])
+    assert.deepEqual(await labels({ 'data.n': { not_in: [1, 'x'] } }), ['b'])
+    assert.deepEqual(await labels({ 'data.n': { not_in: [1, null] } }), ['b', 'd'])
+    assert.deepEqual(await labels({ 'data.n': { not_in: [] } }), ['a', 'b', 'd'])
+    assert.deepEqual(await labels({ 'data.n': { in: [] } }), [])
+    const nested = (depth: number): unknown => (depth ? { or: [nested(depth - 1)] } : { label: { equals: 'a' } })
+    for (const where of [
+      { 'data.n': { in: [...many, 0] } },
+      { label: { not_in: Array.from({ length: 1001 }, String) } },
+      { or: Array.from({ length: 201 }, (_, index) => ({ label: { equals: String(index) } })) },
+      nested(300),
+    ]) {
+      await assert.rejects(() => operations.find({ where: where as never }), (error: unknown) => refused(error) && /at most/.test((error as Error).message), JSON.stringify(where).slice(0, 80))
+    }
+  })
+
   test('a version snapshots a json value whole, a draft holds its own, and a restore writes the snapshot back as it was', async () => {
     const page = built.kayan.pages.operations
     const first = { blocks: [{ type: 'hero', title: 'One' }], seo: { index: true } }

@@ -335,6 +335,13 @@ const jsonConditionsOf = (column: SQLWrapper, path: readonly string[], rules: Re
   const present = some(sql`item.value <> 'null'::jsonb`)
   const text = sql`(item.value #>> '{}')`
   const equal = (value: unknown) => (value === null ? sql`not ${present}` : some(sql`item.value = ${JSON.stringify(value)}::jsonb`))
+  // One subquery for the whole list, against a hashed set: one per value, or `= any(array)`, compares
+  // every item with every value, which took seconds for a thousand values over 20,000 rows.
+  const listed = (value: unknown) => {
+    const { hasNull, values } = splitNulls(value)
+    const hit = values.length ? some(sql`item.value in (select unnest(${sql.param(values.map((one) => JSON.stringify(one)))}::jsonb[]))`) : sql`false`
+    return hasNull ? or(sql`not ${present}`, hit)! : hit
+  }
   const checks = Object.entries(rules).map(([operator, value]): SQL | undefined => {
     switch (operator as Operator) {
       case 'contains':
@@ -350,9 +357,9 @@ const jsonConditionsOf = (column: SQLWrapper, path: readonly string[], rules: Re
       case 'exists':
         return value ? present : sql`not ${present}`
       case 'in':
-        return or(...(value as unknown[]).map(equal)) ?? sql`false`
+        return listed(value)
       case 'not_in':
-        return and(present, ...(value as unknown[]).map((one) => sql`not ${equal(one)}`))
+        return and(present, sql`not ${listed(value)}`)
     }
     // Unreachable past the kind's operators, but never left out of a `where` that carries an access constraint.
     throw new Error(`Unsupported where operator "${operator}" on a json field.`)

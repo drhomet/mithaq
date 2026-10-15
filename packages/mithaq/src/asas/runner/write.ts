@@ -152,6 +152,9 @@ export const assertFieldWhere = ({ said, key, kind, operators, value, valued = t
       throw new Error(`${said} field "${key}" operator "${operator}" only supports numeric, date and datetime fields.`)
     }
     checkOperatorValue(said, key, operator, operand)
+    if (!valued && Array.isArray(operand) && operand.length > whereLimits.values) {
+      throw new Error(`${said} field "${key}" operator "${operator}" lists at most ${whereLimits.values} values.`)
+    }
     // A value an integer or decimal column cannot hold would reach Postgres as a 500.
     // A caller's own query skips this: its row shape refuses values with a path each.
     if (valued && (kind === 'integer' || kind === 'decimal') && operator !== 'exists') {
@@ -173,7 +176,14 @@ export const assertWhere = (kayan: ResolvedKayan, where: unknown): Where =>
 export const assertWhereGrammar = (kayan: ResolvedKayan, where: unknown): Where =>
   normalizedWhere({ kayan, where, valued: false, said: `Kayan "${kayan.name}" query` })
 
-const normalizedWhere = ({ kayan, where, valued, said }: { kayan: ResolvedKayan; where: unknown; valued: boolean; said: string }): Where => {
+/**
+ * How large a caller's `where` may be: the values one `in` or `not_in` lists, and the fields, `and`s and
+ * `or`s it holds in all, however nested. Each is a condition the store runs, so past these a read is
+ * refused before it reaches the store rather than holding it for minutes.
+ */
+export const whereLimits = { values: 1000, nodes: 200 } as const
+
+const normalizedWhere = ({ kayan, where, valued, said, nodes = { left: whereLimits.nodes } }: { kayan: ResolvedKayan; where: unknown; valued: boolean; said: string; nodes?: { left: number } }): Where => {
   if (!where || typeof where !== 'object' || Array.isArray(where)) {
     throw new Error(`${said} is not an object of fields.`)
   }
@@ -182,11 +192,13 @@ const normalizedWhere = ({ kayan, where, valued, said }: { kayan: ResolvedKayan;
   // No prototype, so `__proto__` is a key like any other.
   const normalized: Record<string, unknown> = Object.create(null)
   for (const [key, value] of entries) {
+    // An access constraint is the project's own to size; a caller's is held to the limits.
+    if (!valued && --nodes.left < 0) throw new Error(`${said} holds at most ${whereLimits.nodes} fields, "and"s and "or"s.`)
     if (key === 'and' || key === 'or') {
       if (!Array.isArray(value) || !value.length) {
         throw new Error(`${said} "${key}" must be a non-empty array.`)
       }
-      normalized[key] = value.map((one) => normalizedWhere({ kayan, where: one, valued, said }))
+      normalized[key] = value.map((one) => normalizedWhere({ kayan, where: one, valued, said, nodes }))
       continue
     }
     const queried = queryField({ kayan, key, said })
