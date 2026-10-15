@@ -7694,7 +7694,7 @@ test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the sam
   const host = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/new'), client, value: null, t: english, locale: 'en', onDone: () => {} }))
   assert.equal(host.querySelector('input[type="time"]') === null, true, 'no native time box, which Safari hands back empty')
   const segment = (name: string) => host.querySelector(`[data-time-field] [data-segment="${name}"]`) as HTMLInputElement
-  assert.deepEqual(['hours', 'minutes'].map((name) => segment(name)?.getAttribute('type')), ['tel', 'tel'], 'each segment is a box of its own, as openstatus\'s')
+  assert.deepEqual(['hours', 'minutes'].map((name) => segment(name)?.getAttribute('data-slot')), ['input', 'input'], 'each segment is a shadcn box of its own, as openstatus\'s')
   assert.equal(segment('hours').disabled, true, 'and takes nothing until a day is picked')
   await act(async () => click(host.querySelector('button#sessions-startsAt') as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
@@ -7794,4 +7794,27 @@ test('240q. a red toast stays until it is closed, with its own close button, a g
   const notice = host.querySelector('[data-stale-notice]')
   assert.ok(notice?.textContent?.includes(english('error.conflict.stale')!), 'it stays on the form, in its own sentence')
   assert.ok(notice?.querySelector('button[data-button="reload"]'), 'beside a reload, since nothing saves until the row is read again')
+})
+
+test('240r. a moment\'s time boxes are spin buttons a reader hears the value and range of, the period reads in the clock\'s own order, a pasted 2130 or 9:30 PM is 9:30 PM, and a lone 0 typed over a time keeps it', async () => {
+  const reported: unknown[] = []
+  const Held = () => {
+    const [value, setValue] = useState<unknown>(new Date(2026, 0, 2, 9, 30))
+    return createElement(controls.datetime!, {
+      values: {}, setValue: () => {}, value, field: fieldOf({ name: 'at', kind: 'datetime' }), kayan: courses, id: 'at', t, locale: 'en',
+      readOnly: false, onChange: (next: unknown) => (reported.push(next), setValue(next)),
+    })
+  }
+  const host = await render(createElement(Held))
+  const hours = timeSegment(host, 'hours')
+  assert.deepEqual(['type', 'inputmode', 'role', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow'].map((name) => hours.getAttribute(name)), ['text', 'numeric', 'spinbutton', '1', '12', '9'], 'the hours are a spin button from 1 to 12, now at 9')
+  assert.deepEqual(['aria-valuemin', 'aria-valuemax', 'aria-valuenow'].map((name) => timeSegment(host, 'minutes').getAttribute(name)), ['0', '59', '30'], 'and the minutes from 0 to 59')
+  assert.ok(timeSegment(host, 'period').closest('[dir="ltr"]'), 'AM or PM sits in the clock\'s own left-to-right order, so the arrows move across it the same in Arabic')
+  await act(async () => press(hours as unknown as Element, '0'))
+  assert.deepEqual([timeOf(host), reported.length], ['09:30', 0], 'a lone 0 waits for its second digit and clears nothing')
+  for (const pasted of ['2130', '9:30 PM']) {
+    await act(async () => typeInto(timeSegment(host, 'hours') as unknown as Element, pasted))
+    assert.equal(timeOf(host), '21:30', `${pasted} pasted into the hours is 9:30 in the evening`)
+    await act(async () => click(timeSegment(host, 'period') as unknown as Element))
+  }
 })
