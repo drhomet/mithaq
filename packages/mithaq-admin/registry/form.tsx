@@ -1,8 +1,8 @@
-import { useContext, useId, useState, type FormEvent, type ReactElement } from 'react'
-import type { ClientField, LeafClient } from 'mithaq/admin'
+import { useContext, useEffect, useId, useState, type FormEvent, type ReactElement } from 'react'
+import type { ClientField, ClientKayan, LeafClient } from 'mithaq/admin'
 import { FormContext, ScreenContext } from 'mithaq/admin/react'
 import { Card, CardContent } from '@/components/ui/card'
-import { descriptionOf, titleOf } from 'mithaq-admin/copy.ts'
+import { descriptionOf, labelFor, newTitleOf, titleOf, type Copy } from 'mithaq-admin/copy.ts'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
 import { BoundField, FieldValue } from 'mithaq-admin/field-value.tsx'
 import { readOnlyField } from 'mithaq-admin/field-values.ts'
@@ -11,20 +11,22 @@ import { FormButton } from 'mithaq-admin/form-button.tsx'
 import { FormChrome } from 'mithaq-admin/form-chrome.tsx'
 import { KayanForm } from 'mithaq-admin/form-context.tsx'
 import { FormLayout } from 'mithaq-admin/form-layout.tsx'
-import { brokenRule } from 'mithaq-admin/form-rules.tsx'
-import type { FormProps } from 'mithaq-admin/form-types.tsx'
+import { brokenRule, doneWords, failedWords, issuesOf } from 'mithaq-admin/form-rules.tsx'
+import type { DraftOptions, FormProps } from 'mithaq-admin/form-types.tsx'
 import { LeafControl } from 'mithaq-admin/leaf-control.tsx'
 import { NavLinks } from 'mithaq-admin/nav-links.tsx'
 import { pageButtonOf, type PageButton } from 'mithaq-admin/node-buttons.tsx'
-import { drawsKind, nodesOf, scopeOf, type Draw } from 'mithaq-admin/node-tree.ts'
+import { drawsKind, formIn, leavesOf, nodesOf, scopeOf, type Draw } from 'mithaq-admin/node-tree.ts'
 import { drawNodes, frameOf, pageOf } from 'mithaq-admin/nodes.tsx'
 import { localesOf } from 'mithaq-admin/refusal.ts'
+import { DocumentDrawer } from 'mithaq-admin/record-frame.tsx'
 import { refOf } from 'mithaq-admin/screen-refs.ts'
 import { useAutosave } from 'mithaq-admin/use-autosave.tsx'
 import { useDraftView } from 'mithaq-admin/use-draft-view.tsx'
 import { useFormRefusal } from 'mithaq-admin/use-form-refusal.tsx'
 import { useFormSave } from 'mithaq-admin/use-form-save.tsx'
 import { useFormSeed } from 'mithaq-admin/use-form-seed.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 
 /**
  * The form screen over one kayan's `create`, `update` and `delete`, holding its values in TanStack Form.
@@ -41,16 +43,105 @@ export function Form(props: FormProps): ReactElement {
   return <FormScreen key={`${props.kayan.name}:${held.mount}`} {...props} made={held.made} onMade={(made) => setHeld((before) => ({ ...before, made }))} />
 }
 
+/**
+ * A form in Payload's document drawer: a create or an edit over the page it opened from. Closing it with a change
+ * nobody saved asks the form's own discard question first; the caller closes it once the write lands.
+ */
+export function DrawerForm({ edit, onClose, title, ...props }: Omit<FormProps, 'onCancel' | 'onDirty' | 'blocked'> & { title: string; onClose: () => void; edit?: string }): ReactElement {
+  const [dirty, setDirty] = useState(false)
+  const [closing, setClosing] = useState(false)
+  return (
+    <DocumentDrawer title={title} edit={edit} closeLabel={props.t('admin.close', 'Close') ?? 'Close'} onClose={() => (dirty ? setClosing(true) : onClose())}>
+      <Form {...props} onDirty={setDirty} onCancel={onClose} blocked={closing ? { proceed: onClose, reset: () => setClosing(false) } : undefined} />
+    </DocumentDrawer>
+  )
+}
+
+/** Whether a refusal says the row changed elsewhere since this form read it, after which no save of this form lands. */
+const staleIn = (thrown: unknown) => (thrown as { data?: { key?: unknown } } | null | undefined)?.data?.key === 'error.conflict.stale'
+
+/**
+ * Payload's add-new beside a relationship: a row of `target` made in a drawer over the form, through the screen's own
+ * client and under the viewer's report, with Save draft beside Publish where the target keeps drafts the viewer reads.
+ * The row it made is handed to `made` and the drawer closes.
+ */
+function AddDrawer({ api, copy, kayans, made, onClose, target }: Pick<FormProps, 'api' | 'kayans'> & {
+  target: ClientKayan
+  made: (row: Record<string, unknown>) => void
+  copy: Copy
+  onClose: () => void
+}): ReactElement | null {
+  const screen = useContext(ScreenContext)
+  if (!screen) return null
+  const report = screen.access.collections?.[target.name]
+  const page = target.pages.create
+  const write = (operation: 'create' | 'update' | 'delete') => (input: Record<string, unknown>, options?: DraftOptions) =>
+    screen.client({ kayan: target.name, operation, input, ...(options?.draft && { draft: true }) })
+  return (
+    <DrawerForm
+      kayan={target}
+      title={newTitleOf({ kayan: target, copy })}
+      // The fields its create page asks for, without the page's shell; every field where it has none.
+      nodes={page && 'page' in page ? formIn(nodesOf(page)) : undefined}
+      client={{ create: write('create'), update: write('update'), delete: write('delete') }}
+      drafts={target.drafts && report?.operations?.findVersions === true ? {} : undefined}
+      operations={report?.operations}
+      value={null}
+      t={copy.t}
+      locale={copy.locale}
+      locales={copy.locales}
+      kayans={kayans}
+      api={api}
+      writes={(field, on) => report?.fields?.[field]?.[on] === true}
+      onDone={(row) => {
+        made(row as Record<string, unknown>)
+        onClose()
+      }}
+      onClose={onClose}
+    />
+  )
+}
+
 function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => void }): ReactElement {
   const { api, blocked, client, drafts, kayan, kayans, locale, nodes, onCancel, operations, screen, t, value, writes } = props
   const copy = { t, locale, locales: props.locales }
   // Bumped to remount every control and panel, so a panel reads what it shows afresh.
   const [revision, setRevision] = useState(0)
   const { seed, setSeed, seeded, form, values, dirty } = useFormSeed({ kayan, value, status: drafts?.status, onDirty: props.onDirty })
-  const { held, shown, issues, sentences, banner, setRefused, forget } = useFormRefusal({ copy, error: props.error, form, kayan })
+  const { held, shown, issues, sentences, setRefused, forget } = useFormRefusal({ copy, error: props.error, form })
+  // How many writes the person pressed were refused over fields, which moves the focus to the summary on each.
+  const [refusals, setRefusals] = useState(0)
+  // A refusal naming a field is drawn at that field and in the summary; a row changed elsewhere is a lasting notice on
+  // the form, since nothing saves until it is read again; any other, a request that failed, is said in a red toast.
+  const said = (thrown: unknown) => {
+    if (!thrown || staleIn(thrown)) return
+    const named = Object.entries(issuesOf(thrown))
+    if (!named.length) return void toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
+    // A field the page does not draw has no box to mark, so what is wrong with it is said here.
+    const undrawn = named.filter(([name]) => !drawn.has(name))
+    if (undrawn.length) toast.error(undrawn.map(([name, issue]) => `${labelOf(name)}: ${t(issue, issue) ?? issue}`).join(' '))
+  }
+  // An autosave's refusal marks its fields quietly: the focus and the open tab stay where the person is typing.
+  const quiet = (thrown: unknown) => {
+    setRefused(thrown)
+    said(thrown)
+  }
+  const refuse = (thrown: unknown) => {
+    quiet(thrown)
+    if (thrown && Object.keys(issuesOf(thrown)).length) setRefusals((already) => already + 1)
+  }
+  // A refusal the host caught, which no write of this form said.
+  useEffect(() => said(props.error), [props.error])
   // The access report a node's `when` reads as `$user`; none outside a screen.
-  const access = useContext(ScreenContext)?.access
+  const screenState = useContext(ScreenContext)
+  const access = screenState?.access
+  // The kayan a relationship's + is making a row of, in a drawer over this form, and what picks the row it made.
+  const [adding, setAdding] = useState<{ target: ClientKayan; made: (row: Record<string, unknown>) => void }>()
   const byName = new Map(kayan.fields.map((field) => [field.name, field]))
+  const labelOf = (name: string) => {
+    const field = byName.get(name)
+    return field ? labelFor({ kayan, field, copy }) : name
+  }
   // A create that has autosaved its row edits that row from then on, before the host has handed it.
   const id = String(value?.id ?? props.made ?? '')
   // A row with an id is being changed, one without is being made; a field may be the client's on one operation and the server's on the other.
@@ -59,16 +150,18 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // access denied); it decides both the disabled control and whether the field is in the write.
   const owned = (field: ClientField) => readOnlyField(field, on) || (writes ? !writes(field.name, on) : false)
   const status = drafts && seed.status
-  const { viewing, showing, choose, forget: forgetPublished } = useDraftView({ client, id, kayan, refuse: setRefused, status, values })
+  const { viewing, showing, choose, forget: forgetPublished } = useDraftView({ client, id, kayan, refuse: quiet, status, values })
   // A screen's page names every field it draws; a form handed no page draws every field in declared
   // order, and no join, whose rows are another kayan's.
   const tree = nodes ?? (screen && nodesOf(screen.page))
-  const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse: setRefused, seed, seeded, setSeed, status, tree, values, onWritten: forgetPublished })
+  // The fields this form draws a box for, which its summary lists.
+  const drawn = new Set(tree ? leavesOf(tree) : kayan.fields.map((field) => field.name))
+  const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse, seed, seeded, setSeed, status, tree, values, onWritten: forgetPublished, done: (landed) => doneWords({ kayan, copy, ...landed }) })
   const { busy, run, save, readAt, asking, setAsking, leaving } = saving
   // Never while a discard question is open, which says the change is unsaved, nor once a write was refused because
   // the row changed since this form read it: every autosave after it would be refused the same way.
   const interval = viewing || asking || blocked || leaving || shown === 'error.conflict.stale' ? undefined : drafts?.autosave
-  const autosaved = useAutosave({ ...props, ...saving, client, form, id, interval, owned, readAt: () => readAt(props.expectedUpdatedAt), refuse: setRefused, seed, seeded, setSeed, values })
+  const autosaved = useAutosave({ ...props, ...saving, client, form, id, interval, owned, readAt: () => readAt(props.expectedUpdatedAt), refuse: quiet, seed, seeded, setSeed, values })
 
   const setValue = (name: string, next: unknown) => {
     const field = byName.get(name)
@@ -91,6 +184,8 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const formId = useId()
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    // A form in a drawer over another is that form's child in React, whose submit would otherwise reach it too.
+    event.stopPropagation()
     save()
   }
   const control = (leaf: string | LeafClient) => {
@@ -108,7 +203,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   }
   // A kayan's own operation can change anything the row touches, children included, so the panels are remounted after it.
   const runOperation = (operation: PageButton) => async (input: Record<string, unknown>, refuse: (thrown: unknown) => void) => {
-    const landed = await run({ write: () => client.run!(operation.name, input), effect: operation.effect, refuse })
+    const landed = await run({ write: () => client.run!(operation.name, input), effect: operation.effect, operation, refuse })
     if (landed) setRevision((already) => already + 1)
     return landed
   }
@@ -137,7 +232,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
       const button = id && client.run && !viewing ? pageButtonOf({ kayan, node, allowed: operations }) : undefined
       if (!button) return null
       const onDelete = (refuse: (thrown: unknown) => void) => run({ write: () => client.delete({ id }), effect: 'delete', refuse })
-      return <FormButton key={button.name} {...{ api, busy, copy, id, kayan, kayans, onDelete, screen, value }} operation={button} run={runOperation(button)} refuse={setRefused} />
+      return <FormButton key={button.name} {...{ api, busy, copy, id, kayan, kayans, onDelete, screen, value }} operation={button} run={runOperation(button)} refuse={refuse} />
     },
     // The page's one <form>, so a list of another kayan beside it, with forms of its own, is never inside it;
     // a leaf elsewhere on the page is still this form's value. A page with a controls node draws the actions there.
@@ -168,20 +263,23 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // the top of the form (`chrome`), so it is never in the phone's fixed bar.
   const views = status === 'changed' && client.findByID ? { viewing, choose } : undefined
   const actionsOf = (header: boolean) => (
-    <FormActions {...{ autosaved, banner, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
+    <FormActions {...{ autosaved, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} autosaves={!!drafts?.autosave} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
   )
-  // On a screen's page the title is the page's own `title` node, so the form keeps only the sentence under it.
+  // On a screen's page the title is the page's own `title` node, and a form handed its nodes sits in a drawer or a list
+  // that titles it, so the form keeps only the sentence under it.
   const chrome = (
     <FormChrome
       headed={headed}
-      title={screen ? undefined : titleOf({ kayan, copy })}
+      title={screen || nodes ? undefined : titleOf({ kayan, copy })}
       about={about}
-      banner={controlled ? undefined : banner}
+      problems={Object.entries(sentences).filter(([name]) => drawn.has(name)).map(([name, sentence]) => ({ id: `${kayan.name}-${name}`, label: labelOf(name), sentence }))}
+      refused={refusals}
+      stale={staleIn(held) ? failedWords({ kayan: kayan.name, copy, thrown: held }) : undefined}
       views={controlled ? views : undefined}
       t={t}
       draft={status === 'changed' ? {
         busy: busy || autosaved === 'saving',
-        onRestore: operations?.restoreVersion === true && client.run ? () => void run({ write: () => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), effect: 'update', next: 'published' }) : undefined,
+        onRestore: operations?.restoreVersion === true && client.run ? () => void run({ write: () => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), effect: 'update', operation: { name: 'restoreVersion' }, next: 'published' }) : undefined,
         onViewPublished: client.findByID ? () => void choose('published') : undefined,
         viewing,
       } : undefined}
@@ -191,7 +289,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   return (
     // The provider is around the whole screen, not just the column of inputs, so a panel the project
     // registered binds a field of this form through `useKayanField` wherever the layout put it.
-    <KayanForm.Provider value={{ check, forget, form, issues: sentences, locales: localesOf(held), on, writes }}>
+    <KayanForm.Provider value={{ check, forget, form, issues: sentences, locales: localesOf(held), on, writes, add: screenState ? (target, made) => setAdding({ target, made }) : undefined }}>
       <FormContext value={{ getData: () => showing, setValue, disabled: busy || viewing, saves: saving.saves, expectedUpdatedAtOn: props.expectedUpdatedAtOn }}>
         {/* One question for both ways out, Cancel and a blocked navigation, kept mounted so nothing but an answer closes it. */}
         <DiscardDialog
@@ -211,6 +309,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
         ) : (
           <FormLayout {...{ api, chrome, control, copy, formId, kayan, kayans, values }} row={value} actions={actionsOf(false)} onSubmit={submit} provided={unnamed.filter(owned)} rest={unnamed.filter((field) => !owned(field))} />
         )}
+        {adding ? <AddDrawer {...adding} copy={copy} kayans={kayans} api={api} onClose={() => setAdding(undefined)} /> : null}
       </FormContext>
     </KayanForm.Provider>
   )

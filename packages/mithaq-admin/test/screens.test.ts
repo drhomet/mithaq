@@ -694,7 +694,8 @@ test('a button\'s run asks its confirm first on every path, so a project\'s own 
 for (const mode of ['dialog', 'sheet', 'drawer'] as const) {
   test(`a record opens over the list as a ${mode}`, async () => {
     await render(createElement(RecordFrame, { mode, title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement('p', { id: `in-${mode}` }, 'form')))
-    const popup = document.querySelector(`[data-slot="${mode}-content"]`)
+    // The drawer is Payload's full-page document drawer, a sheet across the page.
+    const popup = document.querySelector(mode === 'drawer' ? '[data-document-drawer]' : `[data-slot="${mode}-content"]`)
     assert.ok(popup, `the ${mode} is open`)
     assert.ok(popup!.querySelector(`#in-${mode}`), 'with the record inside it')
   })
@@ -815,6 +816,8 @@ test('mithaq screens prints every screen of the project as its tree', async () =
 
 test('a person\'s backoffice actions draw on no viewer\'s own row and on a staff row for a super admin alone, and each asks first in a dialog naming the person, a ban with a reason and an end, a role only when it changed', async (t) => {
   const { UserButtons } = (await import(new URL('../../../templates/asas/src/ui-backoffice/user-actions.tsx', import.meta.url).href)) as { UserButtons: () => ReactElement }
+  const { toast } = await import('../registry/toast.tsx')
+  const toasts = t.mock.method(toast, 'success', () => 0)
   const sent: { path: string; body: Record<string, unknown> }[] = []
   let gate: Promise<void> = Promise.resolve()
   let refusal: { code: string } | undefined
@@ -886,9 +889,8 @@ test('a person\'s backoffice actions draw on no viewer\'s own row and on a staff
   })
   await act(async () => click(confirm()!))
   assert.deepEqual(sent.map((one) => [one.path, one.body]), [['/api/auth/user/admin/ban-user', { userId: 'p1', banReason: 'Spam', banExpiresIn: 604800 }]], 'the ban carries its reason and its end')
-  assert.equal(dialog()?.textContent?.includes('Layla $& is banned.'), true, 'the ban says it landed')
-  assert.deepEqual([confirm(), document.querySelector('[data-ban]'), refreshed, reloaded.mock.callCount()], [null, null, 1, 0], 'with no question left, the page asked to refresh once and not reloaded')
-  assert.equal(document.querySelector('[data-button="close"]')?.textContent, 'Close', 'and the dialog closes on Close')
+  assert.deepEqual(toasts.mock.calls.map((one) => one.arguments[0]), ['Layla $& is banned.'], 'the ban says it landed in a toast')
+  assert.deepEqual([dialog(), refreshed, reloaded.mock.callCount()], [null, 1, 0], 'and the dialog closes, the page asked to refresh once and not reloaded')
 
   sent.length = 0
   host = await cell(person, 'user', administrator)
@@ -902,7 +904,7 @@ test('a person\'s backoffice actions draw on no viewer\'s own row and on a staff
   assert.ok(dialog()?.textContent?.includes('Layla $&') && dialog()?.textContent?.includes('Explorer'), 'the dialog names the person and the new role')
   await act(async () => click(confirm()!))
   assert.deepEqual(sent.map((one) => [one.path, one.body]), [['/api/auth/user/admin/set-role', { userId: 'p1', role: 'explorer' }]], 'and the answer sets it')
-  assert.equal(dialog()?.textContent?.includes('Layla $& now holds the backoffice role "Explorer".'), true, 'the role says it landed')
+  assert.equal(toasts.mock.calls.at(-1)?.arguments[0], 'Layla $& now holds the backoffice role "Explorer".', 'the role says it landed in a toast')
 
   sent.length = 0
   host = await cell(person, 'user', support)

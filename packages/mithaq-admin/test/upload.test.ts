@@ -140,7 +140,9 @@ test('186w. the control draws the held file by its thumbnail with Choose and Upl
   assert.equal(read.querySelectorAll('button').length + read.querySelectorAll('[role="combobox"]').length, 0, 'and read-only offers nothing to change')
 })
 
-test('186x. Upload new refuses a file of another type before sending, offers a retry after a failed send and none after the server refused the file, and sets the field to the new row once it is made', async () => {
+test('186x. Upload new refuses a file of another type before sending, offers a retry after a failed send and none after the server refused the file, and sets the field to the new row once it is made, saying so in a toast', async (context) => {
+  const { toast } = await import('../registry/toast.tsx')
+  const toasts = context.mock.method(toast, 'success', () => 0)
   const asked: { operation: string; input: Record<string, unknown> }[] = []
   let refuse = true
   const client = clientOf(asked, {
@@ -197,6 +199,7 @@ test('186x. Upload new refuses a file of another type before sending, offers a r
   assert.deepEqual(reported, ['n1'], 'the field is set to the new row')
   assert.deepEqual(asked.filter((one) => one.operation === 'create').at(-1)?.input, { alt: { en: 'A cover', ar: 'غلاف' }, uploadReference: { id: 'n1' } })
   assert.equal(window.document.querySelector('[data-upload-dialog="media"]') === null, true, 'and the dialog closes')
+  assert.deepEqual(toasts.mock.calls.map((one) => one.arguments[0]), ['media created'], 'with a green toast that it was made')
 })
 
 test('186af. Upload new is offered only to an actor the report lets create a file, and Choose to everyone who may edit the field', async () => {

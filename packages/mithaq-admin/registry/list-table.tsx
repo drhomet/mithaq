@@ -12,10 +12,12 @@ import { isUntitled } from 'mithaq-admin/row-title.tsx'
 import { refOf, type ScreenPage } from 'mithaq-admin/screen-refs.ts'
 
 // Pinned cells are opaque (the card's fill with the head's or hovered row's tint mixed in), because a translucent one
-// shows the cells that scroll beneath it.
+// shows the cells that scroll beneath it. A hovered row's tint is every cell's own, the opaque mix, so the pinned cells
+// and the rest change together and never differ by the row's translucent fill or its transition.
 const headFill = 'bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]'
 const pinnedHead = `sticky z-10 ${headFill}`
-const pinned = 'sticky z-10 bg-card group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]'
+const hovered = 'group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]'
+const pinned = `sticky z-10 bg-card ${hovered}`
 // A shadow on the row menu column's start edge while the table runs on under it. The head cell keeps its rule underneath
 // (`[&_th]:shadow-[inset_0_-1px_0_var(--border)]` on the head row), so the head's own takes `!` and carries the rule too.
 const edge = 'shadow-[-10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)] rtl:shadow-[10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)]'
@@ -201,7 +203,7 @@ export function ListTable({
                       Ref && <Ref field={field} value={row[field.name]} row={row} />
                     )
                     return (
-                      <TableCell key={field.name} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : undefined}>
+                      <TableCell key={field.name} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : hovered}>
                         {field === linked && opens ? (
                           // A real link, so it opens in a new tab and lists for a reader, but out of the tab
                           // order since the row is the stop. An untitled row's name holds the visible text.

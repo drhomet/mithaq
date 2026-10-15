@@ -28,6 +28,8 @@ import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
 import type { FindApi, FoundPage } from 'mithaq-admin/control-props.ts'
 import { labelFor, titleOf } from 'mithaq-admin/copy.ts'
 import { formatDate } from 'mithaq-admin/format.tsx'
+import { doneWords } from 'mithaq-admin/form-rules.tsx'
+import { carry } from 'mithaq-admin/toast.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 import { endonym } from 'mithaq-admin/locale-menu.ts'
 import { CloseButton } from 'mithaq-admin/record-frame.tsx'
@@ -312,6 +314,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
       // since is refused 409 rather than burying it.
       const read = takes ? versions.find((one) => one.latest)?.version.updatedAt : undefined
       await client({ kayan: kayan.name, operation: 'restoreVersion', input: { id: version.id, ...(read !== undefined && { expectedUpdatedAt: read }) }, draft })
+      carry(doneWords({ kayan, copy: { t, locale }, operation: { name: 'restoreVersion' } }))
       window.location.reload()
     } catch (thrown) {
       setRestoring(false)

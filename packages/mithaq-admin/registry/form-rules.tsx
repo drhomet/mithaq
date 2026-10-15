@@ -1,4 +1,4 @@
-import { compareDecimals, decimalDigits, isDecimal, type ClientField } from 'mithaq/admin'
+import { compareDecimals, decimalDigits, isDecimal, type ClientField, type ClientKayan } from 'mithaq/admin'
 import type { Copy } from 'mithaq-admin/copy.ts'
 import { counted, listed } from 'mithaq-admin/format.tsx'
 
@@ -84,6 +84,33 @@ export const refusalOf = ({
     return rule ? [{ path: field.name, message: `${kayan}.${field.name}.${rule}` }] : []
   })
   return issues.length ? { data: { key: 'error.invalid.value', params: { issues } } } : undefined
+}
+
+/**
+ * What a toast says once a write landed: the kayan's own words for its operation (`courses.operations.archive.done`),
+ * the shared ones with its kind put in, or the operation's label. `next` is where a save left a row that keeps drafts.
+ */
+export const doneWords = ({ kayan, copy, effect, operation, next }: { kayan: Pick<ClientKayan, 'name'>; copy: Copy; effect?: string; operation?: { name: string; label?: Readonly<Record<string, string>> }; next?: string }): string => {
+  const { t, locale } = copy
+  const kind = t(`${kayan.name}.singular`, kayan.name) ?? kayan.name
+  const said = (key: string, fallback: string) => (t(key, fallback) ?? fallback).replace('{kind}', () => kind)
+  if (operation) {
+    return t(`${kayan.name}.operations.${operation.name}.done`)
+      ?? t(`admin.done.${operation.name}`)?.replace('{kind}', () => kind)
+      ?? said('admin.done.ran', '{operation}: done').replace('{operation}', () => operation.label?.[locale] ?? t(`${kayan.name}.operations.${operation.name}`, operation.name) ?? operation.name)
+  }
+  if (effect === 'delete') return said('admin.done.deleted', '{kind} deleted')
+  if (next === 'published') return said('admin.done.published', '{kind} published')
+  if (next) return said('admin.done.draftSaved', 'Draft saved')
+  return effect === 'create' ? said('admin.done.created', '{kind} created') : said('admin.done.saved', '{kind} saved')
+}
+
+/** What a toast says when a write failed: its refusal's own sentence, or, for a request that never answered with one or a key with no words, that nothing changed. */
+export const failedWords = ({ kayan, copy, thrown }: { kayan?: string; copy: Copy; thrown: unknown }): string => {
+  const key = (thrown as { data?: { key?: unknown } } | null | undefined)?.data?.key
+  const failed = copy.t('admin.requestFailed', 'Something went wrong, so nothing was saved. Try again.') ?? 'Something went wrong, so nothing was saved. Try again.'
+  // A key the copy does not word is said in the shared sentence, never as the key.
+  return typeof key === 'string' ? refusalWords({ kayan, shown: key, labels: [], fallback: failed, copy }) : failed
 }
 
 /** The sentence over a refused save: a schema refusal that names fields lists them by label; any other is its own key's sentence, or `fallback`. */

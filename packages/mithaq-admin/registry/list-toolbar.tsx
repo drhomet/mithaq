@@ -93,10 +93,10 @@ export function BulkBar({ children, done, said, t, ticked }: {
 }
 
 /**
- * The row above the table: the search box, the refusal the last run answered with, the list's own buttons, the
+ * The row above the table: the search box, the list's own buttons, the
  * filter panel's button and the column picker, and the filter panel under it.
  */
-export function ListToolbar({ api, children, client, columns, copy, kayan, onSearch, onWhere, paths, refusal, search, searched, where }: {
+export function ListToolbar({ api, children, client, columns, copy, kayan, onSearch, onWhere, paths, search, searched, where }: {
   kayan: ClientKayan
   /** Every kayan of the build, so a search across a relationship names its far field. */
   client?: readonly ClientKayan[]
@@ -106,8 +106,6 @@ export function ListToolbar({ api, children, client, columns, copy, kayan, onSea
   /** The paths a search runs over. */
   searched: readonly string[]
   onSearch: (search: string | undefined) => void
-  /** The refusal the last run answered with, so a refused button that closed does not leave the page reading as changed. */
-  refusal?: string
   /** The paths the filter panel offers, and the filter the URL holds. */
   paths: ComponentProps<typeof Filters>['paths']
   where?: FilterWhere
@@ -147,11 +145,6 @@ export function ListToolbar({ api, children, client, columns, copy, kayan, onSea
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {refusal ? (
-            <p role="alert" className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive">
-              {t(refusal, refusal)}
-            </p>
-          ) : null}
           {children}
           {paths.length ? (
             <Button

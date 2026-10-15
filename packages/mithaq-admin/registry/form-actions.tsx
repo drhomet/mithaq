@@ -15,8 +15,6 @@ export type FormActionsProps = {
   header: boolean
   t: Translate
   locale: string
-  /** The sentence over a refused save, drawn in the header row. */
-  banner?: string
   status?: DraftStatus
   /** The draft or published switch, on a changed row whose host can read the published copy. */
   views?: Views
@@ -29,8 +27,10 @@ export type FormActionsProps = {
   updating: boolean
   /** Whether the form shows the published copy, which takes no save. */
   viewing: boolean
-  /** Whether the kayan keeps drafts, which draws Save draft and Publish changes in place of Save. */
+  /** Whether the kayan keeps drafts, which draws Save draft and Publish in place of Save. */
   drafts: boolean
+  /** Whether the form saves its draft as the person types, which leaves Cancel nothing to cancel. */
+  autosaves?: boolean
   /** The id of the form a submit button names, since a controls node draws the row outside it. */
   formId: string
   /** Asks before an unsaved edit is left. */
@@ -112,7 +112,7 @@ export function ViewSwitch({ className, phone = false, viewing, choose, t }: { c
 // logical, so the row mirrors in Arabic.
 export function FormActions({
   autosaved,
-  banner,
+  autosaves,
   busy,
   dirty,
   drafts,
@@ -133,13 +133,6 @@ export function FormActions({
   const tall = header ? 'max-sm:h-11' : ''
   const actions = (
     <>
-      {/* A refusal naming no field, drawn here and not in the form: the form sits in the Details panel, and a
-          Publish pressed from another tab would be refused where nobody is looking. */}
-      {header && banner !== undefined ? (
-        <p role="alert" className="text-destructive line-clamp-2 min-w-24 flex-1 text-sm max-sm:basis-full sm:-order-1">
-          {banner}
-        </p>
-      ) : null}
       {status && !header ? (
         <span data-status={status} className={`me-auto rounded-md px-2 py-0.5 text-sm ${pills[status]}`}>
           {t('version.status', 'Status')}: {t(`version.${status}`, { draft: 'Draft', published: 'Published', changed: 'Changed' }[status])}
@@ -177,7 +170,8 @@ export function FormActions({
           aria-haspopup={dirty ? 'dialog' : undefined}
           onClick={dirty ? onAsk : onCancel}
         >
-          {t('admin.cancel', 'Cancel') ?? 'Cancel'}
+          {/* A draft that saves itself is kept on the way out, so the button says where it goes. */}
+          {autosaves ? (t('admin.backToList', 'Back to list') ?? 'Back to list') : (t('admin.cancel', 'Cancel') ?? 'Cancel')}
         </Button>
       ) : null}
       {viewing ? null : drafts ? (
@@ -189,7 +183,8 @@ export function FormActions({
           </Button>
           <Button type="submit" form={formId} size={size} className={`${publishColour} ${tall}`} data-button="publish" disabled={busy || autosaved === 'saving' || (!dirty && status === 'published')}>
             {busy ? <Spinner /> : null}
-            {t('version.publishChanges', 'Publish changes')}
+            {/* Changes are what a published record has; a record never published is published whole. */}
+            {status === 'published' || status === 'changed' ? t('version.publishChanges', 'Publish changes') : t('version.publish', 'Publish')}
           </Button>
         </>
       ) : (

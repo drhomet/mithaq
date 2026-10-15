@@ -1,4 +1,5 @@
 import { createContext, use, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { Plus } from 'lucide-react'
 import type { ClientKayan } from 'mithaq/admin'
 import { ScreenContext } from 'mithaq/admin/react'
 import {
@@ -11,8 +12,12 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox'
+import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ariaRequired, changeOf, comboboxPhone, missingRow, type ControlProps, type FindApi } from 'mithaq-admin/control-props.ts'
+import { titleOf } from 'mithaq-admin/copy.ts'
+import { createsIn } from 'mithaq-admin/field-values.ts'
+import { KayanForm } from 'mithaq-admin/form-context.tsx'
 import { formatDate } from 'mithaq-admin/format.tsx'
 import { isForbidden } from 'mithaq-admin/refusal.ts'
 
@@ -108,7 +113,13 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
   const reads = target && api ? api[target.name] : undefined
   // The most rows one read asks for: the build's `maxLimit`, off the screen. A form drawn with no
   // screen has no such number, so it holds to the picker's own page of ten.
-  const most = use(ScreenContext)?.screen.maxLimit ?? perPage
+  const screenState = use(ScreenContext)
+  const most = screenState?.screen.maxLimit ?? perPage
+  // Payload's add-new beside a relationship: a row of a form, never a filter's box or an operation's, for a viewer the
+  // report lets create a row of the target. The server still decides the create.
+  const add = use(KayanForm)?.add
+  // An upload's picker has its own Upload new, so only a relationship draws the +.
+  const adds = field.kind === 'relationship' && !!add && !!target && !readOnly && props.form !== undefined && createsIn({ kayan: target, report: screenState?.access.collections?.[target.name] })
   /** Every id this field is holding, which is at most one unless the field said otherwise. */
   const held = idsOf(value)
   const many = field.hasMany === true
@@ -345,10 +356,25 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
     </ComboboxContent>
   )
 
+  /** Picks a row the drawer just made, beside whatever the field already holds. */
+  const made = (row: Record<string, unknown>) => {
+    // A create whose answer names no id it may read has nothing to pick.
+    if (row?.id === undefined || row.id === null) return
+    const one = String(row.id)
+    setChosen((already) => new Map([...already, [one, row]]))
+    change(many ? [...held, one] : one)
+  }
+  const plus = adds ? (
+    <Button type="button" variant="outline" size="icon" data-add-new="" className="shrink-0 max-sm:size-11" aria-label={(t('admin.addNew', 'Add new {kind}') ?? 'Add new {kind}').replace('{kind}', () => titleOf({ kayan: target!, copy: { t, locale: locale ?? '' } }))} onClick={() => add!(target!, made)}>
+      <Plus aria-hidden="true" />
+    </Button>
+  ) : null
+  const beside = (picker: ReactElement) => (plus ? <div className="flex items-start gap-2"><div className="min-w-0 flex-1">{picker}</div>{plus}</div> : picker)
+
   // A set: one chip per chosen row, rendered in the order `value` holds because base-ui removes a
   // chip by its position among them.
   if (many) {
-    return (
+    return beside(
       <Combobox {...root} multiple value={selected} onValueChange={pick}>
         <ComboboxChips ref={chipsRef} aria-invalid={error ? true : undefined}>
           {allRefused ? (
@@ -372,11 +398,11 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
           />
         </ComboboxChips>
         {list}
-      </Combobox>
+      </Combobox>,
     )
   }
 
-  return (
+  return beside(
     // The keyboard model (roles, aria wiring, arrows, Enter, Escape) is base-ui's, so none is here.
     <Combobox {...root} value={selected[0] ?? null} onValueChange={(next) => pick(next ? [next] : [])}>
       <ComboboxInput
@@ -397,6 +423,6 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
         showClear={held.length > 0 && !readOnly}
       />
       {list}
-    </Combobox>
+    </Combobox>,
   )
 }

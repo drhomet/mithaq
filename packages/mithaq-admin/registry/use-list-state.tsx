@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import type { ClientKayan } from 'mithaq/admin'
 import { useScreen } from 'mithaq/admin/react'
 import { refined, remember, remembered, type ListQuery } from 'mithaq-admin/list-query.ts'
-import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { doneWords, failedWords } from 'mithaq-admin/form-rules.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 
 /**
- * A list's own state: the query it asks next, its runs and the refusal the last answered with, the ticked rows and
+ * A list's own state: the query it asks next, its runs, said in toasts as they land or are refused, the ticked rows and
  * what the last bulk did, and the limit and columns remembered for this viewer.
  */
-export const useListState = ({ docs, kayan, onQuery, query, run }: {
+export const useListState = ({ copy, docs, kayan, onQuery, query, run }: {
+  copy: Copy
   kayan: ClientKayan
   query: ListQuery
   onQuery: (query: ListQuery) => void
@@ -18,15 +21,14 @@ export const useListState = ({ docs, kayan, onQuery, query, run }: {
   const { maxLimit } = useScreen()
   const refine = (next: Partial<ListQuery>) => onQuery(refined(query, next))
   const [running, setRunning] = useState(false)
-  /**
-   * The refusal the last run answered with, drawn above the table, so a refused button that closed does not leave the page reading as changed.
-   */
-  const [refused, setRefused] = useState<unknown>(undefined)
-  const runOnRow = async ({ operation, input, refuse = setRefused }: { operation: string; input: Record<string, unknown>; refuse?: (thrown: unknown) => void }) => {
+  /** A refused run said in a red toast, so a button that closed does not leave the page reading as changed. */
+  const refused = (thrown: unknown) => void (thrown && toast.error(failedWords({ kayan: kayan.name, copy, thrown })))
+  const runOnRow = async ({ operation, input, refuse = refused }: { operation: string; input: Record<string, unknown>; refuse?: (thrown: unknown) => void }) => {
     setRunning(true)
-    setRefused(undefined)
     try {
       await run!(operation, input)
+      const declared = kayan.operations.find((one) => one.name === operation)
+      toast.success(declared?.effect === 'delete' ? doneWords({ kayan, copy, effect: 'delete' }) : doneWords({ kayan, copy, operation: { name: operation } }))
       return true
     } catch (thrown) {
       refuse(thrown)
@@ -68,5 +70,5 @@ export const useListState = ({ docs, kayan, onQuery, query, run }: {
     remember(kayan.name, { ...(query.limit !== undefined && { limit: query.limit }), ...(query.cols !== undefined && { cols: query.cols }) })
   }, [kayan.name, query.cols, query.limit])
 
-  return { refine, running, refusal: refusalKeyOf(refused), setRefused, runOnRow, selected, setSelected, rowIds, ticked, done, setDone }
+  return { refine, running, refused, runOnRow, selected, setSelected, rowIds, ticked, done, setDone }
 }

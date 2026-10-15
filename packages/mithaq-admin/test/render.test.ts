@@ -266,12 +266,12 @@ test('5. a field whose kind has no writable control renders read-only, so nothin
   assert.ok(html.includes('0f1d8c2e-0000-4000-8000-000000000001'), 'and it still shows the value it is read-only about')
 })
 
-test('6. a refusal renders the key the server sent, resolved as copy, so a project translates its own refusals', () => {
-  const html = formMarkup({ error: { data: { key: 'error.invalid.value', params: {} } } })
-  assert.ok(html.includes('That value will not do.'), 'the key from the error\'s data.key is resolved through t')
-  const unknown = formMarkup({ error: { data: { key: 'error.nothing.translates.this' } } })
-  assert.ok(unknown.includes('error.nothing.translates.this'), 'an untranslated refusal key is shown as the key')
-  assert.ok(!formMarkup({ error: new Error('boom') }).includes('undefined'), 'a plain error renders no key')
+test('6. a refusal\'s toast says the key the server sent, resolved as copy, so a project translates its own refusals', async () => {
+  const { failedWords } = await import('../registry/form-rules.tsx')
+  assert.equal(failedWords({ copy, thrown: { data: { key: 'error.invalid.value', params: {} } } }), 'That value will not do.', 'the key from the error\'s data.key is resolved through t')
+  assert.equal(failedWords({ copy, thrown: { data: { key: 'error.nothing.translates.this' } } }), 'Something went wrong, so nothing was saved. Try again.', 'an untranslated refusal key is said in the shared words, never as the key')
+  assert.equal(failedWords({ copy, thrown: new Error('boom') }), 'Something went wrong, so nothing was saved. Try again.', 'a plain error says the request failed, never undefined')
+  assert.ok(!formMarkup({ error: { data: { key: 'error.conflict', params: {} } } }).includes('role="alert"'), 'and the form draws none of it')
 })
 
 test('7. a field the client is not the provider of on the operation being rendered is read-only, so no form submits it', () => {
@@ -392,7 +392,7 @@ test('11. a checkbox cell says true from false in words, so the column is not a 
   assert.equal(arabic?.[1], 'نشط', 'and in the other locale it is the other word')
 })
 
-test('184a. a cell joins several values in its locale\'s own list format, never with an ASCII comma, and an unticked box reads apart from an empty one', async () => {
+test('184a. a cell joins several values in its locale\'s own list format, never with an ASCII comma, and an empty box reads as an unticked one', async () => {
   const { RelationshipCell, titleKey } = await import('../registry/relationship-cell.tsx')
   const topics = fieldOf({ name: 'topics', kind: 'textArray' })
   const cell = (locale: string, value: unknown) => staticMarkup(createElement(() => cells.textArray!({ kayan: courses, field: topics, value, t: translator(locale), locale }) as ReactElement))
@@ -404,7 +404,7 @@ test('184a. a cell joins several values in its locale\'s own list format, never 
   const related = staticMarkup(createElement(RelationshipCell, { kayan: courses, field: tags, value: ids, t: translator('ar'), locale: 'ar', titles }))
   assert.equal(related, '<span>مكثف وشهادة</span>', 'and so does a relationship cell holding several rows')
   const box = (value: unknown) => /<span aria-hidden="true"[^>]*>([^<]*)<\/span>/.exec(staticMarkup(createElement(() => cells.checkbox!({ kayan: courses, field: fieldOf({ name: 'archived', kind: 'checkbox' }), value, t: copy.t, locale: 'en' }) as ReactElement)))?.[1]
-  assert.deepEqual([box(true), box(false), box(undefined), box(null)], ['✓', '✗', '—', '—'], 'a false box draws its own glyph, apart from an empty value')
+  assert.deepEqual([box(true), box(false), box(undefined), box(null)], ['✓', '✗', '✗', '✗'], 'an empty box, as a row from before the column holds, is a no like a false one')
 })
 
 test('184c. a search runs only over what the viewer reads, across one relationship to the kayan it points at too, and the box names a far field by the relationship and its own label', () => {
@@ -439,6 +439,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-text-control',
       'mithaq-number-control',
       'mithaq-textarea-control',
+      'mithaq-time-field',
       'mithaq-date-control',
       'mithaq-choice-control',
       'mithaq-checkbox-control',
@@ -471,6 +472,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-node-groups',
       'mithaq-default-nodes',
       'mithaq-form-types',
+      'mithaq-toast',
       'mithaq-form-rules',
       'mithaq-form-context',
       'mithaq-field-value',
@@ -524,7 +526,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-directional-icon',
     ],
-    'the registry declares the ninety-three items this file knows about',
+    'the registry declares the ninety-five items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`
@@ -1177,7 +1179,7 @@ test('42. the package holds the same shadcn primitives the app does, so what thi
   const names = readdirSync(ours).sort()
   // Both listings, not the package's alone: a primitive added to the app and not to the package is the drift this step exists for.
   assert.deepEqual(names, readdirSync(theirs).sort(), 'the two directories hold the same primitives, by name')
-  assert.equal(names.length, 41, `which are the forty-one files the app was given: ${names.join(', ')}`)
+  assert.equal(names.length, 40, `which are the forty files the app was given: ${names.join(', ')}`)
   for (const name of names) {
     const mine = readFileSync(new URL(name, ours), 'utf8')
     assert.ok(mine.length > 0, `${name} is not empty`)
@@ -1631,11 +1633,11 @@ test('69. the two temporal kinds draw the registry\'s date picker, in the viewer
   const moment = drawn('datetime', new Date('2026-01-02T03:04:00'))
   assert.equal(/type="(?:datetime-local|date)"/.test(moment), false, 'a datetime draws no native box')
   assert.match(moment, /<button[^>]*id="at"[^>]*>[\s\S]*January 2, 2026/, 'it draws a button naming the day in the viewer\'s words, which the label points at')
-  assert.match(moment, /type="time"[^>]*value="03:04"|value="03:04"[^>]*type="time"/, 'and the time of day on the reader\'s own clock')
+  assert.ok(moment.includes('data-time-field=""') && !moment.includes('type="time"'), 'and the time of day as its own boxes, never the native one, drawn on the reader\'s own clock once mounted')
   const day = drawn('date', '2026-09-21', 'ar')
   assert.equal(/type="date"/.test(day), false, 'a date draws no native box')
   assert.ok(day.includes('سبتمبر'), `and names the day in Arabic on an Arabic page: ${day}`)
-  assert.equal(day.includes('type="time"'), false, 'with no time of day')
+  assert.equal(day.includes('data-time-field'), false, 'with no time of day')
 })
 
 test('178. a text box and a text area follow their own text\'s direction, and an email or a number reads left to right', () => {

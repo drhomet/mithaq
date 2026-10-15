@@ -6,6 +6,7 @@ import { refusalOf } from 'mithaq-admin/form-rules.tsx'
 import { afterDraft, type DraftOptions, type DraftStatus, type FormProps } from 'mithaq-admin/form-types.tsx'
 import { leavesOf, type Node } from 'mithaq-admin/node-tree.ts'
 import type { Seed, Seeding } from 'mithaq-admin/use-form-seed.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 
 export type FormSaveInput = Pick<FormProps, 'client' | 'expectedUpdatedAt' | 'expectedUpdatedAtOn' | 'onDone' | 'operations'> & {
   kayan: ClientKayan
@@ -29,7 +30,12 @@ export type FormSaveInput = Pick<FormProps, 'client' | 'expectedUpdatedAt' | 'ex
   refuse: (thrown: unknown) => void
   /** What a landed write drops, such as the published copy read before it. */
   onWritten: () => void
+  /** What the toast says once a write landed. */
+  done: (landed: Landed) => string
 }
+
+/** What landed: the write's effect, the kayan's own operation where it was one, and where a save left a row that keeps drafts. */
+export type Landed = { effect?: string; operation?: { name: string; label?: Readonly<Record<string, string>> }; next?: DraftStatus }
 
 /**
  * The form's writes: a save that sends only what changed, every other write the form runs, and the discard that
@@ -37,6 +43,7 @@ export type FormSaveInput = Pick<FormProps, 'client' | 'expectedUpdatedAt' | 'ex
  */
 export const useFormSave = ({
   client,
+  done,
   drafts,
   expectedUpdatedAt,
   expectedUpdatedAtOn,
@@ -76,7 +83,7 @@ export const useFormSave = ({
   const kept = useRef(false)
   // `refuse` is where a refusal lands: the form's own box by default, or an operation dialog's boxes, which
   // stays open to hold them. `next` is the draft status the write leaves the row at. Answers whether the write landed.
-  const run = async ({ write, effect, refuse = setRefused, next }: { write: () => Promise<unknown>; effect?: string; refuse?: (thrown: unknown) => void; next?: DraftStatus }): Promise<boolean> => {
+  const run = async ({ write, effect, operation, refuse = setRefused, next }: Landed & { write: () => Promise<unknown>; refuse?: (thrown: unknown) => void }): Promise<boolean> => {
     setRefused(undefined)
     setBusy(true)
     try {
@@ -89,6 +96,7 @@ export const useFormSave = ({
       setSeed(seeded({ values, status: next ?? seed.status, updatedAt: (written as { updatedAt?: unknown } | null)?.updatedAt ?? seed.updatedAt }))
       noteSave()
       onWritten()
+      toast.success(done({ effect, operation, next }))
       onDone(written, effect)
       return true
     } catch (thrown) {

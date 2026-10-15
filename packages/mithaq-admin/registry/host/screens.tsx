@@ -26,6 +26,7 @@ import { ScreenForm } from './screen-form.tsx'
 import { ScreenList, askedFor, readsDrafts, rowReadsDrafts, rowsKey } from './screen-list.tsx'
 import { screenNamed } from './screen-names.ts'
 import { slide } from './slide.ts'
+import { Toaster } from 'mithaq-admin/toast.tsx'
 import { useCopy } from './routes/__root.tsx'
 
 /**
@@ -552,6 +553,7 @@ function ScreenBar({ user }: { user: ScreenData['user'] }): ReactElement | null 
 
 /** The screen's own frame: its providers, outermost first, around the frame's bar and the page. */
 export function ScreenFrame({ files, data, children }: { files: Files; data: ScreenData; children: ReactNode }): ReactElement {
+  const { t } = useCopy()
   const refs = refsOf(files, data.screen)
   // One per frame: made per request on the server, so no row one actor read
   // reaches another's render; held for the frame's life in the browser.
@@ -598,6 +600,8 @@ export function ScreenFrame({ files, data, children }: { files: Files; data: Scr
         <>
           <ScreenBar user={data.user} />
           {children}
+          {/* The one place every write's toast is drawn, kept across the screen's pages. */}
+          <Toaster closeLabel={t('admin.close', 'Close') ?? 'Close'} />
         </>,
       )}
     </Suspense>
@@ -852,7 +856,9 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
       api={readsOf(related)}
       operations={data.operations}
       related={draw(page).list}
-      edit={(id) => hrefOf(kayan, 'edit', id)}
+      // A create opened over its list closes back to it once it lands, the new row in the list, as Payload's drawer does;
+      // one whose kayan autosaves its drafts moves to the row's page instead, since its first autosave is a create too.
+      edit={(id) => (page.mode && listHref && !data.drafts?.autosave ? listHref : hrefOf(kayan, 'edit', id))}
       list={listHref}
       drafts={data.drafts}
       expectedUpdatedAt={data.expectedUpdatedAt}

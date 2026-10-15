@@ -112,6 +112,20 @@ const plus = (page: PageClient | undefined, region: string, ...nodes: unknown[])
   return { ...tree, page: { ...tree.page, main: [{ ...layout, [region]: [...(layout[region] ?? []), ...nodes] }] } } as never
 }
 
+// Round 3: forms and feedback. Each check reads the copy the app ships, in English. Imported here, before the first
+// test is registered: a top-level await after one lets the runner finish those and close the window the rest draw in.
+const { Toaster, toast } = await import('../registry/toast.tsx')
+const { translator: appCopy } = await import('../../../apps/asas-tanstack/src/copy.ts')
+const english = appCopy('en')
+/** Every toast on screen, as `type: words`, cleared for the next check. */
+const toasted = async () => {
+  const said = [...window.document.querySelectorAll('[data-toast]')].map((one) => `${one.getAttribute('data-toast')}: ${one.textContent}`)
+  await act(async () => void toast.dismiss())
+  window.sessionStorage.removeItem('mithaq:toast')
+  return said
+}
+const withToaster = (element: ReactElement) => createElement('div', null, element, createElement(Toaster, { closeLabel: 'Close' }))
+
 test('the switch override reports a boolean', async () => {
   const reported: unknown[] = []
   const host = await render(createElement(controls.switch!, {
@@ -372,7 +386,7 @@ const drive = async (host: HTMLElement, kind: string) => {
     await act(async () => click(host.querySelector('button')!))
     const today = window.document.querySelector('[data-today] button')
     if (today) await act(async () => click(today as unknown as Element))
-    if (kind === 'datetime') await act(async () => typeInto(host.querySelector('input[type="time"]')!, '03:04'))
+    if (kind === 'datetime') await typeTime(host, '03:04')
     return
   }
   const field = host.querySelector('textarea') ?? host.querySelector('input')!
@@ -383,6 +397,21 @@ const drive = async (host: HTMLElement, kind: string) => {
 
 const now = new Date()
 const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+/** A moment's time of day as its field holds it, `HH:MM` on the 24-hour clock, or `''` while half typed. */
+const timeOf = (root: ParentNode) => root.querySelector('[data-time-field]')?.getAttribute('data-value') ?? undefined
+/** A segment of a moment's time of day: `hours`, `minutes` or `period`. */
+const timeSegment = (root: ParentNode, name: string) => root.querySelector(`[data-time-field] [data-segment="${name}"]`) as unknown as HTMLInputElement
+/** Types `HH:MM` on the 24-hour clock into a moment's field as a person would, hours then minutes then AM or PM; `''` clears it. */
+const typeTime = async (root: ParentNode, text: string) => {
+  const segment = (name: string) => timeSegment(root, name) as unknown as Element
+  if (text === '') return void (await act(async () => void press(segment('minutes'), 'Backspace')))
+  const [hours = 0, minutes = 0] = text.split(':').map(Number)
+  const twelve = segment('period') !== null
+  await act(async () => typeInto(segment('hours'), String(twelve ? hours % 12 || 12 : hours).padStart(2, '0')))
+  await act(async () => typeInto(segment('minutes'), String(minutes).padStart(2, '0')))
+  if (twelve && segment('period').getAttribute('data-period') !== (hours >= 12 ? 'PM' : 'AM')) await act(async () => click(segment('period')))
+}
 
 /** What each kind's control reports for the edit above, as `update` takes it: a number as a number, a moment as a `Date`, a day as its ISO string; nothing on the wire coerces them. The relationship's clear reports `null`. */
 const reportedFor: Record<string, unknown> = {
@@ -451,13 +480,12 @@ test('178d. a date picks off the calendar in the viewer\'s locale and writes the
   assert.equal(window.document.querySelector('[data-slot="calendar"]'), null, 'and the calendar closes')
 
   const moment = await picker('datetime', new Date(2026, 0, 2, 3, 4))
-  const time = moment.host.querySelector('input[type="time"]') as HTMLInputElement
-  assert.equal(time.value, '03:04', 'the time box holds the time of day on the reader\'s clock')
+  assert.equal(timeOf(moment.host), '03:04', 'the time box holds the time of day on the reader\'s clock')
   await act(async () => click(moment.host.querySelector('button#at') as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-day="2026-01-05"] button') as unknown as Element))
   assert.equal((moment.reported[0] as Date).getTime(), new Date(2026, 0, 5, 3, 4).getTime(), 'a new day keeps the time held')
-  await act(async () => typeInto(time, '10:30'))
-  assert.equal((moment.reported[1] as Date).getTime(), new Date(2026, 0, 2, 10, 30).getTime(), 'and a new time keeps the day held')
+  await typeTime(moment.host, '10:30')
+  assert.equal((moment.reported.at(-1) as Date).getTime(), new Date(2026, 0, 2, 10, 30).getTime(), 'and a new time keeps the day held')
 })
 
 test('178e. a moment holds a value only when both its day and its time are set, and clearing either clears it', async () => {
@@ -471,7 +499,7 @@ test('178e. a moment holds a value only when both its day and its time are set, 
     })
   }
   const host = await render(createElement(Held))
-  const time = () => host.querySelector('input[type="time"]') as HTMLInputElement
+  const time = () => timeSegment(host, 'hours')
   const button = () => host.querySelector('button#at')!
   const pickToday = async () => {
     await act(async () => click(button() as unknown as Element))
@@ -485,14 +513,14 @@ test('178e. a moment holds a value only when both its day and its time are set, 
   assert.equal(time().disabled, false, 'and opens the time box')
   assert.ok(button().textContent!.includes(String(now.getFullYear())), 'while the button keeps the day picked')
   assert.equal(button().getAttribute('aria-labelledby')?.split(' ').map((one) => host.querySelector(`[id="${one}"]`)?.textContent).join(' '), `at ${button().textContent}`, 'and its name is the label and the day')
-  assert.equal(time().getAttribute('aria-label'), 'at Time', 'the time box has a name of its own')
-  await act(async () => typeInto(time(), '10:30'))
+  assert.equal(host.querySelector('[data-time-field]')?.getAttribute('aria-label'), 'at Time', 'the time box has a name of its own')
+  await typeTime(host, '10:30')
   assert.equal(moments()[0]!.getTime(), at(10, 30), 'a day and a time write the local moment')
-  await act(async () => typeInto(time(), ''))
+  await typeTime(host, '')
   assert.equal(reported[1], null, 'clearing the time clears the value, never midnight')
   assert.equal(reported.length, 2)
   assert.ok(button().textContent!.includes(String(now.getFullYear())), 'and the day stays on the button')
-  await act(async () => typeInto(time(), '08:15'))
+  await typeTime(host, '08:15')
   assert.equal(moments()[2]!.getTime(), at(8, 15), 'a time typed again writes on the day kept')
   await pickToday()
   assert.equal(reported[3], null, 'picking the held day again clears the value')
@@ -538,7 +566,7 @@ test('178g. a filter on a date or a moment picks its value off the same calendar
     assert.equal(host.querySelector('input[type="date"], input[type="datetime-local"]'), null, `a ${kind} filter draws no browser box`)
     await act(async () => click(host.querySelector('button#filter-0-0') as unknown as Element))
     await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
-    if (kind === 'datetime') await act(async () => typeInto(host.querySelector('input[type="time"]')!, '09:30'))
+    if (kind === 'datetime') await typeTime(host, '09:30')
     await act(async () => sleep(400))
     assert.deepEqual(reported.map((one) => JSON.stringify(one)), [JSON.stringify({ or: [{ and: [{ at: { equals: kind === 'date' ? today : new Date(`${today}T09:30`).toISOString() } }] }] })], `a ${kind} filter sends ${kind === 'date' ? 'the day' : 'the local moment as an instant'}`)
   }
@@ -559,7 +587,7 @@ test('180. a moment filter picked at 09:30 in a UTC+3 browser asks for 06:30Z, i
       const filter = await filtering(kind)
       await act(async () => click(filter.host.querySelector('button#filter-0-0') as unknown as Element))
       await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
-      if (kind === 'datetime') await act(async () => typeInto(filter.host.querySelector('input[type="time"]')!, '09:30'))
+      if (kind === 'datetime') await typeTime(filter.host, '09:30')
       await act(async () => sleep(400))
       return filter
     }
@@ -574,13 +602,13 @@ test('180. a moment filter picked at 09:30 in a UTC+3 browser asks for 06:30Z, i
     assert.equal(asked(moment.rules as never, link), JSON.stringify({ or: [{ and: [{ at: { equals: instant } }] }] }), 'which is what the list asks for')
 
     const restored = await filtering('datetime', readQuery(link, moment.rules as never).where)
-    assert.equal(restored.host.querySelector<HTMLInputElement>('input[type="time"]')?.value, '09:30', 'the link read back draws 09:30 in the time box')
+    assert.equal(timeOf(restored.host), '09:30', 'the link read back draws 09:30 in the time box')
     assert.ok(restored.host.querySelector('button#filter-0-0')?.textContent?.includes(String(here.getFullYear())), 'on the day it was picked')
 
     const old = new URLSearchParams(`where[or][0][and][0][at][equals]=${day}T09:30`)
     assert.equal(asked(moment.rules as never, old), JSON.stringify({ or: [{ and: [{ at: { equals: instant } }] }] }), 'a link written before the fix, with no zone, asks for the same instant, read on the reader\'s own clock')
     const reopened = await filtering('datetime', readQuery(old, moment.rules as never).where)
-    assert.equal(reopened.host.querySelector<HTMLInputElement>('input[type="time"]')?.value, '09:30', 'and draws the same 09:30')
+    assert.equal(timeOf(reopened.host), '09:30', 'and draws the same 09:30')
 
     const calendar = await picked('date')
     assert.deepEqual(calendar.reported, [{ or: [{ and: [{ at: { equals: day } }] }] }], 'a day filter still sends the calendar day')
@@ -643,12 +671,12 @@ const Resettable = ({ initial, reported = [], locale = 'en', translate = t }: { 
 test('178h. a seeded moment clears with its time and returns when the time is typed again, and a reset from outside clears the day too', async () => {
   const reported: unknown[] = []
   const host = await render(createElement(Resettable, { initial: new Date(2026, 0, 2, 3, 4), reported }))
-  const time = () => host.querySelector('input[type="time"]') as HTMLInputElement
+  const time = () => timeSegment(host, 'hours')
   const button = () => host.querySelector('button#at')!
-  await act(async () => typeInto(time(), ''))
+  await typeTime(host, '')
   assert.deepEqual(reported, [null], 'clearing the time clears the value')
   assert.ok(button().textContent!.includes('January 2, 2026'), 'and the day stays')
-  await act(async () => typeInto(time(), '03:04'))
+  await typeTime(host, '03:04')
   assert.equal((reported as unknown as Date[])[1]!.getTime(), new Date(2026, 0, 2, 3, 4).getTime(), 'a time typed again returns the value on that day')
   await act(async () => click(host.querySelector('#reset') as unknown as Element))
   assert.equal(button().textContent, 'Pick a date', 'a value reset from outside leaves no day behind')
@@ -669,7 +697,7 @@ test('178i. a required moment with a day and no time is refused as required and 
   assert.equal(written.length, 0, 'a day alone sends nothing')
   assert.ok(host.querySelector('#sessions-startsAt-error'), 'and the moment is refused under its box')
   assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'as required')
-  const time = host.querySelector('input[type="time"]')!
+  const time = timeSegment(host, 'hours')
   assert.deepEqual([time.getAttribute('aria-required'), time.getAttribute('aria-invalid')], ['true', 'true'], 'and the time box is marked required and refused')
 })
 
@@ -679,7 +707,7 @@ test('178m. a session\'s start picked as a day and typed as a time saves as that
   const host = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/new'), client: created.client, value: null, t, locale: 'en', onDone: () => {} }))
   await act(async () => click(host.querySelector('button#sessions-startsAt') as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
-  await act(async () => typeInto(host.querySelector('input[type="time"]')!, '12:30'))
+  await typeTime(host, '12:30')
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(host.querySelector('#sessions-startsAt-error'), null, 'the start is not refused')
   assert.equal(created.written.length, 1, 'the create is sent')
@@ -688,13 +716,12 @@ test('178m. a session\'s start picked as a day and typed as a time saves as that
   const edited = recording()
   const stored = new Date(2026, 9, 15, 12, 30).toISOString()
   const edit = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/:id'), client: edited.client, value: { id: 's1', course: 'c1', capacity: 5, startsAt: stored }, t, locale: 'en', onDone: () => {} }))
-  const time = () => edit.querySelector('input[type="time"]') as unknown as HTMLInputElement
-  assert.equal(time().value, '12:30', 'the edit draws the stored time')
-  await act(async () => typeInto(time() as unknown as Element, '14:45'))
+  assert.equal(timeOf(edit), '12:30', 'the edit draws the stored time')
+  await typeTime(edit, '14:45')
   await act(async () => fire(edit.querySelector('form')!, 'submit'))
   assert.equal(new Date(edited.written[0]!.startsAt as string).getTime(), new Date(2026, 9, 15, 14, 45).getTime(), `the edit saves the new time on the same day: ${JSON.stringify(edited.written[0])}`)
 
-  await act(async () => typeInto(time() as unknown as Element, ''))
+  await typeTime(edit, '')
   await act(async () => fire(edit.querySelector('form')!, 'submit'))
   assert.equal(edited.written.length, 1, 'a cleared required start sends nothing')
   assert.equal(edit.querySelector('#sessions-startsAt-error')?.textContent, 'sessions.startsAt.required', 'and is refused as required')
@@ -709,12 +736,12 @@ test('178j. a moment in a side region belongs to the page\'s form, so a submit f
     value: { id: 's1', course: 'c1', capacity: 5, startsAt: new Date(2026, 0, 2, 3, 4).toISOString() }, t, locale: 'en', onDone: () => {},
   }))
   const pageForm = host.querySelector('[data-node="form"] form') as unknown as HTMLFormElement
-  const time = host.querySelector('#sessions-startsAt ~ input[type="time"]') as unknown as HTMLInputElement
+  const time = timeSegment(host, 'hours')
   assert.ok(pageForm && time)
   assert.equal(pageForm.contains(time as unknown as Node), false, 'the time box is outside the form element')
   assert.ok(time.form === pageForm, 'and the form owns it all the same')
   assert.equal(time.hasAttribute('name'), false, 'though it posts nothing of its own')
-  await act(async () => typeInto(time as unknown as Element, '10:30'))
+  await typeTime(host, '10:30')
   // happy-dom makes no implicit submission on Enter, so the box's form owner is submitted as a browser would.
   await act(async () => time.form?.requestSubmit())
   assert.equal(saved.length, 1, 'a submit from it saves the page')
@@ -748,7 +775,7 @@ test('178l. the picker names its day and its time in the viewer\'s locale and dr
   const arabic: typeof t = (key, fallback) => ({ 'admin.time': 'الوقت', 'courses.at': 'وقت البداية' })[key] ?? fallback
   const draw = (translate = t, locale = 'en') => createElement(Resettable, { initial: '2026-08-09T23:30:00.000Z', translate, locale })
   const ar = await render(draw(arabic, 'ar'))
-  assert.equal(ar.querySelector('input[type="time"]')?.getAttribute('aria-label'), 'وقت البداية الوقت', 'the time box is named in Arabic, after its field')
+  assert.equal(ar.querySelector('[data-time-field]')?.getAttribute('aria-label'), 'وقت البداية الوقت', 'the time box is named in Arabic, after its field')
   const names = (host: HTMLElement) => (host.querySelector('button#at')!.getAttribute('aria-labelledby') ?? '').split(' ').map((one) => host.querySelector(`[id="${one}"]`)?.textContent).join(' ')
   assert.ok(names(ar).startsWith('وقت البداية '), 'and the button is named by the field and its day')
   const zone = process.env.TZ
@@ -769,7 +796,7 @@ test('178l. the picker names its day and its time in the viewer\'s locale and dr
     assert.equal(problems.length, 0, `no mismatch to report: ${problems.map(String).join(' | ')}`)
     assert.equal(host.querySelector('button#at')!.hasAttribute('aria-label'), false, 'no attribute carries the day')
     assert.equal(names(host), 'at August 10, 2026', 'and the button\'s name is the viewer\'s own day once it has mounted')
-    assert.equal((host.querySelector('input[type="time"]') as unknown as HTMLInputElement).value, '13:30', 'and the time box shows the viewer\'s clock')
+    assert.equal(timeOf(host), '13:30', 'and the time box shows the viewer\'s clock')
     await act(async () => root!.unmount())
   } finally {
     console.error = logged
@@ -1668,7 +1695,7 @@ test('38. a reseed is keyed on the kayan and the id together, and clears a stale
 })
 
 test('39. a non-numeric number and an uncalendared moment are reported as undefined rather than as a value that would clear the column', async () => {
-  // `type="number"` and `type="time"` refuse a value no number or clock reads, so the DOM property is overwritten directly, as a bad `event.target.value` from elsewhere would be.
+  // `type="number"` refuses a value no number reads, so the DOM property is overwritten directly, as a bad `event.target.value` from elsewhere would be.
   const forceValue = (node: Element, text: string) => {
     Object.defineProperty(node, 'value', { value: text, configurable: true })
     fire(node, 'input')
@@ -1690,8 +1717,13 @@ test('39. a non-numeric number and an uncalendared moment are reported as undefi
     await act(async () => {
       forceValue(host.querySelector('input')!, garbage)
     })
+    // A moment's time boxes take digits alone, so letters forced into one report nothing at all.
+    if (kind === 'datetime') {
+      assert.deepEqual(reported, [], 'the moment control reported nothing that would clear the column')
+      continue
+    }
     assert.equal(reported.length, 1, `the ${kind} control reported the edit`)
-    assert.equal(reported[0], undefined, `and reported it as undefined rather than ${kind === 'number' ? 'NaN' : 'an Invalid Date'}`)
+    assert.equal(reported[0], undefined, 'and reported it as undefined rather than NaN')
   }
 })
 
@@ -2654,10 +2686,11 @@ test('70. one dialog asks the discard question, so the form\'s Cancel and a host
 })
 
 test('71. a refused bulk says so and leaves the rows ticked, so a denied row never reads as one the call changed', async () => {
+  await toasted()
   // The runner refuses a bulk on a row the access callbacks narrow away. A refusal that closed the dialog silently would look like a run that landed.
   const calls: string[] = []
   const docs = [{ id: 'c1', title: 'Tajweed' }, { id: 'c2', title: 'Nahw' }]
-  const host = await render(
+  const host = await render(withToaster(
     createElement(List, {
       kayan: courses,
       page: pageOf(docs),
@@ -2674,7 +2707,7 @@ test('71. a refused bulk says so and leaves the rows ticked, so a denied row nev
         // What the arm throws for a refusal: a key, never prose.
         throw { data: { key: 'error.forbidden.operation', params: { kayan: 'courses', operation } } }
       },
-    }),
+    })),
   )
   const boxes = () => [...host.querySelectorAll('[role="checkbox"]')]
   const count = () => host.querySelector('[data-mithaq-selected]')?.getAttribute('data-mithaq-selected')
@@ -2689,9 +2722,7 @@ test('71. a refused bulk says so and leaves the rows ticked, so a denied row nev
   })
   await confirmYes()
   assert.deepEqual(calls, ['deleteMany'], 'the confirm ran the call')
-  const alert = host.querySelector('[role="alert"]')
-  assert.ok(alert, 'and the refusal is drawn beside the buttons, rather than swallowed')
-  assert.equal(alert?.textContent, 'error.forbidden.operation', 'under the key the refusal carried, resolved through the same copy the form resolves one through')
+  assert.deepEqual(await toasted(), ['error: Something went wrong, so nothing was saved. Try again.'], 'and the refusal is said in a red toast, rather than swallowed, in the shared words where its key has none')
   assert.equal(count(), '1', 'the ticked row is still ticked, because nothing was written to it, which is also the set a second try would name')
 
   // The update's dialog stays open on a refusal, so the typed value is still there to correct and the reason is shown inside it.
@@ -3651,7 +3682,7 @@ test('144f. a create page draws every field it names, a timestamp the server fil
   assert.equal(host.querySelector('#courses-createdAt'), null, 'as text, not as a control')
 })
 
-test('145a. a list of another kayan edits one row in place below its table, adds one holding the page\'s row, archives the ticked ones in bulk, and sits outside the page\'s own form', async () => {
+test('145a. a list of another kayan edits one row in a drawer over the page, adds one holding the page\'s row, archives the ticked ones in bulk, and sits outside the page\'s own form', async () => {
   // The course edit page as the dashboard projects it, its Sessions tab a list of `sessions` whose `course` is this row.
   const edit = courses.pages.edit as Extract<PageClient, { page: unknown }>
   const writes: { write: string; input: Record<string, unknown> }[] = []
@@ -3709,7 +3740,7 @@ test('145a. a list of another kayan edits one row in place below its table, adds
   assert.equal(pageForm.contains(table), false, 'and the list is not inside it')
   const button = (text: string, within: ParentNode = host) => [...within.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
   assert.ok(host.querySelector('h2'), 'the list is headed as a part of the page')
-  assert.equal(host.querySelector('[data-mithaq-inline-edit]'), null, 'no row is being edited to begin with')
+  assert.equal(window.document.querySelector('[data-mithaq-inline-edit]'), null, 'no row is being edited to begin with')
 
   const rows = () => [...host.querySelectorAll('tbody tr')]
   const editRow = async (row: Element) => {
@@ -3717,14 +3748,14 @@ test('145a. a list of another kayan edits one row in place below its table, adds
     await act(async () => click(window.document.querySelector('[data-row-action="edit"]')! as unknown as Element))
   }
   await editRow(rows()[0]!)
-  const inline = () => host.querySelector('[data-mithaq-inline-edit]')!
+  const inline = () => window.document.querySelector('[data-mithaq-inline-edit]') as unknown as Element
   assert.equal(inline().getAttribute('data-mithaq-inline-edit'), 's1')
-  assert.equal(inline().closest('table'), null, 'below the table, not inside it')
+  assert.equal(inline().closest('table'), null, 'in a drawer over the page, not inside the table')
   assert.ok(inline().querySelector('#sessions-capacity'), 'drawing the list\'s own columns')
   assert.equal(inline().querySelector('[data-shell], [data-layout]'), null, 'with no shell or layout around them')
   assert.equal(host.querySelectorAll('form form').length, 0, 'and no form is inside another')
   await editRow(rows()[1]!)
-  assert.equal(host.querySelectorAll('[data-mithaq-inline-edit]').length, 1, 'one row at a time')
+  assert.equal(window.document.querySelectorAll('[data-mithaq-inline-edit]').length, 1, 'one row at a time')
   assert.equal(inline().getAttribute('data-mithaq-inline-edit'), 's2')
   const capacity = inline().querySelector('#sessions-capacity') as unknown as HTMLInputElement
   await act(async () => typeInto(capacity as unknown as Element, '9'))
@@ -3732,13 +3763,13 @@ test('145a. a list of another kayan edits one row in place below its table, adds
   await act(async () => fire(capacity.form as unknown as Element, 'submit'))
   assert.deepEqual([...writes], [{ write: 'update', input: { capacity: 9, id: 's2' } }], 'the save is the session\'s own update, of what changed')
   assert.deepEqual(pageWrites, [], 'and the page\'s own form saved nothing')
-  assert.equal(host.querySelector('[data-mithaq-inline-edit]'), null, 'the form closes once the write lands')
+  assert.equal(window.document.querySelector('[data-mithaq-inline-edit]'), null, 'the form closes once the write lands')
 
   await act(async () => click(button('New') as unknown as Element))
   assert.equal(inline().getAttribute('data-mithaq-inline-edit'), 'new')
   await act(async () => click(inline().querySelector('button#sessions-startsAt')! as unknown as Element))
   await act(async () => click(window.document.querySelector('[data-today] button')! as unknown as Element))
-  await act(async () => typeInto(inline().querySelector('input[type="time"]')!, '09:30'))
+  await typeTime(inline(), '09:30')
   await act(async () => fire(inline().querySelector('form')!, 'submit'))
   assert.equal(writes[1]?.write, 'create')
   assert.equal(writes[1]?.input.course, 'c1', 'the new session holds this course, which the form never drew')
@@ -4030,15 +4061,16 @@ test('171a. a controls node draws the form\'s controls where it sits, the course
   assert.ok(plain.querySelector('form button[type="submit"]'), 'and keeps its save in the form')
 })
 
-test('171c. a publish pressed in the header from another tab, refused over no field, draws its sentence in the header, outside every tab panel', async () => {
+test('171c. a publish pressed in the header from another tab, refused over no field, says its sentence in a red toast, seen from any tab, and draws nothing in the page', async () => {
   // The in-form banner sits in the Details panel, so a refusal naming no field must not be drawn on a tab nobody is looking at.
+  await toasted()
   const refusal = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict', params: {} } })
   let failing = true
   const client = draftClient([], async () => {
     if (failing) throw refusal
     return {}
   })
-  const host = await render(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client, value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } }), { record: draftRow })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client, value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })), { record: draftRow })
   const sessionsTab = [...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.trim() === 'Sessions')!
   await act(async () => {
     click(sessionsTab)
@@ -4046,23 +4078,19 @@ test('171c. a publish pressed in the header from another tab, refused over no fi
   await act(async () => {
     click(host.querySelector('[data-node="controls"] [data-button="publish"]')!)
   })
-  const alerts = [...host.querySelectorAll('[role="alert"]')]
-  assert.ok(alerts.some((one) => !one.closest('[data-slot="tabs-content"]')), 'the refusal is drawn outside the tab panels')
-  assert.equal(alerts.filter((one) => one.closest('[data-region="header"]')).length, 1, 'once, in the header')
-  const alert = alerts.find((one) => one.closest('[data-region="header"]'))!
-  assert.ok(alert.className.split(' ').includes('line-clamp-2') && !alert.className.split(' ').includes('truncate'), 'the sentence wraps to two lines where it would be cut')
-  assert.ok(!alert.hasAttribute('title'), 'with no tooltip, which a touch screen never shows')
-  assert.ok(['min-w-24', 'flex-1'].every((one) => alert.className.split(' ').includes(one)), 'and takes the row\'s leftover width with a readable floor, so a 375px screen still reads it')
+  assert.deepEqual(await toasted(), ['error: Something went wrong, so nothing was saved. Try again.'], 'the refusal is said once, in a toast outside every tab panel')
+  assert.equal(host.querySelectorAll('[role="alert"]').length, 0, 'and nothing is drawn in the header or a tab')
 
-  // The next Publish clears it.
+  // The next Publish says it landed.
   failing = false
   await act(async () => {
     click(host.querySelector('[data-node="controls"] [data-button="publish"]')!)
   })
-  assert.equal(host.querySelectorAll('[role="alert"]').length, 0, 'a Publish that succeeds leaves no alert')
+  assert.deepEqual(await toasted(), ['success: courses published'], 'a Publish that succeeds says so, and leaves no alert')
+  assert.equal(host.querySelectorAll('[role="alert"]').length, 0)
 })
 
-test('171d. a refusal naming a field, on a page with a controls node, draws under its box, badges the Details tab, and also draws in the header', async () => {
+test('171d. a refusal naming a field, on a page with a controls node, draws under its box, badges the Details tab, and lists it in the form\'s summary, never in the header', async () => {
   const refusal = Object.assign(new Error('Bad Request'), { status: 400, data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'A published course needs a title.' }] } } })
   const host = await render(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client: draftClient([], async () => {
     throw refusal
@@ -4075,17 +4103,18 @@ test('171d. a refusal naming a field, on a page with a controls node, draws unde
   assert.ok(box.textContent?.includes('A published course needs a title.'), 'the sentence is under the title box')
   const details = [...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.includes('Details'))!
   assert.equal(details.querySelector('[data-mithaq-invalid]')?.getAttribute('data-mithaq-invalid'), '1', 'the Details tab counts the refused field')
-  assert.equal(host.querySelectorAll('[data-region="header"] [role="alert"]').length, 1, 'and the header alert shows too, visible from any tab')
+  assert.equal(host.querySelectorAll('[data-region="header"] [role="alert"]').length, 0, 'the header says nothing of it')
+  assert.ok(host.querySelector('form [data-error-summary]')?.textContent?.includes('A published course needs a title.'), 'the summary at the top of the form names it')
 })
 
 test('171b. Save draft is offered on a kayan that keeps drafts, whether or not it autosaves, and never to an actor without the key', async () => {
   const autosaving = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 2000 } }))
   assert.ok(buttonNamed(autosaving, 'Save draft'), 'an edit that autosaves still offers Save draft')
-  assert.ok(buttonNamed(autosaving, 'Publish changes'), 'beside Publish changes')
+  assert.ok(publishOf(autosaving), 'beside Publish changes')
   const drafting = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published' } }))
   assert.ok(buttonNamed(drafting, 'Save draft'), 'an edit that does not autosave offers it too')
   const keyless = await render(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: undefined }))
-  assert.equal(!!buttonNamed(keyless, 'Save draft') || !!buttonNamed(keyless, 'Publish changes'), false, 'an actor without findVersions gets neither')
+  assert.equal(!!buttonNamed(keyless, 'Save draft') || !!publishOf(keyless), false, 'an actor without findVersions gets neither')
   assert.ok(buttonNamed(keyless, 'Save'), 'and keeps the plain Save')
 })
 
@@ -4227,6 +4256,10 @@ const draftClient = (calls: DraftCall[], answer: (call: DraftCall) => Promise<un
   delete: async () => ({}),
 })
 const buttonNamed = (host: HTMLElement, words: string) => [...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === words) as HTMLButtonElement | undefined
+/** Publish, which reads Publish changes on a published record and Publish on one never published. */
+const publishOf = (host: HTMLElement) => (host.querySelector('[data-button="publish"]') ?? undefined) as HTMLButtonElement | undefined
+/** Cancel, which reads Back to list beside a draft that saves itself. */
+const cancelOf = (host: HTMLElement) => buttonNamed(host, 'Cancel') ?? buttonNamed(host, 'Back to list')
 const draftRow = { id: 'a-row', title: 'Tajweed', summary: 'A short summary', fee: 300, archived: false }
 
 test('132a. a form over a kayan that keeps drafts offers Save draft and Publish changes in place of Save, and a draft save sends the draft word and skips the rules a publish holds', async () => {
@@ -4234,7 +4267,7 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
   const host = await render(createElement(Form, { kayan: courses, client: draftClient(calls), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published' } }))
   assert.ok(!buttonNamed(host, 'Save'), 'there is no plain Save')
   assert.equal(buttonNamed(host, 'Save draft')?.disabled, true, 'Save draft waits for a change on an update, as Payload\'s does')
-  assert.equal(buttonNamed(host, 'Publish changes')?.disabled, true, 'and so does Publish on a published row with nothing pending')
+  assert.equal(publishOf(host)?.disabled, true, 'and so does Publish on a published row with nothing pending')
   await act(async () => {
     typeInto(host.querySelector('#courses-title')!, 'x'.repeat(121))
   })
@@ -4250,7 +4283,7 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
     typeInto(refusing.querySelector('#courses-title')!, 'x'.repeat(121))
   })
   await act(async () => {
-    click(buttonNamed(refusing, 'Publish changes')!)
+    click(publishOf(refusing)!)
   })
   assert.deepEqual(calls, [], 'and a publish is refused the same title before any request')
 
@@ -4258,9 +4291,9 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
   for (const status of ['draft', 'changed'] as const) {
     calls.length = 0
     const pending = await render(createElement(Form, { kayan: courses, client: draftClient(calls), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status } }))
-    assert.equal(buttonNamed(pending, 'Publish changes')?.disabled, false, `Publish is offered on a ${status} row with nothing changed`)
+    assert.equal(publishOf(pending)?.disabled, false, `Publish is offered on a ${status} row with nothing changed`)
     await act(async () => {
-      click(buttonNamed(pending, 'Publish changes')!)
+      click(publishOf(pending)!)
     })
     assert.deepEqual(calls, [{ operation: 'update', input: { id: 'a-row' } }], 'and publishes the pending draft, a plain write naming the row alone')
   }
@@ -4281,7 +4314,7 @@ test('132a. a form over a kayan that keeps drafts offers Save draft and Publish 
   const plain = await render(createElement(Form, { kayan: courses, client: draftClient(calls), value: draftRow, t, locale: 'en', onDone: () => {} }))
   assert.ok(buttonNamed(plain, 'Save'))
   assert.ok(!buttonNamed(plain, 'Save draft'))
-  assert.ok(!buttonNamed(plain, 'Publish changes'))
+  assert.ok(!publishOf(plain))
 })
 
 test('132b. a publish the server refuses draws its sentence under the box it names, as a save does', async () => {
@@ -4291,7 +4324,7 @@ test('132b. a publish the server refuses draws its sentence under the box it nam
   })
   const host = await render(createElement(Form, { kayan: courses, client, value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } }))
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
   const box = host.querySelector('#courses-title')!.closest('[data-slot="field"]') ?? host
   assert.ok(box.textContent?.includes('A published course needs a title.'), 'the refusal is drawn beside the title')
@@ -4387,7 +4420,7 @@ test('132e. a field typed back to what the row was loaded with is still saved on
   await act(async () => sleep(50))
   assert.deepEqual(calls.map((one) => one.input.title), ['Tajweed II', 'Tajweed'], 'the title the draft no longer holds is autosaved back')
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
   assert.deepEqual(calls.at(-1), { operation: 'update', input: { id: 'a-row' } }, 'and Publish then sends what differs from the draft, which is nothing')
 })
@@ -4689,28 +4722,30 @@ test('171p. the previous version is never offered before it is known, so a pick 
   assert.equal(items(), 4, 'once it is read the select offers the previous version once and every other')
 })
 
-test('132g. a field-less refusal banner disappears after a later autosave succeeds', async () => {
-  // A save refused with no field named (a conflict, not a bad value) leaves `refused` set until something clears it; an autosave that lands afterwards must clear it, or the banner sits over a row that just saved.
+test('132g. a field-less refusal is said once in a toast and leaves no banner over the form, and a later autosave still lands', async () => {
+  // A save refused with no field named (a conflict, not a bad value) is the toast's to say, so no banner sits over a row a later autosave saved.
+  await toasted()
   const calls: DraftCall[] = []
   let answer: (call: DraftCall) => Promise<unknown> = async () => {
     throw Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.rowChanged' } })
   }
-  const host = await render(createElement(Form, { kayan: courses, client: draftClient(calls, (call) => answer(call)), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 200 } }))
+  const host = await render(withToaster(createElement(Form, { kayan: courses, client: draftClient(calls, (call) => answer(call)), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 200 } })))
   const title = () => host.querySelector('#courses-title')!
   await act(async () => {
     typeInto(title(), 'Tajweed I')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
-  assert.ok(host.querySelector('[role="alert"]')?.textContent?.includes('error.rowChanged'), 'the refusal banner shows, naming no field')
+  assert.deepEqual(await toasted(), ['error: Something went wrong, so nothing was saved. Try again.'], 'the refusal is a toast, naming no field')
+  assert.ok(!host.querySelector('[role="alert"]'), 'and no banner')
   answer = async () => ({})
   await act(async () => {
     typeInto(title(), 'Tajweed II')
   })
   await act(async () => sleep(300))
   assert.ok(host.querySelector('[data-autosave]')?.textContent?.includes('Saved'), 'the autosave that follows lands')
-  assert.ok(!host.querySelector('[role="alert"]'), 'and the stale banner is gone')
+  assert.ok(!host.querySelector('[role="alert"]'), 'and no banner came back')
 })
 
 test('132h. the versions panel re-reads once a save lands, an autosave included, since a draft save never moves the row\'s own updatedAt', async () => {
@@ -4810,13 +4845,13 @@ test('172f. a Draft and Published switch shows only on a changed row; Published 
   assert.deepEqual(asked, [{ operation: 'findByID', input: { id: 'a-row' } }], 'Published reads the row once, without the draft word')
   assert.equal(title().value, 'Published title', 'and shows the published copy')
   assert.equal([...host.querySelectorAll('input, textarea')].every((one) => (one as HTMLInputElement).disabled), true, 'with every control disabled')
-  assert.deepEqual([!!buttonNamed(host, 'Publish changes'), !!buttonNamed(host, 'Save draft')], [false, false], 'and no Publish or Save draft')
+  assert.deepEqual([!!publishOf(host), !!buttonNamed(host, 'Save draft')], [false, false], 'and no Publish or Save draft')
   await act(async () => {
     click(toggleNamed(host, 'Draft')!)
   })
   assert.equal(title().value, 'Edited', 'Draft again keeps the edit nobody saved')
   assert.equal(title().disabled, false)
-  assert.equal(!!buttonNamed(host, 'Publish changes'), true)
+  assert.equal(!!publishOf(host), true)
   await act(async () => {
     click(toggleNamed(host, 'Published')!)
   })
@@ -5057,7 +5092,7 @@ test('228a. nothing is autosaved while the discard question is open, from Cancel
     typeInto(title(), 'Taj')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   assert.ok(dialogText()?.includes('Leave without saving?'), 'Cancel asks')
   await act(async () => sleep(200))
@@ -5092,7 +5127,7 @@ test('228b. Discard on a create page whose row this page\'s autosave made delete
     await act(async () => {
       typeInto(host.querySelector('#courses-title')!, 'Tajweed')
     })
-    await act(async () => (how === 'cancel' ? click(buttonNamed(host, 'Cancel')!) : block.it!()))
+    await act(async () => (how === 'cancel' ? click(cancelOf(host)!) : block.it!()))
     await act(async () => {
       click(dialogButton('Discard changes')!)
     })
@@ -5119,7 +5154,7 @@ test('228b. Discard on a create page whose row this page\'s autosave made delete
     typeInto(host.querySelector('#courses-title')!, 'Tajweed II')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5135,7 +5170,7 @@ test('228b. Discard on a create page whose row this page\'s autosave made delete
     typeInto(edit.querySelector('#courses-title')!, 'Tajweed II')
   })
   await act(async () => {
-    click(buttonNamed(edit, 'Cancel')!)
+    click(cancelOf(edit)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5155,7 +5190,7 @@ test('228d. an autosave that lands while the discard question is open leaves the
   await act(async () => sleep(120))
   assert.equal(calls.length, 1, 'the autosave is out')
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   assert.ok(dialogText()?.includes('Leave without saving?'), 'Cancel asks while it is out')
   answer = async () => ({ ...draftRow, _status: 'draft' })
@@ -5183,7 +5218,7 @@ test('228e. Discard keeps a draft this page made where the server reads it publi
       typeInto(host.querySelector('#courses-title')!, 'Tajweed')
     })
     await act(async () => {
-      click(buttonNamed(host, 'Cancel')!)
+      click(cancelOf(host)!)
     })
   }
   // Published meanwhile, from another tab: the plain read finds it.
@@ -5241,7 +5276,7 @@ test('228f. once Discard is pressed nothing autosaves the edit it threw away, ho
     typeInto(edit.querySelector('#courses-title')!, 'Tajweed II')
   })
   await act(async () => {
-    click(buttonNamed(edit, 'Cancel')!)
+    click(cancelOf(edit)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5261,7 +5296,7 @@ test('228f. once Discard is pressed nothing autosaves the edit it threw away, ho
     typeInto(host.querySelector('#courses-title')!, 'Tajweed')
   })
   await act(async () => {
-    click(buttonNamed(host, 'Cancel')!)
+    click(cancelOf(host)!)
   })
   await act(async () => {
     click(dialogButton('Discard changes')!)
@@ -5357,16 +5392,20 @@ test('228g. a delete refused because rows still use it says how many, names the 
 test('228h. a refusal a kayan words itself, a unique pair taken, is said in the kayan\'s words, and in the shared ones where the kayan words none', async () => {
   const words: Record<string, string> = { 'courses.conflict.unique': 'Another course already holds this.', 'error.conflict.unique': 'Another row already holds that value.' }
   const said = async (kayan: string) => {
-    const host = await render(createElement(Form, {
+    await toasted()
+    const host = await render(withToaster(createElement(Form, {
       kayan: courses,
-      client: { create: async () => ({}), update: async () => ({}), delete: async () => ({}) },
+      client: { create: async () => ({}), update: async () => {
+        throw Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.unique', params: { kayan } } })
+      }, delete: async () => ({}) },
       value: { id: 'a-row', title: 'Tajweed' },
-      error: Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.unique', params: { kayan } } }),
       t: (key: string, fallback?: string) => words[key] ?? fallback,
       locale: 'en',
       onDone: () => {},
-    }))
-    return [...host.querySelectorAll('[role="alert"]')].map((one) => one.textContent).join(' ')
+    })))
+    await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed II'))
+    await act(async () => fire(host.querySelector('form')!, 'submit'))
+    return (await toasted()).join(' ')
   }
   assert.ok((await said('courses')).includes('Another course already holds this.'), 'the kayan\'s own words')
   delete words['courses.conflict.unique']
@@ -5422,7 +5461,7 @@ test('173b. a landed Publish turns a changed row to Published and hides the swit
     click(toggleNamed(host, 'Draft')!)
   })
   await act(async () => {
-    click(buttonNamed(host, 'Publish changes')!)
+    click(publishOf(host)!)
   })
   await act(async () => sleep(0))
   assert.deepEqual(standing(host), ['published', false, undefined])
@@ -5440,7 +5479,7 @@ test('173b. a landed Publish turns a changed row to Published and hides the swit
 
   const drafted = await render(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client: publishedClient([], []), value: draftRow, t, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } }), { record: draftRow })
   await act(async () => {
-    click(buttonNamed(drafted, 'Publish changes')!)
+    click(publishOf(drafted)!)
   })
   assert.equal(standing(drafted)[0], 'published', 'a draft row published is Published too')
 })
@@ -5494,7 +5533,7 @@ test('176a. a list never widens the page: its table scrolls inside its own frame
   assert.equal(classesOf(toolbar).includes('flex-wrap'), true, 'the toolbar\'s buttons wrap rather than push the card wider')
 })
 
-test('176b. below sm the header keeps the trigger, the title and the pill, the form\'s actions, its autosave note and its refusal sit in a bar fixed to the bottom, and its switch tops the form; sm and up keep one header row', async () => {
+test('176b. below sm the header keeps the trigger, the title and the pill, the form\'s actions and its autosave note sit in a bar fixed to the bottom, and its switch tops the form; sm and up keep one header row', async () => {
   const refusal = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict', params: {} } })
   let failing = false
   const client = { ...publishedClient([], []), update: async () => {
@@ -5513,7 +5552,7 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
   assert.equal(title?.getAttribute('title'), title?.textContent, 'the header\'s title, cut short on a phone, carries its whole text')
   const form = host.querySelector('form')!
   assert.equal(bar.querySelector('[data-button="publish"]')?.getAttribute('form'), form.id, 'Publish changes is in the bar and still submits the page\'s form by its id')
-  assert.deepEqual(['Save draft', 'Cancel'].map((words) => bar.contains(buttonNamed(host, words) ?? null)), [true, true], 'Save draft and Cancel are in the bar')
+  assert.deepEqual(['Save draft', 'Back to list'].map((words) => bar.contains(buttonNamed(host, words) ?? null)), [true, true], 'Save draft and Back to list are in the bar')
   // The switch is not in the phone's bar, where it took a quarter of the screen: it sits at the top of the form below xl, and beside the actions from xl up.
   const switches = [...host.querySelectorAll('[data-view-switch]')]
   assert.equal(switches.length, 2, 'the Draft | Published switch is drawn for each width')
@@ -5532,9 +5571,8 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
   await act(async () => {
     click(bar.querySelector('[data-button="publish"]')!)
   })
-  const alert = controls.querySelector('[role="alert"]')
-  assert.equal(bar.contains(alert), true, 'the header\'s refusal is in the bar')
-  assert.equal(classesOf(alert).includes('sm:-order-1') && classesOf(alert).includes('max-sm:basis-full'), true, 'first on the header row at sm and up, a line of its own in the bar')
+  assert.equal(controls.querySelector('[role="alert"]'), null, 'a refusal takes no room in the bar, where a toast says it')
+  await toasted()
 })
 
 test('176c. the record layout puts main, then side, then the danger zone in the document, and places the danger zone back under the form from lg up', async () => {
@@ -6012,7 +6050,7 @@ test('177s. the same rows in another order are the same read', async () => {
 
 test('182a. the form\'s own row of buttons wraps, so on a page with no header controls its buttons never set the page\'s width, and a row of fields puts each on a line of its own before squeezing it', async () => {
   const host = await render(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: ['title', { row: ['fee', 'currency'] }] }])), client: publishedClient([], []), value: draftRow, t, locale: 'en', onDone: () => {}, onCancel: () => {} }), { record: draftRow })
-  const row = buttonNamed(host, 'Cancel')?.parentElement
+  const row = cancelOf(host)?.parentElement
   assert.equal(row?.contains(buttonNamed(host, 'Save') ?? null), true, 'Cancel and Save share the form\'s own row')
   assert.equal(classesOf(row).includes('flex-wrap'), true, 'which wraps rather than holding every button on one line')
   const fields = host.querySelector('[data-node="row"]')
@@ -6025,11 +6063,11 @@ test('182b. a create opened as a drawer draws only its page: its title once, the
   const { RecordFrame } = await import('../registry/record-frame.tsx')
   const page = { path: '/courses/new', mode: 'drawer', page: { shell: screen.layouts.app!, header: [{ title: {} }], nav: [{ nav: {} }], main: [{ form: ['title'] }] } } as unknown as PageClient
   await render(createElement(RecordFrame, { mode: 'drawer', title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement(Form, { kayan: courses, screen: screenOf(page), client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })))
-  const drawer = window.document.querySelector('[data-slot="drawer-content"]') as unknown as Element | null
+  const drawer = window.document.querySelector('[data-document-drawer]') as unknown as Element | null
   assert.equal(drawer?.querySelectorAll('[data-node="nav"]').length, 0, 'the list\'s shell already draws the nav, so the drawer draws none')
   assert.equal(drawer?.querySelectorAll('[data-node="title"]').length, 1, 'the page\'s title node is drawn once')
   assert.equal(drawer?.querySelector('[data-node="title"]')?.tagName, 'H2', 'as an h2, as Payload titles its drawer, so the list\'s h1 behind it stays the page\'s one')
-  assert.equal(classesOf(drawer?.querySelector('[data-slot="drawer-title"]')).includes('sr-only'), true, 'and the drawer\'s own title is for a screen reader alone')
+  assert.equal(classesOf(drawer?.querySelector('[data-slot="sheet-title"]')).includes('sr-only'), true, 'and the drawer\'s own title is for a screen reader alone')
   const box = drawer?.querySelector('[data-node="title"]')?.closest('.overflow-y-auto')
   assert.deepEqual(['p-4', 'gap-4'].map((one) => classesOf(box).includes(one)), [true, true], 'the page sits in a padded box that scrolls, as the sheet\'s does')
 })
@@ -6092,7 +6130,7 @@ test('182f. a page opened as a drawer draws no nav at any depth', async () => {
   const { RecordFrame } = await import('../registry/record-frame.tsx')
   const page = { path: '/courses/new', mode: 'drawer', page: { shell: screen.layouts.app!, header: [{ title: {} }], main: [{ row: [{ nav: {} }] }, { form: ['title'] }] } } as unknown as PageClient
   await render(createElement(RecordFrame, { mode: 'drawer', title: 'Course', closeLabel: 'Close', onClose: () => {} }, createElement(Form, { kayan: courses, screen: screenOf(page), client: publishedClient([], []), value: null, t, locale: 'en', onDone: () => {}, onCancel: () => {} })))
-  assert.equal(window.document.querySelector('[data-slot="drawer-content"]')?.querySelectorAll('[data-node="nav"]').length, 0, 'a nav inside a row is left out too')
+  assert.equal(window.document.querySelector('[data-document-drawer]')?.querySelectorAll('[data-node="nav"]').length, 0, 'a nav inside a row is left out too')
 })
 
 test('182g. the portal\'s page and main column are one shrinkable track, so no wide child stretches the page past the screen', async () => {
@@ -6186,7 +6224,8 @@ test('217t. the rename dialog leaves validation to the page, and refuses an empt
   }
 })
 
-test('234a. a rename that lands says so in the dialog and asks the page to read again, and never reloads it', async () => {
+test('234a. a rename that lands says so in a green toast, closes its dialog and asks the page to read again, and never reloads it', async () => {
+  await toasted()
   const { OrganizationActions } = await import('../../../templates/asas/src/ui-backoffice/organization-actions.tsx')
   const backoffice = asas.targets.backoffice.client
   const organizations = backoffice.kayan.organization!
@@ -6199,14 +6238,13 @@ test('234a. a rename that lands says so in the dialog and asks the page to read 
   Object.defineProperty(window.location, 'reload', { configurable: true, value: () => reloads++ })
   globalThis.fetch = (async () => new Response('{}')) as typeof fetch
   try {
-    const host = await render(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'en' } as never), { screen: backoffice, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const })
+    const host = await render(withToaster(createElement(OrganizationActions, { kayan: organizations, field: organizations.fields.find((one) => one.name === 'slug')!, value: 'admin-org', row: { id: 'o1', name: 'Admin org' }, t, locale: 'en' } as never)), { screen: backoffice, access: { permissions: '*' as const }, locale: 'en', dir: 'ltr' as const })
     await act(async () => click(host.querySelector('[data-action="rename"]')!))
     await act(async () => typeInto(window.document.querySelector('input[name="name"]') as unknown as Element, 'Hana $& Academy'))
     await act(async () => fire(window.document.querySelector('[role="dialog"] form') as unknown as Element, 'submit'))
-    const dialog = window.document.querySelector('[role="dialog"]')!
-    assert.equal(dialog.textContent?.includes('The organization is now named Hana $& Academy.'), true, 'the dialog says it landed, with the name as written')
-    assert.deepEqual([dialog.querySelector('form'), refreshed, reloads], [null, 1, 0], 'with no boxes left, the page asked to refresh once and not reloaded')
-    assert.deepEqual([...dialog.querySelectorAll('button')].map((one) => one.textContent), ['Close'], 'and only Close to go')
+    await act(async () => sleep(0))
+    assert.deepEqual(await toasted(), ['success: The organization is now named Hana $& Academy.'], 'a toast says it landed, with the name as written')
+    assert.deepEqual([window.document.querySelector('[role="dialog"] form') === null, refreshed, reloads], [true, 1, 0], 'the dialog closed, and the page asked to refresh once and not reloaded')
   } finally {
     globalThis.fetch = fetched
     window.removeEventListener('mithaq:refresh', refresh)
@@ -7227,7 +7265,8 @@ test('223a. on a kayan that keeps drafts and whose update takes expectedUpdatedA
   const calls: DraftCall[] = []
   let answered = 0
   let answer = async (call: DraftCall): Promise<unknown> => ({ ...call.input, _status: 'draft', updatedAt: `2026-10-09T10:00:0${++answered}.000Z` })
-  const host = await render(createElement(Form, {
+  await toasted()
+  const host = await render(withToaster(createElement(Form, {
     kayan: courses,
     client: draftClient(calls, (call) => answer(call)),
     value: { ...draftRow, updatedAt: '2026-10-09T09:00:00.000Z' },
@@ -7236,7 +7275,7 @@ test('223a. on a kayan that keeps drafts and whose update takes expectedUpdatedA
     onDone: () => {},
     drafts: { status: 'published', autosave: 100 },
     expectedUpdatedAt: true,
-  }))
+  })))
   const title = () => host.querySelector('#courses-title')!
   const type = async (words: string) => {
     await act(async () => {
@@ -7266,7 +7305,7 @@ test('223a. on a kayan that keeps drafts and whose update takes expectedUpdatedA
   }
   await type('Tajweed IV')
   assert.equal(calls.length, 4, 'the stale autosave was asked once')
-  assert.ok([...host.querySelectorAll('[role="alert"]')].some((one) => one.textContent?.includes('error.conflict.stale')), 'and the person is told why')
+  assert.ok(host.querySelector('[data-stale-notice] [data-button="reload"]'), 'and the person is told why, on the form, for as long as it holds, beside a reload')
   await type('Tajweed V')
   await type('Tajweed VI')
   assert.equal(calls.length, 4, 'and nothing autosaves after it, whatever is typed')
@@ -7310,7 +7349,7 @@ test('223b. Discard on a create page sends the delete the instant this page\'s l
       typeInto(host.querySelector('#courses-title')!, 'Tajweed II')
     })
     await act(async () => {
-      click(buttonNamed(host, 'Cancel')!)
+      click(cancelOf(host)!)
     })
     await act(async () => {
       click(dialogButton('Discard changes')!)
@@ -7341,6 +7380,7 @@ test('223e. Discard changes on a changed row sends the instant the form holds, w
 })
 
 test('223f. a restore from the Versions tab sends the instant of the latest version it read, where the form says the kayan\'s restoreVersion takes it', async () => {
+  await toasted()
   const { Versions } = await import('../../../templates/asas/src/ui-dashboard/versions.tsx')
   const reload = window.location.reload
   Object.defineProperty(window.location, 'reload', { configurable: true, value: () => {} })
@@ -7360,10 +7400,493 @@ test('223f. a restore from the Versions tab sends the instant of the latest vers
       })
       await act(async () => sleep(0))
       assert.deepEqual(asked.at(-1), { operation: 'restoreVersion', input: takes ? { id: 'v1', expectedUpdatedAt: '2031-01-05T09:59:59.000Z' } : { id: 'v1' }, options: { draft: false } }, takes ? 'the latest version\'s instant rides on the restore' : 'and none where the restore takes none')
+      // The restore reloads the page, so its toast is carried to the page it reloads into.
+      const toaster = await render(withToaster(createElement('p')))
+      assert.equal(toaster.querySelectorAll('[data-toast="success"]').length, 1, 'whose toast says the restore landed')
+      await toasted()
       await act(async () => mounted?.unmount())
       mounted = undefined
     }
   } finally {
     Object.defineProperty(window.location, 'reload', { configurable: true, value: reload })
   }
+})
+
+test('240a. a save, a create, a publish, a draft save, a delete and a kayan\'s own operation each say in a green toast that they landed, in the kayan\'s words', async () => {
+  await toasted()
+  const calls: DraftCall[] = []
+  const draw = (props: Record<string, unknown>) => render(withToaster(createElement(Form, { kayan: courses, client: draftClient(calls, async (call) => ({ id: 'a-row', ...call.input })), t: english, locale: 'en', onDone: () => {}, value: draftRow, ...props })))
+  let host = await draw({})
+  await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed II'))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(await toasted(), ['success: Course saved'], 'a plain save')
+  host = await draw({ value: null })
+  await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed'))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(await toasted(), ['success: Course created'], 'a create')
+  host = await draw({ drafts: { status: 'draft' } })
+  await act(async () => typeInto(host.querySelector('#courses-title')!, 'Tajweed III'))
+  await act(async () => click(host.querySelector('[data-button="save-draft"]')!))
+  assert.deepEqual(await toasted(), ['success: Draft saved'], 'a draft save')
+  await act(async () => click(host.querySelector('[data-button="publish"]')!))
+  assert.deepEqual(await toasted(), ['success: Course published'], 'a publish')
+
+  const ran: string[] = []
+  const operations = { delete: true, archive: true }
+  host = await render(withToaster(createElement(Form, {
+    kayan: courses,
+    screen: screenOf(courses.pages.edit!),
+    client: { ...draftClient([]), delete: async () => ({}), run: async (operation: string) => (ran.push(operation), { id: 'a-row' }) },
+    value: draftRow,
+    t: english,
+    locale: 'en',
+    onDone: () => {},
+    operations,
+  })), { record: draftRow })
+  await act(async () => click(buttonNamed(host, 'Archive')!))
+  await act(async () => typeInto(window.document.querySelector('[data-slot="alert-dialog-content"] form :is(textarea, input)') as unknown as Element, 'Retired'))
+  await act(async () => fire(window.document.querySelector('[data-slot="alert-dialog-content"] form') as unknown as Element, 'submit'))
+  assert.deepEqual(ran, ['archive'])
+  assert.deepEqual(await toasted(), ['success: Course archived'], 'a kayan\'s own operation, in its own words')
+  await act(async () => click(host.querySelector('[data-button="delete"]')!))
+  await act(async () => click(dialogButton('Delete this course')!))
+  assert.deepEqual(await toasted(), ['success: Course deleted'], 'a delete')
+})
+
+test('240b. a save the server refuses over no field, or that never reaches it, says why in a red toast and draws nothing in the page header', async () => {
+  await toasted()
+  const refusal = Object.assign(new Error('Forbidden'), { status: 403, data: { key: 'error.forbidden.update', params: {} } })
+  let thrown: unknown = refusal
+  const client = draftClient([], async () => {
+    throw thrown
+  })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client, value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })), { record: draftRow })
+  await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
+  assert.deepEqual(await toasted(), [`error: ${english('error.forbidden.update')}`], 'the refusal\'s own sentence, in red')
+  assert.equal(host.querySelectorAll('[role="alert"]').length, 0, 'and no alert on the page, in the header or the form')
+  thrown = new TypeError('Failed to fetch')
+  await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
+  assert.deepEqual(await toasted(), ['error: Something went wrong, so nothing was saved. Try again.'], 'a request that never answered says so, where it said nothing before')
+})
+
+test('240c. the members page says in a green toast that an invitation went, an invitation was cancelled, roles were saved, a member was removed and a person was added, and reads the page again rather than reloading it', async (t) => {
+  await toasted()
+  const { Members, AddPerson } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  let answer: [number, unknown] = [200, { id: 'i2', email: 'new@example.com', expiresAt: '2026-10-20T00:00:00.000Z' }]
+  t.mock.method(globalThis, 'fetch', async () => Response.json(answer[1], { status: answer[0] }))
+  const member = { userId: 'u1', name: 'Layla', email: 'layla@example.com', joined: '2026-10-01', owner: false, roles: [] }
+  const loaderData = { members: [member], roles: [{ name: 'teacher', fixed: false, permissions: ['courses.find'] }], invites: [{ id: 'i1', email: 'old@example.com', expiresAt: '2026-10-14T00:00:00.000Z' }] }
+  const host = await render(withToaster(createElement(Members, { loaderData })), {
+    t: english,
+    client: async () => ({ id: 'r1' }),
+    access: { permissions: ['memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'invitation.create', 'invitation.cancel', 'member.delete', 'courses.find'], collections: { memberRoles: { create: true, delete: true } } } as never,
+  })
+  const dialog = (selector: string) => {
+    const one = host.querySelector(selector) as unknown as HTMLDialogElement
+    ;(one as unknown as { showModal: () => void }).showModal = () => one.setAttribute('open', '')
+    ;(one as unknown as { close: () => void }).close = () => (one.removeAttribute('open'), one.dispatchEvent(new window.Event('close') as unknown as Event))
+    return one
+  }
+  const invite = dialog('[data-invite-sheet]')
+  await act(async () => click(host.querySelector('[data-invite]')!))
+  await act(async () => typeInto(invite.querySelector('input[name="email"]')!, 'new@example.com'))
+  await act(async () => fire(invite.querySelector('form')!, 'submit'))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Invitation sent to new@example.com'], 'an invitation')
+  answer = [200, {}]
+  await act(async () => click(host.querySelector('[data-cancel-invite="i1"]')!))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Invitation cancelled'], 'a cancelled invitation')
+
+  const sheet = dialog('[data-member-sheet]')
+  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
+  await act(async () => click(sheet.querySelector('[data-role="teacher"] .font-medium')!))
+  await act(async () => click([...sheet.querySelectorAll('button')].find((one) => one.textContent === 'Save')!))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Roles saved for Layla'], 'a role change')
+  await act(async () => click(host.querySelector('[data-edit-roles="u1"]')!))
+  await act(async () => click(sheet.querySelector('[data-button="remove-member"]')!))
+  await act(async () => click(sheet.querySelector('[data-button="confirm-remove"]')!))
+  await act(async () => sleep(10))
+  assert.deepEqual(await toasted(), ['success: Layla removed'], 'a removal')
+
+  const reload = window.location.reload
+  let reloaded = 0
+  let refreshed = 0
+  const refresh = () => void refreshed++
+  window.addEventListener('mithaq:refresh', refresh)
+  Object.defineProperty(window.location, 'reload', { configurable: true, value: () => void reloaded++ })
+  try {
+    const adding = await render(withToaster(createElement(AddPerson, { roles: [], onInvited: () => {} })), { t: english })
+    const add = adding.querySelector('[data-add-person-sheet]') as unknown as HTMLDialogElement
+    ;(add as unknown as { showModal: () => void }).showModal = () => add.setAttribute('open', '')
+    ;(add as unknown as { close: () => void }).close = () => (add.removeAttribute('open'), add.dispatchEvent(new window.Event('close') as unknown as Event))
+    await act(async () => click(adding.querySelector('[data-add-person]')!))
+    const [name, email] = [...add.querySelectorAll('input')] as unknown as Element[]
+    await act(async () => typeInto(name!, 'Omar'))
+    await act(async () => typeInto(email!, 'omar@example.com'))
+    answer = [200, { added: true }]
+    await act(async () => fire(add.querySelector('form')!, 'submit'))
+    await act(async () => sleep(10))
+    assert.deepEqual(await toasted(), ['success: Omar added. A link to choose a password was sent to omar@example.com.'], 'a person added, and where the link went')
+    assert.deepEqual([reloaded, refreshed, add.hasAttribute('open')], [0, 1, false], 'the page is read again in place, so the toast stays, and the sheet closes')
+  } finally {
+    window.removeEventListener('mithaq:refresh', refresh)
+    Object.defineProperty(window.location, 'reload', { configurable: true, value: reload })
+  }
+})
+
+test('240d. a save refused over fields lists each in a summary at the top of the form, which takes the focus from any tab, and each line is a link that opens its tab and focuses its box', async () => {
+  await toasted()
+  const refusal = Object.assign(new Error('Bad Request'), { status: 400, data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'A published course needs a title.' }] } } })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client: draftClient([], async () => {
+    throw refusal
+  }), value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })), { record: draftRow })
+  const tab = (words: string) => [...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.includes(words))!
+  await act(async () => click(tab('Sessions')))
+  await act(async () => click(host.querySelector('[data-node="controls"] [data-button="publish"]')!))
+  await act(async () => sleep(10))
+  assert.equal(host.querySelectorAll('[data-region="header"] [role="alert"]').length, 0, 'the header says nothing of it')
+  assert.deepEqual(await toasted(), [], 'nor does a toast, since the fields are named where they are')
+  const summary = host.querySelector('form [data-error-summary]') as HTMLElement | null
+  assert.ok(summary, 'a summary is drawn inside the form')
+  assert.deepEqual([...summary!.querySelectorAll('a')].map((one) => [one.textContent, one.getAttribute('href')]), [['Title: A published course needs a title.', '#courses-title']], 'one line per field, its label and its sentence, a link to its box')
+  assert.equal(window.document.activeElement === (summary as unknown), true, 'and the focus moves to it')
+  assert.equal(tab('Details').getAttribute('aria-selected'), 'true', 'which opened the tab it sits on')
+  await act(async () => click(tab('Sessions')))
+  await act(async () => click(summary!.querySelector('a')!))
+  await act(async () => sleep(10))
+  assert.equal(window.document.activeElement?.id, 'courses-title', 'a line focuses its box, opening its tab first')
+  assert.ok(host.querySelector('#courses-title')!.closest('[data-slot="field"]')?.textContent?.includes('A published course needs a title.'), 'and the sentence stays under the box')
+})
+
+test('240e. a section and an accordion holding a refused field each show a red count, as a tab does', async () => {
+  const refusal = { data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'A course needs a title.' }, { path: 'summary', message: 'Too long.' }] } } }
+  const fields = [{ field: 'title' }, { field: 'summary' }]
+  for (const group of [{ section: 'about', fields }, { accordion: [{ item: 'about', fields }] }]) {
+    const host = await render(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: [group] }])), client: recording().client, value: draftRow, error: refusal, t: english, locale: 'en', onDone: () => {} }))
+    const pill = host.querySelector(`[data-node="${'section' in group ? 'section' : 'accordion'}"] [data-mithaq-invalid]`)
+    assert.equal(pill?.getAttribute('data-mithaq-invalid'), '2', `the ${'section' in group ? 'section' : 'accordion item'} counts its two refused fields`)
+    assert.equal(pill?.getAttribute('aria-label'), 'Fields needing attention: 2')
+  }
+})
+
+test('240f. a box is told it is wrong only once the person leaves its field: never while the focus moves inside it, or into a popup it opened', async () => {
+  const host = await render(createElement(Form, {
+    kayan: sessions, screen: screenOf(recordPage([{ form: [{ field: 'startsAt' }, { field: 'capacity' }] }], '/sessions/new'), sessions), client: recording().client, value: null, t: english, locale: 'en', onDone: () => {},
+  }))
+  const day = host.querySelector('button#sessions-startsAt')!
+  const leave = (to: Element | null) => day.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true, relatedTarget: to as never }) as unknown as Event)
+  const inside = day.closest('[data-slot="field"]')!.querySelector(':is(input, button):not(#sessions-startsAt)')
+  assert.ok(inside, 'the moment has a second box in its field, the time')
+  await act(async () => void leave(inside))
+  assert.equal(host.querySelector('#sessions-startsAt-error'), null, 'from the day to the time is no leaving')
+  const popup = window.document.createElement('div')
+  popup.setAttribute('data-slot', 'popover-content')
+  const pick = window.document.createElement('button')
+  popup.append(pick)
+  window.document.body.append(popup)
+  await act(async () => void leave(pick as unknown as Element))
+  assert.equal(host.querySelector('#sessions-startsAt-error'), null, 'nor into the calendar it opened')
+  popup.remove()
+  await act(async () => void leave(host.querySelector('#sessions-capacity')))
+  assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'leaving for another field marks it')
+})
+
+/** The full-page drawer a create opens in, which a portal draws on the body. */
+const documentDrawer = () => window.document.querySelector('[data-document-drawer]') as unknown as Element | null
+
+test('240g. a child made from its parent\'s tab opens in a full-page drawer over the page, as Payload\'s document drawer does, which closes once the write lands and says so in a toast', async () => {
+  await toasted()
+  const writes: { write: string; input: Record<string, unknown> }[] = []
+  const docs = [{ id: 's1', course: 'c1', startsAt: '2026-10-01T10:00:00.000Z', capacity: 5, venue: 'campus', format: 'lecture', archived: false }]
+  const host = await render(withToaster(createElement(Form, {
+    kayan: courses,
+    screen: screenOf(courses.pages.edit!),
+    client: draftClient([]),
+    value: { id: 'c1', title: 'Tajweed' },
+    t: english,
+    locale: 'en',
+    onDone: () => {},
+    related: ({ node }) => createElement(List, {
+      key: 'sessions', kayan: sessions, node, page: pageOf(docs), query: {}, t: english, locale: 'en', onQuery: () => {},
+      href: (id: string) => `/sessions/${id}`, newHref: '#', screen: screenOf(courses.pages.edit!), creates: true, operations: { update: true }, writes: () => true,
+      edit: {
+        client: {
+          create: async (input: Record<string, unknown>) => (writes.push({ write: 'create', input }), { id: 'made', ...input }),
+          update: async (input: Record<string, unknown>) => (writes.push({ write: 'update', input }), input),
+          delete: async () => ({}),
+        },
+        writes: () => true,
+        prefill: { course: 'c1' },
+      },
+    }),
+  })), { record: { id: 'c1', title: 'Tajweed' } })
+  await act(async () => click([...host.querySelectorAll('[data-slot="tabs-trigger"]')].find((one) => one.textContent?.includes('Sessions'))!))
+  await act(async () => click([...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === 'New session' || one.textContent?.trim() === 'New')!))
+  const drawer = documentDrawer()
+  assert.ok(drawer, 'New opens a drawer')
+  assert.equal(host.querySelector('[data-mithaq-inline-edit]'), null, 'and no form under the list')
+  assert.equal(drawer!.getAttribute('data-slot'), 'sheet-content', 'a modal the page stays under, which Esc and its close button leave')
+  assert.ok(classesOf(drawer).some((one) => one.includes('w-[calc(100%-')), 'as wide as the page but a strip of it, as Payload\'s')
+  assert.equal(drawer!.querySelector('h2')?.textContent, 'New session', 'its title says what it makes')
+  assert.ok(drawer!.querySelector('[data-slot="sheet-close"]'), 'and it has a close button')
+  await act(async () => click(drawer!.querySelector('button#sessions-startsAt')!))
+  await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
+  await typeTime(drawer!, '09:30')
+  await act(async () => fire(drawer!.querySelector('form')!, 'submit'))
+  assert.deepEqual(writes.map((one) => [one.write, one.input.course]), [['create', 'c1']], 'the drawer\'s save is the session\'s own create, holding this course')
+  assert.equal(documentDrawer(), null, 'and the drawer closes once it lands')
+  assert.deepEqual(await toasted(), ['success: Session created'], 'with a toast that says so')
+})
+
+test('240h. a relationship picker offers a + beside it, for a viewer who may create its kayan, that makes the row in a drawer and picks it', async () => {
+  await toasted()
+  const made: Record<string, unknown>[] = []
+  const client = async ({ kayan, operation, input }: { kayan: string; operation: string; input: Record<string, unknown> }) => {
+    made.push({ kayan, operation, input })
+    return { id: 'tag-new', ...input }
+  }
+  const tags = screen.kayan.tags!
+  const access = { collections: { tags: { create: true, read: true, fields: { name: { create: true, read: true } } } } }
+  const draw = (over: Partial<ScreenState>) => render(withToaster(createElement(Form, {
+    kayan: courses, screen: screenOf(recordPage([{ form: ['title', 'tags'] }])), client: recording().client, value: draftRow, t: english, locale: 'en', onDone: () => {},
+    kayans, api: fakeApi({ tags: [] }).api,
+  })), { client: client as never, access: access as never, ...over })
+  let host = await draw({})
+  const plus = () => host.querySelector('[data-control="relationship"] button[data-add-new]') as HTMLButtonElement | null
+  assert.equal(plus()?.getAttribute('aria-label'), 'Add new Tag', 'the + is named for what it makes')
+  await act(async () => click(plus()!))
+  const drawer = documentDrawer()
+  assert.ok(drawer, 'and opens a drawer')
+  assert.equal(drawer!.querySelector('h2')?.textContent, 'New tag')
+  assert.equal(drawer!.querySelectorAll('h1').length, 0, 'which is its one title: the form draws no heading of its own under it')
+  await act(async () => typeInto(drawer!.querySelector('#tags-name')!, 'Beginner'))
+  await act(async () => fire(drawer!.querySelector('form')!, 'submit'))
+  await act(async () => sleep(0))
+  assert.deepEqual(made.map((one) => [one.kayan, one.operation]), [['tags', 'create']], 'the row is made through the screen\'s client')
+  assert.equal(documentDrawer(), null, 'the drawer closes')
+  assert.ok(host.querySelector('[data-control="relationship"]')?.textContent?.includes('Beginner'), 'and the new row is picked')
+  assert.deepEqual(await toasted(), ['success: Tag created'])
+  host = await draw({ access: { collections: { tags: { read: true } } } as never })
+  assert.equal(plus(), null, 'a viewer who may not create a tag gets no +')
+})
+
+test('240i. a record never published is published with Publish, one already published with Publish changes, and beside a draft that saves itself Cancel says it goes back to the list', async () => {
+  const named = async (drafts: Record<string, unknown>, value: Record<string, unknown> | null = draftRow) => {
+    const host = await render(createElement(Form, { kayan: courses, client: draftClient([]), value, t: english, locale: 'en', onDone: () => {}, onCancel: () => {}, drafts }))
+    return [publishOf(host)?.textContent?.trim(), cancelOf(host)?.textContent?.trim()]
+  }
+  assert.deepEqual(await named({ status: 'draft' }), ['Publish', 'Cancel'], 'a draft never published')
+  assert.deepEqual(await named({}, null), ['Publish', 'Cancel'], 'and a record being made')
+  assert.deepEqual(await named({ status: 'published' }), ['Publish changes', 'Cancel'], 'a published record')
+  assert.deepEqual(await named({ status: 'changed' }), ['Publish changes', 'Cancel'], 'and one with a draft pending')
+  assert.deepEqual(await named({ status: 'draft', autosave: 2000 }), ['Publish', 'Back to list'], 'a draft that saves itself has nothing to cancel, so the button says where it goes')
+})
+
+test('240k. a yes-or-no field on a record page reads its own word for yes or no under its label, an unset one its no, never a dash', async () => {
+  const { FieldValue } = await import('../registry/field-value.tsx')
+  const archived = courses.fields.find((one) => one.name === 'archived')!
+  const words = async (value: unknown) => (await render(createElement(FieldValue, { kayan: courses, field: archived, row: { id: 'c1', archived: value }, copy: { t: english, locale: 'en' } }))).querySelector('[data-field-value="archived"]')?.textContent
+  assert.equal(await words(true), 'ArchivedArchived', 'set, in the field\'s own word')
+  assert.equal(await words(false), 'ArchivedActive', 'cleared')
+  assert.equal(await words(null), 'ArchivedActive', 'and a row from before the column, which holds nothing, reads the same as cleared')
+  const verified = fieldOf({ name: 'probe', kind: 'checkbox' })
+  assert.equal((await render(createElement(FieldValue, { kayan: courses, field: verified, row: { id: 'c1', probe: true }, copy: { t: english, locale: 'en' } }))).querySelector('[data-field-value="probe"]')?.textContent, 'probeYes', 'and a field with no words of its own reads Yes or No')
+})
+
+test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the same in every browser: digits fill hours then minutes, arrows step them, the moment is written once day and time are set and cleared with a complete time, and Arabic draws its own numerals and words', async () => {
+  const { client, written } = recording()
+  const page = (path: string) => screenOf(recordPage([{ form: [{ field: 'startsAt' }, { field: 'capacity' }] }], path), sessions)
+  const host = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/new'), client, value: null, t: english, locale: 'en', onDone: () => {} }))
+  assert.equal(host.querySelector('input[type="time"]') === null, true, 'no native time box, which Safari hands back empty')
+  const segment = (name: string) => host.querySelector(`[data-time-field] [data-segment="${name}"]`) as HTMLInputElement
+  assert.deepEqual(['hours', 'minutes'].map((name) => segment(name)?.getAttribute('data-slot')), ['input', 'input'], 'each segment is a shadcn box of its own, as openstatus\'s')
+  assert.equal(segment('hours').disabled, true, 'and takes nothing until a day is picked')
+  await act(async () => click(host.querySelector('button#sessions-startsAt') as unknown as Element))
+  await act(async () => click(window.document.querySelector('[data-today] button') as unknown as Element))
+  await act(async () => press(segment('hours') as unknown as Element, '9'))
+  assert.equal(segment('hours').value, '09', 'a digit no second can follow is the whole hour')
+  assert.equal(window.document.activeElement === (segment('minutes') as unknown), true, 'and the minutes are next, as a native time box goes on')
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(written.length, 0, 'half a time writes no moment')
+  assert.equal(host.querySelector('#sessions-startsAt-error')?.textContent, 'This field is required.', 'and a required one says so')
+  await act(async () => typeInto(segment('minutes') as unknown as Element, '30'))
+  await act(async () => press(segment('minutes') as unknown as Element, 'ArrowUp'))
+  assert.equal(segment('minutes').value, '31', 'an arrow steps the minutes')
+  await act(async () => click(segment('period') as unknown as Element))
+  assert.equal(segment('period').textContent, 'PM', 'and the button turns the morning to the evening')
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(new Date(written[0]!.startsAt as string).toISOString(), new Date(`${today}T21:31`).toISOString(), 'the moment is the day at that time, on the 24-hour clock')
+  await act(async () => press(segment('minutes') as unknown as Element, 'Backspace'))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(written.length, 1, 'clearing a complete time clears the moment, which a required start refuses')
+  await act(async () => typeInto(segment('hours') as unknown as Element, '1045'))
+  assert.deepEqual([segment('hours').value, segment('minutes').value], ['10', '45'], 'a whole time pasted into the hours fills both')
+
+  const arabic = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/:id'), client, value: { id: 's1', course: 'c1', startsAt: new Date(2026, 9, 15, 13, 5).toISOString() }, t: appCopy('ar'), locale: 'ar', onDone: () => {} }))
+  const arabicSegment = (name: string) => arabic.querySelector(`[data-time-field] [data-segment="${name}"]`) as HTMLInputElement
+  assert.deepEqual([arabicSegment('hours').value, arabicSegment('minutes').value, arabicSegment('period').textContent], ['٠١', '٠٥', 'م'], 'Arabic numerals and its own word for the evening')
+  assert.equal(arabicSegment('hours').closest('[dir]')?.getAttribute('dir'), 'ltr', 'the clock reads hours then minutes, as a clock does, on a page right to left')
+  await act(async () => typeInto(arabicSegment('hours') as unknown as Element, '٠٢'))
+  assert.equal(arabic.querySelector('[data-time-field]')?.getAttribute('data-value'), '14:05', 'and Arabic digits typed are read')
+})
+
+test('240m. a hovered list row tints every cell itself, the pinned title and actions included, so the row highlights as one in either theme', async () => {
+  const host = await render(createElement(List, {
+    kayan: courses, page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300 }]), query: {}, t, locale: 'en', onQuery: () => {},
+    href: (id: string) => `/courses/${id}`, newHref: '/courses/new', operations: { delete: true }, run: async () => ({}),
+  }))
+  const cells = [...host.querySelectorAll('tbody tr[data-row="c1"] > td')]
+  const tint = (cell: Element) => classesOf(cell).filter((one) => one.startsWith('group-hover/row:bg-'))
+  assert.ok(cells.length > 2 && cells.some((cell) => classesOf(cell).includes('sticky')), 'the row has pinned cells and others')
+  assert.deepEqual(cells.map(tint), cells.map(() => ['group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]']), 'each cell paints the same opaque tint, so nothing but the cells decides the row\'s colour')
+})
+
+test('240n. a picker for an upload offers no + of its own, which its Upload new already is', async () => {
+  const access = { collections: { media: { create: true, fields: { alt: { create: true }, file: { create: true } } }, tags: { create: true, fields: { name: { create: true } } } } }
+  const host = await render(createElement(Form, {
+    kayan: courses, screen: screenOf(recordPage([{ form: ['cover', 'tags'] }])), client: recording().client, value: draftRow, t: english, locale: 'en', onDone: () => {},
+    kayans, api: fakeApi({ tags: [], media: [] }).api,
+  }), { client: (async () => ({})) as never, access: access as never })
+  assert.ok(host.querySelector('[data-control="relationship"] button[data-add-new]'), 'a relationship has it')
+  assert.ok(host.querySelector('[data-control="upload"]'), 'the cover is drawn by its upload control')
+  assert.equal(host.querySelector('[data-control="upload"] button[data-add-new]') === null, true, 'which draws no + beside its picker')
+})
+
+test('240o. an autosave refused over a field marks it and lists it quietly, and never takes the focus from the box being typed in', async () => {
+  await toasted()
+  const refusal = Object.assign(new Error('Bad Request'), { status: 400, data: { key: 'error.invalid.value', params: { issues: [{ path: 'summary', message: 'Too long.' }] } } })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, client: draftClient([], async () => {
+    throw refusal
+  }), value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'published', autosave: 50 } })))
+  const title = host.querySelector('#courses-title') as unknown as HTMLInputElement
+  title.focus()
+  await act(async () => typeInto(title as unknown as Element, 'Tajweed II'))
+  await act(async () => sleep(200))
+  await act(async () => sleep(50))
+  assert.ok(host.querySelector('[data-error-summary]')?.textContent?.includes('Too long.'), 'the refused field is listed')
+  assert.equal(window.document.activeElement === (title as unknown), true, 'and the focus stays in the box being typed in')
+})
+
+test('240p. a refusal the host hands the form that names no field is said in a red toast', async () => {
+  await toasted()
+  await render(withToaster(createElement(Form, { kayan: courses, client: draftClient([]), value: draftRow, t: english, locale: 'en', onDone: () => {}, error: { status: 403, data: { key: 'error.forbidden.update' } } })))
+  assert.deepEqual(await toasted(), [`error: ${english('error.forbidden.update')}`])
+})
+
+test('240q. a red toast stays until it is closed, with its own close button, a green one leaves on its own, and a stale row is a lasting notice on the form with a reload, not a toast', async (t) => {
+  await toasted()
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    const host = await render(withToaster(createElement('p', null, 'page')))
+    await act(async () => {
+      toast.success('Saved')
+      toast.error('Refused')
+    })
+    await act(async () => t.mock.timers.tick(60_000))
+    assert.deepEqual([...host.querySelectorAll('[data-toast]')].map((one) => one.getAttribute('data-toast')), ['error'], 'a minute on, the failure is still there and the success is gone')
+    assert.equal(host.querySelectorAll('[aria-live]').length, 1, 'in one live region')
+    await act(async () => click(host.querySelector('[data-toast] [data-toast-close]')!))
+    assert.equal(host.querySelectorAll('[data-toast]').length, 0, 'and its close button takes it away')
+  } finally {
+    t.mock.timers.reset()
+  }
+  const stale = Object.assign(new Error('Conflict'), { status: 409, data: { key: 'error.conflict.stale', params: {} } })
+  const host = await render(withToaster(createElement(Form, { kayan: courses, client: draftClient([], async () => {
+    throw stale
+  }), value: draftRow, t: english, locale: 'en', onDone: () => {}, drafts: { status: 'draft' } })))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(await toasted(), [], 'a row changed elsewhere is no toast')
+  const notice = host.querySelector('[data-stale-notice]')
+  assert.ok(notice?.textContent?.includes(english('error.conflict.stale')!), 'it stays on the form, in its own sentence')
+  assert.ok(notice?.querySelector('button[data-button="reload"]'), 'beside a reload, since nothing saves until the row is read again')
+})
+
+test('240r. a moment\'s time boxes are spin buttons a reader hears the value and range of, the period reads in the clock\'s own order, a pasted 2130 or 9:30 PM is 9:30 PM, and a lone 0 typed over a time keeps it', async () => {
+  const reported: unknown[] = []
+  const Held = () => {
+    const [value, setValue] = useState<unknown>(new Date(2026, 0, 2, 9, 30))
+    return createElement(controls.datetime!, {
+      values: {}, setValue: () => {}, value, field: fieldOf({ name: 'at', kind: 'datetime' }), kayan: courses, id: 'at', t, locale: 'en',
+      readOnly: false, onChange: (next: unknown) => (reported.push(next), setValue(next)),
+    })
+  }
+  const host = await render(createElement(Held))
+  const hours = timeSegment(host, 'hours')
+  assert.deepEqual(['type', 'inputmode', 'role', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow'].map((name) => hours.getAttribute(name)), ['text', 'numeric', 'spinbutton', '1', '12', '9'], 'the hours are a spin button from 1 to 12, now at 9')
+  assert.deepEqual(['aria-valuemin', 'aria-valuemax', 'aria-valuenow'].map((name) => timeSegment(host, 'minutes').getAttribute(name)), ['0', '59', '30'], 'and the minutes from 0 to 59')
+  assert.ok(timeSegment(host, 'period').closest('[dir="ltr"]'), 'AM or PM sits in the clock\'s own left-to-right order, so the arrows move across it the same in Arabic')
+  await act(async () => press(hours as unknown as Element, '0'))
+  assert.deepEqual([timeOf(host), reported.length], ['09:30', 0], 'a lone 0 waits for its second digit and clears nothing')
+  for (const pasted of ['2130', '9:30 PM']) {
+    await act(async () => typeInto(timeSegment(host, 'hours') as unknown as Element, pasted))
+    assert.equal(timeOf(host), '21:30', `${pasted} pasted into the hours is 9:30 in the evening`)
+    await act(async () => click(timeSegment(host, 'period') as unknown as Element))
+  }
+})
+
+test('240s. the summary lists the fields the page draws and links each to the box in its own form, and a refused field the page does not draw is said in a red toast', async () => {
+  await toasted()
+  const refusal = { status: 400, data: { key: 'error.invalid.value', params: { issues: [{ path: 'title', message: 'A course needs a title.' }, { path: 'fee', message: 'Fee refused.' }] } } }
+  const decoy = createElement('form', null, createElement('input', { id: 'courses-title', 'data-decoy': '' }))
+  const host = await render(withToaster(createElement('div', null, decoy, createElement(Form, {
+    kayan: courses, screen: screenOf(recordPage([{ form: [{ field: 'title' }] }])), client: draftClient([], async () => {
+      throw refusal
+    }), value: draftRow, t: english, locale: 'en', onDone: () => {},
+  }))))
+  await act(async () => typeInto(host.querySelector('[data-node="form"] #courses-title')!, 'Tajweed II'))
+  await act(async () => fire(host.querySelector('[data-node="form"] form')!, 'submit'))
+  await act(async () => sleep(10))
+  const summary = host.querySelector('[data-error-summary]')!
+  assert.deepEqual([...summary.querySelectorAll('a')].map((one) => one.textContent), ['Title: A course needs a title.'], 'the summary lists the field the page draws')
+  assert.deepEqual(await toasted(), ['error: Fee: Fee refused.'], 'and says the one it does not draw in a toast, by its label')
+  await act(async () => click(summary.querySelector('a')!))
+  await act(async () => sleep(10))
+  const focused = window.document.activeElement as unknown as Element | null
+  assert.equal(focused?.id === 'courses-title' && !focused.hasAttribute('data-decoy'), true, 'its link focuses the box in its own form, not one of the same id in another')
+})
+
+test('240t. a list\'s refused run is said in a red toast and drawn nowhere else, and a bulk run that lands says so in a green one', async () => {
+  await toasted()
+  let refusing = true
+  const docs = [{ id: 'c1', title: 'Tajweed' }, { id: 'c2', title: 'Nahw' }]
+  const host = await render(withToaster(createElement(List, {
+    kayan: courses, page: pageOf(docs), query: {}, t: english, locale: 'en', onQuery: () => {},
+    href: (id: string) => `/courses/${id}`, newHref: '/courses/new', screen: listScreen(), operations: { deleteMany: true, updateMany: true },
+    run: async (operation: string) => {
+      if (refusing) throw { data: { key: 'error.forbidden.operation', params: { kayan: 'courses', operation } } }
+      return { docs: [] }
+    },
+  })))
+  const tick = async () => act(async () => click([...host.querySelectorAll('tbody [role="checkbox"]')][0]! as unknown as Element))
+  const deleteTicked = async () => {
+    await act(async () => click([...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === 'Delete')! as unknown as Element))
+    await confirmYes()
+  }
+  await tick()
+  await deleteTicked()
+  assert.deepEqual(await toasted(), ['error: Something went wrong, so nothing was saved. Try again.'], 'the refusal is a red toast, in the shared words where its key has none')
+  assert.equal(host.querySelector('[role="alert"]'), null, 'and nothing beside the buttons')
+  refusing = false
+  await deleteTicked()
+  assert.equal((await toasted()).filter((one) => one.startsWith('success: ')).length, 1, 'a bulk run that lands says so')
+})
+
+test('240u. the + of a relationship to a kayan that keeps drafts makes its row as Payload\'s drawer does, with Save draft beside Publish, and an answer naming no id picks nothing', async () => {
+  await toasted()
+  const made: Record<string, unknown>[] = []
+  const access = { collections: { courses: { create: true, read: true, operations: { findVersions: true }, fields: { title: { create: true, read: true } } } } }
+  const host = await render(withToaster(createElement(Form, {
+    kayan: sessions, screen: screenOf(recordPage([{ form: ['course'] }], '/sessions/new'), sessions), client: recording().client, value: null, t: english, locale: 'en', onDone: () => {},
+    kayans, api: fakeApi({ courses: [] }).api,
+  })), { client: (async (call: Record<string, unknown>) => (made.push(call), {})) as never, access: access as never })
+  await act(async () => click(host.querySelector('button[data-add-new]')!))
+  const drawer = documentDrawer()!
+  assert.ok(drawer.querySelector('[data-button="save-draft"]') && drawer.querySelector('[data-button="publish"]'), 'the drawer offers Save draft and Publish')
+  await act(async () => typeInto(drawer.querySelector('#courses-title')!, 'Tajweed'))
+  await act(async () => click(drawer.querySelector('[data-button="save-draft"]')!))
+  await act(async () => sleep(0))
+  assert.deepEqual(made.map((one) => [one.kayan, one.operation, one.draft]), [['courses', 'create', true]], 'and its draft save is a draft create')
+  assert.equal(host.querySelectorAll('[data-slot="combobox-chip"], [data-control="relationship"] input[value]:not([value=""])').length, 0, 'an answer with no id picks nothing')
 })

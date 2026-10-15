@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from 'mithaq-admin/format.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 import { organizations } from '@asas/mithaq/auth/organizations'
 import { grantable, isOwner, managesRoles, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
 import { tenantRoles } from '@asas/mithaq/roles/tenant-roles.ts'
@@ -140,7 +141,7 @@ const development = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === tr
  * hand over, sent to the server's `add-person`, which makes the account, the membership and the role in one request and
  * mails the link that chooses the password. Someone who already has a proved account is invited instead.
  */
-function AddPerson({ roles, onInvited }: { roles: Role[]; onInvited: (invite: Invite) => void }) {
+export function AddPerson({ roles, onInvited }: { roles: Role[]; onInvited: (invite: Invite) => void }) {
   const { locale, t } = useLocale()
   const sheet = useRef<HTMLDialogElement>(null)
   const nameId = useId()
@@ -166,11 +167,17 @@ function AddPerson({ roles, onInvited }: { roles: Role[]; onInvited: (invite: In
     const body = answered.body as { added?: boolean; link?: string; invited?: boolean; invitation?: { id: string; email: string; expiresAt: string } }
     if (body.invited && body.invitation) {
       onInvited({ id: body.invitation.id, email: body.invitation.email, expiresAt: isoOf(body.invitation.expiresAt) })
+      toast.success((t('dashboard.inviteSent', 'Invitation sent to {email}') ?? 'Invitation sent to {email}').replace('{email}', () => body.invitation!.email))
       return sheet.current?.close()
     }
-    if (body.link) return setLink(body.link)
-    // The new member and their role are read again with the page.
-    window.location.reload()
+    if (body.link) {
+      toast.success((t('dashboard.personAddedLink', '{name} added. Hand them the link below.') ?? '{name} added. Hand them the link below.').replace('{name}', () => name.trim()))
+      return setLink(body.link)
+    }
+    toast.success((t('dashboard.personAdded', '{name} added. A link to choose a password was sent to {email}.') ?? '{name} added. A link to choose a password was sent to {email}.').replace('{name}', () => name.trim()).replace('{email}', () => email.trim()))
+    sheet.current?.close()
+    // The new member and their role are read again in place, so the toast that says so stays.
+    window.dispatchEvent(new Event('mithaq:refresh'))
   }
   return (
     <>
@@ -183,7 +190,7 @@ function AddPerson({ roles, onInvited }: { roles: Role[]; onInvited: (invite: In
         aria-label={t('dashboard.addPersonTitle', 'Add a person')}
         className="bg-background text-foreground m-auto w-[min(28rem,calc(100%-2rem))] rounded-lg border p-0 shadow-lg backdrop:bg-black/80"
         onClose={() => {
-          if (link) window.location.reload()
+          if (link) window.dispatchEvent(new Event('mithaq:refresh'))
           setName('')
           setEmail('')
           setRole('')
@@ -238,6 +245,8 @@ export function Members({ loaderData }: PageProps<MembersData>) {
   const assignments = access.collections?.memberRoles
   const roles = loaderData?.roles ?? []
   const [members, setMembers] = useState(loaderData?.members ?? [])
+  // A page read again in place, after a person is added, hands the new member list.
+  useEffect(() => setMembers(loaderData?.members ?? []), [loaderData?.members])
   const [editing, setEditing] = useState<Member>()
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -303,6 +312,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
     if (!answered.ok) return setInviteRefusal(refused(answered, t('dashboard.inviteRefused', 'The server refused that invitation.')))
     const made = answered.body as { id: string; email: string; expiresAt: string }
     setPending((all) => [...all.filter((one) => one.id !== made.id), { id: made.id, email: made.email, expiresAt: isoOf(made.expiresAt) }])
+    toast.success((t('dashboard.inviteSent', 'Invitation sent to {email}') ?? 'Invitation sent to {email}').replace('{email}', () => made.email))
     inviteSheet.current?.close()
   }
   /** One pending invitation withdrawn, through the provider's own route. */
@@ -311,6 +321,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
     const answered = await authArm('organization/cancel-invitation', { invitationId: one.id })
     if (!answered.ok) return setPendingRefusal(refused(answered, t('dashboard.inviteCancelRefused', 'The server refused to cancel that invitation.')))
     setPending((all) => all.filter((other) => other.id !== one.id))
+    toast.success((t('dashboard.inviteCancelled', 'Invitation cancelled') ?? 'Invitation cancelled'))
   }
   /** The link the invitee opens, for the inviter to hand over where the mail does not reach, in every environment. */
   const copyLink = async (one: Invite) => {
@@ -352,6 +363,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
         const row = await client({ kayan: 'memberRoles', operation: 'create', input: { user: editing.userId, role } })
         held = [...held, { id: String(row.id), role }]
       }
+      toast.success((t('dashboard.rolesSaved', 'Roles saved for {name}') ?? 'Roles saved for {name}').replace('{name}', () => editing.name))
       sheet.current?.close()
     } catch (thrown) {
       const key = (thrown as { data?: { key?: unknown } }).data?.key
@@ -399,6 +411,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
       return setRefusal(refused(answered, t('dashboard.removeRefused', 'The server refused to remove that member.')))
     }
     setMembers((all) => all.filter((one) => one.userId !== editing.userId))
+    toast.success((t('dashboard.memberRemoved', '{name} removed') ?? '{name} removed').replace('{name}', () => editing.name))
     sheet.current?.close()
   }
 

@@ -106,9 +106,11 @@ export function ActivityEntries({ entries, kayan, titles, t, locale, viewer, peo
         const actor = entry.impersonatedBy
           ? (t('auditLog.impersonated', '{staff} as {member}') ?? '{staff} as {member}').replace('{staff}', () => named(entry.impersonatedBy)).replace('{member}', () => named(entry.actor))
           : named(entry.actor)
+        // A create says what the person set: a field left empty, or a box left off, is nothing they did.
+        const made = entry.operation === 'create'
         const shown = changesOf(entry).flatMap(([name, change]) => {
           const field = technical.has(name) ? undefined : kayan.fields.find((one) => one.name === name)
-          return field ? [{ field, change }] : []
+          return field && !(made && (empty(change.to) || change.to === false)) ? [{ field, change }] : []
         })
         return (
           <li key={entry.id} data-entry={entry.operation} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
@@ -133,8 +135,12 @@ export function ActivityEntries({ entries, kayan, titles, t, locale, viewer, peo
                     <li key={field.name} data-change={field.name} className="break-words">
                       <span className="text-foreground">{labelFor({ kayan, field, copy })}</span>
                       {': '}
-                      <span data-from>{drawn(field, change.from)}</span>
-                      <span aria-hidden className="mx-1 inline-block rtl:rotate-180">→</span>
+                      {made ? null : (
+                        <>
+                          <span data-from>{drawn(field, change.from)}</span>
+                          <span aria-hidden className="mx-1 inline-block rtl:rotate-180">→</span>
+                        </>
+                      )}
                       <span data-to>{drawn(field, change.to)}</span>
                     </li>
                   ))}

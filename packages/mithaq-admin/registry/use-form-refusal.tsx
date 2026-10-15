@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { AnyFormApi } from '@tanstack/react-form'
-import type { ClientKayan } from 'mithaq/admin'
-import { labelFor, type Copy } from 'mithaq-admin/copy.ts'
-import { issuesOf, refusalWords } from 'mithaq-admin/form-rules.tsx'
+import type { Copy } from 'mithaq-admin/copy.ts'
+import { issuesOf } from 'mithaq-admin/form-rules.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
 /**
  * The refusal a form holds, its own or the one the host caught: its key, the fields it names with each one's
- * sentence, the sentence over the form, and how a field drops its part once the person changes it.
+ * sentence, and how a field drops its part once the person changes it.
  */
-export const useFormRefusal = ({ copy, error, form, kayan }: { copy: Copy; error: unknown; form: AnyFormApi; kayan: ClientKayan }) => {
+export const useFormRefusal = ({ copy, error, form }: { copy: Copy; error: unknown; form: AnyFormApi }) => {
   const { t } = copy
   const [refused, setRefused] = useState<unknown>(undefined)
   const held = refused === undefined ? error : refused
@@ -19,17 +18,6 @@ export const useFormRefusal = ({ copy, error, form, kayan }: { copy: Copy; error
   // a custom shape that writes none of our keys sends.
   const sentences: Record<string, string> = Object.create(null)
   for (const [name, issue] of Object.entries(issues)) sentences[name] = t(issue, issue) ?? issue
-  const banner = shown
-    ? refusalWords({
-        kayan: kayan.name,
-        shown,
-        labels: Object.keys(issues).flatMap((name) => {
-          const field = kayan.fields.find((one) => one.name === name)
-          return field ? [labelFor({ kayan, field, copy })] : []
-        }),
-        copy,
-      })
-    : undefined
 
   // Put the refusal where TanStack keeps a server's answer (`onServer`), so a project's own control reading
   // `field.state.meta.errors` sees the same sentence the shell draws.
@@ -47,5 +35,5 @@ export const useFormRefusal = ({ copy, error, form, kayan }: { copy: Copy; error
     setRefused(rest.length ? { ...(held as object), data: { ...data, params: { ...data.params, issues: rest } } } : null)
   }
 
-  return { held, shown, issues, sentences, banner, setRefused, forget }
+  return { held, shown, issues, sentences, setRefused, forget }
 }

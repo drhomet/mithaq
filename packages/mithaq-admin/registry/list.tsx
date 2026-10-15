@@ -2,9 +2,9 @@ import { useId, useRef, useState, type ReactElement, type ReactNode } from 'reac
 import type { ButtonClient, Row } from 'mithaq/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { descriptionOf, titleOf, type Copy } from 'mithaq-admin/copy.ts'
+import { descriptionOf, newTitleOf, titleOf, type Copy } from 'mithaq-admin/copy.ts'
 import { filterPathsOf } from 'mithaq-admin/filter-operators.ts'
-import { Form } from 'mithaq-admin/form.tsx'
+import { DrawerForm } from 'mithaq-admin/form.tsx'
 import { counted } from 'mithaq-admin/format.tsx'
 import { ListButton } from 'mithaq-admin/list-button.tsx'
 import { Columns, columnsOf, withColumns } from 'mithaq-admin/list-columns.tsx'
@@ -17,7 +17,9 @@ import { writableFields } from 'mithaq-admin/list-selection.tsx'
 import { ListTable } from 'mithaq-admin/list-table.tsx'
 import { BulkBar, ListToolbar } from 'mithaq-admin/list-toolbar.tsx'
 import type { ListProps } from 'mithaq-admin/list-types.tsx'
+import { doneWords } from 'mithaq-admin/form-rules.tsx'
 import { pageButtonOf, type PageButton } from 'mithaq-admin/node-buttons.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 import { drawsKind, listOf, nodesOf, scopeOf, shown as holds } from 'mithaq-admin/node-tree.ts'
 import { useRelationshipTitles } from 'mithaq-admin/relationship-cell.tsx'
 import { rowTitle, rowWarning } from 'mithaq-admin/row-title.tsx'
@@ -28,7 +30,7 @@ export function List(props: ListProps): ReactElement {
   const { access, api, client, edit, href, kayan, locale, onQuery, operations, page, query, reads, run, screen, t } = props
   const copy: Copy = { t, locale }
   const node = props.node ?? listOf(screen)
-  const { refine, running, refusal, setRefused, runOnRow, selected, setSelected, rowIds, ticked, done, setDone } = useListState({ docs: page.docs, kayan, onQuery, query, run })
+  const { refine, running, refused, runOnRow, selected, setSelected, rowIds, ticked, done, setDone } = useListState({ copy, docs: page.docs, kayan, onQuery, query, run })
   /** The row being edited in place, `null` for a row being added, and nothing while no form is open. */
   const [editing, setEditing] = useState<Row | null | undefined>(undefined)
   const edits = edit && node
@@ -89,7 +91,7 @@ export function List(props: ListProps): ReactElement {
   const unreadable = !(node?.columns.map((column) => column.field) ?? kayan.fields.map((field) => field.name)).some((name) => kayan.fields.some((field) => field.name === name))
   const picks = bulkButtons.length > 0 && !unreadable
   const button = (one: PageButton, inputOf: (values: Record<string, unknown>) => Record<string, unknown>, key: string, extra: { description?: string; disabled?: boolean; onRan?: (written: unknown) => void } = {}) => (
-    <ListButton key={key} operation={one} kayan={kayan} client={client} api={api} copy={copy} screen={screen} run={run!} inputOf={inputOf} onRefused={setRefused} {...extra} />
+    <ListButton key={key} operation={one} kayan={kayan} client={client} api={api} copy={copy} screen={screen} run={run!} inputOf={inputOf} onRefused={refused} {...extra} />
   )
   /** A counted sentence about the ticked rows, capitalised though the kayan's plural may be lower case. */
   const aboutTicked = (key: string, count: number, fallback: string) => {
@@ -127,7 +129,7 @@ export function List(props: ListProps): ReactElement {
         <CardContent>
           <div className="w-full space-y-4">
             <ListToolbar
-              {...{ api, client, copy, kayan, refusal }}
+              {...{ api, client, copy, kayan }}
               search={query.search}
               searched={searchableFields({ kayan, search: node?.search, client })}
               onSearch={(search) => refine({ search })}
@@ -136,7 +138,7 @@ export function List(props: ListProps): ReactElement {
               onWhere={(where) => refine({ where })}
               columns={unreadable ? null : <Columns kayan={kayan} columns={columns} t={t} locale={locale} onChange={(next) => onQuery(withColumns(query, next))} />}
             >
-              {allowed(node?.toolbar).filter((one) => holds(one.node, scope)).map((one, at) => button(one.operation, (values) => values, `toolbar-${at}`, { description: t('admin.toolbarWarning', 'This runs on no row of the list.') ?? 'This runs on no row of the list.' }))}
+              {allowed(node?.toolbar).filter((one) => holds(one.node, scope)).map((one, at) => button(one.operation, (values) => values, `toolbar-${at}`, { description: t('admin.toolbarWarning', 'This runs on no row of the list.') ?? 'This runs on no row of the list.', onRan: () => toast.success(doneWords({ kayan, copy, operation: one.operation })) }))}
               {picks ? (
                 <BulkBar
                   ticked={ticked.length}
@@ -154,7 +156,9 @@ export function List(props: ListProps): ReactElement {
                       // The ticked ids name rows the host's re-read is about to drop, so the selection is cleared
                       // and what the bulk did is said, less the rows it named as left.
                       onRan: (written) => {
-                        setDone({ count: ticked.length - ((written as { errors?: readonly unknown[] } | null)?.errors?.length ?? 0) })
+                        const count = ticked.length - ((written as { errors?: readonly unknown[] } | null)?.errors?.length ?? 0)
+                        setDone({ count })
+                        toast.success(aboutTicked('admin.bulkDone', count, '{plural} done: {count}.'))
                         setSelected(new Set())
                       },
                     }),
@@ -183,7 +187,7 @@ export function List(props: ListProps): ReactElement {
                 const views = operations && operations.update !== true
                 return (
                   <>
-                    {own.map((one, at) => button(one.operation, (values) => ({ ...values, id: row.id }), `row-${at}`, { description: rowWarning({ kayan, row, operation: one.operation.name, copy }) }))}
+                    {own.map((one, at) => button(one.operation, (values) => ({ ...values, id: row.id }), `row-${at}`, { description: rowWarning({ kayan, row, operation: one.operation.name, copy }), onRan: () => toast.success(doneWords({ kayan, copy, operation: one.operation })) }))}
                     {opens || menu.length || deletes || Menu ? (
                       <RowMenu
                         {...{ copy, kayan, Menu, row, running }}
@@ -212,21 +216,23 @@ export function List(props: ListProps): ReactElement {
 
             {unreadable ? null : <Pagination page={page} t={t} locale={locale} onPage={(next) => onQuery({ ...query, page: next })} onLimit={(limit) => refine({ limit })} />}
 
+            {/* A row of another kayan is made or changed in Payload's document drawer over the page, which closes once
+                the write lands; the host's re-read draws the row behind it. */}
             {edits && editing !== undefined ? (
-              <div data-mithaq-inline-edit={editing ? String(editing.id ?? '') : 'new'} className="bg-muted/30 rounded-md border p-3">
-                <Form
-                  {...{ api, kayan, locale, t }}
-                  screen={screen && { ...screen, kayan }}
-                  nodes={node!.columns}
-                  client={edits.client}
-                  writes={edits.writes}
-                  value={editing}
-                  locales={props.locales}
-                  kayans={client}
-                  onDone={() => setEditing(undefined)}
-                  onCancel={() => setEditing(undefined)}
-                />
-              </div>
+              <DrawerForm
+                {...{ api, kayan, locale, t }}
+                edit={editing ? String(editing.id ?? '') : 'new'}
+                title={editing ? rowTitle({ kayan, row: editing, locale }) || titleOf({ kayan, copy }) : newTitleOf({ kayan, copy })}
+                screen={screen && { ...screen, kayan }}
+                nodes={node!.columns}
+                client={edits.client}
+                writes={edits.writes}
+                value={editing}
+                locales={props.locales}
+                kayans={client}
+                onDone={() => setEditing(undefined)}
+                onClose={() => setEditing(undefined)}
+              />
             ) : null}
           </div>
         </CardContent>

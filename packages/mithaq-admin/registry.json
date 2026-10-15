@@ -132,6 +132,23 @@
       ]
     },
     {
+      "name": "mithaq-time-field",
+      "type": "registry:component",
+      "title": "Mithaq time field",
+      "description": "A moment's time of day as two boxes and an AM or PM, after openstatus's time picker, the same in every browser and in the locale's numerals.",
+      "registryDependencies": [
+        "button",
+        "input"
+      ],
+      "files": [
+        {
+          "path": "registry/time-field.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/time-field.tsx"
+        }
+      ]
+    },
+    {
       "name": "mithaq-date-control",
       "type": "registry:component",
       "title": "Mithaq date control",
@@ -140,7 +157,6 @@
         "button",
         "calendar",
         "direction",
-        "input",
         "popover"
       ],
       "files": [
@@ -553,11 +569,11 @@
       "name": "mithaq-record-frame",
       "type": "registry:component",
       "title": "Mithaq record frame",
-      "description": "The dialog, sheet or drawer a record opens in over its list, its close button named in the viewer's language, and the focus held inside it while it is open.",
+      "description": "The dialog, sheet or full-page document drawer a record opens in over its list or its page, its close button named in the viewer's language, and the focus held inside it while it is open.",
       "registryDependencies": [
         "button",
         "dialog",
-        "drawer",
+        "direction",
         "sheet"
       ],
       "files": [
@@ -632,6 +648,19 @@
           "path": "registry/form-types.tsx",
           "type": "registry:component",
           "target": "@components/mithaq/form-types.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-toast",
+      "type": "registry:component",
+      "title": "Mithaq toast",
+      "description": "Sonner's toast call, `toast.success` and `toast.error`, and the one Toaster the host mounts, which says each write that landed or failed.",
+      "files": [
+        {
+          "path": "registry/toast.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/toast.tsx"
         }
       ]
     },
@@ -864,6 +893,9 @@
           "type": "registry:component",
           "target": "@components/mithaq/form-chrome.tsx"
         }
+      ],
+      "registryDependencies": [
+        "button"
       ]
     },
     {
@@ -1037,6 +1069,7 @@
       "title": "Mithaq relationship control",
       "description": "The picker for a relationship field: a debounced search over the target kayan's own find, paged on scroll, with the selected row hydrated by one read.",
       "registryDependencies": [
+        "button",
         "combobox",
         "spinner"
       ],
