@@ -23,11 +23,11 @@ import {
  * A project with a `uuid` id, a `tenant_id` column and a relationship whose column is `author_id`,
  * over the access kayan the template language needs.
  */
-const adoptSourceOf = (posts = '') => `import { fetchHttp } from '${mithaqEntry}'
+const adoptSourceOf = (posts = '') => `import { defaultMaxBodyBytes, fetchHttp } from '${mithaqEntry}'
 import { buildAsas, defineKayan } from '${template}'
 
 export const asas = buildAsas({
-  http: [fetchHttp()],
+  http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
   kayan: [
     defineKayan({
       name: 'authors',

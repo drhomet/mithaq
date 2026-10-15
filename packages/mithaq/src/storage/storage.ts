@@ -9,7 +9,7 @@ import { AsasError, codes, denied, invalid, missing } from '../asas/runner/error
 import { sealOf, type Ctx } from '../asas/runner/steps.ts'
 import type { Authorize, ManagedAdmin } from '../asas/runner/write.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
-import { boundedBody, tooLarge } from '../asas/http/fetch.ts'
+import { assertMaxBodyBytes, boundedBody, tooLarge } from '../asas/http/fetch.ts'
 import { allowedType } from './allowed-type.ts'
 
 /** Written by the runner when the row is made, from the signed upload, and by nobody after. */
@@ -321,9 +321,7 @@ export const resolveStorage = ({ language, resolved, storeOf, active }: {
   if (!Number.isSafeInteger(given.fileSize) || given.fileSize < 1) {
     throw new Error(`storage.fileSize is ${JSON.stringify(given.fileSize)}, and it is a whole number of bytes above 0.`)
   }
-  if (!Number.isSafeInteger(given.maxBodyBytes) || given.maxBodyBytes! < 1) {
-    throw new Error('storage names no "maxBodyBytes", the largest request body in bytes an upload\'s instructions read, as a whole number above 0. Name the project\'s own, such as defaultMaxBodyBytes from mithaq.')
-  }
+  assertMaxBodyBytes('storage', given.maxBodyBytes)
   if (typeof given.onError !== 'function') throw new Error('storage names no "onError" function, which a file route hands what it threw before it answers 500. Name the project\'s own, such as console.error.')
   const adapters = Object.entries(given.adapters ?? {})
   if (!adapters.length) throw new Error('storage names no adapters, so no file has anywhere to go.')

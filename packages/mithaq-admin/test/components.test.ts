@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement, type ReactElement } from 'react'
 import { asas } from 'asas'
 import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
-import { fetchHttp } from 'mithaq'
+import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import './tsx.ts'
 
 const { Form } = await import('../registry/form.tsx')
@@ -28,7 +28,7 @@ type ControlProps = import('../registry/control-props.ts').ControlProps
 const screen = asas.targets.dashboard.client
 // One build of the color language for every test here: a build's pool ends once.
 const { language, swatches } = await import('./color-language.ts')
-const built = language.buildAsas({ http: [fetchHttp()], kayan: [swatches] })
+const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [swatches] })
 after(() => built.destroy())
 const courses = screen.kayan.courses!
 const t = (_key: string, fallback?: string) => fallback

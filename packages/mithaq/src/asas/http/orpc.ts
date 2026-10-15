@@ -8,7 +8,7 @@ import { RPCHandler } from '@orpc/server/fetch'
 import type { OperationTable } from '../build.ts'
 import { AfterCommitError, AsasError, afterCommitHeader, codes } from '../runner/errors.ts'
 import { issueRefusal, withoutPrototype } from '../runner/steps.ts'
-import { boundedBody, decodeJson, defaultMaxBodyBytes, draftOptions, tooLarge } from './fetch.ts'
+import { assertMaxBodyBytes, boundedBody, decodeJson, draftOptions, tooLarge } from './fetch.ts'
 import type { StandardSchemaIssue } from '../../mithaq/standard-schema.ts'
 
 /** The context every procedure is handed, which defaults to the actor alone. */
@@ -29,8 +29,8 @@ export type OrpcHttpOptions = {
    * A host's own deliberate `ORPCError` reaches it too, so a host logging only faults filters on the code.
    */
   onError?: (error: unknown) => void
-  /** The largest body a call takes, answered 413 past it: `defaultMaxBodyBytes` or the project's own. */
-  maxBodyBytes?: number
+  /** The largest body a call takes, answered 413 past it: `defaultMaxBodyBytes` or the project's own. Required. */
+  maxBodyBytes: number
 }
 
 // Matched on the `ValidationError` cause, not the shape of `data`, so a host's own
@@ -66,9 +66,10 @@ export const orpcHttp = ({
   api = '/api',
   context,
   onError,
-  maxBodyBytes = defaultMaxBodyBytes,
-}: OrpcHttpOptions = {}) =>
-  <View>(operations: OperationTable<View>) => {
+  maxBodyBytes,
+}: OrpcHttpOptions) => {
+  assertMaxBodyBytes('orpcHttp', maxBodyBytes)
+  return <View>(operations: OperationTable<View>) => {
     // A reporter that throws must not replace the error the host has to see.
     const report = (thrown: unknown) => {
       try {
@@ -185,3 +186,4 @@ export const orpcHttp = ({
       },
     }
   }
+}

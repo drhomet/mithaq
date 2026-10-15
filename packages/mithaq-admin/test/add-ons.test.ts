@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module'
 import { after, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
-import { fetchHttp } from 'mithaq'
+import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import { ScreenContext, type ScreenState } from 'mithaq/admin/react'
 import './tsx.ts'
 // The template's screens, which plain-language.ts borrows, sit beside a language that lays down rich text for its server,
@@ -26,7 +26,7 @@ const { List } = await import('../registry/list.tsx')
 const { ComponentsProvider, checkComponents } = await import('../registry/components.tsx')
 const { defaultComponents } = await import('../registry/default-components.tsx')
 const { language, notes } = await import('./plain-language.ts')
-const built = language.buildAsas({ http: [fetchHttp()], kayan: [notes] })
+const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] })
 after(() => built.destroy())
 
 test('a language with no rich text and no files starts, and draws its forms and lists, with defaultComponents alone and loads neither add-on', () => {

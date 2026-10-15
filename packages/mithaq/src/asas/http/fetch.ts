@@ -82,12 +82,19 @@ export const boundedBody = async (request: Request, limit: number): Promise<Blob
   }
 }
 
+/** Refused by name, since core holds no limit of its own. */
+export const assertMaxBodyBytes = (owner: string, value: unknown) => {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    throw new Error(`${owner} names no "maxBodyBytes", the largest request body in bytes it reads, as a whole number above 0. Name the project's own, such as defaultMaxBodyBytes from mithaq.`)
+  }
+}
+
 export const tooLarge = (limit: number) =>
   Response.json({ code: codes[413], message: `The request body holds at most ${limit} bytes.` }, { status: 413 })
 
 export type FetchHttpOptions = {
-  /** The largest body a call takes, answered 413 past it: `defaultMaxBodyBytes` or the project's own. */
-  maxBodyBytes?: number
+  /** The largest body a call takes, answered 413 past it: `defaultMaxBodyBytes` or the project's own. Required. */
+  maxBodyBytes: number
   /**
    * Builds the context every step of a served call reads, from the request and the actor.
    * The plug reads no header or body key into it; a throw is answered 500.
@@ -101,8 +108,9 @@ export type FetchHttpOptions = {
  * The default HTTP plug: `POST /api/<kayan>/<operation>` with a JSON body, over
  * `Request` and `Response` alone. The runner parses each operation's input.
  */
-export const fetchHttp = ({ context, onError = console.error, maxBodyBytes = defaultMaxBodyBytes }: FetchHttpOptions = {}) =>
-  <View>(operations: OperationTable<View>): HttpPlug => {
+export const fetchHttp = ({ context, onError = console.error, maxBodyBytes }: FetchHttpOptions) => {
+  assertMaxBodyBytes('fetchHttp', maxBodyBytes)
+  return <View>(operations: OperationTable<View>): HttpPlug => {
     const table = new Map(operations.map((one) => [`${one.kayan}/${one.name}`, one]))
     return {
       name: 'fetch',
@@ -169,3 +177,4 @@ export const fetchHttp = ({ context, onError = console.error, maxBodyBytes = def
       },
     }
   }
+}

@@ -492,7 +492,7 @@ export const buildAsas = <
     auth?: Auth
     /**
      * The HTTP plugs, asked in order, so the order decides who owns a prefix two claim. Required:
-     * `fetchHttp()` takes no dependency; `orpcHttp()` first gives `asas.router` its typed client.
+     * `fetchHttp` takes no dependency; `orpcHttp` first gives `asas.router` its typed client.
      */
     http: readonly [
       (operations: OperationTable<Procedures<KayanList, GlobalList, Declared<KayanList, GlobalList>, L>>) => Http,
@@ -513,7 +513,7 @@ export const buildAsas = <
   // Refused before any work: core picks no plug of its own.
   if (!http?.length) {
     throw new Error(
-      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp()], or http: [orpcHttp(), fetchHttp()] for the typed client.',
+      'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], or http: [orpcHttp({ maxBodyBytes: defaultMaxBodyBytes }), fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] for the typed client.',
     )
   }
   const globals = (global ?? []) as readonly Kayan[]
@@ -1061,7 +1061,7 @@ export const buildAsas = <
     statements: statements as Readonly<Record<string, readonly string[]>>,
     /** Every built operation, flat. Its `procedures` view is a type, keyed by kayan then operation. */
     operations: operationTable as OperationTable<Procedures<KayanList, GlobalList, All, L>>,
-    /** The router the first plug built, which a typed client is built from; `undefined` for `fetchHttp()`. */
+    /** The router the first plug built, which a typed client is built from; `undefined` for `fetchHttp`. */
     router: plugs[0]?.router as Http['router'],
     /** Every target as the language passed it, so `asas.targets.drizzle.db` is drizzle. A screen also carries its projection under `client`. */
     targets: Object.fromEntries(

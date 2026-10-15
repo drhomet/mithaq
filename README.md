@@ -97,11 +97,11 @@ export const tags = defineKayan({
 
 ```ts
 // src/asas.ts
-import { fetchHttp } from 'mithaq'
+import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import { buildAsas } from './mithaq.ts'
 import { tags } from './tags.ts'
 
-export const asas = buildAsas({ kayan: [tags], http: [fetchHttp()] })
+export const asas = buildAsas({ kayan: [tags], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })] })
 ```
 
 `asas.handler(request)` answers a `Request` with a `Response`; mount it under `/api` in any server. With `fetchHttp`, `POST /api/tags/create` with a JSON body creates a tag, and `POST /api/tags/find` lists them. In development, `asas.connect()` pushes the schema to Postgres. A kayan that declares no access answers only the admin the build names, so this one opens reads to everyone.

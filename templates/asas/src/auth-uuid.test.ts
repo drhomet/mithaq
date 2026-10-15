@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter as betterAuthDrizzle } from 'better-auth/adapters/drizzle'
 import {
+  defaultMaxBodyBytes,
   base,
   defaultAuthorize,
   defaultBulkLimit,
@@ -69,7 +70,7 @@ before(async () => {
   await generateAuth({ language: '../../../mithaq.ts', options: uuidOptions, directory: uuidDirectory, schemaName })
   await generateAuth({ language: '../../../mithaq.ts', options: plainOptions, directory: textDirectory })
   const { betterAuth: kayan } = (await import(new URL('index.ts', uuidDirectory).href)) as { betterAuth: { core: never[] } }
-  built = language.buildAsas({ http: [fetchHttp()], kayan: kayan.core, auth: { onError: console.error } })
+  built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: kayan.core, auth: { onError: console.error } })
   tables = built.targets.drizzle.tables
   // Only this test's own schema is dropped, so the other test files' tables in
   // `public` are never touched.

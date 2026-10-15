@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
 import { z } from 'zod'
 import {
+  defaultMaxBodyBytes,
   actorRoles,
   AsasError,
   base,
@@ -360,7 +361,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, secret: 'tenant-scope-a-local-auth-test-secret' }),
     targets: { service: { operations: { ...defaultOperations, ...localAuthOperations } } },
   }
-  return language.buildAsas({ http: [fetchHttp()], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
 type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
@@ -1127,7 +1128,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
 
   test('the HTTP read route takes ?tenant= on both plugs, and a write route refuses it', async () => {
     const actor = await actorOf({ active: 'org1', orgs: { org1: ['editor'], org2: ['reader'] } })
-    for (const plug of [fetchHttp()(built.operations as never), orpcHttp()(built.operations as never)]) {
+    for (const plug of [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })(built.operations as never), orpcHttp({ maxBodyBytes: defaultMaxBodyBytes })(built.operations as never)]) {
       const call = async (path: string, body: unknown) => {
         const response = (await plug.handle(new Request(`http://test/api/memos/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }), async () => actor))!
         return { status: response.status, body: (await response.json()) as { docs?: { firmId: string }[] } }
@@ -1185,7 +1186,7 @@ test('a language with no tenant target hands every step ctx.tenant undefined', a
       },
     },
   }
-  const built = language.buildAsas({ http: [fetchHttp()], kayan: [notes] } as never) as unknown as { kayan: { notes: { operations: Record<'create' | 'find', (input: object) => Promise<unknown>> } } }
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [notes] } as never) as unknown as { kayan: { notes: { operations: Record<'create' | 'find', (input: object) => Promise<unknown>> } } }
   seenTenants.length = 0
   await built.kayan.notes.operations.create({ title: 'shared' })
   await built.kayan.notes.operations.find({})

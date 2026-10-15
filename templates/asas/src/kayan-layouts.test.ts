@@ -26,7 +26,7 @@ const project = async () => {
   await write('package.json', '{ "name": "kayan-layouts-fixture", "private": true, "type": "module" }')
   await write(
     'src/mithaq.ts',
-    `import { screenKinds, defaultAuthorize, defaultDepth, defaultLimit, defaultMaxLimit, defaultJoinLimit, defaultBulkLimit, base, defineMithaq, drizzleAdapter, drizzleTarget, folderOf, screenTarget, serviceTarget, zodTarget } from 'mithaq'
+    `import { defaultMaxBodyBytes, screenKinds, defaultAuthorize, defaultDepth, defaultLimit, defaultMaxLimit, defaultJoinLimit, defaultBulkLimit, base, defineMithaq, drizzleAdapter, drizzleTarget, folderOf, screenTarget, serviceTarget, zodTarget } from 'mithaq'
 export const ui = folderOf(new URL('./ui/', import.meta.url))
 const language = defineMithaq({
   locales: ['en'] as const,
@@ -85,7 +85,7 @@ export const widget = defineKayan({
 import { buildAsas } from './mithaq.ts'
 import { flatKayan } from './kayan/flat-kayan.ts'
 import * as widget from './features/widget/index.ts'
-export const asas = buildAsas({ http: [fetchHttp()], kayan: [flatKayan, ...widget.kayan] })
+export const asas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [flatKayan, ...widget.kayan] })
 `,
   )
   return root
@@ -162,7 +162,7 @@ export const widget = defineKayan({
     `import { fetchHttp } from 'mithaq'
 import { buildAsas } from '@fixture/mithaq'
 import * as widget from '@fixture/widget'
-export const asas = buildAsas({ http: [fetchHttp()], kayan: [...widget.kayan] })
+export const asas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [...widget.kayan] })
 `,
   )
   await write('packages/asas/src/ui/panel.tsx', 'export const Panel = () => null\n')

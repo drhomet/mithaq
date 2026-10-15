@@ -11,6 +11,7 @@ import { generateAuth, header as authHeader, run as runAuth } from 'mithaq/gener
 import { generateScreens } from 'mithaq/generate-screens'
 import { generateMessages, refusals, run } from 'mithaq/generate-messages'
 import {
+  defaultMaxBodyBytes,
   defaultAuthorize,
   defaultDepth,
   defaultLimit,
@@ -376,7 +377,7 @@ test("the registry carries the labels mithaq ships under one scope of its own, e
 
 test("a kayan's own messages entry overrides the seed for that rule, and the seed is no collision", () => {
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'notes',
@@ -401,7 +402,7 @@ test("a kayan's own messages entry overrides the seed for that rule, and the see
 
 test("a kayan's messages nest by the parts of the key, and a key that names no field nests the same way", () => {
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'notes',
@@ -435,7 +436,7 @@ test("a kayan's messages nest by the parts of the key, and a key that names no f
 test('a message key written flat is refused at build, naming the first part and the nested spelling', () => {
   const notes = (messages: Record<string, unknown>) =>
     buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         defineKayan({
           name: 'notes',
@@ -465,7 +466,7 @@ test('a message key written flat is refused at build, naming the first part and 
 test('a message that is no object at all is refused at build by what was written, rather than destroyed or thrown past', () => {
   const notes = (messages: Record<string, unknown>) =>
     buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         defineKayan({
           name: 'notes',
@@ -505,7 +506,7 @@ test('a message that is no object at all is refused at build by what was written
 test('a part of a message that is neither a string, a group nor a function is refused naming that part', () => {
   const notes = (messages: Record<string, unknown>) =>
     buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         defineKayan({
           name: 'notes',
@@ -543,7 +544,7 @@ test('a part of a message that is neither a string, a group nor a function is re
 test('a message whose parts are strings under keys the language never declared as locales is refused, rather than written over', () => {
   const notes = (messages: Record<string, unknown>) =>
     buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         defineKayan({
           name: 'notes',
@@ -582,7 +583,7 @@ test('a message whose parts are strings under keys the language never declared a
   // A message short of a declared locale is not this guard's: a run fills it in and `--check`
   // reports it missing.
   const short = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'notes',
@@ -603,7 +604,7 @@ test('a message whose parts are strings under keys the language never declared a
 test('a message key that is a sentence and a group at once is refused at build, and so is one that is neither', () => {
   const notes = (messages: Record<string, unknown>) =>
     buildAsas({
-      http: [fetchHttp()],
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
       kayan: [
         defineKayan({
           name: 'notes',
@@ -708,7 +709,7 @@ const refusingRules = ['max', 'maxLength', 'maxRows', 'min', 'minLength', 'minRo
 
 test('message seeds cover only fields clients can supply on a write', async () => {
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'seedProviders',
@@ -744,7 +745,7 @@ test('message seeds cover only fields clients can supply on a write', async () =
 
 test('an id still seeds refusal keys when its provider is application on both writes', () => {
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'serverIds',
@@ -855,7 +856,7 @@ test("a project rule carrying its own sentence seeds mithaq.rules.<name>, and it
     },
   })
   const { messages } = language.buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       language.defineKayan({
         name: 'scores',
@@ -938,7 +939,7 @@ test("a key the resolver's returned object never carried is refused by name", as
 
 test('a key two scopes both claim is refused by name, and a field beats the kayan messages that claimed it', async () => {
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'collisions',
@@ -969,7 +970,7 @@ test('a key two scopes both claim is refused by name, and a field beats the kaya
 
 test('a label written as a function is reported unverifiable rather than refused', async () => {
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'hatches',
@@ -1021,7 +1022,7 @@ test("the project's own resolver rides on buildAsas, is called with nothing, and
   // zero-argument arrow would report nothing whatever mithaq handed it.
   let handed: unknown[] | undefined
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'resolverProbe',
@@ -1140,7 +1141,7 @@ test('a kayan with no field the store can sort a page by is named whether or not
   // `test-language.ts` draws no screens.
   const { buildAsas, defineKayan } = dashboardScreen(['allLocalized'])
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'allLocalized',
@@ -1211,13 +1212,13 @@ test('a kayan that takes the name of a scope mithaq writes is refused at buildAs
     })
     // `buildAsas` itself, not the `messages` getter, so a project is told at boot rather than when
     // the CLI asks for its copy.
-    assert.throws(() => buildAsas({ http: [fetchHttp()], kayan: [bare, ...accessKayan] }), new RegExp(`Kayan name "${name}" is reserved`))
+    assert.throws(() => buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })], kayan: [bare, ...accessKayan] }), new RegExp(`Kayan name "${name}" is reserved`))
   }
 })
 
 test('the localized scan sorts by a field it can sort by, rather than by whichever field was declared first', () => {
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'notes',
@@ -1241,7 +1242,7 @@ test('the localized scan sorts by a field it can sort by, rather than by whichev
 test('the messages registry is assembled when it is read, not when the project is built', () => {
   let called = 0
   const built = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'lazyProbe',
@@ -2266,7 +2267,7 @@ test('the copy sweep ignores a custom bag, whatever locale-shaped value it holds
   // positions the language names and no others, so a record that happens to look like copy claims
   // no key and is refused for no missing locale.
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'bagCopy',
@@ -2303,7 +2304,7 @@ test('a field overriding only the store target still seeds the schema target\'s 
   // `targets.drizzle` replaces the column mithaq would have derived, but the zod shape this kayan's
   // `schema` reads through is still mithaq's own, so the seed still writes for it.
   const { messages } = buildAsas({
-    http: [fetchHttp()],
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })],
     kayan: [
       defineKayan({
         name: 'storeOverridden',

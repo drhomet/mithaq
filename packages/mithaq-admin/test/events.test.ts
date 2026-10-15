@@ -7,7 +7,7 @@ import { mock, test } from 'node:test'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { StrictMode, act, createElement, useLayoutEffect, useState, type ReactElement } from 'react'
 import { asas } from 'asas'
-import { fetchHttp } from 'mithaq'
+import { defaultMaxBodyBytes, fetchHttp } from 'mithaq'
 import { FormContext, ListContext, ScreenContext, useForm, useKayan, useRecord, type ScreenState } from 'mithaq/admin/react'
 import './tsx.ts'
 import { click, fire, mount, press, window, type as typeInto } from './dom.ts'
@@ -2167,7 +2167,7 @@ test('a datetime the plain text input draws is edited, saved through the fetch p
   // A datetime drawn with the plain `text` control must show the shape the fetch plug decodes back into a `Date`; `String(date)` would be posted and refused by `z.date()`.
   // The operation behind the plug is `sessions.update` with its call replaced by the parse the runner makes first, so no store is needed.
   const update = asas.operations.find((one) => one.kayan === 'sessions' && one.name === 'update')!
-  const plug = fetchHttp()([{ ...update, call: async (input: unknown) => update.input['~standard'].validate(input) }])
+  const plug = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })([{ ...update, call: async (input: unknown) => update.input['~standard'].validate(input) }])
   const answers: Record<string, unknown>[] = []
   const post = async (input: Record<string, unknown>) => {
     const response = await plug.handle(new Request('http://mithaq.test/api/sessions/update', { method: 'POST', body: JSON.stringify(input) }), async () => null)

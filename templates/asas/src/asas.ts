@@ -56,7 +56,7 @@ export const asas = buildAsas({
     ...settings.global,
     // end add-on: settings
   ],
-  // The HTTP layer, a list the handler asks in order. `orpcHttp()` is first
+  // The HTTP layer, a list the handler asks in order. `orpcHttp` is first
   // because it owns `/api/rpc`, where a typed client would reach the build, and
   // because `asas.router` is the first plug's. It also claims `/api`, so the
   // plain plug behind it answers only what oRPC's own OpenAPI arm matched
