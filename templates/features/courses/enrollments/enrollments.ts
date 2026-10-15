@@ -1,11 +1,18 @@
-import { defaultOperations, folderOf, invalid, type Ctx, type FilterOptions, type WriteTools } from 'mithaq'
+import { conflict, defaultOperations, folderOf, invalid, type Ctx, type FilterOptions, type WriteTools } from 'mithaq'
 import { defineKayan, organization, serverTargets } from '@asas/mithaq'
 import { currentOrganization, readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
-import { activity, appPage, danger, backofficeList, backofficeRecord, topPage } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
 import { sessions } from '../sessions/sessions.ts'
-import { courses } from '../courses/courses.ts'
+import { holdSeats, seatsTaken, sessionHeld } from '../sessions/seats.ts'
+// add-on: settings
+import { sql } from 'mithaq/drizzle'
+import type { NodePgDatabase } from 'mithaq/drizzle/node-postgres'
+// end add-on: settings
 
 const ui = folderOf(new URL('./ui/', import.meta.url))
+const portalUi = folderOf(new URL('../portal/ui/', import.meta.url))
+/** A portal page in its shell, which draws the portal's own nav, over its single column. */
+const portalPage = <const Main extends readonly unknown[]>(main: Main) => ({ shell: 'top', header: [{ title: {} }], main: [{ layout: 'page', main }] }) as const
 const sessionCell = ui('session-cell.tsx#SessionCell')
 const enrollment = [{ section: 'enrollment', label: { en: 'Enrollment', ar: 'التسجيل' }, fields: ['session', 'student'] }] as const
 
@@ -61,26 +68,95 @@ const open = (path: string) => ({ or: [{ [path]: { exists: false } }, { [path]: 
 /** What a seat's session picker offers, and a save is held to: a session open for seats, of a course open too. */
 const openSessions: FilterOptions = () => ({ and: [open('archived'), open('course.archived')] })
 
+/** Whether the actor writes its own seats alone: a student, held to what each course lets its students do. */
+const ownSeatsOnly = (user: unknown) => !readsPast(user, 'enrollments.others')
+
+/** Whether a session is still to start, which a student's enrollment and its cancel both ask. */
+const yetToStart = (startsAt: unknown) => new Date(startsAt as string | Date).getTime() > Date.now()
+
 /**
- * Refuses a seat in an archived session, or in a session of an archived
- * course, in words of its own. A session the actor may not read is left to the
- * reference check, which refuses it in the words a missing one gets.
+ * Whether a session takes this seat. A session the actor may not read is left
+ * to the reference check, which refuses it in the words a missing one gets.
+ * The rest is judged on the session's own columns, whatever the actor is shown:
+ * an archived session, or one of an archived course, takes none; a student
+ * takes a seat only where its course lets students enroll themselves, and only
+ * before the session starts; and a session with a capacity takes no seat past
+ * it, whoever writes, counted under a lock on the session. A seat kept in the
+ * session it already holds takes no new one.
  */
-const sessionTakesSeats = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Promise<Ctx> => {
+const takesSeat = async (ctx: Ctx<{ session?: unknown }>, tools: WriteTools): Promise<Ctx> => {
   const id = ctx.data.session
-  if (typeof id !== 'string') return ctx
-  const session = await tools.of(sessions).findByID({ id }).catch(() => null)
+  // An edit of a seat the actor may not reach loaded no row; the store answers it the 404 a missing one gets.
+  if (typeof id !== 'string' || (tools.operation !== 'create' && !ctx.dataBefore)) return ctx
+  if (!(await tools.of(sessions).findByID({ id }).catch(() => null))) return ctx
+  const session = await sessionHeld({ tx: ctx.tx, session: id })
   if (!session) return ctx
-  const course = session.archived ? undefined : await tools.of(courses).findByID({ id: session.course }).catch(() => null)
-  if (session.archived || course?.archived) {
+  // The stored id from here on: a uuid matches in any case, and the lock, the count and the comparison below must not
+  // tell `A0EE…` from `a0ee…`.
+  const held = session.id
+  if (session.archived || session.courseArchived) {
     throw invalid({
       message: 'This session is archived, or its course is, so it takes no new seat.',
       key: 'error.invalid.archived_session',
       params: { kayan: 'enrollments', field: 'session' },
     })
   }
+  if (held === ctx.dataBefore?.session) return ctx
+  if (ownSeatsOnly(ctx.user)) {
+    if (session.selfEnroll !== true) {
+      throw invalid({
+        message: 'Students of this course do not enroll themselves: the school enrolls them.',
+        key: 'error.invalid.enrollment_closed',
+        params: { kayan: 'enrollments', field: 'session' },
+      })
+    }
+    if (!yetToStart(session.startsAt)) {
+      throw invalid({ message: 'This session has started, so it takes no new seat.', key: 'error.invalid.session_started', params: { kayan: 'enrollments', field: 'session' } })
+    }
+  }
+  if (session.capacity !== null) {
+    await holdSeats({ tx: ctx.tx, session: held })
+    if ((await seatsTaken({ session: held, tx: ctx.tx })) >= session.capacity) {
+      throw conflict({ message: 'Every seat of this session is taken.', key: 'error.conflict.session_full', params: { kayan: 'enrollments', field: 'session' } })
+    }
+  }
   return ctx
 }
+
+/**
+ * A student leaves a session only before it starts: the seat it held stays the
+ * record that it was there. Whoever reads every seat withdraws one at any time.
+ * A seat the actor may not reach loaded no row, and answers the 404 a missing
+ * one does. The start is the session's column, so a seat whose course has since
+ * left the actor's sight is not said to have started.
+ */
+const leavesBeforeStart = async (ctx: Ctx): Promise<Ctx> => {
+  if (!ownSeatsOnly(ctx.user) || !ctx.dataBefore) return ctx
+  const id = ctx.dataBefore.session
+  const session = typeof id === 'string' ? await sessionHeld({ tx: ctx.tx, session: id }) : undefined
+  if (!session || !yetToStart(session.startsAt)) {
+    throw invalid({ message: 'This session has started, so its seat stays.', key: 'error.invalid.session_started', params: { kayan: 'enrollments' } })
+  }
+  return ctx
+}
+
+// add-on: settings
+/**
+ * While the portal is closed for maintenance a student takes and gives back no
+ * seat, whatever calls the server; staff keep working. The organization's
+ * settings are read in the write's own transaction, since a student reads them
+ * as itself and a role might not.
+ */
+// The table and column are written out, as `sessionHeld`'s are; R7g fails on a rename.
+const portalOpen = async (ctx: Ctx): Promise<Ctx> => {
+  if (!ownSeatsOnly(ctx.user) || !ctx.tenant) return ctx
+  const [held] = (await (ctx.tx as NodePgDatabase).execute<{ maintenance: boolean | null }>(sql`select maintenance from settings where organization_id = ${ctx.tenant}`)).rows
+  if (held?.maintenance === true) {
+    throw invalid({ message: 'The portal is closed for maintenance, so no seat changes from it.', key: 'error.invalid.portal_closed', params: { kayan: 'enrollments' } })
+  }
+  return ctx
+}
+// end add-on: settings
 
 export const enrollments = defineKayan({
   name: 'enrollments',
@@ -118,9 +194,8 @@ export const enrollments = defineKayan({
     // A create that names no student enrolls the person making it: the runner's
     // defaults step fills it from the actor, and a field with a default is one a
     // create may leave out, at the HTTP boundary too. A role without the column's
-    // key is refused the filled value, so today only the instructor's and the
-    // administrator's API create fills it; the student reads its own seats and
-    // creates none.
+    // key is refused the filled value. A student holds it, so its own enrollment
+    // names itself, and `namesAnother` refuses it any other person.
     student: {
       kind: 'relationship', label: { en: 'Student', ar: 'الطالب' }, relationTo: 'user',
       filterOptions: students,
@@ -161,14 +236,32 @@ export const enrollments = defineKayan({
     service: {
       operations: {
         ...defaultOperations,
-        create: { ...defaultOperations.create, steps: ({ steps }) => [sessionTakesSeats, steps.insert] },
-        update: { ...defaultOperations.update, steps: ({ steps }) => [sessionTakesSeats, steps.update] },
+        create: { ...defaultOperations.create, steps: ({ steps }) => [
+          // add-on: settings
+          portalOpen,
+          // end add-on: settings
+          takesSeat,
+          steps.insert,
+        ] },
+        update: { ...defaultOperations.update, steps: ({ steps }) => [
+          // add-on: settings
+          portalOpen,
+          // end add-on: settings
+          takesSeat,
+          steps.update,
+        ] },
+        delete: { ...defaultOperations.delete, steps: ({ steps }) => [
+          // add-on: settings
+          portalOpen,
+          // end add-on: settings
+          leavesBeforeStart,
+          steps.remove,
+        ] },
       },
     },
-    // Both screens list enrollments; the portal's create opens as a drawer over
-    // its list. Titled by the student on the dashboard, as on the backoffice, so a
-    // tab and a heading tell one seat from another; on the portal, where the
-    // student is most often the viewer, by the session.
+    // Titled by the student on the dashboard, as on the backoffice, so a tab and a
+    // heading tell one seat from another; on the portal, where the student is most
+    // often the viewer, by the session.
     dashboard: {
       useAsTitle: 'student',
       description: {
@@ -202,12 +295,14 @@ export const enrollments = defineKayan({
     portal: {
       useAsTitle: 'session',
       pages: {
-        list: { path: '/enrollments', page: topPage([{ layout: 'page', main: [{ list: { columns: ['session', 'createdAt'] } }] }]) },
-        // The student too, as the dashboard draws it, so an instructor picks
-        // whom it enrolls. A role without `enrollments.fields.student` is not
-        // projected the field and is drawn the session alone.
-        create: { path: '/enrollments/new', mode: 'drawer', page: topPage([{ layout: 'page', main: [{ form: ['session', 'student'] }] }]) },
-        edit: { path: '/enrollments/:id', page: topPage([{ layout: 'page', main: [{ form: ['session'] }] }]) },
+        // The viewer's seats, upcoming first, drawn whole by the courses feature's portal.
+        list: { path: '/enrollments', component: portalUi('enrollments.tsx#Enrollments') },
+        // The list's New enrollment, which only staff are offered, with the
+        // student as the dashboard draws it, so an instructor picks whom it
+        // enrolls. A student who opens it by its address and names another is
+        // refused by `namesAnother`; one who names nobody enrolls itself.
+        create: { path: '/enrollments/new', page: portalPage([{ form: ['session', 'student'] }]) },
+        edit: { path: '/enrollments/:id', page: portalPage([{ form: ['session'] }]) },
       },
     },
   },

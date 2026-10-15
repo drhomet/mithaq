@@ -159,7 +159,7 @@ test('217h. a refused localized field marks the box its path names, or the empty
 })
 
 test('217i. a settings page draws its global\'s sentence, and the maintenance switch says what it does', () => {
-  const html = render(createElement(Form, { kayan: settings, screen: { refs, kayan: settings, page: settings.pages.settings as never }, client, value: { id: 's1', siteTitle: 'Asas' }, ...copyOf('ar'), onDone: () => {} }), 'ar', settings)
+  const html = render(createElement(Form, { kayan: settings, screen: { refs, kayan: settings, page: settings.pages.settings as never }, client, value: { id: 's1', contactEmail: 'office@example.com' }, ...copyOf('ar'), onDone: () => {} }), 'ar', settings)
   assert.ok(html.includes(settings.description!.ar!), 'the sentence under its title')
   const maintenance = settings.fields.find((one) => one.name === 'maintenance')!
   assert.ok(maintenance.description?.ar && html.includes(maintenance.description.ar), 'and the switch\'s help text under it')
@@ -289,20 +289,18 @@ test('217r. a global with no saved row keeps its own name as its title, and a fo
 })
 
 test('236. a form trims a field under `trim` before it calls it empty, as the server does, so a title of spaces is refused here in either locale', () => {
-  const siteTitle = settings.fields.filter((one) => one.name === 'siteTitle')
-  const checked = (value: string) => refusalOf({ kayan: 'settings', fields: siteTitle, values: { siteTitle: value } })?.data.params.issues
-  assert.deepEqual(checked(' \t\u3000 '), [{ path: 'siteTitle', message: 'settings.siteTitle.required' }], 'spaces alone are empty once trimmed')
+  const title = courses.fields.filter((one) => one.name === 'title')
+  const checked = (value: string) => refusalOf({ kayan: 'courses', fields: title, values: { title: value } })?.data.params.issues
+  assert.deepEqual(checked(' \t\u3000 '), [{ path: 'title', message: 'courses.title.required' }], 'spaces alone are empty once trimmed')
   assert.equal(checked('  Madrasa  '), undefined, 'and a value with spaces around it is not')
   assert.deepEqual(checked(` ${'a'.repeat(120)} `), undefined, 'the length is judged on the trimmed value, as the server judges it')
-  const title = courses.fields.filter((one) => one.name === 'title')
-  assert.deepEqual(refusalOf({ kayan: 'courses', fields: title, values: { title: '   ' } })?.data.params.issues, [{ path: 'title', message: 'courses.title.required' }])
   // `uppercase` and `lowercase` rewrite the value before it is judged, on the server's pipe.
   const cased = (rules: Record<string, unknown>, value: string) =>
     refusalOf({ kayan: 'courses', fields: [{ ...title[0]!, rules, options: [{ value: 'ABC', label: { en: 'ABC', ar: 'ABC' } }] } as never], values: { title: value } })?.data.params.issues
   assert.equal(cased({ uppercase: true, trim: true }, ' abc '), undefined, 'an option written in lower case is the upper-case one the server stores')
   assert.deepEqual(cased({ lowercase: true }, 'ABC'), [{ path: 'title', message: 'courses.title.invalid' }], 'and under `lowercase` the same option is a value the server would refuse')
-  const en = translator('en')('settings.siteTitle.required')
-  const ar = translator('ar')('settings.siteTitle.required')
+  const en = translator('en')('courses.title.required')
+  const ar = translator('ar')('courses.title.required')
   assert.equal(typeof en === 'string' && en.length > 0 && typeof ar === 'string' && ar.length > 0 && en !== ar, true, 'and the refusal reads in English and in Arabic')
 })
 

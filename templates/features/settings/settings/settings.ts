@@ -20,21 +20,16 @@ export const settings = defineGlobal({
   fields: {
     ...defaultFields,
     organization: { ...organization, rules: { ...organization.rules, unique: true } },
-    siteTitle: {
-      kind: 'text',
-      label: { en: 'Site title', ar: 'عنوان الموقع' },
-      // Trimmed, so a title of spaces is refused as required.
-      rules: { required: true, trim: true, maxLength: 120 },
-    },
+    // The site has no name of its own: it is the organization's, in every locale.
     maintenance: {
       kind: 'checkbox',
       label: { en: 'Maintenance', ar: 'الصيانة' },
       description: {
-        en: 'While this is on, the site tells visitors it is closed for maintenance.',
-        ar: 'ما دام هذا مفعلا، يخبر الموقع زواره بأنه مغلق للصيانة.',
+        en: 'While this is on, the portal tells students it is closed for maintenance. Staff keep working.',
+        ar: 'ما دام هذا مفعلا، تخبر البوابة الطلاب بأنها مغلقة للصيانة. ويواصل الموظفون عملهم.',
       },
     },
-    // Where a visitor writes to, the one address the project shows.
+    // Where a student writes to, the one address the portal shows: at its foot, and on its maintenance page.
     contactEmail: { kind: 'email', label: { en: 'Contact email', ar: 'بريد التواصل' } },
     // The column default is the one the table was made with, so the committed
     // migrations still describe it.
@@ -52,14 +47,14 @@ export const settings = defineGlobal({
     // yes or no setting a switch with its label beside it.
     dashboard: {
       description: {
-        en: 'How the site presents itself, and whether it is open to visitors.',
-        ar: 'كيف يظهر الموقع، وهل هو مفتوح للزوار.',
+        en: 'Where students reach the school, and whether the portal is open to them.',
+        ar: 'أين يتواصل الطلاب مع المدرسة، وهل البوابة مفتوحة لهم.',
       },
       pages: {
         settings: {
           path: '/settings',
           page: appPage([{ layout: 'record', main: [{ form: [
-            { section: 'site', label: { en: 'Site', ar: 'الموقع' }, fields: ['siteTitle', 'contactEmail'] },
+            { section: 'contact', label: { en: 'Contact', ar: 'التواصل' }, fields: ['contactEmail'] },
             { section: 'availability', label: { en: 'Availability', ar: 'الإتاحة' }, fields: [{ field: 'maintenance', component: 'switch' }] },
           ] }] }]),
         },

@@ -1,6 +1,6 @@
-// The courses the portal offers: every course not archived. The portal lists
-// these alone, as its screen's `baseFilter` for the kayan, and its home counts
-// these alone. Plain data in a file of its own, so the page that counts reads it
-// without the kayan's declaration. A course with no `archived` value is not
-// archived either.
+// The courses the portal offers: every course not archived, of those a plain
+// read answers, which are the published ones. The portal's catalogue, its home
+// and its course page read these alone. Plain data in a file of its own, so a
+// page reads it without the kayan's declaration. A course with no `archived`
+// value is not archived either.
 export const onOffer = { or: [{ archived: { exists: false } }, { archived: { equals: false } }] }

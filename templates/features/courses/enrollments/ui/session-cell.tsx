@@ -1,4 +1,5 @@
-// What an enrollment's session column draws: the session's course by its title, then when it starts, which tells two sessions of one course apart.
+// What an enrollment's session column draws: the session's course by its title, then when it starts, which tells two sessions of one course apart,
+// then where and how it meets.
 // A session is titled by its start and a title is one field, so the course is a second read.
 //
 // The list's own `useRelationshipTitles` keeps only each session's title, the start as text, and not the course it points at, so this cell reads them again:
@@ -38,7 +39,7 @@ const sessionsOf = async ({ client, ids, maxLimit }: { client: FetchClient; ids:
 export function SessionCell({ field, value, row }: CellProps) {
   const client = useClient()
   const { locale, t } = useLocale()
-  const { kayan: { courses }, maxLimit } = useScreen()
+  const { kayan: { courses, sessions: sessionKayan }, maxLimit } = useScreen()
   // A list's page, or the one row a record page draws.
   // Sorted, so the same rows in another order are the same query.
   const ids = [...new Set((use(ListContext)?.page.docs ?? [row]).flatMap((one: Row) => (typeof one[field.name] === 'string' ? [one[field.name] as string] : [])))].sort()
@@ -47,6 +48,12 @@ export function SessionCell({ field, value, row }: CellProps) {
   const session = sessions?.get(value)
   const when = formatDate({ value: session?.startsAt, locale })
   const course = session?.course ? nameOfRow({ row: session.course as Row, title: titleFieldOf(courses), locale }) : undefined
+  // Where and how it meets, each by its option's label in the viewer's locale, where the viewer reads it.
+  const labelOf = (name: string) => {
+    const option = sessionKayan?.fields.find((one) => one.name === name)?.options?.find((one) => one.value === session?.[name])
+    return option?.label[locale]
+  }
+  const place = [labelOf('venue'), labelOf('format')].filter(Boolean).join(' · ')
   // Never the id the column holds, as the relationship cell draws none:
   // loading until the read answers, the server's render among it, a dash
   // where it failed, and not available for a session it may not read or one
@@ -62,6 +69,7 @@ export function SessionCell({ field, value, row }: CellProps) {
       {course ? <span className="font-medium">{course}</span> : null}
       {/* One unbroken run, so a narrow column breaks between the course and the date and never inside the date. */}
       {when ? <span className="text-muted-foreground text-xs"><bdi className="whitespace-nowrap">{when}</bdi></span> : null}
+      {place ? <span className="text-muted-foreground text-xs">{place}</span> : null}
     </span>
   )
 }

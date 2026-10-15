@@ -24,6 +24,7 @@ export type CoursesValues = {
   _status: 'draft' | 'published' | null
   details: { root: Record<string, unknown> } | null
   cover: string | null
+  selfEnroll: boolean | null
 }
 export type EnrollmentsValues = {
   id: string
@@ -84,7 +85,7 @@ export type Values = {
   user: UserValues
 }
 export type Pages = {
-  courses: 'list' | 'edit'
+  courses: 'list' | 'view'
   enrollments: 'list' | 'create' | 'edit'
   sessions: never
   media: never

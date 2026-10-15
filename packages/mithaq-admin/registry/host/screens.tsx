@@ -487,7 +487,8 @@ const nameOfPage = ({ screen, name, match, row, titledBy, copy }: {
   if (match.kayan === undefined) return screen.nav.find((entry) => !entry.kayan && entry.page === match.page)?.label?.[copy.locale] ?? copy.t(`screens.${name}`, name) ?? name
   const kayan = screen.kayan[match.kayan]!
   const page = kayan.pages[match.page]
-  const many = !!page && 'page' in page && listIn(nodesOf(page)) !== undefined
+  // A list page draws every row, whether a tree's list node or a component drawing it whole.
+  const many = match.page === 'list' || (!!page && 'page' in page && listIn(nodesOf(page)) !== undefined)
   if (match.page === 'create') return newTitleOf({ kayan, copy })
   const field = kayan.fields.find((one) => one.name === kayan.useAsTitle)
   const target = field?.kind === 'relationship' ? screen.kayan[field.relationTo ?? ''] : undefined

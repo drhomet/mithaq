@@ -1660,14 +1660,14 @@ test('178c. a record page with no side column gives its main column the whole wi
   const page = (regions: Record<string, unknown>) => renderToStaticMarkup(createElement(RecordPage, { regions, page: { path: '/x' } } as never))
   assert.equal(page({ main: 'm' }).includes('grid-cols'), false, 'one column where nothing sits beside it')
   assert.equal(page({ main: 'm', side: 's' }).includes('lg:grid-cols-'), true, 'two where something does')
-  const bare = formMarkup({ kayan: { ...settings, description: undefined }, value: null, screen: screenOf(recordPage([{ form: [{ field: 'siteTitle' }] }]), settings) })
+  const bare = formMarkup({ kayan: { ...settings, description: undefined }, value: null, screen: screenOf(recordPage([{ form: [{ field: 'contactEmail' }] }]), settings) })
   assert.equal(bare.includes('<header class="max-w-3xl"'), false, 'no header holding nothing')
   assert.equal(bare.includes('border-t pt-6'), false, 'and no rule under it')
   // A page of one row is about that row and draws no sentence, so the sentence is read off a create page of a kayan of many rows.
   const many = { ...settings, single: false }
-  const headed = formMarkup({ kayan: many, value: null, screen: screenOf(recordPage([{ form: [{ field: 'siteTitle' }] }]), many) })
+  const headed = formMarkup({ kayan: many, value: null, screen: screenOf(recordPage([{ form: [{ field: 'contactEmail' }] }]), many) })
   assert.ok(headed.includes('<header class="max-w-3xl"') && headed.includes('border-t pt-6'), 'while a kayan with a sentence draws it on a create, and the rule under it')
-  const global = formMarkup({ kayan: settings, value: { id: 's1' }, screen: screenOf(recordPage([{ form: [{ field: 'siteTitle' }] }]), settings) })
+  const global = formMarkup({ kayan: settings, value: { id: 's1' }, screen: screenOf(recordPage([{ form: [{ field: 'contactEmail' }] }]), settings) })
   assert.equal(global.includes('<header class="max-w-3xl"'), true, 'and a global\'s one row draws its sentence')
 })
 
