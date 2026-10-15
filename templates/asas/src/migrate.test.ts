@@ -310,6 +310,22 @@ test('`mithaq migrate --name` names the folder after a slug of lowercase letters
   }
 })
 
+test('`mithaq migrate` reads an envelope larger than a pipe holds, which drizzle-kit prints just before it exits', async () => {
+  await migrateDatabase()
+  // Enough columns that each envelope is several times the 64 KB a pipe holds.
+  const columns = Array.from({ length: 400 }, (_, at) => `        column_that_fills_the_envelope_${at}: { kind: 'text' },`).join('\n')
+  const root = await migrationProject(`        id: { kind: 'text' },\n${columns}`)
+  try {
+    assert.equal(await sqlIn(root, resetSchemas), 0)
+    const migrated = await migrating(root, 'migrate')
+    assert.equal(migrated.code, 0, migrated.stderr)
+    assert.match(await latestSql(root), /"column_that_fills_the_envelope_399" text/)
+  } finally {
+    await sqlIn(root, resetSchemas)
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('a kayan spreading only defaultIdField migrates to a table with no timestamp column, and creates and reads its rows', async () => {
   await migrateDatabase()
   const root = await migrationProject(withSummary)

@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import * as modules from 'node:module'
-import { existsSync, readFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
@@ -804,27 +804,28 @@ export const bootMigrations = async ({ db, prodMigrations }: { db: NodePgDatabas
   )
 }
 
-// stdout alone is parsed: stderr carries import-time warnings, never the envelope.
-const kit = (cwd: string, argv: string[]) =>
-  new Promise<{ code: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string }>((done, fail) => {
-    // Node's 1 MB default `maxBuffer` kills a child past it, and the envelope grows with the
-    // migration. Without an `error` listener a child that cannot spawn hangs the command.
-    const child = execFile(process.execPath, ['--import', kitOrm(ownKit), binary, ...argv], { cwd, maxBuffer: 64 * 1024 * 1024 })
-    let stdout = ''
-    let stderr = ''
-    // Decoded by the stream, so a multibyte character split across chunks stays whole.
-    child.stdout?.setEncoding('utf8')
-    child.stderr?.setEncoding('utf8')
-    child.stdout?.on('data', (chunk: string) => {
-      stdout += chunk
+// stdout alone is parsed: stderr carries import-time warnings, never the envelope. Both go to files:
+// drizzle-kit exits right after printing, and Node writes to a pipe asynchronously off Linux, so
+// an envelope past the pipe's 64 KB was cut short, where a file is written synchronously.
+const kit = async (cwd: string, argv: string[]) => {
+  const scratch = await mkdtemp(join(tmpdir(), 'mithaq-kit-'))
+  const [out, err] = [join(scratch, 'stdout'), join(scratch, 'stderr')]
+  const [outFd, errFd] = [openSync(out, 'w'), openSync(err, 'w')]
+  try {
+    const { code, signal } = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((done, fail) => {
+      const child = spawn(process.execPath, ['--import', kitOrm(ownKit), binary, ...argv], { cwd, stdio: ['ignore', outFd, errFd] })
+      // Without an `error` listener a child that cannot spawn hangs the command.
+      child.on('error', fail)
+      // The signal too, since a child killed from outside closes with no code.
+      child.on('close', (code, signal) => done({ code, signal }))
     })
-    child.stderr?.on('data', (chunk: string) => {
-      stderr += chunk
-    })
-    child.on('error', fail)
-    // The signal too, since a child killed from outside closes with no code.
-    child.on('close', (code, signal) => done({ code, signal, stdout, stderr }))
-  })
+    return { code, signal, stdout: await readFile(out, 'utf8'), stderr: await readFile(err, 'utf8') }
+  } finally {
+    closeSync(outFd)
+    closeSync(errFd)
+    await rm(scratch, { recursive: true, force: true })
+  }
+}
 
 const envelopeOf = async (cwd: string, argv: string[]): Promise<Envelope> => {
   const { code, signal, stdout, stderr } = await kit(cwd, argv)
