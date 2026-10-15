@@ -112,6 +112,19 @@ const plus = (page: PageClient | undefined, region: string, ...nodes: unknown[])
   return { ...tree, page: { ...tree.page, main: [{ ...layout, [region]: [...(layout[region] ?? []), ...nodes] }] } } as never
 }
 
+// Round 3: forms and feedback. Each check reads the copy the app ships, in English. Imported here, before the first
+// test is registered: a top-level await after one lets the runner finish those and close the window the rest draw in.
+const { Toaster, toast } = await import('../registry/toast.tsx')
+const { translator: appCopy } = await import('../../../apps/asas-tanstack/src/copy.ts')
+const english = appCopy('en')
+/** Every toast on screen, as `type: words`, cleared for the next check. */
+const toasted = async () => {
+  const said = [...window.document.querySelectorAll('[data-toast]')].map((one) => `${one.getAttribute('data-toast')}: ${one.textContent}`)
+  await act(async () => void toast.dismiss())
+  return said
+}
+const withToaster = (element: ReactElement) => createElement('div', null, element, createElement(Toaster))
+
 test('the switch override reports a boolean', async () => {
   const reported: unknown[] = []
   const host = await render(createElement(controls.switch!, {
@@ -304,18 +317,6 @@ const render = async (element: ReactElement, over: Partial<ScreenState> = {}) =>
   })
   return host
 }
-
-// Round 3: forms and feedback. Each check reads the copy the app ships, in English.
-const { Toaster, toast } = await import('../registry/toast.tsx')
-const { translator: appCopy } = await import('../../../apps/asas-tanstack/src/copy.ts')
-const english = appCopy('en')
-/** Every toast on screen, as `type: words`, cleared for the next check. */
-const toasted = async () => {
-  const said = [...window.document.querySelectorAll('[data-toast]')].map((one) => `${one.getAttribute('data-toast')}: ${one.textContent}`)
-  await act(async () => void toast.dismiss())
-  return said
-}
-const withToaster = (element: ReactElement) => createElement('div', null, element, createElement(Toaster))
 
 /** What an open popover shows; its content is portaled to the document body, not the host. */
 const opened = () => window.document.querySelector('[data-slot="combobox-content"]')
