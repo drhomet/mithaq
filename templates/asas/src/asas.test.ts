@@ -1350,10 +1350,10 @@ test('0v. with one organization a holder of member.create sends a member a new l
   const send = (userId: string, cookie = owner.headers.get('cookie')!, on = gated, origin = tenantOrigin) =>
     on.handler(new Request('http://test/api/auth/user/organization/send-password-link', { method: 'POST', headers: { cookie, 'content-type': 'application/json', origin }, body: JSON.stringify({ userId }) }))
   const context = await school.$context
-  const account = async ({ email, member = true, verified = true }: { email: string; member?: boolean; verified?: boolean }) => {
+  const account = async ({ email, member = true, verified = true, password = true }: { email: string; member?: boolean; verified?: boolean; password?: boolean }) => {
     const id = `${email.split('@')[0]}-id`
     await db.execute(`insert into "user" (id, name, email, email_verified, created_at, updated_at) values ('${id}', '${email}', '${email}', ${verified}, now(), now())`)
-    await db.execute(`insert into account (id, account_id, provider_id, user_id, password, created_at, updated_at) values ('${id}-account', '${id}', 'credential', '${id}', '${await context.password.hash(modePassword)}', now(), now())`)
+    if (password) await db.execute(`insert into account (id, account_id, provider_id, user_id, password, created_at, updated_at) values ('${id}-account', '${id}', 'credential', '${id}', '${await context.password.hash(modePassword)}', now(), now())`)
     if (member) await school.api.addMember({ body: { userId: id, organizationId: owner.organization, role: 'member' } })
     return id
   }
@@ -1391,11 +1391,11 @@ test('0v. with one organization a holder of member.create sends a member a new l
   assert.deepEqual(await answerOf(await send(flooded)), [429, 'INVITATIONS_PER_MINUTE'], 'and past ten mails a minute one is refused')
   await db.execute(`delete from verification where value = 'mailed:${owner.organization}'`)
 
-  // Without a mailer a link is answered to copy, on this machine alone, and only for an account nobody proved: a proved
-  // one's link would hand its account to whoever asked, an administrator's to a delegate holding member.create.
+  // Without a mailer a link is answered to copy, on this machine alone, and only for an account that holds no password
+  // yet: any other's link would hand its account to whoever asked, an administrator's to a delegate holding member.create.
   const unmailed = betterAuthStrategy({ server: modeServer({ ...schoolSettings, mailer: undefined }), collection: 'user', assigned: accessResolve as never, onError: console.error })
-  const unproved = await account({ email: 'unproved-0s@example.com', verified: false })
-  assert.match(((await (await send(unproved, owner.headers.get('cookie')!, unmailed)).json()) as { link?: string }).link ?? '', /^http:\/\/localhost:5173\/auth\/set-password\?token=/, 'an account nobody proved gets a link to copy')
+  const unproved = await account({ email: 'unproved-0s@example.com', verified: false, password: false })
+  assert.match(((await (await send(unproved, owner.headers.get('cookie')!, unmailed)).json()) as { link?: string }).link ?? '', /^http:\/\/localhost:5173\/auth\/set-password\?token=/, 'an account with no password yet gets a link to copy')
   assert.equal((await send(unproved, owner.headers.get('cookie')!, unmailed, 'https://app.example.com')).status, 403, 'never answered off this machine')
   await seedRoleRow(owner.organization, 'adder-0s', ['screen.dashboard', 'member.create'])
   const adder = await account({ email: 'adder-0s@example.com' })
@@ -1408,6 +1408,15 @@ test('0v. with one organization a holder of member.create sends a member a new l
   assert.equal(takeover.status, 403, 'a delegate is handed no link to the proved administrator\'s account')
   assert.doesNotMatch(await takeover.text(), /set-password/, 'and reads none in the refusal')
   assert.equal(await links(), held, 'nor is one made')
+  // Invited, an account keeps its address unproved while it holds the password it chose: it is held all the same.
+  const invited = await account({ email: 'invited-admin-0s@example.com', verified: false })
+  await assignRole(owner.organization, invited, 'administrator')
+  const invitedLinks = async () => (await modeRows(`select id from verification where value = '${invited}' and identifier like 'reset-password:%'`)).length
+  const invitedHeld = await invitedLinks()
+  const invitedTakeover = await send(invited, delegate, unmailed)
+  assert.equal(invitedTakeover.status, 403, 'a delegate is handed no link to an invited administrator who has a password and no proved address')
+  assert.doesNotMatch(await invitedTakeover.text(), /set-password/, 'and reads none in the refusal')
+  assert.equal(await invitedLinks(), invitedHeld, 'nor is one made')
 })
 
 test('0q. an invitation the server accepts for a sign-up is held to the rule the accept route keeps: a role value with whitespace around a name joins nobody', async () => {

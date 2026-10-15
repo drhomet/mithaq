@@ -1556,8 +1556,9 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   }
   // A new link to choose a password, for a member of the one organization who lost theirs or never opened Add person's,
   // asked by whoever may add a person. It is mailed to the member. With no mailer it is answered to the caller, on this
-  // machine alone, and only for an account nobody proved, as Add person answers one: a proved account's link would hand
-  // it to whoever asked, an administrator's to a delegate holding member.create. Anyone outside the organization answers
+  // machine alone, and only for an account that holds no password yet: any other's link would hand it to whoever asked,
+  // an administrator's to a delegate holding member.create, whether or not its address is proved, since an invited
+  // account keeps an unproved address beside the password it chose. Anyone outside the organization answers
   // as nobody, and staff hold the backoffice, whose sign-in a tenant never touches. The member's password and sessions
   // stand until they choose.
   const sendPasswordLink = {
@@ -1568,10 +1569,10 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         if (typeof organization !== 'string' || !holdsPermission('member.create')) throw new APIError('FORBIDDEN', { message: 'Sending a password link needs the permission "member.create" in your active organization.' })
         const { userId } = (ctx.body ?? {}) as Record<string, unknown>
         const member = typeof userId === 'string' && (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: userId } } } }))
-        const user = member ? ((await ctx.context.internalAdapter.findUserById(userId as string)) as ({ id: string; email: string; emailVerified: boolean; role?: unknown } | null)) : null
+        const user = member ? ((await ctx.context.internalAdapter.findUserById(userId as string)) as ({ id: string; email: string; role?: unknown } | null)) : null
         if (!user) throw new APIError('NOT_FOUND', { code: 'error.missing.member', message: 'No member of this organization has that id.' })
         if (holdsRole(user.role, (one) => Object.hasOwn(backofficeRoles, one))) throw new APIError('FORBIDDEN', { message: 'A staff member\'s sign-in is the backoffice\'s, never a tenant\'s.' })
-        if (!settings.mailer && (user.emailVerified || !isLocalHost(ctx.headers?.get('origin') ?? ''))) throw new APIError('FORBIDDEN', { message: 'A password link is mailed, and no mailer is configured.' })
+        if (!settings.mailer && (!isLocalHost(ctx.headers?.get('origin') ?? '') || (await ctx.context.internalAdapter.findAccounts(user.id)).some((one) => one.providerId === 'credential'))) throw new APIError('FORBIDDEN', { message: 'A password link is mailed, and no mailer is configured.' })
         if (settings.mailer && (await mailedLately(user.id))) return ctx.json({ sent: true })
         if (settings.mailer) await withinLimits(organization)
         const token = randomBytes(24).toString('base64url')
