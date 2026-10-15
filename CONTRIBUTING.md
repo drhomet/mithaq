@@ -89,7 +89,7 @@ The `AGENTS.md` files hold the rules for a coding agent, each for the tree it si
 - `packages/mithaq-admin/AGENTS.md`, for the admin package and the files projects hold from it;
 - `templates/asas/AGENTS.md`, with `templates/asas/CLAUDE.md` beside it, for working in a created project. Both ship with the template, and `create-mithaq` lays them, with the project's `README.md`, at the project's root.
 
-The skills are Claude Code's `SKILL.md` files, each opening with its folder's `name` and a `description` (`apps/docs.test.ts` checks both). `.claude/skills/` holds the ones for changing mithaq (`ponytail`, `tdd`). `templates/asas/.claude/skills/` holds the workflow skills a created project carries at its root, each short, pointing at the guides and naming the checks to run; `apps/pack.ts` also ships them in `@drhomet/mithaq` under `skills/`, for an upgrade to copy again.
+The skills are Claude Code's `SKILL.md` files, each opening with its folder's `name` and a `description` (`apps/docs.test.ts` checks both). `.claude/skills/ponytail/` is the one the repository ships for changing mithaq; the `tdd` skill the root `AGENTS.md` asks for is Matt Pocock's, from [mattpocock/skills](https://github.com/mattpocock/skills/blob/main/skills/engineering/tdd/SKILL.md), which a contributor installs. `templates/asas/.claude/skills/` holds the workflow skills a created project carries at its root, each short, pointing at the guides and naming the checks to run; `apps/pack.ts` also ships them in `@drhomet/mithaq` under `skills/`, for an upgrade to copy again.
 
 The guides sit beside the code they describe, each as its folder's `README.md`:
 
