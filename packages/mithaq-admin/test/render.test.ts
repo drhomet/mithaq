@@ -1750,6 +1750,17 @@ test('170. a create\'s audit entry holds only the fields it set, so the Activity
   assert.doesNotMatch(html, /data-from="">—<\/span><span[^>]*>→<\/span><span data-to="">—</, 'and no line reads a dash to a dash')
 })
 
+test('170a. an entry lists its changes in the order the kayan declares its fields, whatever order the log keeps its keys in', async () => {
+  const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')
+  const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
+  const declared = courses.fields.map((field) => field.name).filter((name) => ['title', 'fee', 'currency'].includes(name))
+  assert.equal(declared.length, 3)
+  const changes = Object.fromEntries([...declared].reverse().map((name) => [name, { from: name === 'fee' ? 1 : 'a', to: name === 'fee' ? 2 : 'b' }]))
+  const entry = { id: 'e1', createdAt: new Date(0), operation: 'update', actor: null, changes }
+  const html = renderToStaticMarkup(createElement(ActivityEntries, { entries: [entry], kayan: courses, t: translator('en'), locale: 'en' }))
+  assert.deepEqual([...html.matchAll(/data-change="([^"]+)"/g)].map((match) => match[1]), declared)
+})
+
 test('170b. a changed value too long to keep whole is kept as the start of its JSON with a note, so a large json value never swells the log, and the panel says so in both locales', async () => {
   const { changesOf, keptLength } = await import('../../../templates/mithaq/src/mithaq/audit-sink.ts')
   const { ActivityEntries } = await import('../../../templates/mithaq/src/ui/activity.tsx')

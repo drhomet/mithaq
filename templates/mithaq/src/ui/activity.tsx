@@ -125,9 +125,10 @@ export function ActivityEntries({ entries, kayan: one, kayans, record, titles, t
           : named(entry.actor)
         // A create says what the person set: a field left empty, or a box left off, is nothing they did.
         const made = entry.operation === 'create'
-        const shown = changesOf(entry).flatMap(([name, change]) => {
-          const field = technical.has(name) ? undefined : kayan?.fields.find((field) => field.name === name)
-          return field && !(made && (empty(change.to) || change.to === false)) ? [{ field, change }] : []
+        // In the order the kayan declares its fields: jsonb keeps its keys in an order of its own.
+        const shown = (kayan?.fields ?? []).flatMap((field) => {
+          const change = technical.has(field.name) || !Object.hasOwn(entry.changes ?? {}, field.name) ? undefined : entry.changes[field.name]
+          return change && !(made && (empty(change.to) || change.to === false)) ? [{ field, change }] : []
         })
         return (
           <li key={entry.id} data-entry={entry.operation} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
