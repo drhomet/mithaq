@@ -21,5 +21,6 @@ export const member = defineKayan({
     userId: { kind: 'relationship', relationTo: () => user, dbName: 'user_id', rules: { required: true, onDelete: 'cascade' } },
     role: { kind: 'text', rules: { required: true } },
     createdAt: { kind: 'datetime', rules: { required: true } },
+    lastSeenAt: { kind: 'datetime' },
   },
 })

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { addOns, create, keepAddOns, managerOf, resolveAddOns, updatePackageJSONDependencies } from './index.js'
+import { addOns, create, exportsPath, keepAddOns, managerOf, resolveAddOns, updatePackageJSONDependencies } from './index.js'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const scratch = mkdtempSync(join(tmpdir(), 'create-mithaq-'))
@@ -307,4 +307,18 @@ test('a single package reaches the organization mode by path', () => {
   create({ name: 'single-modes', cwd: scratch, template, version: '1.2.3', layout: 'single', showOrganization: false })
   assert.match(read('single-modes/src/organizations.ts'), /from '\.\/mithaq\/auth\/organizations\.ts'/)
   assert.match(read('single-modes/src/mithaq/auth/organizations.ts'), /^export const showOrganization: [^=]+ = false$/m)
+})
+
+test('in one package an import of a feature resolves only where that feature exports the path, as its package did', () => {
+  const read = (feature: string) => JSON.parse(readFileSync(join(root, 'templates/features', feature, 'package.json'), 'utf8')).exports
+  assert.equal(exportsPath(read('roles'), '/roles/ui/role-form.tsx'), true, 'roles exports its role form')
+  assert.equal(exportsPath(read('courses'), '/domain/on-offer.ts'), true, 'courses its domain')
+  assert.equal(exportsPath(read('roles'), ''), true, 'and every feature its index')
+  assert.equal(exportsPath(read('tags'), '/tags/ui/anything.tsx'), false, 'a feature exporting no ui/ admits none')
+  assert.equal(exportsPath(read('courses'), '/courses/ui/fee-cell.tsx'), false, 'nor one exporting another path')
+  assert.equal(exportsPath(read('roles'), '/roles/roles.ts'), false, 'and a pattern admits only what lies under it')
+  for (const sub of ['/roles/ui/../roles.ts', '/roles/ui/./role-form.tsx', '/roles/ui/../../index.ts']) assert.equal(exportsPath(read('roles'), sub), false, `a dot segment climbs nowhere: ${sub}`)
+  const excluding = { '.': './index.ts', './ui/*': './ui/*', './ui/private/*': null }
+  assert.equal(exportsPath(excluding, '/ui/open.tsx'), true, 'a path under a pattern is admitted')
+  assert.equal(exportsPath(excluding, '/ui/private/secret.tsx'), false, 'unless a more specific key excludes it with null, as Node does')
 })

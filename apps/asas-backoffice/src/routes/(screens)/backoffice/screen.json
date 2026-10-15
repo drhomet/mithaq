@@ -764,6 +764,15 @@
           },
           "component": "text",
           "cell": "text"
+        },
+        {
+          "name": "lastSeenAt",
+          "kind": "datetime",
+          "rules": {
+            "required": false
+          },
+          "component": "datetime",
+          "cell": "datetime"
         }
       ],
       "operations": [

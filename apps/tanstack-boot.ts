@@ -1178,10 +1178,15 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
   // A page that names a key is served only to an actor holding it, and its nav entry is drawn only for one.
   assert.equal(await sentTo('/dashboard/members', cookie), null, 'the members page is served to the tenant administrator, who holds every key')
   assert.ok((await screenHtml('/dashboard/members')).includes('data-members'), 'and draws it')
+  assert.ok(screened['/dashboard/members']!.includes('>Last seen<'), 'with when each member was last seen, to the administrator')
+  // With many organizations people join by invitation alone: Invite is the page's first action, and nobody is added.
+  assert.ok(screened['/dashboard/members']!.includes('data-invite=') && !screened['/dashboard/members']!.includes('data-add-person'), 'with many organizations Invite is the first action, and there is no Add person')
   const members = (await (await fetch(`${origin}/api/auth/user/organization/list-members`, { headers: { cookie } })).json()) as { members: { userId: string; user: { email: string } }[] }
   const drawn = screened['/dashboard/members']!
+  /** The members' table alone, the first of the page's two. */
+  const memberRows = (html: string) => html.slice(html.indexOf('data-members-tab="members"'), html.indexOf('</table>', html.indexOf('data-members-tab="members"')))
   assert.deepEqual(
-    [...drawn.matchAll(/<tr[^>]*data-member="([^"]+)"/g)].map((hit) => hit[1]).sort(),
+    [...memberRows(drawn).matchAll(/<tr[^>]*data-row="([^"]+)"/g)].map((hit) => hit[1]).sort(),
     members.members.map((member) => member.userId).sort(),
     `the members page draws one row per member of the active organization:\n${drawn.slice(drawn.indexOf('data-members'), drawn.indexOf('data-members') + 600)}`,
   )
@@ -1190,7 +1195,7 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
   const invited = await post('/api/auth/user/organization/invite-member', { email: `copied-${Date.now()}@example.com`, role: 'member' }, { cookie, origin })
   assert.equal(invited.response.status, 200, JSON.stringify(invited.body))
   const pendingPage = await (await fetch(`${origin}/dashboard/members`, { headers: { cookie } })).text()
-  assert.ok(pendingPage.includes(`data-copy-invite="${String(invited.body.id)}"`), `the pending invitation offers its link to copy in production:\n${pendingPage.slice(pendingPage.indexOf('data-pending'), pendingPage.indexOf('data-pending') + 600)}`)
+  assert.ok(new RegExp(`<tr[^>]*data-row="${String(invited.body.id)}"[\\s\\S]*?data-row-menu="${String(invited.body.id)}"`).test(pendingPage), `the pending invitation is listed under Invitations with its menu, which copies its link, in production:\n${pendingPage.slice(pendingPage.indexOf('data-members-tab'), pendingPage.indexOf('data-members-tab') + 600)}`)
   assert.equal((await post('/api/auth/user/organization/cancel-invitation', { invitationId: String(invited.body.id) }, { cookie, origin })).response.status, 200)
   await holding('registrar', async () => {
     assert.equal(await sentTo('/dashboard/members', cookie), '/unauthorized', 'the registrar is sent from it to /unauthorized')
@@ -1793,8 +1798,8 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
       if (path === '/courses/new') assert.ok(shown.includes('حفظ المسودة') && shown.includes('نشر'), 'the create page offers Save draft and Publish, in Arabic')
       // The members page's sheet is a closed dialog in the first paint, so every word it shows is walked here.
       if (path === '/members') {
-        assert.ok(html.includes('data-member-sheet') && html.includes('data-role="registrar"'), 'the members page draws its sheet, one box per role')
-        for (const word of ['تعديل الأدوار', 'الأدوار الثابتة', 'كل الصلاحيات', 'حفظ', 'إلغاء', tenantRoles.registrar.label.ar]) assert.ok(shown.includes(word), `the sheet says ${word} in Arabic`)
+        assert.ok(html.includes('data-members-tab="invitations"') && html.includes('data-role-filter'), 'the members page draws its tabs and its role filter')
+        for (const word of ['الأعضاء', 'الاسم', 'الأدوار', 'تاريخ الانضمام', 'آخر ظهور', 'كل الأدوار', 'البريد الإلكتروني', 'أرسلها', 'تنتهي في', tenantRoles.registrar.label.ar]) assert.ok(shown.includes(word), `the members page says ${word} in Arabic`)
       }
       if (path === `/roles/${role.id}`) {
         assert.ok(html.includes('data-role-form') && html.includes('data-key="courses.find"'), 'the role form draws its badges')
@@ -2049,21 +2054,20 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   assert.equal(typeof custom.id, 'string', JSON.stringify(custom))
 
   const page = await screenHtml('/dashboard/members')
-  const sheet = page.slice(page.indexOf('data-member-sheet'))
-  const offered = [...sheet.matchAll(/data-role="([^"]+)" data-disabled="(true|false)"/g)].map((hit) => [hit[1]!, hit[2]!] as const)
-  for (const role of ['administrator', 'registrar', 'instructor', custom.name]) assert.ok(offered.some(([name]) => name === role), `the sheet offers ${role}`)
-  for (const role of Object.keys(backofficeRoles)) assert.ok(!offered.some(([name]) => name === role), `and never the backoffice role ${role}`)
-  assert.deepEqual(offered.filter(([, disabled]) => disabled === 'true'), [], 'and disables none for the tenant administrator')
-  assert.ok(page.includes(`data-edit-roles="${member.id}"`), 'each member row carries its Edit roles button')
+  // The roles the filter offers are the roles the Edit roles drawer offers: the page's one list of them.
+  const offered = [...page.slice(page.indexOf('data-role-filter'), page.indexOf('</select>', page.indexOf('data-role-filter'))).matchAll(/<option value="([^"]+)"/g)].map((hit) => hit[1]!)
+  for (const role of ['administrator', 'registrar', 'instructor', custom.name]) assert.ok(offered.includes(role), `the page offers ${role}`)
+  for (const role of Object.keys(backofficeRoles)) assert.ok(!offered.includes(role), `and never the backoffice role ${role}`)
+  assert.ok(page.includes(`data-row-menu="${member.id}"`), 'each member row carries its menu, which edits its roles')
   assert.ok(!page.includes('href="/dashboard/member-roles'), 'and nothing links a Member roles page, which the dashboard no longer has')
   assert.equal((await fetch(`${origin}/dashboard/member-roles`, { headers: { cookie } })).status, 404, 'nor serves one')
 
   const added = await post('/api/memberRoles/create', { user: member.id, role: custom.name }, { cookie })
   assert.equal(added.response.status, 200, JSON.stringify(added.body))
   const drawn = await screenHtml('/dashboard/members')
-  const row = new RegExp(`<tr[^>]*data-member="${member.id}"[\\s\\S]*?</tr>`).exec(drawn)?.[0] ?? ''
+  const row = new RegExp(`<tr[^>]*data-row="${member.id}"[\\s\\S]*?</tr>`).exec(drawn)?.[0] ?? ''
   assert.ok(row.includes('>Teacher 62<') && !row.includes(`>${custom.name}<`), 'the member now holds the role on the page, read by its label')
-  assert.ok(new RegExp(`data-role="registrar"[^>]*>(?:(?!</label>)[\\s\\S])*>${tenantRoles.registrar.label.en}<`).test(drawn), 'and the sheet names a fixed role by the label its code declares')
+  assert.ok(drawn.includes(`<option value="registrar">${tenantRoles.registrar.label.en}</option>`), 'and the page names a fixed role by the label its code declares')
 
   for (const [operation, body] of [['delete', { id: custom.id }], ['update', { id: custom.id, name: `${custom.name}-renamed` }]] as const) {
     const refused = await post(`/api/roles/${operation}`, body, { cookie })
@@ -2081,7 +2085,7 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   const counted = await post('/api/memberRoles/count', { where: { role: { equals: custom.name } } }, { cookie })
   assert.equal(counted.body.totalDocs, 1, 'and the count the role\'s delete asks with says one member holds it')
   assert.equal((await post('/api/memberRoles/delete', { id: added.body.id }, { cookie })).response.status, 200, 'unticking it removes the row')
-  assert.ok(!new RegExp(`<tr[^>]*data-member="${member.id}"[\\s\\S]*?</tr>`).exec(await screenHtml('/dashboard/members'))?.[0]?.includes('>Teacher 62<'), 'and the page no longer lists it')
+  assert.ok(!new RegExp(`<tr[^>]*data-row="${member.id}"[\\s\\S]*?</tr>`).exec(await screenHtml('/dashboard/members'))?.[0]?.includes('>Teacher 62<'), 'and the page no longer lists it')
 
   const assigner = await post('/api/roles/create', {
     name: 'assigner',
@@ -2094,11 +2098,11 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   }, { cookie })
   assert.equal(assigner.response.status, 200, JSON.stringify(assigner.body))
   await holding('assigner', async () => {
+    // Which boxes the Edit roles drawer disables is the page's own test; here the server refuses whatever it draws.
     const delegated = await screenHtml('/dashboard/members')
-    const boxes = new Map([...delegated.slice(delegated.indexOf('data-member-sheet')).matchAll(/data-role="([^"]+)" data-disabled="(true|false)"/g)].map((hit) => [hit[1]!, hit[2]!]))
-    assert.equal(boxes.get('administrator'), 'true', 'administrator is offered disabled')
-    assert.equal(boxes.get('registrar'), 'true', 'so is registrar, whose course keys the delegate lacks')
-    assert.equal(boxes.get(custom.name), 'false', 'while a role inside what it holds is not')
+    assert.ok(delegated.includes(`data-row="${member.id}"`) && !delegated.includes('>Last seen<'), 'the delegate lists the members, and without member.fields.lastSeenAt no one\'s last seen')
+    const listed = (await (await fetch(`${origin}/api/auth/user/organization/list-members`, { headers: { cookie } })).json()) as { members: Record<string, unknown>[] }
+    assert.ok(listed.members.length > 0 && listed.members.every((one) => !('lastSeenAt' in one)), 'nor does the server answer it')
     for (const role of ['administrator', 'registrar']) {
       const refused = await post('/api/memberRoles/create', { user: member.id, role }, { cookie })
       assert.equal(refused.response.status, 403, `the server refuses ${role} anyway: ${JSON.stringify(refused.body)}`)
