@@ -7,9 +7,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useClient, useLocale, useScreen, useUser } from 'mithaq/admin/react'
 import { buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PortalShell, display } from '@asas/courses/portal/ui/portal-shell.tsx'
+import { PortalShell, display } from '@asas/courses/portal/ui/shell.tsx'
 import { CardsLoading, Cover, CourseCard, ReadFailed, usePlace } from '@asas/courses/portal/ui/parts.tsx'
-import { byWhen, partOfDay, startsIn, whenOf } from '@asas/courses/portal/ui/portal.ts'
+import { byWhen, partOfDay, startsIn, whenOf } from '@asas/courses/portal/ui/rules.ts'
 import { catalogueOf, readSeats } from '@asas/courses/portal/ui/reads.ts'
 
 /** How many courses the home offers before its link to the rest. */

@@ -1080,7 +1080,8 @@ const walkScreen = async (name: 'dashboard' | 'portal') => {
   }
   for (const page of Object.values(screen.pages)) html += await screenHtml(`${screen.path}${page.path === '/' ? '' : page.path}`)
   assert.ok(expected.length > 10, `the walk found what ${name} declares: ${expected.length}`)
-  assert.ok(affixes >= 2, `and ${name} draws a field with a prefix and one with a suffix: ${affixes}`)
+  // The portal's courses are drawn whole, so its trees, the enrollment's two forms, hold no field with an affix.
+  if (name === 'dashboard') assert.ok(affixes >= 2, `and ${name} draws a field with a prefix and one with a suffix: ${affixes}`)
   for (const [what, marker] of expected) assert.match(html, marker, `${name} draws ${what}`)
 }
 
@@ -1565,12 +1566,13 @@ test('51. the portal\'s route chunks do not carry the dashboard\'s members page,
   assert.deepEqual([...chunks].filter(([, source]) => declared.some((label) => source.includes(label))).map(([file]) => file), [], 'no client chunk carries the fixed roles\' code')
 })
 
-test('52. a when decides what each screen draws: the access code follows the delivery on both screens and the archive button the row, while the server still refuses the operation to an actor without its key', async () => {
+test('52. a when decides what the dashboard draws: the access code follows the delivery and the archive button the row, while the server still refuses the operation to an actor without its key', async () => {
   // A server render draws the form's first values, so the redraw as a value changes is proved in the rendered tree elsewhere.
   const recorded = await post('/api/courses/create', { title: `Recorded ${Date.now()}`, delivery: 'recorded', accessCode: 'REC001' }, { cookie })
   assert.equal(recorded.response.status, 200, JSON.stringify(recorded.body))
   const id = String(recorded.body.id)
-  for (const screen of ['dashboard', 'portal']) {
+  // The portal draws a course whole and holds no form of it.
+  for (const screen of ['dashboard']) {
     const live = await screenHtml(`/${screen}/courses/${screenCourse}`)
     assert.ok(live.includes('for="courses-delivery"') && live.includes('for="courses-accessCode"'), `the ${screen} draws the access code over a live course`)
     const other = await screenHtml(`/${screen}/courses/${id}`)

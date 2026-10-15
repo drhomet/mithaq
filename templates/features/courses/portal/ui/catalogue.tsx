@@ -6,9 +6,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useClient, useLocale, useScreen } from 'mithaq/admin/react'
 import { Input } from '@/components/ui/input'
 import { Toggle } from '@/components/ui/toggle'
-import { PortalShell, display } from './portal-shell.tsx'
+import { PortalShell, display } from './shell.tsx'
 import { CardsLoading, CourseCard, ReadFailed } from './parts.tsx'
-import { inLocale } from './portal.ts'
+import { inLocale } from './rules.ts'
 import { catalogueOf } from './reads.ts'
 
 /** Drawn whole as the courses' list page, so it reads the list itself. */

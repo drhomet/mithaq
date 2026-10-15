@@ -364,7 +364,7 @@ export const portalScreen = screenTarget({
   // single column; the courses example's pages draw it whole.
   layouts: {
     // add-on: courses
-    top: coursesPortal('portal-shell.tsx#PortalShell'),
+    top: coursesPortal('shell.tsx#PortalShell'),
     // end add-on: courses
     // without add-on: courses
     // top: ui('top-shell.tsx#PortalTopShell'),

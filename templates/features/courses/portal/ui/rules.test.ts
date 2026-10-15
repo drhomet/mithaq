@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { byWhen, closedTo, feeOf, nextByCourse, partOfDay, seatsOf, startsIn } from './portal.ts'
+import { byWhen, closedTo, feeOf, nextByCourse, partOfDay, seatsOf, startsIn } from './rules.ts'
 
 const t = (key: string, fallback?: string) => fallback ?? key
 const now = Date.parse('2026-10-15T12:00:00Z')

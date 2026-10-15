@@ -22,7 +22,7 @@ import { frame, UserMenu } from '@asas/mithaq/ui/app-shell.tsx'
 import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 import { nameIn } from '@asas/mithaq/mithaq/auth/organizations.ts'
 // add-on: settings
-import { closedTo } from './portal.ts'
+import { closedTo } from './rules.ts'
 // end add-on: settings
 
 export const regions = ['header', 'main'] as const

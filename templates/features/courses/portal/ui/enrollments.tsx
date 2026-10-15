@@ -12,9 +12,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { PortalShell, display } from './portal-shell.tsx'
+import { PortalShell, display } from './shell.tsx'
 import { CardsLoading, Cover, ReadFailed, usePlace } from './parts.tsx'
-import { byWhen, startsIn, whenOf } from './portal.ts'
+import { byWhen, startsIn, whenOf } from './rules.ts'
 import { readSeats, type Seat } from './reads.ts'
 
 export function Enrollments() {

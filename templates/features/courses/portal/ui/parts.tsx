@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import type { Row } from 'mithaq/admin'
 import { useLocale, useScreen } from 'mithaq/admin/react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { display } from './portal-shell.tsx'
-import { feeOf, inLocale, whenOf } from './portal.ts'
+import { display } from './shell.tsx'
+import { feeOf, inLocale, whenOf } from './rules.ts'
 
 /** A text field's option in the viewer's words, as a choice reads it on every screen, and the stored value where none is declared. */
 export const useOption = () => {

@@ -14,9 +14,9 @@ import { toast } from 'mithaq-admin/toast.tsx'
 import { Button } from '@/components/ui/button'
 import { DirectionalIcon } from '@/components/ui/directional-icon'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PortalShell, display } from './portal-shell.tsx'
+import { PortalShell, display } from './shell.tsx'
 import { Cover, Tags, useOption, usePlace } from './parts.tsx'
-import { feeOf, seatsOf, whenOf } from './portal.ts'
+import { feeOf, seatsOf, whenOf } from './rules.ts'
 import { byIds, readSeats } from './reads.ts'
 
 type Session = Row & { seatsLeft?: number | null }

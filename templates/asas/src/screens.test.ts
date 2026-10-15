@@ -396,7 +396,7 @@ test('the template screens share their controls and layouts through one const, r
     assert.deepEqual(named(client), Object.values(client.layouts).sort(), `${client.path} registers exactly the layouts its pages name`)
   }
   assert.equal(dashboard.layouts.top, '@asas/mithaq:./src/ui/top-shell.tsx#TopShell')
-  assert.equal(portal.layouts.top, '@asas/courses:./portal/ui/portal-shell.tsx#PortalShell', 'the portal draws its own shell, the courses example\'s')
+  assert.equal(portal.layouts.top, '@asas/courses:./portal/ui/shell.tsx#PortalShell', 'the portal draws its own shell, the courses example\'s')
   assert.deepEqual(dashboard.controls, portal.controls, 'and so is what draws each kind')
   const shells = (client: typeof dashboard) => new Set(Object.values(client.kayan).flatMap((kayan) => Object.values(kayan.pages).flatMap((page) => ('page' in page ? [page.page.shell] : []))))
   assert.deepEqual([...shells(dashboard)].sort(), [dashboard.layouts.app, dashboard.layouts.top].sort(), 'the dashboard roots its pages at both shells')

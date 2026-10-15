@@ -2,7 +2,7 @@
 // not read is left out of what comes back and a page draws what it can.
 import type { FetchClient, Row } from 'mithaq/admin'
 import { onOffer } from '../../domain/on-offer.ts'
-import { nextByCourse } from './portal.ts'
+import { nextByCourse } from './rules.ts'
 
 type Reads = { client: FetchClient; maxLimit: number }
 type Found = { docs: Row[]; totalDocs: number }

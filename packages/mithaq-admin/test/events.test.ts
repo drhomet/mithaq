@@ -7453,7 +7453,7 @@ test('233r. a course that lets students enroll themselves offers the sessions wi
 })
 
 test('233t. an instructor\'s new enrollment on the portal draws the student it enrolls beside the session', async () => {
-  const { PortalShell } = await import('../../../templates/features/courses/portal/ui/portal-shell.tsx')
+  const { PortalShell } = await import('../../../templates/features/courses/portal/ui/shell.tsx')
   const { Page } = await import('../../../templates/asas/src/ui-portal/page.tsx')
   const kayan = portalScreen.kayan.enrollments!
   const page = kayan.pages.create! as Extract<PageClient, { page: unknown }>

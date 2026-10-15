@@ -25,7 +25,7 @@
     }
   ],
   "layouts": {
-    "top": "@asas/courses:./portal/ui/portal-shell.tsx#PortalShell",
+    "top": "@asas/courses:./portal/ui/shell.tsx#PortalShell",
     "page": "./src/ui-portal/page.tsx#Page"
   },
   "components": {},
@@ -797,7 +797,7 @@
         "create": {
           "path": "/enrollments/new",
           "page": {
-            "shell": "@asas/courses:./portal/ui/portal-shell.tsx#PortalShell",
+            "shell": "@asas/courses:./portal/ui/shell.tsx#PortalShell",
             "header": [
               {
                 "title": {}
@@ -829,7 +829,7 @@
         "edit": {
           "path": "/enrollments/:id",
           "page": {
-            "shell": "@asas/courses:./portal/ui/portal-shell.tsx#PortalShell",
+            "shell": "@asas/courses:./portal/ui/shell.tsx#PortalShell",
             "header": [
               {
                 "title": {}
