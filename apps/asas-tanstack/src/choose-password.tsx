@@ -36,8 +36,8 @@ type Props = {
   redirect?: string
   signedIn: boolean
   home: { path: string; name?: string }
-  /** The paths of the screens a signed-in person opens. */
-  screens: readonly string[]
+  /** The screens a signed-in person opens. */
+  screens: readonly { name: string; path: string }[]
   password: { min: number; max: number }
   /** The account the link is for; `null` for a link that names none, `undefined` while unread. */
   email?: string | null
