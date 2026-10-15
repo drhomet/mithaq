@@ -9,13 +9,15 @@ bunx mithaq --help
 
 `mithaq --help` (or `-h`) prints the usage line and exits 0. A command it does not understand prints the same line and exits 1.
 
-Two things hold for every command:
+Three things hold for every command:
 
 - **It runs under Node and does not read `.env`.** Commands that open a database (`migrate`, `rbac assign`, `storage sweep`, and the data scan of `generate messages --check`) refuse to run unless `DATABASE_URL` is set in the shell. Load the project's `.env` first:
 
   ```sh
   set -a; . ./.env; set +a
   ```
+
+- **It reads the project's own sources as Vite and Bun do.** A relative import with no extension (`import './notes'`) that names no file Node finds is read as `./notes.ts`, then `./notes/index.ts`. Nothing under `node_modules` is read that way.
 
 - **Exit codes.** 0 means success or nothing to do. 1 means a check failed, the command refused, or something threw. Some commands also use 2, described below. A refusal prints one sentence that says what to do. Any other error prints Node's stack trace, which usually means `src/asas.ts` failed to import.
 

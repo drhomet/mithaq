@@ -183,12 +183,16 @@ export const tenancy = ({ language, assigned, onError, collection }: {
    * organization's delete never reaches it.
    */
   const sealWrites = ({ writes, find, kayanOf }: { writes: WriteTools['store']; find: Store['find']; kayanOf: (name: string) => ResolvedKayan | undefined }): WriteTools['store'] => {
-    const references = async ({ name, data, tx }: { name: string; data: Record<string, unknown>; tx: unknown }) => {
+    // A versions table or a join table holds no tenant field to seal by, so a step reaches neither.
+    const named = (name: string) => {
       const kayan = kayanOf(name)
-      if (kayan) await assertReferences({ kayan, store: { find }, data, tenant: active(running.getStore()?.user), tx })
+      if (!kayan) throw new Error(`A step wrote "${name}", which names no kayan, and a step writes a kayan's rows alone: versions and join rows are core's.`)
+      return kayan
     }
+    const references = async ({ name, data, tx }: { name: string; data: Record<string, unknown>; tx: unknown }) =>
+      assertReferences({ kayan: named(name), store: { find }, data, tenant: active(running.getStore()?.user), tx })
     const sealed = (name: string, data?: Record<string, unknown>) => {
-      const field = kayanOf(name)?.tenant
+      const field = named(name).tenant
       if (!field) return undefined
       const org = active(running.getStore()?.user)
       if (org === undefined) throw new Error(`A step wrote kayan "${name}", whose rows belong to an organization, under no active organization.`)
@@ -197,7 +201,7 @@ export const tenancy = ({ language, assigned, onError, collection }: {
     }
     return Object.freeze({
       insert: async (args) => {
-        const field = kayanOf(args.kayan)?.tenant
+        const field = named(args.kayan).tenant
         if (field) {
           const org = active(running.getStore()?.user)
           if (org === undefined || args.data[field] !== org) {

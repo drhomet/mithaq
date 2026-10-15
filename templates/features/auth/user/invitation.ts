@@ -16,8 +16,8 @@ export const invitation = defineKayan({
   fields: {
     ...defaultFields,
     id: { kind: 'text' },
-    organizationId: { kind: 'relationship', relationTo: () => organization, dbName: 'organization_id', rules: { required: true, onDelete: 'cascade' } },
-    email: { kind: 'text', rules: { required: true } },
+    organizationId: { kind: 'relationship', relationTo: () => organization, dbName: 'organization_id', rules: { required: true, index: true, onDelete: 'cascade' } },
+    email: { kind: 'text', rules: { required: true, index: true } },
     role: { kind: 'text' },
     status: { kind: 'text', rules: { required: true } },
     expiresAt: { kind: 'datetime', rules: { required: true } },

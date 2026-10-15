@@ -398,6 +398,15 @@ const seal = <S extends OperationStep<never>>(name: Seal, step: S) => {
 /** What position this step holds, or nothing at all for a step of the app's own. */
 export const sealOf = (step: OperationStep<never>): Seal | undefined => seals.get(step)
 
+// Each copy of mithaq in the process lists its seals here, so a step a second install sealed is
+// named rather than miscounted. Anything can write this map, so its answer only ever refuses.
+const copies: Map<string, (step: unknown) => unknown> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mithaq.copies')] ??= new Map()) as never
+copies.set(import.meta.url, (step) => seals.get(step as OperationStep<never>))
+
+/** Where the other copy of mithaq that sealed this step was loaded from, if one did. */
+export const foreignCopyOf = (step: OperationStep<never>): string | undefined =>
+  [...copies].find(([url, of]) => url !== import.meta.url && of(step))?.[0]
+
 /** Hold an operation's `output` function until `build` has the derived shapes. */
 export const holdOutput = (operation: ResolvedOperation, of: (schemas: never) => RowOutput) => {
   outputs.set(operation, of)

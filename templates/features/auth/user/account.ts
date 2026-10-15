@@ -17,7 +17,7 @@ export const account = defineKayan({
     id: { kind: 'text' },
     accountId: { kind: 'text', rules: { required: true } },
     providerId: { kind: 'text', rules: { required: true } },
-    userId: { kind: 'relationship', relationTo: () => user, dbName: 'user_id', rules: { required: true, onDelete: 'cascade' } },
+    userId: { kind: 'relationship', relationTo: () => user, dbName: 'user_id', rules: { required: true, index: true, onDelete: 'cascade' } },
     accessToken: { kind: 'text' },
     refreshToken: { kind: 'text' },
     idToken: { kind: 'text' },

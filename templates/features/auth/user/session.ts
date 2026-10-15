@@ -21,7 +21,7 @@ export const session = defineKayan({
     updatedAt: { kind: 'datetime', rules: { required: true, nowOnUpdate: true, providedBy: { update: 'application' } } },
     ipAddress: { kind: 'text' },
     userAgent: { kind: 'text' },
-    userId: { kind: 'relationship', relationTo: () => user, dbName: 'user_id', rules: { required: true, onDelete: 'cascade' } },
+    userId: { kind: 'relationship', relationTo: () => user, dbName: 'user_id', rules: { required: true, index: true, onDelete: 'cascade' } },
     impersonatedBy: { kind: 'text' },
     activeOrganizationId: { kind: 'text' },
   },

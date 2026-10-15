@@ -163,7 +163,10 @@ core does all of this:
   `tools.store.remove` are ANDed with `organization = active` and may not name
   the field. A relationship value a raw write names must point at the active
   organization's row. This holds whichever per-organization kayan the step
-  names, not only the operation's own.
+  names, not only the operation's own. A raw write reaches exactly the id it
+  names; only the operation's own row takes its access, versions and soft
+  delete. A raw write names a kayan; a versions or join table is core's and
+  is refused.
 
 `ctx.tx` is the store's transaction itself. Raw SQL through it is the
 project's own privileged path, which core does not scope; see

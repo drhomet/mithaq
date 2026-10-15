@@ -443,6 +443,8 @@ const memoAsas = buildTestAsas({ http: [fetchHttp()], kayan: [memos, localeMemos
  * Both are shared: a column called `tenant` binds nothing, so the reference check a write
  * runs is the target's own read, which is under test.
  */
+/** The parent a `prune` step removes through the raw store, beside the one the delete names. */
+const prunedParent: { id?: string } = {}
 const markedParents = defineTestKayan({
   name: 'markedParents',
   dbName: 'marked_parents',
@@ -457,7 +459,19 @@ const markedParents = defineTestKayan({
       rules: { providedBy: { create: 'never', update: 'never' } },
     },
   },
-  targets: { service: { operations: defaultOperations } },
+  targets: {
+    service: {
+      operations: {
+        ...defaultOperations,
+        prune: {
+          steps: ({ steps }: { steps: { remove: WriteStep } }) => [
+            (async (ctx, tools) => (await tools.store.remove({ tx: ctx.tx, kayan: 'markedParents', id: prunedParent.id }), ctx)) as WriteStep,
+            steps.remove,
+          ],
+        },
+      },
+    },
+  },
 })
 const markedChildren = defineTestKayan({
   name: 'markedChildren',
@@ -5798,18 +5812,20 @@ test('38. two concurrent first updates on a tenant global make one row, not two'
   const options = { actor }
   const before = (await db.select().from(tables.settings!)).length
 
-  // Both writes read an empty tenant before either has committed, so the unique
-  // tenant column is what leaves one row and one error rather than two rows.
-  const results = await Promise.allSettled([
-    settings.update({ contactEmail: 'first@mithaq.test' }, options),
-    settings.update({ contactEmail: 'second@mithaq.test' }, options),
-  ])
-  assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
-  assert.match(refusal(results), /settings_organization_id_key/)
+  const writes = [{ contactEmail: 'first@mithaq.test', maintenance: true }, { contactEmail: 'second@mithaq.test', maintenance: false }]
+  const results = await Promise.allSettled(writes.map((write) => settings.update(write, options)))
+  // Two writes that both read an empty tenant collide on the unique tenant column, so one is refused.
+  // Under load one can commit before the other reads, and that one then updates the row it finds,
+  // as a second update after the first would: both succeed, and the row is still one.
+  if (results.some((result) => result.status === 'rejected')) {
+    assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
+    assert.match(refusal(results), /settings_organization_id_key/)
+  }
   assert.equal((await db.select().from(tables.settings!)).length, before + 1)
   const found = await settings.findOne({}, options)
   assert.ok(found)
-  assert.ok(['first@mithaq.test', 'second@mithaq.test'].includes(String(found.contactEmail)))
+  // One write's values whole, never a mix of the two.
+  assert.ok(writes.some((write) => found.contactEmail === write.contactEmail && found.maintenance === write.maintenance), JSON.stringify(found))
 })
 
 test('39. a global on a language with no tenant field refuses a create or delete access key and a duplicate name, and is one row on one table for the project', async () => {
@@ -8765,6 +8781,21 @@ test('82. a kayan the access target reads carrying the soft-delete mark is refus
     build('none'),
     'while the same two kayan without the mark build, and the account kayan carrying it is untouched',
   )
+})
+
+test('83a. a delete keeps its soft delete while its step removes a sibling outright', async () => {
+  const parents = markedAsas.kayan.markedParents.operations as typeof markedAsas.kayan.markedParents.operations & { prune: (input: { id: string }) => Promise<unknown> }
+  const rowOf = async (id: string) => (await db.execute(`select deleted_at from marked_parents where id = '${id}'`)).rows[0] as { deleted_at: Date | null } | undefined
+  try {
+    const own = await parents.create({ title: 'Own' })
+    const sibling = await parents.create({ title: 'Sibling' })
+    Object.assign(prunedParent, { id: sibling.id })
+    await parents.prune({ id: own.id })
+    assert.equal(await rowOf(sibling.id), undefined, 'the sibling the step named is removed outright, as a raw remove does')
+    assert.ok((await rowOf(own.id))?.deleted_at, 'while the row the delete names is marked and kept')
+  } finally {
+    await db.execute('delete from marked_parents')
+  }
 })
 
 test('83. a write referencing a parent the delete marked is refused exactly as one referencing a parent that was never there', async () => {

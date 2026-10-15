@@ -2,6 +2,7 @@
 // Each generator is imported when its word is asked for, so `better-auth/db` loads
 // only for `generate auth` and the `generate --check` sweep.
 import { realpathSync } from 'node:fs'
+import * as modules from 'node:module'
 import { pathToFileURL } from 'node:url'
 import type { Command } from '../../mithaq/language.ts'
 import { Refusal } from '../../mithaq/refusal.ts'
@@ -19,6 +20,25 @@ type Built = {
 
 // Run as a command, not imported. The bin is a symlink, so compare real paths.
 if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
+  // A project's sources may import each other with no extension, as Vite, Bun and drizzle-kit
+  // resolve them and Node does not, so a relative import that names no file is tried as `.ts`,
+  // then as a folder's `index.ts`. Only after Node's own resolution failed, never under node_modules.
+  modules.registerHooks?.({
+    resolve: (specifier, context, next) => {
+      try {
+        return next(specifier, context)
+      } catch (error) {
+        const code = (error as { code?: string }).code
+        if (!/^\.\.?\//.test(specifier) || context.parentURL?.includes('/node_modules/') || (code !== 'ERR_MODULE_NOT_FOUND' && code !== 'ERR_UNSUPPORTED_DIR_IMPORT')) throw error
+        for (const tail of ['.ts', '/index.ts']) {
+          try {
+            return next(`${specifier}${tail}`, context)
+          } catch {}
+        }
+        throw error
+      }
+    },
+  })
   try {
     const [, , verb, noun, ...rest] = process.argv
     // Before anything reads the project: outside one there is no `src/asas.ts` to import.

@@ -509,6 +509,10 @@ const validateTenantRelationships = async <Actor>(
  * organization than the written row's, or one `access` leaves out. A step's own raw write
  * passes no `access`, so it is held to the organization alone.
  */
+// Postgres answers a uuid in lowercase, so ids are compared in that case.
+const keyIn = (kayan: ResolvedKayan) => (value: unknown) =>
+  kayan.fields.id?.kind === 'uuid' && typeof value === 'string' ? value.toLowerCase() : value
+
 export const assertReferences = async ({ kayan, store, data, tenant, access, offered, tx }: {
   kayan: ResolvedKayan
   store: Pick<Store, 'find'>
@@ -570,9 +574,7 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
       // Fail closed before the store is asked, so the foreign key cannot tell which ids exist.
       throw refuse(sets[0]!.field)
     }
-    // Postgres answers a uuid in lowercase, so ids are compared in that case.
-    const uuid = target.fields.id?.kind === 'uuid'
-    const keyOf = (value: unknown) => (uuid && typeof value === 'string' ? value.toLowerCase() : value)
+    const keyOf = keyIn(target)
     const ids = [...new Set(sets.map(({ value }) => keyOf(value)))]
     const found = await store.find({ kayan: target.name, args: {
       limit: ids.length,
@@ -964,38 +966,51 @@ export const write = <Actor = unknown>({
         const inputData = fieldOperation
           ? await fieldAccess(fieldOperation, kayan, given, actor, targetId, tools.operation, existing, carried)
           : given
-        // The audit sink writes through the same three, so only the kayan's own writes save versions.
+        // The audit sink writes through the same three, so only the kayan's own writes save versions,
+        // through the store itself: a versions table is no kayan, and the seal refuses it to a step.
         const versioned = versions ? kayan as ResolvedKayan & { versions: NonNullable<typeof versions> } : undefined
         const own = (name: string) => versioned && name === kayan.name ? versioned : undefined
+        // The row this write authorized, which alone takes its access, versions and soft delete, in
+        // whatever case the caller sent its uuid. A step naming any other id writes that row.
+        const keyOf = keyIn(kayan)
+        const ownRow = (name: string, id: unknown) =>
+          kind !== 'insert' && name === kayan.name && (keyOf(id) === keyOf(targetId) || (existing !== undefined && id === existing.id))
+        // And a raw write of this kayan never reaches the authorized row, however its id is spelled.
+        const elsewhere = <Args extends { kayan: string; where?: Where }>(args: Args): Args =>
+          kind !== 'insert' && args.kayan === kayan.name && targetId !== undefined ? { ...args, where: combineWhere(args.where, { id: { not_equals: targetId as Scalar } }) } : args
         const protectedStore: WriteTools<unknown, Actor>['store'] = Object.freeze({
           insert: async ({ tx: heldTx, kayan: name, data: values }) => {
             const row = await tools.store.insert({ tx: heldTx, kayan: name, data: values })
             const kept = own(name)
-            if (kept) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row, autosave: autosaving })
+            if (kept) await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row, autosave: autosaving })
             return row
           },
-          update: async ({ tx: heldTx, kayan: name, id, data: values }) => {
+          update: async (args) => {
+            const { tx: heldTx, kayan: name, id, data: values } = args
+            // Any other row is the step's own raw write, held by the tenant seal alone.
+            if (!ownRow(name, id)) return tools.store.update(elsewhere(args))
             const kept = own(name)
             if (drafting && kept) {
               const draft = { ...base, ...values, id: targetId }
-              await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row: draft, autosave: autosaving })
+              await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: draft, autosave: autosaving })
               return draft
             }
-            const row = await tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: values, where: writeWhere })
+            const row = await tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: values, where: writeWhere })
             // A never-published row is its own draft, so the draft appended below is its one version.
-            if (kept && !(pending && status === 'draft')) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row, autosave: false })
+            if (kept && !(pending && status === 'draft')) await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row, autosave: false })
             // Appended after the row's own, so the draft stays the latest.
-            if (kept && pending) await saveVersion({ kayan: kept, store, writes: tools.store, tx: heldTx, row: { ...pending, ...values, id: targetId, _status: 'draft' }, autosave: false })
+            if (kept && pending) await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: { ...pending, ...values, id: targetId, _status: 'draft' }, autosave: false })
             return row
           },
           // A soft delete keeps the `remove` seal, so the effect, the access answer and the 404 stay
           // the delete's; the mark is refused as a field any caller supplies.
-
-          remove: async ({ tx: heldTx, kayan: name, id }) => {
-            if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId ?? id, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
+          remove: async (args) => {
+            const { tx: heldTx, kayan: name, id } = args
+            if (!ownRow(name, id)) return tools.store.remove(elsewhere(args))
+            if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
             // A marked row is kept, so only a delete that removes it answers to the rows naming it.
-            if (name === kayan.name && pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
-            return tools.store.remove({ tx: heldTx, kayan: name, id: targetId ?? id, where: writeWhere })
+            if (pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
+            return tools.store.remove({ tx: heldTx, kayan: name, id: targetId, where: writeWhere })
           },
         })
         // Its absence is a build fault: the partial update shape would make a row without its required fields.

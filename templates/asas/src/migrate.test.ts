@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
-import { readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { realpathSync } from 'node:fs'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { test } from 'node:test'
+import { kitOrm } from '../../../packages/mithaq/src/drizzle/migrate.ts'
 import {
   appliedIn,
   foldersIn,
@@ -16,6 +22,25 @@ import {
   sqlIn,
   withSummary,
 } from './migrate.support.ts'
+
+test('drizzle-kit, which imports drizzle-orm without declaring it, loads the copy mithaq builds with, never one the project hoists', async () => {
+  const root = realpathSync(await mkdtemp(join(tmpdir(), 'mithaq-kit-')))
+  try {
+    // drizzle-kit's place in an isolated install: a folder of its own, with only the project's drizzle-orm above it.
+    await mkdir(join(root, 'node_modules/drizzle-orm'), { recursive: true })
+    await writeFile(join(root, 'node_modules/drizzle-orm/package.json'), JSON.stringify({ name: 'drizzle-orm', version: '0.45.0', main: 'index.js' }))
+    await writeFile(join(root, 'node_modules/drizzle-orm/index.js'), "module.exports = { version: '0.45.0' }")
+    await mkdir(join(root, 'kit'))
+    // As drizzle-kit's bin does: `require`, and a subpath only drizzle-orm 1 has.
+    await writeFile(join(root, 'kit/bin.cjs'), "require('drizzle-orm/_relations'); console.log(require('drizzle-orm').version ?? 'mithaq')")
+    const loaded = (args: string[]) => execFileSync(process.execPath, [...args, join(root, 'kit/bin.cjs')], { encoding: 'utf8' }).trim()
+    assert.throws(() => loaded([]), /Cannot find module/, 'on its own it loads the hoisted copy')
+    const from = new URL('../../../packages/mithaq/src/drizzle/migrate.ts', import.meta.url).href
+    assert.equal(loaded(['--import', kitOrm({ kit: pathToFileURL(join(root, 'kit/')).href, from })]), 'mithaq')
+  } finally {
+    await rm(root, { recursive: true })
+  }
+})
 
 test('`mithaq migrate` writes its config and schema module, migrates a database from zero, and gates every later change', async (t) => {
   await migrateDatabase()
@@ -281,6 +306,22 @@ test('`mithaq migrate --name` names the folder after a slug of lowercase letters
     assert.equal(folders.length, 2)
     assert.doesNotMatch(folders[1]!, /center_feedback$/, 'a run with no --name keeps the name drizzle-kit picks')
   } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('`mithaq migrate` reads an envelope larger than a pipe holds, which drizzle-kit prints just before it exits', async () => {
+  await migrateDatabase()
+  // Enough columns that each envelope is several times the 64 KB a pipe holds.
+  const columns = Array.from({ length: 400 }, (_, at) => `        column_that_fills_the_envelope_${at}: { kind: 'text' },`).join('\n')
+  const root = await migrationProject(`        id: { kind: 'text' },\n${columns}`)
+  try {
+    assert.equal(await sqlIn(root, resetSchemas), 0)
+    const migrated = await migrating(root, 'migrate')
+    assert.equal(migrated.code, 0, migrated.stderr)
+    assert.match(await latestSql(root), /"column_that_fills_the_envelope_399" text/)
+  } finally {
+    await sqlIn(root, resetSchemas)
     await rm(root, { recursive: true, force: true })
   }
 })

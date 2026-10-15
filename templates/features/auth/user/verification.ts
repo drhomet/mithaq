@@ -14,7 +14,7 @@ export const verification = defineKayan({
   fields: {
     ...defaultFields,
     id: { kind: 'text' },
-    identifier: { kind: 'text', rules: { required: true } },
+    identifier: { kind: 'text', rules: { required: true, index: true } },
     value: { kind: 'text', rules: { required: true } },
     expiresAt: { kind: 'datetime', rules: { required: true } },
     createdAt: { kind: 'datetime', rules: { required: true } },
