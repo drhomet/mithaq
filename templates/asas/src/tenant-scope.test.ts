@@ -139,7 +139,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       rbac: access,
       versions: versionsTarget({ max: 100 }),
       tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', organizations: 'many', backoffice: ({ user }) => backofficeApp && staff.has((user as { id: string }).id) }),
-      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize }),
+      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize, softDelete: 'deletedAt' }),
     } as {},
   })
   const { tenant } = (language as unknown as { targets: { tenant: ReturnType<typeof betterAuthTenant<'firms'>> } }).targets
@@ -387,6 +387,31 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       },
     },
   }
+  // Tenant-owned and kept when deleted: a delete marks its row and asks no rows naming it.
+  const shelves = {
+    name: 'shelves',
+    schemaName: 'tenant_scope',
+    fields: {
+      ...defaultFields,
+      firmId: tenant.field,
+      title: { kind: 'text' },
+      next: { kind: 'relationship', relationTo: 'shelves' },
+      deletedAt: { kind: 'datetime', rules: { providedBy: { create: 'never', update: 'never' } } },
+    },
+    access: { create: () => true, read: () => true, update: () => true, delete: () => true },
+    targets: {
+      service: {
+        operations: {
+          ...defaultOperations,
+          // Marks its row, stops holding it, then changes the row `aimed` names.
+          heldShelve: { steps: ({ steps }: { steps: { remove: unknown } }) => [steps.remove, pause, aimAt('update')] },
+          // Changes the row `aimed` names, then makes a row naming another.
+          link: { steps: ({ steps }: { steps: { insert: unknown } }) => [aimAt('update'), steps.insert] },
+          heldClear: { steps: ({ steps }: { steps: { deleteMany: unknown } }) => [steps.deleteMany, pause] },
+        },
+      },
+    },
+  }
   const user = { name: 'user', schemaName: 'tenant_scope', fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
   // A local account, which is no organization's member.
   const locals = {
@@ -397,11 +422,11 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, secret: 'tenant-scope-a-local-auth-test-secret' }),
     targets: { service: { operations: { ...defaultOperations, ...localAuthOperations } } },
   }
-  return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, shelves, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode', (input?: unknown, options?: unknown) => Promise<any>>
-type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear', (input?: unknown, options?: unknown) => Promise<any>>
+type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
 const actorOf = async ({ active, orgs = active ? { [active]: ['editor'] } : {}, backoffice = false, collection = 'user' }: { active?: string | null; orgs?: Record<string, string[]>; backoffice?: boolean; collection?: string }) => {
@@ -1399,6 +1424,42 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const outcomes = await Promise.allSettled([listing, naming])
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.deepEqual((await notes.findByID({ id: listed.id }, { actor: one })).memoSet, [ids.org1])
+  })
+
+  // A soft delete only sets its mark, as an UPDATE of a non-key column does, so it holds its row FOR NO
+  // KEY UPDATE: a write naming the row passes it rather than waiting while the delete waits on that write.
+  if (postgres) test('a held soft delete and a write naming its row both commit, with no deadlock, and once the delete commits a write naming the row is refused as an absent id is', { timeout: 10_000 }, async () => {
+    const shelves = built.kayan.shelves.operations
+    const shelved = await shelves.create({ title: 'shelved', next: null }, { actor: one })
+    const beside = await shelves.create({ title: 'beside', next: null }, { actor: one })
+    Object.assign(aimed, { kayan: 'shelves', id: beside.id, data: { title: 'beside again' } })
+    const held = hold()
+    const shelving = shelves.heldShelve({ id: shelved.id }, { actor: one })
+    await held.reached.promise
+    const naming = shelves.link({ title: 'names the shelved', next: shelved.id }, { actor: one })
+    await Promise.race([naming.catch(() => {}), blocked()])
+    held.release.resolve()
+    const outcomes = await Promise.allSettled([shelving, naming])
+    assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
+    assert.equal((await refusal(shelves.findByID({ id: shelved.id }, { actor: one }))).status, 404, 'the row is marked')
+    const late = await refusal(shelves.create({ title: 'too late', next: shelved.id }, { actor: one }))
+    assert.deepEqual(told(late), told(await refusal(shelves.create({ title: 'too late', next: absent }, { actor: one }))))
+  })
+
+  if (postgres) test('a bulk soft delete holding the rows it marked never holds up a write naming one of them', { timeout: 10_000 }, async () => {
+    const shelves = built.kayan.shelves.operations
+    const cleared = await shelves.create({ title: 'cleared', next: null }, { actor: one })
+    const held = hold()
+    const clearing = shelves.heldClear({ where: { id: { equals: cleared.id } } }, { actor: one })
+    await held.reached.promise
+    try {
+      const naming = shelves.create({ title: 'names the cleared', next: cleared.id }, { actor: one })
+      const named = await Promise.race([naming, setTimeout(2000, 'waited')])
+      assert.equal((named as { next?: unknown }).next, cleared.id, `the write commits while the bulk holds its rows: ${String(named)}`)
+    } finally {
+      held.release.resolve()
+      await clearing
+    }
   })
 })
 

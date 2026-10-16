@@ -479,12 +479,13 @@ export const assertSingleConstrained = (kayan: ResolvedKayan, where: Where | und
 /**
  * The lock a write holds on a row it changes, as Postgres's own statement takes it: `FOR UPDATE` for a
  * delete, or for an update naming a column of a unique index, which holds off a write naming the row
- * `FOR KEY SHARE`, and `FOR NO KEY UPDATE` for any other update, which that write passes. Taken whole
- * when the row loads, before any value is compared: an UPDATE raising its lock later would wait on a
- * writer that named the row in between while that writer waits on it, a deadlock.
+ * `FOR KEY SHARE`, and `FOR NO KEY UPDATE` for any other update, which that write passes. A soft delete
+ * is an update of its mark, and asks no rows naming its row, so it has no reference to hold off. Taken
+ * whole when the row loads, before any value is compared: an UPDATE raising its lock later would wait on
+ * a writer that named the row in between while that writer waits on it, a deadlock.
  */
 export const rowLock = ({ kayan, kind, data }: { kayan: ResolvedKayan; kind: string; data: Record<string, unknown> }) => {
-  const written = kind === 'remove' || kind === 'deleteMany' ? undefined : Object.keys(data)
+  const written = kind === 'remove' || kind === 'deleteMany' ? (kayan.softDelete ? [kayan.softDelete] : undefined) : Object.keys(data)
   return !written || kayan.indexes.some((index) => index.unique && index.fields.some((name) => written.includes(name))) ? 'update' : 'noKeyUpdate'
 }
 

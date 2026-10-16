@@ -612,8 +612,9 @@ skip a check, because the checks belong to the runner, not to the list.
 5. `beforeTransaction`, outside the transaction. No row is loaded yet.
 6. The transaction opens. An update or delete loads its row under the access
    answer and locks it as Postgres's own statement would: an update `FOR NO KEY
-   UPDATE`, which a write naming the row passes, and a delete, or an update
-   naming a column of a unique index, `FOR UPDATE`, which holds that write off.
+   UPDATE`, which a write naming the row passes, a soft delete the same, and a
+   delete, or an update naming a column of a unique index, `FOR UPDATE`, which
+   holds that write off.
 7. Field access for the fields the write names.
 8. The parse and the defaults. Without an `input`, the defaults fill and the
    whole row is parsed; with one, the caller's shape is parsed first and the
