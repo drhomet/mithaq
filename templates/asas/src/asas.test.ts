@@ -18781,6 +18781,38 @@ test('R7b. a session takes no seat past its capacity, whoever writes, even when 
   assert.equal(keyOf(moved.body), 'error.conflict.session_full', 'a seat moved into a full session is refused as a new one is')
 })
 
+for (const kayan of ['sessions', 'courses'] as const) test(`R7h. an enrollment waits for a ${kayan === 'sessions' ? 'session' : 'course'} archive before judging whether it takes seats`, { timeout: 20_000 }, async () => {
+  const tenant = await roleTenant(`archive-r7h-${kayan}`)
+  const store = asas.targets.drizzle
+  const course = await courses.operations.create({ title: `Archive R7h ${kayan}`, selfEnroll: true }, tenant.options)
+  const session = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 7 * 864e5), capacity: 2 }, tenant.options)
+  const holding = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const archiving = store.transaction(async (tx) => {
+    await store.update({ tx, kayan, id: kayan === 'sessions' ? session.id : course.id, data: { archived: true } })
+    holding.resolve()
+    await release.promise
+  })
+  await holding.promise
+  const enrolling = tenant.as('student', 'enrollments/create', { session: session.id })
+  let answered = false
+  void enrolling.finally(() => { answered = true })
+  try {
+    // The archive stays uncommitted until the enrollment either waits on this table or answers.
+    for (let tries = 0; tries < 200 && !answered; tries += 1) {
+      const { rows } = await db.execute("select 1 from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and wait_event_type = 'Lock' and query like '%course_sessions%'")
+      if (rows.length) break
+      await setTimeout(10)
+    }
+  } finally {
+    release.resolve()
+    await archiving
+  }
+  const answer = await enrolling
+  assert.equal(keyOf(answer.body), 'error.invalid.archived_session', `${kayan}: ${JSON.stringify(answer.body)}`)
+  assert.equal((await enrollments.operations.find({ where: { session: { equals: session.id } } }, tenant.options)).totalDocs, 0)
+})
+
 test('R7f. a session\'s capacity holds for a role that reads no capacity: the seat is counted against the column, not against what the role is shown', async () => {
   const tenant = await roleTenant('blind-r7f')
   const course = await courses.operations.create({ title: 'Blind R7f' }, tenant.options)
