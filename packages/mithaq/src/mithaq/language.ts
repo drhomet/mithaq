@@ -154,8 +154,12 @@ export type Store<
     kayan: string
     args: {
       limit: number
-      /** A store must hold the rows it returns until the transaction ends: a step that compares a row, such as `expectedUpdatedAt`, relies on it. */
-      lock?: 'update'
+      /**
+       * A store must hold the rows it returns until the transaction ends: a step that compares a row, such as
+       * `expectedUpdatedAt`, relies on it. `'update'` holds them against every other writer; `'keyShare'` against
+       * a delete or a change of their key alone, as a Postgres foreign key holds the row it names.
+       */
+      lock?: 'update' | 'keyShare'
       page: number
       sort: { field: string; direction: 'asc' | 'desc' }
       where?: Where

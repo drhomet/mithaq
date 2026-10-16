@@ -4,6 +4,7 @@
 import './test-storage-dir.ts'
 import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
+import { setTimeout } from 'node:timers/promises'
 import { z } from 'zod'
 import {
   defaultMaxBodyBytes,
@@ -105,6 +106,14 @@ const aimed: { kayan?: string; id?: string; data?: Record<string, unknown> } = {
 const aimAt = (write: 'insert' | 'update' | 'remove') =>
   async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
     (await tools.store[write]({ tx: ctx.tx, kayan: aimed.kayan, id: aimed.id, data: aimed.data }), ctx)
+/** Where a held write stops, inside its transaction with its locks still taken, until the test that set it lets it go. */
+const gate: { reached?: PromiseWithResolvers<void>; release?: PromiseWithResolvers<void> } = {}
+const pause = async (ctx: unknown) => {
+  gate.reached?.resolve()
+  await gate.release?.promise
+  return ctx
+}
+const hold = () => Object.assign(gate, { reached: Promise.withResolvers<void>(), release: Promise.withResolvers<void>() }) as Required<typeof gate>
 /** The sessions the build's own Better Auth server knows, by the `x-person` header a request carries; `actorOf` writes them. */
 const sessions = new Map<string, { active: string | null | undefined; orgs: string[] }>()
 const sessionOf = (headers: Headers) => sessions.get(headers.get('x-person') ?? '')
@@ -198,6 +207,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
             ],
           },
           touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] },
+          heldDelete: { steps: ({ steps }: { steps: { remove: unknown } }) => [pause, steps.remove] },
           prune: { steps: ({ steps }: { steps: { remove: unknown } }) => [aimAt('remove'), steps.remove] },
           // A raw insert into another tenant-owned kayan, under another organization.
           plant: {
@@ -242,6 +252,8 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       service: {
         operations: {
           ...defaultOperations,
+          // Names its memo, stops holding it, then changes the row `aimed` names.
+          heldLink: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert, pause, aimAt('update')] },
           link: { steps: ({ steps }: { steps: { insert: unknown } }) => [(ctx: { data: Record<string, unknown> }) => ({ ...ctx, data: { ...ctx.data, memo: linked.memo } }), steps.insert] },
           scribble: {
             steps: ({ steps }: { steps: { insert: unknown } }) => [
@@ -282,7 +294,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, memo: { kind: 'relationship', relationTo: 'memos' }, ...draftFields },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
-      service: { operations: { ...defaultOperations, ...versionOperations, touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] } } },
+      service: { operations: { ...defaultOperations, ...versionOperations, touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] }, heldDraft: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause] } } },
       versions: { drafts: { autosave: true } },
     },
   }
@@ -364,7 +376,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -1140,6 +1152,88 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       assert.deepEqual([...new Set(mine.body.docs!.map((row) => row.firmId))].sort(), ['org1', 'org2'])
       assert.equal((await call('find?tenant=all', {})).status, 403)
       assert.equal((await call('create?tenant=mine', { title: 'served' })).status, 400)
+    }
+  })
+
+  // A write holds a row it names against the row's delete alone, as a Postgres foreign key does, so
+  // another transaction changing that row's other columns passes it, and the two cannot deadlock.
+  if (postgres) test('a write naming a row and another transaction changing that row and one the write changes next both commit, with no deadlock', { timeout: 10_000 }, async () => {
+    const a = await memos().create({ title: 'a' }, { actor: one })
+    const b = await memos().create({ title: 'b' }, { actor: one })
+    const held = hold()
+    Object.assign(aimed, { kayan: 'memos', id: b.id, data: { title: 'b by the write' } })
+    const holdsB = Promise.withResolvers<void>()
+    const beside = store.transaction(async (tx) => {
+      await store.update({ tx, kayan: 'memos', id: b.id, data: { title: 'b beside' } })
+      holdsB.resolve()
+      // The write has named a and goes on to b, which waits on this transaction, which now changes a.
+      await held.reached.promise
+      held.release.resolve()
+      await store.update({ tx, kayan: 'memos', id: a.id, data: { title: 'a beside' } })
+    })
+    await holdsB.promise
+    const writing = built.kayan.notes.operations.heldLink(note({ title: 'between', memo: a.id }), { actor: one })
+    const outcomes = await Promise.allSettled([beside, writing])
+    assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
+    assert.equal((await memos().findByID({ id: a.id }, { actor: one })).title, 'a beside')
+    assert.equal((await memos().findByID({ id: b.id }, { actor: one })).title, 'b by the write')
+    assert.equal((await writing).memo, a.id)
+  })
+
+  if (postgres) test('a delete and a write naming its row never leave a reference to a deleted row: whichever holds the row first, the other is refused', { timeout: 10_000 }, async () => {
+    const papers = built.kayan.papers.operations
+    const paper = await papers.create({ title: 'held', memo: ids.org1, _status: 'published' }, { actor: one })
+    // A draft, which no foreign key holds: the row's lock is all that keeps the delete from passing it.
+    const first = await memos().create({ title: 'named first' }, { actor: one })
+    const drafted = hold()
+    const drafting = papers.heldDraft({ id: paper.id, memo: first.id }, { actor: one, draft: true })
+    await drafted.reached.promise
+    const deleting = memos().delete({ id: first.id }, { actor: one })
+    drafted.release.resolve()
+    await drafting
+    const referenced = await refusal(deleting)
+    assert.equal(referenced.status, 409)
+    assert.equal(referenced.key, 'error.conflict.referenced')
+    assert.equal((await memos().findByID({ id: first.id }, { actor: one })).title, 'named first', 'the row the draft names stays')
+
+    const second = await memos().create({ title: 'deleted first' }, { actor: one })
+    const deleted = hold()
+    const removing = memos().heldDelete({ id: second.id }, { actor: one })
+    await deleted.reached.promise
+    const naming = papers.update({ id: paper.id, memo: second.id }, { actor: one, draft: true })
+    deleted.release.resolve()
+    await removing
+    const late = await refusal(naming)
+    assert.equal(late.status, 400)
+    assert.equal(late.key, 'error.invalid.tenant_reference')
+    const versions = await store.find({ kayan: '_papers_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { 'version.memo': { equals: second.id } } } })
+    assert.equal(versions.totalDocs, 0, 'and no version names the deleted row')
+  })
+
+  if (postgres) test('another organization holding its rows locked never holds up a write: one naming its memo is refused at once as an absent id is, and one naming a shared tag it is changing commits', { timeout: 10_000 }, async () => {
+    const notes = built.kayan.notes.operations
+    const tag = await raw('tags', { label: 'shared', open: true })
+    const holding = Promise.withResolvers<void>()
+    const done = Promise.withResolvers<void>()
+    const theirs = store.transaction(async (tx) => {
+      await store.find({ kayan: 'memos', args: { limit: 1, page: 1, lock: 'update', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: ids.org2 } } }, tx })
+      await store.update({ tx, kayan: 'tags', id: tag.id, data: { label: 'relabelled' } })
+      holding.resolve()
+      await done.promise
+    })
+    await holding.promise
+    // Each call answers while the other organization still holds its rows, or is caught waiting.
+    const calls: Promise<unknown>[] = []
+    const atOnce = (call: Promise<unknown>) => Promise.race([calls[calls.push(call.then((row) => row, (error: unknown) => error)) - 1], setTimeout(2000, 'waited')])
+    try {
+      const refused = await atOnce(notes.create(note({ title: 'reach', memo: ids.org2 }), { actor: one }))
+      assert.ok(refused instanceof AsasError, `the reference is refused at once: ${String(refused)}`)
+      assert.deepEqual(told(refused), told(await refusal(notes.create(note({ title: 'reach', memo: absent }), { actor: one }))))
+      const tagged = await atOnce(notes.create(note({ title: 'tagged', tag: tag.id }), { actor: one }))
+      assert.equal((tagged as { tag?: unknown }).tag, tag.id, `the shared tag is named at once: ${String(tagged)}`)
+    } finally {
+      done.resolve()
+      await Promise.all([theirs, ...calls])
     }
   })
 })

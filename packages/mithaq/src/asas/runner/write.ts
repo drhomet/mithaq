@@ -271,9 +271,9 @@ export const referencingIds = async ({ id, pointers, store, tenant, tx }: {
 
 /**
  * Refuses the delete while a live row or the latest version of a row names it, in the delete's own
- * transaction. The row is held `FOR UPDATE` by the delete, and a write naming it holds it the same
- * way in `assertReferences`, a draft save included, so no new reference lands between this count
- * and the delete. The refusal counts the actor's own organization's rows and names by title only
+ * transaction. The delete holds the row `FOR UPDATE`, and a write naming it holds it `FOR KEY SHARE`
+ * in `assertReferences`, a draft save included. The two conflict, so no new reference lands between
+ * this count and the delete. The refusal counts the actor's own organization's rows and names by title only
  * those the actor reads; a row another organization's rows name is refused with no count at all.
  */
 const refuseReferenced = async <Actor>({ kayan, existing, pointers, store, tenant, tx, authorize, admin, actor }: {
@@ -601,7 +601,9 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
     const ids = [...new Set(sets.map(({ value }) => keyOf(value)))]
     const found = await store.find({ kayan: target.name, args: {
       limit: ids.length,
-      lock: 'update',
+      // The lock a foreign key takes: it holds off the row's delete, and never another write naming the
+      // row or a plain update of its other columns, so those neither wait on it nor deadlock with it.
+      lock: 'keyShare',
       page: 1,
       sort: { field: 'id', direction: 'asc' },
       where: combineWhere(

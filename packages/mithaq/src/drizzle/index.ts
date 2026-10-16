@@ -1205,7 +1205,7 @@ const storeOf = <
       const offset = limit > 0 ? (page - 1) * limit : 0
       // `$dynamic()` keeps each branch one type, so drizzle checks `orderBy` against the table.
       const query = client.select().from(table).$dynamic().where(condition)
-      const locked = tx && lock === 'update' ? query.for('update') : query
+      const locked = tx && lock ? query.for(lock === 'update' ? 'update' : 'key share') : query
       const ordered = locked.orderBy(...orderBy).offset(offset)
       const docs = limit > 0 ? await ordered.limit(limit) : await ordered
       const rows = await client.select({ totalDocs: sqlCount() }).from(table).where(condition)
