@@ -1151,10 +1151,11 @@ const storeOf = <
       const matched = idWhere(tx as Database, tables, kayanByName, name, id, where)
       let result: unknown
       try {
-        // drizzle refuses an empty `set`, so a write naming only sets locks the row instead.
+        // drizzle refuses an empty `set`, so a write naming only sets locks the row instead, as an UPDATE
+        // of no key column would: a stronger lock would deadlock with a write naming the row.
         result = Object.keys(flat).length
           ? await (tx as Database).update(tables[name]!).set(flat).where(matched).returning()
-          : await (tx as Database).select().from(tables[name]!).where(matched).for('update')
+          : await (tx as Database).select().from(tables[name]!).where(matched).for('no key update')
       } catch (thrown) {
         throw collision(thrown, name)
       }

@@ -1377,6 +1377,29 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await stamps.findByID({ id: stamp.id }, { actor: one })).code, 'after recode')
   })
+
+  // A store update naming only a set changes no column of the row, so the store locks the row in its
+  // place; under an update's own FOR NO KEY UPDATE, a raise there past a key share would deadlock.
+  if (postgres) test('a store update naming only a set and a write naming its row and then changing it both commit, with no deadlock', { timeout: 10_000 }, async () => {
+    const notes = built.kayan.notes.operations
+    const listed = await notes.create(note({ title: 'sets only' }), { actor: one })
+    const held = hold()
+    const listing = store.transaction(async (tx) => {
+      await store.find({ kayan: 'notes', args: { limit: 1, page: 1, lock: 'noKeyUpdate', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: listed.id } } }, tx })
+      await pause(undefined)
+      await store.update({ tx, kayan: 'notes', id: listed.id, data: { memoSet: [ids.org1] } })
+    })
+    await held.reached.promise
+    const naming = store.transaction(async (tx) => {
+      await store.find({ kayan: 'notes', args: { limit: 1, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: listed.id } } }, tx })
+      await store.update({ tx, kayan: 'notes', id: listed.id, data: { title: 'beside the set' } })
+    })
+    await blocked()
+    held.release.resolve()
+    const outcomes = await Promise.allSettled([listing, naming])
+    assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
+    assert.deepEqual((await notes.findByID({ id: listed.id }, { actor: one })).memoSet, [ids.org1])
+  })
 })
 
 suite('memory store', async () => {
