@@ -52,7 +52,8 @@ const uuidDirectory = new URL('auth/user/', root)
 const textDirectory = new URL('plain/user/', root)
 const uuidOptions = { emailAndPassword: { enabled: true }, advanced: { database: { generateId: 'uuid' } } } as never
 const plainOptions = { emailAndPassword: { enabled: true } } as never
-const schemaName = 'auth_uuid'
+const schemaName = `auth_uuid_${randomUUID().replaceAll('-', '')}`
+const previousRun = randomUUID()
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 const language = defineMithaq({
@@ -72,20 +73,26 @@ before(async () => {
   const { betterAuth: kayan } = (await import(new URL('index.ts', uuidDirectory).href)) as { betterAuth: { core: never[] } }
   built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: kayan.core, auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error } })
   tables = built.targets.drizzle.tables
-  // Only this test's own schema is dropped, so the other test files' tables in
-  // `public` are never touched.
-  await built.targets.drizzle.db.execute(`drop schema if exists ${schemaName} cascade`)
+  // A reused database still holds schemas another run's push may be reading.
+  await built.targets.drizzle.db.execute('create schema if not exists auth_uuid; create table if not exists auth_uuid.previous_run (id text primary key)')
+  await built.targets.drizzle.db.execute(`insert into auth_uuid.previous_run values ('${previousRun}')`)
   await built.connect()
 })
 
 after(async () => {
   try {
-    // Parallel schema pushes may still be reading its catalogue entries; the next run drops it in `before`.
+    // Parallel pushes may still read its catalogue entries, so the schema stays until the database is discarded.
     await built?.destroy()
   } finally {
     // A `before` that failed halfway still leaves no `src/auth-uuid-*` behind.
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('a uuid auth run leaves an earlier run\'s schema intact for parallel catalogue reads', async () => {
+  const { db } = built.targets.drizzle
+  assert.equal((await db.execute("select to_regclass('auth_uuid.previous_run') as name")).rows[0]!.name, 'auth_uuid.previous_run')
+  assert.deepEqual((await db.execute(`select id from auth_uuid.previous_run where id = '${previousRun}'`)).rows, [{ id: previousRun }])
 })
 
 test('generateAuth writes a uuid id when generateId is "uuid", and the text id it always wrote when it is not', async () => {
