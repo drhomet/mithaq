@@ -159,6 +159,7 @@ export type Store<
        * `expectedUpdatedAt`, relies on it. The modes are Postgres's: `'update'` holds them against every other
        * lock, as a delete does; `'noKeyUpdate'` against every other but `'keyShare'`, as an update of their
        * other columns does; `'keyShare'` against a delete or a change of their key alone, as a foreign key does.
+       * A store handles all three: one that locks for `'update'` alone takes no lock for the other two.
        */
       lock?: 'update' | 'noKeyUpdate' | 'keyShare'
       page: number

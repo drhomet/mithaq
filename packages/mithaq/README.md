@@ -904,6 +904,7 @@ A target of an existing capability can be the project's own and spreads into `ta
 7. **One object argument** for any function a project calls or implements with three or more parameters, or two whose order matters and whose types match. `bun run lint:args` checks the first case.
 8. **A store that writes at `connect()`** (a push, a seed, a marker) skips that under `connect({ readOnly: true })`, because `generate messages --check` reads through that connect and relies on it writing nothing.
 9. **A target that holds a secret makes the language module server-only.** Check that no module a browser loads imports it; `apps/client-imports.test.ts` walks the apps for this.
+10. **A store handles every `lock` mode `find` is handed:** `'update'`, `'noKeyUpdate'` and `'keyShare'`. One written as `lock === 'update' ? … : none` takes no lock for the other two, and the runner's delete guard and `expectedUpdatedAt` rely on them.
 
 #### Order
 
