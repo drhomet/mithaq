@@ -110,6 +110,7 @@ import { memoryStore, noRelationship } from './memory-store.ts'
 import { plainTarget } from './standard-schema-target.ts'
 import { assignedRoles, tenantAccess } from '../../mithaq/src/roles/tenant-access.ts'
 import { testDatabase } from './test-database.ts'
+import { blocked, within } from './test-locks.ts'
 import { systemRoles, tenantRoles } from '../../mithaq/src/roles/system-roles.ts'
 import { buildAsas as buildTestAsas, defineGlobal as defineTestGlobal, defineKayan as defineTestKayan, locales as declaredLocales, narrowed } from './test-language.ts'
 import { betterAuth as authKayan } from '../../features/auth/user/index.ts'
@@ -4461,16 +4462,20 @@ test('20a. managed reads apply collection and field access before query, count a
 })
 
 
-test('20b. update field access reads the existing doc under a row lock', async () => {
+test('20b. update field access reads the existing doc under a row lock', { timeout: 10_000 }, async () => {
   const language = online()
   let release!: () => void
   const released = new Promise<void>((resolve) => { release = resolve })
   let loaded!: () => void
   const loadedDoc = new Promise<void>((resolve) => { loaded = resolve })
   const pause: Step = async (ctx) => {
-    loaded()
-    await released
-    return ctx
+    try {
+      loaded()
+      await within(released, 5000)
+      return ctx
+    } finally {
+      release()
+    }
   }
   const guarded = language.defineKayan({
     name: 'lockedPolicyRows',
@@ -4491,17 +4496,16 @@ test('20b. update field access reads the existing doc under a row lock', async (
   const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [guarded] })
   const row = await built.kayan.lockedPolicyRows.operations.create({ title: 'old', summary: 'open' })
   const changing = built.kayan.lockedPolicyRows.operations.updateTitle({ id: row.id, title: 'new' })
-  await loadedDoc
-  const pool = (db as unknown as { $client: { query(sql: string, params?: unknown[]): Promise<unknown> } }).$client
+  void changing.catch(() => {})
   try {
-    await pool.query(`set lock_timeout = '100ms'`)
-    await assert.rejects(
-      () => pool.query('update courses set summary = $1 where id = $2', ['closed', row.id]),
-      /lock timeout|canceling statement due to lock timeout/,
-    )
+    await within(loadedDoc)
+    await assert.rejects(db.transaction(async (tx) => {
+      await tx.execute("set local lock_timeout = '100ms'")
+      await tx.execute(`update courses set summary = 'closed' where id = '${row.id}'`)
+    }), (error: unknown) => (error as { cause?: { code?: string } }).cause?.code === '55P03')
   } finally {
-    await pool.query(`set lock_timeout = 0`)
     release()
+    await within(Promise.allSettled([changing]), 5000)
   }
   assert.equal((await changing).title, 'new')
   assert.deepEqual((await db.execute(`select title, summary from courses where id = '${row.id}'`)).rows, [{ title: 'new', summary: 'open' }])
@@ -11034,7 +11038,7 @@ test('109. afterCommit runs after the transaction committed, where the row is vi
   await built.destroy()
 })
 
-test('110. beforeTransaction runs outside the transaction: it sees no row before the write and holds no lock', async () => {
+test('110. beforeTransaction runs outside the transaction: it sees no row before the write and holds no lock', { timeout: 10_000 }, async () => {
   const language = online()
   let parked: () => void = () => {}
   let arrived: () => void = () => {}
@@ -11045,9 +11049,13 @@ test('110. beforeTransaction runs outside the transaction: it sees no row before
   const hold: Step = async (ctx) => {
     sawDataBefore = ctx.dataBefore
     sawTx = ctx.tx
-    arrived()
-    await gate
-    return ctx
+    try {
+      arrived()
+      await within(gate, 5000)
+      return ctx
+    } finally {
+      parked()
+    }
   }
   const fields = { ...defaultFields, ...borrowed, title: { kind: 'text', rules: { required: true } } } as const
   const slow = language.defineKayan({
@@ -11071,18 +11079,19 @@ test('110. beforeTransaction runs outside the transaction: it sees no row before
 
   const row = await built.kayan.quickRows.operations.create({ title: 'Unlocked' })
   const held = built.kayan.slowRows.operations.update({ id: row.id, title: 'Held' })
-  await reached
-  assert.equal(sawDataBefore, undefined, 'beforeTransaction runs before the row is loaded')
-  assert.equal(sawTx, undefined, 'and before any transaction is open')
-  // The row would be locked for the length of the parked step if
-  // `beforeTransaction` ran inside the transaction, so this write would wait
-  // for the gate below and the race would answer with the timeout instead.
-  const raced = await Promise.race([
-    built.kayan.quickRows.operations.update({ id: row.id, title: 'Not blocked' }).then(() => 'written'),
-    setTimeout(1000, 'blocked'),
-  ])
-  assert.equal(raced, 'written', 'a concurrent update during beforeTransaction is not blocked')
-  parked()
+  void held.catch(() => {})
+  let quickWrite: Promise<unknown> | undefined
+  try {
+    await within(reached)
+    assert.equal(sawDataBefore, undefined, 'beforeTransaction runs before the row is loaded')
+    assert.equal(sawTx, undefined, 'and before any transaction is open')
+    // Moving the parked step inside the transaction would hold this write off.
+    quickWrite = built.kayan.quickRows.operations.update({ id: row.id, title: 'Not blocked' })
+    await within(quickWrite)
+  } finally {
+    parked()
+    await within(Promise.allSettled([held, ...(quickWrite ? [quickWrite] : [])]), 5000)
+  }
   await held
   assert.deepEqual(
     (await db.execute(`select title from courses where id = '${row.id}'`)).rows,
@@ -16500,7 +16509,7 @@ test('166a. the organization\'s owner always holds administrator: another admini
  * other at the same moment would each see the other still there; the check runs under a
  * lock on the tenant, so the second one to reach it sees the first one's removal.
  */
-test('166b. two administrators removing each other at the same moment leave one of them, and the other removal is refused 409 because the tenant would keep nobody who manages roles', async () => {
+test('166b. two administrators removing each other at the same moment leave one of them, and the other removal is refused 409 because the tenant would keep nobody who manages roles', { timeout: 20_000 }, async () => {
   const creator = await signedUp('creator-166b')
   const organization = await server.api.createOrganization({ body: { name: 'Race 166', slug: 'race-166' }, headers: creator.headers })
   const tenant = organization!.id
@@ -16513,31 +16522,31 @@ test('166b. two administrators removing each other at the same moment leave one 
 
   // Both rows held, so both removals are in flight in their own transactions
   // before either decides anything.
-  let release!: () => void
-  const released = new Promise<void>((resolve) => (release = resolve))
-  let held!: () => void
-  const holding = new Promise<void>((resolve) => (held = resolve))
+  const release = Promise.withResolvers<void>()
+  const holding = Promise.withResolvers<number>()
   const holder = db.transaction(async (tx) => {
-    await tx.execute(`select id from member_roles where organization_id = '${tenant}' for update`)
-    held()
-    await released
-  })
-  await holding
-  const removals = [
-    asas.kayan.memberRoles.operations.delete({ id: rowOf(second.id) }, { actor: first.actor as never }),
-    asas.kayan.memberRoles.operations.delete({ id: rowOf(first.id) }, { actor: second.actor as never }),
-  ].map((removal) => removal.then(() => 'removed' as const, (thrown: unknown) => thrown))
-  try {
-    for (let tries = 0; ; tries++) {
-      const waiting = (await db.execute(`select count(*)::int as waiting from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%member_roles%'`)).rows[0] as { waiting: number }
-      if (waiting.waiting >= 2) break
-      assert.ok(tries < 400, 'both removals reach the database')
-      await setTimeout(25)
+    try {
+      await tx.execute(`select id from member_roles where organization_id = '${tenant}' for update`)
+      holding.resolve((await tx.execute('select pg_backend_pid() as pid')).rows[0]!.pid as number)
+      await within(release.promise, 5000)
+    } finally {
+      release.resolve()
     }
+  })
+  void holder.catch(() => {})
+  const removals: Promise<unknown>[] = []
+  try {
+    const pid = await within(holding.promise)
+    removals.push(...[
+      asas.kayan.memberRoles.operations.delete({ id: rowOf(second.id) }, { actor: first.actor as never }),
+      asas.kayan.memberRoles.operations.delete({ id: rowOf(first.id) }, { actor: second.actor as never }),
+    ].map((removal) => removal.then(() => 'removed' as const, (thrown: unknown) => thrown)))
+    assert.equal(await blocked({ db, where: `pg_blocking_pids(pid) @> array[${pid}] and query like '%member_roles%'`, count: 2 }), 'waited', 'both removals reach this holder')
   } finally {
-    release()
-    await holder
+    release.resolve()
+    await within(Promise.allSettled([holder, ...removals]), 5000)
   }
+  await holder
 
   const outcomes = await Promise.all(removals)
   assert.equal(outcomes.filter((one) => one === 'removed').length, 1, `exactly one removal goes ahead: ${outcomes.map(String).join(', ')}`)
@@ -18803,61 +18812,106 @@ for (const operation of ['create', 'update'] as const) test(`R7i. two enrollment
     answered += 1
     first.resolve()
     if (answered === 2) both.resolve('answered')
-    await release.promise
-    return row
+    try {
+      await within(release.promise, 5000)
+      return row
+    } finally {
+      release.resolve()
+    }
   })) as never)
   const calls: Promise<unknown>[] = []
   try {
     calls.push(enrollments.operations[operation](inputs[0] as never, tenant.options))
-    await first.promise
+    void calls[0]!.catch(() => {})
+    await within(first.promise)
     calls.push(enrollments.operations[operation](inputs[1] as never, tenant.options))
-    const blocked = async () => {
-      for (let tries = 0; tries < 200 && answered < 2; tries += 1) {
-        const { rows } = await db.execute(`select 1 from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and pid in (${pids.join(',')}) and wait_event_type = 'Lock' and query like '%course_sessions%'`)
-        if (rows.length) return 'waited'
-        await setTimeout(10)
-      }
-      return 'timed out'
-    }
-    assert.equal(await Promise.race([both.promise, blocked()]), 'answered', 'neither enrollment waits for the other session of its course')
+    void calls[1]!.catch(() => {})
+    assert.equal(await Promise.race([both.promise, blocked({ db, where: () => `pid in (${pids.join(',') || 'null'}) and query like '%course_sessions%'`, finished: () => answered === 2 })]), 'answered', 'neither enrollment waits for the other session of its course')
   } finally {
     release.resolve()
     held.mock.restore()
-    const outcomes = await Promise.allSettled(calls)
+    const outcomes = await within(Promise.allSettled(calls), 5000)
     assert.deepEqual(outcomes.map((outcome) => outcome.status), ['fulfilled', 'fulfilled'])
   }
 })
 
-for (const kayan of ['sessions', 'courses'] as const) test(`R7h. an enrollment waits for a ${kayan === 'sessions' ? 'session' : 'course'} archive before judging whether it takes seats`, { timeout: 20_000 }, async () => {
-  const tenant = await roleTenant(`archive-r7h-${kayan}`)
+for (const operation of ['create', 'update'] as const) for (const kayan of ['sessions', 'courses'] as const) test(`R7h. an enrollment ${operation} waits for a ${kayan === 'sessions' ? 'session' : 'course'} archive before judging whether it takes seats`, { timeout: 20_000 }, async () => {
+  const tenant = await roleTenant(`archive-r7h-${operation}-${kayan}`)
   const store = asas.targets.drizzle
-  const course = await courses.operations.create({ title: `Archive R7h ${kayan}`, selfEnroll: true }, tenant.options)
+  const course = await courses.operations.create({ title: `Archive R7h ${operation} ${kayan}`, selfEnroll: true }, tenant.options)
   const session = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 7 * 864e5), capacity: 2 }, tenant.options)
+  const source = operation === 'update' ? await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 8 * 864e5) }, tenant.options) : undefined
+  const seat = source ? await enrollments.operations.create({ session: source.id, student: tenant.people.student.id }, tenant.options) : undefined
   const holding = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
+  const pids: number[] = []
+  const run = db.transaction.bind(db) as (callback: (tx: never) => unknown) => unknown
+  const tracked = mock.method(db, 'transaction', ((callback: (tx: never) => unknown) => run(async (tx: never) => {
+    pids.push((await (tx as { execute(query: string): Promise<{ rows: { pid: number }[] }> }).execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+    return callback(tx)
+  })) as never)
   const archiving = store.transaction(async (tx) => {
-    await store.update({ tx, kayan, id: kayan === 'sessions' ? session.id : course.id, data: { archived: true } })
-    holding.resolve()
-    await release.promise
-  })
-  await holding.promise
-  const enrolling = tenant.as('student', 'enrollments/create', { session: session.id })
-  let answered = false
-  void enrolling.finally(() => { answered = true })
-  try {
-    // The archive stays uncommitted until the enrollment either waits on this table or answers.
-    for (let tries = 0; tries < 200 && !answered; tries += 1) {
-      const { rows } = await db.execute("select 1 from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and wait_event_type = 'Lock' and query like '%course_sessions%'")
-      if (rows.length) break
-      await setTimeout(10)
+    try {
+      await store.update({ tx, kayan, id: kayan === 'sessions' ? session.id : course.id, data: { archived: true } })
+      holding.resolve()
+      await within(release.promise, 5000)
+    } finally {
+      release.resolve()
     }
+  })
+  void archiving.catch(() => {})
+  const calls: Promise<unknown>[] = [archiving]
+  let enrolling: ReturnType<typeof tenant.as> | undefined
+  try {
+    await within(holding.promise)
+    enrolling = tenant.as(operation === 'create' ? 'student' : 'admin', `enrollments/${operation}`, { ...(seat && { id: seat.id }), session: session.id })
+    calls.push(enrolling)
+    const answered = enrolling.then(() => 'answered')
+    // Only these transactions may release the archive, never a parallel file's lock wait.
+    assert.equal(await Promise.race([answered, blocked({ db, where: () => `pid in (${pids.join(',') || 'null'}) and query like '%course_sessions%'` })]), 'waited')
   } finally {
     release.resolve()
-    await archiving
+    tracked.mock.restore()
+    await within(Promise.allSettled(calls), 5000)
   }
-  const answer = await enrolling
+  await archiving
+  const answer = await enrolling!
   assert.equal(keyOf(answer.body), 'error.invalid.archived_session', `${kayan}: ${JSON.stringify(answer.body)}`)
   assert.equal((await enrollments.operations.find({ where: { session: { equals: session.id } } }, tenant.options)).totalDocs, 0)
+  if (seat) assert.equal((await enrollments.operations.findByID({ id: seat.id }, tenant.options)).session, source!.id, 'a refused move keeps its original seat')
+})
+
+test('R7j. a student withdrawing a seat waits for a concurrent start-time change and keeps the seat once the session has started', { timeout: 20_000 }, async () => {
+  const tenant = await roleTenant('start-r7j')
+  const store = asas.targets.drizzle
+  const course = await courses.operations.create({ title: 'Start R7j', selfEnroll: true }, tenant.options)
+  const session = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 7 * 864e5) }, tenant.options)
+  const seat = await enrollments.operations.create({ session: session.id, student: tenant.people.student.id }, tenant.options)
+  const holding = Promise.withResolvers<number>()
+  const release = Promise.withResolvers<void>()
+  const changing = store.transaction(async (tx) => {
+    try {
+      await store.update({ tx, kayan: 'sessions', id: session.id, data: { startsAt: new Date(Date.now() - 864e5) } })
+      holding.resolve((await (tx as { execute(query: string): Promise<{ rows: { pid: number }[] }> }).execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+      await within(release.promise, 5000)
+    } finally {
+      release.resolve()
+    }
+  })
+  void changing.catch(() => {})
+  let leaving: ReturnType<typeof tenant.as> | undefined
+  try {
+    const holder = await within(holding.promise)
+    leaving = tenant.as('student', 'enrollments/delete', { id: seat.id })
+    assert.equal(await Promise.race([leaving.then(() => 'answered'), blocked({ db, where: `pg_blocking_pids(pid) @> array[${holder}] and query like '%course_sessions%'` })]), 'waited', 'the cancellation waits for the session lock')
+  } finally {
+    release.resolve()
+    await within(Promise.allSettled([changing, ...(leaving ? [leaving] : [])]), 5000)
+  }
+  await changing
+  const answer = await leaving!
+  assert.equal(keyOf(answer.body), 'error.invalid.session_started', JSON.stringify(answer.body))
+  assert.equal((await enrollments.operations.findByID({ id: seat.id }, tenant.options)).session, session.id)
 })
 
 test('R7f. a session\'s capacity holds for a role that reads no capacity: the seat is counted against the column, not against what the role is shown', async () => {

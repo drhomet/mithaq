@@ -3,6 +3,7 @@
 // First, so the template's storage reads its folder from it.
 import './test-storage-dir.ts'
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { after, before, describe, test } from 'node:test'
 import { setTimeout } from 'node:timers/promises'
 import { z } from 'zod'
@@ -53,6 +54,9 @@ import { memoryStore } from './memory-store.ts'
 import { expectedUpdatedAt } from '../../mithaq/src/steps/expected-updated-at.ts'
 import { storageConfig } from '../../mithaq/src/storage/index.ts'
 import { testDatabase } from './test-database.ts'
+import { blocked as waitForLock, within } from './test-locks.ts'
+
+const schemaName = `tenant_scope_${randomUUID().replaceAll('-', '')}`
 
 const label = (en: string) => ({ en, ar: en })
 const reads = ['memos.find', 'memos.peek', 'memos.count', 'memos.findByID', 'memos.nested', 'memos.fields.id', 'memos.fields.title', 'memos.fields.firmId', 'memos.fields.createdAt', 'memos.fields.updatedAt']
@@ -110,9 +114,14 @@ const aimAt = (write: 'insert' | 'update' | 'remove') =>
 /** Where a held write stops, inside its transaction with its locks still taken, until the test that set it lets it go. */
 const gate: { reached?: PromiseWithResolvers<void>; release?: PromiseWithResolvers<void> } = {}
 const pause = async (ctx: unknown) => {
-  gate.reached?.resolve()
-  await gate.release?.promise
-  return ctx
+  const { reached, release } = gate
+  try {
+    reached?.resolve()
+    await within(release?.promise ?? Promise.resolve(), 5000)
+    return ctx
+  } finally {
+    release?.resolve()
+  }
 }
 const hold = () => Object.assign(gate, { reached: Promise.withResolvers<void>(), release: Promise.withResolvers<void>() }) as Required<typeof gate>
 /** The sessions the build's own Better Auth server knows, by the `x-person` header a request carries; `actorOf` writes them. */
@@ -143,11 +152,11 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     } as {},
   })
   const { tenant } = (language as unknown as { targets: { tenant: ReturnType<typeof betterAuthTenant<'firms'>> } }).targets
-  const firms = { name: 'firms', schemaName: 'tenant_scope', fields: { id: { kind: 'text' }, name: { kind: 'text' }, memos: { kind: 'join', relationTo: 'memos', on: 'firmId' } }, access: { read: () => true }, targets: { service: { operations: defaultOperations } } }
+  const firms = { name: 'firms', schemaName, fields: { id: { kind: 'text' }, name: { kind: 'text' }, memos: { kind: 'join', relationTo: 'memos', on: 'firmId' } }, access: { read: () => true }, targets: { service: { operations: defaultOperations } } }
   const moveTo = (to: string) => (ctx: { data: Record<string, unknown> }) => ({ ...ctx, data: { ...ctx.data, firmId: to } })
   const memos = language.defineKayan({
     name: 'memos',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, meta: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: {} } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
     // `read: true` for an editor: the broadest answer a row gives.
     // A reader's answer is a filter, so under `tenant: 'mine'` its organizations take a branch of their own.
@@ -232,7 +241,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // Every callback answers true: no row table and no filter of its own.
   const open = {
     name: 'opens',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' } },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: { service: { operations: defaultOperations } },
@@ -240,7 +249,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // Tenant-owned, naming other rows every way a row can: one, a set, a shared row, and a value its own step writes.
   const notes = {
     name: 'notes',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: {
       ...defaultFields,
       firmId: tenant.field,
@@ -282,7 +291,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // Tenant-owned files, which a note's cover names.
   const files = {
     name: 'files',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, ...uploadFields, firmId: tenant.field },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
@@ -299,7 +308,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // Tenant-owned and drafted, so a draft save and a restore name a memo too.
   const papers = {
     name: 'papers',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, memo: { kind: 'relationship', relationTo: 'memos' }, ...draftFields },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
@@ -312,7 +321,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // One row per organization, kept so by its unique tenant field.
   const prefs = language.defineGlobal({
     name: 'prefs',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: {
       ...defaultFields,
       firmId: { ...tenant.field, rules: { ...tenant.field.rules, unique: true } },
@@ -325,7 +334,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // Shared: its own read access admits the open tags alone, the same in every organization.
   const tags = {
     name: 'tags',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, label: { kind: 'text' }, open: { kind: 'checkbox' } },
     access: { read: () => ({ open: { equals: true } }) },
     targets: { service: { operations: defaultOperations } },
@@ -333,7 +342,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // Shared, pointing at a tenant-owned kayan.
   const pins = {
     name: 'pins',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, label: { kind: 'text' }, memo: { kind: 'relationship', relationTo: 'memos' } },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
@@ -349,7 +358,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // A code is unique within an organization: the default, beside a plain list of the kayan's own.
   const badges = {
     name: 'badges',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, firmId: tenant.field, code: { kind: 'text', rules: { unique: true } }, title: { kind: 'text' } },
     indexes: [{ fields: ['firmId', 'title'], unique: true }],
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
@@ -364,7 +373,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // A code is unique per term within an organization, written as a group; a plain unique ref is one across every organization.
   const terms = {
     name: 'terms',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, firmId: tenant.field, code: { kind: 'text' }, term: { kind: 'text' }, ref: { kind: 'text' } },
     indexes: [{ within: 'firmId', unique: [['code', 'term']] }, { fields: ['ref'], unique: true }],
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
@@ -391,7 +400,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   // Tenant-owned and kept when deleted: a delete marks its row and asks no rows naming it.
   const shelves = {
     name: 'shelves',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: {
       ...defaultFields,
       firmId: tenant.field,
@@ -413,11 +422,11 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       },
     },
   }
-  const user = { name: 'user', schemaName: 'tenant_scope', fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
+  const user = { name: 'user', schemaName, fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
   // A local account, which is no organization's member.
   const locals = {
     name: 'locals',
-    schemaName: 'tenant_scope',
+    schemaName,
     fields: { ...defaultFields, ...localAuthFields },
     access: { create: () => true, read: () => false, update: () => false, delete: () => false },
     auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, secret: 'tenant-scope-a-local-auth-test-secret' }),
@@ -817,17 +826,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     if (error.cause?.code === '55P03') return 'waited'
     throw error
   })
-  /**
-   * Until another transaction using this test's schema waits on a lock, so a test lets a held write go only once
-   * the other has reached it. Bounded: a write that never waits leaves the test's own assertions to fail.
-   */
-  const blocked = async () => {
-    for (let tries = 0; tries < 200; tries += 1) {
-      const { rows } = await built.targets.store.db.execute("select 1 from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and wait_event_type = 'Lock' and query like '%\"tenant_scope\".%'")
-      if (rows.length) return
-      await setTimeout(10)
-    }
-  }
+  const blocked = () => waitForLock({ db: built.targets.store.db, where: `pid <> pg_backend_pid() and query like '%"${schemaName}".%'` })
 
   test('a reference to another organization\'s row is refused exactly as an absent id is: one row, a set, a file and a step\'s value, on create, update and bulk', async () => {
     const notes = built.kayan.notes.operations
@@ -1235,14 +1234,29 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const beside = store.transaction(async (tx) => {
       await store.update({ tx, kayan: 'memos', id: b.id, data: { title: 'b beside' } })
       holdsB.resolve()
-      // The write has named a and goes on to b, which waits on this transaction, which now changes a.
-      await held.reached.promise
-      held.release.resolve()
-      await store.update({ tx, kayan: 'memos', id: a.id, data: { title: 'a beside' } })
+      try {
+        // The write has named a and goes on to b, which waits on this transaction, which now changes a.
+        await within(held.reached.promise)
+        held.release.resolve()
+        await store.update({ tx, kayan: 'memos', id: a.id, data: { title: 'a beside' } })
+      } finally {
+        held.release.resolve()
+      }
     })
-    await holdsB.promise
-    const writing = built.kayan.notes.operations.heldLink(note({ title: 'between', memo: a.id }), { actor: one })
-    const outcomes = await Promise.allSettled([beside, writing])
+    void beside.catch(() => {})
+    let writing: Promise<any> | undefined
+    let outcomes: PromiseSettledResult<unknown>[]
+    try {
+      await within(holdsB.promise)
+      writing = built.kayan.notes.operations.heldLink(note({ title: 'between', memo: a.id }), { actor: one })
+      void writing.catch(() => {})
+      outcomes = await within(Promise.allSettled([beside, writing]), 5000)
+    } finally {
+      holdsB.resolve()
+      held.reached.resolve()
+      held.release.resolve()
+      await within(Promise.allSettled([beside, ...(writing ? [writing] : [])]), 5000)
+    }
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await memos().findByID({ id: a.id }, { actor: one })).title, 'a beside')
     assert.equal((await memos().findByID({ id: b.id }, { actor: one })).title, 'b by the write')
@@ -1256,12 +1270,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const first = await memos().create({ title: 'named first' }, { actor: one })
     const drafted = hold()
     const drafting = papers.heldDraft({ id: paper.id, memo: first.id }, { actor: one, draft: true })
-    await drafted.reached.promise
-    const deleting = memos().delete({ id: first.id }, { actor: one })
-    await blocked()
-    drafted.release.resolve()
-    await drafting
-    const referenced = await refusal(deleting)
+    void drafting.catch(() => {})
+    let deleting: Promise<AsasError> | undefined
+    try {
+      await within(drafted.reached.promise)
+      deleting = refusal(memos().delete({ id: first.id }, { actor: one }))
+      void deleting.catch(() => {})
+      assert.equal(await blocked(), 'waited')
+    } finally {
+      drafted.release.resolve()
+      await within(Promise.allSettled([drafting, ...(deleting ? [deleting] : [])]), 5000)
+    }
+    const referenced = await deleting!
     assert.equal(referenced.status, 409)
     assert.equal(referenced.key, 'error.conflict.referenced')
     assert.equal((await memos().findByID({ id: first.id }, { actor: one })).title, 'named first', 'the row the draft names stays')
@@ -1273,12 +1293,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const second = await memos().create({ title: 'deleted first' }, { actor: one })
     const deleted = hold()
     const removing = memos().heldDelete({ id: second.id }, { actor: one })
-    await deleted.reached.promise
-    const naming = papers.update({ id: paper.id, memo: second.id }, { actor: one, draft: true })
-    await blocked()
-    deleted.release.resolve()
-    await removing
-    const late = await refusal(naming)
+    void removing.catch(() => {})
+    let naming: Promise<AsasError> | undefined
+    try {
+      await within(deleted.reached.promise)
+      naming = refusal(papers.update({ id: paper.id, memo: second.id }, { actor: one, draft: true }))
+      void naming.catch(() => {})
+      assert.equal(await blocked(), 'waited')
+    } finally {
+      deleted.release.resolve()
+      await within(Promise.allSettled([removing, ...(naming ? [naming] : [])]), 5000)
+    }
+    const late = await naming!
     assert.equal(late.status, 400)
     assert.equal(late.key, 'error.invalid.tenant_reference')
     const versions = await store.find({ kayan: '_papers_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { 'version.memo': { equals: second.id } } } })
@@ -1292,16 +1318,20 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const removing = { ...hold() }
     const erased = memos().heldErase({ id: memo.id, title: 'changed before removing' }, { actor: one })
     const outcome = erased.then(() => undefined, (error: unknown) => error)
-    await removing.reached.promise
-    const drafting = { ...hold() }
-    const drafted = papers.heldDraft({ id: paper.id, memo: memo.id }, { actor: one, draft: true })
-    await drafting.reached.promise
+    let drafted: Promise<unknown> | undefined
+    let drafting: Required<typeof gate> | undefined
     try {
+      await within(removing.reached.promise)
+      drafting = { ...hold() }
+      drafted = papers.heldDraft({ id: paper.id, memo: memo.id }, { actor: one, draft: true })
+      void drafted.catch(() => {})
+      assert.equal(await Promise.race([drafting.reached.promise.then(() => 'reached'), blocked()]), 'reached', 'a draft passes the update holding its own row')
       removing.release.resolve()
-      await blocked()
+      assert.equal(await blocked(), 'waited', 'the erase waits before counting references')
     } finally {
-      drafting.release.resolve()
-      await drafted
+      removing.release.resolve()
+      drafting?.release.resolve()
+      await within(Promise.allSettled([erased, ...(drafted ? [drafted] : [])]), 5000)
     }
     const error = await outcome
     assert.ok(error instanceof AsasError, `the delete is refused: ${String(error)}`)
@@ -1320,13 +1350,14 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       await store.find({ kayan: 'memos', args: { limit: 1, page: 1, lock: 'update', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: ids.org2 } } }, tx })
       await store.update({ tx, kayan: 'tags', id: tag.id, data: { label: 'relabelled' } })
       holding.resolve()
-      await done.promise
+      try { await within(done.promise, 5000) } finally { done.resolve() }
     })
-    await holding.promise
+    void theirs.catch(() => {})
     // Each call answers while the other organization still holds its rows, or is caught waiting.
     const calls: Promise<unknown>[] = []
     const atOnce = (call: Promise<unknown>) => Promise.race([calls[calls.push(call.then((row) => row, (error: unknown) => error)) - 1], setTimeout(2000, 'waited')])
     try {
+      await within(holding.promise)
       const refused = await atOnce(notes.create(note({ title: 'reach', memo: ids.org2 }), { actor: one }))
       assert.ok(refused instanceof AsasError, `the reference is refused at once: ${String(refused)}`)
       assert.deepEqual(told(refused), told(await refusal(notes.create(note({ title: 'reach', memo: absent }), { actor: one }))))
@@ -1334,8 +1365,9 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       assert.equal((tagged as { tag?: unknown }).tag, tag.id, `the shared tag is named at once: ${String(tagged)}`)
     } finally {
       done.resolve()
-      await Promise.all([theirs, ...calls])
+      await within(Promise.allSettled([theirs, ...calls]), 5000)
     }
+    await theirs
   })
 
   if (postgres) test('another organization holding its row FOR UPDATE never holds up single or bulk updates and deletes outside its scope', { timeout: 10_000 }, async () => {
@@ -1344,9 +1376,9 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const theirs = store.transaction(async (tx) => {
       await store.find({ kayan: 'memos', args: { limit: 1, page: 1, lock: 'update', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: ids.org2 } } }, tx })
       holding.resolve()
-      await release.promise
+      try { await within(release.promise, 5000) } finally { release.resolve() }
     })
-    await holding.promise
+    void theirs.catch(() => {})
     const calls: Promise<unknown>[] = []
     const atOnce = (call: Promise<unknown>) => {
       const answered = call.then((answer) => answer, (error: unknown) => error)
@@ -1354,6 +1386,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       return Promise.race([answered, setTimeout(2000, 'waited')])
     }
     try {
+      await within(holding.promise)
       for (const operation of ['update', 'delete'] as const) {
         const answer = await atOnce(memos()[operation]({ id: ids.org2, ...(operation === 'update' && { title: 'outside scope' }) }, { actor: one }))
         assert.ok(answer instanceof AsasError, `${operation} answers at once: ${String(answer)}`)
@@ -1367,8 +1400,9 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, 'two')
     } finally {
       release.resolve()
-      await Promise.all([theirs, ...calls])
+      await within(Promise.allSettled([theirs, ...calls]), 5000)
     }
+    await theirs
   })
 
   // An update holds its own row FOR NO KEY UPDATE, as Postgres's own UPDATE of its other columns does,
@@ -1380,13 +1414,21 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     // Each stops holding its own row; let go together, each then names the row the other holds.
     const first = { ...hold() }
     const editingC = notes.heldEdit({ id: c.id, title: 'c edited', reply: v.id }, { actor: one })
-    await first.reached.promise
-    const second = { ...hold() }
-    const editingV = notes.heldEdit({ id: v.id, title: 'v edited', reply: c.id }, { actor: one })
-    await second.reached.promise
-    first.release.resolve()
-    second.release.resolve()
-    const outcomes = await Promise.allSettled([editingC, editingV])
+    void editingC.catch(() => {})
+    let second: Required<typeof gate> | undefined
+    let editingV: Promise<unknown> | undefined
+    try {
+      await within(first.reached.promise)
+      second = { ...hold() }
+      editingV = notes.heldEdit({ id: v.id, title: 'v edited', reply: c.id }, { actor: one })
+      void editingV.catch(() => {})
+      await within(second.reached.promise)
+    } finally {
+      first.release.resolve()
+      second?.release.resolve()
+      await within(Promise.allSettled([editingC, ...(editingV ? [editingV] : [])]), 5000)
+    }
+    const outcomes = await within(Promise.allSettled([editingC, editingV]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await notes.findByID({ id: c.id }, { actor: one })).reply, v.id)
     assert.equal((await notes.findByID({ id: v.id }, { actor: one })).reply, c.id)
@@ -1396,15 +1438,19 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const swept = await memos().create({ title: 'swept' }, { actor: one })
     const held = hold()
     const sweeping = memos().heldSweep({ where: { id: { equals: swept.id } }, data: { title: 'swept again' } }, { actor: one })
-    await held.reached.promise
+    void sweeping.catch(() => {})
+    let naming: Promise<any> | undefined
     try {
-      const naming = built.kayan.notes.operations.create(note({ title: 'names the swept memo', memo: swept.id }), { actor: one })
+      await within(held.reached.promise)
+      naming = built.kayan.notes.operations.create(note({ title: 'names the swept memo', memo: swept.id }), { actor: one })
+      void naming.catch(() => {})
       const named = await Promise.race([naming, setTimeout(2000, 'waited')])
       assert.equal((named as { memo?: unknown }).memo, swept.id, `the write commits while the bulk holds its rows: ${String(named)}`)
     } finally {
       held.release.resolve()
-      await sweeping
+      await within(Promise.allSettled([sweeping, ...(naming ? [naming] : [])]), 5000)
     }
+    await sweeping
   })
 
   // No key update conflicts with itself, so a second update waits for the first to commit before it
@@ -1415,16 +1461,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     await setTimeout(5)
     const held = hold()
     const first = notes.heldStale({ id: read.id, title: 'first', expectedUpdatedAt: read.updatedAt }, { actor: one })
-    await held.reached.promise
-    let second: Promise<unknown>
+    void first.catch(() => {})
+    let second: Promise<unknown> | undefined
     try {
+      await within(held.reached.promise)
       assert.equal(await takes('notes', read.id, 'noKeyUpdate'), 'waited', 'another update waits on the row')
       second = notes.heldStale({ id: read.id, title: 'second', expectedUpdatedAt: read.updatedAt }, { actor: one })
     } finally {
       held.release.resolve()
+      await within(Promise.allSettled([first, ...(second ? [second] : [])]), 5000)
     }
     assert.equal((await first).title, 'first')
-    const stale = await refusal(second)
+    const stale = await refusal(second!)
     assert.equal(stale.status, 409)
     assert.equal(stale.key, 'error.conflict.stale')
   })
@@ -1437,12 +1485,13 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     for (const [code, answer] of [['locked-key', 'waited'], ['changed-key', 'waited']] as const) {
       const held = hold()
       const editing = stamps.heldEdit({ id: stamp.id, code }, { actor: one })
-      await held.reached.promise
+      void editing.catch(() => {})
       try {
+        await within(held.reached.promise)
         assert.equal(await takes('stamps', stamp.id, 'keyShare'), answer, `code ${code}`)
       } finally {
         held.release.resolve()
-        await editing
+        await within(editing, 5000)
       }
     }
   })
@@ -1455,14 +1504,21 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const stamp = await stamps.create({ code: 'before recode' }, { actor: one })
     const held = hold()
     const recoding = stamps.heldRecode({ id: stamp.id, code: 'after recode' }, { actor: one })
-    await held.reached.promise
-    const naming = store.transaction(async (tx) => {
-      await store.find({ kayan: 'stamps', args: { limit: 1, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: stamp.id } } }, tx })
-      await store.update({ tx, kayan: 'stamps', id: stamp.id, data: { updatedAt: new Date() } })
-    })
-    await blocked()
-    held.release.resolve()
-    const outcomes = await Promise.allSettled([recoding, naming])
+    void recoding.catch(() => {})
+    let naming: Promise<unknown> | undefined
+    try {
+      await within(held.reached.promise)
+      naming = store.transaction(async (tx) => {
+        await store.find({ kayan: 'stamps', args: { limit: 1, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: stamp.id } } }, tx })
+        await store.update({ tx, kayan: 'stamps', id: stamp.id, data: { updatedAt: new Date() } })
+      })
+      void naming.catch(() => {})
+      assert.equal(await blocked(), 'waited')
+    } finally {
+      held.release.resolve()
+      await within(Promise.allSettled([recoding, ...(naming ? [naming] : [])]), 5000)
+    }
+    const outcomes = await within(Promise.allSettled([recoding, naming]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await stamps.findByID({ id: stamp.id }, { actor: one })).code, 'after recode')
   })
@@ -1478,14 +1534,21 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       await pause(undefined)
       await store.update({ tx, kayan: 'notes', id: listed.id, data: { memoSet: [ids.org1] } })
     })
-    await held.reached.promise
-    const naming = store.transaction(async (tx) => {
-      await store.find({ kayan: 'notes', args: { limit: 1, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: listed.id } } }, tx })
-      await store.update({ tx, kayan: 'notes', id: listed.id, data: { title: 'beside the set' } })
-    })
-    await blocked()
-    held.release.resolve()
-    const outcomes = await Promise.allSettled([listing, naming])
+    void listing.catch(() => {})
+    let naming: Promise<unknown> | undefined
+    try {
+      await within(held.reached.promise)
+      naming = store.transaction(async (tx) => {
+        await store.find({ kayan: 'notes', args: { limit: 1, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: listed.id } } }, tx })
+        await store.update({ tx, kayan: 'notes', id: listed.id, data: { title: 'beside the set' } })
+      })
+      void naming.catch(() => {})
+      assert.equal(await blocked(), 'waited')
+    } finally {
+      held.release.resolve()
+      await within(Promise.allSettled([listing, ...(naming ? [naming] : [])]), 5000)
+    }
+    const outcomes = await within(Promise.allSettled([listing, naming]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.deepEqual((await notes.findByID({ id: listed.id }, { actor: one })).memoSet, [ids.org1])
   })
@@ -1499,11 +1562,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     Object.assign(aimed, { kayan: 'shelves', id: beside.id, data: { title: 'beside again' } })
     const held = hold()
     const shelving = shelves.heldShelve({ id: shelved.id }, { actor: one })
-    await held.reached.promise
-    const naming = shelves.link({ title: 'names the shelved', next: shelved.id }, { actor: one })
-    await Promise.race([naming.catch(() => {}), blocked()])
-    held.release.resolve()
-    const outcomes = await Promise.allSettled([shelving, naming])
+    void shelving.catch(() => {})
+    let naming: Promise<unknown> | undefined
+    try {
+      await within(held.reached.promise)
+      naming = shelves.link({ title: 'names the shelved', next: shelved.id }, { actor: one })
+      void naming.catch(() => {})
+      await within(Promise.race([naming, blocked()]))
+    } finally {
+      held.release.resolve()
+      await within(Promise.allSettled([shelving, ...(naming ? [naming] : [])]), 5000)
+    }
+    const outcomes = await within(Promise.allSettled([shelving, naming]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await refusal(shelves.findByID({ id: shelved.id }, { actor: one }))).status, 404, 'the row is marked')
     const late = await refusal(shelves.create({ title: 'too late', next: shelved.id }, { actor: one }))
@@ -1515,15 +1585,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const cleared = await shelves.create({ title: 'cleared', next: null }, { actor: one })
     const held = hold()
     const clearing = shelves.heldClear({ where: { id: { equals: cleared.id } } }, { actor: one })
-    await held.reached.promise
+    void clearing.catch(() => {})
+    let naming: Promise<any> | undefined
     try {
-      const naming = shelves.create({ title: 'names the cleared', next: cleared.id }, { actor: one })
+      await within(held.reached.promise)
+      naming = shelves.create({ title: 'names the cleared', next: cleared.id }, { actor: one })
       const named = await Promise.race([naming, setTimeout(2000, 'waited')])
       assert.equal((named as { next?: unknown }).next, cleared.id, `the write commits while the bulk holds its rows: ${String(named)}`)
     } finally {
       held.release.resolve()
-      await clearing
+      await within(Promise.allSettled([clearing, ...(naming ? [naming] : [])]), 5000)
     }
+    await clearing
   })
 })
 
@@ -1534,14 +1607,11 @@ suite('memory store', async () => {
 
 suite('postgres', async () => {
   const built = languageOf(drizzleAdapter({ connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }) as never, { withLocal: true })
-  const db = built.targets.store.db
-  await db.execute('drop schema if exists tenant_scope cascade')
   await built.connect()
   return {
     built,
     store: built.targets.store as Store,
     done: async () => {
-      await db.execute('drop schema if exists tenant_scope cascade')
       await built.destroy()
     },
   }

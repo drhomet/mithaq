@@ -251,7 +251,7 @@ test('a json default is JSON, and each row gets its own copy of it', async () =>
 })
 
 describe('postgres', () => {
-  const schemaName = 'json_kind'
+  const schemaName = `json_kind_${crypto.randomUUID().replaceAll('-', '')}`
   const { defineKayan, buildAsas } = defineMithaq({
     arkan: [base],
     targets: {
@@ -281,11 +281,9 @@ describe('postgres', () => {
   const labels = async (where: unknown) => (await operations.find({ where: where as never, limit: 0, sort: 'label' })).docs.map((row) => row.label)
 
   before(async () => {
-    await db.execute(`drop schema if exists ${schemaName} cascade`)
     await built.connect()
   })
   after(async () => {
-    await db.execute(`drop schema if exists ${schemaName} cascade`)
     await built.destroy()
   })
 

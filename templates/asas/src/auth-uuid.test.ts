@@ -77,7 +77,7 @@ before(async () => {
 
 after(async () => {
   try {
-    // Parallel pushes may still read its catalogue entries, so the schema stays until the database is discarded.
+    // Parallel pushes may still read its catalogue entries, so the schema stays until `bun run test` cleans leftovers before starting files.
     await built?.destroy()
   } finally {
     // A `before` that failed halfway still leaves no `src/auth-uuid-*` behind.

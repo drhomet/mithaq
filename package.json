@@ -13,7 +13,7 @@
     "apps/*"
   ],
   "scripts": {
-    "test": "node apps/lint-args.ts && LOCAL_AUTH_SECRET=asas-local-auth-test-secret-of-32-characters node --test 'packages/**/*.test.ts' 'templates/**/*.test.ts' 'apps/**/*.test.ts'",
+    "test": "node apps/lint-args.ts && node apps/test-setup.ts && LOCAL_AUTH_SECRET=asas-local-auth-test-secret-of-32-characters node --test 'packages/**/*.test.ts' 'templates/**/*.test.ts' 'apps/**/*.test.ts'",
     "test:next": "node --test apps/next-boot.ts",
     "test:tanstack": "node --test apps/tanstack-boot.ts",
     "test:r2": "node --test templates/mithaq/src/storage/r2.smoke.ts",

@@ -5,6 +5,7 @@
 // First, so the template's storage reads its folder from it.
 import '../../../asas/src/test-storage-dir.ts'
 import assert from 'node:assert/strict'
+import { within } from '../../../asas/src/test-locks.ts'
 import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -292,7 +293,7 @@ test('186b2. an object the verification cannot read back is a 500 the caller may
   await rm(built.dir, { recursive: true, force: true })
 })
 
-test('198a. a create replayed while the first is in flight, whose verification fails to read, never deletes the object the first row names', async () => {
+test('198a. a create replayed while the first is in flight, whose verification fails to read, never deletes the object the first row names', { timeout: 10_000 }, async () => {
   // The first read of the object waits for the second to start; the second
   // waits for the first create to answer, then fails as a bucket that is down.
   let releaseBoth!: () => void
@@ -305,10 +306,12 @@ test('198a. a create replayed while the first is in flight, whose verification f
       ...adapter,
       head: async (args) => {
         const call = ++heads
-        if (call === 1) await both
+        if (call === 1) {
+          try { await within(both) } finally { releaseBoth() }
+        }
         if (call === 2) {
           releaseBoth()
-          await committed
+          try { await within(committed) } finally { releaseCommit() }
           throw new Error('the bucket is down')
         }
         return adapter.head(args)
@@ -316,7 +319,15 @@ test('198a. a create replayed while the first is in flight, whose verification f
     }),
   })
   const { file } = await upload(built, 'org-a')
-  const answered = await Promise.all([1, 2].map(() => create(built, 'org-a', file.uploadReference).then((response) => (releaseCommit(), response))))
+  const calls = [1, 2].map(() => create(built, 'org-a', file.uploadReference).then((response) => (releaseCommit(), response)))
+  let answered: Response[]
+  try {
+    answered = await within(Promise.all(calls))
+  } finally {
+    releaseBoth()
+    releaseCommit()
+    await within(Promise.allSettled(calls), 5000)
+  }
   assert.deepEqual(answered.map((one) => one.status).sort(), [200, 500])
   const row = await answered.find((one) => one.status === 200)!.json() as { url: string }
   assert.equal(await exists(join(built.dir, String(file.uploadReference.key))), true, 'the first row keeps its object')
