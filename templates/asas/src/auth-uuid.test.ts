@@ -80,7 +80,7 @@ before(async () => {
 
 after(async () => {
   try {
-    await built?.targets.drizzle.db.execute(`drop schema if exists ${schemaName} cascade`)
+    // Parallel schema pushes may still be reading its catalogue entries; the next run drops it in `before`.
     await built?.destroy()
   } finally {
     // A `before` that failed halfway still leaves no `src/auth-uuid-*` behind.
