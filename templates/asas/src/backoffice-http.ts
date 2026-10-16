@@ -92,7 +92,7 @@ export const backofficeHttp = ({ organizations }: { organizations: 'one' | 'many
       const store = targets.drizzle
       // The row is found and written under one lock, so a delete between the
       // two answers 404 rather than failing the write. `FOR UPDATE`, not `FOR NO
-      // KEY UPDATE`: the slug is unique, so the UPDATE would raise to it anyway.
+      // KEY UPDATE`: the slug is unique, and the lock is taken before we know whether it changes.
       await store.transaction(async (tx) => {
         const found = await store.find({ kayan: 'organization', args: { limit: 1, lock: 'update', page: 1, sort: { field: 'id', direction: 'asc' }, where: { id: { equals: id } } }, tx })
         if (!found.docs.length) throw missing({ message: `No organization "${id}".`, key: 'error.not_found.row', params: { kayan: 'organization' } })

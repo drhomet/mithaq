@@ -208,6 +208,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
             ],
           },
           touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] },
+          heldErase: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause, async (ctx: { tx: unknown; data: { id: unknown } }, tools: { store: { remove: (args: object) => Promise<unknown> } }) => (await tools.store.remove({ tx: ctx.tx, kayan: 'memos', id: ctx.data.id }), ctx)] },
           heldDelete: { steps: ({ steps }: { steps: { remove: unknown } }) => [pause, steps.remove] },
           heldSweep: { steps: ({ steps }: { steps: { updateMany: unknown } }) => [steps.updateMany, pause] },
           prune: { steps: ({ steps }: { steps: { remove: unknown } }) => [aimAt('remove'), steps.remove] },
@@ -425,7 +426,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, shelves, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -817,12 +818,12 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     throw error
   })
   /**
-   * Until another transaction of this database waits on a lock, so a test lets a held write go only once
+   * Until another transaction using this test's schema waits on a lock, so a test lets a held write go only once
    * the other has reached it. Bounded: a write that never waits leaves the test's own assertions to fail.
    */
   const blocked = async () => {
     for (let tries = 0; tries < 200; tries += 1) {
-      const { rows } = await built.targets.store.db.execute("select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'")
+      const { rows } = await built.targets.store.db.execute("select 1 from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and wait_event_type = 'Lock' and query like '%\"tenant_scope\".%'")
       if (rows.length) return
       await setTimeout(10)
     }
@@ -1248,7 +1249,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await writing).memo, a.id)
   })
 
-  if (postgres) test('a delete and a write naming its row never leave a reference to a deleted row: whichever holds the row first, the other is refused', { timeout: 10_000 }, async () => {
+  if (postgres) test('a delete waits for a draft holding its row first and refuses to leave a reference to a deleted row', { timeout: 10_000 }, async () => {
     const papers = built.kayan.papers.operations
     const paper = await papers.create({ title: 'held', memo: ids.org1, _status: 'published' }, { actor: one })
     // A draft, which no foreign key holds: the row's lock is all that keeps the delete from passing it.
@@ -1264,7 +1265,11 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal(referenced.status, 409)
     assert.equal(referenced.key, 'error.conflict.referenced')
     assert.equal((await memos().findByID({ id: first.id }, { actor: one })).title, 'named first', 'the row the draft names stays')
+  })
 
+  if (postgres) test('a draft waits for a delete holding its row first and refuses to name the deleted row', { timeout: 10_000 }, async () => {
+    const papers = built.kayan.papers.operations
+    const paper = await papers.create({ title: 'held', memo: ids.org1, _status: 'published' }, { actor: one })
     const second = await memos().create({ title: 'deleted first' }, { actor: one })
     const deleted = hold()
     const removing = memos().heldDelete({ id: second.id }, { actor: one })
@@ -1278,6 +1283,32 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal(late.key, 'error.invalid.tenant_reference')
     const versions = await store.find({ kayan: '_papers_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { 'version.memo': { equals: second.id } } } })
     assert.equal(versions.totalDocs, 0, 'and no version names the deleted row')
+  })
+
+  if (postgres) test('an update step removing its own row waits for a held draft before counting references and refuses the delete', { timeout: 10_000 }, async () => {
+    const memo = await memos().create({ title: 'kept for the draft' }, { actor: one })
+    const papers = built.kayan.papers.operations
+    const paper = await papers.create({ title: 'published', memo: null, _status: 'published' }, { actor: one })
+    const removing = { ...hold() }
+    const erased = memos().heldErase({ id: memo.id, title: 'changed before removing' }, { actor: one })
+    const outcome = erased.then(() => undefined, (error: unknown) => error)
+    await removing.reached.promise
+    const drafting = { ...hold() }
+    const drafted = papers.heldDraft({ id: paper.id, memo: memo.id }, { actor: one, draft: true })
+    await drafting.reached.promise
+    try {
+      removing.release.resolve()
+      await blocked()
+    } finally {
+      drafting.release.resolve()
+      await drafted
+    }
+    const error = await outcome
+    assert.ok(error instanceof AsasError, `the delete is refused: ${String(error)}`)
+    assert.equal(error.key, 'error.conflict.referenced')
+    assert.equal((await memos().findByID({ id: memo.id }, { actor: one })).title, 'kept for the draft')
+    const latest = await papers.findVersions({ where: { parent: { equals: paper.id } }, limit: 1, sort: '-createdAt' }, { actor: one })
+    assert.equal(latest.docs[0].version.memo, memo.id)
   })
 
   if (postgres) test('another organization holding its rows locked never holds up a write: one naming its memo is refused at once as an absent id is, and one naming a shared tag it is changing commits', { timeout: 10_000 }, async () => {
@@ -1303,6 +1334,39 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       assert.equal((tagged as { tag?: unknown }).tag, tag.id, `the shared tag is named at once: ${String(tagged)}`)
     } finally {
       done.resolve()
+      await Promise.all([theirs, ...calls])
+    }
+  })
+
+  if (postgres) test('another organization holding its row FOR UPDATE never holds up single or bulk updates and deletes outside its scope', { timeout: 10_000 }, async () => {
+    const holding = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const theirs = store.transaction(async (tx) => {
+      await store.find({ kayan: 'memos', args: { limit: 1, page: 1, lock: 'update', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: ids.org2 } } }, tx })
+      holding.resolve()
+      await release.promise
+    })
+    await holding.promise
+    const calls: Promise<unknown>[] = []
+    const atOnce = (call: Promise<unknown>) => {
+      const answered = call.then((answer) => answer, (error: unknown) => error)
+      calls.push(answered)
+      return Promise.race([answered, setTimeout(2000, 'waited')])
+    }
+    try {
+      for (const operation of ['update', 'delete'] as const) {
+        const answer = await atOnce(memos()[operation]({ id: ids.org2, ...(operation === 'update' && { title: 'outside scope' }) }, { actor: one }))
+        assert.ok(answer instanceof AsasError, `${operation} answers at once: ${String(answer)}`)
+        assert.equal(answer.key, 'error.not_found.row')
+        assert.equal(answer.status, 404)
+      }
+      for (const operation of ['updateMany', 'deleteMany'] as const) {
+        const answer = await atOnce(memos()[operation]({ where: { id: { equals: ids.org2 } }, ...(operation === 'updateMany' && { data: { title: 'outside scope' } }) }, { actor: one }))
+        assert.deepEqual(answer, { docs: [], errors: [] }, `${operation} changes nothing at once`)
+      }
+      assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, 'two')
+    } finally {
+      release.resolve()
       await Promise.all([theirs, ...calls])
     }
   })

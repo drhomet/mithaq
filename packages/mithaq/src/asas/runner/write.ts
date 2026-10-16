@@ -482,7 +482,14 @@ export const assertSingleConstrained = (kayan: ResolvedKayan, where: Where | und
  * `FOR KEY SHARE`, and `FOR NO KEY UPDATE` for any other update, which that write passes. A soft delete
  * is an update of its mark, and asks no rows naming its row, so it has no reference to hold off. Taken
  * whole when the row loads, before any value is compared: an UPDATE raising its lock later would wait on
- * a writer that named the row in between while that writer waits on it, a deadlock.
+ * a writer that named the row in between while that writer waits on it, a deadlock. `FOR KEY SHARE`
+ * lets a named row's other columns change before the writer commits. A step judging those columns must
+ * lock that row itself with `noKeyUpdate` before the store step; `FOR UPDATE` after the reference check
+ * can deadlock with another writer doing the same.
+ * ponytail: publishing a latest draft's unique column can still raise this lock; take `update` for every
+ * non-draft update on a kayan with drafts and a unique index if that path needs to be covered.
+ * ponytail: an update step writing its own row's unique column can still raise this lock; take `update`
+ * from the load for operations whose steps can write unique columns if that path needs to be covered.
  */
 export const rowLock = ({ kayan, kind, data }: { kayan: ResolvedKayan; kind: string; data: Record<string, unknown> }) => {
   const written = kind === 'remove' || kind === 'deleteMany' ? (kayan.softDelete ? [kayan.softDelete] : undefined) : Object.keys(data)
@@ -1050,6 +1057,8 @@ export const write = <Actor = unknown>({
             if (!ownRow(name, id)) return tools.store.remove(elsewhere(args))
             if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
             // A marked row is kept, so only a delete that removes it answers to the rows naming it.
+            // An update step can remove its own row, so exclude new references before counting them.
+            if (pointers.length && existing && kind !== 'remove') await store.find({ kayan: name, args: { limit: 1, page: 1, lock: 'update', sort: byId, where: { id: { equals: existing.id as Scalar } } }, tx: heldTx })
             if (pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
             return tools.store.remove({ tx: heldTx, kayan: name, id: targetId, where: writeWhere })
           },
