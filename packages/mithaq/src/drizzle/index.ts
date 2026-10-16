@@ -247,11 +247,13 @@ const refusedSchema = (name: unknown) =>
 const refuseLocalized = (kayan: string, field: string, what: 'filter' | 'sort', locales?: readonly string[]) =>
   new Error(localizedQuery({ kayan, field, what, locales }))
 
-// Postgres answers `23503`, refused as a conflict naming which kayan points at the
-// row, never which row. Read by schema too: another tool may share a table name.
+// Postgres answers `23503`, or from 18 on `23001` for an `ON DELETE RESTRICT` key, refused as a
+// conflict naming which kayan points at the row, never which row. Read by schema too: another
+// tool may share a table name.
+const pointedAt = new Set(['23503', '23001'])
 const referenced = ({ thrown, name, kayans, tables }: { thrown: unknown; name: string; kayans: Map<string, ResolvedKayan>; tables: Tables }) => {
   const held = thrown as { code?: unknown; table?: unknown; schema?: unknown; cause?: { code?: unknown; table?: unknown; schema?: unknown } } | null
-  const error = held?.code === '23503' ? held : held?.cause?.code === '23503' ? held.cause : undefined
+  const error = pointedAt.has(held?.code as string) ? held : pointedAt.has(held?.cause?.code as string) ? held!.cause : undefined
   if (!error) return thrown
   // A kayan's join tables are built in its own table's schema.
   const by = [...kayans].find(([key, kayan]) =>
