@@ -615,8 +615,11 @@ skip a check, because the checks belong to the runner, not to the list.
    UPDATE`, which a write naming the row passes, a soft delete the same, and a
    delete, or an update naming a column of a unique index, `FOR UPDATE`, which
    holds that write off. `FOR KEY SHARE` lets a named row's other columns change
-   before the writer commits. A step judging those columns must lock that row
-   itself with `'noKeyUpdate'` before the store step. Taking `FOR UPDATE` after
+   before the writer commits. The field's `filterOptions`, the target's read
+   access and `publishedWhere` are checked under that same `FOR KEY SHARE`; a
+   project whose concurrent writes must not slip past those checks locks the
+   row in a step, as courses does. A step judging those columns must lock that row
+   itself before the store step, for example with `'noKeyUpdate'`. Taking `FOR UPDATE` after
    the reference check can deadlock with another writer doing the same.
 7. Field access for the fields the write names.
 8. The parse and the defaults. Without an `input`, the defaults fill and the
