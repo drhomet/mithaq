@@ -18781,6 +18781,53 @@ test('R7b. a session takes no seat past its capacity, whoever writes, even when 
   assert.equal(keyOf(moved.body), 'error.conflict.session_full', 'a seat moved into a full session is refused as a new one is')
 })
 
+for (const operation of ['create', 'update'] as const) test(`R7i. two enrollment ${operation}s in different sessions of one course both answer while their transactions stay open`, { timeout: 20_000 }, async () => {
+  const tenant = await roleTenant(`parallel-r7i-${operation}`)
+  const course = await courses.operations.create({ title: `Parallel R7i ${operation}` }, tenant.options)
+  const inputs = await Promise.all([0, 1].map(async () => {
+    const session = await sessions.operations.create({ course: course.id, startsAt: new Date(Date.now() + 7 * 864e5) }, tenant.options)
+    const seat = operation === 'update' ? await enrollments.operations.create({ session: session.id, student: tenant.people.student.id }, tenant.options) : undefined
+    return { ...(seat && { id: seat.id }), session: session.id, student: tenant.people.student.id }
+  }))
+  const first = Promise.withResolvers<void>()
+  const both = Promise.withResolvers<string>()
+  const release = Promise.withResolvers<void>()
+  const pids: number[] = []
+  let answered = 0
+  // Hold each transaction after the operation's steps answer, before its commit releases any locks.
+  const run = db.transaction.bind(db) as (callback: (tx: never) => unknown) => unknown
+  const held = mock.method(db, 'transaction', ((callback: (tx: never) => unknown) => run(async (tx: never) => {
+    const connection = tx as { execute(query: string): Promise<{ rows: { pid: number }[] }> }
+    pids.push((await connection.execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+    const row = await callback(tx)
+    answered += 1
+    first.resolve()
+    if (answered === 2) both.resolve('answered')
+    await release.promise
+    return row
+  })) as never)
+  const calls: Promise<unknown>[] = []
+  try {
+    calls.push(enrollments.operations[operation](inputs[0] as never, tenant.options))
+    await first.promise
+    calls.push(enrollments.operations[operation](inputs[1] as never, tenant.options))
+    const blocked = async () => {
+      for (let tries = 0; tries < 200 && answered < 2; tries += 1) {
+        const { rows } = await db.execute(`select 1 from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid() and pid in (${pids.join(',')}) and wait_event_type = 'Lock' and query like '%course_sessions%'`)
+        if (rows.length) return 'waited'
+        await setTimeout(10)
+      }
+      return 'timed out'
+    }
+    assert.equal(await Promise.race([both.promise, blocked()]), 'answered', 'neither enrollment waits for the other session of its course')
+  } finally {
+    release.resolve()
+    held.mock.restore()
+    const outcomes = await Promise.allSettled(calls)
+    assert.deepEqual(outcomes.map((outcome) => outcome.status), ['fulfilled', 'fulfilled'])
+  }
+})
+
 for (const kayan of ['sessions', 'courses'] as const) test(`R7h. an enrollment waits for a ${kayan === 'sessions' ? 'session' : 'course'} archive before judging whether it takes seats`, { timeout: 20_000 }, async () => {
   const tenant = await roleTenant(`archive-r7h-${kayan}`)
   const store = asas.targets.drizzle
