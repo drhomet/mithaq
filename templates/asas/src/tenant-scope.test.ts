@@ -782,6 +782,17 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     if (error.cause?.code === '55P03') return 'waited'
     throw error
   })
+  /**
+   * Until another transaction of this database waits on a lock, so a test lets a held write go only once
+   * the other has reached it. Bounded: a write that never waits leaves the test's own assertions to fail.
+   */
+  const blocked = async () => {
+    for (let tries = 0; tries < 200; tries += 1) {
+      const { rows } = await built.targets.store.db.execute("select 1 from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'")
+      if (rows.length) return
+      await setTimeout(10)
+    }
+  }
 
   test('a reference to another organization\'s row is refused exactly as an absent id is: one row, a set, a file and a step\'s value, on create, update and bulk', async () => {
     const notes = built.kayan.notes.operations
@@ -1212,6 +1223,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const drafting = papers.heldDraft({ id: paper.id, memo: first.id }, { actor: one, draft: true })
     await drafted.reached.promise
     const deleting = memos().delete({ id: first.id }, { actor: one })
+    await blocked()
     drafted.release.resolve()
     await drafting
     const referenced = await refusal(deleting)
@@ -1224,6 +1236,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const removing = memos().heldDelete({ id: second.id }, { actor: one })
     await deleted.reached.promise
     const naming = papers.update({ id: paper.id, memo: second.id }, { actor: one, draft: true })
+    await blocked()
     deleted.release.resolve()
     await removing
     const late = await refusal(naming)
