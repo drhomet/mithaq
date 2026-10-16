@@ -10,7 +10,7 @@
 // Listing the step without widening the input protects nothing, since the strict update
 // shape refuses the key by name.
 //
-// The compare is against `ctx.dataBefore`, loaded with `lock: 'noKeyUpdate'` inside the update's
+// The compare is against `ctx.dataBefore`, loaded under the update's own row lock inside its
 // transaction, so on a store that honours the lock a second writer waits and no write lands
 // between the compare and the store step. A store that ignores the lock lets both through.
 //
@@ -38,4 +38,4 @@ export const expectedUpdatedAt = (ctx: Ctx<{ expectedUpdatedAt?: Date | string }
   }
   return ctx
 }
-// mithaq-admin 0.0.0 f4897620412a675e2baaa382bb92b17da24e7b1651bcfe909ee6294dc22ac7f2
+// mithaq-admin 0.0.0 10cc4a57db299d48c4fd53314ed42e02fc04b0464a7fa8a0c512cefc7ccb2b82

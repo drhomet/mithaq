@@ -5,7 +5,7 @@ import { assertReadableWhere, checkedWhere } from './read.ts'
 import { running } from './runtime.ts'
 import { refuseTenantOption, writeTenant } from './tenant.ts'
 import { atEffect, parse, validated, type BulkResult, type Ctx, type ResolvedOperation, type WriteStep, type WriteTools } from './steps.ts'
-import { aliveWhere, beginWrite, drain, ontoRow, projectReadableFields, publishedWhere, runOutside, type Authorize, type ManagedAdmin, type Options } from './write.ts'
+import { aliveWhere, beginWrite, drain, ontoRow, projectReadableFields, publishedWhere, rowLock, runOutside, type Authorize, type ManagedAdmin, type Options } from './write.ts'
 import { combineWhere, type Where } from '../../mithaq/where.ts'
 import type { ResolvedKayan } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
@@ -102,11 +102,12 @@ export const bulk = <Actor = unknown>({
       }
       // The rows a plain read shows, so a bulk never reaches a draft that was never published.
       const where = combineWhere(combineWhere(callerWhere, accessWhere), publishedWhere(kayan))
+      const values = (data.data ?? {}) as Record<string, unknown>
       // Holds every matched row until commit, as each row's own write then holds it; the limit is the
       // ceiling, and `totalDocs` counts the whole matched set without reading it.
       const found = await store.find({
         kayan: kayan.name,
-        args: { limit: ceiling, page: 1, lock: tools.kind === 'deleteMany' ? 'update' : 'noKeyUpdate', sort: { field: 'id', direction: 'asc' }, where },
+        args: { limit: ceiling, page: 1, lock: rowLock({ kayan, kind: tools.kind, data: values }), sort: { field: 'id', direction: 'asc' }, where },
         tx,
       })
       // Refused rather than written in part: a caller could not tell which rows a partial
@@ -118,7 +119,6 @@ export const bulk = <Actor = unknown>({
           params: { kayan: kayan.name, operation: tools.operation, matched: found.totalDocs, ceiling },
         })
       }
-      const values = (data.data ?? {}) as Record<string, unknown>
       const docs: Record<string, unknown>[] = []
       // In order, not in parallel: each write joins this transaction, which is one connection.
       for (const row of found.docs) {

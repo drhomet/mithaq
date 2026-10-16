@@ -375,8 +375,17 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     name: 'stamps',
     fields: { ...defaultFields, code: { kind: 'text', rules: { unique: true } } },
     indexes: undefined,
-    // Stops after its UPDATE ran, holding whatever lock that statement took.
-    targets: { service: { operations: { ...defaultOperations, heldEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause] } } } },
+    targets: {
+      service: {
+        operations: {
+          ...defaultOperations,
+          // Stops after its UPDATE ran, holding whatever lock that statement took.
+          heldEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause] },
+          // Stops with its own row loaded and held, before its UPDATE runs.
+          heldRecode: { steps: ({ steps }: { steps: { update: unknown } }) => [pause, steps.update] },
+        },
+      },
+    },
   }
   const user = { name: 'user', schemaName: 'tenant_scope', fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
   // A local account, which is no organization's member.
@@ -391,7 +400,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -1331,12 +1340,12 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal(stale.key, 'error.conflict.stale')
   })
 
-  // The runner never changes an id, and only an id is ever named, so it locks an update FOR NO KEY UPDATE;
-  // an UPDATE changing another unique column takes FOR UPDATE itself, as Postgres's own does.
-  if (postgres) test('an update leaves its row to a write naming it unless the update changed a unique column', { timeout: 10_000 }, async () => {
+  // Postgres raises an UPDATE to FOR UPDATE only when the unique value differs, which the load cannot know
+  // yet, so the runner takes FOR UPDATE for any update naming a unique column, the value kept or not.
+  if (postgres) test('an update naming a unique column holds its row against a write naming it, whether or not it changes the value', { timeout: 10_000 }, async () => {
     const stamps = built.kayan.stamps.operations
     const stamp = await stamps.create({ code: 'locked-key' }, { actor: one })
-    for (const [code, answer] of [['locked-key', 'taken'], ['changed-key', 'waited']] as const) {
+    for (const [code, answer] of [['locked-key', 'waited'], ['changed-key', 'waited']] as const) {
       const held = hold()
       const editing = stamps.heldEdit({ id: stamp.id, code }, { actor: one })
       await held.reached.promise
@@ -1347,6 +1356,26 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
         await editing
       }
     }
+  })
+
+  // A held update changing the row's unique code, and a transaction that names the row, as a reference
+  // check does, then changes its other columns. Were the update to load the row FOR NO KEY UPDATE, its
+  // UPDATE would raise that to FOR UPDATE past the other's key share while the other waits on it.
+  if (postgres) test('an update changing a unique column and a write naming its row and then changing it both commit, with no deadlock', { timeout: 10_000 }, async () => {
+    const stamps = built.kayan.stamps.operations
+    const stamp = await stamps.create({ code: 'before recode' }, { actor: one })
+    const held = hold()
+    const recoding = stamps.heldRecode({ id: stamp.id, code: 'after recode' }, { actor: one })
+    await held.reached.promise
+    const naming = store.transaction(async (tx) => {
+      await store.find({ kayan: 'stamps', args: { limit: 1, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { id: { equals: stamp.id } } }, tx })
+      await store.update({ tx, kayan: 'stamps', id: stamp.id, data: { updatedAt: new Date() } })
+    })
+    await blocked()
+    held.release.resolve()
+    const outcomes = await Promise.allSettled([recoding, naming])
+    assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
+    assert.equal((await stamps.findByID({ id: stamp.id }, { actor: one })).code, 'after recode')
   })
 })
 

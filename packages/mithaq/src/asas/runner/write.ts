@@ -273,8 +273,8 @@ export const referencingIds = async ({ id, pointers, store, tenant, tx }: {
  * Refuses the delete while a live row or the latest version of a row names it, in the delete's own
  * transaction. The delete holds the row `FOR UPDATE`, and a write naming it holds it `FOR KEY SHARE`
  * in `assertReferences`, a draft save included. The two conflict, so no new reference lands between
- * this count and the delete. An update holds its own row `FOR NO KEY UPDATE`, which `FOR KEY SHARE`
- * passes, so only a delete holds off a write naming its row. The refusal counts the actor's own
+ * this count and the delete. An update holds its own row as `rowLock` says, which `FOR KEY SHARE` passes
+ * unless the update names a unique column. The refusal counts the actor's own
  * organization's rows and names by title only those the actor reads; a row another organization's
  * rows name is refused with no count at all.
  */
@@ -476,6 +476,18 @@ export const assertSingleConstrained = (kayan: ResolvedKayan, where: Where | und
   }
 }
 
+/**
+ * The lock a write holds on a row it changes, as Postgres's own statement takes it: `FOR UPDATE` for a
+ * delete, or for an update naming a column of a unique index, which holds off a write naming the row
+ * `FOR KEY SHARE`, and `FOR NO KEY UPDATE` for any other update, which that write passes. Taken whole
+ * when the row loads, before any value is compared: an UPDATE raising its lock later would wait on a
+ * writer that named the row in between while that writer waits on it, a deadlock.
+ */
+export const rowLock = ({ kayan, kind, data }: { kayan: ResolvedKayan; kind: string; data: Record<string, unknown> }) => {
+  const written = kind === 'remove' || kind === 'deleteMany' ? undefined : Object.keys(data)
+  return !written || kayan.indexes.some((index) => index.unique && index.fields.some((name) => written.includes(name))) ? 'update' : 'noKeyUpdate'
+}
+
 const loadExisting = async ({ kayan, store, id, where, tx, rows = aliveWhere(kayan), lock }: {
   kayan: ResolvedKayan
   store: Store
@@ -483,9 +495,6 @@ const loadExisting = async ({ kayan, store, id, where, tx, rows = aliveWhere(kay
   where: Where | undefined
   tx?: unknown
   rows?: Where
-  // As Postgres locks the row it changes: a delete `FOR UPDATE`, which holds off a write naming the row,
-  // and an update `FOR NO KEY UPDATE`, which that write passes. An update never changes the id, the one
-  // key a reference names, and an UPDATE changing another unique column takes `FOR UPDATE` itself.
   lock: 'update' | 'noKeyUpdate'
 }) => {
   assertSingleConstrained(kayan, where)
@@ -934,7 +943,7 @@ export const write = <Actor = unknown>({
     const run = (tx: unknown) => {
       entry.tx = tx
       return running.run({ context, transactions: new Map(open).set(store, entry), user: actor }, async () => {
-        const existing = tools.kind === 'insert' ? undefined : await loadExisting({ kayan, store, id: values.id, where: accessWhere, tx, rows: rowsWhere, lock: tools.kind === 'remove' ? 'update' : 'noKeyUpdate' })
+        const existing = tools.kind === 'insert' ? undefined : await loadExisting({ kayan, store, id: values.id, where: accessWhere, tx, rows: rowsWhere, lock: rowLock({ kayan, kind: tools.kind, data: values }) })
         // An actor who may not read this row's drafts writes onto it as it is, so nothing tells
         // it a draft is pending.
         const hidesDrafts = !!versions?.drafts && !!existing && (!admits || (!draftsAsked && !!admits.where
