@@ -482,12 +482,8 @@ export const assertSingleConstrained = (kayan: ResolvedKayan, where: Where | und
  * `FOR KEY SHARE`, and `FOR NO KEY UPDATE` for any other update, which that write passes. A soft delete
  * is an update of its mark, and asks no rows naming its row, so it has no reference to hold off. Taken
  * whole when the row loads, before any value is compared: an UPDATE raising its lock later would wait on
- * a writer that named the row in between while that writer waits on it, a deadlock. `FOR KEY SHARE`
- * lets a named row's other columns change before the writer commits. The field's `filterOptions`, the
- * target's read access and `publishedWhere` are checked under that same `FOR KEY SHARE`; a project whose
- * concurrent writes must not slip past those checks locks the row in a step, as courses does. A step
- * judging those columns must lock that row itself before the store step, for example with `noKeyUpdate`;
- * `FOR UPDATE` after the reference check can deadlock with another writer doing the same.
+ * a writer that named the row in between while that writer waits on it, a deadlock.
+ *
  * ponytail: publishing a latest draft's unique column can still raise this lock; take `update` for every
  * non-draft update on a kayan with drafts and a unique index if that path needs to be covered.
  * ponytail: an update step can raise its own row's lock by writing a unique column or hard-deleting the
@@ -628,9 +624,7 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
       limit: ids.length,
       // The lock a foreign key takes: it holds off the row's delete, and never another write naming the
       // row or a plain update of its other columns, so those neither wait on it nor deadlock with it.
-      // The field's filterOptions, the target's read access and publishedWhere are checked under that same
-      // FOR KEY SHARE; a project whose concurrent writes must not slip past them locks the row in a step,
-      // as courses does.
+      // See "Create, update and delete" in packages/mithaq/README.md for checks that need a stronger lock.
       lock: 'keyShare',
       page: 1,
       sort: { field: 'id', direction: 'asc' },
@@ -1063,7 +1057,7 @@ export const write = <Actor = unknown>({
             if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
             // A marked row is kept, so only a delete that removes it answers to the rows naming it.
             // An update step can remove its own row, so exclude new references before counting them.
-            // This raises its lock; taking `update` at load avoids a deadlock with a writer naming it.
+            // This raises its lock; the upgrade path is taking `update` at load for such an operation.
             if (pointers.length && existing && kind !== 'remove') await store.find({ kayan: name, args: { limit: 1, page: 1, lock: 'update', sort: byId, where: { id: { equals: existing.id as Scalar } } }, tx: heldTx })
             if (pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
             return tools.store.remove({ tx: heldTx, kayan: name, id: targetId, where: writeWhere })

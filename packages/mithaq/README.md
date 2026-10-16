@@ -612,9 +612,11 @@ skip a check, because the checks belong to the runner, not to the list.
 5. `beforeTransaction`, outside the transaction. No row is loaded yet.
 6. The transaction opens. An update or delete loads its row under the access
    answer and locks it as Postgres's own statement would: an update `FOR NO KEY
-   UPDATE`, which a write naming the row passes, a soft delete the same, and a
-   delete, or an update naming a column of a unique index, `FOR UPDATE`, which
-   holds that write off. `FOR KEY SHARE` lets a named row's other columns change
+   UPDATE`, which a write naming the row passes. A hard delete, or an update
+   naming a column of a unique index, takes `FOR UPDATE`, which holds that write
+   off. A soft delete updates its mark, so it takes `FOR NO KEY UPDATE` unless
+   that mark belongs to a unique index, as enrollments' `deletedAt` does, when it
+   takes `FOR UPDATE`. `FOR KEY SHARE` lets a named row's other columns change
    before the writer commits. The field's `filterOptions`, the target's read
    access and `publishedWhere` are checked under that same `FOR KEY SHARE`; a
    project whose concurrent writes must not slip past those checks locks the
