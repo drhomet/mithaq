@@ -50,6 +50,7 @@ import {
 } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
 import { memoryStore } from './memory-store.ts'
+import { expectedUpdatedAt } from '../../mithaq/src/steps/expected-updated-at.ts'
 import { storageConfig } from '../../mithaq/src/storage/index.ts'
 import { testDatabase } from './test-database.ts'
 
@@ -208,6 +209,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           },
           touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] },
           heldDelete: { steps: ({ steps }: { steps: { remove: unknown } }) => [pause, steps.remove] },
+          heldSweep: { steps: ({ steps }: { steps: { updateMany: unknown } }) => [steps.updateMany, pause] },
           prune: { steps: ({ steps }: { steps: { remove: unknown } }) => [aimAt('remove'), steps.remove] },
           // A raw insert into another tenant-owned kayan, under another organization.
           plant: {
@@ -246,6 +248,8 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       memoSet: { kind: 'relationship', relationTo: 'memos', hasMany: true },
       tag: { kind: 'relationship', relationTo: 'tags' },
       cover: { kind: 'upload', relationTo: 'files' },
+      // Another note, so two edits can each name the row the other changes.
+      reply: { kind: 'relationship', relationTo: 'notes' },
     },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
@@ -254,6 +258,10 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           ...defaultOperations,
           // Names its memo, stops holding it, then changes the row `aimed` names.
           heldLink: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert, pause, aimAt('update')] },
+          // Stops with its own row loaded and held, before its references are checked.
+          heldEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [pause, steps.update] },
+          // Compares the instant its caller read, then stops holding the row before it writes.
+          heldStale: { input: ({ update }: { update: z.ZodObject }) => update.extend({ expectedUpdatedAt: z.date() }), steps: ({ steps }: { steps: { update: unknown } }) => [expectedUpdatedAt, pause, steps.update] },
           link: { steps: ({ steps }: { steps: { insert: unknown } }) => [(ctx: { data: Record<string, unknown> }) => ({ ...ctx, data: { ...ctx.data, memo: linked.memo } }), steps.insert] },
           scribble: {
             steps: ({ steps }: { steps: { insert: unknown } }) => [
@@ -362,7 +370,14 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     targets: { service: { operations: defaultOperations } },
   }
   // Shared, so its unique code is one across the whole table.
-  const stamps = { ...badges, name: 'stamps', fields: { ...defaultFields, code: { kind: 'text', rules: { unique: true } } }, indexes: undefined }
+  const stamps = {
+    ...badges,
+    name: 'stamps',
+    fields: { ...defaultFields, code: { kind: 'text', rules: { unique: true } } },
+    indexes: undefined,
+    // Stops after its UPDATE ran, holding whatever lock that statement took.
+    targets: { service: { operations: { ...defaultOperations, heldEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause] } } } },
+  }
   const user = { name: 'user', schemaName: 'tenant_scope', fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
   // A local account, which is no organization's member.
   const locals = {
@@ -376,7 +391,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
@@ -677,7 +692,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const papers = built.kayan.papers.operations
     const notes = built.kayan.notes.operations
     const theirs = await papers.create({ title: 'theirs', memo: null, _status: 'published' }, { actor: two })
-    const theirNote = await notes.create({ title: 'their note', memo: null, memoSet: [ids.org2], tag: null, cover: null }, { actor: two })
+    const theirNote = await notes.create({ title: 'their note', memo: null, memoSet: [ids.org2], tag: null, cover: null, reply: null }, { actor: two })
     const snapshots = async () => (await store.find({ kayan: '_papers_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { parent: { equals: theirs.id } } } })).docs
     const held = await snapshots()
     const snapshot = held[0]!
@@ -755,10 +770,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
   const told = (error: AsasError) => ({ status: error.status, key: error.key, message: error.message, params: error.params })
   const absent = '00000000-0000-4000-8000-000000000000'
   // Every column named, since the memory store keeps a key it was never handed as absent rather than null.
-  const note = (data: Record<string, unknown>) => ({ memo: null, memoSet: [], tag: null, cover: null, ...data })
+  const note = (data: Record<string, unknown>) => ({ memo: null, memoSet: [], tag: null, cover: null, reply: null, ...data })
   /** A row written past every operation, as a row older than the scope or another tool would be. */
   const raw = (kayan: string, data: Record<string, unknown>) =>
     store.transaction((tx) => store.insert({ tx, kayan, data: { ...data, createdAt: new Date(), updatedAt: new Date() } })) as Promise<Record<string, unknown>>
+  /** Whether another transaction takes the row in that mode now, or is still waiting on it when its lock timeout ends. */
+  const takes = (kayan: string, id: unknown, lock: 'noKeyUpdate' | 'keyShare') => store.transaction(async (tx) => {
+    await (tx as { execute: (sql: string) => Promise<unknown> }).execute("set local lock_timeout = '200ms'")
+    await store.find({ kayan, args: { limit: 1, page: 1, lock, sort: { field: 'id', direction: 'asc' }, where: { id: { equals: id as string } } }, tx })
+  }).then(() => 'taken', (error: { cause?: { code?: string } }) => {
+    if (error.cause?.code === '55P03') return 'waited'
+    throw error
+  })
 
   test('a reference to another organization\'s row is refused exactly as an absent id is: one row, a set, a file and a step\'s value, on create, update and bulk', async () => {
     const notes = built.kayan.notes.operations
@@ -1234,6 +1257,82 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     } finally {
       done.resolve()
       await Promise.all([theirs, ...calls])
+    }
+  })
+
+  // An update holds its own row FOR NO KEY UPDATE, as Postgres's own UPDATE of its other columns does,
+  // which a write naming that row passes FOR KEY SHARE, so two edits each naming the other's row cannot deadlock.
+  if (postgres) test('two updates, each naming the row the other changes, both commit with no deadlock', { timeout: 10_000 }, async () => {
+    const notes = built.kayan.notes.operations
+    const c = await notes.create(note({ title: 'c' }), { actor: one })
+    const v = await notes.create(note({ title: 'v' }), { actor: one })
+    // Each stops holding its own row; let go together, each then names the row the other holds.
+    const first = { ...hold() }
+    const editingC = notes.heldEdit({ id: c.id, title: 'c edited', reply: v.id }, { actor: one })
+    await first.reached.promise
+    const second = { ...hold() }
+    const editingV = notes.heldEdit({ id: v.id, title: 'v edited', reply: c.id }, { actor: one })
+    await second.reached.promise
+    first.release.resolve()
+    second.release.resolve()
+    const outcomes = await Promise.allSettled([editingC, editingV])
+    assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
+    assert.equal((await notes.findByID({ id: c.id }, { actor: one })).reply, v.id)
+    assert.equal((await notes.findByID({ id: v.id }, { actor: one })).reply, c.id)
+  })
+
+  if (postgres) test('a bulk update holding the rows it changed never holds up a write naming one of them', { timeout: 10_000 }, async () => {
+    const swept = await memos().create({ title: 'swept' }, { actor: one })
+    const held = hold()
+    const sweeping = memos().heldSweep({ where: { id: { equals: swept.id } }, data: { title: 'swept again' } }, { actor: one })
+    await held.reached.promise
+    try {
+      const naming = built.kayan.notes.operations.create(note({ title: 'names the swept memo', memo: swept.id }), { actor: one })
+      const named = await Promise.race([naming, setTimeout(2000, 'waited')])
+      assert.equal((named as { memo?: unknown }).memo, swept.id, `the write commits while the bulk holds its rows: ${String(named)}`)
+    } finally {
+      held.release.resolve()
+      await sweeping
+    }
+  })
+
+  // No key update conflicts with itself, so a second update waits for the first to commit before it
+  // loads the row, and then compares the instant the first wrote.
+  if (postgres) test('an update holds its row against a second update until it commits, so expectedUpdatedAt refuses the second, which read the same instant', { timeout: 10_000 }, async () => {
+    const notes = built.kayan.notes.operations
+    const read = await notes.create(note({ title: 'read once' }), { actor: one })
+    await setTimeout(5)
+    const held = hold()
+    const first = notes.heldStale({ id: read.id, title: 'first', expectedUpdatedAt: read.updatedAt }, { actor: one })
+    await held.reached.promise
+    let second: Promise<unknown>
+    try {
+      assert.equal(await takes('notes', read.id, 'noKeyUpdate'), 'waited', 'another update waits on the row')
+      second = notes.heldStale({ id: read.id, title: 'second', expectedUpdatedAt: read.updatedAt }, { actor: one })
+    } finally {
+      held.release.resolve()
+    }
+    assert.equal((await first).title, 'first')
+    const stale = await refusal(second)
+    assert.equal(stale.status, 409)
+    assert.equal(stale.key, 'error.conflict.stale')
+  })
+
+  // The runner never changes an id, and only an id is ever named, so it locks an update FOR NO KEY UPDATE;
+  // an UPDATE changing another unique column takes FOR UPDATE itself, as Postgres's own does.
+  if (postgres) test('an update leaves its row to a write naming it unless the update changed a unique column', { timeout: 10_000 }, async () => {
+    const stamps = built.kayan.stamps.operations
+    const stamp = await stamps.create({ code: 'locked-key' }, { actor: one })
+    for (const [code, answer] of [['locked-key', 'taken'], ['changed-key', 'waited']] as const) {
+      const held = hold()
+      const editing = stamps.heldEdit({ id: stamp.id, code }, { actor: one })
+      await held.reached.promise
+      try {
+        assert.equal(await takes('stamps', stamp.id, 'keyShare'), answer, `code ${code}`)
+      } finally {
+        held.release.resolve()
+        await editing
+      }
     }
   })
 })

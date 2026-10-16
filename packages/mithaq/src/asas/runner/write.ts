@@ -273,8 +273,10 @@ export const referencingIds = async ({ id, pointers, store, tenant, tx }: {
  * Refuses the delete while a live row or the latest version of a row names it, in the delete's own
  * transaction. The delete holds the row `FOR UPDATE`, and a write naming it holds it `FOR KEY SHARE`
  * in `assertReferences`, a draft save included. The two conflict, so no new reference lands between
- * this count and the delete. The refusal counts the actor's own organization's rows and names by title only
- * those the actor reads; a row another organization's rows name is refused with no count at all.
+ * this count and the delete. An update holds its own row `FOR NO KEY UPDATE`, which `FOR KEY SHARE`
+ * passes, so only a delete holds off a write naming its row. The refusal counts the actor's own
+ * organization's rows and names by title only those the actor reads; a row another organization's
+ * rows name is refused with no count at all.
  */
 const refuseReferenced = async <Actor>({ kayan, existing, pointers, store, tenant, tx, authorize, admin, actor }: {
   kayan: ResolvedKayan
@@ -474,19 +476,23 @@ export const assertSingleConstrained = (kayan: ResolvedKayan, where: Where | und
   }
 }
 
-const loadExisting = async (
-  kayan: ResolvedKayan,
-  store: Store,
-  id: unknown,
-  where: Where | undefined,
-  tx?: unknown,
-  rows = aliveWhere(kayan),
-) => {
+const loadExisting = async ({ kayan, store, id, where, tx, rows = aliveWhere(kayan), lock }: {
+  kayan: ResolvedKayan
+  store: Store
+  id: unknown
+  where: Where | undefined
+  tx?: unknown
+  rows?: Where
+  // As Postgres locks the row it changes: a delete `FOR UPDATE`, which holds off a write naming the row,
+  // and an update `FOR NO KEY UPDATE`, which that write passes. An update never changes the id, the one
+  // key a reference names, and an UPDATE changing another unique column takes `FOR UPDATE` itself.
+  lock: 'update' | 'noKeyUpdate'
+}) => {
   assertSingleConstrained(kayan, where)
   const found = await store.find({ kayan: kayan.name, args: {
     limit: 1,
     page: 1,
-    lock: 'update',
+    lock,
     // A write's own look at the row it changes, over a set an id or a constraint already reduced.
     sort: { field: 'id', direction: 'asc' },
     // A marked row is not there to change, so a second delete of it is the 404 an absent id gets.
@@ -928,7 +934,7 @@ export const write = <Actor = unknown>({
     const run = (tx: unknown) => {
       entry.tx = tx
       return running.run({ context, transactions: new Map(open).set(store, entry), user: actor }, async () => {
-        const existing = tools.kind === 'insert' ? undefined : await loadExisting(kayan, store, values.id, accessWhere, tx, rowsWhere)
+        const existing = tools.kind === 'insert' ? undefined : await loadExisting({ kayan, store, id: values.id, where: accessWhere, tx, rows: rowsWhere, lock: tools.kind === 'remove' ? 'update' : 'noKeyUpdate' })
         // An actor who may not read this row's drafts writes onto it as it is, so nothing tells
         // it a draft is pending.
         const hidesDrafts = !!versions?.drafts && !!existing && (!admits || (!draftsAsked && !!admits.where
@@ -938,7 +944,7 @@ export const write = <Actor = unknown>({
         // the upsert. A per-tenant global is left out: the unconstrained look would find another tenant's row.
         if (
           kayan.single && !kayan.tenant && tools.kind === 'update' && !existing && accessWhere
-          && await loadExisting(kayan, store, values.id, undefined, tx)
+          && await loadExisting({ kayan, store, id: values.id, where: undefined, tx, lock: 'noKeyUpdate' })
         ) {
           throw missing({
             message: `No "${kayan.name}" row the access constraint admits.`,

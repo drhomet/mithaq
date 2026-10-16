@@ -156,10 +156,11 @@ export type Store<
       limit: number
       /**
        * A store must hold the rows it returns until the transaction ends: a step that compares a row, such as
-       * `expectedUpdatedAt`, relies on it. `'update'` holds them against every other writer; `'keyShare'` against
-       * a delete or a change of their key alone, as a Postgres foreign key holds the row it names.
+       * `expectedUpdatedAt`, relies on it. The modes are Postgres's: `'update'` holds them against every other
+       * lock, as a delete does; `'noKeyUpdate'` against every other but `'keyShare'`, as an update of their
+       * other columns does; `'keyShare'` against a delete or a change of their key alone, as a foreign key does.
        */
-      lock?: 'update' | 'keyShare'
+      lock?: 'update' | 'noKeyUpdate' | 'keyShare'
       page: number
       sort: { field: string; direction: 'asc' | 'desc' }
       where?: Where

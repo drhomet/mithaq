@@ -102,11 +102,11 @@ export const bulk = <Actor = unknown>({
       }
       // The rows a plain read shows, so a bulk never reaches a draft that was never published.
       const where = combineWhere(combineWhere(callerWhere, accessWhere), publishedWhere(kayan))
-      // `lock: 'update'` holds every matched row until commit; the limit is the ceiling,
-      // and `totalDocs` counts the whole matched set without reading it.
+      // Holds every matched row until commit, as each row's own write then holds it; the limit is the
+      // ceiling, and `totalDocs` counts the whole matched set without reading it.
       const found = await store.find({
         kayan: kayan.name,
-        args: { limit: ceiling, page: 1, lock: 'update', sort: { field: 'id', direction: 'asc' }, where },
+        args: { limit: ceiling, page: 1, lock: tools.kind === 'deleteMany' ? 'update' : 'noKeyUpdate', sort: { field: 'id', direction: 'asc' }, where },
         tx,
       })
       // Refused rather than written in part: a caller could not tell which rows a partial

@@ -10,7 +10,7 @@
 // Listing the step without widening the input protects nothing, since the strict update
 // shape refuses the key by name.
 //
-// The compare is against `ctx.dataBefore`, loaded with `lock: 'update'` inside the update's
+// The compare is against `ctx.dataBefore`, loaded with `lock: 'noKeyUpdate'` inside the update's
 // transaction, so on a store that honours the lock a second writer waits and no write lands
 // between the compare and the store step. A store that ignores the lock lets both through.
 //
