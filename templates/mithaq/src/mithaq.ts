@@ -101,11 +101,11 @@ const featuresFolder = new URL('../../features/', import.meta.url)
  */
 const drizzleStore = drizzleAdapter({
   connectionString,
-  // The column builders per kind, mithaq's default.
+  /** The column builders per kind, mithaq's default. */
   kinds: drizzleKinds,
-  // The column rules, mithaq's default.
+  /** The column rules, mithaq's default. */
   rules: drizzleRules,
-  // The kinds an id may use, mithaq's default.
+  /** The kinds an id may use, mithaq's default. */
   idKinds: drizzleIdKinds,
   prodMigrations: { migrationsFolder: fileURLToPath(new URL('migrations/', asasSource)), pending: 'refuse' },
 })
@@ -180,11 +180,11 @@ export const accessTarget = (roles: typeof systemRoles = systemRoles) => {
 export const serverTargets = {
   drizzle: guarded(drizzleStore),
   zod: zodTarget({
-    // The schema builders per kind, mithaq's default.
+    /** The schema builders per kind, mithaq's default. */
     kinds: zodKinds,
-    // The schema rules, mithaq's default.
+    /** The schema rules, mithaq's default. */
     rules: zodRules,
-    // The kinds an id may use, mithaq's default.
+    /** The kinds an id may use, mithaq's default. */
     idKinds: zodIdKinds,
   }),
   rbac: accessTarget(),

@@ -506,18 +506,21 @@ commands, run as `mithaq <target> <command>`.
 
 ### Targets and adapters
 
-A **target** is one setting in `defineMithaq`'s `targets`, each with one capability from the table above, as many as that row allows.
+A **target** is one setting in `defineMithaq`'s `targets`, each with one
+capability from the table above, as many as that row allows.
 It says what a kayan declaration becomes or runs through: a drizzle table,
 zod shapes, service operations, screens or the tenant rule. Each kayan can
 carry its own settings for a target under its own `targets`.
-An **adapter** is a target that connects to a system outside mithaq, such as
-`drizzleAdapter` to Postgres. Mithaq's own service, roles, versions, screens
-and tenant parts are targets, not adapters.
+An **adapter** connects mithaq to a system outside it: `drizzleAdapter` is a
+store target that connects to Postgres, and the storage target takes adapters
+such as `r2` or `s3`. Mithaq's own service, roles, versions, screens and tenant
+parts connect to nothing outside, so they are targets and not adapters.
 An adapter provides a fixed set of words every adapter of its kind must
 have, such as the [store words](../../templates/asas/README.md#add-a-step);
 those words are not settings and are never written out in the config.
-Every default is written out by name in a project's config: `drizzleKinds`,
-`zodKinds`, `defaultLimit`, `newRows: 'active'`. Reading it shows everything in force.
+Each named default mithaq ships (`drizzleKinds`, `drizzleIdKinds`, `zodKinds`,
+`defaultLimit`, `newRows: 'active'`) is written out by name in a project's config,
+so reading it shows which defaults are in force.
 
 ### The shipped targets
 

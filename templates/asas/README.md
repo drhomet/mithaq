@@ -501,6 +501,12 @@ In one organization, nobody founds another organization or leaves the one over H
 
 ## Upgrading
 
+What a project made before the store additions changes when it takes this version:
+
+- **`drizzleTarget` is removed.** Write `kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds` in `drizzleAdapter(...)`.
+- **`zodTarget` is a function.** Write `zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds })`.
+- **`betterAuthTenant` requires `newRows: 'active'`.** Name it in the tenant target's config.
+
 What a project made before the sign-up round changes when it takes this version:
 
 - **A sign-up that proves its address asks no password.** The page asks a name and an address; the person chooses the password on `/auth/set-password`, which the sign-up's and Add person's links now open. Copy `src/choose-password.tsx` and `src/routes/auth.set-password.tsx` from the template into `apps/asas-tanstack`, replace `auth.reset-password.tsx` and `auth.sign-up.tsx` with the template's, and run the app once so the router writes `routeTree.gen.ts`. A link mailed before still opens the reset page, which takes the same token.
