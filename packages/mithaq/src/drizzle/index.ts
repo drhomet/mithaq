@@ -744,7 +744,7 @@ const storeOf = <
   const increments = ({ name, values, insert = false }: { name: string; values: Record<string, unknown>; insert?: boolean }) => {
     const data = { ...declaredData(name, values) }
     for (const [field, value] of Object.entries(data)) {
-      if (!value || typeof value !== 'object' || !('$inc' in value)) continue
+      if (kayanByName.get(name)?.fields[field]?.kind === 'json' || !value || typeof value !== 'object' || !('$inc' in value)) continue
       if (kayanByName.get(name)?.fields[field]?.kind !== 'integer' || !Number.isSafeInteger(value.$inc) || Object.keys(value).length !== 1) {
         throw invalid({ message: `Kayan "${name}" field "${field}" accepts $inc only on an integer field with one safe integer.`, key: 'error.invalid.value', params: { kayan: name, field } })
       }

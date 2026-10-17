@@ -1857,6 +1857,12 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal(kept.title, 'foreign')
   })
 
+  if (postgres) test('managed json values keep a $inc key on create and update', { timeout: 10_000 }, async () => {
+    const row = await memos().create({ title: 'json increment key', meta: { $inc: 1 } }, { actor: one })
+    assert.deepEqual(row.meta, { $inc: 1 })
+    assert.deepEqual((await memos().update({ id: row.id, meta: { $inc: 1 } }, { actor: one })).meta, { $inc: 1 })
+  })
+
   if (postgres) test('an increment of the operation row keeps numeric versions and its pending draft, and refuses arithmetic in a draft snapshot', async () => {
     const papers = built.kayan.papers.operations
     const row = await papers.create({ title: 'published arithmetic', memo: null, balance: 10, _status: 'published' }, { actor: one })
