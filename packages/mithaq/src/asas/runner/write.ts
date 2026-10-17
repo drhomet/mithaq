@@ -1063,7 +1063,7 @@ export const write = <Actor = unknown>({
             // Any other row is the step's own raw write, held by the tenant seal alone.
             if (!ownRow(name, id)) return tools.store.update(elsewhere(args))
             const kept = own(name)
-            const incremented = Object.keys(values).filter((field) => values[field] && typeof values[field] === 'object' && '$inc' in (values[field] as object))
+            const incremented = Object.keys(values).filter((field) => kayan.fields[field]?.kind !== 'json' && values[field] && typeof values[field] === 'object' && '$inc' in (values[field] as object))
             if (drafting && kept && incremented.length) throw invalid({ message: 'An increment writes a stored integer field, not a draft snapshot.', key: 'error.invalid.value', params: { kayan: name } })
             if (drafting && kept) {
               const draft = { ...base, ...values, id: targetId }

@@ -326,7 +326,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const papers = {
     name: 'papers',
     schemaName,
-    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, balance: { kind: 'integer', rules: { defaultValue: 0 } }, memo: { kind: 'relationship', relationTo: 'memos' }, ...draftFields },
+    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, balance: { kind: 'integer', rules: { defaultValue: 0 } }, memo: { kind: 'relationship', relationTo: 'memos' }, meta: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: {} } }, ...draftFields },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
       service: { operations: { ...defaultOperations, ...versionOperations, probeAfterEdit: { input: ({ update }: { update: StandardSchemaV1 }) => update, steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] }, draftProbeAfterEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] }, probe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert] }, bump: { input: ({ update }: { update: StandardSchemaV1 }) => update, steps: ({ steps }: { steps: { update: unknown } }) => [(ctx: Ctx) => ({ ...ctx, data: { ...ctx.data, balance: { $inc: 3 } } }), steps.update] }, draftBump: { steps: ({ steps }: { steps: { update: unknown } }) => [(ctx: Ctx) => ({ ...ctx, data: { ...ctx.data, balance: { $inc: 3 } } }), steps.update] }, touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] }, heldDraft: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause] } } },
@@ -1861,6 +1861,23 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const row = await memos().create({ title: 'json increment key', meta: { $inc: 1 } }, { actor: one })
     assert.deepEqual(row.meta, { $inc: 1 })
     assert.deepEqual((await memos().update({ id: row.id, meta: { $inc: 1 } }, { actor: one })).meta, { $inc: 1 })
+  })
+
+  test('a draft json update keeps a $inc key and still refuses integer draft arithmetic', { timeout: 10_000 }, async () => {
+    const papers = built.kayan.papers.operations
+    const row = await papers.create({ title: 'draft json increment key', memo: null, meta: {}, _status: 'published' }, { actor: one })
+    await papers.update({ id: row.id, meta: { $inc: 1 } }, { actor: one, draft: true })
+    assert.deepEqual((await papers.findByID({ id: row.id }, { actor: one, draft: true })).meta, { $inc: 1 })
+    assert.equal((await refusal(papers.draftBump({ id: row.id }, { actor: one, draft: true }))).status, 400)
+  })
+
+  if (!postgres) test('memory store json updates and upserts keep a $inc key', { timeout: 10_000 }, async () => {
+    const row = await memos().create({ title: 'memory json increment key', meta: {} }, { actor: one })
+    assert.deepEqual((await memos().update({ id: row.id, meta: { $inc: 1 } }, { actor: one })).meta, { $inc: 1 })
+    storeProbe = async (ctx, tools) => {
+      assert.deepEqual((await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on: ['id'], data: { id: row.id, meta: { $inc: 1 } } })).meta, { $inc: 1 })
+    }
+    try { await memos().probe({ title: 'memory json upsert' }, { actor: one }) } finally { storeProbe = async () => {} }
   })
 
   if (postgres) test('an increment of the operation row keeps numeric versions and its pending draft, and refuses arithmetic in a draft snapshot', async () => {

@@ -66,7 +66,7 @@ export const memoryStore = () => {
     return row
   }
   const increments = (name: string, values: Record<string, unknown>, row?: Record<string, unknown>) => Object.fromEntries(Object.entries(values).map(([field, value]) => {
-    if (!value || typeof value !== 'object' || !('$inc' in value)) return [field, value]
+    if (kayanByName.get(name)?.fields[field]?.kind === 'json' || !value || typeof value !== 'object' || !('$inc' in value)) return [field, value]
     if (kayanByName.get(name)?.fields[field]?.kind !== 'integer' || !Number.isSafeInteger(value.$inc) || Object.keys(value).length !== 1) throw invalid({ message: 'An increment needs an integer field and a safe integer.', key: 'error.invalid.value' })
     return [field, row ? Number(row[field]) + Number(value.$inc) : value.$inc]
   }))
