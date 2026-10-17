@@ -326,7 +326,6 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const papers = {
     name: 'papers',
     schemaName,
-    indexes: [{ fields: ['id'], unique: true }],
     fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, balance: { kind: 'integer', rules: { defaultValue: 0 } }, memo: { kind: 'relationship', relationTo: 'memos' }, ...draftFields },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
@@ -1642,6 +1641,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     } finally { storeProbe = async () => {} }
   })
 
+  test('a step find with a lock requires a transaction on every store', { timeout: 10_000 }, async () => {
+    storeProbe = async (_ctx, tools) => {
+      await assert.rejects(tools.store.find({ kayan: declaration(built, 'memos'), args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock: 'share' } }), /Holding rows requires a transaction/)
+    }
+    try { await memos().probe({ title: 'lock without transaction' }, { actor: one }) } finally { storeProbe = async () => {} }
+  })
+
+  test('a step hold refuses an invalid mode with 400', { timeout: 10_000 }, async () => {
+    storeProbe = async (ctx, tools) => { await tools.store.hold({ tx: ctx.tx, kayan: declaration(built, 'memos'), ids: [ids.org1], mode: 'bad' as 'share' }) }
+    try { assert.equal((await refusal(memos().probe({ title: 'invalid hold' }, { actor: one }))).status, 400) } finally { storeProbe = async () => {} }
+  })
+
   test('a step holds duplicate own and shared ids, and refuses foreign ids exactly like missing ones', async () => {
     const tag = await store.transaction((tx) => store.insert({ tx, kayan: 'tags', data: { label: 'shared hold', open: false } }))
     storeProbe = async (ctx, tools) => {
@@ -1783,8 +1794,37 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     try { await memos().probe({ title: 'upsert paths' }, { actor: one }) } finally { storeProbe = async () => {} }
   })
 
-  if (postgres) test('upsert refuses foreign tenants and undeclared unique keys without changing their rows', async () => {
-    const foreign = await store.transaction((tx) => store.insert({ tx, kayan: 'memos', data: { firmId: 'org2', code: 'tenant-upsert', globalCode: 'global-upsert', title: 'foreign', balance: 40 } }))
+  test('a step insert fills its organization, accepts its own and refuses another, while shared inserts stay shared', { timeout: 10_000 }, async () => {
+    storeProbe = async (ctx, tools) => {
+      for (const data of [{ title: 'insert filled' }, { title: 'insert explicit', firmId: 'org1' }]) assert.equal((await tools.store.insert({ tx: ctx.tx, kayan: declaration(built, 'opens'), data })).firmId, 'org1')
+      const shared = await tools.store.insert({ tx: ctx.tx, kayan: declaration(built, 'tags'), data: { label: 'shared insert' } })
+      assert.equal(shared.label, 'shared insert')
+      assert.equal(Object.hasOwn(shared, 'firmId'), false)
+    }
+    try { await memos().probe({ title: 'insert probe' }, { actor: one }) } finally { storeProbe = async () => {} }
+    storeProbe = async (ctx, tools) => { await tools.store.insert({ tx: ctx.tx, kayan: declaration(built, 'opens'), data: { title: 'insert foreign', firmId: 'org2' } }) }
+    try { await assert.rejects(memos().probe({ title: 'insert refused' }, { actor: one }), /another organization/) } finally { storeProbe = async () => {} }
+    assert.equal((await built.kayan.opens.operations.count({ where: { title: { equals: 'insert foreign' } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('a step upserts by id without an extra index and refuses another organization\'s id', { timeout: 10_000 }, async () => {
+    storeProbe = async (ctx, tools) => {
+      const kayan = declaration(built, 'memos')
+      const data = { id: randomUUID(), title: 'id inserted' }
+      assert.equal((await tools.store.upsert({ tx: ctx.tx, kayan, on: ['id'], data })).title, 'id inserted')
+      const updated = await tools.store.upsert({ tx: ctx.tx, kayan, on: ['id'], data: { ...data, title: 'id updated' } })
+      assert.equal(updated.id, data.id)
+      assert.equal(updated.title, 'id updated')
+    }
+    try { await memos().probe({ title: 'id upsert' }, { actor: one }) } finally { storeProbe = async () => {} }
+    const foreign = await memos().findByID({ id: ids.org2 }, { actor: two })
+    storeProbe = async (ctx, tools) => { await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on: ['id'], data: { id: ids.org2, title: 'stolen' } }) }
+    try { assert.equal((await refusal(memos().probe({ title: 'foreign id' }, { actor: one }))).status, 404) } finally { storeProbe = async () => {} }
+    assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, foreign.title)
+  })
+
+  test('upsert refuses foreign tenants and undeclared unique keys without changing their rows', async () => {
+    const foreign = await memos().create({ code: 'tenant-upsert', globalCode: 'global-upsert', title: 'foreign', balance: 40 }, { actor: two })
     storeProbe = async (ctx, tools) => {
       const own = await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on: ['firmId', 'code'], data: { code: 'tenant-upsert', title: 'own', balance: { $inc: 2 } } })
       assert.notEqual(own.id, foreign.id)
@@ -1795,10 +1835,12 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     try { await memos().probe({ title: 'tenant upsert' }, { actor: one }) } finally { storeProbe = async () => {} }
     for (const [on, data, status] of [
       [['firmId', 'code'], { firmId: 'org2', code: 'tenant-upsert', balance: { $inc: 1 } }, undefined],
+      [['firmId', 'code'], { firmId: 'org2', code: 'fresh-foreign' }, undefined],
       [['globalCode'], { globalCode: 'global-upsert', title: 'stolen' }, 404],
       [['title'], { title: 'no unique key' }, 400],
       [[], { title: 'no key' }, 400],
       [['code', 'code'], { code: 'duplicate key' }, 400],
+      [['firmId', 'code'], { code: { $inc: 1 } }, 400],
       [['firmId', 'code'], { title: 'missing key' }, 400],
       [['firmId', 'code'], { code: 'invalid increment', balance: { $inc: 0.5 } }, 400],
       [['firmId', 'code'], { code: 'wrong field', title: { $inc: 1 } }, 400],
@@ -1809,6 +1851,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
         if (status) assert.equal(error.status, status, String(error))
       } finally { storeProbe = async () => {} }
     }
+    assert.equal((await store.find({ kayan: 'memos', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { code: { equals: 'fresh-foreign' } } } })).totalDocs, 0)
     const kept = await memos().findByID({ id: foreign.id }, { actor: two })
     assert.equal(kept.balance, 40)
     assert.equal(kept.title, 'foreign')

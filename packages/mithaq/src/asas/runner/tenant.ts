@@ -211,6 +211,7 @@ export const tenancy = ({ language, assigned, onError, collection }: {
       return { [field]: { equals: org } } as Where
     }
     const sealedFind: Store['find'] = async (args) => {
+      if (args.args.lock && !args.tx) throw new Error('Holding rows requires a transaction.')
       declaredField(args.kayan, args.args.sort.field)
       return find({ ...args, args: { ...args.args, where: combineWhere(checked(args.kayan, args.args.where), sealed(args.kayan)) } })
     }
@@ -221,6 +222,7 @@ export const tenancy = ({ language, assigned, onError, collection }: {
         return writes.sum({ ...args, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) })
       },
       hold: async ({ tx, kayan, ids, mode }) => {
+        if (!['update', 'noKeyUpdate', 'share', 'keyShare'].includes(mode)) throw invalid({ message: 'Holding rows requires a valid lock mode.', key: 'error.invalid.value' })
         if (!tx) throw new Error('Holding rows requires a transaction.')
         const uuid = named(kayan).fields.id?.kind === 'uuid'
         const ordered = [...new Set(ids.map((id) => uuid && typeof id === 'string' ? id.toLowerCase() : id))].sort((left, right) => compareValues({ left, right, direction: 'asc' }))
@@ -236,6 +238,10 @@ export const tenancy = ({ language, assigned, onError, collection }: {
           throw new Error(`A step upserted kayan "${args.kayan}" in another organization than the active one.`)
         }
         const data = field ? { ...args.data, [field]: org } : args.data
+        const kayan = named(args.kayan)
+        if (!args.on.length || new Set(args.on).size !== args.on.length || !(args.on.length === 1 && args.on[0] === 'id') && !kayan.indexes.some((index) => index.unique && index.fields.length === args.on.length && index.fields.every((field) => args.on.includes(field))) || args.on.some((key) => !Object.hasOwn(data, key) || (data[key] && typeof data[key] === 'object' && '$inc' in (data[key] as object)))) {
+          throw invalid({ message: `Kayan "${args.kayan}" upsert needs plain key values for a declared unique index in "on".`, key: 'error.invalid.value', params: { kayan: args.kayan } })
+        }
         for (const key of args.on) declaredField(args.kayan, key)
         await references({ name: args.kayan, data, tx: args.tx })
         return writes.upsert({ ...args, data, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) })
@@ -244,12 +250,13 @@ export const tenancy = ({ language, assigned, onError, collection }: {
         const field = named(args.kayan).tenant
         if (field) {
           const org = active(running.getStore()?.user)
-          if (org === undefined || args.data[field] !== org) {
+          if (org === undefined || (Object.hasOwn(args.data, field) && args.data[field] !== org)) {
             throw new Error(`A step made a row of kayan "${args.kayan}" in another organization than the active one, and a row is made in its own organization alone.`)
           }
         }
-        await references({ name: args.kayan, data: args.data, tx: args.tx })
-        return writes.insert(args)
+        const data = field ? { ...args.data, [field]: active(running.getStore()?.user) } : args.data
+        await references({ name: args.kayan, data, tx: args.tx })
+        return writes.insert({ ...args, data })
       },
       update: async (args) => {
         const where = combineWhere(checked(args.kayan, args.where), sealed(args.kayan, args.data))

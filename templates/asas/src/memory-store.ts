@@ -102,7 +102,6 @@ export const memoryStore = () => {
       return row
     },
     upsert: async ({ kayan: name, on, data: values, where }: { tx: unknown; kayan: string; on: readonly string[]; data: Record<string, unknown>; where?: Where }) => {
-      if (!on.length || new Set(on).size !== on.length || !kayanByName.get(name)!.indexes.some((index) => index.unique && index.fields.length === on.length && index.fields.every((field) => on.includes(field)))) throw invalid({ message: 'An upsert needs a declared unique index.', key: 'error.invalid.value' })
       const row = of(name).find((row) => on.every((field) => row[field] === values[field]))
       if (row && where && !matches(name, row, where)) throw missing({ message: `No "${name}" row found.`, key: 'error.not_found.row' })
       const made = held(name, { ...row, ...increments(name, values, row), id: row?.id ?? values.id ?? randomUUID() })

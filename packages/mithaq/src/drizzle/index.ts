@@ -1174,9 +1174,6 @@ const storeOf = <
       if (!tx) throw new Error('An upsert requires a transaction.')
       const kayan = kayanByName.get(name)!
       const table = tables[name]!
-      if (!on.length || new Set(on).size !== on.length || !kayan.indexes.some((index) => index.unique && index.fields.length === on.length && index.fields.every((field) => on.includes(field))) || on.some((field) => !Object.hasOwn(values, field) || (values[field] && typeof values[field] === 'object' && '$inc' in (values[field] as object)))) {
-        throw invalid({ message: `Kayan "${name}" upsert needs plain key values for a declared unique index in "on".`, key: 'error.invalid.value', params: { kayan: name } })
-      }
       const inserted = withoutSets(name, increments({ name, values, insert: true }))
       const updated = withoutSets(name, increments({ name, values }))
       const set = flatten(name, Object.fromEntries(Object.entries(updated.columns).filter(([field]) => field !== 'id' && field !== kayan.tenant && !on.includes(field))))
