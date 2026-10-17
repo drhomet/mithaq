@@ -148,9 +148,9 @@ export type Store<
   /** Run `fn` in one transaction. What it returns is what the write returns. */
   transaction<Result>(fn: (tx: Tx) => Promise<Result>): Promise<Result>
   insert(args: { tx: Tx; kayan: string; data: Record<string, unknown> }): Promise<Row>
-  /** Insert or update by the declared unique index `on` names, with key values in `data`. An increment inserts its amount or adds it to the existing value. Returns the row with its existing identity kept; upserting the operation's own versioned kayan while saving a draft is refused. */
+  /** Insert or update by the declared unique index `on` names, with key values in `data`. An increment inserts its amount or adds it to the existing value. Returns the row with its existing identity kept. */
   upsert(args: { tx: Tx; kayan: string; on: readonly string[]; data: Record<string, unknown>; where?: Where }): Promise<Row>
-  /** `{ field: { $inc: n } }` adds a safe integer in the database to an integer field, alongside plain values. Draft snapshot arithmetic is refused. Store writes skip validation; enforce quantities that must not become negative with a database CHECK. Returns the changed row. */
+  /** `{ field: { $inc: n } }` adds a safe integer in the database to an integer field, alongside plain values. Store writes skip validation; enforce quantities that must not become negative with a database CHECK. Returns the changed row. */
   update(args: { tx: Tx; kayan: string; id: unknown; data: Record<string, unknown>; where?: Where }): Promise<Row>
   remove(args: { tx: Tx; kayan: string; id: unknown; where?: Where }): Promise<Row>
   /** Required, so no store can exist that the managed reads cannot use. */

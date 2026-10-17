@@ -158,15 +158,19 @@ core does all of this:
   organization. An upload is signed for the active organization and served
   through the row's read. A global that places the field is one row per
   organization.
-- **A step's raw store write is sealed.** `tools.store.insert` must name the
-  active organization in the field, or it throws. `tools.store.update` and
-  `tools.store.remove` are ANDed with `organization = active` and may not name
-  the field. A relationship value a raw write names must point at the active
+- **A step's raw store is sealed.** `tools.store.find`, `hold`, `sum`, `upsert`,
+  `update` and `remove` are ANDed with `organization = active`. `insert` and
+  `upsert` fill the active organization and refuse any other or no active
+  organization. `update` and `remove` may not name the field.
+  A relationship value a raw write names must point at the active
   organization's row. This holds whichever per-organization kayan the step
   names, not only the operation's own. A raw write reaches exactly the id it
   names; only the operation's own row takes its access, versions and soft
   delete. A raw write names a kayan; a versions or join table is core's and
-  is refused.
+  is refused. `upsert` requires plain key values for exactly a declared unique
+  index in `on`; `on: ['id']` works without an extra index. Upserting the
+  operation's own versioned kayan while saving a draft is refused. An update
+  of the operation's own row refuses arithmetic in a draft snapshot.
 
 `ctx.tx` is the store's transaction itself. Raw SQL through it is the
 project's own privileged path, which core does not scope; see
