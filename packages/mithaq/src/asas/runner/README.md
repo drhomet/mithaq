@@ -22,6 +22,7 @@ words kayan, rukn, asas, target or operation are new.
    tenant: betterAuthTenant({
      relationTo: 'organization',
      onDelete: 'restrict',
+     newRows: 'active',
      organizations,
      backoffice: ({ user }) => onBackoffice() && backofficeRolesOf(user).length > 0,
    }),

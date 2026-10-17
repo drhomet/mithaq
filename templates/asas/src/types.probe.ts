@@ -3210,16 +3210,16 @@ type ScreenFieldKeys = Expect<
 // lays the target down under `tenant` alone. A field is owned by its `targets.tenant`, never its name.
 {
   const ops = { service: { operations: defaultOperations } }
-  const tenantLanguage = defineMithaq({ targets: { ...arkanTargets, tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }) }, arkan: [base] })
+  const tenantLanguage = defineMithaq({ targets: { ...arkanTargets, tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations: 'many' }) }, arkan: [base] })
   const noTenant = defineMithaq({ targets: arkanTargets, arkan: [base] })
   const { targets: { tenant: owner } } = tenantLanguage
   type ExactTenantField = Expect<Equal<typeof owner.field, TenantField<'organization'>>>
   // @ts-expect-error a language that lays down no tenant target has no tenant.field
   void noTenant.targets.tenant
   // @ts-expect-error betterAuthTenant takes onDelete: 'restrict' alone
-  betterAuthTenant({ relationTo: 'organization', onDelete: 'cascade', organizations: 'many' })
+  betterAuthTenant({ relationTo: 'organization', onDelete: 'cascade', newRows: 'active', organizations: 'many' })
   // @ts-expect-error the tenant target is registered under the key "tenant" alone
-  defineMithaq({ targets: { ...arkanTargets, owner: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }) }, arkan: [base] })
+  defineMithaq({ targets: { ...arkanTargets, owner: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations: 'many' }) }, arkan: [base] })
 
   const organization = tenantLanguage.defineKayan({ name: 'organization', fields: { id: { kind: 'text' }, name: { kind: 'text' } }, targets: ops })
   const owned = tenantLanguage.defineKayan({ name: 'owned', fields: { ...defaultFields, organizationId: { ...owner.field, label: { en: 'Organization', ar: 'المؤسسة' } }, title: { kind: 'text' } }, targets: ops })
@@ -3330,3 +3330,6 @@ export const rawStoreValuesProbe = async (ctx: Ctx, tools: WriteTools) => {
 
 // @ts-expect-error A drizzle adapter must name its kinds map.
 drizzleAdapter({ connectionString: 'postgresql://never-connected', rules: drizzleRules })
+
+// @ts-expect-error A tenant target must name the new-row fill rule.
+betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' })

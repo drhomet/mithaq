@@ -30,7 +30,7 @@ const language = defineMithaq({
     drizzle: drizzleStore,
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     rbac: accessTarget(),
-    tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }),
+    tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations: 'many' }),
     service: serviceTarget({ /* ... */ }),
     dashboard: dashboardScreen,
   },
@@ -503,6 +503,18 @@ capability alone:
 A store or schema target has one entry per kind and per rule; a kind may also
 carry its own implementation for a target's `type`. A target may carry
 commands, run as `mithaq <target> <command>`.
+
+### Targets and adapters
+
+A **target** is one setting in `defineMithaq`'s `targets`, one per capability.
+It says what a kayan declaration becomes or runs through: a drizzle table,
+zod shapes, service operations, screens or the tenant rule. Each kayan can
+carry its own settings for a target under its own `targets`.
+An **adapter** is a target that connects to a system outside mithaq, such as
+`drizzleAdapter` to Postgres. Mithaq's own service, roles, versions, screens
+and tenant parts are targets, not adapters.
+Every default is written out by name in a project's config: `drizzleKinds`,
+`zodKinds`, `defaultLimit`, `newRows: 'active'`. Reading it shows everything in force.
 
 ### The shipped targets
 

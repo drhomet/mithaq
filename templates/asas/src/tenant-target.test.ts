@@ -39,7 +39,7 @@ const offline = () => ({
 
 const tenanted = defineMithaq({
   arkan: [base],
-  targets: { ...offline(), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }) },
+  targets: { ...offline(), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations: 'many' }) },
 })
 const { targets: { tenant } } = tenanted
 const untenanted = defineMithaq({ arkan: [base], targets: offline() })
@@ -69,10 +69,19 @@ test('betterAuthTenant is the tenant target, and its field is one required, inde
 test('betterAuthTenant takes onDelete restrict alone', () => {
   for (const onDelete of ['cascade', 'set null', undefined]) {
     assert.throws(
-      () => betterAuthTenant({ relationTo: 'organization', onDelete: onDelete as never, organizations: 'many' }),
+      () => betterAuthTenant({ relationTo: 'organization', onDelete: onDelete as never, newRows: 'active', organizations: 'many' }),
       /betterAuthTenant takes onDelete: 'restrict' alone/,
     )
   }
+})
+
+test('betterAuthTenant takes newRows active alone', { timeout: 10_000 }, () => {
+  assert.throws(() => betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many', newRows: 'other' as never }), (error) => error instanceof Error && !(error instanceof TypeError) && /betterAuthTenant takes newRows: 'active' alone.*"other"/.test(error.message))
+})
+
+test('resolve takes newRows active alone', { timeout: 10_000 }, () => {
+  const other = defineMithaq({ arkan: [base], targets: { ...offline(), tenant: { ...tenant, newRows: 'other' } } } as never)
+  assert.throws(() => build(other), (error) => error instanceof Error && !(error instanceof TypeError) && /The tenant target declares newRows "other".*newRows: 'active' alone/.test(error.message))
 })
 
 /** What the store and the schema made of the notes field `key`. */
@@ -277,9 +286,9 @@ test('buildAsas refuses a group within anything but the tenant field, a group na
 })
 
 test('betterAuthTenant takes the organization mode, one or many, and nothing else: a project that hid its one organization says so in its own settings', () => {
-  for (const organizations of ['one', 'many'] as const) assert.equal(betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations }).organizations, organizations)
+  for (const organizations of ['one', 'many'] as const) assert.equal(betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations }).organizations, organizations)
   for (const organizations of ['none', 'some', undefined]) {
-    assert.throws(() => betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: organizations as never }), /organizations: 'one' or 'many'/)
+    assert.throws(() => betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations: organizations as never }), /organizations: 'one' or 'many'/)
   }
 })
 
@@ -292,7 +301,7 @@ test('connect() refuses a store holding more than one organization where the ten
       targets: {
         store,
         zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
-        tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations }),
+        tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations }),
         service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }),
       } as {},
     })

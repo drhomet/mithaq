@@ -247,7 +247,7 @@ const tenantField = ({ where, field, language }: { where: string; field: Runtime
   const target = language.targets.tenant
   if (!isTenant(target)) {
     throw new Error(
-      `${where} is bound through targets.tenant, and this language lays down no tenant target. Add tenant: betterAuthTenant({ relationTo, onDelete: 'restrict', organizations }) to its targets, or drop targets.tenant from the field.`,
+      `${where} is bound through targets.tenant, and this language lays down no tenant target. Add tenant: betterAuthTenant({ relationTo, onDelete: 'restrict', newRows: 'active', organizations }) to its targets, or drop targets.tenant from the field.`,
     )
   }
   const bound = tenantDefaults(language, field)
@@ -550,6 +550,9 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
   }
   if (isTenant(tenantTarget) && tenantTarget.onDelete !== 'restrict') {
     throw new Error(`The tenant target declares onDelete ${JSON.stringify(tenantTarget.onDelete)}, and a tenant takes onDelete: 'restrict' alone.`)
+  }
+  if (isTenant(tenantTarget) && tenantTarget.newRows !== 'active') {
+    throw new Error(`The tenant target declares newRows ${JSON.stringify(tenantTarget.newRows)}, and a tenant takes newRows: 'active' alone.`)
   }
   const byName = new Map(kayanList.map((kayan) => [kayan.name, kayan]))
   const resolved = kayanList.map((kayan) => {

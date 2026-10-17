@@ -108,6 +108,8 @@ export type TenantTarget<RelationTo extends string = string> = {
   readonly capability: 'tenant'
   readonly relationTo: RelationTo
   readonly onDelete: 'restrict'
+  /** A new row on a tenant-owned kayan takes the active organization, through an operation or a step's insert/upsert; naming another organization is refused. */
+  readonly newRows: 'active'
   /** How many organizations the project holds; in `'one'` a `connect()` over more refuses to start. */
   readonly organizations: 'one' | 'many'
   readonly field: TenantField<RelationTo>

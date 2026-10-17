@@ -157,7 +157,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       rbac: access,
       versions: versionsTarget({ max: 100 }),
-      tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', organizations: 'many', backoffice: ({ user }) => backofficeApp && staff.has((user as { id: string }).id) }),
+      tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', newRows: 'active', organizations: 'many', backoffice: ({ user }) => backofficeApp && staff.has((user as { id: string }).id) }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize, softDelete: 'deletedAt', beforeSteps: [(ctx: Ctx, tools: { kind: string }) => tools.kind === 'insert' && ctx.kayan.name === 'memos' ? { ...ctx, data: { code: null, globalCode: null, ...ctx.data } } : ctx] }),
     } as {},
   })

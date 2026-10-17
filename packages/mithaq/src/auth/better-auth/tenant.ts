@@ -7,6 +7,7 @@ import type { TenantTarget } from '../../mithaq/language.ts'
 export const betterAuthTenant = <const RelationTo extends string>({
   relationTo,
   onDelete,
+  newRows,
   backoffice,
   organizations,
 }: {
@@ -14,6 +15,8 @@ export const betterAuthTenant = <const RelationTo extends string>({
   relationTo: RelationTo
   /** `restrict`: a tenant still holding a row is not deleted. */
   onDelete: 'restrict'
+  /** A new row on a tenant-owned kayan takes the active organization, through an operation or a step's insert/upsert; naming another organization is refused. */
+  newRows: 'active'
   /**
    * Whether this actor is backoffice staff in the trusted backoffice app, who may read every
    * tenant with `tenant: 'all'`. The answer is the project's: it decides which app is trusted.
@@ -34,6 +37,9 @@ export const betterAuthTenant = <const RelationTo extends string>({
   if (onDelete !== 'restrict') {
     throw new Error(`betterAuthTenant takes onDelete: 'restrict' alone, and was handed ${JSON.stringify(onDelete)}.`)
   }
+  if (newRows !== 'active') {
+    throw new Error(`betterAuthTenant takes newRows: 'active' alone, and was handed ${JSON.stringify(newRows)}.`)
+  }
   if (!['one', 'many'].includes(organizations)) {
     throw new Error(`betterAuthTenant takes organizations: 'one' or 'many', and was handed ${JSON.stringify(organizations)}.`)
   }
@@ -41,6 +47,7 @@ export const betterAuthTenant = <const RelationTo extends string>({
     capability: 'tenant',
     relationTo,
     onDelete,
+    newRows,
     organizations,
     ...(backoffice && { backoffice }),
     field: {

@@ -110,7 +110,7 @@ To make a kayan belong to one organization, add the tenant target to the languag
 
 ```ts
 // in defineMithaq's targets:
-tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }),
+tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', newRows: 'active', organizations: 'many' }),
 
 // in a kayan's fields, with `tenant` taken from the language's `targets`:
 organization: tenant.field,

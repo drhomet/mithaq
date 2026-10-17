@@ -194,6 +194,8 @@ export const serverTargets = {
   tenant: betterAuthTenant({
     relationTo: 'organization',
     onDelete: 'restrict',
+    // New rows take the active organization, mithaq's tenant fill rule.
+    newRows: 'active',
     // How many organizations this project holds; in one a start over more is refused.
     organizations,
     // Staff read every organization with `tenant: 'all'` in the backoffice app
