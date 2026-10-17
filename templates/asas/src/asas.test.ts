@@ -467,7 +467,7 @@ const markedParents = defineTestKayan({
         ...defaultOperations,
         prune: {
           steps: ({ steps }: { steps: { remove: WriteStep } }) => [
-            (async (ctx, tools) => (await tools.store.remove({ tx: ctx.tx, kayan: 'markedParents', id: prunedParent.id }), ctx)) as WriteStep,
+            (async (ctx, tools) => (await tools.store.remove({ tx: ctx.tx, kayan: ctx.kayan, id: prunedParent.id }), ctx)) as WriteStep,
             steps.remove,
           ],
         },
@@ -824,6 +824,7 @@ const firstAccount = async (
 }
 
 before(async () => {
+  // Known shared-schema exception: this file alone owns public and the enum probes in app.
   // `drop schema public` is unrecoverable, so it runs only on a throwaway database a person
   // named for this run, never on the dev database.
   testDatabase()
@@ -18980,4 +18981,29 @@ test('R7e. a student takes no seat in another organization\'s session, whose cou
   const answer = await mine.as('student', 'enrollments/create', { session: session.id })
   assert.equal(answer.status, 400, JSON.stringify(answer.body))
   assert.ok(['error.invalid.reference', 'error.invalid.tenant_reference'].includes(String(keyOf(answer.body))), `refused as any reference past the organization is: ${JSON.stringify(answer.body)}`)
+})
+
+
+test('R7k. bulk enrollment moves keep capacity and bulk withdrawals keep the start-time rule', { timeout: 20_000 }, async () => {
+  const tenant = await roleTenant('bulk-r7k')
+  const course = await courses.operations.create({ title: 'Bulk R7k', selfEnroll: true }, tenant.options)
+  const at = new Date(Date.now() + 7 * 864e5)
+  const original = await sessions.operations.create({ course: course.id, startsAt: at }, tenant.options)
+  const full = await sessions.operations.create({ course: course.id, startsAt: at, capacity: 1 }, tenant.options)
+  const pupil = await anotherStudent(tenant, 'bulk-r7k-pupil')
+  assert.equal((await pupil('enrollments/create', { session: full.id })).status, 200)
+  const seat = await enrollments.operations.create({ session: original.id, student: tenant.people.student.id }, tenant.options)
+  const moved = await tenant.as('admin', 'enrollments/updateMany', { where: { id: { equals: seat.id } }, data: { session: full.id } })
+  assert.equal(keyOf(moved.body), 'error.conflict.session_full', JSON.stringify(moved.body))
+  assert.equal((await enrollments.operations.findByID({ id: seat.id }, tenant.options)).session, original.id)
+  const role = await tenant.as('admin', 'roles/create', { name: 'bulkStudent', label: { en: 'Bulk student', ar: 'طالب' }, permissions: [...tenantRoles.student.permissions, 'enrollments.deleteMany'] })
+  assert.equal(role.status, 200, JSON.stringify(role.body))
+  await assignRole(tenant.organization, tenant.people.student.id, 'bulkStudent')
+  const upcoming = await tenant.as('student', 'enrollments/deleteMany', { where: { id: { equals: seat.id } } })
+  assert.equal(upcoming.status, 200, JSON.stringify(upcoming.body))
+  const kept = await enrollments.operations.create({ session: original.id, student: tenant.people.student.id }, tenant.options)
+  await sessions.operations.update({ id: original.id, startsAt: new Date(Date.now() - 864e5) }, tenant.options)
+  const leaving = await tenant.as('student', 'enrollments/deleteMany', { where: { id: { equals: kept.id } } })
+  assert.equal(keyOf(leaving.body), 'error.invalid.session_started', JSON.stringify(leaving.body))
+  assert.equal((await enrollments.operations.findByID({ id: kept.id }, tenant.options)).session, original.id)
 })

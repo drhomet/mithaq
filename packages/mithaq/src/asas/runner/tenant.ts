@@ -3,11 +3,11 @@
 import { authActor, markAuthActor, resolveAssigned, type AssignedResolver } from '../actor.ts'
 import { isTenant, type Language, type Store } from '../../mithaq/language.ts'
 import type { ResolvedKayan } from '../../mithaq/types.ts'
-import { combineWhere, same, type Where } from '../../mithaq/where.ts'
-import { AsasError, denied, invalid } from './errors.ts'
+import { combineWhere, compareValues, same, type Scalar, type Where } from '../../mithaq/where.ts'
+import { AsasError, denied, invalid, missing } from './errors.ts'
 import { running } from './runtime.ts'
-import type { OperationEffect, WriteTools } from './steps.ts'
-import { assertReferences, type Authorize } from './write.ts'
+import type { OperationEffect, RuntimeWriteTools as WriteTools } from './steps.ts'
+import { assertStoreWhere, assertReferences, type Authorize } from './write.ts'
 
 /** How far a read reaches past the active organization: every verified membership, or every tenant. */
 export type TenantReach = 'mine' | 'all'
@@ -182,15 +182,26 @@ export const tenancy = ({ language, assigned, onError, collection }: {
    * it writes names a tenant-owned row of the active organization alone, so another
    * organization's delete never reaches it.
    */
-  const sealWrites = ({ writes, find, kayanOf }: { writes: WriteTools['store']; find: Store['find']; kayanOf: (name: string) => ResolvedKayan | undefined }): WriteTools['store'] => {
+  const sealWrites = ({ writes, find, kayanOf }: { writes: Omit<WriteTools['store'], 'hold'>; find: Store['find']; kayanOf: (name: string) => ResolvedKayan | undefined }): WriteTools['store'] => {
     // A versions table or a join table holds no tenant field to seal by, so a step reaches neither.
     const named = (name: string) => {
       const kayan = kayanOf(name)
       if (!kayan) throw new Error(`A step wrote "${name}", which names no kayan, and a step writes a kayan's rows alone: versions and join rows are core's.`)
       return kayan
     }
-    const references = async ({ name, data, tx }: { name: string; data: Record<string, unknown>; tx: unknown }) =>
-      assertReferences({ kayan: named(name), store: { find }, data, tenant: active(running.getStore()?.user), tx })
+    const declaredField = (name: string, key: string) => {
+      if (!Object.hasOwn(named(name).fields, key)) throw invalid({ message: `Kayan "${name}" declares no field "${key}".`, key: 'error.invalid.value', params: { kayan: name, field: key } })
+    }
+    const checked = (name: string, where?: Where) => {
+      if (!where) return where
+      try { return assertStoreWhere(named(name), where) } catch (cause) {
+        throw invalid({ message: cause instanceof Error ? cause.message : 'Invalid store filter.', key: 'error.invalid.value', params: { kayan: name }, cause })
+      }
+    }
+    const references = async ({ name, data, tx }: { name: string; data: Record<string, unknown>; tx: unknown }) => {
+      for (const key of Object.keys(data)) declaredField(name, key)
+      return assertReferences({ kayan: named(name), store: { find }, data, tenant: active(running.getStore()?.user), tx })
+    }
     const sealed = (name: string, data?: Record<string, unknown>) => {
       const field = named(name).tenant
       if (!field) return undefined
@@ -199,7 +210,36 @@ export const tenancy = ({ language, assigned, onError, collection }: {
       if (data && field in data) throw new Error(`A step wrote field "${field}" of kayan "${name}", and a row is made in its organization by the runner alone and never leaves it.`)
       return { [field]: { equals: org } } as Where
     }
+    const sealedFind: Store['find'] = async (args) => {
+      declaredField(args.kayan, args.args.sort.field)
+      return find({ ...args, args: { ...args.args, where: combineWhere(checked(args.kayan, args.args.where), sealed(args.kayan)) } })
+    }
     return Object.freeze({
+      find: sealedFind,
+      sum: async (args) => {
+        declaredField(args.kayan, args.field)
+        return writes.sum({ ...args, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) })
+      },
+      hold: async ({ tx, kayan, ids, mode }) => {
+        if (!tx) throw new Error('Holding rows requires a transaction.')
+        const uuid = named(kayan).fields.id?.kind === 'uuid'
+        const ordered = [...new Set(ids.map((id) => uuid && typeof id === 'string' ? id.toLowerCase() : id))].sort((left, right) => compareValues({ left, right, direction: 'asc' }))
+        for (const id of ordered) {
+          const { docs } = await sealedFind({ tx, kayan, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock: mode, where: { id: { equals: id as Scalar } } } })
+          if (!docs.length) throw missing({ message: `No "${kayan}" row found.`, key: 'error.not_found.row', params: { kayan } })
+        }
+      },
+      upsert: async (args) => {
+        const field = named(args.kayan).tenant
+        const org = active(running.getStore()?.user)
+        if (field && (org === undefined || (Object.hasOwn(args.data, field) && args.data[field] !== org))) {
+          throw new Error(`A step upserted kayan "${args.kayan}" in another organization than the active one.`)
+        }
+        const data = field ? { ...args.data, [field]: org } : args.data
+        for (const key of args.on) declaredField(args.kayan, key)
+        await references({ name: args.kayan, data, tx: args.tx })
+        return writes.upsert({ ...args, data, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) })
+      },
       insert: async (args) => {
         const field = named(args.kayan).tenant
         if (field) {
@@ -212,11 +252,11 @@ export const tenancy = ({ language, assigned, onError, collection }: {
         return writes.insert(args)
       },
       update: async (args) => {
-        const where = combineWhere(args.where, sealed(args.kayan, args.data))
+        const where = combineWhere(checked(args.kayan, args.where), sealed(args.kayan, args.data))
         await references({ name: args.kayan, data: args.data, tx: args.tx })
         return writes.update({ ...args, where })
       },
-      remove: (args) => writes.remove({ ...args, where: combineWhere(args.where, sealed(args.kayan)) }),
+      remove: async (args) => writes.remove({ ...args, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) }),
     })
   }
   return { open, scoped, active, sealWrites }

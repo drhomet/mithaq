@@ -757,8 +757,24 @@ A kayan lists it after the store step: `create: { input: ({ create }) => create.
 Choose how a step reaches data, in this order:
 
 1. **`tools.of(kayan)`** for another kayan. It runs that kayan's own operation: its access for the same actor, its steps, its validation and the audit, inside the same transaction. A failure rolls the whole write back. Prefer it.
-2. **`tools.store`** for a raw insert, update or remove that should skip the other kayan's operation list. It writes exactly the id it names, of this kayan or another. It skips that kayan's access, steps, validation and audit, but it is still sealed to the active organization; see [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md#what-core-enforces).
+2. **`tools.store`** for a raw find, hold, insert, update, upsert or remove that should skip the other kayan's operation list. A call names this kayan or another. It skips that kayan's access, steps, validation and audit, but it is still sealed to the active organization; see [Tenancy](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/runner/README.md#what-core-enforces).
 3. **`ctx.tx`** for raw SQL. It is the project's own privileged path: nothing scopes it, checks it or audits it. Use it only for what no kayan models, and scope it yourself.
+
+Pass the kayan declaration, `kayan: variants`, as with `tools.of(variants)`, never its string name or `.name`. That declaration types field names, stored values, filters, ids, conflict keys and numeric fields; runtime also refuses undeclared fields. An adapter implements the same `Store` contract with string names behind this step boundary.
+
+The step store's words have these meanings, on shared kayan as well as tenant-owned ones:
+
+- `find({ tx, kayan, args: { limit, page, sort, where, lock } })` reads rows past access and field masks. Core ANDs the active organization onto a tenant-owned kayan's filter. These rows can contain fields the actor may not read; never copy them into output or messages. `lock` is optional; any lock requires a transaction and holds the returned rows until it ends. `update` excludes every competing lock. `noKeyUpdate` keeps their values unchanged by others while allowing `keyShare` readers. `share` keeps them as read while allowing other `share` and `keyShare` readers. `keyShare` keeps their identity and unique keys while allowing other values to change.
+- `hold({ tx, kayan, ids, mode })` keeps the named rows held in that mode until the transaction ends, taking them in ascending id order and ignoring duplicates. It returns nothing. A missing id and another organization's id both answer the same 404. Order across different kayan remains the step's responsibility.
+- `update({ tx, kayan, id, data: { quantity: { $inc: n }, ...plainValues } })` adds `n` in the database and returns the changed row. The field must be an integer and `n` a safe integer. An increment writes a stored integer field; arithmetic in a draft snapshot is refused. Store writes skip validation, including a field's minimum rule; a quantity that must never go negative needs a database `CHECK`.
+- `sum({ tx, kayan, field, where })` returns the exact total of an integer, number or decimal field as a decimal string, including for integer totals, so no aggregate passes through a float. No matching values returns `'0'`. A non-numeric field is refused; core seals the selection to the active organization just as for `find`.
+- `upsert({ tx, kayan, on: ['organization', 'code'], data: { code: 'MAIN', quantity: { $inc: n } } })` inserts a row or updates the row with the same unique key, and returns it. `on` names all fields of a unique index the kayan declares, including indexes from `unique` rules; another set of fields is refused. Key values are plain values in `data`. Core fills a tenant-owned kayan's tenant field from the active organization and refuses any other value, whether or not the field appears in `on`. A conflict can never change another organization's row, even through a globally unique index. An increment inserts `n` if the row is new or adds `n` if it exists; plain values replace their fields, and an existing row keeps its id. Null keys follow the declared index's null uniqueness. While saving a draft, an upsert of the operation's own versioned kayan is refused; use `update` for that snapshot. Like the other store writes, upsert skips access, steps, validation and audit.
+
+`find`, `hold`, `sum` and `upsert` are available inside the operation's transaction, as the existing store writes are; outside steps use managed operations. A store implements these promises itself. The drizzle store maps lock modes to its database's row locks and binds increment amounts as parameters.
+
+Add a new store word only when at least two real callers need it, every store could keep its promise, and it is documented by meaning with a test that breaks when the promise breaks.
+
+A deadlock or serialization failure that rolls a transaction back answers 409 with `error.conflict.retry`; the caller may try the operation again. Core never retries it automatically.
 
 Where a step goes:
 

@@ -6,7 +6,7 @@ import { ORPCError, ValidationError, os } from '@orpc/server'
 import type { Procedure, Schema } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import type { OperationTable } from '../build.ts'
-import { AfterCommitError, AsasError, afterCommitHeader, codes } from '../runner/errors.ts'
+import { AfterCommitError, AsasError, afterCommitHeader, codes, retryConflict } from '../runner/errors.ts'
 import { issueRefusal, withoutPrototype } from '../runner/steps.ts'
 import { assertMaxBodyBytes, assertOnError, boundedBody, decodeJson, draftOptions } from './fetch.ts'
 import type { StandardSchemaIssue } from '../../mithaq/standard-schema.ts'
@@ -84,6 +84,7 @@ export const orpcHttp = (options: OrpcHttpOptions) => {
       } catch (thrown) {
         // oRPC validates the bound input inside this middleware, so its own refusal is
         // re-emitted in the runner's shape: one shape answers every 400 a procedure raises.
+        thrown = retryConflict(thrown)
         const held = thrown instanceof AsasError ? thrown : boundaryRefusal(thrown)
         if (!held) {
           report(thrown)

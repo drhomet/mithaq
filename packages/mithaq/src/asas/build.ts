@@ -2,7 +2,7 @@ import { rowsOf } from '../mithaq/rows.ts'
 import { accessReport, actor, actorPermissions, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
 import { betterAuthStrategy } from '../auth/better-auth/index.ts'
 import { holdsVerificationSteps, isLocalAuthTarget, localAuthStrategy, type LocalAuthActor, type LocalAuthOptions, type ProtectedLocalField } from '../auth/local/index.ts'
-import { bulkSeals, outputOf, sealOf, storeSeals, type AuditHandler, type DerivedShapes, type OperationEffect, type OperationScreen, type WriteStep, type WriteTools } from './runner/steps.ts'
+import { bulkSeals, outputOf, sealOf, storeSeals, type AuditHandler, type DerivedShapes, type OperationEffect, type OperationScreen, type WriteStep, type RuntimeWriteTools as WriteTools } from './runner/steps.ts'
 import { running } from './runner/runtime.ts'
 import { tenancy } from './runner/tenant.ts'
 import { assertWhere, defaultAccess, defaultAuthorize, projectReadableFields, referencingIds, restrictingPointers, type Authorize, type Pointer, type Globals, type ManagedAdmin, type Options, type Procedures, type Row, type Writes } from './runner/write.ts'
@@ -291,16 +291,19 @@ const operations = <Actor>(
   contextDeclared: boolean,
   /** The most rows a served read of many may ask for, and one bulk write may match. */
   { maxLimit, bulkLimit }: Pick<ServiceTarget, 'maxLimit' | 'bulkLimit'>,
-  tenant: { active: (actor: unknown) => string | undefined; seal: (writes: WriteTools['store']) => WriteTools['store'] },
+  tenant: { active: (actor: unknown) => string | undefined; seal: (writes: Omit<WriteTools['store'], 'hold'>) => WriteTools['store'] },
   /** The fields of every kayan that keep a row of this one while they name it. */
   pointers: readonly Pointer[],
 ) => {
   // Bound, so a step cannot reach `transaction` or the adapter's own client, and sealed, so no
   // step writes a tenant-owned row outside the active organization.
   const writes: WriteTools<unknown, Actor>['store'] = tenant.seal({
+    find: store.find.bind(store),
     insert: store.insert.bind(store),
     remove: store.remove.bind(store),
     update: store.update.bind(store),
+    upsert: store.upsert.bind(store),
+    sum: store.sum.bind(store),
   })
   const table: Operation[] = []
   /** The bulk lists, held for the second pass: each needs a method the first builds. */

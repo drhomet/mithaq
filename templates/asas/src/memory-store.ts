@@ -2,7 +2,7 @@
 // Every kind builds the column name, every rule is an identity, and the transaction is the callback
 // run straight through, since nothing here can be rolled back.
 import { randomUUID } from 'node:crypto'
-import { conflict, defaultKinds, defaultRules, type ResolvedField, type ResolvedKayan, type Where } from 'mithaq'
+import { conflict, invalid, missing, defaultKinds, defaultRules, type ResolvedField, type ResolvedKayan, type Where } from 'mithaq'
 import { compareValues as compare, matchesWhere } from 'mithaq/admin'
 
 const each = <Value>(names: string[], value: Value): Record<string, Value> =>
@@ -65,6 +65,11 @@ export const memoryStore = () => {
     if (taken) throw conflict({ message: `A "${name}" row already holds one of the unique values this write carries.`, key: 'error.conflict.unique', params: { kayan: name } })
     return row
   }
+  const increments = (name: string, values: Record<string, unknown>, row?: Record<string, unknown>) => Object.fromEntries(Object.entries(values).map(([field, value]) => {
+    if (!value || typeof value !== 'object' || !('$inc' in value)) return [field, value]
+    if (kayanByName.get(name)?.fields[field]?.kind !== 'integer' || !Number.isSafeInteger(value.$inc) || Object.keys(value).length !== 1) throw invalid({ message: 'An increment needs an integer field and a safe integer.', key: 'error.invalid.value' })
+    return [field, row ? Number(row[field]) + Number(value.$inc) : value.$inc]
+  }))
   return {
     capability: 'store' as const,
     rows,
@@ -96,9 +101,18 @@ export const memoryStore = () => {
       of(name).push(row)
       return row
     },
+    upsert: async ({ kayan: name, on, data: values, where }: { tx: unknown; kayan: string; on: readonly string[]; data: Record<string, unknown>; where?: Where }) => {
+      if (!on.length || new Set(on).size !== on.length || !kayanByName.get(name)!.indexes.some((index) => index.unique && index.fields.length === on.length && index.fields.every((field) => on.includes(field)))) throw invalid({ message: 'An upsert needs a declared unique index.', key: 'error.invalid.value' })
+      const row = of(name).find((row) => on.every((field) => row[field] === values[field]))
+      if (row && where && !matches(name, row, where)) throw missing({ message: `No "${name}" row found.`, key: 'error.not_found.row' })
+      const made = held(name, { ...row, ...increments(name, values, row), id: row?.id ?? values.id ?? randomUUID() })
+      if (row) Object.assign(row, made)
+      else of(name).push(made)
+      return made
+    },
     update: async ({ kayan: name, id, data: values, where }: { tx: unknown; kayan: string; id: unknown; data: Record<string, unknown>; where?: Where }) => {
       const row = of(name)[constrained(name, id, where)]!
-      return Object.assign(row, held(name, { ...row, ...values }))
+      return Object.assign(row, held(name, { ...row, ...increments(name, values, row) }))
     },
     remove: async ({ kayan: name, id, where }: { tx: unknown; kayan: string; id: unknown; where?: Where }) =>
       of(name).splice(constrained(name, id, where), 1)[0]!,
@@ -112,6 +126,15 @@ export const memoryStore = () => {
         })
       const offset = limit > 0 ? (page - 1) * limit : 0
       return { docs: limit > 0 ? sorted.slice(offset, offset + limit) : sorted, totalDocs: sorted.length }
+    },
+    sum: async ({ kayan: name, field, where }: { tx?: unknown; kayan: string; field: string; where?: Where }) => {
+      if (!['integer', 'number', 'decimal'].includes(kayanByName.get(name)?.fields[field]?.kind ?? '')) throw invalid({ message: 'Only numeric fields can be summed.', key: 'error.invalid.value' })
+      const values = of(name).filter((row) => !where || matches(name, row, where)).map((row) => String(row[field] ?? 0))
+      const scale = Math.max(0, ...values.map((value) => value.split('.')[1]?.length ?? 0))
+      const total = values.reduce((sum, value) => sum + BigInt(value.replace('.', '') + '0'.repeat(scale - (value.split('.')[1]?.length ?? 0))), 0n)
+      if (!scale) return String(total)
+      const digits = String(total < 0n ? -total : total).padStart(scale + 1, '0')
+      return `${total < 0n ? '-' : ''}${digits.slice(0, -scale)}.${digits.slice(-scale)}`
     },
     count: async ({ kayan: name, args: { where } }: { tx?: unknown; kayan: string; args: { where?: Where } }) =>
       of(name).filter((row) => !where || matches(name, row, where)).length,

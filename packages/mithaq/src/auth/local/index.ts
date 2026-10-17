@@ -4,7 +4,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import { declaredFieldAccess } from '../../mithaq/rows.ts'
 import { providerOf } from '../../base/rules.ts'
 import { accessReport, isAdminActor, markAuthActor, resolveAssigned, type AssignedResolver, type AuthStrategy, type LocalAuthPermissions } from '../../asas/actor.ts'
-import { AsasError, codes, denied as refused, Notice } from '../../asas/runner/errors.ts'
+import { AsasError, codes, retryConflict, denied as refused, Notice } from '../../asas/runner/errors.ts'
 import { firstRegisters, running, type Open } from '../../asas/runner/runtime.ts'
 import { drain } from '../../asas/runner/write.ts'
 import type { Store } from '../../mithaq/language.ts'
@@ -879,8 +879,9 @@ export const localAuthStrategy = <Name extends string = string>({
           return json({ ok: true })
         }
       } catch (error) {
-        // Matched on the status the store translates from the SQLSTATE, not a sentence that
-        // changes with a locale. Any 409 in this handler answers in these words.
+        error = retryConflict(error)
+        if (error instanceof AsasError && error.key === 'error.conflict.retry') return json({ code: codes[409], message: error.message, data: { key: error.key, params: error.params } }, { status: 409 })
+        // The driver detail may name another account, so other conflicts keep the existing refusal.
         if (error instanceof AsasError && error.status === 409) {
           return refusal(409, 'Email already exists.')
         }

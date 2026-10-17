@@ -71,10 +71,24 @@ export const invalid = ({ message, key, params, cause }: Refusal) => new AsasErr
 export const missing = ({ message, key, params, cause }: Refusal) => new AsasError(message, 404, key, params, cause)
 
 /**
- * The write collides with a row already there, as a 409 so an offline client
- * does not retry it. It never says which column or whose row it hit.
+ * The write cannot complete, as a 409. Its key says whether trying again can help.
+ * It never says which column or whose row it hit.
  */
 export const conflict = ({ message, key, params, cause }: Refusal) => new AsasError(message, 409, key, params, cause)
+
+/** A transaction the database rolled back may be retried, without exposing its query or rows. */
+export const retryConflict = (thrown: unknown): unknown => {
+  if (thrown instanceof AsasError || thrown instanceof AfterCommitError) return thrown
+  const seen = new Set<unknown>()
+  for (let cause = thrown; cause && typeof cause === 'object' && !seen.has(cause); cause = (cause as { cause?: unknown }).cause) {
+    if (cause instanceof AfterCommitError) return thrown
+    seen.add(cause)
+    if (['40P01', '40001'].includes(String((cause as { code?: unknown }).code))) {
+      return conflict({ message: 'The transaction conflicted with another write. Try again.', key: 'error.conflict.retry', cause: thrown })
+    }
+  }
+  return thrown
+}
 
 // Shared by the read layer, which answers the caller with a 400, and the drizzle
 // store, which throws at the access callback that built the query.

@@ -4,10 +4,11 @@ import type { InferInput, InferOutput, StandardSchemaIssue, StandardSchemaV1 } f
 import type { BoundOf } from './write.ts'
 import type { Where } from '../../mithaq/where.ts'
 import type { LabelFunction, Localized, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
-import type { Store } from '../../mithaq/language.ts'
+import type { RawStepStore, StepStore, Store } from '../../mithaq/language.ts'
 import { providerOf } from '../../base/rules.ts'
 import { invalid } from './errors.ts'
 import { snapshot } from './runtime.ts'
+import { rawStepStore } from './store.ts'
 
 /**
  * What the caller passed, plus the three keys the runner keeps. `Extra` is the service target's
@@ -111,8 +112,8 @@ export type WriteTools<Kayans = unknown, Actor = unknown, Tx = unknown> = Common
   kind: 'deleteMany' | 'insert' | 'remove' | 'update' | 'updateMany'
   /** One kayan's bound operations, found and typed by the declaration handed in, so a step imports the kayan it calls. */
   of: BoundOf<'write'>
-  /** The store's three writes, each bound, and the store itself is not here. */
-  store: Pick<Store, 'insert' | 'remove' | 'update'>
+  /** Bound store calls, sealed to the active organization; no adapter or client is exposed. */
+  store: StepStore
   /** Access constraint already granted for this operation, if access returned one. */
   where?: Where
   /** The keys the caller's own object carried, read before any step ran, so validation can tell the runner's values from the caller's. */
@@ -137,6 +138,9 @@ export type BulkResult<Doc = Record<string, unknown>> = {
   docs: Doc[]
   errors: { id: unknown; message: string }[]
 }
+
+/** The runner keeps string names on its side of the step boundary; adapters never receive declarations. */
+export type RuntimeWriteTools<Kayans = unknown, Actor = unknown, Tx = unknown> = Omit<WriteTools<Kayans, Actor, Tx>, 'store'> & { store: RawStepStore }
 
 export type Tools = ReadTools | WriteTools
 
@@ -448,7 +452,7 @@ export const audit = seal('audit', async (ctx: Ctx, tools?: Tools) => {
     operation: tools.operation,
     dataBefore: withoutSecrets(ctx.kayan, ctx.dataBefore),
     dataAfter: withoutSecrets(ctx.kayan, ctx.dataAfter ?? snapshot(ctx.data) ?? ctx.data),
-    store: 'store' in tools ? tools.store : undefined,
+    store: 'store' in tools ? rawStepStore(tools.store) : undefined,
     tx: ctx.tx,
     user: ctx.user,
   })
@@ -567,7 +571,7 @@ const columns = (ctx: Ctx) =>
 
 /** Make the row, and what came back is what the rest of the list sees. */
 export const insert = seal('insert', async (ctx: Ctx, tools: WriteTools) => {
-  const row = await tools.store.insert({ tx: ctx.tx, kayan: ctx.kayan.name, data: columns(ctx) })
+  const row = await tools.store.insert({ tx: ctx.tx, kayan: ctx.kayan, data: columns(ctx) })
   return { ...ctx, data: { ...ctx.data, ...row }, dataAfter: snapshot(row) }
 }) as WriteStep & Holds<'insert'>
 
@@ -584,13 +588,13 @@ export const update = seal('update', async (ctx: Ctx, tools: WriteTools) => {
       params: { kayan: ctx.kayan.name, operation: tools.operation },
     })
   }
-  const row = await tools.store.update({ tx: ctx.tx, kayan: ctx.kayan.name, id: ctx.data.id, data: values, where: tools.where })
+  const row = await tools.store.update({ tx: ctx.tx, kayan: ctx.kayan, id: ctx.data.id, data: values, where: tools.where })
   return { ...ctx, data: { ...ctx.data, ...row }, dataAfter: snapshot(row) }
 }) as WriteStep & Holds<'update'>
 
 /** Remove the one row the id names, and hand back what was removed. */
 export const remove = seal('remove', async (ctx: Ctx<Record<string, unknown>>, tools: WriteTools) => {
-  const data = await tools.store.remove({ tx: ctx.tx, kayan: ctx.kayan.name, id: ctx.data.id, where: tools.where })
+  const data = await tools.store.remove({ tx: ctx.tx, kayan: ctx.kayan, id: ctx.data.id, where: tools.where })
   return { ...ctx, data, dataAfter: snapshot(data) }
 }) as WriteStep & Holds<'remove'>
 

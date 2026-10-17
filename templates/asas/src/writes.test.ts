@@ -2059,7 +2059,7 @@ test('20h. a steps function runs once and is sealed like a list, and depth is to
   await named.kayan.namedDepth.operations.depth({ id: 1, body: 'custom name' })
 })
 
-test('21. a step is handed the three writes and no store, and a seal cannot be forged', async () => {
+test('21. a step is handed bound store calls and no client, and a seal cannot be forged', async () => {
   const store = memoryStore()
   let handed: Record<string, unknown> = {}
   const peek: WriteStep = (ctx, tools) => {
@@ -2084,9 +2084,9 @@ test('21. a step is handed the three writes and no store, and a seal cannot be f
   })
   await built.kayan.notes.operations.create({ id: 1, body: 'peeked' })
 
-  // The three bound writes and nothing else: no `transaction` to open a second
+  // Only the bound store calls: no `transaction` to open a second
   // one with, and no `db` to write outside the list's transaction through.
-  assert.deepEqual(Object.keys(handed).sort(), ['insert', 'remove', 'update'])
+  assert.deepEqual(Object.keys(handed).sort(), ['find', 'hold', 'insert', 'remove', 'sum', 'update', 'upsert'])
   assert.equal(handed.transaction, undefined)
   assert.equal(handed.db, undefined)
 

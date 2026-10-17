@@ -201,7 +201,7 @@ const targetOf = (who: string, named: string, language: Language, role: 'schema'
   if (!target || isStore(target) !== (role === 'store')) {
     throw new Error(
       role === 'store'
-        ? `${who} names store "${named}", which is not a store: a store target declares capability "store" and has init, connect, transaction, insert, update, remove, find and destroy beside kinds and rules.`
+        ? `${who} names store "${named}", which is not a store: a store target declares capability "store" and has init, connect, transaction, insert, update, upsert, remove, find, sum and destroy beside kinds and rules.`
         : `${who} names schema "${named}", which is not a schema target: a schema target has kinds and rules, and does not declare capability "store".`,
     )
   }

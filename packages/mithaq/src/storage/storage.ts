@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { isStorage, type Command, type CommandInput, type Language, type Store } from '../mithaq/language.ts'
 import type { Field, ResolvedKayan } from '../mithaq/types.ts'
 import { providerOf } from '../base/rules.ts'
-import { AsasError, codes, denied, invalid, missing } from '../asas/runner/errors.ts'
+import { AsasError, retryConflict, codes, denied, invalid, missing } from '../asas/runner/errors.ts'
 import { sealOf, type Ctx } from '../asas/runner/steps.ts'
 import type { Authorize, ManagedAdmin } from '../asas/runner/write.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
@@ -509,6 +509,7 @@ export const storageRoutes = <Actor>({
       if (!one.storage.public) headers.set('Cache-Control', 'private, no-store')
       return new Response(served.body, { status: served.status, statusText: served.statusText, headers })
     } catch (thrown) {
+      thrown = retryConflict(thrown)
       if (thrown instanceof AsasError) return refusal(thrown)
       config.onError(thrown)
       return Response.json({ code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' }, { status: 500 })

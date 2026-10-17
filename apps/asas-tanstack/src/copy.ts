@@ -990,6 +990,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       ar: 'تسجيل الدخول المحلي متوقف على هذا الخادم: لم يُضبط LOCAL_AUTH_SECRET. اضبطه بسر من 32 حرفا على الأقل وأعد تشغيل الخادم.',
     },
     'not_found.row': { en: 'That row is no longer there.', ar: 'لم يعد هذا السجل موجودا.' },
+    'conflict.retry': { en: 'Another write interrupted this transaction. Try again.', ar: 'تعارضت هذه المعاملة مع عملية أخرى. حاول مرة أخرى.' },
     'conflict.unique': { en: 'Another row already holds that value.', ar: 'يحمل سجل آخر هذه القيمة بالفعل.' },
     'conflict.stale': { en: 'This was changed by someone else since you opened it. Reload it and make your change again.', ar: 'غيّر شخص آخر هذا منذ فتحته. أعد تحميله ثم أعد إجراء تغييرك.' },
     'invalid.reference': { en: 'That record is not one you may choose.', ar: 'هذا السجل ليس مما يمكنك اختياره.' },

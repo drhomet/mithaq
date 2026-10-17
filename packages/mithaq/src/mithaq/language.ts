@@ -8,6 +8,7 @@ import type { VersionsTarget } from '../versions/index.ts'
 import type { StorageTarget } from '../storage/storage.ts'
 import { buildAsas, type HttpPlug } from '../asas/build.ts'
 import type { AuthConfig } from '../asas/build.ts'
+import type { DeclarationStore } from '../asas/runner/write.ts'
 import type { AuditHandler, Derives, DerivedShapes } from '../asas/runner/steps.ts'
 import type { Where } from './where.ts'
 import { defineGlobal, defineKayan } from './define.ts'
@@ -147,6 +148,9 @@ export type Store<
   /** Run `fn` in one transaction. What it returns is what the write returns. */
   transaction<Result>(fn: (tx: Tx) => Promise<Result>): Promise<Result>
   insert(args: { tx: Tx; kayan: string; data: Record<string, unknown> }): Promise<Row>
+  /** Insert or update by the declared unique index `on` names, with key values in `data`. An increment inserts its amount or adds it to the existing value. Returns the row with its existing identity kept; upserting the operation's own versioned kayan while saving a draft is refused. */
+  upsert(args: { tx: Tx; kayan: string; on: readonly string[]; data: Record<string, unknown>; where?: Where }): Promise<Row>
+  /** `{ field: { $inc: n } }` adds a safe integer in the database to an integer field, alongside plain values. Draft snapshot arithmetic is refused. Store writes skip validation; enforce quantities that must not become negative with a database CHECK. Returns the changed row. */
   update(args: { tx: Tx; kayan: string; id: unknown; data: Record<string, unknown>; where?: Where }): Promise<Row>
   remove(args: { tx: Tx; kayan: string; id: unknown; where?: Where }): Promise<Row>
   /** Required, so no store can exist that the managed reads cannot use. */
@@ -155,23 +159,34 @@ export type Store<
     args: {
       limit: number
       /**
-       * A store must hold the rows it returns until the transaction ends: a step that compares a row, such as
-       * `expectedUpdatedAt`, relies on it. The modes are Postgres's: `'update'` holds them against every other
-       * lock, as a delete does; `'noKeyUpdate'` against every other but `'keyShare'`, as an update of their
-       * other columns does; `'keyShare'` against a delete or a change of their key alone, as a foreign key does.
-       * A store handles all three: one that locks for `'update'` alone takes no lock for the other two.
+       * Hold returned rows until this transaction ends. `update` excludes every competing lock;
+       * `noKeyUpdate` keeps their values unchanged by others while allowing `keyShare` readers;
+       * `share` keeps them as read while allowing other `share` and `keyShare` readers;
+       * `keyShare` keeps their identity and unique keys, allowing other values to change.
+       * Every mode requires a transaction; a lock without one must throw.
        */
-      lock?: 'update' | 'noKeyUpdate' | 'keyShare'
+      lock?: 'update' | 'noKeyUpdate' | 'share' | 'keyShare'
       page: number
       sort: { field: string; direction: 'asc' | 'desc' }
       where?: Where
     }
     tx?: Tx
   }): Promise<{ docs: Row[]; totalDocs: number }>
+  /** Exact total of an integer, number or decimal field, as a decimal string so no value passes through a float; empty selections return '0'. */
+  sum(args: { tx?: Tx; kayan: string; field: string; where?: Where }): Promise<string>
   /** Counts matching rows without loading them. Without it, `find` with a limit of `0` is asked. */
   count?(args: { kayan: string; args: { where?: Where }; tx?: Tx }): Promise<number>
   destroy(): Promise<void>
 }
+
+/** The runner keeps bound string-name calls behind the declaration boundary: access and field masks are skipped, tenant scope is not. Upsert fills the tenant from the active organization and refuses another value. Never expose privileged rows or fields through step output. */
+export type RawStepStore = Pick<Store, 'find' | 'insert' | 'remove' | 'update' | 'upsert' | 'sum'> & {
+  /** Holds existing ids in ascending order until the transaction ends, deduplicated; any missing or foreign id is a 404. Requires a transaction. */
+  hold(args: { tx: unknown; kayan: string; ids: readonly unknown[]; mode: NonNullable<Parameters<Store['find']>[0]['args']['lock']> }): Promise<void>
+}
+
+/** A step names a kayan by its declaration; fields and values follow that declaration, as with tools.of. */
+export type StepStore = DeclarationStore
 
 /** A target that holds rows. Takes `undefined`, so a caller can name the bad target in its own throw. */
 export const isStore = (target: RuntimeTarget | undefined): target is RuntimeStore => target?.capability === 'store'

@@ -1,10 +1,11 @@
 // One transaction for every row: a row that cannot be written rolls the whole call
 // back, because a bulk that half happened is a state no client can undo.
+import { stepTools } from './store.ts'
 import { AfterCommitError, AsasError, invalid } from './errors.ts'
 import { assertReadableWhere, checkedWhere } from './read.ts'
 import { running } from './runtime.ts'
 import { refuseTenantOption, writeTenant } from './tenant.ts'
-import { atEffect, parse, validated, type BulkResult, type Ctx, type ResolvedOperation, type WriteStep, type WriteTools } from './steps.ts'
+import { atEffect, parse, validated, type BulkResult, type Ctx, type ResolvedOperation, type WriteStep, type RuntimeWriteTools as WriteTools } from './steps.ts'
 import { aliveWhere, beginWrite, drain, ontoRow, projectReadableFields, publishedWhere, rowLock, runOutside, type Authorize, type ManagedAdmin, type Options } from './write.ts'
 import { combineWhere, type Where } from '../../mithaq/where.ts'
 import type { ResolvedKayan } from '../../mithaq/types.ts'
@@ -149,14 +150,15 @@ export const bulk = <Actor = unknown>({
       entry.tx = tx
       return running.run({ context, transactions: new Map(open).set(store, entry), user: actor }, async () => {
         const runTools = Object.freeze({ ...tools, many: (data: Record<string, unknown>) => many(data, tx) })
+        const publicTools = stepTools(runTools as WriteTools)
         let ctx: Ctx = { kayan, data: { ...values }, actor, user: actor, tx, context, tenant: owner }
         // No defaults here: each row's single-row write fills its own.
-        ctx = await parse({ schema: runTools.schema, ctx, tools: runTools })
+        ctx = await parse({ schema: runTools.schema, ctx, tools: publicTools })
         for (const step of atEffect<WriteStep>([
           ...declaration.beforeSteps,
           ...list,
           ...declaration.afterSteps,
-        ])) ctx = { ...(await step(ctx, runTools as WriteTools)), tenant: owner }
+        ])) ctx = { ...(await step(ctx, publicTools)), tenant: owner }
         committed = ctx
         // Each document already passed its single-row output and read mask.
         // The bulk contract validates the envelope after the steps have run.

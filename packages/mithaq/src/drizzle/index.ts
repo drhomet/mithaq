@@ -1,4 +1,4 @@
-import { and, asc, count as sqlCount, desc, eq, getTableColumns, getTableName, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
+import { and, asc, count as sqlCount, sum as sqlSum, desc, eq, getTableColumns, getTableName, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import {
   boolean as pgBoolean,
@@ -40,7 +40,7 @@ import type { CompoundIndex, ResolvedField, ResolvedKayan, RuntimeField } from '
 import type { Store } from '../mithaq/language.ts'
 import { implementationOf } from '../mithaq/rukn.ts'
 import type { Operator, Where } from '../mithaq/where.ts'
-import { conflict, localizedQuery } from '../asas/runner/errors.ts'
+import { conflict, invalid, missing, retryConflict, localizedQuery } from '../asas/runner/errors.ts'
 import { Refusal } from '../mithaq/refusal.ts'
 import { providerOf } from '../base/rules.ts'
 import { idKinds as drizzleIdKinds, kinds as drizzleKinds } from './kinds.ts'
@@ -733,6 +733,25 @@ const storeOf = <
     }
     return flat
   }
+  const declaredData = (name: string, values: Record<string, unknown>) => {
+    const described = kayanByName.get(name)
+    // A version's fields describe virtual snapshot paths, while core writes the physical snapshot column.
+    const fields = described?.fields.parent?.target?.versions?.table === name ? getTableColumns(tables[name]!) : described?.fields ?? getTableColumns(tables[name]!)
+    const field = Object.keys(values).find((key) => !Object.hasOwn(fields, key))
+    if (field) throw invalid({ message: `Kayan "${name}" declares no field "${field}".`, key: 'error.invalid.value', params: { kayan: name, field } })
+    return values
+  }
+  const increments = ({ name, values, insert = false }: { name: string; values: Record<string, unknown>; insert?: boolean }) => {
+    const data = { ...declaredData(name, values) }
+    for (const [field, value] of Object.entries(data)) {
+      if (!value || typeof value !== 'object' || !('$inc' in value)) continue
+      if (kayanByName.get(name)?.fields[field]?.kind !== 'integer' || !Number.isSafeInteger(value.$inc) || Object.keys(value).length !== 1) {
+        throw invalid({ message: `Kayan "${name}" field "${field}" accepts $inc only on an integer field with one safe integer.`, key: 'error.invalid.value', params: { kayan: name, field } })
+      }
+      data[field] = insert ? value.$inc : sql`${(tables[name] as unknown as Record<string, SQLWrapper>)[field]} + ${value.$inc}`
+    }
+    return data
+  }
   // A field whose every locale column is null is one null, which matches the derived row shape.
   const expand = (name: string, row: Record<string, unknown>) => {
     const fields = localizedOf(name)
@@ -1128,11 +1147,15 @@ const storeOf = <
 
     // Kept as drizzle's own callback: the runner passes `tx` down the list.
     async transaction(run) {
-      return db.transaction((tx) => run(tx))
+      try {
+        return await db.transaction((tx) => run(tx))
+      } catch (thrown) {
+        throw retryConflict(thrown)
+      }
     },
 
     async insert({ tx, kayan: name, data: values }) {
-      const { columns, sets } = withoutSets(name, values)
+      const { columns, sets } = withoutSets(name, declaredData(name, values))
       let result: unknown
       try {
         result = await (tx as Database).insert(tables[name]!).values(flatten(name, columns)).returning()
@@ -1147,8 +1170,34 @@ const storeOf = <
       return withSets(tx as Database, name, held)
     },
 
+    async upsert({ tx, kayan: name, on, data: values, where }) {
+      if (!tx) throw new Error('An upsert requires a transaction.')
+      const kayan = kayanByName.get(name)!
+      const table = tables[name]!
+      if (!on.length || new Set(on).size !== on.length || !kayan.indexes.some((index) => index.unique && index.fields.length === on.length && index.fields.every((field) => on.includes(field))) || on.some((field) => !Object.hasOwn(values, field) || (values[field] && typeof values[field] === 'object' && '$inc' in (values[field] as object)))) {
+        throw invalid({ message: `Kayan "${name}" upsert needs plain key values for a declared unique index in "on".`, key: 'error.invalid.value', params: { kayan: name } })
+      }
+      const inserted = withoutSets(name, increments({ name, values, insert: true }))
+      const updated = withoutSets(name, increments({ name, values }))
+      const set = flatten(name, Object.fromEntries(Object.entries(updated.columns).filter(([field]) => field !== 'id' && field !== kayan.tenant && !on.includes(field))))
+      // Even a key-only upsert returns the existing row, without changing its identity.
+      if (!Object.keys(set).length) set[on[0]!] = table[on[0]!]!
+      let result: unknown
+      try {
+        result = await (tx as Database).insert(table).values(flatten(name, inserted.columns)).onConflictDoUpdate({ target: on.map((field) => table[field]! as never), set, setWhere: where ? whereOf(tx as Database, tables, kayanByName, name, where) : undefined }).returning()
+      } catch (thrown) {
+        throw collision(thrown, name)
+      }
+      if (!Array.isArray(result)) throw new Error('The drizzle store expected upsert to return rows.')
+      const [row] = result
+      if (!row) throw missing({ message: `No "${name}" row found.`, key: 'error.not_found.row', params: { kayan: name } })
+      const held = expand(name, row)
+      await writeSets(tx, name, held.id, inserted.sets)
+      return withSets(tx as Database, name, held)
+    },
+
     async update({ tx, kayan: name, id, data: values, where }) {
-      const { columns, sets } = withoutSets(name, values)
+      const { columns, sets } = withoutSets(name, increments({ name, values }))
       const flat = flatten(name, columns)
       const matched = idWhere(tx as Database, tables, kayanByName, name, id, where)
       let result: unknown
@@ -1190,8 +1239,10 @@ const storeOf = <
     },
 
     async find({ kayan: name, args: { limit, lock, page, sort, where }, tx }) {
+      if (lock && !tx) throw new Error('A locked find requires a transaction.')
       const client = (tx ?? db) as Database
       const table = tables[name]!
+      if (!Object.hasOwn(kayanByName.get(name)?.fields ?? getTableColumns(table), sort.field)) throw invalid({ message: `Kayan "${name}" declares no field "${sort.field}".`, key: 'error.invalid.value', params: { kayan: name, field: sort.field } })
       if (kayanByName.get(name)?.fields[sort.field]?.rules?.localized) {
         throw refuseLocalized(name, sort.field, 'sort')
       }
@@ -1208,7 +1259,7 @@ const storeOf = <
       const offset = limit > 0 ? (page - 1) * limit : 0
       // `$dynamic()` keeps each branch one type, so drizzle checks `orderBy` against the table.
       const query = client.select().from(table).$dynamic().where(condition)
-      const locked = tx && lock ? query.for(({ update: 'update', noKeyUpdate: 'no key update', keyShare: 'key share' } as const)[lock]) : query
+      const locked = tx && lock ? query.for(({ update: 'update', noKeyUpdate: 'no key update', share: 'share', keyShare: 'key share' } as const)[lock]) : query
       const ordered = locked.orderBy(...orderBy).offset(offset)
       const docs = limit > 0 ? await ordered.limit(limit) : await ordered
       const rows = await client.select({ totalDocs: sqlCount() }).from(table).where(condition)
@@ -1218,6 +1269,15 @@ const storeOf = <
         docs: held.map((row) => ({ ...row, ...sets.get(String(row.id)) })),
         totalDocs: Number(rows[0]?.totalDocs ?? 0),
       }
+    },
+
+    async sum({ tx, kayan: name, field, where }) {
+      if (!['integer', 'number', 'decimal'].includes(kayanByName.get(name)?.fields[field]?.kind ?? '')) {
+        throw invalid({ message: `Kayan "${name}" field "${field}" is not numeric, so it cannot be summed.`, key: 'error.invalid.value', params: { kayan: name, field } })
+      }
+      const client = (tx ?? db) as Database
+      const rows = await client.select({ total: sqlSum(tables[name]![field]!) }).from(tables[name]!).where(where ? whereOf(client, tables, kayanByName, name, where) : undefined)
+      return rows[0]?.total ?? '0'
     },
 
     async count({ kayan: name, args: { where }, tx }) {

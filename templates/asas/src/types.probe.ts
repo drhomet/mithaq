@@ -3273,3 +3273,57 @@ export const plugOptionsProbe = () => {
   // @ts-expect-error a plug names its onError
   fetchHttp({ maxBodyBytes: defaultMaxBodyBytes })
 }
+
+export const typedStoreWordsProbe = async (ctx: Ctx, tools: WriteTools) => {
+  const items = defineKayan({
+    name: 'typedStoreItems',
+    fields: { ...defaultFields, name: { kind: 'text', rules: { required: true, unique: true } }, quantity: { kind: 'integer', rules: { required: true } }, price: { kind: 'decimal', rules: { precision: 14, scale: 3 } }, active: { kind: 'checkbox' } },
+    targets: { service: { operations: defaultOperations } },
+  })
+  const row = await tools.store.insert({ tx: ctx.tx, kayan: items, data: { name: 'Item', quantity: 1, price: '0.125', active: true, createdAt: new Date() } })
+  const quantity: number = row.quantity
+  const id: string = row.id
+  await tools.store.update({ tx: ctx.tx, kayan: items, id, data: { quantity: { $inc: 2 }, active: false } })
+  await tools.store.upsert({ tx: ctx.tx, kayan: items, on: ['name'], data: { name: 'Item', quantity: { $inc: 2 } } })
+  await tools.store.find({ tx: ctx.tx, kayan: items, args: { limit: 0, page: 1, sort: { field: 'quantity', direction: 'asc' }, lock: 'share', where: { and: [{ quantity: { greater_than: 1 } }, { name: { in: ['Item'] } }] } } })
+  await tools.store.hold({ tx: ctx.tx, kayan: items, ids: [id], mode: 'noKeyUpdate' })
+  const total: string = await tools.store.sum({ tx: ctx.tx, kayan: items, field: 'price', where: { quantity: { equals: quantity } } })
+  await tools.store.remove({ tx: ctx.tx, kayan: items, id })
+  // @ts-expect-error the step store accepts a declaration, never a misspelt string name
+  tools.store.insert({ tx: ctx.tx, kayan: 'typedStoreItmes', data: {} })
+  // @ts-expect-error a misspelt data field is not declared
+  tools.store.update({ tx: ctx.tx, kayan: items, id, data: { quatity: 2 } })
+  // @ts-expect-error a misspelt where key is not declared
+  tools.store.find({ kayan: items, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { quatity: { equals: 1 } } } })
+  // @ts-expect-error an integer's where value is a number
+  tools.store.find({ kayan: items, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { quantity: { equals: 'one' } } } })
+  // @ts-expect-error a plain integer value is a number
+  tools.store.insert({ tx: ctx.tx, kayan: items, data: { quantity: 'one' } })
+  // @ts-expect-error text fields cannot be incremented
+  tools.store.update({ tx: ctx.tx, kayan: items, id, data: { name: { $inc: 1 } } })
+  // @ts-expect-error a sum requires a numeric field
+  tools.store.sum({ tx: ctx.tx, kayan: items, field: 'name' })
+  // @ts-expect-error a conflict key must name a field
+  tools.store.upsert({ tx: ctx.tx, kayan: items, on: ['naem'], data: { name: 'Item' } })
+  // @ts-expect-error a uuid id is text
+  tools.store.hold({ tx: ctx.tx, kayan: items, ids: [1], mode: 'share' })
+  // @ts-expect-error the four lock names are fixed
+  tools.store.find({ kayan: items, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, lock: 'shared' } })
+  return total
+}
+
+export const rawStoreValuesProbe = async (ctx: Ctx, tools: WriteTools) => {
+  const parents = defineKayan({ name: 'typedStoreParents', fields: { id: { kind: 'number' }, name: { kind: 'text' } } })
+  const children = defineKayan({
+    name: 'typedStoreChildren',
+    fields: { ...defaultFields, parent: { kind: 'relationship', relationTo: () => parents }, organization: { kind: 'relationship', relationTo: 'organization' }, measure: { kind: 'integer', targets: { zod: z.string().transform(Number) } } },
+  })
+  await tools.store.insert({ tx: ctx.tx, kayan: children, data: { parent: 2, organization: 'org-1', measure: 3 } })
+  await tools.store.find({ kayan: children, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { parent: { equals: 2 }, 'parent.name': { equals: 'Parent' } } } })
+  // @ts-expect-error the declaration's referenced id is a number
+  tools.store.insert({ tx: ctx.tx, kayan: children, data: { parent: 'two' } })
+  // @ts-expect-error raw writes take stored values, not input that needs a schema transform
+  tools.store.insert({ tx: ctx.tx, kayan: children, data: { measure: '3' } })
+  // @ts-expect-error a referenced field name is checked too
+  tools.store.find({ kayan: children, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { 'parent.naem': { equals: 'Parent' } } } })
+}

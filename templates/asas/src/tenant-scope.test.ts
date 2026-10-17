@@ -11,6 +11,7 @@ import {
   defaultMaxBodyBytes,
   actorRoles,
   AsasError,
+  AfterCommitError,
   base,
   betterAuthStrategy,
   betterAuthTenant,
@@ -48,8 +49,12 @@ import {
   type Authorize,
   type StandardSchemaV1,
   type Store,
+  type RuntimeField,
+  type Ctx,
+  type WriteTools,
 } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
+import { storageRoutes } from '../../../packages/mithaq/src/storage/storage.ts'
 import { memoryStore } from './memory-store.ts'
 import { expectedUpdatedAt } from '../../mithaq/src/steps/expected-updated-at.ts'
 import { storageConfig } from '../../mithaq/src/storage/index.ts'
@@ -91,6 +96,11 @@ const access = {
   seed: async () => {},
 }
 
+let storeProbe: (ctx: Ctx, tools: WriteTools) => Promise<void> = async () => {}
+const probeStore = async (ctx: Ctx, tools: WriteTools) => (await storeProbe(ctx, tools), ctx)
+
+let localProbe = async (_request: Request): Promise<Record<string, unknown>> => ({})
+
 let outside = 0
 let members = 0
 /** What `onError` was handed, so a resolver failure is seen to be reported. */
@@ -107,10 +117,6 @@ const linked: { memo?: string } = {}
 const scribbled: { id?: string; data?: Record<string, unknown> } = {}
 /** The row a step writes past its own: a kayan, an id and, for an insert or an update, the values. */
 const aimed: { kayan?: string; id?: string; data?: Record<string, unknown> } = {}
-/** A step that writes the row `aimed` names through the raw store, beside the operation's own. */
-const aimAt = (write: 'insert' | 'update' | 'remove') =>
-  async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
-    (await tools.store[write]({ tx: ctx.tx, kayan: aimed.kayan, id: aimed.id, data: aimed.data }), ctx)
 /** Where a held write stops, inside its transaction with its locks still taken, until the test that set it lets it go. */
 const gate: { reached?: PromiseWithResolvers<void>; release?: PromiseWithResolvers<void> } = {}
 const pause = async (ctx: unknown) => {
@@ -140,6 +146,10 @@ const stubServer = () => ({
 })
 
 const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { authorize = defaultAuthorize, withLocal = false, publicFiles = false }: { authorize?: Authorize; withLocal?: boolean; publicFiles?: boolean } = {}) => {
+  /** A step that writes the row `aimed` names through the raw store, beside the operation's own. */
+  const aimAt = (write: 'insert' | 'update' | 'remove') =>
+    async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
+      (await tools.store[write]({ tx: ctx.tx, kayan: declaration(built, aimed.kayan ?? ''), id: aimed.id, data: aimed.data }), ctx)
   const language = defineMithaq({
     arkan: [base, storage(storageConfig)],
     targets: {
@@ -148,7 +158,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       rbac: access,
       versions: versionsTarget({ max: 100 }),
       tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', organizations: 'many', backoffice: ({ user }) => backofficeApp && staff.has((user as { id: string }).id) }),
-      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize, softDelete: 'deletedAt' }),
+      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize, softDelete: 'deletedAt', beforeSteps: [(ctx: Ctx, tools: { kind: string }) => tools.kind === 'insert' && ctx.kayan.name === 'memos' ? { ...ctx, data: { code: null, globalCode: null, ...ctx.data } } : ctx] }),
     } as {},
   })
   const { tenant } = (language as unknown as { targets: { tenant: ReturnType<typeof betterAuthTenant<'firms'>> } }).targets
@@ -157,7 +167,8 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const memos = language.defineKayan({
     name: 'memos',
     schemaName,
-    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, secret: { kind: 'text', rules: { defaultValue: '-' } }, meta: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: {} } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
+    indexes: [{ fields: ['globalCode'], unique: true }],
+    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, code: { kind: 'text', rules: { unique: true } }, globalCode: { kind: 'text' }, balance: { kind: 'integer', rules: { defaultValue: 0 } }, quantity: { kind: 'decimal', rules: { precision: 18, scale: 3, defaultValue: '0' } }, amount: { kind: 'number', rules: { defaultValue: 0 } }, secret: { kind: 'text', rules: { defaultValue: '-' } }, meta: { kind: 'json', maxBytes: defaultJsonMaxBytes, rules: { defaultValue: {} } }, notes: { kind: 'join', relationTo: 'notes', on: 'memo' } },
     // `read: true` for an editor: the broadest answer a row gives.
     // A reader's answer is a filter, so under `tenant: 'mine'` its organizations take a branch of their own.
     access: language.rows({ editor: { create: true, read: true, update: true, delete: true }, reader: { read: { title: { not_equals: 'hidden' } } }, staff: { read: true } } as never),
@@ -165,6 +176,12 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       service: {
         operations: {
           ...defaultOperations,
+          outsideProbe: { beforeTransaction: [probeStore], steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert] },
+          afterProbe: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], afterCommit: [probeStore] },
+          probeAfterEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] },
+          probeEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [probeStore, steps.update] },
+          probeBulk: { steps: ({ steps }: { steps: { updateMany: unknown } }) => [probeStore, steps.updateMany] },
+          probe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert] },
           guarded: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], beforeTransaction: [(ctx: unknown) => (outside += 1, ctx)] },
           claimed: { input: () => z.object({ title: z.string(), firmId: z.string() }).strict(), steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], beforeTransaction: [(ctx: unknown) => (outside += 1, ctx)] },
           stamp: { steps: ({ steps }: { steps: { insert: unknown } }) => [moveTo('org2'), steps.insert] },
@@ -202,7 +219,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           // A raw write in a bulk list's step, which the sealed store holds to the active organization.
           sweep: {
             steps: ({ steps }: { steps: { updateMany: unknown } }) => [
-              async (ctx: { tx: unknown }, tools: { store: { update: (args: object) => Promise<unknown> } }) => (await tools.store.update({ tx: ctx.tx, kayan: 'memos', id: victim.id, data: victim.data }), ctx),
+              async (ctx: { tx: unknown }, tools: { store: { update: (args: object) => Promise<unknown> } }) => (await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'memos'), id: victim.id, data: victim.data }), ctx),
               steps.updateMany,
             ],
           },
@@ -213,18 +230,18 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
             steps: ({ steps }: { steps: { insert: unknown } }) => [
               steps.insert,
               async (ctx: { tx: unknown; data: Record<string, unknown> }, tools: { store: { update: (args: object) => Promise<Record<string, unknown>> } }) =>
-                ({ ...ctx, data: { ...ctx.data, ...(await tools.store.update({ tx: ctx.tx, kayan: 'memos', id: ctx.data.id, data: { title: 'restamped' } })) } }),
+                ({ ...ctx, data: { ...ctx.data, ...(await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'memos'), id: ctx.data.id, data: { title: 'restamped' } })) } }),
             ],
           },
           touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] },
-          heldErase: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause, async (ctx: { tx: unknown; data: { id: unknown } }, tools: { store: { remove: (args: object) => Promise<unknown> } }) => (await tools.store.remove({ tx: ctx.tx, kayan: 'memos', id: ctx.data.id }), ctx)] },
+          heldErase: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause, async (ctx: { tx: unknown; data: { id: unknown } }, tools: { store: { remove: (args: object) => Promise<unknown> } }) => (await tools.store.remove({ tx: ctx.tx, kayan: declaration(built, 'memos'), id: ctx.data.id }), ctx)] },
           heldDelete: { steps: ({ steps }: { steps: { remove: unknown } }) => [pause, steps.remove] },
           heldSweep: { steps: ({ steps }: { steps: { updateMany: unknown } }) => [steps.updateMany, pause] },
           prune: { steps: ({ steps }: { steps: { remove: unknown } }) => [aimAt('remove'), steps.remove] },
           // A raw insert into another tenant-owned kayan, under another organization.
           plant: {
             steps: ({ steps }: { steps: { insert: unknown } }) => [
-              async (ctx: { tx: unknown }, tools: { store: { insert: (args: object) => Promise<unknown> } }) => (await tools.store.insert({ tx: ctx.tx, kayan: 'opens', data: { title: 'planted', firmId: 'org2', createdAt: new Date(), updatedAt: new Date() } }), ctx),
+              async (ctx: { tx: unknown }, tools: { store: { insert: (args: object) => Promise<unknown> } }) => (await tools.store.insert({ tx: ctx.tx, kayan: declaration(built, 'opens'), data: { title: 'planted', firmId: 'org2', createdAt: new Date(), updatedAt: new Date() } }), ctx),
               steps.insert,
             ],
           },
@@ -277,8 +294,8 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
             steps: ({ steps }: { steps: { insert: unknown } }) => [
               async (ctx: { tx: unknown }, tools: { store: { insert: (args: object) => Promise<unknown>; update: (args: object) => Promise<unknown> } }) => {
                 await (scribbled.id
-                  ? tools.store.update({ tx: ctx.tx, kayan: 'notes', id: scribbled.id, data: scribbled.data })
-                  : tools.store.insert({ tx: ctx.tx, kayan: 'notes', data: scribbled.data }))
+                  ? tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'notes'), id: scribbled.id, data: scribbled.data })
+                  : tools.store.insert({ tx: ctx.tx, kayan: declaration(built, 'notes'), data: scribbled.data }))
                 return ctx
               },
               steps.insert,
@@ -309,10 +326,11 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const papers = {
     name: 'papers',
     schemaName,
-    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, memo: { kind: 'relationship', relationTo: 'memos' }, ...draftFields },
+    indexes: [{ fields: ['id'], unique: true }],
+    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, balance: { kind: 'integer', rules: { defaultValue: 0 } }, memo: { kind: 'relationship', relationTo: 'memos' }, ...draftFields },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
-      service: { operations: { ...defaultOperations, ...versionOperations, touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] }, heldDraft: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause] } } },
+      service: { operations: { ...defaultOperations, ...versionOperations, probeAfterEdit: { input: ({ update }: { update: StandardSchemaV1 }) => update, steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] }, draftProbeAfterEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] }, probe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert] }, bump: { input: ({ update }: { update: StandardSchemaV1 }) => update, steps: ({ steps }: { steps: { update: unknown } }) => [(ctx: Ctx) => ({ ...ctx, data: { ...ctx.data, balance: { $inc: 3 } } }), steps.update] }, draftBump: { steps: ({ steps }: { steps: { update: unknown } }) => [(ctx: Ctx) => ({ ...ctx, data: { ...ctx.data, balance: { $inc: 3 } } }), steps.update] }, touch: { steps: ({ steps }: { steps: { update: unknown } }) => [aimAt('update'), steps.update] }, heldDraft: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, pause] } } },
       versions: { drafts: { autosave: true } },
     },
   }
@@ -335,7 +353,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const tags = {
     name: 'tags',
     schemaName,
-    fields: { ...defaultFields, label: { kind: 'text' }, open: { kind: 'checkbox' } },
+    fields: { ...defaultFields, label: { kind: 'text' }, code: { kind: 'text', rules: { unique: true } }, balance: { kind: 'integer', rules: { defaultValue: 0 } }, quantity: { kind: 'decimal', rules: { precision: 18, scale: 3, defaultValue: '0' } }, amount: { kind: 'number', rules: { defaultValue: 0 } }, open: { kind: 'checkbox' } },
     access: { read: () => ({ open: { equals: true } }) },
     targets: { service: { operations: defaultOperations } },
   }
@@ -422,6 +440,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       },
     },
   }
+  const numbered = { name: 'numbered', schemaName, fields: { id: { kind: 'number' }, name: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }
   const user = { name: 'user', schemaName, fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
   // A local account, which is no organization's member.
   const locals = {
@@ -429,14 +448,20 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     schemaName,
     fields: { ...defaultFields, ...localAuthFields },
     access: { create: () => true, read: () => false, update: () => false, delete: () => false },
-    auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, secret: 'tenant-scope-a-local-auth-test-secret' }),
+    auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, context: (request) => localProbe(request), secret: 'tenant-scope-a-local-auth-test-secret' }),
     targets: { service: { operations: { ...defaultOperations, ...localAuthOperations } } },
   }
-  return language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, shelves, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  const built: Built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, shelves, numbered, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  return built
 }
 
-type Ops = Record<'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
-type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
+type Ops = Record<'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
+type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
+
+// Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
+const declaration = (built: Built, name: string) => (built.kayan as unknown as Record<string, { name: string; fields: Record<string, RuntimeField> }>)[name]
+  ?? (built.global as unknown as Record<string, { name: string; fields: Record<string, RuntimeField> }>)[name]
+  ?? { name, fields: {} as Record<string, RuntimeField> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
 const actorOf = async ({ active, orgs = active ? { [active]: ['editor'] } : {}, backoffice = false, collection = 'user' }: { active?: string | null; orgs?: Record<string, string[]>; backoffice?: boolean; collection?: string }) => {
@@ -817,7 +842,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
   const note = (data: Record<string, unknown>) => ({ memo: null, memoSet: [], tag: null, cover: null, reply: null, ...data })
   /** A row written past every operation, as a row older than the scope or another tool would be. */
   const raw = (kayan: string, data: Record<string, unknown>) =>
-    store.transaction((tx) => store.insert({ tx, kayan, data: { ...data, createdAt: new Date(), updatedAt: new Date() } })) as Promise<Record<string, unknown>>
+    store.transaction((tx) => store.insert({ tx, kayan, data: { ...(kayan === 'tags' && { code: null, balance: 0, quantity: '0', amount: 0 }), ...data, createdAt: new Date(), updatedAt: new Date() } })) as Promise<Record<string, unknown>>
   /** Whether another transaction takes the row in that mode now, or is still waiting on it when its lock timeout ends. */
   const takes = (kayan: string, id: unknown, lock: 'noKeyUpdate' | 'keyShare') => store.transaction(async (tx) => {
     await (tx as { execute: (sql: string) => Promise<unknown> }).execute("set local lock_timeout = '200ms'")
@@ -1417,6 +1442,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     void editingC.catch(() => {})
     let second: Required<typeof gate> | undefined
     let editingV: Promise<unknown> | undefined
+    let outcomes: PromiseSettledResult<unknown>[] = []
     try {
       await within(first.reached.promise)
       second = { ...hold() }
@@ -1426,9 +1452,8 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     } finally {
       first.release.resolve()
       second?.release.resolve()
-      await within(Promise.allSettled([editingC, ...(editingV ? [editingV] : [])]), 5000)
+      outcomes = await within(Promise.allSettled([editingC, ...(editingV ? [editingV] : [])]), 5000)
     }
-    const outcomes = await within(Promise.allSettled([editingC, editingV]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await notes.findByID({ id: c.id }, { actor: one })).reply, v.id)
     assert.equal((await notes.findByID({ id: v.id }, { actor: one })).reply, c.id)
@@ -1506,6 +1531,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const recoding = stamps.heldRecode({ id: stamp.id, code: 'after recode' }, { actor: one })
     void recoding.catch(() => {})
     let naming: Promise<unknown> | undefined
+    let outcomes: PromiseSettledResult<unknown>[] = []
     try {
       await within(held.reached.promise)
       naming = store.transaction(async (tx) => {
@@ -1516,9 +1542,8 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       assert.equal(await blocked(), 'waited')
     } finally {
       held.release.resolve()
-      await within(Promise.allSettled([recoding, ...(naming ? [naming] : [])]), 5000)
+      outcomes = await within(Promise.allSettled([recoding, ...(naming ? [naming] : [])]), 5000)
     }
-    const outcomes = await within(Promise.allSettled([recoding, naming]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await stamps.findByID({ id: stamp.id }, { actor: one })).code, 'after recode')
   })
@@ -1536,6 +1561,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     })
     void listing.catch(() => {})
     let naming: Promise<unknown> | undefined
+    let outcomes: PromiseSettledResult<unknown>[] = []
     try {
       await within(held.reached.promise)
       naming = store.transaction(async (tx) => {
@@ -1546,9 +1572,8 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       assert.equal(await blocked(), 'waited')
     } finally {
       held.release.resolve()
-      await within(Promise.allSettled([listing, ...(naming ? [naming] : [])]), 5000)
+      outcomes = await within(Promise.allSettled([listing, ...(naming ? [naming] : [])]), 5000)
     }
-    const outcomes = await within(Promise.allSettled([listing, naming]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.deepEqual((await notes.findByID({ id: listed.id }, { actor: one })).memoSet, [ids.org1])
   })
@@ -1564,6 +1589,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const shelving = shelves.heldShelve({ id: shelved.id }, { actor: one })
     void shelving.catch(() => {})
     let naming: Promise<unknown> | undefined
+    let outcomes: PromiseSettledResult<unknown>[] = []
     try {
       await within(held.reached.promise)
       naming = shelves.link({ title: 'names the shelved', next: shelved.id }, { actor: one })
@@ -1571,9 +1597,8 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       await within(Promise.race([naming, blocked()]))
     } finally {
       held.release.resolve()
-      await within(Promise.allSettled([shelving, ...(naming ? [naming] : [])]), 5000)
+      outcomes = await within(Promise.allSettled([shelving, ...(naming ? [naming] : [])]), 5000)
     }
-    const outcomes = await within(Promise.allSettled([shelving, naming]), 5000)
     assert.deepEqual(outcomes.map((outcome) => (outcome.status === 'rejected' ? String(outcome.reason?.cause?.code ?? outcome.reason) : outcome.status)), ['fulfilled', 'fulfilled'])
     assert.equal((await refusal(shelves.findByID({ id: shelved.id }, { actor: one }))).status, 404, 'the row is marked')
     const late = await refusal(shelves.create({ title: 'too late', next: shelved.id }, { actor: one }))
@@ -1598,6 +1623,435 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     }
     await clearing
   })
+  test('a step finds only its active organization, even with an opposing filter, and reads shared rows past their access', async () => {
+    const tag = await store.transaction((tx) => store.insert({ tx, kayan: 'tags', data: { label: 'private shared', open: false } }))
+    storeProbe = async (ctx, tools) => {
+      const args = { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' as const } }
+      const own = await tools.store.find({ tx: ctx.tx, kayan: declaration(built, 'memos'), args })
+      assert.ok(own.docs.length)
+      assert.ok(own.docs.every((row) => row.firmId === 'org1'))
+      const other = await tools.store.find({ tx: ctx.tx, kayan: declaration(built, 'memos'), args: { ...args, where: { firmId: { equals: 'org2' } } } })
+      assert.deepEqual(other, { docs: [], totalDocs: 0 })
+      const shared = await tools.store.find({ tx: ctx.tx, kayan: declaration(built, 'tags'), args: { ...args, where: { id: { equals: tag.id as string } } } })
+      assert.equal(shared.docs[0]?.label, 'private shared')
+    }
+    try {
+      await memos().probe({ title: 'store find' }, { actor: one })
+      await memos().probeEdit({ id: ids.org1, title: 'one' }, { actor: one })
+      await memos().probeBulk({ where: { id: { equals: ids.org1 } }, data: { title: 'one' } }, { actor: one })
+    } finally { storeProbe = async () => {} }
+  })
+
+  test('a step holds duplicate own and shared ids, and refuses foreign ids exactly like missing ones', async () => {
+    const tag = await store.transaction((tx) => store.insert({ tx, kayan: 'tags', data: { label: 'shared hold', open: false } }))
+    storeProbe = async (ctx, tools) => {
+      await tools.store.hold({ tx: ctx.tx, kayan: declaration(built, 'memos'), ids: [ids.org1.toUpperCase(), ids.org1], mode: 'noKeyUpdate' })
+      await tools.store.hold({ tx: ctx.tx, kayan: declaration(built, 'tags'), ids: [tag.id, tag.id], mode: 'share' })
+      await tools.store.hold({ tx: ctx.tx, kayan: declaration(built, 'memos'), ids: [], mode: 'update' })
+      assert.equal((await refusal(tools.store.hold({ tx: ctx.tx, kayan: declaration(built, 'tags'), ids: [randomUUID()], mode: 'share' }))).status, 404)
+      const errors = []
+      for (const id of [ids.org2, randomUUID()]) errors.push(await refusal(tools.store.hold({ tx: ctx.tx, kayan: declaration(built, 'memos'), ids: [id], mode: 'update' })))
+      assert.equal(errors[0]!.status, 404)
+      assert.deepEqual([errors[0]!.key, errors[0]!.message], [errors[1]!.key, errors[1]!.message])
+      await assert.rejects(tools.store.hold({ tx: undefined, kayan: declaration(built, 'tags'), ids: [], mode: 'share' }), /transaction/)
+    }
+    try {
+      await memos().probe({ title: 'store hold' }, { actor: one })
+      await memos().probeEdit({ id: ids.org1, title: 'one' }, { actor: one })
+      await memos().probeBulk({ where: { id: { equals: ids.org1 } }, data: { title: 'one' } }, { actor: one })
+    } finally { storeProbe = async () => {} }
+  })
+
+  if (postgres) for (const method of ['update', 'upsert'] as const) for (const kayan of ['memos', 'tags'] as const) test(`two step ${method} increments of ${kayan} both land and return their new row`, { timeout: 10_000 }, async () => {
+    const row = method === 'update' ? await store.transaction((tx) => store.insert({ tx, kayan, data: kayan === 'memos' ? { firmId: 'org1', title: 'initial', balance: 10 } : { label: 'initial', balance: 10 } })) : { id: undefined }
+    const reached = Promise.withResolvers<number>()
+    const release = Promise.withResolvers<void>()
+    const balances: number[] = []
+    storeProbe = async (ctx, tools) => {
+      const amount = Number(ctx.data.title)
+      const data = { balance: { $inc: amount }, [kayan === 'memos' ? 'title' : 'label']: 'incremented' }
+      const updated = method === 'update' ? await tools.store.update({ tx: ctx.tx, kayan: declaration(built, kayan), id: row.id, data }) : await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, kayan), on: kayan === 'memos' ? ['firmId', 'code'] : ['code'], data: { ...data, code: 'concurrent-upsert' } })
+      row.id = updated.id
+      balances.push(updated.balance as number)
+      if (amount === 3) {
+        try {
+          reached.resolve((await (ctx.tx as { execute(query: string): Promise<{ rows: { pid: number }[] }> }).execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+          await within(release.promise, 5000)
+        } finally { release.resolve() }
+      }
+    }
+    const first = memos().probe({ title: '3' }, { actor: one })
+    void first.catch(() => {})
+    let second: Promise<unknown> | undefined
+    try {
+      const holder = await within(reached.promise)
+      second = memos().probe({ title: '7' }, { actor: one })
+      void second.catch(() => {})
+      assert.equal(await Promise.race([second.then(() => 'answered'), waitForLock({ db: built.targets.store.db, where: `pg_blocking_pids(pid) @> array[${holder}]` })]), 'waited')
+    } finally {
+      release.resolve()
+      await within(Promise.allSettled([first, ...(second ? [second] : [])]), 5000)
+      storeProbe = async () => {}
+    }
+    await first
+    await second
+    assert.deepEqual(balances, method === 'update' ? [13, 20] : [3, 10])
+    const found = await store.find({ kayan, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { id: { equals: row.id as string } } } })
+    assert.equal(found.docs[0]?.balance, method === 'update' ? 20 : 10)
+    assert.equal(found.docs[0]?.[kayan === 'memos' ? 'title' : 'label'], 'incremented')
+  })
+
+  if (postgres) test('step increments refuse unsafe amounts, non-integer fields and another organization', async () => {
+    const row = await memos().create({ title: 'increment refusals' }, { actor: one })
+    for (const data of [{ balance: { $inc: 1.5 } }, { balance: { $inc: Number.MAX_SAFE_INTEGER + 1 } }, { balance: { $inc: NaN } }, { balance: { $inc: Infinity } }, { balance: { $inc: '2' } }, { title: { $inc: 2 } }, { balance: { $inc: 1, extra: true } }]) {
+      storeProbe = async (ctx, tools) => { await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'memos'), id: row.id, data }) }
+      try {
+        const error = await refusal(memos().probe({ title: 'invalid increment' }, { actor: one }))
+        assert.equal(error.status, 400)
+        assert.equal(error.key, 'error.invalid.value')
+      } finally { storeProbe = async () => {} }
+    }
+    storeProbe = async (ctx, tools) => { await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'memos'), id: ids.org2, data: { balance: { $inc: 5 } } }) }
+    try { await assert.rejects(memos().probe({ title: 'foreign increment' }, { actor: one })) } finally { storeProbe = async () => {} }
+    assert.equal((await memos().findByID({ id: row.id }, { actor: one })).balance, 0)
+    assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).balance, 0)
+  })
+
+  if (postgres) for (const kayan of ['tags', 'firms', 'numbered'] as const) test(`hold sorts and deduplicates ${kayan} ids before waiting on a later row`, { timeout: 10_000 }, async () => {
+    const ids = kayan === 'tags' ? ['00000000-0000-4000-8000-000000000001', 'ffffffff-ffff-4fff-8fff-ffffffffffff'] : kayan === 'firms' ? ['a-hold', 'z-hold'] : [2, 10]
+    await store.transaction(async (tx) => { for (const id of ids) await store.insert({ tx, kayan, data: { id, [kayan === 'tags' ? 'label' : 'name']: 'ordered' } }) })
+    const reached = Promise.withResolvers<number>()
+    const release = Promise.withResolvers<void>()
+    const holding = store.transaction(async (tx) => {
+      try {
+        await store.find({ tx, kayan, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock: 'update', where: { id: { equals: ids[1]! } } } })
+        reached.resolve((await (tx as { execute(query: string): Promise<{ rows: { pid: number }[] }> }).execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+        await within(release.promise, 5000)
+      } finally { release.resolve() }
+    })
+    void holding.catch(() => {})
+    const probePid = Promise.withResolvers<number>()
+    storeProbe = async (ctx, tools) => {
+      probePid.resolve((await (ctx.tx as { execute(query: string): Promise<{ rows: { pid: number }[] }> }).execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+      await tools.store.hold({ tx: ctx.tx, kayan: declaration(built, kayan), ids: [kayan === 'tags' ? String(ids[1]).toUpperCase() : ids[1], ids[0], ids[1]], mode: 'noKeyUpdate' })
+    }
+    let probing: Promise<unknown> | undefined
+    let changing: Promise<unknown> | undefined
+    try {
+      const holder = await within(reached.promise)
+      probing = memos().probe({ title: 'ordered hold' }, { actor: one })
+      void probing.catch(() => {})
+      const probe = await within(probePid.promise)
+      assert.equal(await Promise.race([probing.then(() => 'answered'), waitForLock({ db: built.targets.store.db, where: `pid = ${probe} and pg_blocking_pids(pid) @> array[${holder}]` })]), 'waited')
+      changing = store.transaction((tx) => store.update({ tx, kayan, id: ids[0], data: { [kayan === 'tags' ? 'label' : 'name']: 'changed after hold' } }))
+      void changing.catch(() => {})
+      assert.equal(await Promise.race([changing.then(() => 'answered'), waitForLock({ db: built.targets.store.db, where: `pg_blocking_pids(pid) @> array[${probe}]` })]), 'waited', 'the earlier id is already held despite the reversed input')
+    } finally {
+      release.resolve()
+      await within(Promise.allSettled([holding, ...(probing ? [probing] : []), ...(changing ? [changing] : [])]), 5000)
+      storeProbe = async () => {}
+    }
+    await holding
+    await probing
+    assert.equal((await changing as Record<string, unknown>)[kayan === 'tags' ? 'label' : 'name'], 'changed after hold')
+  })
+
+  for (const operation of ['outsideProbe', 'afterProbe'] as const) test(`step find, hold, sum and upsert are unavailable in ${operation}`, async () => {
+    storeProbe = async (ctx, tools) => {
+      assert.throws(() => tools.store.find({ tx: ctx.tx, kayan: declaration(built, 'memos'), args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } } }), /outside.*transaction/)
+      assert.throws(() => tools.store.hold({ tx: ctx.tx, kayan: declaration(built, 'memos'), ids: [ids.org1], mode: 'share' }), /outside.*transaction/)
+      assert.throws(() => tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on: ['firmId', 'code'], data: { code: 'outside' } }), /outside.*transaction/)
+      assert.throws(() => tools.store.sum({ tx: ctx.tx, kayan: declaration(built, 'memos'), field: 'balance' }), /outside.*transaction/)
+    }
+    try { await memos()[operation]({ title: 'outside store' }, { actor: one }) } finally { storeProbe = async () => {} }
+  })
+
+  for (const kayan of ['memos', 'tags'] as const) test(`a step upserts ${kayan} by a declared unique key and adds in the database`, async () => {
+    const on = kayan === 'memos' ? ['firmId', 'code'] : ['code']
+    storeProbe = async (ctx, tools) => {
+      const data = { code: 'upsert-paths', [kayan === 'memos' ? 'title' : 'label']: 'inserted', balance: { $inc: 2 } }
+      const inserted = await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, kayan), on, data })
+      assert.equal(inserted.balance, 2)
+      if (kayan === 'memos') assert.equal(inserted.firmId, 'org1')
+      const updated = await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, kayan), on, data: { ...data, id: randomUUID(), balance: { $inc: 3 }, [kayan === 'memos' ? 'title' : 'label']: 'updated' } })
+      assert.equal(updated.id, inserted.id)
+      assert.equal(updated.balance, 5)
+      assert.equal(updated[kayan === 'memos' ? 'title' : 'label'], 'updated')
+      const keyed = await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, kayan), on, data: { code: 'key-only' } })
+      assert.equal((await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, kayan), on, data: { code: 'key-only' } })).id, keyed.id)
+    }
+    try { await memos().probe({ title: 'upsert paths' }, { actor: one }) } finally { storeProbe = async () => {} }
+  })
+
+  if (postgres) test('upsert refuses foreign tenants and undeclared unique keys without changing their rows', async () => {
+    const foreign = await store.transaction((tx) => store.insert({ tx, kayan: 'memos', data: { firmId: 'org2', code: 'tenant-upsert', globalCode: 'global-upsert', title: 'foreign', balance: 40 } }))
+    storeProbe = async (ctx, tools) => {
+      const own = await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on: ['firmId', 'code'], data: { code: 'tenant-upsert', title: 'own', balance: { $inc: 2 } } })
+      assert.notEqual(own.id, foreign.id)
+      assert.equal(own.firmId, 'org1')
+      const same = await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on: ['code', 'firmId'], data: { firmId: 'org1', code: 'tenant-upsert', title: 'own updated' } })
+      assert.equal(same.id, own.id)
+    }
+    try { await memos().probe({ title: 'tenant upsert' }, { actor: one }) } finally { storeProbe = async () => {} }
+    for (const [on, data, status] of [
+      [['firmId', 'code'], { firmId: 'org2', code: 'tenant-upsert', balance: { $inc: 1 } }, undefined],
+      [['globalCode'], { globalCode: 'global-upsert', title: 'stolen' }, 404],
+      [['title'], { title: 'no unique key' }, 400],
+      [[], { title: 'no key' }, 400],
+      [['code', 'code'], { code: 'duplicate key' }, 400],
+      [['firmId', 'code'], { title: 'missing key' }, 400],
+      [['firmId', 'code'], { code: 'invalid increment', balance: { $inc: 0.5 } }, 400],
+      [['firmId', 'code'], { code: 'wrong field', title: { $inc: 1 } }, 400],
+    ] as const) {
+      storeProbe = async (ctx, tools) => { await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on, data }) }
+      try {
+        const error = await refusal(memos().probe({ title: 'refused upsert' }, { actor: one }))
+        if (status) assert.equal(error.status, status, String(error))
+      } finally { storeProbe = async () => {} }
+    }
+    const kept = await memos().findByID({ id: foreign.id }, { actor: two })
+    assert.equal(kept.balance, 40)
+    assert.equal(kept.title, 'foreign')
+  })
+
+  if (postgres) test('an increment of the operation row keeps numeric versions and its pending draft, and refuses arithmetic in a draft snapshot', async () => {
+    const papers = built.kayan.papers.operations
+    const row = await papers.create({ title: 'published arithmetic', memo: null, balance: 10, _status: 'published' }, { actor: one })
+    assert.equal((await papers.bump({ id: row.id }, { actor: one })).balance, 13)
+    await papers.update({ id: row.id, title: 'pending arithmetic', balance: 30 }, { actor: one, draft: true })
+    assert.equal((await papers.bump({ id: row.id }, { actor: one })).balance, 16)
+    const latest = await papers.findVersions({ where: { parent: { equals: row.id } }, limit: 1, sort: '-createdAt' }, { actor: one })
+    assert.equal(latest.docs[0].version.title, 'pending arithmetic')
+    assert.equal(latest.docs[0].version.balance, 16)
+    const refused = await refusal(papers.draftBump({ id: row.id }, { actor: one, draft: true }))
+    assert.equal(refused.status, 400)
+    assert.equal(refused.key, 'error.invalid.value')
+    assert.equal((await papers.findByID({ id: row.id }, { actor: one })).balance, 16)
+  })
+
+  if (postgres) for (const kayan of ['memos', 'tags'] as const) test(`a step sums ${kayan} exactly and refuses a non-numeric field`, async () => {
+    await store.transaction(async (tx) => {
+      for (const quantity of ['0.1', '0.2']) await store.insert({ tx, kayan, data: { ...(kayan === 'memos' && { firmId: 'org1' }), code: `sum-${quantity}`, quantity, amount: quantity === '0.1' ? '9007199254740993.1' : '0.2', balance: 2 } })
+      if (kayan === 'memos') await store.insert({ tx, kayan, data: { firmId: 'org2', code: 'sum-foreign', quantity: '100', balance: 100 } })
+    })
+    storeProbe = async (ctx, tools) => {
+      const where = { code: { in: ['sum-0.1', 'sum-0.2', 'sum-foreign'] } }
+      assert.equal(await tools.store.sum({ tx: ctx.tx, kayan: declaration(built, kayan), field: 'amount', where }), '9007199254740993.3')
+      assert.equal(await tools.store.sum({ tx: ctx.tx, kayan: declaration(built, kayan), field: 'quantity', where }), '0.300')
+      assert.equal(await tools.store.sum({ tx: ctx.tx, kayan: declaration(built, kayan), field: 'balance', where }), '4')
+      assert.equal(await tools.store.sum({ tx: ctx.tx, kayan: declaration(built, kayan), field: 'quantity', where: { code: { equals: 'sum-empty' } } }), '0')
+      if (kayan === 'memos') assert.equal(await tools.store.sum({ tx: ctx.tx, kayan: declaration(built, kayan), field: 'balance', where: { firmId: { equals: 'org2' } } }), '0')
+      for (const field of [kayan === 'memos' ? 'title' : 'label', 'absent']) {
+        const error = await refusal(tools.store.sum({ tx: ctx.tx, kayan: declaration(built, kayan), field }))
+        assert.equal(error.status, 400)
+        assert.equal(error.key, 'error.invalid.value')
+      }
+    }
+    try { await memos().probe({ title: 'sum values' }, { actor: one }) } finally { storeProbe = async () => {} }
+  })
+
+  if (postgres) for (const state of ['40P01', '40001'] as const) for (const surface of ['local', 'fetch', 'openapi', 'rpc', 'storage', 'local-auth'] as const) test(`${surface} maps a forced ${state} to a retry conflict without leaking database errors`, { timeout: 20_000 }, async () => {
+    const rows = await store.transaction(async (tx) => Promise.all([0, 1].map(() => store.insert({ tx, kayan: 'tags', data: { balance: 0 } }))))
+    const reached = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+    const release = Promise.withResolvers<void>()
+    const reports: unknown[] = []
+    const work = async (tx: any, first: boolean) => {
+      try {
+        if (state === '40001') {
+          await tx.setTransaction({ isolationLevel: 'serializable' })
+          await store.find({ tx, kayan: 'tags', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { id: { equals: rows[0]!.id as string } } } })
+        } else await store.update({ tx, kayan: 'tags', id: rows[first ? 0 : 1]!.id, data: { balance: { $inc: 1 } } })
+        reached[first ? 0 : 1]!.resolve()
+        await within(release.promise, 5000)
+        await store.update({ tx, kayan: 'tags', id: rows[state === '40001' || !first ? 0 : 1]!.id, data: { balance: { $inc: 1 } } })
+      } finally { release.resolve() }
+    }
+    const raw = (first: boolean) => built.targets.store.db.transaction((tx: unknown) => work(tx, first))
+    const table = [{ kayan: 'work', name: 'run', effect: 'create', single: false, input: z.object({ first: z.boolean() }), call: async ({ first }: { first: boolean }) => (await raw(first), {}) }]
+    const plug = surface === 'fetch' ? fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => reports.push(error) })(table as never) : orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => reports.push(error) })(table as never)
+    const files = storageRoutes({ kayan: [{ name: 'files', storage: { operation: 'create' } }] as never, config: { ...storageConfig, adapters: {}, serve: async ({ id }) => (await raw(id === 'first'), new Response('{}', { headers: { 'content-type': 'application/json' } })), onError: (error) => reports.push(error) }, read: async () => null, authorize: async () => undefined })
+    localProbe = async (request) => (await raw(request.headers.get('x-first') === 'yes'), {})
+    const call = async (first: boolean) => {
+      if (surface === 'local') return store.transaction((tx) => work(tx, first)).then(() => ({ status: 200, key: undefined }), (error: AsasError) => ({ status: error.status, key: error.key }))
+      const request = new Request(surface === 'storage' ? `http://test/api/files/file/${first ? 'first' : 'second'}` : surface === 'local-auth' ? 'http://test/api/auth/local/first-register' : `http://test/${surface === 'rpc' ? 'api/rpc' : 'api'}/work/run`, {
+        method: surface === 'storage' ? 'GET' : 'POST',
+        headers: { 'content-type': 'application/json', 'x-first': first ? 'yes' : 'no' },
+        ...(surface !== 'storage' && { body: JSON.stringify(surface === 'local-auth' ? { email: `retry-${state}-${first}@test.com`, password: 'a-long-test-password' } : surface === 'rpc' ? { json: { first } } : { first }) }),
+      })
+      const response = (surface === 'storage' ? await files(request, async () => one) : surface === 'local-auth' ? await built.handler(request) : await plug.handle(request, async () => one))!
+      const body = await response.json() as { json?: { data?: { key?: string } }; data?: { key?: string } }
+      assert.doesNotMatch(JSON.stringify(body), /deadlock detected|could not serialize|tenant_scope_/)
+      return { status: response.status, key: (body.json ?? body).data?.key }
+    }
+    const calls: Promise<{ status: number; key?: string }>[] = []
+    let outcomes: PromiseSettledResult<{ status: number; key?: string }>[] = []
+    try {
+      calls.push(call(true), call(false))
+      for (const promise of calls) void promise.catch(() => {})
+      await within(Promise.all(reached.map((gate) => gate.promise)))
+    } finally {
+      release.resolve()
+      outcomes = await within(Promise.allSettled(calls), 5000)
+      localProbe = async () => ({})
+    }
+    assert.ok(outcomes.every((one) => one.status === 'fulfilled'), String(outcomes.find((one) => one.status === 'rejected')?.reason))
+    const answers = outcomes.map((one) => (one as PromiseFulfilledResult<{ status: number; key?: string }>).value)
+    assert.equal(answers.filter((one) => one.status === 409 && one.key === 'error.conflict.retry').length, 1, JSON.stringify(answers))
+    assert.ok(answers.every((one) => one.status !== 500), JSON.stringify(answers))
+    assert.equal(reports.length, 0)
+    const final = await store.find({ kayan: 'tags', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { id: { in: rows.map((row) => row.id as string) } } } })
+    assert.deepEqual(final.docs.map((row) => row.balance).sort(), state === '40P01' ? [1, 1] : [0, 1])
+  })
+
+  if (postgres) test('a versioned operation upserts a sibling with versions and keeps its references in the organization', async () => {
+    const papers = built.kayan.papers.operations
+    const id = randomUUID()
+    storeProbe = async (ctx, tools) => {
+      const data = { id, title: 'upserted sibling', memo: ids.org1, balance: { $inc: 2 }, _status: 'published' }
+      assert.equal((await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'papers'), on: ['id'], data })).balance, 2)
+      const refused = await refusal(tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'papers'), on: ['id'], data: { ...data, memo: ids.org2 } }))
+      assert.equal(refused.key, 'error.invalid.tenant_reference')
+      assert.equal((await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'papers'), on: ['id'], data: { ...data, balance: { $inc: 3 } } })).balance, 5)
+    }
+    try { await papers.probe({ title: 'upsert outer', memo: null }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.equal((await papers.findByID({ id }, { actor: one })).balance, 5)
+    const versions = await papers.findVersions({ where: { parent: { equals: id } }, limit: 10 }, { actor: one })
+    assert.deepEqual(versions.docs.map((row: { version: { balance: number } }) => row.version.balance).sort(), [2, 5])
+  })
+
+  if (postgres) for (const kayan of ['memos', 'papers'] as const) test(`an upsert of the operation's own ${kayan} row keeps successive edits and numeric versions`, async () => {
+    const operations = built.kayan[kayan].operations
+    const row = await operations.create({ title: 'upsert own row', balance: 10, ...(kayan === 'memos' ? { code: 'upsert-own' } : { memo: null, _status: 'published' }) }, { actor: one })
+    if (kayan === 'papers') await operations.update({ id: row.id, title: 'pending own row', balance: 30 }, { actor: one, draft: true })
+    storeProbe = async (ctx, tools) => {
+      ctx.data = await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, kayan), on: kayan === 'memos' ? ['firmId', 'code'] : ['id'], data: { ...(kayan === 'memos' ? { code: 'upsert-own' } : { id: row.id }), balance: { $inc: 3 } } })
+    }
+    try {
+      const updated = await operations.probeAfterEdit({ id: row.id, title: 'edited own row' }, { actor: one })
+      assert.equal(updated.balance, 13)
+      assert.equal(updated.title, 'edited own row')
+      if (kayan === 'papers') {
+        const latest = await operations.findVersions({ where: { parent: { equals: row.id } }, limit: 1, sort: '-createdAt' }, { actor: one })
+        assert.equal(latest.docs[0].version.balance, 13)
+        assert.equal(latest.docs[0].version.title, 'edited own row')
+        assert.equal((await refusal(operations.draftProbeAfterEdit({ id: row.id, title: 'refused draft' }, { actor: one, draft: true }))).key, 'error.invalid.value')
+      }
+    } finally { storeProbe = async () => {} }
+    assert.equal((await operations.findByID({ id: row.id }, { actor: one })).balance, 13)
+  })
+
+  for (const method of ['insert', 'update', 'upsert'] as const) test(`a step ${method} refuses a field the kayan never declared`, async () => {
+    storeProbe = async (ctx, tools) => {
+      const data = { title: 'unknown field', baalance: 5, ...(method === 'insert' && { firmId: 'org1' }) }
+      if (method === 'insert') await tools.store.insert({ tx: ctx.tx, kayan: declaration(built, 'memos'), data })
+      else if (method === 'upsert') await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'memos'), on: ['firmId', 'code'], data: { ...data, code: 'unknown-field' } })
+      else await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'memos'), id: ids.org1, data })
+    }
+    try {
+      const error = await refusal(memos().probe({ title: 'unknown field guard' }, { actor: one }))
+      assert.equal(error.status, 400)
+      assert.equal(error.key, 'error.invalid.value')
+    } finally { storeProbe = async () => {} }
+  })
+
+  test('step store filters, sort and conflict keys refuse undeclared fields and never trust a forged declaration', async () => {
+    storeProbe = async (ctx, tools) => {
+      const kayan = declaration(built, 'memos')
+      const args = { tx: ctx.tx, kayan }
+      const query = { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' as const } }
+      const cases = [
+        ['find', { ...args, args: { ...query, where: { baalance: { equals: 0 } } } }],
+        ['find', { ...args, args: { ...query, where: { constructor: { equals: 0 } } } }],
+        ['find', { ...args, args: { ...query, sort: { field: 'baalance', direction: 'asc' } } }],
+        ['sum', { ...args, field: 'balance', where: { baalance: { equals: 0 } } }],
+        ['update', { ...args, id: ids.org1, data: { title: 'wrong filter' }, where: { baalance: { equals: 0 } } }],
+        ['remove', { ...args, id: ids.org1, where: { baalance: { equals: 0 } } }],
+        ['upsert', { ...args, on: ['baalance'], data: { title: 'wrong key' } }],
+        ['update', { ...args, kayan: { name: 'memos', fields: { baalance: { kind: 'integer' } } }, id: ids.org1, data: { baalance: 2 } }],
+      ] as const
+      for (const [word, input] of cases) {
+        const error = await refusal((tools.store[word] as (args: unknown) => Promise<unknown>)(input))
+        assert.equal(error.status, 400, word)
+        assert.equal(error.key, 'error.invalid.value', word)
+      }
+      assert.throws(() => tools.store.find({ kayan: 'memos', args: query } as never), (error: unknown) => error instanceof AsasError && error.status === 400)
+    }
+    try { await memos().probe({ title: 'unknown query fields' }, { actor: one }) } finally { storeProbe = async () => {} }
+  })
+
+  if (postgres) test('the raw adapter refuses undeclared write and sort fields before a statement can change rows', async () => {
+    for (const word of ['insert', 'update', 'upsert'] as const) {
+      const error = await refusal(store.transaction((tx) => {
+        const data = { firmId: 'org1', title: 'raw unknown field', baalance: 2 }
+        return word === 'insert' ? store.insert({ tx, kayan: 'memos', data }) : word === 'update' ? store.update({ tx, kayan: 'memos', id: ids.org1, data }) : store.upsert({ tx, kayan: 'memos', on: ['firmId', 'code'], data: { ...data, code: 'raw-unknown' } })
+      }))
+      assert.equal(error.status, 400, word)
+      assert.equal(error.key, 'error.invalid.value', word)
+    }
+    const error = await refusal(store.find({ kayan: 'memos', args: { limit: 1, page: 1, sort: { field: 'baalance', direction: 'asc' } } }))
+    assert.equal(error.status, 400)
+  })
+
+  test('step store name checks preserve empty raw filters without widening the tenant', async () => {
+    const row = await memos().create({ title: 'empty raw filter', balance: 7 }, { actor: one })
+    storeProbe = async (ctx, tools) => {
+      const kayan = declaration(built, 'memos')
+      const found = await tools.store.find({ tx: ctx.tx, kayan, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: {} } })
+      assert.ok(found.docs.some((one) => one.id === row.id))
+      assert.ok(found.docs.every((one) => one.firmId === 'org1'))
+      assert.equal((await tools.store.update({ tx: ctx.tx, kayan, id: row.id, where: { and: [] }, data: { title: 'empty filter kept' } })).title, 'empty filter kept')
+      assert.ok(BigInt(await tools.store.sum({ tx: ctx.tx, kayan, field: 'balance', where: { and: [{}] } })) >= 7n)
+      await tools.store.remove({ tx: ctx.tx, kayan, id: row.id, where: {} })
+    }
+    try { await memos().probe({ title: 'empty filter probe' }, { actor: one }) } finally { storeProbe = async () => {} }
+  })
+
+  if (postgres) test('locked store calls refuse to run without a transaction', async () => {
+    for (const lock of ['update', 'noKeyUpdate', 'share', 'keyShare'] as const) await assert.rejects(store.find({ kayan: 'memos', args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock } }), /transaction/)
+    await assert.rejects(store.upsert({ tx: undefined, kayan: 'tags', on: ['code'], data: { code: 'no transaction' } }), /transaction/)
+  })
+
+  if (postgres) for (const method of ['find', 'hold'] as const) for (const mode of ['update', 'noKeyUpdate', 'share', 'keyShare'] as const) for (const kayan of ['memos', 'tags'] as const) test(`a step ${method} holds ${kayan} in ${mode} until its transaction ends`, { timeout: 10_000 }, async () => {
+    const row = await store.transaction((tx) => store.insert({ tx, kayan, data: kayan === 'memos' ? { firmId: 'org1', title: 'held' } : { label: 'held', open: false } }))
+    const reached = Promise.withResolvers<number>()
+    const release = Promise.withResolvers<void>()
+    storeProbe = async (ctx, tools) => {
+      try {
+        if (method === 'hold') await tools.store.hold({ tx: ctx.tx, kayan: declaration(built, kayan), ids: [row.id], mode })
+        else {
+          const found = await tools.store.find({ tx: ctx.tx, kayan: declaration(built, kayan), args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock: mode, where: { id: { equals: row.id as string } } } })
+          assert.equal(found.docs[0]?.id, row.id)
+        }
+        reached.resolve((await (ctx.tx as { execute(query: string): Promise<{ rows: { pid: number }[] }> }).execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+        await within(release.promise, 5000)
+      } finally { release.resolve() }
+    }
+    const holding = memos().probe({ title: 'find holder' }, { actor: one })
+    void holding.catch(() => {})
+    let changing: Promise<unknown> | undefined
+    let reading: Promise<unknown> | undefined
+    try {
+      const holder = await within(reached.promise)
+      if (mode !== 'update') {
+        const compatible = mode === 'share' ? 'share' : mode === 'noKeyUpdate' ? 'keyShare' : 'noKeyUpdate'
+        reading = store.transaction((tx) => store.find({ tx, kayan, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock: compatible, where: { id: { equals: row.id as string } } } })).then(() => 'compatible')
+        void reading.catch(() => {})
+        assert.equal(await Promise.race([reading, waitForLock({ db: built.targets.store.db, where: `pg_blocking_pids(pid) @> array[${holder}]` })]), 'compatible')
+      }
+      changing = store.transaction((tx) => mode === 'keyShare' ? store.remove({ tx, kayan, id: row.id }) : store.update({ tx, kayan, id: row.id, data: kayan === 'memos' ? { title: 'changed' } : { label: 'changed' } }))
+      void changing.catch(() => {})
+      assert.equal(await Promise.race([changing.then(() => 'answered'), waitForLock({ db: built.targets.store.db, where: `pg_blocking_pids(pid) @> array[${holder}]` })]), 'waited')
+    } finally {
+      release.resolve()
+      await within(Promise.allSettled([holding, ...(changing ? [changing] : []), ...(reading ? [reading] : [])]), 5000)
+      storeProbe = async () => {}
+    }
+    await holding
+    const changed = await changing as Record<string, unknown>
+    assert.equal(mode === 'keyShare' ? changed.id : changed[kayan === 'memos' ? 'title' : 'label'], mode === 'keyShare' ? row.id : 'changed')
+  })
+
+
 })
 
 suite('memory store', async () => {
@@ -1659,4 +2113,13 @@ test('a custom service authorizer answering nothing still runs under the scope',
   await built.kayan.memos.operations.create({ title: 'b' }, { actor: two })
   const page = await built.kayan.memos.operations.find({ limit: 0 }, { actor: one })
   assert.deepEqual(page.docs.map((row: { firmId: string }) => row.firmId), ['org1'])
+})
+
+
+test('an error wrapping an after-commit failure is not advertised as a retryable rollback', async () => {
+  const committed = new AfterCommitError({}, Object.assign(new Error('database failure after commit'), { code: '40P01' }))
+  const table = [{ kayan: 'work', name: 'run', effect: 'create', single: false, input: z.object({}), call: async () => { throw new Error('wrapped committed failure', { cause: committed }) } }]
+  const plug = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })(table as never)
+  const response = await plug.handle(new Request('http://test/api/work/run', { method: 'POST', body: '{}' }), async () => null)
+  assert.equal(response?.status, 500)
 })

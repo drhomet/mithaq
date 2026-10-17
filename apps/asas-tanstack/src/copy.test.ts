@@ -39,3 +39,9 @@ test('each organization mode\'s words replace keys the copy has, in both locales
     .map(([key]) => key)
   assert.deepEqual(named, [], 'with the organization never shown, these still name one')
 })
+
+test('a retry conflict tells the caller to try again in both locales', async () => {
+  const { translator } = await import('./copy.ts')
+  assert.equal(translator('en')('error.conflict.retry'), 'Another write interrupted this transaction. Try again.')
+  assert.equal(translator('ar')('error.conflict.retry'), 'تعارضت هذه المعاملة مع عملية أخرى. حاول مرة أخرى.')
+})

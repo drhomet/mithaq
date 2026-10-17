@@ -1,4 +1,5 @@
 // One list in one place, so drizzle's callback transaction is kept as it is.
+import { stepTools } from './store.ts'
 import { rowsOfField, type Rows } from '../../mithaq/rows.ts'
 import { heldPermissions } from '../../rbac/index.ts'
 import { authActor } from '../actor.ts'
@@ -12,7 +13,7 @@ import type { Store } from '../../mithaq/language.ts'
 import type { LanguageOf } from '../../mithaq/define.ts'
 import { providerOf } from '../../base/rules.ts'
 import type { InferInput, InferOutput, StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
-import { atEffect, defaults, issueRefusal, parse, sealOf, storeSeals, validated, withoutPrototype, type BulkResult, type Context, type ContextOf, type Ctx, type DerivedSchemas, type OperationEffect, type ResolvedOperation, type StepsOf, type Tools, type WriteTools, type WriteStep } from './steps.ts'
+import { atEffect, defaults, issueRefusal, parse, sealOf, storeSeals, validated, withoutPrototype, type BulkResult, type Context, type ContextOf, type Ctx, type DerivedSchemas, type OperationEffect, type ResolvedOperation, type StepsOf, type Tools, type RuntimeWriteTools as WriteTools, type WriteStep } from './steps.ts'
 import { firstRegisters, running, snapshot, type Open, type Running } from './runtime.ts'
 import type { FindInput } from './read.ts'
 import { changedColumns, latestVersion, restoreInput, revived, saveVersion } from '../../versions/versions.ts'
@@ -113,15 +114,25 @@ const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; s
   const resolved = kayan.fields[field]
   if ((parts.length > 2 && resolved?.kind !== 'json') || parts.some((part) => !part || !isStorableText(part))) throw new Error(unsupported)
   const path = parts[1]
-  if (!resolved) throw new Error(`${said} names unknown field "${key}".`)
+  if (!resolved || !Object.hasOwn(kayan.fields, field)) throw new Error(`${said} names unknown field "${key}".`)
   if (resolved.kind === 'json') return { field, key, kind: resolved.kind, operators: resolved.operators }
   if (!path || resolved.locales?.includes(path)) return { field, key, kind: resolved.kind, operators: resolved.operators }
   if (!resolved.target) throw new Error(unsupported)
   const target = resolved.target.fields[path]
-  if (!target) throw new Error(`${said} path "${key}" names unknown related field.`)
+  if (!target || !Object.hasOwn(resolved.target.fields, path)) throw new Error(`${said} path "${key}" names unknown related field.`)
   // A path into json across a hop would be a third segment, and a json value compared whole has no store answer.
   if (target.kind === 'json') throw new Error(`${said} path "${key}" reaches json field "${path}" across a relationship, and a json field is filtered on its own kayan alone.`)
   return { field, key, kind: target.kind, operators: target.operators }
+}
+
+/** Raw store filters keep their adapter's value and empty-filter semantics; only declared paths are checked here. */
+export const assertStoreWhere = (kayan: ResolvedKayan, where: Where): Where => {
+  for (const [key, value] of Object.entries(where)) {
+    if (key === 'and' || key === 'or') {
+      if (Array.isArray(value)) for (const one of value) assertStoreWhere(kayan, one)
+    } else queryField({ kayan, key, said: `Kayan "${kayan.name}" store filter` })
+  }
+  return where
 }
 
 // An access constraint and a screen's `when` share this one grammar.
@@ -773,7 +784,7 @@ const outsideStore = (kayan: ResolvedKayan, operation: string, slot: string): Wr
       `Kayan "${kayan.name}" operation "${operation}" reached the store from "${slot}", which runs outside the operation's transaction, so the write would not be in it. Write through tools.kayans, which opens its own, or move the step into "steps".`,
     )
   }
-  return Object.freeze({ insert: refuse, remove: refuse, update: refuse })
+  return Object.freeze({ find: refuse, hold: refuse, upsert: refuse, sum: refuse, insert: refuse, remove: refuse, update: refuse })
 }
 
 // No transaction is carried, so a managed write here opens its own. An `afterCommit`
@@ -793,13 +804,13 @@ export const runOutside = async <Actor>({
   start: Ctx
   around: { context: Context; user: Actor | null }
 }): Promise<Ctx> => {
-  const given = Object.freeze({ ...tools, store: outsideStore(kayan, tools.operation, slot) })
+  const given = stepTools({ ...tools, store: outsideStore(kayan, tools.operation, slot) } as WriteTools)
   // Read before the first step, which is handed `start` itself and may rewrite it in place.
   const { tenant } = start
   return running.run(around as Running, async () => {
     let ctx = start
     try {
-      for (const step of list) ctx = { ...(await step(ctx, given as WriteTools)), tenant }
+      for (const step of list) ctx = { ...(await step(ctx, given)), tenant }
     } catch (cause) {
       if (slot === 'beforeTransaction') throw cause
       throw new Error(
@@ -989,7 +1000,7 @@ export const write = <Actor = unknown>({
           : values
         // Carried from a draft rather than sent, so field access refuses rather than drops them.
         const carried = merged === values ? [] : Object.keys(merged).filter((key) => !(key in values))
-        const pending = asIs && newest && !restoring && base?._status === 'draft' ? base : undefined
+        let pending = asIs && newest && !restoring && base?._status === 'draft' ? base : undefined
         // A key the operation's own shape would refuse is refused here first, in that shape's words.
         if (drafting) {
           const stray = Object.keys(data).find((key) =>
@@ -1026,6 +1037,21 @@ export const write = <Actor = unknown>({
         const elsewhere = <Args extends { kayan: string; where?: Where }>(args: Args): Args =>
           kind !== 'insert' && args.kayan === kayan.name && targetId !== undefined ? { ...args, where: combineWhere(args.where, { id: { not_equals: targetId as Scalar } }) } : args
         const protectedStore: WriteTools<unknown, Actor>['store'] = Object.freeze({
+          find: tools.store.find,
+          hold: tools.store.hold,
+          sum: tools.store.sum,
+          upsert: async (args) => {
+            const kept = own(args.kayan)
+            if (drafting && kept) throw invalid({ message: "An upsert writes stored rows, not this operation's draft snapshot. Use update for that draft.", key: 'error.invalid.value', params: { kayan: args.kayan } })
+            const row = await tools.store.upsert(args)
+            const current = ownRow(args.kayan, row.id)
+            if (kept && !(current && pending && status === 'draft')) await saveVersion({ kayan: kept, store, writes: store, tx: args.tx, row, autosave: false })
+            if (kept && current && pending) {
+              pending = { ...pending, ...Object.fromEntries(Object.keys(args.data).map((field) => [field, row[field]])), id: targetId, _status: 'draft' }
+              await saveVersion({ kayan: kept, store, writes: store, tx: args.tx, row: pending, autosave: false })
+            }
+            return row
+          },
           insert: async ({ tx: heldTx, kayan: name, data: values }) => {
             const row = await tools.store.insert({ tx: heldTx, kayan: name, data: values })
             const kept = own(name)
@@ -1037,6 +1063,8 @@ export const write = <Actor = unknown>({
             // Any other row is the step's own raw write, held by the tenant seal alone.
             if (!ownRow(name, id)) return tools.store.update(elsewhere(args))
             const kept = own(name)
+            const incremented = Object.keys(values).filter((field) => values[field] && typeof values[field] === 'object' && '$inc' in (values[field] as object))
+            if (drafting && kept && incremented.length) throw invalid({ message: 'An increment writes a stored integer field, not a draft snapshot.', key: 'error.invalid.value', params: { kayan: name } })
             if (drafting && kept) {
               const draft = { ...base, ...values, id: targetId }
               await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: draft, autosave: autosaving })
@@ -1046,7 +1074,10 @@ export const write = <Actor = unknown>({
             // A never-published row is its own draft, so the draft appended below is its one version.
             if (kept && !(pending && status === 'draft')) await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row, autosave: false })
             // Appended after the row's own, so the draft stays the latest.
-            if (kept && pending) await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: { ...pending, ...values, id: targetId, _status: 'draft' }, autosave: false })
+            if (kept && pending) {
+              pending = { ...pending, ...values, ...Object.fromEntries(incremented.map((field) => [field, row[field]])), id: targetId, _status: 'draft' }
+              await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: pending, autosave: false })
+            }
             return row
           },
           // A soft delete keeps the `remove` seal, so the effect, the access answer and the 404 stay
@@ -1080,13 +1111,14 @@ export const write = <Actor = unknown>({
           store: protectedStore,
           where: writeWhere,
         })
+        const publicTools = stepTools(runTools as WriteTools)
         let ctx: Ctx = { kayan, data: { ...inputData }, actor, user: actor, tx, context, dataBefore, dataAfter: dataBefore, tenant: owner }
         // With no `input` the filled row is parsed, so a default reaches a required column; with one,
         // the caller's strict shape is parsed first. A remove writes no column, so neither runs.
-        const fill = (one: Ctx) => (fieldOperation ? (defaults(one, runTools as WriteTools) as Ctx) : one)
+        const fill = (one: Ctx) => (fieldOperation ? (defaults(one, publicTools) as Ctx) : one)
         ctx = declaration.input
-          ? fill(await parse({ schema: runTools.schema, ctx, tools: runTools }))
-          : await parse({ schema: runTools.schema, ctx: fill(ctx), tools: runTools })
+          ? fill(await parse({ schema: runTools.schema, ctx, tools: publicTools }))
+          : await parse({ schema: runTools.schema, ctx: fill(ctx), tools: publicTools })
         // Filled after the parse, from the session alone.
         if (kind === 'insert' && kayan.tenant) ctx = { ...ctx, data: { ...ctx.data, [kayan.tenant]: owner } }
         // The guards belong to the store seal, and no slot may hold one.
@@ -1148,7 +1180,7 @@ export const write = <Actor = unknown>({
             // runner's value; on insert no create callback would refuse a step's.
             if (kayan.single) ctx = { ...ctx, data: { ...ctx.data, globalType: kayan.name } }
           }
-          ctx = { ...(await step(ctx, runTools as WriteTools)), tenant: owner }
+          ctx = { ...(await step(ctx, publicTools)), tenant: owner }
         }
         committed = ctx
         // A draft may be short of `required`, so it leaves through the draft shape, which holds it to its kinds alone.
@@ -1473,6 +1505,45 @@ type BoundOne<
       ? [input?: InputOf<K, Name, Fields, L, List>]
       : [input: InputOf<K, Name, Fields, L, List>]
   ) => OperationResult<OwnOperation<K, Name>, Fields, L, List>
+}
+
+type StoreFields<K extends Registry[number]> = { [N in keyof K['fields'] as K['fields'][N] extends { kind: 'join' } ? never : N]: K['fields'][N] }
+type StoreNames<K extends Registry[number]> = keyof StoreFields<K> & string
+type StoreNumeric<K extends Registry[number]> = string extends StoreNames<K> ? string : { [N in StoreNames<K>]: K['fields'][N] extends { kind: 'integer' | 'number' | 'decimal' } ? N : never }[StoreNames<K>]
+type StoreValue<K extends Registry[number], F> = ([Value<F, LanguageOf<K>, readonly [K]>] extends [never]
+  ? F extends { relationTo: string } ? F extends { hasMany: true } ? (string | number)[] : string | number : never
+  : Value<F, LanguageOf<K>, readonly [K]>) | (F extends { rules: { required: true } } ? never : null)
+type StoreData<K extends Registry[number], Increment extends boolean = false> = string extends StoreNames<K> ? Record<string, unknown> : {
+  [N in StoreNames<K>]?: (N extends 'id' ? StoreID<K> : StoreValue<K, K['fields'][N]>)
+    | (Increment extends true ? K['fields'][N] extends { kind: 'integer' } ? { $inc: number } : never : never)
+}
+type StorePath<K extends Registry[number]> = StoreNames<K> | {
+  [N in StoreNames<K>]: K['fields'][N] extends { rules: { localized: true } } ? `${N}.${LocalesOf<LanguageOf<K>>}`
+    : K['fields'][N] extends { relationTo: () => infer Related extends Registry[number] } ? `${N}.${keyof Related['fields'] & string}`
+    : K['fields'][N] extends { kind: 'json' } ? `${N}.${string}` : never
+}[StoreNames<K>]
+type StorePathValue<K extends Registry[number], Path extends string> = Path extends keyof K['fields'] ? StoreValue<K, K['fields'][Path]>
+  : Path extends `${infer Name}.${infer Rest}` ? Name extends keyof K['fields']
+    ? K['fields'][Name] extends { relationTo: () => infer Related extends Registry[number] } ? Rest extends keyof Related['fields'] ? StoreValue<Related, Related['fields'][Rest]> : never
+    : K['fields'][Name] extends { rules: { localized: true } } ? KindCarried<K['fields'][Name], LanguageOf<K>, readonly [K]> | null
+    : Scalar : never : never
+type StoreCondition<Value> = { [O in Operator]?: O extends 'exists' ? boolean : O extends 'in' | 'not_in' ? readonly Value[] : O extends 'like' ? Extract<Value, string> : O extends 'contains' ? Extract<Value, string> | (Value extends readonly (infer Item)[] ? Item : never) : Value }
+type StoreWhere<K extends Registry[number]> = string extends StoreNames<K> ? Where : {
+  [P in StorePath<K>]?: StoreCondition<StorePathValue<K, P>>
+} & { and?: readonly StoreWhere<K>[]; or?: readonly StoreWhere<K>[] }
+type StoreResult<K extends Registry[number]> = StoredRow<StoreFields<K>, LanguageOf<K>, readonly [K]>
+type StoreID<K extends Registry[number]> = string extends StoreNames<K> ? unknown : Exclude<Value<K['fields']['id'], LanguageOf<K>, readonly [K]>, null | undefined>
+type StoreLock = NonNullable<Parameters<Store['find']>[0]['args']['lock']>
+
+/** The declaration carries the language and fields, so a step needs no separate name registry. */
+export type DeclarationStore = {
+  insert<const K extends Registry[number]>(args: { tx: unknown; kayan: K; data: StoreData<NoInfer<K>> }): Promise<StoreResult<K>>
+  update<const K extends Registry[number]>(args: { tx: unknown; kayan: K; id: StoreID<NoInfer<K>>; data: StoreData<NoInfer<K>, true>; where?: StoreWhere<NoInfer<K>> }): Promise<StoreResult<K>>
+  upsert<const K extends Registry[number]>(args: { tx: unknown; kayan: K; on: readonly StoreNames<NoInfer<K>>[]; data: StoreData<NoInfer<K>, true>; where?: StoreWhere<NoInfer<K>> }): Promise<StoreResult<K>>
+  remove<const K extends Registry[number]>(args: { tx: unknown; kayan: K; id: StoreID<NoInfer<K>>; where?: StoreWhere<NoInfer<K>> }): Promise<StoreResult<K>>
+  find<const K extends Registry[number]>(args: { tx?: unknown; kayan: K; args: { limit: number; page: number; sort: { field: StoreNames<NoInfer<K>>; direction: 'asc' | 'desc' }; lock?: StoreLock; where?: StoreWhere<NoInfer<K>> } }): Promise<{ docs: StoreResult<K>[]; totalDocs: number }>
+  hold<const K extends Registry[number]>(args: { tx: unknown; kayan: K; ids: readonly StoreID<NoInfer<K>>[]; mode: StoreLock }): Promise<void>
+  sum<const K extends Registry[number]>(args: { tx?: unknown; kayan: K; field: StoreNumeric<NoInfer<K>>; where?: StoreWhere<NoInfer<K>> }): Promise<string>
 }
 
 // Read in a step's body, never its annotation, where two kayan importing each other would

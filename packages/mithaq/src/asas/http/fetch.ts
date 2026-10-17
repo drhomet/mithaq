@@ -1,6 +1,6 @@
 // Imports no library, so a project that wants plain HTTP installs no optional peer.
 import type { HttpPlug, OperationTable } from '../build.ts'
-import { AfterCommitError, AsasError, afterCommitHeader, codes } from '../runner/errors.ts'
+import { AfterCommitError, AsasError, afterCommitHeader, codes, retryConflict } from '../runner/errors.ts'
 import type { StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
 
 type WireShape = {
@@ -176,6 +176,7 @@ export const fetchHttp = (options: FetchHttpOptions) => {
             }
             return Response.json(thrown.result, { headers: { [afterCommitHeader]: 'failed' } })
           }
+          thrown = retryConflict(thrown)
           if (thrown instanceof AsasError) {
             // The cause is never serialized: a conflict's driver error names the column and
             // value the refusal's message withholds.
