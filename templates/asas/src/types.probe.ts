@@ -465,7 +465,7 @@ defineMithaq({
 defineMithaq({
   targets: {
     // @ts-expect-error the drizzle map names no `slug`, and the kind carries no column of its own
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
   },

@@ -606,7 +606,7 @@ type DrizzleAdapterArguments<Kinds, Rules> = {
   connectionString?: string
   kinds: Kinds
   rules: Rules
-  /** The kinds this store builds an id of; set it where you replace the kinds map and its relationship builder. */
+  /** The kinds this store builds an id of; `drizzleIdKinds`, unless you replace the kinds map and its relationship builder. */
   idKinds: readonly string[]
   /** Push the schema on connect instead of running migrations. */
   push?: boolean

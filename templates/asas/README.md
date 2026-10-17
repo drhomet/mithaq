@@ -506,6 +506,8 @@ What a project made before the store additions changes when it takes this versio
 - **`drizzleTarget` is removed.** Write `kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds` in `drizzleAdapter(...)`.
 - **`zodTarget` is a function.** Write `zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds })`.
 - **`betterAuthTenant` requires `newRows: 'active'`.** Name it in the tenant target's config.
+- **A step's `tools.store` call takes the kayan declaration.** Write `kayan: products`, not its string name, which now throws.
+- **A custom store implements `upsert`, `sum` and the `share` lock mode.** A build refuses a store without `upsert` or `sum`.
 
 What a project made before the sign-up round changes when it takes this version:
 
