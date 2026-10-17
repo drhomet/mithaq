@@ -1,7 +1,7 @@
 // The Payload password checker, tested here and not beside a held copy: no template project
 // moves off Payload, so nothing holds it.
 import assert from 'node:assert/strict'
-import { pbkdf2Sync, randomBytes } from 'node:crypto'
+import { pbkdf2Sync, randomBytes, randomUUID } from 'node:crypto'
 import { after, before, test } from 'node:test'
 import { betterAuth } from 'better-auth'
 import type { APIError } from 'better-auth/api'
@@ -99,7 +99,7 @@ test('the import helper names each Payload scheme by its prefix and refuses what
 })
 
 // Every sign-in below runs through a real Better Auth on Postgres, in a schema of this file's own.
-const schema = 'payload_password'
+const schema = `payload_password_${randomUUID().replaceAll('-', '')}`
 const pool = new pg.Pool({ connectionString: testDatabase(), options: `-c search_path=${schema}` })
 const errors: unknown[][] = []
 const authOf = (password = payloadPassword()) =>
@@ -116,11 +116,10 @@ const authOf = (password = payloadPassword()) =>
 const auth = authOf()
 
 before(async () => {
-  await pool.query(`drop schema if exists ${schema} cascade; create schema ${schema}`)
+  await pool.query(`create schema ${schema}`)
   await (await getMigrations(auth.options)).runMigrations()
 })
 after(async () => {
-  await pool.query(`drop schema if exists ${schema} cascade`)
   await pool.end()
 })
 
