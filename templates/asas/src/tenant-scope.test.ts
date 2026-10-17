@@ -1921,7 +1921,10 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     const files = storageRoutes({ kayan: [{ name: 'files', storage: { operation: 'create' } }] as never, config: { ...storageConfig, adapters: {}, serve: async ({ id }) => (await raw(id === 'first'), new Response('{}', { headers: { 'content-type': 'application/json' } })), onError: (error) => reports.push(error) }, read: async () => null, authorize: async () => undefined })
     localProbe = async (request) => (await raw(request.headers.get('x-first') === 'yes'), {})
     const call = async (first: boolean) => {
-      if (surface === 'local') return store.transaction((tx) => work(tx, first)).then(() => ({ status: 200, key: undefined }), (error: AsasError) => ({ status: error.status, key: error.key }))
+      if (surface === 'local') {
+        storeProbe = async (ctx) => work(ctx.tx, ctx.data.title === 'first')
+        return memos().probe({ title: first ? 'first' : 'second' }, { actor: one }).then(() => ({ status: 200, key: undefined }), (error: AsasError) => ({ status: error.status, key: error.key }))
+      }
       const request = new Request(surface === 'storage' ? `http://test/api/files/file/${first ? 'first' : 'second'}` : surface === 'local-auth' ? 'http://test/api/auth/local/first-register' : `http://test/${surface === 'rpc' ? 'api/rpc' : 'api'}/work/run`, {
         method: surface === 'storage' ? 'GET' : 'POST',
         headers: { 'content-type': 'application/json', 'x-first': first ? 'yes' : 'no' },
@@ -1942,6 +1945,7 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
       release.resolve()
       outcomes = await within(Promise.allSettled(calls), 5000)
       localProbe = async () => ({})
+      storeProbe = async () => {}
     }
     assert.ok(outcomes.every((one) => one.status === 'fulfilled'), String(outcomes.find((one) => one.status === 'rejected')?.reason))
     const answers = outcomes.map((one) => (one as PromiseFulfilledResult<{ status: number; key?: string }>).value)
@@ -2119,6 +2123,18 @@ suite('postgres', async () => {
     },
   }
 }, true)
+
+test('a local operation maps a custom store transaction deadlock to a retry conflict', { timeout: 10_000 }, async () => {
+  const built = languageOf({ ...memoryStore(), transaction: async () => { throw Object.assign(new Error('deadlock'), { code: '40P01' }) } } as never)
+  const error = await refusal(built.kayan.memos.operations.create({ title: 'retry' }, { actor: await actorOf({ active: 'org1' }) }))
+  assert.equal(error.status, 409)
+  assert.equal(error.key, 'error.conflict.retry')
+})
+
+test('buildAsas refuses a store missing sum with a plain error naming the word', { timeout: 10_000 }, () => {
+  const { sum: _sum, ...store } = memoryStore()
+  assert.throws(() => languageOf(store as never), (error) => error instanceof Error && !(error instanceof TypeError) && /store.*sum/.test(error.message))
+})
 
 test('a language with no tenant target hands every step ctx.tenant undefined', async () => {
   const language = defineMithaq({

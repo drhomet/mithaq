@@ -1,7 +1,7 @@
 // One transaction for every row: a row that cannot be written rolls the whole call
 // back, because a bulk that half happened is a state no client can undo.
 import { stepTools } from './store.ts'
-import { AfterCommitError, AsasError, invalid } from './errors.ts'
+import { AfterCommitError, AsasError, invalid, retryConflict } from './errors.ts'
 import { assertReadableWhere, checkedWhere } from './read.ts'
 import { running } from './runtime.ts'
 import { refuseTenantOption, writeTenant } from './tenant.ts'
@@ -200,6 +200,8 @@ export const bulk = <Actor = unknown>({
     let result: Record<string, unknown>
     try {
       result = await store.transaction(run)
+    } catch (thrown) {
+      throw retryConflict(thrown)
     } finally {
       entry.settled = true
     }

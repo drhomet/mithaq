@@ -297,6 +297,8 @@ const operations = <Actor>(
 ) => {
   // Bound, so a step cannot reach `transaction` or the adapter's own client, and sealed, so no
   // step writes a tenant-owned row outside the active organization.
+  const missing = (['upsert', 'sum'] as const).filter((word) => typeof store[word] !== 'function')
+  if (missing.length) throw new Error(`The store is missing required words: ${missing.join(', ')}.`)
   const writes: WriteTools<unknown, Actor>['store'] = tenant.seal({
     find: store.find.bind(store),
     insert: store.insert.bind(store),

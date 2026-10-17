@@ -40,7 +40,7 @@ import type { CompoundIndex, ResolvedField, ResolvedKayan, RuntimeField } from '
 import type { Store } from '../mithaq/language.ts'
 import { implementationOf } from '../mithaq/rukn.ts'
 import type { Operator, Where } from '../mithaq/where.ts'
-import { conflict, invalid, missing, retryConflict, localizedQuery } from '../asas/runner/errors.ts'
+import { conflict, invalid, missing, localizedQuery } from '../asas/runner/errors.ts'
 import { Refusal } from '../mithaq/refusal.ts'
 import { providerOf } from '../base/rules.ts'
 import { idKinds as drizzleIdKinds, kinds as drizzleKinds } from './kinds.ts'
@@ -1147,11 +1147,7 @@ const storeOf = <
 
     // Kept as drizzle's own callback: the runner passes `tx` down the list.
     async transaction(run) {
-      try {
-        return await db.transaction((tx) => run(tx))
-      } catch (thrown) {
-        throw retryConflict(thrown)
-      }
+      return db.transaction((tx) => run(tx))
     },
 
     async insert({ tx, kayan: name, data: values }) {

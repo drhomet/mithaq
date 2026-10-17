@@ -3,7 +3,7 @@ import { stepTools } from './store.ts'
 import { rowsOfField, type Rows } from '../../mithaq/rows.ts'
 import { heldPermissions } from '../../rbac/index.ts'
 import { authActor } from '../actor.ts'
-import { AfterCommitError, AsasError, conflict, denied, invalid, missing } from './errors.ts'
+import { AfterCommitError, AsasError, conflict, denied, invalid, missing, retryConflict } from './errors.ts'
 import type { AdminAccess, FieldAccess, LocalesOf, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
 import { defaultKinds, isStorableText, type Kind } from '../../base/kinds.ts'
@@ -1216,6 +1216,8 @@ export const write = <Actor = unknown>({
     let result: unknown
     try {
       result = await store.transaction(run)
+    } catch (thrown) {
+      throw retryConflict(thrown)
     } finally {
       entry.settled = true
     }
