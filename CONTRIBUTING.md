@@ -115,7 +115,7 @@ The folders follow the parts of the framework. `index.ts` re-exports the public 
 | `rich-text/` | The `richText` rukn and its Lexical reading and writing, with `defaultNodes`, behind `mithaq/rich-text`; `value.ts` is the Lexical-free part the rest of core imports. |
 | `storage/` | The storage rukn: the `upload` kind, the storage target, `uploadFields` and the building blocks the defaults call. |
 | `versions/` | The `versions` rukn: the versions target, `draftFields` and `versionOperations`. |
-| `drizzle/` | The Postgres store: `drizzleAdapter` and `drizzleTarget` (`index.ts`), its kinds and rules, `mithaq migrate` (`migrate.ts`), and `proxy/`, which re-exports drizzle-orm as `mithaq/drizzle`. |
+| `drizzle/` | The Postgres store: `drizzleAdapter` (`index.ts`), its kinds and rules, `mithaq migrate` (`migrate.ts`), and `proxy/`, which re-exports drizzle-orm as `mithaq/drizzle`. |
 | `zod/` | The zod schema target, with its kinds and rules. |
 | `service/` | `serviceTarget`, the runner as a target, and its named defaults (`defaultDepth`, `defaultLimit`, `defaultMaxLimit`, `defaultJoinLimit`, `defaultBulkLimit`). |
 | `rbac/` | `rbacTarget`, the access target over system roles and row tables, and the role-assignment steps. |

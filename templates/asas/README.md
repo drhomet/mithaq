@@ -847,7 +847,9 @@ In production, `connect()` does not push. It checks the migrations instead, as `
 ```ts
 const drizzleStore = drizzleAdapter({
   connectionString,
-  ...drizzleTarget,
+  kinds: drizzleKinds,
+  rules: drizzleRules,
+  idKinds: drizzleIdKinds,
   prodMigrations: { migrationsFolder: fileURLToPath(new URL('migrations/', asasSource)), pending: 'refuse' },
 })
 ```

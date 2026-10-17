@@ -33,7 +33,7 @@ import {
   drizzleRules,
   fetchHttp,
   serviceTarget,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
   betterAuth,
   defaultLockTime,
   defaultMaxLoginAttempts,
@@ -154,7 +154,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     arkan: [base, storage(storageConfig)],
     targets: {
       store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       rbac: access,
       versions: versionsTarget({ max: 100 }),
       tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', organizations: 'many', backoffice: ({ user }) => backofficeApp && staff.has((user as { id: string }).id) }),
@@ -2177,7 +2177,7 @@ test('a language with no tenant target hands every step ctx.tenant undefined', a
     arkan: [base],
     targets: {
       store: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }),
     } as {},
   })

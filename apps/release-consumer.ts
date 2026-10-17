@@ -133,10 +133,10 @@ function withoutRichText(tarball: string) {
   writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'without-rich-text', private: true, type: 'module', dependencies: { mithaq: tarball } }))
   writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, module: 'nodenext', target: 'esnext', noEmit: true, skipLibCheck: true, types: [] }, files: ['index.ts'] }))
   writeFileSync(join(project, 'index.ts'), [
-    "import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxBodyBytes, defaultMaxLimit, defaultOperations, defineMithaq, drizzleAdapter, drizzleTarget, fetchHttp, serviceTarget, zodTarget } from 'mithaq'",
+    "import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxBodyBytes, defaultMaxLimit, defaultOperations, defineMithaq, drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds, fetchHttp, serviceTarget, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'",
     'const { defineKayan, buildAsas } = defineMithaq({',
     '  arkan: [base],',
-    "  targets: { drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', ...drizzleTarget }), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }) },",
+    "  targets: { drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }) },",
     '})',
     "const notes = defineKayan({ name: 'notes', fields: { ...defaultFields, title: { kind: 'text', label: { en: 'Title' } } }, targets: { service: { operations: defaultOperations } } })",
     '// @ts-expect-error a language without the richText rukn has no richText kind',

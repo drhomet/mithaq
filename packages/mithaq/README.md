@@ -28,7 +28,7 @@ const language = defineMithaq({
   arkan: [base, richText({ nodes: richTextNodes }), files, versions({ max: 100 })],
   targets: {
     drizzle: drizzleStore,
-    zod: zodTarget,
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     rbac: accessTarget(),
     tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }),
     service: serviceTarget({ /* ... */ }),
@@ -507,7 +507,7 @@ commands, run as `mithaq <target> <command>`.
 ### The shipped targets
 
 - **drizzle** (`store`): Postgres through Drizzle.
-  `drizzleAdapter({ connectionString, ...drizzleTarget, prodMigrations })`. Its
+  `drizzleAdapter({ connectionString, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds, prodMigrations })`. Its
   `migrate` command is `mithaq migrate`. `packages/mithaq/src/drizzle/index.ts`
   `drizzleAdapter`.
 - **zod** (`schema`): the create, update, id, byID, row and list shapes, and

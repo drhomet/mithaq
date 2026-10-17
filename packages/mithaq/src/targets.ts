@@ -1,10 +1,10 @@
 // Every target factory mithaq ships and the named defaults its options take, so a project's
 // `targets` block reads from one place: `import { drizzleAdapter, serviceTarget } from 'mithaq/targets'`.
-export { drizzleAdapter, drizzleTarget, type Adapter, type ColumnBuilder, type ColumnRule } from './drizzle/index.ts'
-export { kinds as drizzleKinds } from './drizzle/kinds.ts'
+export { drizzleAdapter, type Adapter, type ColumnBuilder, type ColumnRule } from './drizzle/index.ts'
+export { kinds as drizzleKinds, idKinds as drizzleIdKinds } from './drizzle/kinds.ts'
 export { rules as drizzleRules } from './drizzle/rules.ts'
 export { zodTarget, type ZodRule, type ZodShape } from './zod/index.ts'
-export { kinds as zodKinds } from './zod/kinds.ts'
+export { kinds as zodKinds, idKinds as zodIdKinds } from './zod/kinds.ts'
 export { rules as zodRules } from './zod/rules.ts'
 export { defaultBulkLimit, defaultDepth, defaultJoinLimit, defaultLimit, defaultMaxLimit, serviceTarget, type ServiceTarget } from './service/index.ts'
 export { defaultAuthorize } from './asas/runner/write.ts'

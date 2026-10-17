@@ -19,7 +19,7 @@ import {
   drizzleRules,
   fetchHttp,
   serviceTarget,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
 } from 'mithaq'
 import { is, sql } from 'mithaq/drizzle'
 import { drizzle } from 'mithaq/drizzle/node-postgres'
@@ -29,7 +29,7 @@ const build = (table?: PgTable) => {
   const language = defineMithaq({
     targets: {
       drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     },
     arkan: [base],

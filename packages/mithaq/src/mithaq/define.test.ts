@@ -15,20 +15,20 @@ import {
   defineMithaq,
   draftFields,
   drizzleAdapter,
-  drizzleTarget,
+  drizzleKinds, drizzleRules, drizzleIdKinds,
   defaultMaxBodyBytes,
   fetchHttp,
   serviceTarget,
   versionOperations,
   versions,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
 } from '../index.ts'
 
 const language = defineMithaq({
   arkan: [base, versions({ max: 10 })],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', ...drizzleTarget }),
-    zod: zodTarget,
+    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }),
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
   },
 })

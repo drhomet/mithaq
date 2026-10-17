@@ -48,15 +48,15 @@ A language comes from `defineMithaq`. Its arkan (singular rukn, "pillar") are th
 // src/mithaq.ts
 import {
   base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultJoinLimit, defaultLimit, defaultMaxLimit,
-  defineMithaq, drizzleAdapter, drizzleTarget, serviceTarget, zodTarget,
+  defineMithaq, drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds, serviceTarget, zodKinds, zodRules, zodIdKinds, zodTarget,
 } from 'mithaq'
 
 export const { defineKayan, buildAsas } = defineMithaq({
   locales: ['en', 'ar'] as const,
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: process.env.DATABASE_URL!, ...drizzleTarget }),
-    zod: zodTarget,
+    drizzle: drizzleAdapter({ connectionString: process.env.DATABASE_URL!, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }),
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({
       authorize: defaultAuthorize,
       depth: defaultDepth,
@@ -120,7 +120,7 @@ organization: tenant.field,
 
 ## What's in the box
 
-- **Store:** Postgres through drizzle (`drizzleAdapter`, `drizzleTarget`), with a schema push in development and migration files written by `mithaq migrate` for production.
+- **Store:** Postgres through drizzle (`drizzleAdapter`), with a schema push in development and migration files written by `mithaq migrate` for production.
 - **Validation:** zod schemas derived from every kayan (`zodTarget`). A field can carry its own zod shape instead.
 - **Runtime:** the operation runner (`serviceTarget`) with the default operations (create, update, delete, find, findByID, count, updateMany, deleteMany), steps around every write, an audit step, soft delete and bulk limits.
 - **HTTP:** plain fetch routes (`fetchHttp`), or a typed client and OpenAPI through oRPC (`mithaq/orpc`).

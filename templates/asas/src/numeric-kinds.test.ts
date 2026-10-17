@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { defaultMaxBodyBytes, AsasError, base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, fetchHttp, zodTarget, type Where } from 'mithaq'
+import { defaultMaxBodyBytes, AsasError, base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, fetchHttp, zodKinds, zodRules, zodIdKinds, zodTarget, type Where } from 'mithaq'
 import { memoryStore } from './memory-store.ts'
 import { plainTarget } from './standard-schema-target.ts'
 
+const zod = zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds })
+
 const allowAccess = { create: () => true, read: () => true, update: () => true, delete: () => true } as const
-const language = (schema: typeof zodTarget | typeof plainTarget = zodTarget) =>
+const language = (schema: typeof zod | typeof plainTarget = zod) =>
   defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
@@ -79,7 +81,7 @@ test('a decimal field declares a precision and a scale or neither, and a scale n
 })
 
 test('an unsized decimal holds any fixed-point text through both schema targets, and refuses what is no decimal', async () => {
-  for (const schema of [zodTarget, plainTarget]) {
+  for (const schema of [zod, plainTarget]) {
     const { defineKayan, buildAsas } = language(schema)
     const ledger = defineKayan({
       name: 'ledger',

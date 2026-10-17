@@ -31,7 +31,7 @@ import {
   updateMany,
   userRefs,
   validate,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
   type Ctx,
   type Field,
   type Kayan,
@@ -80,7 +80,7 @@ const language = (
     arkan: [base],
     targets: {
       memory: store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: depth ?? defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit },
     },
   })
@@ -365,7 +365,7 @@ test('19b. `defaultNow` fills a datetime with the write\'s moment on create, `no
     arkan: [defineRukn({ name: 'project', kinds: { ...defaultKinds, moment: { ...defaultKinds.datetime, label: { en: 'Moment', ar: 'وقت' } } }, rules: defaultRules })],
     targets: {
       memory,
-      zod: { ...zodTarget, kinds: { ...zodTarget.kinds, moment: zodTarget.kinds.datetime } },
+      zod: zodTarget({ kinds: { ...zodKinds, moment: zodKinds.datetime }, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
     },
   })
@@ -389,7 +389,7 @@ test('19b. `defaultNow` fills a datetime with the write\'s moment on create, `no
         arkan: [defineRukn({ name: 'project', kinds: { ...defaultKinds, stamp: { ...defaultKinds.datetime, now: undefined, label: { en: 'Stamp', ar: 'ختم' } } }, rules: defaultRules })],
         targets: {
           memory: momentless,
-          zod: { ...zodTarget, kinds: { ...zodTarget.kinds, stamp: zodTarget.kinds.datetime } },
+          zod: zodTarget({ kinds: { ...zodKinds, stamp: zodKinds.datetime }, rules: zodRules, idKinds: zodIdKinds }),
           service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
         },
       }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ name: 'events', fields: { id: { kind: 'number' }, at: { kind: 'stamp', rules: { defaultNow: true } } } }] }),
@@ -621,7 +621,7 @@ const contextLanguage = (store: ReturnType<typeof memoryStore>) =>
     arkan: [base],
     targets: {
       memory: store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize, context: {} as { requestId: string } }),
     },
   })
@@ -743,7 +743,7 @@ test('20b. a store is the target that declares the capability, and one that omit
   const { capability: _capability, ...withoutCapability } = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: withoutCapability as never, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory' as never, schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: withoutCapability as never, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory' as never, schema: 'zod', authorize: defaultAuthorize }) },
   })
   // A target that never says what it is cannot be the store a kayan writes to; nothing is sniffed.
   assert.throws(
@@ -758,7 +758,7 @@ test('20b. a store is the target that declares the capability, and one that omit
   const declared = memoryStore()
   const withCapability = defineMithaq({
     arkan: [base],
-    targets: { memory: declared, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: declared, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = withCapability.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -814,7 +814,7 @@ test('20b2. a schema target that declares no derive is refused at buildAsas, nam
   // The types refuse a target with no `derive` outright, so this language is
   // written as data, the way a generator or a project's own loader hands one
   // over.
-  const { derive: _derive, ...withoutDerive } = zodTarget
+  const { derive: _derive, ...withoutDerive } = zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds })
   const mithaq = defineMithaq({
     arkan: [base],
     targets: { memory: memoryStore(), shapeless: withoutDerive as never, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'shapeless' as never, authorize: defaultAuthorize }) },
@@ -833,7 +833,7 @@ test('20b2. a schema target that declares no derive is refused at buildAsas, nam
   )
   const own = defineMithaq({
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, shapeless: withoutDerive as never, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), shapeless: withoutDerive as never, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   assert.throws(
     () =>
@@ -851,7 +851,7 @@ test('20c. count is a default operation: the method, the table entry, the route 
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({
         depth: defaultDepth,
         defaultLimit,
@@ -1080,7 +1080,7 @@ test('20d2. a kayan with no sortable field can be counted, but a page needs a so
   const mithaq = defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, dashboard: screenTarget({ ...dashboardScreen, kayan: ['allLocalized'], pages: { dashboard: { path: '/', component: dashboardScreen.pages.dashboard!.component } } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), dashboard: screenTarget({ ...dashboardScreen, kayan: ['allLocalized'], pages: { dashboard: { path: '/', component: dashboardScreen.pages.dashboard!.component } } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const allLocalized = mithaq.defineKayan({
     name: 'allLocalized',
@@ -1138,7 +1138,7 @@ test('20e. custom language authorize cannot bypass collection access or read con
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: async () => undefined }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: async () => undefined }) },
   })
   const denied = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -1231,7 +1231,7 @@ test('20f. public output schemas run once after field masking for write/read/lis
 const plainLanguage = (store: ReturnType<typeof memoryStore>) =>
   defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'plain', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'plain', authorize: defaultAuthorize }) },
   })
 
 test('20f1. a function output receives the derived shapes, behaves as the same schema written bare, and is still masked', async () => {
@@ -1493,7 +1493,7 @@ test('20f7. both shipped targets derive an id shape that takes the id alone, ref
   // by hand against `~standard` alone, so what is asserted below is the seam
   // rather than either library.
   for (const [name, derived] of [
-    ['zod', zodTarget.derive(fields).id],
+    ['zod', zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive(fields).id],
     ['plain', plainTarget.derive(fields).id],
   ] as const) {
     const parse = (value: unknown) => derived['~standard'].validate(value)
@@ -1509,7 +1509,7 @@ test('20f7. both shipped targets derive an id shape that takes the id alone, ref
   // A field record with no id addresses no row, so the shape it derives admits
   // the empty object and refuses every key.
   for (const [name, derived] of [
-    ['zod', zodTarget.derive({ title: { kind: 'text', name: 'title' } } as never).id],
+    ['zod', zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive({ title: { kind: 'text', name: 'title' } } as never).id],
     ['plain', plainTarget.derive({ title: { kind: 'text', name: 'title' } } as never).id],
   ] as const) {
     assert.deepEqual(
@@ -2346,7 +2346,7 @@ const suppliedNotes = <const Ops extends Record<string, OperationDeclaration>>(
 }
 
 test('27. a field the client does not supply for an operation is absent from that operation\'s derived shape, and the two operations are decided apart', async () => {
-  const derived = zodTarget.derive(supplierFields)
+  const derived = zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive(supplierFields)
   const keys = (shape: unknown) => Object.keys((shape as z.ZodObject).shape)
   // Absent, never optional: the key is not in the object at all, which is what
   // lets the strict object refuse a caller that sends it.
@@ -2357,7 +2357,7 @@ test('27. a field the client does not supply for an operation is absent from tha
   // Two schema targets: the one the `mithaq` package ships, and the one this package writes by hand
   // against `~standard` alone. This package's entrypoint does not export the second.
   for (const [name, shapes] of [
-    ['zod', zodTarget.derive(supplierFields)],
+    ['zod', zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive(supplierFields)],
     ['plain', plainTarget.derive(supplierFields)],
   ] as const) {
     const parse = (shape: StandardSchemaV1, value: unknown) => shape['~standard'].validate(value)
@@ -2421,7 +2421,7 @@ test('29. a field that declares no providedBy is in every shape it was in before
     body: { kind: 'text', name: 'body', rules: { required: true } },
     ref: { kind: 'text', name: 'ref' },
   } as never
-  const derived = zodTarget.derive(fields)
+  const derived = zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive(fields)
   const keys = (shape: unknown) => Object.keys((shape as z.ZodObject).shape)
   // The default for a field that says nothing: the client supplies it on create and on update
   // alike.
@@ -2571,7 +2571,7 @@ test('33. both schema targets derive a localized field as one object keyed by lo
     },
   }
   for (const [name, shapes] of [
-    ['zod', zodTarget.derive(localizedFields as never)],
+    ['zod', zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive(localizedFields as never)],
     ['plain', plainTarget.derive(localizedFields as never)],
   ] as const) {
     const parse = (shape: StandardSchemaV1, value: unknown) => shape['~standard'].validate(value)
@@ -2713,7 +2713,7 @@ test('37. a language authorize returning a malformed constraint is refused by qu
     arkan: [base],
     targets: {
       memory: store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({
         depth: defaultDepth,
         defaultLimit,
@@ -2753,7 +2753,7 @@ test('37. a language authorize returning a malformed constraint is refused by qu
 
   const open = defineMithaq({
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: async () => undefined }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: async () => undefined }) },
   })
   const plain = open.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -2769,7 +2769,7 @@ test('38. the three normalizing rules rewrite a value before every narrowing rul
   const mithaq = defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const fields = {
     // A code a person types in whatever case, stored in one, and a maximum that judges the stored
@@ -2906,7 +2906,7 @@ const slotted = (
 ) =>
   defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize, beforeSteps: slots.beforeSteps ?? [], afterSteps: slots.afterSteps ?? (slots.audit ? [audit] : []), afterCommit: slots.afterCommit ?? [], ...(slots.audit ? { audit: slots.audit as never } : {}) }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize, beforeSteps: slots.beforeSteps ?? [], afterSteps: slots.afterSteps ?? (slots.audit ? [audit] : []), afterCommit: slots.afterCommit ?? [], ...(slots.audit ? { audit: slots.audit as never } : {}) }) },
   })
 
 test('109. every shipped list is one word, and the runner fills the defaults, parses the derived shape and audits around it', async () => {
@@ -3629,7 +3629,7 @@ test('117. a service target a project wrote in the capability\'s shape runs an o
     joinLimit: defaultJoinLimit,
     bulkLimit: defaultBulkLimit,
   }
-  const mithaq = defineMithaq({ arkan: [base], targets: { memory: store, zod: zodTarget, service: own } })
+  const mithaq = defineMithaq({ arkan: [base], targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: own } })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
     kayan: [
@@ -3665,7 +3665,7 @@ test('117. a service target a project wrote in the capability\'s shape runs an o
     const { [member]: _dropped, ...short } = own
     assert.throws(
       () =>
-        (defineMithaq({ arkan: [base], targets: { memory: memoryStore(), zod: zodTarget, service: short } } as never) as unknown as {
+        (defineMithaq({ arkan: [base], targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: short } } as never) as unknown as {
           buildAsas: (args: { kayan: Kayan[]; http: unknown[] }) => unknown
         }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [{ name: 'notes', fields: { id: { kind: 'number' } } }] }),
       new RegExp(`The service target declares no "${member}", and every build's runner has one\\. Add it to serviceTarget\\(\\{ \\.\\.\\. \\}\\)\\.`),
@@ -3680,7 +3680,7 @@ test('117. a service target a project wrote in the capability\'s shape runs an o
     [{ maxLimit: 2.5 }, /service\.maxLimit must be a positive integer\./],
   ] as const) {
     assert.throws(
-      () => defineMithaq({ arkan: [base], targets: { memory: memoryStore(), zod: zodTarget, service: { ...own, ...change } } }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] }),
+      () => defineMithaq({ arkan: [base], targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: { ...own, ...change } } }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] }),
       refusal,
     )
   }
@@ -4002,7 +4002,7 @@ test('126. a relationship write refuses an id the target\'s read access hides fr
 test('160a. minRows and maxRows bound a list on either schema target, Payload\'s way: an optional list left empty passes, a required one is held to its floor, and a list past either bound carries that rule\'s key', async () => {
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const fields = {
     tags: { kind: 'textArray', rules: { minRows: 2, maxRows: 3 } },
@@ -4054,7 +4054,7 @@ test('161a. a row stored before a stricter rule was declared still reads on eith
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   // The same two kayan twice over one store: first as they were when the rows
   // were written, then with the rules a later release declared on them.
@@ -4126,7 +4126,7 @@ test('164a. a row holding an option the kayan has since removed reads as stored 
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const optionsOf = (...values: string[]) => values.map((value) => ({ value, label: {} }))
   // The same two kayan twice over one store: first with the option the rows
@@ -4177,7 +4177,7 @@ test('164b. a stored row that is not of its kind is a server fault on either sch
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const fields = { id: { kind: 'number' as const }, body: { kind: 'text' as const }, note: { kind: 'text' as const } }
   const reported: unknown[] = []
@@ -4259,7 +4259,7 @@ test('132. a kayan keeps versions only where the language declares them, and dra
       arkan: [base],
       targets: {
         memory: memoryStore(),
-        zod: zodTarget,
+        zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
         plain: plainTarget,
         service: { capability: 'service', store: 'memory', schema, authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit },
         ...targets,
@@ -4317,7 +4317,7 @@ test('132m. a kayan keeping versions has a uuid id, since a version is addressed
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit },
       versions: versionsTarget({ max: 100 }),
     } as never,
@@ -4349,7 +4349,7 @@ const richText = (text: string) => ({
 
 test('185. a richText value is Lexical\'s editor state, walked and then parsed with the rukn\'s own node list, refused 400 by name on either schema target and either HTTP plug, and a required one holds text', async () => {
   const store = memoryStore()
-  const targets = { memory: store, zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) }
+  const targets = { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) }
   // The project's own node, spread onto the defaults, which is the list both
   // the server and the editor read with. The autolink registered too, so its
   // address is refused by the walk and not because its type is unknown.
@@ -4450,7 +4450,7 @@ test('185. a richText value is Lexical\'s editor state, walked and then parsed w
 test('185i. a draft of a required rich text field may be blank, since required is a rule, and is still walked and parsed, since that is its kind', async () => {
   const mithaq = defineMithaq({
     arkan: [base, richTextRukn({ nodes: defaultNodes })],
-    targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -4478,7 +4478,7 @@ test('223c. the memory store gives each version row an id of its own, so every s
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -4509,7 +4509,7 @@ test('266. on a drafts kayan whose findVersions is row-limited, a row it does no
   }
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize }), versions: versionsTarget({ max: 100 }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -4626,7 +4626,7 @@ test('207. the page a read opens with, the most a served read may ask for, a joi
     arkan: [base],
     targets: {
       memory: store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit: 2, maxLimit: 3, joinLimit: 1, bulkLimit: 2, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
       versions: versionsTarget({ max: 100 }),
     },
@@ -4713,7 +4713,7 @@ test('207. the page a read opens with, the most a served read may ask for, a joi
   )
   const negative = defineMithaq({
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit: 2, maxLimit: -1, joinLimit: 1, bulkLimit: 2, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit: 2, maxLimit: -1, joinLimit: 1, bulkLimit: 2, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   assert.throws(
     () => negative.buildAsas({
@@ -4781,7 +4781,7 @@ test('241. a join reads its rows in the order its defaultSort names, as Payload\
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit },
     },
   })
@@ -4841,7 +4841,7 @@ test('242. the shipped findByID takes depth, as Payload\'s does, so a served rea
   for (const schema of ['zod', 'plain'] as const) {
     const mithaq = defineMithaq({
       arkan: [base],
-      targets: { memory: memoryStore(), zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema, authorize: defaultAuthorize }) },
+      targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema, authorize: defaultAuthorize }) },
     })
     const built = mithaq.buildAsas({
       http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -4889,7 +4889,7 @@ test('242. the shipped findByID takes depth, as Payload\'s does, so a served rea
   }
 
   const fields = { id: { kind: 'number', name: 'id' }, title: { kind: 'text', name: 'title' } } as never
-  for (const [name, derived] of [['zod', zodTarget.derive(fields).byID], ['plain', plainTarget.derive(fields).byID]] as const) {
+  for (const [name, derived] of [['zod', zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive(fields).byID], ['plain', plainTarget.derive(fields).byID]] as const) {
     const parse = (value: unknown) => derived['~standard'].validate(value)
     assert.deepEqual(await parse({ id: 1, depth: 1 }), { value: { id: 1, depth: 1 } }, `the ${name} target's byID takes a depth`)
     assert.deepEqual(await parse({ id: 1 }), { value: { id: 1 } }, `and the ${name} target's needs none`)
@@ -4902,12 +4902,12 @@ test('242. the shipped findByID takes depth, as Payload\'s does, so a served rea
   // A target that derives no such shape is refused by name at build rather than failing the first
   // read of one row.
   const older = {
-    ...zodTarget,
+    ...zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     derive: (fields: Record<string, never>) => {
-      const { byID: _byID, ...rest } = zodTarget.derive(fields)
+      const { byID: _byID, ...rest } = zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }).derive(fields)
       return rest
     },
-  } as unknown as typeof zodTarget
+  } as unknown as typeof serverTargets.zod
   const mithaq = defineMithaq({
     arkan: [base],
     targets: { memory: memoryStore(), zod: older, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
@@ -4926,7 +4926,7 @@ test('215a. a required text refuses the empty value on a publish and on a kayan 
   const mithaq = defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
   })
   const fields = {
     id: { kind: 'number' },
@@ -4996,7 +4996,7 @@ test('215i. a stored empty value in a required text reads on either schema targe
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const fields = { id: { kind: 'number' }, title: { kind: 'text', rules: { required: true } }, tags: { kind: 'textArray', rules: { required: true } } } as const
   const built = mithaq.buildAsas({
@@ -5016,7 +5016,7 @@ test('215j. null is the field\'s own required refusal only where the field is re
   const mithaq = defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -5045,7 +5045,7 @@ test('215j. null is the field\'s own required refusal only where the field is re
 test('215k. a draft takes an emptied required title, and a publish of that draft naming nothing but its status is refused', async () => {
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -5076,7 +5076,7 @@ test('215l. a bulk over rows never published leaves them and names each in error
     }
     const mithaq = defineMithaq({
       arkan: [base],
-      targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize }), versions: versionsTarget({ max: 100 }) },
+      targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize }), versions: versionsTarget({ max: 100 }) },
     })
     const built = mithaq.buildAsas({
       http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -5113,7 +5113,7 @@ test('215l. a bulk over rows never published leaves them and names each in error
 test('215n. a required trimmed text refuses a value of spaces on either schema target, since the trim empties it before required reads it', async () => {
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: memoryStore(), zod: zodTarget, plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), plain: plainTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const fields = { id: { kind: 'number' }, code: { kind: 'text', rules: { required: true, trim: true } } } as const
   const built = mithaq.buildAsas({
@@ -5129,4 +5129,11 @@ test('215n. a required trimmed text refuses a value of spaces on either schema t
     assert.deepEqual(thrown.params, { issues: [{ path: 'code', message: `${kayan}.code.required` }] }, 'under the required key')
     assert.equal((await built.kayan[kayan].operations.create({ id: 2, code: ' x ' })).code, 'x', 'and keeps the trimmed value it takes')
   }
+})
+
+test('zodTarget validates with the custom kinds map it receives', { timeout: 10_000 }, () => {
+  const custom = zodTarget({ kinds: { custom: () => z.literal('custom') }, rules: {}, idKinds: [] })
+  const { create } = custom.derive({ value: { name: 'value', kind: 'custom' } } as never)
+  assert.equal(create.safeParse({ value: 'custom' }).success, true)
+  assert.equal(create.safeParse({ value: 'other' }).success, false)
 })

@@ -16,7 +16,7 @@ import {
   screenKinds,
   screenTarget,
   serviceTarget,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
 } from 'mithaq'
 import { dashboardScreen } from '../../../templates/mithaq/src/mithaq.ts'
 
@@ -25,7 +25,7 @@ export const language = defineMithaq({
   arkan: [base],
   targets: {
     drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
-    zod: zodTarget,
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     dashboard: screenTarget({ ...dashboardScreen, kayan: ['notes'], providers: [], controls: screenKinds, pages: { home: { path: '/', component: dashboardScreen.pages.dashboard!.component } } }),
   },

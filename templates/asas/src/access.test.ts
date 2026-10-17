@@ -28,7 +28,7 @@ import {
   rbacTarget,
   requestOrganization,
   userRefs,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
   type AccessRow,
   type Field,
   type FieldAccessArgs,
@@ -55,7 +55,7 @@ const language = (store: ReturnType<typeof memoryStore>, access?: RowTable) =>
   defineMithaq({
     arkan: [base],
     // No `rolesOf`, so the rows read `user.roles` off the actor, which every plain-object actor in this file carries.
-    targets: { memory: store, zod: zodTarget, rbac: rbacTarget({ roles: fourRoles, access: (access ?? {}) as never, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: rbacTarget({ roles: fourRoles, access: (access ?? {}) as never, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
 
 // The same language with the tenant target laid down, so a kayan placing `tenant.field` is tenant-owned and inherits the
@@ -63,7 +63,7 @@ const language = (store: ReturnType<typeof memoryStore>, access?: RowTable) =>
 const tenantLanguage = (store: ReturnType<typeof memoryStore>, access?: RowTable) =>
   defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, rbac: rbacTarget({ roles: fourRoles, access: (access ?? {}) as never, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: rbacTarget({ roles: fourRoles, access: (access ?? {}) as never, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
 
 // The target may answer `'*'`, which the snapshot keeps as `true`; every case here that reads a key back reads a list.
@@ -560,7 +560,7 @@ test('20. a kayan table is compiled with the language reader, so a role it never
     arkan: [base],
     targets: {
       memory: store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       rbac: rbacTarget({
         roles: fourRoles,
         rolesOf: (actor: { tier?: string }) => (actor?.tier && tiers.includes(actor.tier) ? [actor.tier] : []),
@@ -971,7 +971,7 @@ const rbacBuilt = () => {
   })
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   // Every kayan names the target's rows as its own: no kayan here places a tenant field, so none inherits them.
   const own = mithaq.rows(rbacTable)
@@ -1675,7 +1675,7 @@ test('49. a build has exactly one access target, two are refused by name, and a 
   const second = rbacTarget({ roles: rbacRoles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } })
   const two = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, rbac: first, provider: second, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: first, provider: second, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const courses = two.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
   assert.throws(
@@ -1690,7 +1690,7 @@ test('49. a build has exactly one access target, two are refused by name, and a 
   const floorStore = memoryStore()
   const floor = defineMithaq({
     arkan: [base],
-    targets: { memory: floorStore, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: floorStore, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const plain = floor.defineKayan({
     name: 'courses',
@@ -1715,7 +1715,7 @@ const withStatements = () => {
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, rbac: rbacTarget({ roles: fourRoles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: rbacTarget({ roles: fourRoles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
   return {
@@ -1803,7 +1803,7 @@ test('51. the default sort runs the chosen field\'s own read access and takes th
   const localizedMithaq = defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const partial = localizedMithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -1839,7 +1839,7 @@ test('52. a field read callback that reads the row denies the actor-only sort pr
   const perRow = { read: ({ doc }: FieldAccessArgs) => doc !== undefined }
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -1884,7 +1884,7 @@ test('53. a service target whose store names no target is refused by name on the
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       rbac: rbacTarget({ roles: fourRoles, access: { member: { create: true, read: true, update: true, delete: true } }, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }),
       service: serviceTarget({
         depth: defaultDepth,
@@ -1930,7 +1930,7 @@ test('54. a filter names a locale as a second path segment, and a locale of a fi
   const mithaq = defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -1980,7 +1980,7 @@ test('55. a dotted key whose near field carries no relationTo is refused by name
   const store = memoryStore()
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const built = mithaq.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
@@ -2041,7 +2041,7 @@ test('56. a field\'s keys other than its name contribute nothing to the catalog,
     // have is refused too, and nothing here connects, so it never seeds a row.
     targets: {
       memory: store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       rbac: rbacTarget({ roles: {}, access: {}, kayan: { memberRoles: 'notes', roles: 'notes' } }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
     },
@@ -2236,7 +2236,7 @@ test('59. a role the assignment guard cannot read is the largest role it could b
   })
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const roleCatalog = mithaq.defineKayan({
     name: 'roleCatalog',
@@ -2301,7 +2301,7 @@ test('60. a system role key the catalog does not name is refused at buildAsas, n
   const build = (roles: SystemRoles) => () => {
     const mithaq = defineMithaq({
       arkan: [base],
-      targets: { memory: memoryStore(), zod: zodTarget, rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+      targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
     })
     const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
     return mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [courses, ...accessKayan] })
@@ -2360,7 +2360,7 @@ test('63. a system role holding an operation key of a kayan and no field key of 
   const build = (roles: SystemRoles) => () => {
     const mithaq = defineMithaq({
       arkan: [base],
-      targets: { memory: memoryStore(), zod: zodTarget, rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+      targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
     })
     const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, targets: { service: { operations: defaultOperations } } })
     return mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [courses, ...accessKayan] })
@@ -2385,7 +2385,7 @@ test('63. a system role holding an operation key of a kayan and no field key of 
   const withProvider = (roles: SystemRoles) => () => {
     const mithaq = defineMithaq({
       arkan: [base],
-      targets: { memory: memoryStore(), zod: zodTarget, rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+      targets: { memory: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: rbacTarget({ roles, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
     })
     const kayan = ['user', 'tag', 'tags'].map((name) => mithaq.defineKayan({ name, fields: { id: courseFields.id, title: courseFields.title }, targets: { service: { operations: defaultOperations } } }))
     return mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [...kayan, ...accessKayan], statements: { user: ['impersonate', 'update'] } })
@@ -2418,7 +2418,7 @@ test('64. memberRoleTarget answers a member the system roles its Better Auth mem
   const target = memberRoleTarget({ roles, access: rbacTable, rolesOf })
   const mithaq = defineMithaq({
     arkan: [base],
-    targets: { memory: store, zod: zodTarget, rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
+    targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), rbac: target, service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) },
   })
   const courses = mithaq.defineKayan({ name: 'courses', fields: courseFields, access: mithaq.rows(rbacTable), targets: { service: { operations: defaultOperations } } })
   const membership = mithaq.defineKayan({

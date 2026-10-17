@@ -33,7 +33,7 @@ import {
   upload,
   zodKinds,
   zodRules,
-  zodTarget,
+  zodIdKinds, drizzleIdKinds, zodTarget,
   serviceTarget,
   fetchHttp,
 } from 'mithaq'
@@ -93,7 +93,7 @@ const dashboardScreen = (kayan: readonly string[]) =>
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
       dashboard: screenTarget({ ...templateDashboard, kayan, pages: { dashboard: { path: '/', component: templateDashboard.pages.dashboard!.component } } }),
     },
@@ -851,7 +851,7 @@ test("a project rule carrying its own sentence seeds mithaq.rules.<name>, and it
         kinds: drizzleKinds,
         rules: { ...drizzleRules, positive: (({ column }) => column) satisfies ColumnRule<boolean> },
       }),
-      zod: { ...zodTarget, kinds: zodKinds, rules: { ...zodRules, positive: (({ shape }) => shape) satisfies ZodRule<boolean> } },
+      zod: zodTarget({ kinds: zodKinds, rules: { ...zodRules, positive: (({ shape }) => shape) satisfies ZodRule<boolean> }, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     },
   })
@@ -2194,10 +2194,10 @@ test("`mithaq migrate` refuses a language whose drizzle target was built from a 
   // `execute` answers no rows, as the client of a database no push has marked does: the dev-push
   // marker is read through it first. This is the store `init` returns for a build of no kayan,
   // which migrates nothing.
-  const root = await projectOf(`import { drizzleAdapter, drizzleTarget } from '${core}'
+  const root = await projectOf(`import { drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds } from '${core}'
 
 export const asas = {
-  targets: { drizzle: drizzleAdapter({ db: { execute: async () => ({ rows: [] }) }, ...drizzleTarget }).init([]) },
+  targets: { drizzle: drizzleAdapter({ db: { execute: async () => ({ rows: [] }) }, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }).init([]) },
   connect: async () => {},
   destroy: async () => {},
 }
@@ -2422,12 +2422,12 @@ test('`mithaq drizzle migrate` and `mithaq migrate` are one command reached two 
 })
 
 test('a target that declares no `migrate` is refused naming both, while the alias still finds the one target that declares it', async () => {
-  const root = await projectOf(`import { drizzleAdapter, drizzleTarget } from '${core}'
+  const root = await projectOf(`import { drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds } from '${core}'
 import { memoryStore } from '${memory}'
 
 export const asas = {
   targets: {
-    drizzle: drizzleAdapter({ db: { execute: async () => ({ rows: [] }) }, ...drizzleTarget }).init([]),
+    drizzle: drizzleAdapter({ db: { execute: async () => ({ rows: [] }) }, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }).init([]),
     memory: memoryStore(),
   },
   connect: async () => {},

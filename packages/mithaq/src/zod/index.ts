@@ -182,4 +182,9 @@ const target = {
 } as const satisfies SchemaTarget<typeof defaultKinds, typeof defaultRules, z.ZodType, z.ZodType<Record<string, unknown>>>
 
 /** The zod schema target. */
-export const zodTarget: typeof target & { readonly derives?: ZodDerives } = target
+export const zodTarget = <
+  const Kinds extends Record<string, ZodShape>,
+  const Rules extends Record<string, ZodRule>,
+  const IdKinds extends readonly string[],
+>({ kinds, rules, idKinds }: { kinds: Kinds; rules: Rules; idKinds: IdKinds }): Omit<typeof target, 'kinds' | 'rules' | 'idKinds'> & { kinds: Kinds; rules: Rules; idKinds: IdKinds; readonly derives?: ZodDerives } =>
+  ({ ...target, kinds, rules, idKinds })

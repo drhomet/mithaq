@@ -13,7 +13,7 @@ import {
   screenKinds,
   defineMithaq,
   drizzleAdapter,
-  drizzleTarget,
+  drizzleKinds, drizzleRules, drizzleIdKinds,
   folderOf,
   // add-on: roles
   rbacTarget,
@@ -25,7 +25,7 @@ import {
   storage,
   // end add-on: uploads
   versions,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
   type CommandInput,
 } from 'mithaq'
 // add-on: rich-text
@@ -101,7 +101,12 @@ const featuresFolder = new URL('../../features/', import.meta.url)
  */
 const drizzleStore = drizzleAdapter({
   connectionString,
-  ...drizzleTarget,
+  // The column builders per kind, mithaq's default.
+  kinds: drizzleKinds,
+  // The column rules, mithaq's default.
+  rules: drizzleRules,
+  // The kinds an id may use, mithaq's default.
+  idKinds: drizzleIdKinds,
   prodMigrations: { migrationsFolder: fileURLToPath(new URL('migrations/', asasSource)), pending: 'refuse' },
 })
 
@@ -174,7 +179,14 @@ export const accessTarget = (roles: typeof systemRoles = systemRoles) => {
  */
 export const serverTargets = {
   drizzle: guarded(drizzleStore),
-  zod: zodTarget,
+  zod: zodTarget({
+    // The schema builders per kind, mithaq's default.
+    kinds: zodKinds,
+    // The schema rules, mithaq's default.
+    rules: zodRules,
+    // The kinds an id may use, mithaq's default.
+    idKinds: zodIdKinds,
+  }),
   rbac: accessTarget(),
   // Every kayan placing `organization` belongs to one organization,
   // the session's active one. `restrict`: an organization that still holds a row

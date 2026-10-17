@@ -19,7 +19,7 @@ import {
   defaultOperations,
   defineMithaq,
   fetchHttp,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
 } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
 import { memoryStore } from '../../../asas/src/memory-store.ts'
@@ -34,7 +34,7 @@ const build = <Expected extends z.ZodType<Date | undefined>>(expected: Expected)
     arkan: [base],
     targets: {
       memory: store,
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit },
     },
   })
@@ -103,7 +103,7 @@ test('a kayan with no updatedAt field that lists the step refuses every update a
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit },
     },
   })

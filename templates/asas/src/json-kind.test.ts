@@ -4,15 +4,17 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { after, before, describe, test } from 'node:test'
 import { pathToFileURL } from 'node:url'
-import { AsasError, base, defaultAuthorize, defaultJsonMaxBytes, defaultMaxBodyBytes, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, draftFields, drizzleAdapter, drizzleKinds, drizzleRules, fetchHttp, serviceTarget, versionOperations, versionsTarget, zodTarget } from 'mithaq'
+import { AsasError, base, defaultAuthorize, defaultJsonMaxBytes, defaultMaxBodyBytes, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, draftFields, drizzleAdapter, drizzleKinds, drizzleRules, fetchHttp, serviceTarget, versionOperations, versionsTarget, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
 import { pushInput } from '../../../packages/mithaq/src/drizzle/index.ts'
 import { memoryStore } from './memory-store.ts'
 import { plainTarget } from './standard-schema-target.ts'
 import { testDatabase } from './test-database.ts'
 
+const zod = zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds })
+
 const allowAccess = { create: () => true, read: () => true, update: () => true, delete: () => true } as const
-const language = (schema: typeof zodTarget | typeof plainTarget = zodTarget, memory = memoryStore()) =>
+const language = (schema: typeof zod | typeof plainTarget = zod, memory = memoryStore()) =>
   defineMithaq({
     locales: ['ar', 'en'] as const,
     arkan: [base],
@@ -49,7 +51,7 @@ const settingsKayan = (defineKayan: ReturnType<typeof language>['defineKayan'], 
   })
 
 test('a json field holds every JSON type through both schema targets and reads it back unchanged, and refuses what is no JSON', async () => {
-  for (const schema of [zodTarget, plainTarget]) {
+  for (const schema of [zod, plainTarget]) {
     const { defineKayan, buildAsas } = language(schema)
     const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan)] }).kayan.blobs.operations
     for (const data of everyJsonType) {
@@ -70,7 +72,7 @@ test('a json value nests at most 64 deep, and one deeper, however deep, is the c
     for (let level = 0; level < depth; level += 1) value = level % 2 ? { next: value } : [value]
     return value
   }
-  for (const schema of [zodTarget, plainTarget]) {
+  for (const schema of [zod, plainTarget]) {
     const { defineKayan, buildAsas } = language(schema)
     const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan)] }).kayan.blobs.operations
     const { id } = await operations.create({ id: crypto.randomUUID(), data: nested(64) as never })
@@ -175,7 +177,7 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
     fileMatch: ['a://b/foo.json'],
     schema: { type: 'object', properties: { foo: { enum: ['bar', 'foobar'] }, count: { type: 'integer', minimum: 0 } }, required: ['foo'] },
   }
-  for (const schemaTarget of [zodTarget, plainTarget]) {
+  for (const schemaTarget of [zod, plainTarget]) {
     const { defineKayan, buildAsas } = language(schemaTarget)
     const operations = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(defineKayan, schema)] }).kayan.blobs.operations
     // A key the schema does not name is kept, as JSON Schema leaves it open.
@@ -201,7 +203,7 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
     await draft.create({ id: crypto.randomUUID(), data: ['one', 2] })
   }
 
-  const build = (field: Record<string, unknown>, schemaTarget: typeof zodTarget | typeof plainTarget = zodTarget) => () => {
+  const build = (field: Record<string, unknown>, schemaTarget: typeof zod | typeof plainTarget = zod) => () => {
     const { defineKayan, buildAsas } = language(schemaTarget)
     buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [defineKayan({ name: 'blobs', fields: { ...defaultFields, data: { kind: 'json', maxBytes: defaultJsonMaxBytes, ...field } as never }, targets: { service: { operations: defaultOperations } } })] })
   }
@@ -223,10 +225,10 @@ test('a json field with a jsonSchema refuses a value its schema refuses through 
 
 test('a row stored before its field took a jsonSchema still reads, and its next save is held to the schema', async () => {
   const memory = memoryStore()
-  const before = language(zodTarget, memory)
+  const before = language(zod, memory)
   const loose = before.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(before.defineKayan)] }).kayan.blobs.operations
   const { id } = await loose.create({ id: crypto.randomUUID(), data: { old: true } })
-  const after = language(zodTarget, memory)
+  const after = language(zod, memory)
   const held = after.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [settingsKayan(after.defineKayan, { schema: { type: 'object', required: ['foo'] } })] }).kayan.blobs.operations
   assert.deepEqual((await held.findByID({ id }))?.data, { old: true })
   await assert.rejects(() => held.update({ id, data: { old: false } }), refused)
@@ -256,7 +258,7 @@ describe('postgres', () => {
     arkan: [base],
     targets: {
       drizzle: drizzleAdapter({ connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       versions: versionsTarget({ max: 100 }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     },

@@ -9,7 +9,7 @@ import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from 'node:test'
-import { defaultKinds, defaultRules, defineRukn, storage as storageRukn, versions as versionsRukn, zodTarget } from 'mithaq'
+import { defaultKinds, defaultRules, defineRukn, storage as storageRukn, versions as versionsRukn, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'
 import { defaultNodes, richText as richTextRukn } from 'mithaq/rich-text'
 import { checkLock, formatLock, notice, run, sealLanguage, verifyLock, vocabularyOf, warnLock, type Lock, type Seal } from '../../../packages/mithaq/src/mithaq/lock.ts'
 import { receivedLanguage } from '../../../packages/mithaq/src/mithaq/language.ts'
@@ -165,8 +165,8 @@ test('changing the vocabulary turns the check red naming the path, and ends with
     ['a removed rule', arkan({ rules: { ...rules, trim: undefined } }), 'rules.trim was removed'],
     ["a rule's message", arkan({ rules: { ...rules, required: { ...rules.required, message: { ...rules.required.message, ar: 'مطلوب.' } } } }), 'rules.required.message.ar'],
     ["a rule's excludes", arkan({ rules: { ...rules, uppercase: { ...rules.uppercase, excludes: [] } } }), 'rules.uppercase.excludes[0] was removed'],
-    ['a new target', { ...language, targets: { ...targets, schema: zodTarget } }, 'targets.schema was added'],
-    ['a renamed target', { ...language, targets: { ...targets, zod: undefined, validation: zodTarget } }, 'targets.validation was added'],
+    ['a new target', { ...language, targets: { ...targets, schema: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }) } }, 'targets.schema was added'],
+    ['a renamed target', { ...language, targets: { ...targets, zod: undefined, validation: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }) } }, 'targets.validation was added'],
     ["a target's capability", { ...language, targets: { ...targets, zod: { ...targets.zod, capability: 'store' } } }, 'targets.zod was "schema" and is now "store"'],
     ['a new root key', { ...language, extra: {} }, 'keys[1]'],
     ['a removed root key', { ...language, generate: undefined }, 'keys'],

@@ -25,7 +25,7 @@ import {
   drizzleRules,
   fetchHttp,
   serviceTarget,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
   type Kayan,
 } from 'mithaq'
 import { memoryStore } from './memory-store.ts'
@@ -33,7 +33,7 @@ import { memoryStore } from './memory-store.ts'
 /** The targets of a build that makes tables and never connects. */
 const offline = () => ({
   drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
-  zod: zodTarget,
+  zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
   service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
 })
 
@@ -199,7 +199,7 @@ test('buildAsas refuses a bound field that loosens the tenant: a set, another ka
 test('the tenant target is registered under the key tenant, the kayan decides by its field alone, and onDelete restrict is the only choice', () => {
   const misnamed = defineMithaq({ arkan: [base], targets: { ...offline(), owner: tenant } } as never)
   assert.throws(() => build(misnamed), /Target "owner" declares capability "tenant" and has to be named "tenant" in targets/)
-  const taken = defineMithaq({ arkan: [base], targets: { ...offline(), tenant: zodTarget } } as never)
+  const taken = defineMithaq({ arkan: [base], targets: { ...offline(), tenant: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }) } } as never)
   assert.throws(() => build(taken), /Target "tenant" declares capability "schema", and the key "tenant" is the tenant target's/)
   const cascading = defineMithaq({ arkan: [base], targets: { ...offline(), tenant: { ...tenant, onDelete: 'cascade' } } } as never)
   assert.throws(() => build(cascading), /The tenant target declares onDelete "cascade", and a tenant takes onDelete: 'restrict' alone\./)
@@ -291,7 +291,7 @@ test('connect() refuses a store holding more than one organization where the ten
       arkan: [base],
       targets: {
         store,
-        zod: zodTarget,
+        zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
         tenant: betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations }),
         service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }),
       } as {},

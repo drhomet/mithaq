@@ -9,7 +9,7 @@ import { test } from 'node:test'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { sql } from 'drizzle-orm'
 import {
-  drizzleAdapter,
+  drizzleIdKinds, drizzleAdapter,
   drizzleKinds,
   drizzleRules,
 } from 'mithaq'
@@ -40,11 +40,11 @@ test('a production `connect()` runs or refuses the migrations this database has 
   // template's own choice is booted by the app tests.
   await writeFile(
     new URL('adapter.ts', root),
-    `import { drizzleAdapter, drizzleTarget } from '${mithaqEntry}'
+    `import { drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds } from '${mithaqEntry}'
 const [pending, readOnly, migrationsFolder = 'src/migrations'] = process.argv.slice(2)
 const store = drizzleAdapter({
   connectionString: process.env.DATABASE_URL!,
-  ...drizzleTarget,
+  kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds,
   push: false,
   ...(pending === 'none' ? {} : { prodMigrations: { migrationsFolder, pending: pending as 'run' | 'refuse' } }),
 }).init([])

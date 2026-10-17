@@ -26,7 +26,7 @@ import {
   serviceTarget,
   zodKinds,
   zodRules,
-  zodTarget,
+  zodIdKinds, zodTarget,
 } from 'mithaq'
 import { generateAuth } from 'mithaq/generate-auth'
 import { pushInput } from '../../../packages/mithaq/src/drizzle/index.ts'
@@ -59,7 +59,7 @@ const language = defineMithaq({
   arkan: [base],
   targets: {
     drizzle: drizzleAdapter({ connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }),
-    zod: { ...zodTarget, kinds: zodKinds, rules: zodRules },
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
   },
 })

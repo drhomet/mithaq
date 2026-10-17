@@ -36,7 +36,7 @@ import {
   userRefs,
   versionsTarget,
   withUploadReference,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
   type Authorize,
   type StandardSchemaV1,
   type StorageAdapter,
@@ -109,7 +109,7 @@ const languageOf = ({ softDelete, config = unused(), authorize = defaultAuthoriz
     arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storageRukn(config)],
     targets: {
       memory: softDelete ? memoryOf() : memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       plain: plainTarget,
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, ...(softDelete && { softDelete: 'deletedAt' }) },
       versions: versionsTarget({ max: 100 }),
@@ -484,7 +484,7 @@ test('190a. the build refuses a second target of capability storage beside the r
     arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storageRukn(config)],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit },
       files: storageTarget(config),
     },

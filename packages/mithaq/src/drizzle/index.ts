@@ -599,9 +599,6 @@ export const recordMigration = async ({ db, hash, createdAt, name }: {
     insert into ${historyTable} (hash, created_at, name) values (${hash}, ${createdAt}, ${name})`)
 }
 
-/** The drizzle store target's maps: a map per kind and a map per rule. */
-export const drizzleTarget = { capability: 'store', type: 'drizzle', idKinds: drizzleIdKinds, kinds: drizzleKinds, rules: drizzleRules } as const
-
 type DrizzleAdapterArguments<Kinds, Rules> = {
   /** A ready drizzle instance, so the pool, logger and options are the developer's. */
   db?: Database

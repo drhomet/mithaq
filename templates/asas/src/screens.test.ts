@@ -23,7 +23,7 @@ import {
   folderOf,
   screenTarget,
   serviceTarget,
-  zodTarget,
+  zodKinds, zodRules, zodIdKinds, zodTarget,
   fetchHttp,
 } from 'mithaq'
 import { referencesIn, studioText, studioTree } from 'mithaq/admin'
@@ -62,7 +62,7 @@ const screens = (extra: Record<string, unknown> = {}) =>
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
       dashboard: screenTarget({ ...dashboardBase, kayan: ['courses'] }),
       portal: screenTarget({ ...portalBase, kayan: ['courses'] }),
@@ -187,7 +187,7 @@ test('a kayan in targets.<screen> the screen does not list, and a listed name th
 })
 
 test('a target named screen is refused', () => {
-  assert.throws(() => build(undefined, undefined, { screen: zodTarget }), /A target is named "screen", which is the word for the capability\./)
+  assert.throws(() => build(undefined, undefined, { screen: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }) }), /A target is named "screen", which is the word for the capability\./)
 })
 
 test('a kayan named screen is refused by name, because the catalog derives screen.<name> for every screen', () => {
@@ -341,7 +341,7 @@ test('a built-in on a kind it does not draw, a project kind with no controls row
     arkan: [defineRukn({ name: 'project', kinds: { ...defaultKinds, slug: defaultKinds.text }, rules: defaultRules })],
     targets: {
       memory: memoryStore(),
-      zod: { ...zodTarget, kinds: { ...zodTarget.kinds, slug: zodTarget.kinds.text } },
+      zod: zodTarget({ kinds: { ...zodKinds, slug: zodKinds.text }, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
       dashboard: screenTarget({ ...dashboardBase, kayan: [], controls: short }),
     },
@@ -1162,7 +1162,7 @@ test("a field's label, description or placeholder written as a function is left 
     arkan: [base],
     targets: {
       memory: memoryStore(),
-      zod: zodTarget,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }),
       dashboard: screenTarget({ ...dashboardBase, kayan: ['hatches'] }),
     },

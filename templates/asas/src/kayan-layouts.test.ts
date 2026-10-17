@@ -26,7 +26,7 @@ const project = async () => {
   await write('package.json', '{ "name": "kayan-layouts-fixture", "private": true, "type": "module" }')
   await write(
     'src/mithaq.ts',
-    `import { defaultMaxBodyBytes, screenKinds, defaultAuthorize, defaultDepth, defaultLimit, defaultMaxLimit, defaultJoinLimit, defaultBulkLimit, base, defineMithaq, drizzleAdapter, drizzleTarget, folderOf, screenTarget, serviceTarget, zodTarget } from 'mithaq'
+    `import { defaultMaxBodyBytes, screenKinds, defaultAuthorize, defaultDepth, defaultLimit, defaultMaxLimit, defaultJoinLimit, defaultBulkLimit, base, defineMithaq, drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds, folderOf, screenTarget, serviceTarget, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'
 export const ui = folderOf(new URL('./ui/', import.meta.url))
 const language = defineMithaq({
   locales: ['en'] as const,
@@ -35,8 +35,8 @@ const language = defineMithaq({
     // node-postgres opens no socket until the first query, so a connection
     // string nothing can reach costs this fixture nothing
     // (\`packages/mithaq/src/drizzle/index.ts\` \`const opened =\`).
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://user:pass@localhost:1/fixture', ...drizzleTarget }),
-    zod: zodTarget,
+    drizzle: drizzleAdapter({ connectionString: 'postgresql://user:pass@localhost:1/fixture', kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }),
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     dashboard: screenTarget({
       path: '/dashboard',
@@ -123,15 +123,15 @@ const packages = async () => {
   await write('packages/mithaq/package.json', manifest('@fixture/mithaq', './src/mithaq.ts'))
   await write(
     'packages/mithaq/src/mithaq.ts',
-    `import { screenKinds, defaultAuthorize, defaultDepth, defaultLimit, defaultMaxLimit, defaultJoinLimit, defaultBulkLimit, base, defineMithaq, drizzleAdapter, drizzleTarget, folderOf, screenTarget, serviceTarget, zodTarget } from 'mithaq'
+    `import { screenKinds, defaultAuthorize, defaultDepth, defaultLimit, defaultMaxLimit, defaultJoinLimit, defaultBulkLimit, base, defineMithaq, drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds, folderOf, screenTarget, serviceTarget, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'
 // The screens' own pieces sit in the asas, which the language names by path and never imports.
 const ui = folderOf(new URL('../../asas/src/ui/', import.meta.url))
 const language = defineMithaq({
   locales: ['en'] as const,
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://user:pass@localhost:1/fixture', ...drizzleTarget }),
-    zod: zodTarget,
+    drizzle: drizzleAdapter({ connectionString: 'postgresql://user:pass@localhost:1/fixture', kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }),
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     dashboard: screenTarget({ path: '/dashboard', controls: screenKinds, providers: [], pages: { home: { path: '/', component: ui('panel.tsx#Panel') } }, layouts: {}, components: {}, kayan: ['widget'] }),
   },
