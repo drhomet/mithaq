@@ -15798,6 +15798,17 @@ test('151c. the backoffice renames an organization and its slug through its own 
   assert.equal(((await refusedInOne!.json()) as { data: { key: string } }).data.key, 'error.conflict.organization_name_in_code')
 })
 
+test('the backoffice rename maps a custom store transaction deadlock to a retry conflict', { timeout: 10_000 }, async (t) => {
+  const { backofficeHttp } = await import('./backoffice-http.ts')
+  const administrator = await staffOn('backoffice-retry', 'super_admin')
+  t.mock.method(languageTargets.drizzle, 'transaction', async () => { throw Object.assign(new Error('deadlock'), { code: '40P01' }) })
+  const response = await asBackoffice(async () => backofficeHttp({ organizations: 'many' })().handle(new Request('http://test/api/backoffice/organizations/update', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'retry', name: 'Retry', slug: 'retry' }),
+  }), async () => asas.auth.actor(await onBackoffice(administrator.headers))))
+  assert.equal(response?.status, 409)
+  assert.equal(((await response!.json()) as { data: { key: string } }).data.key, 'error.conflict.retry')
+})
+
 test('151d. the backoffice\'s people, organizations and members lists read their URL the way the host does, and a search, a filter, a sort and a page each narrow the read support makes there', async () => {
   const { QueryRefused, findOf, readQuery, rulesOf, writeQuery } = await import('../../../packages/mithaq-admin/registry/list-query.ts')
   const backoffice = asas.targets.backoffice.client

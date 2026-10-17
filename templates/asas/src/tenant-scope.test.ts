@@ -366,6 +366,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       service: {
         operations: {
           ...defaultOperations,
+          probe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert] },
           forge: { steps: ({ steps }: { steps: { insert: unknown } }) => [seeTenant, steps.insert] },
           peek: { steps: ({ steps }: { steps: { find: unknown } }) => [seeTenant, steps.find] },
         },
@@ -439,7 +440,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       },
     },
   }
-  const numbered = { name: 'numbered', schemaName, fields: { id: { kind: 'number' }, name: { kind: 'text' } }, targets: { service: { operations: defaultOperations } } }
+  const numbered = { name: 'numbered', schemaName, fields: { id: { kind: 'number' }, name: { kind: 'text' }, code: { kind: 'integer', rules: { unique: true } } }, targets: { service: { operations: defaultOperations } } }
   const user = { name: 'user', schemaName, fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
   // A local account, which is no organization's member.
   const locals = {
@@ -1857,6 +1858,15 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal(kept.title, 'foreign')
   })
 
+  test('a step upsert refuses an increment on an integer key field', { timeout: 10_000 }, async () => {
+    storeProbe = async (ctx, tools) => { await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'numbered'), on: ['code'], data: { id: 99, name: 'key increment', code: { $inc: 1 } } }) }
+    try {
+      const error = await refusal(memos().probe({ title: 'integer key' }, { actor: one }))
+      assert.equal(error.status, 400)
+      assert.match(error.message, /plain key values/)
+    } finally { storeProbe = async () => {} }
+  })
+
   if (postgres) test('managed json values keep a $inc key on create and update', { timeout: 10_000 }, async () => {
     const row = await memos().create({ title: 'json increment key', meta: { $inc: 1 } }, { actor: one })
     assert.deepEqual(row.meta, { $inc: 1 })
@@ -2146,6 +2156,15 @@ test('a local operation maps a custom store transaction deadlock to a retry conf
   const error = await refusal(built.kayan.memos.operations.create({ title: 'retry' }, { actor: await actorOf({ active: 'org1' }) }))
   assert.equal(error.status, 409)
   assert.equal(error.key, 'error.conflict.retry')
+  assert.equal((await refusal(built.kayan.memos.operations.updateMany({ where: { title: { equals: 'retry' } }, data: { title: 'retry' } }, { actor: await actorOf({ active: 'org1' }) }))).status, 409)
+})
+
+test('a step insert without an active organization throws and writes nothing', { timeout: 10_000 }, async () => {
+  const store = memoryStore()
+  const built = languageOf(store as never, { authorize: async () => undefined })
+  storeProbe = async (ctx, tools) => { await tools.store.insert({ tx: ctx.tx, kayan: declaration(built, 'opens'), data: { title: 'organizationless insert' } }) }
+  try { await assert.rejects(built.kayan.pins.operations.probe({ label: 'shared probe', memo: null }), /another organization/) } finally { storeProbe = async () => {} }
+  assert.equal((await store.find({ kayan: 'opens', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { title: { equals: 'organizationless insert' } } } })).totalDocs, 0)
 })
 
 test('buildAsas refuses a store missing sum with a plain error naming the word', { timeout: 10_000 }, () => {

@@ -12,7 +12,7 @@
 // governance role stay out: each is irreversible or passes the plugin's own
 // owner rules by, and staff do each by impersonating a member, which is
 // audited under the real person's name.
-import { AsasError, actorPermissions, conflict, denied, invalid, missing, type HttpPlug } from 'mithaq'
+import { AsasError, actorPermissions, conflict, denied, invalid, missing, retryConflict, type HttpPlug } from 'mithaq'
 import { namesOf, oneLine, backofficeRoles } from '@asas/mithaq/auth'
 import { organizations as mode } from '@asas/mithaq/auth/organizations'
 import { targets } from '@asas/mithaq'
@@ -109,6 +109,7 @@ export const backofficeHttp = ({ organizations }: { organizations: 'one' | 'many
       }))
       return Response.json({ id, name, slug })
     } catch (thrown) {
+      thrown = retryConflict(thrown)
       if (thrown instanceof AsasError) return refusal(thrown)
       throw thrown
     }

@@ -248,13 +248,13 @@ export const tenancy = ({ language, assigned, onError, collection }: {
       },
       insert: async (args) => {
         const field = named(args.kayan).tenant
+        const org = active(running.getStore()?.user)
         if (field) {
-          const org = active(running.getStore()?.user)
           if (org === undefined || (Object.hasOwn(args.data, field) && args.data[field] !== org)) {
             throw new Error(`A step made a row of kayan "${args.kayan}" in another organization than the active one, and a row is made in its own organization alone.`)
           }
         }
-        const data = field ? { ...args.data, [field]: active(running.getStore()?.user) } : args.data
+        const data = field ? { ...args.data, [field]: org } : args.data
         await references({ name: args.kayan, data, tx: args.tx })
         return writes.insert({ ...args, data })
       },

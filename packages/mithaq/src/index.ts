@@ -12,7 +12,7 @@ export { holdsPermission, requestOrganization } from './auth/better-auth/index.t
 export type { AssignedResolver, AuthStrategy, KayanAuth } from './asas/actor.ts'
 export type { AuthConfig, HttpPlug, Operation, OperationTable, Vocabulary } from './asas/build.ts'
 export { defaultMaxBodyBytes, fetchHttp, type FetchHttpOptions } from './asas/http/fetch.ts'
-export { AfterCommitError, AsasError, conflict, denied, invalid, missing, Notice, type MessageKey } from './asas/runner/errors.ts'
+export { AfterCommitError, AsasError, conflict, denied, invalid, missing, retryConflict, Notice, type MessageKey } from './asas/runner/errors.ts'
 export {
   audit,
   count,
