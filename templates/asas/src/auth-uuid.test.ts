@@ -20,7 +20,7 @@ import {
   defaultMaxLimit,
   defineMithaq,
   drizzleAdapter,
-  drizzleKinds,
+  drizzleIdKinds, drizzleKinds,
   drizzleRules,
   fetchHttp,
   serviceTarget,
@@ -58,7 +58,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const language = defineMithaq({
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
   },

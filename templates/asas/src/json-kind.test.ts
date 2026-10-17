@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { after, before, describe, test } from 'node:test'
 import { pathToFileURL } from 'node:url'
-import { AsasError, base, defaultAuthorize, defaultJsonMaxBytes, defaultMaxBodyBytes, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, draftFields, drizzleAdapter, drizzleKinds, drizzleRules, fetchHttp, serviceTarget, versionOperations, versionsTarget, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'
+import { AsasError, base, defaultAuthorize, defaultJsonMaxBytes, defaultMaxBodyBytes, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, draftFields, drizzleAdapter, drizzleIdKinds, drizzleKinds, drizzleRules, fetchHttp, serviceTarget, versionOperations, versionsTarget, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
 import { pushInput } from '../../../packages/mithaq/src/drizzle/index.ts'
 import { memoryStore } from './memory-store.ts'
@@ -257,7 +257,7 @@ describe('postgres', () => {
   const { defineKayan, buildAsas } = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       versions: versionsTarget({ max: 100 }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),

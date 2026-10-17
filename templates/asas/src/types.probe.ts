@@ -27,7 +27,7 @@ import {
   defineMithaq,
   defineRukn,
   drizzleAdapter,
-  drizzleKinds,
+  drizzleIdKinds, drizzleKinds,
   drizzleRules,
   kind,
   storage,
@@ -79,7 +79,7 @@ import {
   type Localized,
   type StandardSchemaV1,
   type Where,
-  type TenantField,
+  type TenantField, type TenantTarget,
   serviceTarget,
   folderOf,
   screenTarget,
@@ -365,7 +365,7 @@ defineKayan({ name: 'probe', fields: { title: { kind: 'text', rules: { min: 1 } 
 defineMithaq({
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
     // @ts-expect-error the language has six kinds and this target's map names one
     partial: { ...zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), kinds: { text: zodKinds.text }, rules: zodRules },
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'partial', authorize: defaultAuthorize }),
@@ -374,7 +374,7 @@ defineMithaq({
 defineMithaq({
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
     // @ts-expect-error `colour` is not a kind the language named
     extra: { ...zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), kinds: { ...zodKinds, colour: zodKinds.text }, rules: zodRules },
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'extra', authorize: defaultAuthorize }),
@@ -382,7 +382,7 @@ defineMithaq({
 })
 
 const arkanTargets = {
-  drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+  drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
   zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
   service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
 }
@@ -455,7 +455,7 @@ const slugKind = <const Targets extends Record<string, unknown>>(targets: Target
   })
 defineMithaq({
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
     // @ts-expect-error the zod map names no `slug`, and the kind carries no shape of its own
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
@@ -543,7 +543,7 @@ defineMithaq({
 defineMithaq({
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
     // @ts-expect-error `slug` is not a kind the language named
     strayId: { ...zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), idKinds: ['slug'], kinds: zodKinds, rules: zodRules },
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'strayId', authorize: defaultAuthorize }),
@@ -574,6 +574,7 @@ const customLanguage = defineMithaq({
   ],
   targets: {
     drizzle: drizzleAdapter({
+      idKinds: drizzleIdKinds,
       connectionString: 'postgresql://never-connected',
       kinds: { ...drizzleKinds, money: drizzleKinds.number },
       rules: { ...drizzleRules, searchable: drizzleRules.required },
@@ -877,7 +878,7 @@ const plainCode: StandardSchemaV1<string, 'A' | 'B'> = {
 const plainLanguage = defineMithaq({
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     plain: plainTarget,
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'plain', authorize: defaultAuthorize }),
@@ -1076,6 +1077,7 @@ const narrowDateLanguage = defineMithaq({
   ],
   targets: {
     drizzle: drizzleAdapter({
+      idKinds: drizzleIdKinds,
       connectionString: 'postgresql://never-connected',
       kinds: { ...drizzleKinds, narrowDate: drizzleKinds.datetime },
       rules: drizzleRules,
@@ -1098,6 +1100,7 @@ const secondStoreLanguage = defineMithaq({
   arkan: [base],
   targets: {
     drizzle: drizzleAdapter({
+      idKinds: drizzleIdKinds,
       connectionString: 'postgresql://never-connected',
       kinds: drizzleKinds,
       rules: drizzleRules,
@@ -1748,7 +1751,7 @@ const check = async () => {
 const tenancyLanguage = defineMithaq({
   arkan: [base],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     rbac: rbacTarget({ roles: systemRoles, access: { '*': { read: true } }, kayan: { roles: 'roles', memberRoles: 'memberRoles' } }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
@@ -2130,7 +2133,7 @@ export const supplierProbes = { noRefOnCreate, noSealOnUpdate }
 // A label is `Readonly<Record<Locale, string>>`, so every declared locale is required and adding a
 // locale breaks each label until each carries it.
 const localeTargets = {
-  drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
+  drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
   zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
 } as const
 const bilingual = defineMithaq({
@@ -2240,7 +2243,7 @@ rbacTarget({ roles: systemRoles, kayan: { roles: 'roles' } })
 localAuthStrategy({
   options: developmentOptions,
   kayan: undefined as unknown as ResolvedKayan,
-  target: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+  target: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
   writes: {},
   projectUser: async (row) => row,
   onError: console.error,
@@ -2694,7 +2697,7 @@ defineMithaq({
 // The service target owns these keys, and one left on the language root is a second spelling of one
 // fact, refused where it is written.
 const serviceProbeTargets = {
-  drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
+  drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false }),
   zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
 }
 defineMithaq({
@@ -3329,7 +3332,14 @@ export const rawStoreValuesProbe = async (ctx: Ctx, tools: WriteTools) => {
 }
 
 // @ts-expect-error A drizzle adapter must name its kinds map.
-drizzleAdapter({ connectionString: 'postgresql://never-connected', rules: drizzleRules })
+drizzleAdapter({ connectionString: 'postgresql://never-connected', rules: drizzleRules, idKinds: drizzleIdKinds })
 
 // @ts-expect-error A tenant target must name the new-row fill rule.
 betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many' })
+
+// @ts-expect-error A drizzle adapter must name its id kinds.
+drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules })
+
+const { newRows: _newRows, ...tenantWithoutNewRows } = betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many', newRows: 'active' })
+// @ts-expect-error A tenant target must name the new-row fill rule.
+const tenantNewRowsProbe: TenantTarget = tenantWithoutNewRows

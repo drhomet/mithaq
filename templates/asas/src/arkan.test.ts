@@ -21,7 +21,7 @@ import {
   defineMithaq,
   defineRukn,
   drizzleAdapter,
-  drizzleKinds,
+  drizzleIdKinds, drizzleKinds,
   drizzleRules,
   kind,
   rule,
@@ -45,7 +45,7 @@ import { storageConfig } from '../../mithaq/src/storage/index.ts'
 
 /** The targets of a build that makes tables and never connects. */
 const offline = (kinds: Record<string, unknown> = drizzleKinds) => ({
-  drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: kinds as typeof drizzleKinds, rules: drizzleRules }),
+  drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: kinds as typeof drizzleKinds, rules: drizzleRules }),
   zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
   service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
 })

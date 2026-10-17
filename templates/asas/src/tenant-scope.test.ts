@@ -29,7 +29,7 @@ import {
   defineMithaq,
   draftFields,
   drizzleAdapter,
-  drizzleKinds,
+  drizzleIdKinds, drizzleKinds,
   drizzleRules,
   fetchHttp,
   serviceTarget,
@@ -2140,7 +2140,7 @@ suite('memory store', async () => {
 })
 
 suite('postgres', async () => {
-  const built = languageOf(drizzleAdapter({ connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }) as never, { withLocal: true })
+  const built = languageOf(drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }) as never, { withLocal: true })
   await built.connect()
   return {
     built,

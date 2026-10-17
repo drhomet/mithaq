@@ -847,6 +847,7 @@ test("a project rule carrying its own sentence seeds mithaq.rules.<name>, and it
     arkan: [defineRukn({ name: 'project', kinds: { ...defaultKinds, number: { ...defaultKinds.number, rules: [...defaultKinds.number.rules, 'positive'] as const } }, rules: { ...defaultRules, positive: rule<boolean>({ accepts: (value): value is boolean => typeof value === 'boolean', message }) } })],
     targets: {
       drizzle: drizzleAdapter({
+        idKinds: drizzleIdKinds,
         connectionString: 'postgresql://never-connected',
         kinds: drizzleKinds,
         rules: { ...drizzleRules, positive: (({ column }) => column) satisfies ColumnRule<boolean> },

@@ -21,7 +21,7 @@ import {
   defaultOperations,
   defineMithaq,
   drizzleAdapter,
-  drizzleKinds,
+  drizzleIdKinds, drizzleKinds,
   drizzleRules,
   fetchHttp,
   serviceTarget,
@@ -32,7 +32,7 @@ import { memoryStore } from './memory-store.ts'
 
 /** The targets of a build that makes tables and never connects. */
 const offline = () => ({
-  drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+  drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
   zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
   service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
 })

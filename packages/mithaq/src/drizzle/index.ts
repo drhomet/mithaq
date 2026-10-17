@@ -43,7 +43,7 @@ import type { Operator, Where } from '../mithaq/where.ts'
 import { conflict, invalid, missing, localizedQuery } from '../asas/runner/errors.ts'
 import { Refusal } from '../mithaq/refusal.ts'
 import { providerOf } from '../base/rules.ts'
-import { idKinds as drizzleIdKinds, kinds as drizzleKinds } from './kinds.ts'
+import { kinds as drizzleKinds } from './kinds.ts'
 import { rules as drizzleRules } from './rules.ts'
 
 type Database = NodePgDatabase
@@ -607,7 +607,7 @@ type DrizzleAdapterArguments<Kinds, Rules> = {
   kinds: Kinds
   rules: Rules
   /** The kinds this store builds an id of; set it where you replace the kinds map and its relationship builder. */
-  idKinds?: readonly string[]
+  idKinds: readonly string[]
   /** Push the schema on connect instead of running migrations. */
   push?: boolean
   /**
@@ -632,7 +632,7 @@ export const drizzleAdapter = <
   connectionString,
   kinds,
   rules,
-  idKinds = drizzleIdKinds,
+  idKinds,
   push: named,
   prodMigrations,
 }: DrizzleAdapterArguments<Kinds, Rules>): Omit<Adapter, 'kinds' | 'rules'> & { kinds: Kinds; rules: Rules } => {

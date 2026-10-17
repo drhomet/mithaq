@@ -12,7 +12,7 @@ import {
   defineMithaq,
   defineRukn,
   drizzleAdapter,
-  drizzleKinds,
+  drizzleIdKinds, drizzleKinds,
   drizzleRules,
   fetchHttp,
   kind,
@@ -35,7 +35,7 @@ export const language = defineMithaq({
   locales: ['ar', 'en'] as const,
   arkan: [base, defineRukn({ name: 'colors', kinds: { color } })],
   targets: {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     dashboard: screenTarget({ ...dashboardScreen, kayan: ['swatches'], controls: screenKinds, pages: { home: { path: '/', component: dashboardScreen.pages.dashboard!.component } } }),

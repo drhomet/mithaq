@@ -101,10 +101,10 @@ try {
     await t.test('push: true beside prodMigrations is refused when the adapter is built, since Payload never pushes in production', () => {
       const prodMigrations = { migrationsFolder: 'src/migrations', pending: 'refuse' } as const
       assert.throws(
-        () => drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: true, prodMigrations }),
+        () => drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: true, prodMigrations }),
         /takes `push: true` or `prodMigrations`, never both/,
       )
-      assert.doesNotThrow(() => drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false, prodMigrations }))
+      assert.doesNotThrow(() => drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, push: false, prodMigrations }))
     })
 
     await t.test('a migrations folder holding no drizzle.config.ts is refused, since it would read as nothing pending', async () => {

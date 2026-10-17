@@ -47,7 +47,7 @@ import {
   versions as versionsRukn,
   drizzleAdapter,
   fetchHttp,
-  drizzleKinds,
+  drizzleIdKinds, drizzleKinds,
   drizzleRules,
   insert,
   local,
@@ -637,7 +637,7 @@ const offlineTargets = (
   shapes: Record<string, ZodShape> = zodKinds,
   rules: Record<string, ColumnRule> = drizzleRules,
 ) => ({
-  drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds, rules }),
+  drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds, rules }),
   zod: zodTarget({ kinds: shapes, rules: zodRules, idKinds: zodIdKinds }),
   service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
 })
@@ -689,7 +689,7 @@ const online = () =>
   reporting(defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({
         depth: defaultDepth,
@@ -2135,6 +2135,7 @@ test('8. every rule is one entry per target, and a rule a target does not name t
     ],
     targets: {
       drizzle: drizzleAdapter({
+        idKinds: drizzleIdKinds,
         db,
         kinds: drizzleKinds,
         rules: { ...drizzleRules, positive: positiveColumn },
@@ -2169,7 +2170,7 @@ test("8a. a kind carries the sentence a value it refuses is shown as and one wri
     (defineMithaq({
       arkan: [defineRukn({ name: 'base', kinds: defaultKinds, rules: defaultRules, ...over })],
       targets: {
-        drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+        drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
         zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
         service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
       },
@@ -3033,7 +3034,7 @@ test('each build has tables of its own: a refused build leaves nothing for the n
   // each build a store without the override: refused at build.
   const unwrapped = reporting(defineMithaq({
     arkan: [base],
-    targets: { ...offlineTargets(), drizzle: { ...drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }), connect: async () => {} } },
+    targets: { ...offlineTargets(), drizzle: { ...drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }), connect: async () => {} } },
   }))
   assert.throws(
     () => unwrapped.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [unwrapped.defineKayan({ name: 'memos_259', fields: { id: defaultFields.id }, targets: { service: { operations: defaultOperations } } })] }),
@@ -3041,7 +3042,7 @@ test('each build has tables of its own: a refused build leaves nothing for the n
   )
   // The store the language holds merges every build's tables, so it pushes
   // and migrates nothing: a build's own store does.
-  const merged = drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules })
+  const merged = drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules })
   await assert.rejects(() => merged.connect(), /connect a build/)
   await assert.rejects(async () => merged.commands!.migrate!({ flags: [] } as never), /connect a build/)
 })
@@ -3270,7 +3271,7 @@ test('14. a second store is checked and used, every target is checked, and what 
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       memory,
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
@@ -3331,7 +3332,7 @@ test('14. a second store is checked and used, every target is checked, and what 
   const partial = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       memory: dateless,
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
@@ -3535,7 +3536,7 @@ test('16b. configured audit handlers run in the write transaction and can fail t
     arkan: [base],
     defaultFields,
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize, afterSteps: [audit], audit: (async ({ kayan, operation, dataBefore, dataAfter, store, tx, user }) => {
       events.push({ kayan: kayan.name, operation, dataBefore, dataAfter, user })
@@ -3574,7 +3575,7 @@ test('16b. configured audit handlers run in the write transaction and can fail t
     arkan: [base],
     defaultFields,
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize, afterSteps: [audit], audit: (() => {
       throw new Error('audit sink failed')
@@ -4896,7 +4897,7 @@ test('21b. first registration hands every step the context local()\'s own functi
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({
         depth: defaultDepth,
@@ -8415,7 +8416,7 @@ test('75. a localized field declaring a defaultValue, a localized field whose pe
     locales: ['ar', 'en'] as const,
     arkan: [defineRukn({ name: 'project', kinds: bothKinds, rules: defaultRules })],
     targets: {
-      drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     },
@@ -8755,7 +8756,7 @@ test('82. a kayan the access target reads carrying the soft-delete mark is refus
     const language = defineMithaq({
       arkan: [base],
       targets: {
-        drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+        drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
         zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
         rbac: rbacTarget({
           roles: { reader: { label: { ar: 'قارئ', en: 'Reader' }, permissions: [] } },
@@ -9990,7 +9991,7 @@ test('98a. one create makes a local account for an administrator and for a publi
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({
         depth: defaultDepth,
@@ -11379,7 +11380,7 @@ test('116. the access target answers for a local actor too, under no organizatio
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       rbac: rbacTarget({
         roles: { clerk: { label: { ar: 'كاتب', en: 'Clerk' }, permissions: ['localNotes.find', 'localNotes.fields.id', 'localNotes.fields.body', 'localNotes.fields.tenant'] } },
@@ -11490,7 +11491,7 @@ test('117. a build declaring the access target without a kayan that target reads
     const language = defineMithaq({
       arkan: [base],
       targets: {
-        drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+        drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
         zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
         rbac: rbacTarget({
           roles: { reader: { label: { ar: 'قارئ', en: 'Reader' }, permissions: [] } },
@@ -12226,7 +12227,7 @@ test('128. an impersonated write audits the real person beside the actor it was 
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize, afterSteps: [audit], audit: ((entry: { user: unknown }) => void entries.push(entry)) as AuditHandler }),
     },
@@ -14060,6 +14061,7 @@ test('137. a rule declares the rules it excludes on its own value, a field decla
       arkan: [defineRukn({ name: 'project', kinds: { ...defaultKinds, text: { ...defaultKinds.text, rules: [...defaultKinds.text.rules, 'slugify'] as const } }, rules: { ...defaultRules, slugify: projectRule } })],
       targets: {
         drizzle: drizzleAdapter({
+          idKinds: drizzleIdKinds,
           connectionString: 'postgresql://never-connected',
           kinds: drizzleKinds,
           rules: { ...drizzleRules, slugify: (({ column }) => column) satisfies ColumnRule<boolean> },
@@ -14366,7 +14368,7 @@ test('141. in a build graded by the template\'s own access target, a local-auth 
 
 test('143. the runner is a target: a build with none is refused naming the fix, a second is refused, one under another name is refused by that name, transport inside it is refused, and any of its ten keys left on the language root is refused by name', () => {
   const targets = () => ({
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
   })
   const runner = () => serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, authorize: defaultAuthorize, store: 'drizzle', schema: 'zod' })
@@ -14431,7 +14433,7 @@ test('144. audit and depth on the language root are refused by name', () => {
   for (const [key, value] of Object.entries({ audit: () => {}, depth: 4 })) {
     assert.throws(
       () => (defineMithaq as any)({ arkan: [base], targets: {
-        drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+        drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
         zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
         service: runner,
       }, [key]: value }).buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] }),
@@ -14442,7 +14444,7 @@ test('144. audit and depth on the language root are refused by name', () => {
 
 test('145. a listed audit step requires a service sink', () => {
   const targets = {
-    drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+    drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
   }
   const build = (afterSteps: readonly Step[], auditSink?: AuditHandler) =>
@@ -14543,7 +14545,7 @@ test('148. a built kayan publishes only the outputs the targets it selected buil
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       memory,
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       plain: plainTarget,
@@ -14579,7 +14581,7 @@ test('149. registration order changes no selection: the service target may be de
   const build = (runnerFirst: boolean) => {
     const service = serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize })
     const rest = {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       memory: memoryStore(),
       plain: plainTarget,
@@ -14719,7 +14721,7 @@ test('152. the service target takes no operations, and passing one is refused by
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       // @ts-expect-error the service target takes no `operations`
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, operations: defaultOperations, authorize: defaultAuthorize, store: 'drizzle', schema: 'zod' }),
@@ -14823,7 +14825,7 @@ test('156. a kayan, field or operation named for what Object.prototype carries b
     locales: ['ar', 'en'] as const,
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
     },
@@ -15060,7 +15062,7 @@ test('160. without an access target, only the auth.admin actor its access admits
   const language = defineMithaq({
     arkan: [base],
     targets: {
-      drizzle: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules }),
+      drizzle: drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize, afterSteps: [] }),
       dashboard: screenTarget({ ...shell, path: '/dashboard', kayan: [], pages: home(dashboardUi, 'dashboard.tsx#Dashboard') }),
