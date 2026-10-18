@@ -14,7 +14,7 @@ import { click, fire, mount, window } from './dom.ts'
 const { createRoot } = await import('react-dom/client')
 const { counted, formatDate } = await import('../registry/format.tsx')
 const { localesOf } = await import('../registry/refusal.ts')
-const { newTitleOf } = await import('../registry/copy.ts')
+const { newTitleOf, descriptionOf } = await import('../registry/copy.ts')
 const { withAddOns } = await import('./with-add-ons.ts')
 // The template's language holds rich text and files, so its screens draw with both add-ons spread in, as its apps do.
 const defaultComponents = withAddOns((await import('../registry/default-components.tsx')).defaultComponents, (await import('../registry/rich-text.tsx')).richTextComponents, (await import('../registry/upload.tsx')).uploadComponents)
@@ -163,6 +163,14 @@ test('217i. a settings page draws its global\'s sentence, and the maintenance sw
   assert.ok(html.includes(settings.description!.ar!), 'the sentence under its title')
   const maintenance = settings.fields.find((one) => one.name === 'maintenance')!
   assert.ok(maintenance.description?.ar && html.includes(maintenance.description.ar), 'and the switch\'s help text under it')
+})
+
+test('a page description never reads the label of a description field', () => {
+  const kayan = { ...tags, description: undefined, fields: [...tags.fields, { name: 'description', kind: 'text', component: 'text', cell: 'text' }] } as typeof tags
+  const t = (key: string) => key === 'tags.description' ? 'Description field label' : undefined
+  assert.equal(descriptionOf(kayan, { locale: 'en', t }), undefined)
+  assert.equal(descriptionOf(kayan, { locale: 'en', t: (key) => key === 'tags.page.description' ? 'About tags' : t(key) }), 'About tags')
+  assert.equal(descriptionOf({ ...kayan, description: { en: 'Declared about text' } }, { locale: 'en', t }), 'Declared about text')
 })
 
 test('217j. the accepted types read as names, never as raw MIME types, each named once and a vendor type short', () => {

@@ -35,7 +35,7 @@ export const placeholderFor = ({ kayan, field, copy: { t, locale } }: { kayan: C
  */
 export const descriptionOf = (kayan: ClientKayan, { t, locale }: Copy): string | undefined =>
   (typeof kayan.description === 'object' ? kayan.description[locale] : undefined)
-  ?? t(`${kayan.name}.description`)
+  ?? t(`${kayan.name}.page.description`)
 
 /**
  * The words on a page's button for a kayan's operation: the page's label for the locale, else the project's copy under `<kayan>.operations.<name>`, else the operation's name.
