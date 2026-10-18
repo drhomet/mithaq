@@ -329,7 +329,7 @@ const operations = <Actor>(
     const declaration = kayan.operations[name]!
     const bulkInput = declaration.steps.some((step) => bulkSeals.includes(sealOf(step) as never))
     const normalize = (input: unknown) => normalizeInput({
-      kayan, input, bulk: bulkInput,
+      kayan: declaration.mode === 'versions' ? kayan.versions!.kayan : kayan, input, bulk: bulkInput,
       filters: declaration.effect === 'read' || bulkInput,
       version: declaration.mode === 'version' || declaration.steps.some((step) => sealOf(step) === 'restoreVersion'),
     })

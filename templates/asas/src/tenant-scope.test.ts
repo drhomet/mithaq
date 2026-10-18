@@ -1154,6 +1154,14 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     return { paper, versions: page.docs as { id: string }[] }
   }
 
+  if (!postgres) test('a versions filter lower-cases its parent uuid on the memory store without widening the tenant', async () => {
+    const { paper, versions } = await paperWithVersions('uppercase version parent')
+    const where = { parent: { equals: paper.id.toUpperCase() } }
+    const found = await built.kayan.papers.operations.findVersions({ where }, { actor: one })
+    assert.deepEqual(found.docs.map((row: { id: string }) => row.id).sort(), versions.map((row) => row.id).sort())
+    assert.equal((await built.kayan.papers.operations.findVersions({ where }, { actor: two })).totalDocs, 0)
+  })
+
   test('another organization\'s versions answer as missing ones: a list, a diff\'s read by parent, a read by id, a restore, a discard, a draft save, an autosave and a publish', async () => {
     const papers = built.kayan.papers.operations
     const { paper, versions } = await paperWithVersions('versioned')
