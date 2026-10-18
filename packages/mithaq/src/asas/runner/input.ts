@@ -10,10 +10,11 @@ const valueOf = (field: ResolvedField, value: unknown): unknown =>
     : field.hasMany && Array.isArray(value) ? value.map(lower) : lower(value)
 
 /** Postgres returns lowercase uuid text, so access, validation and steps must see that same spelling. */
-export const normalizeInput = ({ kayan, input, bulk = false, version = false }: {
+export const normalizeInput = ({ kayan, input, bulk = false, filters = false, version = false }: {
   kayan: ResolvedKayan
   input: unknown
   bulk?: boolean
+  filters?: boolean
   version?: boolean
 }): unknown => {
   if (!object(input)) return input
@@ -34,6 +35,7 @@ export const normalizeInput = ({ kayan, input, bulk = false, version = false }: 
   return Object.assign(Object.create(null), {
     ...(bulk ? input : fields(input)),
     ...(bulk && object(input.data) && { data: fields(input.data) }),
-    ...(Object.hasOwn(input, 'where') && { where: where(input.where) }),
+    // A row can declare a field named where, so only a query envelope owns this filter.
+    ...(filters && Object.hasOwn(input, 'where') && { where: where(input.where) }),
   })
 }

@@ -327,9 +327,10 @@ const operations = <Actor>(
   ) => {
     // The declared arity is what this widens across, which TypeScript asks two steps for.
     const declaration = kayan.operations[name]!
+    const bulkInput = declaration.steps.some((step) => bulkSeals.includes(sealOf(step) as never))
     const normalize = (input: unknown) => normalizeInput({
-      kayan, input,
-      bulk: declaration.steps.some((step) => bulkSeals.includes(sealOf(step) as never)),
+      kayan, input, bulk: bulkInput,
+      filters: declaration.effect === 'read' || bulkInput,
       version: declaration.mode === 'version' || declaration.steps.some((step) => sealOf(step) === 'restoreVersion'),
     })
     const normalized = ((given: unknown, options: unknown) => (method as unknown as Called)(normalize(given), options as never)) as unknown as Method

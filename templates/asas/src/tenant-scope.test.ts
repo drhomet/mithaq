@@ -442,6 +442,17 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       },
     },
   }
+  const uuidData = {
+    name: 'uuidData', schemaName,
+    fields: {
+      ...defaultFields, firmId: tenant.field, text: { kind: 'text' }, uuid: { kind: 'uuid' },
+      memo: { kind: 'relationship', relationTo: 'memos' },
+      meta: { kind: 'json', maxBytes: defaultJsonMaxBytes },
+      where: { kind: 'json', maxBytes: defaultJsonMaxBytes },
+    },
+    access: { create: () => true, read: () => true, update: () => true, delete: () => true },
+    targets: { service: { operations: defaultOperations } },
+  }
   const numbered = { name: 'numbered', schemaName, fields: { id: { kind: 'number' }, name: { kind: 'text' }, code: { kind: 'integer', rules: { unique: true } } }, targets: { service: { operations: defaultOperations } } }
   const user = { name: 'user', schemaName, fields: { id: { kind: 'text' } }, auth: betterAuth({ server: stubServer as never }), targets: { service: { operations: defaultOperations } } }
   // A local account, which is no organization's member.
@@ -453,12 +464,12 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, context: (request) => localProbe(request), secret: 'tenant-scope-a-local-auth-test-secret' }),
     targets: { service: { operations: { ...defaultOperations, ...localAuthOperations } } },
   }
-  const built: Built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, shelves, numbered, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  const built: Built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, shelves, numbered, uuidData, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
   return built
 }
 
 type Ops = Record<'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
-type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
+type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 // Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
 const declaration = (built: Built, name: string) => (built.kayan as unknown as Record<string, { name: string; fields: Record<string, RuntimeField> }>)[name]
@@ -557,6 +568,44 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     await call('notes', 'delete', { id: note.id.toUpperCase() })
     assert.equal((await call('memos', 'delete', { id: upper })).id, row.id)
     assert.equal((await call('memos', 'count', { where: { id: { equals: upper } } })).totalDocs, 0)
+  })
+
+  for (const surface of ['local', 'http', 'openapi', 'rpc'] as const) test(`${surface} preserves JSON and text byte for byte while normalizing declared uuid and relationship values`, async () => {
+    const plug = surface === 'http' ? fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(built.operations as never)
+      : orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(built.operations as never)
+    const call = async (operation: keyof Ops, input: object, actor = one) => {
+      if (surface === 'local') return built.kayan.uuidData.operations[operation](input, { actor })
+      const response = (await plug.handle(new Request(`http://test/api/${surface === 'rpc' ? 'rpc/' : ''}uuidData/${operation}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(surface === 'rpc' ? { json: input } : input),
+      }), async () => actor))!
+      const body = await response.json() as any
+      assert.equal(response.status, 200, JSON.stringify(body))
+      return surface === 'rpc' ? body.json : body
+    }
+    let id: string | undefined
+    for (const [upper, lower] of [
+      ['ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF', 'abcdefab-cdef-4abc-8def-abcdefabcdef'],
+      ['FEDCBAFE-DCBA-4FED-8CBA-FEDCBAFEDCBA', 'fedcbafe-dcba-4fed-8cba-fedcbafedcba'],
+    ]) {
+      const meta = { where: { id: { equals: upper } } }
+      const where = { id: { equals: upper } }
+      const input = { ...(id && { id: id.toUpperCase() }), text: upper, uuid: upper, memo: ids.org1.toUpperCase(), meta, where }
+      const row = await call(id ? 'update' : 'create', input)
+      id = row.id
+      const stored = await call('findByID', { id: row.id.toUpperCase() })
+      for (const result of [row, stored]) {
+        assert.equal(result.text, upper)
+        assert.equal(JSON.stringify(result.meta), JSON.stringify(meta))
+        assert.equal(JSON.stringify(result.where), JSON.stringify(where))
+        assert.equal(result.uuid, lower)
+        assert.equal(result.memo, ids.org1)
+      }
+      assert.equal((await call('count', { where: { uuid: { equals: upper } } })).totalDocs, 1)
+      assert.equal((await call('count', { where: { text: { equals: upper } } })).totalDocs, 1)
+      assert.equal((await call('count', { where: { text: { equals: lower } } })).totalDocs, 0)
+      assert.equal((await call('count', { where: { id: { equals: row.id } } }, two)).totalDocs, 0)
+    }
+    await call('delete', { id })
   })
 
   for (const surface of ['local', 'http', 'openapi', 'rpc'] as const) test(`${surface} refuses a reloaded target with a stable conflict and leaves both rows unchanged`, async () => {
