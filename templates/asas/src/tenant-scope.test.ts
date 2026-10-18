@@ -559,6 +559,35 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await call('memos', 'count', { where: { id: { equals: upper } } })).totalDocs, 0)
   })
 
+  for (const surface of ['local', 'http', 'openapi', 'rpc'] as const) test(`${surface} refuses a reloaded target with a stable conflict and leaves both rows unchanged`, async () => {
+    const row = await memos().create({ title: 'authorized target' }, { actor: one })
+    const sibling = await memos().create({ title: 'reloaded target' }, { actor: one })
+    storeProbe = async (ctx, tools) => {
+      const reloaded = await (tools.kayans as { memos: Ops }).memos.findByID({ id: sibling.id })
+      ctx.data = { ...ctx.data, id: reloaded.id }
+    }
+    try {
+      if (surface === 'local') {
+        const error = await refusal(memos().probeEdit({ id: row.id, title: 'must not write' }, { actor: one }))
+        assert.equal(error.status, 409)
+        assert.equal(error.key, 'error.conflict.target')
+      } else {
+        const plug = surface === 'http' ? fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(built.operations as never)
+          : orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(built.operations as never)
+        const input = { id: row.id, title: 'must not write' }
+        const response = (await plug.handle(new Request(`http://test/api/${surface === 'rpc' ? 'rpc/' : ''}memos/probeEdit`, {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(surface === 'rpc' ? { json: input } : input),
+        }), async () => one))!
+        const body = await response.json() as any
+        assert.equal(response.status, 409)
+        assert.equal((body.json ?? body).data.key, 'error.conflict.target')
+      }
+    } finally { storeProbe = async () => {} }
+    assert.equal((await memos().findByID({ id: row.id }, { actor: one })).title, 'authorized target')
+    assert.equal((await memos().findByID({ id: sibling.id }, { actor: one })).title, 'reloaded target')
+    assert.equal((await memos().count({ where: { id: { in: [row.id, sibling.id] } } }, { actor: two })).totalDocs, 0)
+  })
+
   test('a create is filled with the active organization, and a caller naming the field is refused before any step runs', async () => {
     const made = await memos().create({ title: 'filled' }, { actor: one })
     assert.equal(made.firmId, 'org1')

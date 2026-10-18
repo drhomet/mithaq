@@ -1140,7 +1140,11 @@ export const write = <Actor = unknown>({
               })
             }
             if (kind !== 'insert' && ctx.data.id !== targetId) {
-              throw new Error(`Kayan "${kayan.name}" operation "${tools.operation}" cannot change the authorized target id.`)
+              throw conflict({
+                message: `Kayan "${kayan.name}" operation "${tools.operation}" cannot change the authorized target id.`,
+                key: 'error.conflict.target',
+                params: { kayan: kayan.name, operation: tools.operation },
+              })
             }
             if (fieldOperation) {
               ctx = { ...ctx, data: await fieldAccess(fieldOperation, kayan, ctx.data, actor, targetId, tools.operation, existing, carried) }
