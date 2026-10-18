@@ -49,6 +49,12 @@
     "ar": "المؤسسة",
     "en": "Organization"
   },
+  "page": {
+    "description": {
+      "ar": "ما يمكن لكل دور في هذه المؤسسة أن يراه ويفعله.",
+      "en": "What each role in this organization may see and do."
+    }
+  },
   "permissions": {
     "$value": {
       "ar": "الصلاحيات",

@@ -286,7 +286,7 @@ export const courses = defineKayan({
     },
     dashboard: {
       // What this kayan is for, drawn under the list heading and the form title.
-      // One string per declared locale, keyed `courses.description`.
+      // One string per declared locale, keyed `courses.page.description`.
       description: {
         en: 'Everything on offer in the catalogue, and what a seat on each costs.',
         ar: 'كل ما هو معروض في الدليل، وما يكلفه مقعد في كل منها.',

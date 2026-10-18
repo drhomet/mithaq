@@ -1050,6 +1050,23 @@ test('a key two scopes both claim is refused by name, and a field beats the kaya
   })
 })
 
+test('a page description colliding with a page field description is reported by message generation', async () => {
+  const language = dashboardScreen(['pageCollision'])
+  const built = language.buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [language.defineKayan({
+      name: 'pageCollision',
+      fields: { ...defaultFields, page: { kind: 'text', description: { ar: 'وصف الحقل', en: 'Field description' } } },
+      targets: { service: { operations: defaultOperations }, dashboard: { description: { ar: 'وصف الصفحة', en: 'Page description' } } },
+    })],
+  })
+  assert.deepEqual(built.messages.collisions, { 'pageCollision.page.description': ['field "page" description', 'screen "dashboard" description'] })
+  await inTemporary(async (directory) => {
+    const report = await generateMessages({ registry: built.messages, directory, check: true })
+    assert.ok(refusals(report).includes('"pageCollision.page.description" is claimed by field "page" description and screen "dashboard" description.'))
+  })
+})
+
 test('a label written as a function is reported unverifiable rather than refused', async () => {
   const { messages } = buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],

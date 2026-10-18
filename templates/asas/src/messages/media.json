@@ -51,6 +51,12 @@
     "ar": "المؤسسة",
     "en": "Organization"
   },
+  "page": {
+    "description": {
+      "ar": "الصور التي تستخدمها هذه المؤسسة، ولكل منها الكلمات التي يقرؤها قارئ الشاشة.",
+      "en": "The images this organization uses, each with the words a screen reader says for it."
+    }
+  },
   "plural": {
     "ar": "الصور",
     "en": "Images"

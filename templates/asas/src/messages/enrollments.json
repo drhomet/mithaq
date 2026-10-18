@@ -23,6 +23,12 @@
     "ar": "المؤسسة",
     "en": "Organization"
   },
+  "page": {
+    "description": {
+      "ar": "أي طالب يشغل مقعدا في أي حصة.",
+      "en": "Which student holds a seat in which session."
+    }
+  },
   "session": {
     "$value": {
       "ar": "الحصة",

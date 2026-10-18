@@ -99,6 +99,12 @@
     "ar": "المؤسسة",
     "en": "Organization"
   },
+  "page": {
+    "description": {
+      "ar": "مواعيد انعقاد كل دورة، وعدد المقاعد في كل منها.",
+      "en": "The dates each course meets, and how many seats each one holds."
+    }
+  },
   "startsAt": {
     "$value": {
       "ar": "وقت البداية",

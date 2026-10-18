@@ -54,5 +54,11 @@
   "organization": {
     "ar": "المؤسسة",
     "en": "Organization"
+  },
+  "page": {
+    "description": {
+      "ar": "أين يتواصل الطلاب مع المدرسة، وهل البوابة مفتوحة لهم.",
+      "en": "Where students reach the school, and whether the portal is open to them."
+    }
   }
 }

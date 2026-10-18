@@ -505,6 +505,8 @@ In one organization, nobody founds another organization or leaves the one over H
 
 In the project's own `copy.ts`, wrap each imported message file with `copyFile` as in the template, using `flattenMessageFile` from `mithaq/admin`; otherwise nested keys stop resolving. Then run `bunx mithaq generate messages` to rewrite existing message files as nested objects; this release still reads flat files.
 
+Move page about text from `<kayan>.description` to `<kayan>.page.description` in the project's message copy.
+
 A generated auth kayan can take extra operations from a sibling `<kayan>.operations.ts` exporting `operations`; run `bunx mithaq generate auth` after adding it.
 
 What a project made before the store additions changes when it takes this version:

@@ -201,6 +201,12 @@
     "ar": "المؤسسة",
     "en": "Organization"
   },
+  "page": {
+    "description": {
+      "ar": "كل ما هو معروض في الدليل، وما يكلفه مقعد في كل منها.",
+      "en": "Everything on offer in the catalogue, and what a seat on each costs."
+    }
+  },
   "plural": {
     "ar": "الدورات",
     "en": "Courses"

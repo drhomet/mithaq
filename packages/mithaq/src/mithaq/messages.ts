@@ -92,6 +92,14 @@ export const messagesOf = ({
       if (!field.label || field.label === (defaultFields as Record<string, { label?: Copy }>)[name]?.label || field.label === globalTypeLabel) continue
       claim(name, `field "${name}" label`, field.label)
     }
+    // Screens share this fallback key, so the first description is claimed once.
+    for (const [screen, target] of Object.entries(language.targets)) {
+      if (target.capability !== 'screen') continue
+      const description = (kayan.targets?.[screen] as { description?: Copy } | undefined)?.description
+      if (!description) continue
+      claim('page.description', `screen "${screen}" description`, description)
+      break
+    }
     // Claimed once per field however many screens ask for it.
     for (const [name, operation] of Object.entries(kayan.operations)) {
       const fields = Object.entries(operation.targets ?? {}).flatMap(([screen, block]) =>
