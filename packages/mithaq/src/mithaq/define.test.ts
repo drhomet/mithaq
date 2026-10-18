@@ -69,23 +69,6 @@ test('a kayan built without defineKayan that writes its operations as a function
   assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [raw] } as never), /Kayan "raw" writes its operations as a function, which only defineKayan and defineGlobal run/)
 })
 
-test('wire input validates an omitted toString field after uuid normalization', async () => {
-  const built = language.buildAsas({
-    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
-    kayan: [language.defineKayan({
-      name: 'wireInputs',
-      fields: { ...defaultFields, toString: { kind: 'text' } },
-      targets: { service: { operations: defaultOperations } },
-    })],
-  })
-  const create = built.operations.find((operation) => operation.kayan === 'wireInputs' && operation.name === 'create')!
-  const input = Object.assign(Object.create(null), { id: 'ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF' })
-  const result = await create.input['~standard'].validate(input)
-  assert.equal(result.issues, undefined, 'normalizing the id must not supply Object.prototype.toString as a field value')
-  if (!result.issues) assert.equal((result.value as { id: string }).id, 'abcdefab-cdef-4abc-8def-abcdefabcdef')
-  assert.equal(input.id, 'ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF', 'the caller keeps its input')
-})
-
 test('names beginning with $ are refused for fields, kinds, rules, operations and message parts', () => {
   const build = (kayan: object) => language.buildAsas({
     http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],

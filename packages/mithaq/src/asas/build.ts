@@ -4,7 +4,6 @@ import { betterAuthStrategy } from '../auth/better-auth/index.ts'
 import { holdsVerificationSteps, isLocalAuthTarget, localAuthStrategy, type LocalAuthActor, type LocalAuthOptions, type ProtectedLocalField } from '../auth/local/index.ts'
 import { bulkSeals, outputOf, sealOf, storeSeals, type AuditHandler, type DerivedShapes, type OperationEffect, type OperationScreen, type WriteStep, type RuntimeWriteTools as WriteTools } from './runner/steps.ts'
 import { running } from './runner/runtime.ts'
-import { normalizeInput } from './runner/input.ts'
 import { tenancy } from './runner/tenant.ts'
 import { assertWhere, defaultAccess, defaultAuthorize, projectReadableFields, referencingIds, restrictingPointers, type Authorize, type Pointer, type Globals, type ManagedAdmin, type Options, type Procedures, type Row, type Writes } from './runner/write.ts'
 import { combineWhere } from '../mithaq/where.ts'
@@ -240,6 +239,17 @@ export type HttpPlug = {
   handle: (request: Request, actor: () => Promise<unknown>) => Promise<Response | null>
 }
 
+const lowerCase = (value: unknown): unknown => typeof value === 'string' ? value.toLowerCase() : Array.isArray(value) ? value.map(lowerCase) : value
+const isObject = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+// The parse lower-cases a uuid, as Postgres answers one, but access and the steps before the
+// transaction run ahead of it, so a JS comparison there must see the same spelling.
+const lowerUuids = ({ kayan, input, bulk }: { kayan: ResolvedKayan; input: unknown; bulk: boolean }): unknown => {
+  const fields = (data: Record<string, unknown>) => Object.fromEntries(Object.entries(data).map(([key, value]) =>
+    [key, kayan.fields[key]?.kind === 'uuid' || kayan.fields[key]?.target?.fields.id?.kind === 'uuid' ? lowerCase(value) : value]))
+  // A bulk write's own keys are its query; a row's columns are under `data`.
+  return !isObject(input) ? input : bulk ? { ...input, ...(isObject(input.data) && { data: fields(input.data) }) } : fields(input)
+}
+
 // A symbol: no schema of something a browser can send takes it, so a schema that names
 // the key answers with an issue at the key.
 const probe = Symbol('mithaq.operation.input')
@@ -325,26 +335,16 @@ const operations = <Actor>(
     method: Method,
     bounded = false,
   ) => {
+    const bulk = kayan.operations[name]!.steps.some((step) => bulkSeals.includes(sealOf(step) as never))
     // The declared arity is what this widens across, which TypeScript asks two steps for.
-    const declaration = kayan.operations[name]!
-    const bulkInput = declaration.steps.some((step) => bulkSeals.includes(sealOf(step) as never))
-    const normalize = (input: unknown) => normalizeInput({
-      kayan: declaration.mode === 'versions' ? kayan.versions!.kayan : kayan, input, bulk: bulkInput,
-      filters: declaration.effect === 'read' || bulkInput,
-      version: declaration.mode === 'version' || declaration.steps.some((step) => sealOf(step) === 'restoreVersion'),
-    })
-    const normalized = ((given: unknown, options: unknown) => (method as unknown as Called)(normalize(given), options as never)) as unknown as Method
+    const normalized = ((given: unknown, options: unknown) => (method as unknown as Called)(lowerUuids({ kayan, input: given, bulk }), options as never)) as unknown as Method
     const called = normalized as unknown as Called
-    // The wire may validate before it calls the runner; preserve the schema's own introspection.
-    const boundaryInput = Object.assign(Object.create(input) as StandardSchemaV1, {
-      '~standard': { ...input['~standard'], validate: (value: unknown, options: Parameters<StandardSchemaV1['~standard']['validate']>[1]) => input['~standard'].validate(normalize(value), options) },
-    })
     table.push({
       kayan: kayan.name,
       name,
       effect,
       single: !!kayan.single,
-      input: boundaryInput,
+      input,
       call: (given, { actor, context, draft, autosave, tenant }) => {
         if (contextDeclared && !context) {
           throw new Error(

@@ -225,6 +225,8 @@ const isoMoment = /^\d{4}-\d{2}-\d{2}(?:[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d
 // sent for one is refused rather than read through a double.
 const coerced = (kind: string, value: unknown) => {
   if (typeof value !== 'string') return value
+  // Lower-cased, as the parse lower-cases a uuid, so a store comparing text finds the row too.
+  if (kind === 'uuid') return value.toLowerCase()
   if (kind === 'checkbox') return value.toLowerCase() === 'true' ? true : value.toLowerCase() === 'false' ? false : value
   if ((kind === 'number' || kind === 'integer') && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value)
   return value

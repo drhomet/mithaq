@@ -21,7 +21,8 @@ const idShapes = {
   number: (error?: KindError) => z.int32({ error }),
   text: (error?: KindError) => z.string({ error }),
   // `guid`, not `uuid`: `z.uuid()` also demands an RFC version and variant, which Postgres does not.
-  uuid: (error?: KindError) => z.guid({ error }),
+  // Lower-cased, the spelling Postgres answers, so a step comparing ids as text sees one id.
+  uuid: (error?: KindError) => z.guid({ error }).toLowerCase(),
 }
 
 /** The kinds this target shapes an id of, the same three the store's columns are. */
@@ -53,7 +54,7 @@ export const kinds = {
   date: (field?: ResolvedField) => z.iso.date({ error: errorOf(field) }),
   // The same error on each element, so a bad element reads as the field's own sentence.
   textArray: (field?: ResolvedField) => z.array(textShape(field, true), { error: errorOf(field) }),
-  uuid: (field?: ResolvedField) => z.guid({ error: errorOf(field) }),
+  uuid: (field?: ResolvedField) => idShape('uuid', errorOf(field)),
   relationship: (field: ResolvedField) =>
     field.hasMany
       ? z.array(idShape(field.target!.fields.id!.kind, errorOf(field, true)), { error: errorOf(field) })
