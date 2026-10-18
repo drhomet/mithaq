@@ -31,9 +31,9 @@ export const normalizeInput = ({ kayan, input, bulk = false, version = false }: 
         [operator, ['equals', 'in', 'not_equals', 'not_in'].includes(operator) ? Array.isArray(operand) ? operand.map(lower) : lower(operand) : operand])) : rules]
     }))
   }
-  return {
+  return Object.assign(Object.create(null), {
     ...(bulk ? input : fields(input)),
     ...(bulk && object(input.data) && { data: fields(input.data) }),
     ...(Object.hasOwn(input, 'where') && { where: where(input.where) }),
-  }
+  })
 }
