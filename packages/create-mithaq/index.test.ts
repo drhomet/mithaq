@@ -238,7 +238,7 @@ test('a minimal project holds auth and the tags example alone: no other feature,
   assert.match(language, /^import \{ accessTarget \} from '\.\/roles\/member-access\.ts'$/m)
   assert.match(language, /^export \{ accessTarget \}$/m)
   assert.doesNotMatch(language, /rbacTarget|auditSink|sessionLabels|softDelete|'courses'|'roles'|'auditLog'|'settings'|richText|storage\(/)
-  assert.deepEqual(Object.keys(json('minimal/packages/asas/src/messages/mithaq.json')).filter((key) => /richText|upload/.test(key)), [], 'nor the copy of a word it left out')
+  assert.deepEqual(Object.keys(json('minimal/packages/asas/src/messages/mithaq.json').kinds).filter((key) => /richText|upload/.test(key)), [], 'nor the copy of a word it left out')
   // No add-on's npm packages either, Lexical's above all.
   for (const workspace of ['', 'packages/mithaq', 'packages/asas', 'apps/asas-tanstack']) {
     const { dependencies = {}, devDependencies = {} } = json('minimal', workspace, 'package.json')
