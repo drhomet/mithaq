@@ -93,13 +93,9 @@ export const messagesOf = ({
       claim(name, `field "${name}" label`, field.label)
     }
     // Screens share this fallback key, so the first description is claimed once.
-    for (const [screen, target] of Object.entries(language.targets)) {
-      if (target.capability !== 'screen') continue
-      const description = (kayan.targets?.[screen] as { description?: Copy } | undefined)?.description
-      if (!description) continue
-      claim('page.description', `screen "${screen}" description`, description)
-      break
-    }
+    const describe = (screen: string) => (kayan.targets?.[screen] as { description?: Copy } | undefined)?.description
+    const described = Object.keys(language.targets).find((screen) => language.targets[screen]!.capability === 'screen' && describe(screen))
+    if (described) claim('page.description', `screen "${described}" description`, describe(described)!)
     // Claimed once per field however many screens ask for it.
     for (const [name, operation] of Object.entries(kayan.operations)) {
       const fields = Object.entries(operation.targets ?? {}).flatMap(([screen, block]) =>
