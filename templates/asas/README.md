@@ -376,7 +376,7 @@ packages/features/courses/
 
 A kayan's `name` is camelCase (`auditLog`, `memberRoles`), and a multi-word table sets `dbName` in snake case (`audit_log`, `member_roles`). `<kayan>.access.ts`, `<kayan>.steps.ts` or `<kayan>.screens.ts` sit beside the kayan file once they outgrow it.
 
-**`auth/user/`** holds the kayan Better Auth's tables become: `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`, `organizationRole` and `index.ts`, which groups them by plugin. `mithaq generate auth` writes them from the options in `packages/mithaq/src/mithaq/auth/index.ts`, and each starts with `Written by` and is never edited. The project's own choices for one of them go in `<kayan>.access.ts` and `<kayan>.screens.ts` beside it, which the generator imports on its next run.
+**`auth/user/`** holds the kayan Better Auth's tables become: `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`, `organizationRole` and `index.ts`, which groups them by plugin. `mithaq generate auth` writes them from the options in `packages/mithaq/src/mithaq/auth/index.ts`, and each starts with `Written by` and is never edited. The project's own choices for one of them go in `<kayan>.access.ts`, `<kayan>.operations.ts` and `<kayan>.screens.ts` beside it, which the generator imports on its next run.
 
 ### `packages/asas`
 
@@ -455,7 +455,7 @@ The app owns its copy, its routes, its providers and its styling. It says nothin
 | Copy | `packages/asas/src/messages/<camelName>.json`, written by `mithaq generate messages` |
 | Migrations | `packages/asas/src/migrations/<timestamp>_<slug>/`, written by `mithaq migrate --name <slug>` |
 | Screens | each app's `src/routes/(screens)/`, written by `mithaq generate screens` |
-| Better Auth kayan | `packages/features/auth/user/`, written by `mithaq generate auth`; the project's choices in `<kayan>.access.ts` and `<kayan>.screens.ts` |
+| Better Auth kayan | `packages/features/auth/user/`, written by `mithaq generate auth`; the project's choices in `<kayan>.access.ts`, `<kayan>.operations.ts` and `<kayan>.screens.ts` |
 | Tests | beside the code they test, as `<name>.test.ts`; shared test helpers as `test-<name>.ts` |
 
 A file a generator writes starts with a line saying which command wrote it, such as `// Written by \`mithaq generate screens\`. Do not edit.`, and changes only by rerunning that command. A file ejected from `mithaq-admin` ends with a marker line, `// mithaq-admin <version> <hash>`, and is the project's own to edit; `mithaq upgrade --check` reports which were edited or differ from the installed package.
@@ -675,9 +675,9 @@ The kayan is done when the project's tests, its typecheck and `bunx mithaq gener
 Change the kayan first, then everything that follows from it.
 
 1. **Check the language can say it.** Open `packages/mithaq/src/mithaq.ts` beside the kayan. If the change needs a kind, rule, locale or target the language does not have, it is a vocabulary change: stop and ask the owner.
-2. **Edit the declaration and nothing else**, then read it back. For a kayan Better Auth owns, the declaration is the provider options in `packages/mithaq/src/mithaq/auth/index.ts` and the project's `<kayan>.access.ts` and `<kayan>.screens.ts` files under `packages/features/auth/user/`. Never edit a file that starts with `Written by`.
+2. **Edit the declaration and nothing else**, then read it back. For a kayan Better Auth owns, the declaration is the provider options in `packages/mithaq/src/mithaq/auth/index.ts` and the project's `<kayan>.access.ts`, `<kayan>.operations.ts` and `<kayan>.screens.ts` files under `packages/features/auth/user/`. Never edit a file that starts with `Written by`.
 3. **Run the generators that follow**, in this order:
-   1. `bunx mithaq generate auth` when the provider options or an `.access.ts` or `.screens.ts` file changed;
+   1. `bunx mithaq generate auth` when the provider options or an `.access.ts`, `.operations.ts` or `.screens.ts` file changed;
    2. `bunx mithaq generate messages` when copy changed;
    3. `bunx mithaq generate screens` when anything a screen draws changed: a field, a page or an operation's button;
    4. `bunx mithaq migrate --name <slug>` when a column changed, then read the `migration.sql`.
