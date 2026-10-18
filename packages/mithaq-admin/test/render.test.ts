@@ -11,6 +11,7 @@ import './tsx.ts'
 
 const { List } = await import('../registry/list.tsx')
 const { Form } = await import('../registry/form.tsx')
+const { copyFile } = await import('../../../apps/asas-tanstack/src/copy.ts')
 const { descriptionOf, labelFor, operationLabelFor, placeholderFor, titleOf } = await import('../registry/copy.ts')
 const { readOnlyField, seedOf, valuesOf } = await import('../registry/field-values.ts')
 const { controlFor: controlIn } = await import('../registry/components.tsx')
@@ -63,7 +64,7 @@ const fieldOf = (field: Partial<ClientField> & { name: string; kind: string }): 
 
 const scopes: Record<string, Record<string, Record<string, string>>> = {
   courses: {
-    ...JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/courses.json', import.meta.url), 'utf8')),
+    ...copyFile(JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/courses.json', import.meta.url), 'utf8'))),
     // Keys no generator writes live here: `mithaq generate messages --check` compares the whole of `courses.json`.
     'delete.confirm': { en: 'Delete this course', ar: 'احذف هذه الدورة' },
     'archived.true': { en: 'Archived', ar: 'مؤرشف' },
@@ -1799,7 +1800,7 @@ test('214. the Activity panel names every operation in the viewer\'s locale and 
     assert.ok(!html.includes('u-hidden'), 'and never names the raw id')
   }
   // Every operation a tenant kayan writes through, which the audit sink records, has its own words, so none is drawn as its name.
-  const messages = JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/auditLog.json', import.meta.url), 'utf8')) as Record<string, Record<string, string>>
+  const messages = copyFile(JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/auditLog.json', import.meta.url), 'utf8'))) as Record<string, Record<string, string>>
   const audited = asas.operations.filter((one) => one.effect !== 'read' && screen.kayan[one.kayan]?.fields.some((field) => field.name === 'organization'))
   assert.ok(audited.some((one) => one.name === 'restoreVersion'), 'restoreVersion is among them')
   for (const one of audited) assert.ok(messages[`action.${one.name}`]?.en && messages[`action.${one.name}`]?.ar, `${one.kayan}.${one.name} has auditLog.action copy in both locales`)

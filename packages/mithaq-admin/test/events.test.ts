@@ -31,6 +31,7 @@ timeoutManager.setTimeoutProvider({
 })
 const { createRoot } = await import('react-dom/client')
 const { Form } = await import('../registry/form.tsx')
+const { copyFile } = await import('../../../apps/asas-tanstack/src/copy.ts')
 const { DiscardDialog } = await import('../registry/discard-dialog.tsx')
 const { List } = await import('../registry/list.tsx')
 const { Filters } = await import('../registry/list-filters.tsx')
@@ -708,7 +709,7 @@ test('178h. a seeded moment clears with its time and returns when the time is ty
 
 test('178i. a required moment with a day and no time is refused as required and sends nothing', async () => {
   const { client, written } = recording()
-  const copy = JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/sessions.json', import.meta.url), 'utf8')) as Record<string, { en?: string }>
+  const copy = copyFile(JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/sessions.json', import.meta.url), 'utf8'))) as Record<string, { en?: string }>
   const host = await render(createElement(Form, {
     kayan: sessions, screen: screenOf(recordPage([{ form: [{ field: 'startsAt' }, { field: 'capacity' }] }], '/sessions/new'), sessions), client, value: null,
     t: (key: string, fallback?: string) => (key.startsWith('sessions.') ? copy[key.slice('sessions.'.length)]?.en : undefined) ?? fallback, locale: 'en', onDone: () => {},
@@ -3383,7 +3384,7 @@ test('79. the form marks a box touched when the person leaves it and shows nothi
   }
 })
 
-const coursesCopy = JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/courses.json', import.meta.url), 'utf8')) as Record<string, { en?: string }>
+const coursesCopy = copyFile(JSON.parse(readFileSync(new URL('../../../templates/asas/src/messages/courses.json', import.meta.url), 'utf8'))) as Record<string, { en?: string }>
 const said = (key: string, fallback?: string) => (key.startsWith('courses.') ? coursesCopy[key.slice('courses.'.length)]?.en : undefined) ?? fallback
 
 test('80. a rule the projection carries refuses a value before any request, in the sentence the server would send for it', async () => {

@@ -1909,7 +1909,8 @@ test('160c. a course names at most two topics, refused by the server under a key
   const two = await courses.operations.create({ title: 'Two topics', topics: ['script', 'grammar'] }, options)
   assert.deepEqual(two.topics, ['script', 'grammar'], 'two are within it')
 
-  const scope = async (name: string) => JSON.parse(await readFile(new URL(`./messages/${name}.json`, import.meta.url), 'utf8')) as Record<string, Record<string, string>>
+  const { copyFile } = await import('../../../apps/asas-tanstack/src/copy.ts')
+  const scope = async (name: string) => copyFile(JSON.parse(await readFile(new URL(`./messages/${name}.json`, import.meta.url), 'utf8')))
   const over = { ar: 'هذه القائمة فيها عناصر أكثر من المسموح.', en: 'This list has too many entries.' }
   assert.deepEqual((await scope('courses'))['topics.maxRows'], over, 'the field\'s own key, in both locales')
   const floor = await scope('mithaq')
