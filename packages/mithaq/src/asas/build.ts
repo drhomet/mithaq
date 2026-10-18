@@ -4,6 +4,7 @@ import { betterAuthStrategy } from '../auth/better-auth/index.ts'
 import { holdsVerificationSteps, isLocalAuthTarget, localAuthStrategy, type LocalAuthActor, type LocalAuthOptions, type ProtectedLocalField } from '../auth/local/index.ts'
 import { bulkSeals, outputOf, sealOf, storeSeals, type AuditHandler, type DerivedShapes, type OperationEffect, type OperationScreen, type WriteStep, type RuntimeWriteTools as WriteTools } from './runner/steps.ts'
 import { running } from './runner/runtime.ts'
+import { normalizeInput } from './runner/input.ts'
 import { tenancy } from './runner/tenant.ts'
 import { assertWhere, defaultAccess, defaultAuthorize, projectReadableFields, referencingIds, restrictingPointers, type Authorize, type Pointer, type Globals, type ManagedAdmin, type Options, type Procedures, type Row, type Writes } from './runner/write.ts'
 import { combineWhere } from '../mithaq/where.ts'
@@ -325,13 +326,24 @@ const operations = <Actor>(
     bounded = false,
   ) => {
     // The declared arity is what this widens across, which TypeScript asks two steps for.
-    const called = method as unknown as Called
+    const declaration = kayan.operations[name]!
+    const normalize = (input: unknown) => normalizeInput({
+      kayan, input,
+      bulk: declaration.steps.some((step) => bulkSeals.includes(sealOf(step) as never)),
+      version: declaration.mode === 'version' || declaration.steps.some((step) => sealOf(step) === 'restoreVersion'),
+    })
+    const normalized = ((given: unknown, options: unknown) => (method as unknown as Called)(normalize(given), options as never)) as unknown as Method
+    const called = normalized as unknown as Called
+    // The wire may validate before it calls the runner; preserve the schema's own introspection.
+    const boundaryInput = Object.assign(Object.create(input) as StandardSchemaV1, {
+      '~standard': { ...input['~standard'], validate: (value: unknown, options: Parameters<StandardSchemaV1['~standard']['validate']>[1]) => input['~standard'].validate(normalize(value), options) },
+    })
     table.push({
       kayan: kayan.name,
       name,
       effect,
       single: !!kayan.single,
-      input,
+      input: boundaryInput,
       call: (given, { actor, context, draft, autosave, tenant }) => {
         if (contextDeclared && !context) {
           throw new Error(
@@ -347,7 +359,7 @@ const operations = <Actor>(
         return called(given, { actor, ...(context ? { context } : {}), ...(draft ? { draft } : {}), ...(autosave ? { autosave } : {}), ...(tenant !== undefined ? { tenant } : {}) })
       },
     })
-    return method
+    return normalized
   }
   const methods: Record<string, (...args: never[]) => Promise<unknown>> = Object.create(null)
   for (const [operation, declaration] of Object.entries(kayan.operations)) {

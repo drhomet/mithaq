@@ -96,6 +96,7 @@ const access = {
   seed: async () => {},
 }
 
+let boundaryProbe = (_data: Record<string, unknown>) => {}
 let storeProbe: (ctx: Ctx, tools: WriteTools) => Promise<void> = async () => {}
 const probeStore = async (ctx: Ctx, tools: WriteTools) => (await storeProbe(ctx, tools), ctx)
 
@@ -158,7 +159,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       rbac: access,
       versions: versionsTarget({ max: 100 }),
       tenant: betterAuthTenant({ relationTo: 'firms', onDelete: 'restrict', newRows: 'active', organizations: 'many', backoffice: ({ user }) => backofficeApp && staff.has((user as { id: string }).id) }),
-      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize, softDelete: 'deletedAt', beforeSteps: [(ctx: Ctx, tools: { kind: string }) => tools.kind === 'insert' && ctx.kayan.name === 'memos' ? { ...ctx, data: { code: null, globalCode: null, ...ctx.data } } : ctx] }),
+      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: async (args) => { boundaryProbe(args.data); return authorize(args) }, softDelete: 'deletedAt', beforeSteps: [(ctx: Ctx, tools: { kind: string }) => tools.kind === 'insert' && ctx.kayan.name === 'memos' ? { ...ctx, data: { code: null, globalCode: null, ...ctx.data } } : ctx] }),
     } as {},
   })
   const { tenant } = (language as unknown as { targets: { tenant: ReturnType<typeof betterAuthTenant<'firms'>> } }).targets
@@ -176,6 +177,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       service: {
         operations: {
           ...defaultOperations,
+          canonical: { input: ({ update }: { update: z.ZodObject }) => update.refine((data) => typeof data.id !== 'string' || data.id === data.id.toLowerCase(), 'The input id must already be lower-case.'), steps: ({ steps }: { steps: { update: unknown } }) => [probeStore, steps.update] },
           outsideProbe: { beforeTransaction: [probeStore], steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert] },
           afterProbe: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], afterCommit: [probeStore] },
           probeAfterEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] },
@@ -455,7 +457,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return built
 }
 
-type Ops = Record<'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 // Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
@@ -514,6 +516,48 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     }
   })
   after(() => done())
+
+  for (const surface of ['local', 'http', 'openapi', 'rpc'] as const) test(`${surface} lower-cases uuid input before validation, access and steps without widening the tenant`, async () => {
+    const plug = surface === 'http'
+      ? fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(built.operations as never)
+      : orpcHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })(built.operations as never)
+    const call = async (kayan: 'memos' | 'notes', operation: keyof Ops, input: object, actor = one) => {
+      if (surface === 'local') return built.kayan[kayan].operations[operation](input, { actor })
+      const response = (await plug.handle(new Request(`http://test/api/${surface === 'rpc' ? 'rpc/' : ''}${kayan}/${operation}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(surface === 'rpc' ? { json: input } : input),
+      }), async () => actor))!
+      const body = await response.json() as any
+      assert.equal(response.status, 200, JSON.stringify(body))
+      return surface === 'rpc' ? body.json : body
+    }
+    const row = await call('memos', 'create', { title: `uuid ${surface}` })
+    const upper = row.id.toUpperCase()
+    assert.equal((await call('memos', 'findByID', { id: upper })).id, row.id)
+    assert.equal((await call('memos', 'update', { id: upper, title: 'uuid edited' })).id, row.id)
+    storeProbe = async (ctx, tools) => {
+      assert.equal(ctx.data.id, row.id, 'steps compare the normalized id with stored ids')
+      assert.equal(ctx.data.id, (await (tools.kayans as { memos: Ops }).memos.findByID({ id: ctx.data.id })).id)
+    }
+    boundaryProbe = (data) => { if (data.id !== undefined) assert.equal(data.id, row.id, 'access sees the normalized id') }
+    try { await call('memos', 'canonical', { id: upper, title: 'uuid reloaded' }) } finally { storeProbe = async () => {}; boundaryProbe = () => {} }
+    const note = await call('notes', 'create', { title: 'uuid links', memo: upper, memoSet: [upper], tag: null, cover: null, reply: null })
+    assert.equal(note.memo, row.id)
+    assert.deepEqual(note.memoSet, [row.id])
+    assert.equal((await call('notes', 'findByID', { id: note.id })).memo, row.id)
+    for (const [operator, operand, expected] of [
+      ['equals', upper, 1], ['in', [upper], 1], ['not_equals', upper, 0], ['not_in', [upper], 0],
+    ] as const) {
+      assert.equal((await call('memos', 'find', { where: { and: [{ id: { [operator]: operand } }, { title: { equals: 'uuid reloaded' } }] } })).totalDocs, expected, operator)
+      assert.equal((await call('notes', 'count', { where: { and: [{ memo: { [operator]: operand } }, { id: { equals: note.id } }] } })).totalDocs, expected, `relationship ${operator}`)
+    }
+    assert.equal((await call('memos', 'find', { where: { id: { equals: upper } } }, two)).totalDocs, 0)
+    const changed = await call('notes', 'updateMany', { where: { id: { equals: note.id.toUpperCase() } }, data: { memo: upper, memoSet: [upper] } })
+    assert.equal(changed.docs[0].memo, row.id)
+    assert.deepEqual(changed.docs[0].memoSet, [row.id])
+    await call('notes', 'delete', { id: note.id.toUpperCase() })
+    assert.equal((await call('memos', 'delete', { id: upper })).id, row.id)
+    assert.equal((await call('memos', 'count', { where: { id: { equals: upper } } })).totalDocs, 0)
+  })
 
   test('a create is filled with the active organization, and a caller naming the field is refused before any step runs', async () => {
     const made = await memos().create({ title: 'filled' }, { actor: one })
