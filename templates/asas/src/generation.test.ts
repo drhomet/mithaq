@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { generateKeyPairSync } from 'node:crypto'
 import { globSync } from 'node:fs'
@@ -237,6 +238,44 @@ test('generateAuth imports a kayan\'s access from a <kayan>.access.ts beside it,
     assert.deepEqual(await generateAuth({ language: '../../../mithaq.ts', options, directory, check: true }), ['user.ts'], 'and so is one that went')
   } finally {
     await rm(root, { recursive: true })
+  }
+})
+
+test('generateAuth imports extra member operations from the project and the generated operation can be called', async () => {
+  const root = new URL(`./auth-operations-${randomUUID()}/`, import.meta.url)
+  const directory = new URL('auth/user/', root)
+  try {
+    await mkdir(directory, { recursive: true })
+    await writeFile(new URL('mithaq.ts', root), `
+import { base, defineMithaq, defaultAuthorize, defaultDepth, defaultLimit, defaultMaxLimit, defaultJoinLimit, defaultBulkLimit, serviceTarget, zodTarget, zodKinds, zodRules, zodIdKinds } from 'mithaq'
+import { memoryStore } from '../memory-store.ts'
+const language = defineMithaq({ arkan: [base], targets: {
+  store: memoryStore(), zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+  service: serviceTarget({ store: 'store', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+} })
+export const { defineKayan, buildAsas } = language
+`)
+    const settings = { language: '../../mithaq.ts', options, directory }
+    await generateAuth(settings)
+    const operations = "import type { OperationDeclaration } from 'mithaq'\nexport const operations = { roster: { steps: ({ steps }) => [steps.find] } } satisfies Record<string, OperationDeclaration>\n"
+    await writeFile(new URL('member.operations.ts', directory), operations)
+    await writeFile(new URL('member.access.ts', directory), 'export const access = { read: () => true }\n')
+    assert.deepEqual(await generateAuth({ ...settings, check: true }), ['member.ts'])
+    await generateAuth(settings)
+    const generated = await readFile(new URL('member.ts', directory), 'utf8')
+    assert.ok(generated.startsWith(authHeader))
+    assert.match(generated, /operations: \{ \.\.\.defaultOperations, \.\.\.operations \}/)
+    assert.equal(await readFile(new URL('member.operations.ts', directory), 'utf8'), operations)
+    const { betterAuth: declarations } = await import(new URL('index.ts', directory).href)
+    const { buildAsas } = await import(new URL('mithaq.ts', root).href)
+    const built = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: Object.values(declarations).flat() })
+    assert.equal((await built.kayan.member.operations.roster({})).totalDocs, 0)
+    assert.equal(typeof built.kayan.member.operations.create, 'function')
+    assert.deepEqual(await generateAuth({ ...settings, check: true }), [])
+  } finally {
+    await mkdir(new URL('file://' + process.env.HOME + '/.Trash/'), { recursive: true })
+    const { rename } = await import('node:fs/promises')
+    await rename(root, new URL('file://' + process.env.HOME + '/.Trash/' + root.pathname.split('/').at(-2)))
   }
 })
 

@@ -501,6 +501,8 @@ In one organization, nobody founds another organization or leaves the one over H
 
 ## Upgrading
 
+A generated auth kayan can take extra operations from a sibling `<kayan>.operations.ts` exporting `operations`; run `bunx mithaq generate auth` after adding it.
+
 What a project made before the store additions changes when it takes this version:
 
 - **`drizzleTarget` is removed.** Write `kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds` in `drizzleAdapter(...)`.

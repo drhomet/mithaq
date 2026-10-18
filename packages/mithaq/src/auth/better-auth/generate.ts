@@ -82,6 +82,7 @@ const kayanSource = ({
   providers,
   screens = {},
   access = false,
+  operations = false,
   drawn,
   schemaName,
   idKind,
@@ -93,6 +94,7 @@ const kayanSource = ({
   providers?: string
   screens?: Readonly<Record<string, readonly string[]>>
   access?: boolean
+  operations?: boolean
   drawn?: readonly string[]
   schemaName?: string
   idKind: 'text' | 'uuid'
@@ -124,9 +126,11 @@ const kayanSource = ({
     ...(carries ? [`import { providers } from ${sourceString(providers ?? '')}`] : []),
     ...references.map((model) => `import { ${exportName(model)} } from './${exportName(model)}.ts'`),
     ...(access ? [`import { access } from './${exported}.access.ts'`] : []),
+    ...(operations ? [`import { operations } from './${exported}.operations.ts'`] : []),
     ...(drawn ? [`import { screens } from './${exported}.screens.ts'`] : []),
   ]
   if (!carries) imports[0] = `import { defaultFields, defaultOperations } from 'mithaq'`
+  const operationSource = operations ? '{ ...defaultOperations, ...operations }' : 'defaultOperations'
   return `${header}
 // This kayan's access and what each screen draws of it are the project's:
 // \`${exported}.access.ts\` exporting \`access\` and \`${exported}.screens.ts\` exporting
@@ -139,7 +143,7 @@ export const ${exported} = defineKayan({
   dbName: ${sourceString(dbName)}`},${schemaName === undefined ? '' : `
   schemaName: ${sourceString(schemaName)},`}${carries ? `
   auth: betterAuth({ server: providers${key}.server }),` : ''}
-  targets: { ${drawn ? `${titled.slice(2)}${titled ? ', ' : ''}...screens, service: { operations: defaultOperations }` : `service: { operations: defaultOperations }${titled}`} },${access ? `
+  targets: { ${drawn ? `${titled.slice(2)}${titled ? ', ' : ''}...screens, service: { operations: ${operationSource} }` : `service: { operations: ${operationSource} }${titled}`} },${access ? `
   access,` : ''}
   fields: {
     ...defaultFields,
@@ -238,9 +242,9 @@ export const generateAuth = async ({
   // that stops the run stops it before the first deletion.
   if (!check) await mkdir(directory, { recursive: true })
   const files = (await readFolder(directory)).map((entry) => entry.name)
-  // A sibling `<kayan>.access.ts` or `<kayan>.screens.ts` is the only way in: the
+  // Sibling access, screens and operations files are the project's way in: the
   // generated file is the generator's.
-  const siblings = new Set(files.filter((file) => file.endsWith('.access.ts') || file.endsWith('.screens.ts')))
+  const siblings = new Set(files.filter((file) => file.endsWith('.access.ts') || file.endsWith('.screens.ts') || file.endsWith('.operations.ts')))
   // Read by importing it: a title written beside a block the sibling also writes is
   // one the compiler refuses as overwritten.
   const drawnBy = new Map<string, string[]>()
@@ -252,7 +256,7 @@ export const generateAuth = async ({
   const wanted = new Map(
     Object.entries(tables).map(([name, table]) => [
       `${name}.ts`,
-      kayanSource({ name, table: table as never, language, provider, providers, screens, access: siblings.has(`${name}.access.ts`), drawn: drawnBy.get(`${name}.screens.ts`), schemaName, idKind }),
+      kayanSource({ name, table: table as never, language, provider, providers, screens, access: siblings.has(`${name}.access.ts`), operations: siblings.has(`${name}.operations.ts`), drawn: drawnBy.get(`${name}.screens.ts`), schemaName, idKind }),
     ]),
   )
   // Otherwise the `auth` key would be written onto nothing.
