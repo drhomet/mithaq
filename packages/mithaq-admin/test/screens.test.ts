@@ -85,7 +85,7 @@ const refs = {
   './src/ui-dashboard/course-board.tsx#CourseBoard': Board,
 }
 type TreePage = Extract<PageClient, { page: unknown }>
-const recordPage = (main: unknown[], regions: Record<string, unknown[]> = {}): PageClient => ({ path: '/courses/new', page: { shell: screen.layouts.app!, main: [{ layout: screen.layouts.record!, main: main as never, ...(regions as Record<string, never>) }] } })
+const recordPage = (main: unknown[], regions: Record<string, unknown[]> = {}): PageClient => ({ path: '/courses/new', page: { shell: screen.layouts.app!, main: [{ layout: screen.layouts.record!, main: main as never, ...(regions as Record<string, never>) } as never] } })
 const writes = { create: async () => ({}), update: async () => ({}), delete: async () => ({}) }
 
 const formOf = (page: PageClient | undefined, value: Record<string, unknown> | null = null) =>
