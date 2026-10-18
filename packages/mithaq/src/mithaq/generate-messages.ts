@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { Copy, MessageRegistry } from './messages.ts'
 import { Refusal } from './refusal.ts'
+import { flattenMessageFile, nestMessageFile, type MessageEntry } from './message-file.ts'
 
 // `null` for a label written as a function, which has no string to write down.
-type Entry = Record<string, string> | string | null
+type Entry = MessageEntry
 
 /**
  * What a run found: `changed`, the files a run writes, and the refusals, each naming what is wrong
@@ -23,7 +24,7 @@ const fileOf = (name: string, out: string | undefined, directory: URL, root: URL
   out ? new URL(out, root) : new URL(`${name}.json`, directory)
 
 // What is on disk wins: these files are the project's to translate, so a run adds a
-// missing key and never deletes or rewrites one.
+// missing key and keeps every translation when rewriting the file shape.
 const merge = (copy: Copy, current: Entry | undefined, locales: readonly string[]): Entry => {
   if (typeof copy === 'function') return null
   if (typeof copy === 'string') return copy
@@ -69,7 +70,7 @@ export const generateMessages = async ({
     }
   })
   // Read before any write, so a file that stops the run stops it before the first write.
-  const committed: Record<string, Entry>[] = []
+  const committed: Record<string, unknown>[] = []
   for (const file of files) {
     // A file that is there and does not parse is refused, not read as `{}`: every
     // translation in it would be rewritten with nothing reported.
@@ -88,7 +89,7 @@ export const generateMessages = async ({
         `${file.pathname} is not a copy file \`mithaq generate messages\` can read, and generating would overwrite it. Fix it or delete it.`,
       )
     }
-    committed.push(parsed as Record<string, Entry>)
+    committed.push(parsed as Record<string, unknown>)
   }
   const report: MessagesReport = { changed: [], missing: [], noSource: [], resolver: [], collisions: [], unverifiable: [], data: [] }
   for (const [key, claims] of Object.entries(registry.collisions)) {
@@ -104,7 +105,7 @@ export const generateMessages = async ({
   let floor: Record<string, Entry> = {}
   for (const [at, scope] of registry.scopes.entries()) {
     const file = files[at]!
-    const current = committed[at]!
+    const current = flattenMessageFile({ file: committed[at]!, locales: registry.locales })
     const wanted: Record<string, Entry> = { ...current }
     for (const key of Object.keys(current)) {
       if (!Object.hasOwn(scope.keys, key)) report.noSource.push(`${scope.name}.${key} is an entry with no source. Delete it; a run keeps it.`)
@@ -134,8 +135,8 @@ export const generateMessages = async ({
         if (!entry[locale]) report.missing.push(`${scope.name}.${key} has no "${locale}".`)
       }
     }
-    const source = `${JSON.stringify(Object.fromEntries(Object.keys(wanted).sort().map((key) => [key, wanted[key]])), null, 2)}\n`
-    if (source === `${JSON.stringify(current, null, 2)}\n`) continue
+    const source = `${JSON.stringify(nestMessageFile(wanted), null, 2)}\n`
+    if (source === `${JSON.stringify(committed[at], null, 2)}\n`) continue
     report.changed.push(scope.out ?? `${scope.name}.json`)
     if (check) continue
     // Per file: a scope's own `out` may name a directory no run has made yet.

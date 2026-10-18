@@ -1,27 +1,31 @@
 {
-  "id.invalid": {
-    "ar": "هذا ليس معرفا فريدا.",
-    "en": "This is not a unique identifier."
-  },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس معرفا فريدا.",
+      "en": "This is not a unique identifier."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "name": {
-    "ar": "الاسم",
-    "en": "Name"
-  },
-  "name.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "name.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "name.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الاسم",
+      "en": "Name"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "organization": {
     "ar": "المؤسسة",

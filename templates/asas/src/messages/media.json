@@ -1,19 +1,21 @@
 {
   "alt": {
-    "ar": "النص البديل",
-    "en": "Alternative text"
-  },
-  "alt.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "alt.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "alt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "النص البديل",
+      "en": "Alternative text"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "filename": {
     "ar": "اسم الملف",
@@ -27,13 +29,15 @@
     "ar": "الارتفاع",
     "en": "Height"
   },
-  "id.invalid": {
-    "ar": "هذا ليس معرفا فريدا.",
-    "en": "This is not a unique identifier."
-  },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس معرفا فريدا.",
+      "en": "This is not a unique identifier."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "key": {
     "ar": "مفتاح الملف",

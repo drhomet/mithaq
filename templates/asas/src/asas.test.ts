@@ -14881,8 +14881,8 @@ test('156. a kayan, field or operation named for what Object.prototype carries b
       await generateMessages({ registry: built.messages, directory })
       assert.deepEqual(refusals(await generateMessages({ registry: built.messages, directory, check: true })), [])
       const written = JSON.parse(await readFile(new URL('constructor.json', directory), 'utf8')) as Record<string, unknown>
-      assert.deepEqual(written.toString, { ar: 'نصا', en: 'As text' }, 'the label is written under the field name')
-      assert.ok(Object.hasOwn(written, 'toString.invalid'))
+      assert.deepEqual((written.toString as unknown as { $value: unknown }).$value, { ar: 'نصا', en: 'As text' }, 'the label is written under the field name')
+      assert.ok(Object.hasOwn(written.toString, 'invalid'))
     } finally {
       await rm(directory, { recursive: true })
     }

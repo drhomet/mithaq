@@ -1,178 +1,214 @@
 {
-  "fields.createdAt": {
-    "ar": "تاريخ الإنشاء",
-    "en": "Created at"
-  },
-  "fields.id": {
-    "ar": "المعرف",
-    "en": "ID"
-  },
-  "fields.updatedAt": {
-    "ar": "تاريخ التعديل",
-    "en": "Updated at"
+  "fields": {
+    "createdAt": {
+      "ar": "تاريخ الإنشاء",
+      "en": "Created at"
+    },
+    "id": {
+      "ar": "المعرف",
+      "en": "ID"
+    },
+    "updatedAt": {
+      "ar": "تاريخ التعديل",
+      "en": "Updated at"
+    }
   },
   "globalType": {
     "ar": "النوع العام",
     "en": "Global type"
   },
-  "kinds.checkbox": {
-    "ar": "خانة اختيار",
-    "en": "Checkbox"
+  "kinds": {
+    "checkbox": {
+      "$value": {
+        "ar": "خانة اختيار",
+        "en": "Checkbox"
+      },
+      "invalid": {
+        "ar": "يجاب على هذا بنعم أو لا.",
+        "en": "This is answered yes or no."
+      }
+    },
+    "date": {
+      "$value": {
+        "ar": "التاريخ",
+        "en": "Date"
+      },
+      "invalid": {
+        "ar": "هذا ليس تاريخا.",
+        "en": "This is not a date."
+      }
+    },
+    "datetime": {
+      "$value": {
+        "ar": "التاريخ والوقت",
+        "en": "Date and time"
+      },
+      "invalid": {
+        "ar": "هذا ليس تاريخا ووقتا.",
+        "en": "This is not a date and time."
+      }
+    },
+    "decimal": {
+      "$value": {
+        "ar": "عدد عشري",
+        "en": "Decimal"
+      },
+      "invalid": {
+        "ar": "هذا ليس عددا عشريا.",
+        "en": "This is not a decimal number."
+      }
+    },
+    "email": {
+      "$value": {
+        "ar": "بريد إلكتروني",
+        "en": "Email"
+      },
+      "invalid": {
+        "ar": "هذا ليس بريدا إلكترونيا.",
+        "en": "This is not an email address."
+      }
+    },
+    "integer": {
+      "$value": {
+        "ar": "عدد صحيح",
+        "en": "Integer"
+      },
+      "invalid": {
+        "ar": "هذا ليس عددا صحيحا من 32 بت.",
+        "en": "This is not a 32-bit integer."
+      }
+    },
+    "join": {
+      "$value": {
+        "ar": "صفوف مرتبطة",
+        "en": "Related rows"
+      },
+      "invalid": {
+        "ar": "هذه ليست قائمة عناصر مرتبطة.",
+        "en": "This is not a list of related entries."
+      }
+    },
+    "json": {
+      "$value": {
+        "ar": "JSON",
+        "en": "JSON"
+      },
+      "invalid": {
+        "ar": "هذه ليست بيانات JSON يقبلها هذا الحقل.",
+        "en": "This is not JSON this field takes."
+      }
+    },
+    "number": {
+      "$value": {
+        "ar": "رقم",
+        "en": "Number"
+      },
+      "invalid": {
+        "ar": "هذا ليس رقما.",
+        "en": "This is not a number."
+      }
+    },
+    "relationship": {
+      "$value": {
+        "ar": "علاقة",
+        "en": "Relationship"
+      },
+      "invalid": {
+        "ar": "اختر عنصرًا من القائمة.",
+        "en": "Pick one of the listed entries."
+      }
+    },
+    "richText": {
+      "$value": {
+        "ar": "نص منسق",
+        "en": "Rich text"
+      },
+      "invalid": {
+        "ar": "هذا ليس نصا منسقا.",
+        "en": "This is not rich text."
+      }
+    },
+    "text": {
+      "$value": {
+        "ar": "نص",
+        "en": "Text"
+      },
+      "invalid": {
+        "ar": "هذا ليس نصا.",
+        "en": "This is not text."
+      }
+    },
+    "textArray": {
+      "$value": {
+        "ar": "قائمة نصوص",
+        "en": "Text list"
+      },
+      "invalid": {
+        "ar": "هذه ليست قائمة نصوص.",
+        "en": "This is not a list of text."
+      }
+    },
+    "upload": {
+      "$value": {
+        "ar": "ملف مرفوع",
+        "en": "Upload"
+      },
+      "invalid": {
+        "ar": "اختر ملفا من القائمة.",
+        "en": "Pick one of the listed files."
+      }
+    },
+    "uuid": {
+      "$value": {
+        "ar": "معرف فريد",
+        "en": "UUID"
+      },
+      "invalid": {
+        "ar": "هذا ليس معرفا فريدا.",
+        "en": "This is not a unique identifier."
+      }
+    }
   },
-  "kinds.checkbox.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
-  },
-  "kinds.date": {
-    "ar": "التاريخ",
-    "en": "Date"
-  },
-  "kinds.date.invalid": {
-    "ar": "هذا ليس تاريخا.",
-    "en": "This is not a date."
-  },
-  "kinds.datetime": {
-    "ar": "التاريخ والوقت",
-    "en": "Date and time"
-  },
-  "kinds.datetime.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
-  },
-  "kinds.decimal": {
-    "ar": "عدد عشري",
-    "en": "Decimal"
-  },
-  "kinds.decimal.invalid": {
-    "ar": "هذا ليس عددا عشريا.",
-    "en": "This is not a decimal number."
-  },
-  "kinds.email": {
-    "ar": "بريد إلكتروني",
-    "en": "Email"
-  },
-  "kinds.email.invalid": {
-    "ar": "هذا ليس بريدا إلكترونيا.",
-    "en": "This is not an email address."
-  },
-  "kinds.integer": {
-    "ar": "عدد صحيح",
-    "en": "Integer"
-  },
-  "kinds.integer.invalid": {
-    "ar": "هذا ليس عددا صحيحا من 32 بت.",
-    "en": "This is not a 32-bit integer."
-  },
-  "kinds.join": {
-    "ar": "صفوف مرتبطة",
-    "en": "Related rows"
-  },
-  "kinds.join.invalid": {
-    "ar": "هذه ليست قائمة عناصر مرتبطة.",
-    "en": "This is not a list of related entries."
-  },
-  "kinds.json": {
-    "ar": "JSON",
-    "en": "JSON"
-  },
-  "kinds.json.invalid": {
-    "ar": "هذه ليست بيانات JSON يقبلها هذا الحقل.",
-    "en": "This is not JSON this field takes."
-  },
-  "kinds.number": {
-    "ar": "رقم",
-    "en": "Number"
-  },
-  "kinds.number.invalid": {
-    "ar": "هذا ليس رقما.",
-    "en": "This is not a number."
-  },
-  "kinds.relationship": {
-    "ar": "علاقة",
-    "en": "Relationship"
-  },
-  "kinds.relationship.invalid": {
-    "ar": "اختر عنصرًا من القائمة.",
-    "en": "Pick one of the listed entries."
-  },
-  "kinds.richText": {
-    "ar": "نص منسق",
-    "en": "Rich text"
-  },
-  "kinds.richText.invalid": {
-    "ar": "هذا ليس نصا منسقا.",
-    "en": "This is not rich text."
-  },
-  "kinds.text": {
-    "ar": "نص",
-    "en": "Text"
-  },
-  "kinds.text.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "kinds.textArray": {
-    "ar": "قائمة نصوص",
-    "en": "Text list"
-  },
-  "kinds.textArray.invalid": {
-    "ar": "هذه ليست قائمة نصوص.",
-    "en": "This is not a list of text."
-  },
-  "kinds.upload": {
-    "ar": "ملف مرفوع",
-    "en": "Upload"
-  },
-  "kinds.upload.invalid": {
-    "ar": "اختر ملفا من القائمة.",
-    "en": "Pick one of the listed files."
-  },
-  "kinds.uuid": {
-    "ar": "معرف فريد",
-    "en": "UUID"
-  },
-  "kinds.uuid.invalid": {
-    "ar": "هذا ليس معرفا فريدا.",
-    "en": "This is not a unique identifier."
-  },
-  "rules.max": {
-    "ar": "القيمة أكبر من المسموح.",
-    "en": "The value is too large."
-  },
-  "rules.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "rules.maxRows": {
-    "ar": "هذه القائمة فيها عناصر أكثر من المسموح.",
-    "en": "This list has too many entries."
-  },
-  "rules.min": {
-    "ar": "القيمة أصغر من المسموح.",
-    "en": "The value is too small."
-  },
-  "rules.minLength": {
-    "ar": "القيمة أقصر من المسموح.",
-    "en": "The value is too short."
-  },
-  "rules.minRows": {
-    "ar": "هذه القائمة فيها عناصر أقل من المسموح.",
-    "en": "This list has too few entries."
-  },
-  "rules.pattern": {
-    "ar": "القيمة ليست بالشكل الذي يقبله هذا الحقل.",
-    "en": "The value is not in the shape this field takes."
-  },
-  "rules.precision": {
-    "ar": "القيمة فيها أرقام أكثر من المسموح.",
-    "en": "The value has too many digits."
-  },
-  "rules.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "rules.scale": {
-    "ar": "القيمة فيها منازل عشرية أكثر من المسموح.",
-    "en": "The value has too many decimal places."
+  "rules": {
+    "max": {
+      "ar": "القيمة أكبر من المسموح.",
+      "en": "The value is too large."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "maxRows": {
+      "ar": "هذه القائمة فيها عناصر أكثر من المسموح.",
+      "en": "This list has too many entries."
+    },
+    "min": {
+      "ar": "القيمة أصغر من المسموح.",
+      "en": "The value is too small."
+    },
+    "minLength": {
+      "ar": "القيمة أقصر من المسموح.",
+      "en": "The value is too short."
+    },
+    "minRows": {
+      "ar": "هذه القائمة فيها عناصر أقل من المسموح.",
+      "en": "This list has too few entries."
+    },
+    "pattern": {
+      "ar": "القيمة ليست بالشكل الذي يقبله هذا الحقل.",
+      "en": "The value is not in the shape this field takes."
+    },
+    "precision": {
+      "ar": "القيمة فيها أرقام أكثر من المسموح.",
+      "en": "The value has too many digits."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    },
+    "scale": {
+      "ar": "القيمة فيها منازل عشرية أكثر من المسموح.",
+      "en": "The value has too many decimal places."
+    }
   }
 }

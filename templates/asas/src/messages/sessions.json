@@ -8,103 +8,123 @@
     "en": "Archived"
   },
   "capacity": {
-    "ar": "السعة",
-    "en": "Capacity"
-  },
-  "capacity.invalid": {
-    "ar": "هذا ليس رقما.",
-    "en": "This is not a number."
-  },
-  "capacity.min": {
-    "ar": "القيمة أصغر من المسموح.",
-    "en": "The value is too small."
-  },
-  "capacity.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "السعة",
+      "en": "Capacity"
+    },
+    "invalid": {
+      "ar": "هذا ليس رقما.",
+      "en": "This is not a number."
+    },
+    "min": {
+      "ar": "القيمة أصغر من المسموح.",
+      "en": "The value is too small."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "course": {
-    "ar": "الدورة",
-    "en": "Course"
-  },
-  "course.invalid": {
-    "ar": "اختر عنصرًا من القائمة.",
-    "en": "Pick one of the listed entries."
-  },
-  "course.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الدورة",
+      "en": "Course"
+    },
+    "invalid": {
+      "ar": "اختر عنصرًا من القائمة.",
+      "en": "Pick one of the listed entries."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "details": {
-    "ar": "التفاصيل",
-    "en": "Details"
-  },
-  "details.invalid": {
-    "ar": "هذا ليس نصا منسقا.",
-    "en": "This is not rich text."
-  },
-  "details.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "التفاصيل",
+      "en": "Details"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا منسقا.",
+      "en": "This is not rich text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "enrollments": {
     "ar": "التسجيلات",
     "en": "Enrollments"
   },
   "format": {
-    "ar": "الصيغة",
-    "en": "Format"
+    "$value": {
+      "ar": "الصيغة",
+      "en": "Format"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "format.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس معرفا فريدا.",
+      "en": "This is not a unique identifier."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "format.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "id.invalid": {
-    "ar": "هذا ليس معرفا فريدا.",
-    "en": "This is not a unique identifier."
-  },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "operations.archive.reason": {
-    "ar": "السبب",
-    "en": "Reason"
-  },
-  "operations.unarchive.reason": {
-    "ar": "السبب",
-    "en": "Reason"
+  "operations": {
+    "archive": {
+      "reason": {
+        "ar": "السبب",
+        "en": "Reason"
+      }
+    },
+    "unarchive": {
+      "reason": {
+        "ar": "السبب",
+        "en": "Reason"
+      }
+    }
   },
   "organization": {
     "ar": "المؤسسة",
     "en": "Organization"
   },
   "startsAt": {
-    "ar": "وقت البداية",
-    "en": "Starts at"
-  },
-  "startsAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
-  },
-  "startsAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "وقت البداية",
+      "en": "Starts at"
+    },
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "venue": {
-    "ar": "المكان",
-    "en": "Venue"
-  },
-  "venue.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "venue.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "المكان",
+      "en": "Venue"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   }
 }

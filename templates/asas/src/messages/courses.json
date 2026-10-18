@@ -1,31 +1,35 @@
 {
   "_status": {
-    "ar": "الحالة",
-    "en": "Status"
-  },
-  "_status.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "_status.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الحالة",
+      "en": "Status"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "accessCode": {
-    "ar": "رمز الدخول",
-    "en": "Access code"
-  },
-  "accessCode.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "accessCode.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "accessCode.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "رمز الدخول",
+      "en": "Access code"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "archiveReason": {
     "ar": "سبب الأرشفة",
@@ -36,136 +40,162 @@
     "en": "Archived"
   },
   "audience": {
-    "ar": "الجمهور",
-    "en": "Audience"
-  },
-  "audience.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "audience.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الجمهور",
+      "en": "Audience"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "cover": {
-    "ar": "صورة الغلاف",
-    "en": "Cover image"
-  },
-  "cover.invalid": {
-    "ar": "اختر ملفا من القائمة.",
-    "en": "Pick one of the listed files."
-  },
-  "cover.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "صورة الغلاف",
+      "en": "Cover image"
+    },
+    "invalid": {
+      "ar": "اختر ملفا من القائمة.",
+      "en": "Pick one of the listed files."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "currency": {
-    "ar": "العملة",
-    "en": "Currency"
-  },
-  "currency.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "currency.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "العملة",
+      "en": "Currency"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "delivery": {
-    "ar": "طريقة التقديم",
-    "en": "Delivery"
-  },
-  "delivery.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "delivery.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "طريقة التقديم",
+      "en": "Delivery"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "details": {
-    "ar": "التفاصيل",
-    "en": "Details"
-  },
-  "details.invalid": {
-    "ar": "هذا ليس نصا منسقا.",
-    "en": "This is not rich text."
-  },
-  "details.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "التفاصيل",
+      "en": "Details"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا منسقا.",
+      "en": "This is not rich text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "fee": {
-    "ar": "الرسوم",
-    "en": "Fee"
+    "$value": {
+      "ar": "الرسوم",
+      "en": "Fee"
+    },
+    "invalid": {
+      "ar": "هذا ليس رقما.",
+      "en": "This is not a number."
+    },
+    "min": {
+      "ar": "الرسوم لا تكون سالبة أبدًا.",
+      "en": "A fee is never negative."
+    }
   },
-  "fee.invalid": {
-    "ar": "هذا ليس رقما.",
-    "en": "This is not a number."
-  },
-  "fee.min": {
-    "ar": "الرسوم لا تكون سالبة أبدًا.",
-    "en": "A fee is never negative."
-  },
-  "id.invalid": {
-    "ar": "هذا ليس معرفا فريدا.",
-    "en": "This is not a unique identifier."
-  },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس معرفا فريدا.",
+      "en": "This is not a unique identifier."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "level": {
-    "ar": "المستوى",
-    "en": "Level"
-  },
-  "level.invalid": {
-    "ar": "هذا ليس رقما.",
-    "en": "This is not a number."
-  },
-  "level.max": {
-    "ar": "القيمة أكبر من المسموح.",
-    "en": "The value is too large."
-  },
-  "level.min": {
-    "ar": "القيمة أصغر من المسموح.",
-    "en": "The value is too small."
-  },
-  "level.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "المستوى",
+      "en": "Level"
+    },
+    "invalid": {
+      "ar": "هذا ليس رقما.",
+      "en": "This is not a number."
+    },
+    "max": {
+      "ar": "القيمة أكبر من المسموح.",
+      "en": "The value is too large."
+    },
+    "min": {
+      "ar": "القيمة أصغر من المسموح.",
+      "en": "The value is too small."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "notifications": {
-    "ar": "الإشعارات",
-    "en": "Notifications"
-  },
-  "notifications.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
-  },
-  "notifications.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الإشعارات",
+      "en": "Notifications"
+    },
+    "invalid": {
+      "ar": "يجاب على هذا بنعم أو لا.",
+      "en": "This is answered yes or no."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "opensOn": {
-    "ar": "يفتح في",
-    "en": "Opens on"
+    "$value": {
+      "ar": "يفتح في",
+      "en": "Opens on"
+    },
+    "invalid": {
+      "ar": "هذا ليس تاريخا.",
+      "en": "This is not a date."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "opensOn.invalid": {
-    "ar": "هذا ليس تاريخا.",
-    "en": "This is not a date."
-  },
-  "opensOn.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "operations.archive.reason": {
-    "ar": "السبب",
-    "en": "Reason"
-  },
-  "operations.unarchive.reason": {
-    "ar": "السبب",
-    "en": "Reason"
+  "operations": {
+    "archive": {
+      "reason": {
+        "ar": "السبب",
+        "en": "Reason"
+      }
+    },
+    "unarchive": {
+      "reason": {
+        "ar": "السبب",
+        "en": "Reason"
+      }
+    }
   },
   "organization": {
     "ar": "المؤسسة",
@@ -180,87 +210,97 @@
     "en": "Scheduled sessions"
   },
   "selfEnroll": {
-    "ar": "يسجّل الطلاب أنفسهم",
-    "en": "Students may enroll themselves"
-  },
-  "selfEnroll.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
-  },
-  "selfEnroll.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "يسجّل الطلاب أنفسهم",
+      "en": "Students may enroll themselves"
+    },
+    "invalid": {
+      "ar": "يجاب على هذا بنعم أو لا.",
+      "en": "This is answered yes or no."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "singular": {
     "ar": "دورة",
     "en": "Course"
   },
   "summary": {
-    "ar": "الملخص",
-    "en": "Summary"
-  },
-  "summary.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "summary.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "summary.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الملخص",
+      "en": "Summary"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "tags": {
-    "ar": "الوسوم",
-    "en": "Tags"
-  },
-  "tags.invalid": {
-    "ar": "اختر عنصرًا من القائمة.",
-    "en": "Pick one of the listed entries."
-  },
-  "tags.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الوسوم",
+      "en": "Tags"
+    },
+    "invalid": {
+      "ar": "اختر عنصرًا من القائمة.",
+      "en": "Pick one of the listed entries."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "title": {
-    "ar": "العنوان",
-    "en": "Title"
-  },
-  "title.description": {
-    "ar": "الاسم الذي يراه الطالب في الدليل.",
-    "en": "The name a student sees in the catalogue."
-  },
-  "title.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "title.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "title.placeholder": {
-    "ar": "مقدمة في الخط العربي",
-    "en": "Introduction to Arabic calligraphy"
-  },
-  "title.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "العنوان",
+      "en": "Title"
+    },
+    "description": {
+      "ar": "الاسم الذي يراه الطالب في الدليل.",
+      "en": "The name a student sees in the catalogue."
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "placeholder": {
+      "ar": "مقدمة في الخط العربي",
+      "en": "Introduction to Arabic calligraphy"
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "topics": {
-    "ar": "المواضيع",
-    "en": "Topics"
-  },
-  "topics.invalid": {
-    "ar": "هذه ليست قائمة نصوص.",
-    "en": "This is not a list of text."
-  },
-  "topics.maxRows": {
-    "ar": "هذه القائمة فيها عناصر أكثر من المسموح.",
-    "en": "This list has too many entries."
-  },
-  "topics.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "المواضيع",
+      "en": "Topics"
+    },
+    "invalid": {
+      "ar": "هذه ليست قائمة نصوص.",
+      "en": "This is not a list of text."
+    },
+    "maxRows": {
+      "ar": "هذه القائمة فيها عناصر أكثر من المسموح.",
+      "en": "This list has too many entries."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   }
 }

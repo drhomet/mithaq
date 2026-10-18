@@ -85,3 +85,18 @@ test('wire input validates an omitted toString field after uuid normalization', 
   if (!result.issues) assert.equal((result.value as { id: string }).id, 'abcdefab-cdef-4abc-8def-abcdefabcdef')
   assert.equal(input.id, 'ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF', 'the caller keeps its input')
 })
+
+test('names beginning with $ are refused for fields, kinds, rules, operations and message parts', () => {
+  const build = (kayan: object) => language.buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [{ name: 'reservedNames', fields: defaultFields, targets: { service: { operations: defaultOperations } }, ...kayan }] as never,
+  })
+  assert.throws(() => build({ fields: { ...defaultFields, $field: { kind: 'text' } } }), /field "\$field".*reserved/)
+  assert.throws(() => build({ targets: { service: { operations: { ...defaultOperations, $operation: defaultOperations.create } } } }), /operation "\$operation".*reserved/)
+  for (const word of ['kinds', 'rules'] as const) {
+    const extra = word === 'kinds' ? { $kind: base.kinds.text } : { $rule: base.rules.required }
+    const reserved = defineMithaq({ arkan: [{ ...base, [word]: { ...base[word], ...extra } }], targets: language.targets })
+    assert.throws(() => reserved.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [] }), /(?:kind "\$kind"|rule "\$rule").*reserved/)
+  }
+  assert.throws(() => build({ messages: { group: { $value: { en: 'Must not collide' } } } }), /message.*"group.\$value".*reserved/)
+})

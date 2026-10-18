@@ -1,106 +1,132 @@
 {
-  "accessToken.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "accessToken": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "accessToken.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "accessTokenExpiresAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "accessTokenExpiresAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
+  "accountId": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "accessTokenExpiresAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "createdAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "accountId.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "accountId.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "idToken": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "createdAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
+  "password": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "createdAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "providerId": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "id.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "refreshToken": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "refreshTokenExpiresAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "idToken.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "scope": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "idToken.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "updatedAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "password.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "password.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "providerId.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "providerId.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "refreshToken.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "refreshToken.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "refreshTokenExpiresAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
-  },
-  "refreshTokenExpiresAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "scope.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "scope.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "updatedAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
-  },
-  "updatedAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "userId.invalid": {
-    "ar": "اختر عنصرًا من القائمة.",
-    "en": "Pick one of the listed entries."
-  },
-  "userId.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "userId": {
+    "invalid": {
+      "ar": "اختر عنصرًا من القائمة.",
+      "en": "Pick one of the listed entries."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   }
 }

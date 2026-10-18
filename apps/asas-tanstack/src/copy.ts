@@ -1,4 +1,5 @@
 // Imports no router, stylesheet or React, so a test can load this under plain `node`.
+import { flattenMessageFile } from 'mithaq/admin'
 import { organizations, showOrganization } from 'asas/organizations'
 import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
 import organization from 'asas/messages/organization.json' with { type: 'json' }
@@ -29,6 +30,12 @@ type Translate = (key: string, fallback?: string) => string | undefined
 /** The locales this project declares. */
 export const locales = ['ar', 'en'] as const
 
+/** The app reads either message-file format during the upgrade release. */
+export const copyFile = (file: Record<string, unknown>): Record<string, Record<string, string>> =>
+  Object.fromEntries(Object.entries(flattenMessageFile({ file, locales })).map(([key, value]) =>
+    [key, typeof value === 'string' ? Object.fromEntries(locales.map((locale) => [locale, value])) : value ?? {}]))
+
+
 /** One of the locales this project declares. */
 export type Locale = (typeof locales)[number]
 
@@ -58,7 +65,7 @@ export const dirOf = (locale: Locale): 'rtl' | 'ltr' => (locale === 'ar' ? 'rtl'
 const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   // add-on: courses
   courses: {
-    ...courses,
+    ...copyFile(courses),
     'delete.confirm': { en: 'Delete this course', ar: 'احذف هذه الدورة' },
     dangerZoneWarning: { en: 'These actions change this course for everyone.', ar: 'هذه الإجراءات تغير هذه الدورة للجميع.' },
     none: { en: 'No courses yet.', ar: 'لا توجد دورات بعد.' },
@@ -785,7 +792,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     updatedAt: { en: 'Updated at', ar: 'تاريخ التعديل' },
   },
   organization: {
-    ...organization,
+    ...copyFile(organization),
     singular: { en: 'Organization', ar: 'مؤسسة' },
     plural: { en: 'Organizations', ar: 'المؤسسات' },
     none: { en: 'No organizations yet.', ar: 'لا توجد مؤسسات بعد.' },
@@ -811,14 +818,14 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   },
   // add-on: settings
   settings: {
-    ...settings,
+    ...copyFile(settings),
     singular: { en: 'Settings', ar: 'الإعدادات' },
     plural: { en: 'Settings', ar: 'الإعدادات' },
   },
   // end add-on: settings
   // add-on: roles
   roles: {
-    ...roles,
+    ...copyFile(roles),
     singular: { en: 'Role', ar: 'دور' },
     plural: { en: 'Roles', ar: 'الأدوار' },
     'delete.confirm': { en: 'Delete this role', ar: 'احذف هذا الدور' },
@@ -836,7 +843,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   // end add-on: roles
   // add-on: courses
   sessions: {
-    ...sessions,
+    ...copyFile(sessions),
     singular: { en: 'Session', ar: 'جلسة' },
     plural: { en: 'Sessions', ar: 'الجلسات' },
     'operations.archiveMany': { en: 'Archive many', ar: 'أرشفة عدة جلسات' },
@@ -853,7 +860,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   // end add-on: courses
   // add-on: courses
   enrollments: {
-    ...enrollments,
+    ...copyFile(enrollments),
     singular: { en: 'Enrollment', ar: 'تسجيل' },
     plural: { en: 'Enrollments', ar: 'التسجيلات' },
     'operations.others': { en: 'Everyone\'s enrollments', ar: 'تسجيلات الجميع' },
@@ -863,14 +870,14 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   },
   // end add-on: courses
   tags: {
-    ...tags,
+    ...copyFile(tags),
     new: { en: 'New tag', ar: 'وسم جديد' },
     none: { en: 'No tags yet.', ar: 'لا توجد وسوم بعد.' },
     dangerZoneWarning: { en: 'These actions change this tag for everyone.', ar: 'هذه الإجراءات تغير هذا الوسم للجميع.' },
   },
   // add-on: media
   media: {
-    ...media,
+    ...copyFile(media),
     new: { en: 'New image', ar: 'صورة جديدة' },
     none: { en: 'No images yet.', ar: 'لا توجد صور بعد.' },
     newAbout: { en: 'Choose an image and describe it. It is uploaded before it is saved.', ar: 'اختر صورة وصِفها. تُرفع قبل أن تُحفظ.' },
@@ -880,14 +887,14 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     dangerZoneWarning: { en: 'These actions change this image for everyone.', ar: 'هذه الإجراءات تغير هذه الصورة للجميع.' },
   },
   // end add-on: media
-  localUsers: { ...localUsers, none: { en: 'No local accounts yet.', ar: 'لا توجد حسابات محلية بعد.' } },
+  localUsers: { ...copyFile(localUsers), none: { en: 'No local accounts yet.', ar: 'لا توجد حسابات محلية بعد.' } },
   // add-on: audit-log
-  auditLog,
-  backofficeLog: { ...backofficeLog, none: { en: 'No staff action yet.', ar: 'لا يوجد إجراء للطاقم بعد.' } },
+  auditLog: copyFile(auditLog),
+  backofficeLog: { ...copyFile(backofficeLog), none: { en: 'No staff action yet.', ar: 'لا يوجد إجراء للطاقم بعد.' } },
   // end add-on: audit-log
   // add-on: roles
   memberRoles: {
-    ...memberRoles,
+    ...copyFile(memberRoles),
     singular: { en: 'Member role', ar: 'دور عضو' },
     plural: { en: 'Member roles', ar: 'أدوار الأعضاء' },
     none: { en: 'No member roles yet.', ar: 'لا توجد أدوار أعضاء بعد.' },

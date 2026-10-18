@@ -1,47 +1,55 @@
 {
   "contactEmail": {
-    "ar": "بريد التواصل",
-    "en": "Contact email"
+    "$value": {
+      "ar": "بريد التواصل",
+      "en": "Contact email"
+    },
+    "invalid": {
+      "ar": "هذا ليس بريدا إلكترونيا.",
+      "en": "This is not an email address."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "contactEmail.invalid": {
-    "ar": "هذا ليس بريدا إلكترونيا.",
-    "en": "This is not an email address."
+  "globalType": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "contactEmail.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "globalType.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "globalType.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "id.invalid": {
-    "ar": "هذا ليس معرفا فريدا.",
-    "en": "This is not a unique identifier."
-  },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس معرفا فريدا.",
+      "en": "This is not a unique identifier."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "maintenance": {
-    "ar": "الصيانة",
-    "en": "Maintenance"
-  },
-  "maintenance.description": {
-    "ar": "ما دام هذا مفعلا، تخبر البوابة الطلاب بأنها مغلقة للصيانة. ويواصل الموظفون عملهم.",
-    "en": "While this is on, the portal tells students it is closed for maintenance. Staff keep working."
-  },
-  "maintenance.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
-  },
-  "maintenance.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الصيانة",
+      "en": "Maintenance"
+    },
+    "description": {
+      "ar": "ما دام هذا مفعلا، تخبر البوابة الطلاب بأنها مغلقة للصيانة. ويواصل الموظفون عملهم.",
+      "en": "While this is on, the portal tells students it is closed for maintenance. Staff keep working."
+    },
+    "invalid": {
+      "ar": "يجاب على هذا بنعم أو لا.",
+      "en": "This is answered yes or no."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "organization": {
     "ar": "المؤسسة",

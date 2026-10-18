@@ -3,49 +3,51 @@
     "ar": "كل تغيير في هذه المؤسسة، الأحدث أولا.",
     "en": "Every change in this organization, newest first."
   },
-  "action.archive": {
-    "ar": "أُرشف",
-    "en": "Archived"
-  },
-  "action.archiveMany": {
-    "ar": "أُرشف",
-    "en": "Archived"
-  },
-  "action.create": {
-    "ar": "أُنشئ",
-    "en": "Created"
-  },
-  "action.delete": {
-    "ar": "حُذف",
-    "en": "Deleted"
-  },
-  "action.deleteMany": {
-    "ar": "حُذف",
-    "en": "Deleted"
-  },
-  "action.publish": {
-    "ar": "نُشر",
-    "en": "Published"
-  },
-  "action.restoreVersion": {
-    "ar": "استُعيد إصدار",
-    "en": "Restored a version"
-  },
-  "action.unarchive": {
-    "ar": "أُلغيت أرشفته",
-    "en": "Unarchived"
-  },
-  "action.unpublish": {
-    "ar": "أُلغي نشره",
-    "en": "Unpublished"
-  },
-  "action.update": {
-    "ar": "حُدِّث",
-    "en": "Updated"
-  },
-  "action.updateMany": {
-    "ar": "حُدِّث",
-    "en": "Updated"
+  "action": {
+    "archive": {
+      "ar": "أُرشف",
+      "en": "Archived"
+    },
+    "archiveMany": {
+      "ar": "أُرشف",
+      "en": "Archived"
+    },
+    "create": {
+      "ar": "أُنشئ",
+      "en": "Created"
+    },
+    "delete": {
+      "ar": "حُذف",
+      "en": "Deleted"
+    },
+    "deleteMany": {
+      "ar": "حُذف",
+      "en": "Deleted"
+    },
+    "publish": {
+      "ar": "نُشر",
+      "en": "Published"
+    },
+    "restoreVersion": {
+      "ar": "استُعيد إصدار",
+      "en": "Restored a version"
+    },
+    "unarchive": {
+      "ar": "أُلغيت أرشفته",
+      "en": "Unarchived"
+    },
+    "unpublish": {
+      "ar": "أُلغي نشره",
+      "en": "Unpublished"
+    },
+    "update": {
+      "ar": "حُدِّث",
+      "en": "Updated"
+    },
+    "updateMany": {
+      "ar": "حُدِّث",
+      "en": "Updated"
+    }
   },
   "actionFilter": {
     "ar": "الإجراء",
@@ -56,16 +58,18 @@
     "en": "Activity"
   },
   "actor": {
-    "ar": "المنفذ",
-    "en": "Actor"
-  },
-  "actor.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "actor.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "المنفذ",
+      "en": "Actor"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "all": {
     "ar": "كل النشاط",
@@ -76,16 +80,18 @@
     "en": "Any"
   },
   "changes": {
-    "ar": "التغييرات",
-    "en": "Changes"
-  },
-  "changes.invalid": {
-    "ar": "هذه ليست بيانات JSON يقبلها هذا الحقل.",
-    "en": "This is not JSON this field takes."
-  },
-  "changes.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "التغييرات",
+      "en": "Changes"
+    },
+    "invalid": {
+      "ar": "هذه ليست بيانات JSON يقبلها هذا الحقل.",
+      "en": "This is not JSON this field takes."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "clear": {
     "ar": "مسح عوامل التصفية",
@@ -115,25 +121,27 @@
     "ar": "الحقل",
     "en": "Field"
   },
-  "filter.created": {
-    "ar": "أُنشئ",
-    "en": "Created"
-  },
-  "filter.deleted": {
-    "ar": "حُذف",
-    "en": "Deleted"
-  },
-  "filter.published": {
-    "ar": "نُشر",
-    "en": "Published"
-  },
-  "filter.restored": {
-    "ar": "استُعيد",
-    "en": "Restored"
-  },
-  "filter.updated": {
-    "ar": "حُدِّث",
-    "en": "Updated"
+  "filter": {
+    "created": {
+      "ar": "أُنشئ",
+      "en": "Created"
+    },
+    "deleted": {
+      "ar": "حُذف",
+      "en": "Deleted"
+    },
+    "published": {
+      "ar": "نُشر",
+      "en": "Published"
+    },
+    "restored": {
+      "ar": "استُعيد",
+      "en": "Restored"
+    },
+    "updated": {
+      "ar": "حُدِّث",
+      "en": "Updated"
+    }
   },
   "filters": {
     "ar": "تصفية النشاط",
@@ -147,45 +155,51 @@
     "ar": "من",
     "en": "From"
   },
-  "id.invalid": {
-    "ar": "هذا ليس معرفا فريدا.",
-    "en": "This is not a unique identifier."
-  },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس معرفا فريدا.",
+      "en": "This is not a unique identifier."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "impersonated": {
     "ar": "{staff} بصفة {member}",
     "en": "{staff} as {member}"
   },
   "impersonatedBy": {
-    "ar": "انتحل الصفة",
-    "en": "Impersonated by"
-  },
-  "impersonatedBy.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "impersonatedBy.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "انتحل الصفة",
+      "en": "Impersonated by"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "kayan": {
-    "ar": "الكيان",
-    "en": "Kayan"
-  },
-  "kayan.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "kayan.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "kayan.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "الكيان",
+      "en": "Kayan"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "loading": {
     "ar": "جارٍ تحميل النشاط…",
@@ -208,20 +222,22 @@
     "en": "One record's activity."
   },
   "operation": {
-    "ar": "العملية",
-    "en": "Operation"
-  },
-  "operation.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "operation.maxLength": {
-    "ar": "القيمة طويلة جدًا.",
-    "en": "The value is too long."
-  },
-  "operation.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "العملية",
+      "en": "Operation"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "organization": {
     "ar": "المؤسسة",
@@ -236,16 +252,18 @@
     "en": "Audit log"
   },
   "record": {
-    "ar": "السجل",
-    "en": "Record"
-  },
-  "record.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "record.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+    "$value": {
+      "ar": "السجل",
+      "en": "Record"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
   "searchChanges": {
     "ar": "القيم المتغيرة",

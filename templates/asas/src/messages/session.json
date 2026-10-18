@@ -1,82 +1,102 @@
 {
-  "activeOrganizationId.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "activeOrganizationId": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "activeOrganizationId.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "createdAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "createdAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
+  "expiresAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "createdAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "expiresAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
+  "impersonatedBy": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "expiresAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "ipAddress": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "id.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "token": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "updatedAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "impersonatedBy.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "userAgent": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "impersonatedBy.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "ipAddress.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "ipAddress.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "token.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "token.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "updatedAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
-  },
-  "updatedAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "userAgent.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "userAgent.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "userId.invalid": {
-    "ar": "اختر عنصرًا من القائمة.",
-    "en": "Pick one of the listed entries."
-  },
-  "userId.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "userId": {
+    "invalid": {
+      "ar": "اختر عنصرًا من القائمة.",
+      "en": "Pick one of the listed entries."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   }
 }

@@ -1,90 +1,112 @@
 {
-  "banExpires.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
+  "banExpires": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "banExpires.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "banReason": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "banReason.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "banned": {
+    "invalid": {
+      "ar": "يجاب على هذا بنعم أو لا.",
+      "en": "This is answered yes or no."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "banReason.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "createdAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "banned.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
+  "email": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "banned.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "emailVerified": {
+    "invalid": {
+      "ar": "يجاب على هذا بنعم أو لا.",
+      "en": "This is answered yes or no."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "createdAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "createdAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "image": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "email.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
+  "name": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "email.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "role": {
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   },
-  "emailVerified.invalid": {
-    "ar": "يجاب على هذا بنعم أو لا.",
-    "en": "This is answered yes or no."
-  },
-  "emailVerified.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "id.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "id.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "image.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "image.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "name.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "name.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "role.invalid": {
-    "ar": "هذا ليس نصا.",
-    "en": "This is not text."
-  },
-  "role.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
-  },
-  "updatedAt.invalid": {
-    "ar": "هذا ليس تاريخا ووقتا.",
-    "en": "This is not a date and time."
-  },
-  "updatedAt.required": {
-    "ar": "هذا الحقل مطلوب.",
-    "en": "This field is required."
+  "updatedAt": {
+    "invalid": {
+      "ar": "هذا ليس تاريخا ووقتا.",
+      "en": "This is not a date and time."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
   }
 }

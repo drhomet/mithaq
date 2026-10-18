@@ -739,10 +739,44 @@ const writtenIn = async (directory: URL) =>
     await Promise.all(
       (await readdir(directory)).map(async (file) => [
         file.replace(/\.json$/, ''),
-        JSON.parse(await readFile(new URL(file, directory), 'utf8')) as Record<string, Record<string, string>>,
+        JSON.parse(await readFile(new URL(file, directory), 'utf8')) as Record<string, any>,
       ]),
     ),
-  ) as Record<string, Record<string, Record<string, string>>>
+  ) as Record<string, Record<string, any>>
+
+test('nested message files round-trip operation fields, refusals and values with children, while flat files still resolve', async () => {
+  await inTemporary(async (directory) => {
+    const registry = registryOf({ scopes: [{ name: 'customer', keys: {
+      customerType: { ar: 'النوع', en: 'Type' },
+      'customerType.invalid': { ar: 'نوع غير صالح', en: 'Invalid type' },
+      'operations.create.initialBalance': { ar: 'الرصيد الأولي', en: 'Initial balance' },
+      hint: 'A hint', 'hint.more': { ar: 'المزيد', en: 'More' },
+      computed: () => 'Computed', 'computed.invalid': { ar: 'غير صالح', en: 'Invalid' },
+    } }] })
+    await generateMessages({ registry, directory })
+    const file = (await writtenIn(directory)).customer!
+    assert.deepEqual(file, {
+      computed: { $value: null, invalid: { ar: 'غير صالح', en: 'Invalid' } },
+      customerType: { $value: { ar: 'النوع', en: 'Type' }, invalid: { ar: 'نوع غير صالح', en: 'Invalid type' } },
+      hint: { $value: 'A hint', more: { ar: 'المزيد', en: 'More' } },
+      operations: { create: { initialBalance: { ar: 'الرصيد الأولي', en: 'Initial balance' } } },
+    })
+    assert.deepEqual(refusals(await generateMessages({ registry, directory, check: true })), [])
+    const { copyFile, scopes, translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
+    try {
+      scopes.messageFixture = copyFile(file)
+      assert.equal(translator('en')('messageFixture.operations.create.initialBalance'), 'Initial balance')
+      assert.equal(translator('ar')('messageFixture.customerType.invalid'), 'نوع غير صالح')
+      assert.equal(translator('en')('messageFixture.customerType'), 'Type')
+      assert.equal(translator('en')('messageFixture.hint'), 'A hint')
+      assert.equal(translator('en')('messageFixture.computed'), undefined)
+      assert.equal(translator('en')('messageFixture.computed.invalid'), 'Invalid')
+      scopes.messageFixture = copyFile({ 'operations.create.initialBalance': { en: 'Initial balance', ar: 'الرصيد الأولي' }, 'customerType.invalid': { en: 'Invalid type', ar: 'نوع غير صالح' } })
+      assert.equal(translator('en')('messageFixture.operations.create.initialBalance'), 'Initial balance')
+      assert.equal(translator('ar')('messageFixture.customerType.invalid'), 'نوع غير صالح')
+    } finally { delete scopes.messageFixture }
+  })
+})
 
 const refusingRules = ['max', 'maxLength', 'maxRows', 'min', 'minLength', 'minRows', 'pattern', 'precision', 'required', 'scale']
 
@@ -803,21 +837,21 @@ test("the shipped rule and kind refusal sentences are keys of the project's mith
   await inTemporary(async (directory) => {
     await generateMessages({ registry: asas.messages, directory })
     const floor = (await writtenIn(directory)).mithaq!
-    assert.deepEqual(Object.keys(floor).filter((key) => key.startsWith('rules.')), refusingRules.map((rule) => `rules.${rule}`))
+    assert.deepEqual(Object.keys(floor.rules), refusingRules)
     for (const rule of refusingRules) {
-      assert.deepEqual(floor[`rules.${rule}`], defaultRules[rule as keyof typeof defaultRules].message, `rules.${rule}`)
+      assert.deepEqual(floor.rules[rule], defaultRules[rule as keyof typeof defaultRules].message, `rules.${rule}`)
     }
-    assert.deepEqual(floor['rules.maxLength'], { ar: 'القيمة طويلة جدًا.', en: 'The value is too long.' })
-    assert.deepEqual(floor['rules.max'], { ar: 'القيمة أكبر من المسموح.', en: 'The value is too large.' })
+    assert.deepEqual(floor.rules.maxLength, { ar: 'القيمة طويلة جدًا.', en: 'The value is too long.' })
+    assert.deepEqual(floor.rules.max, { ar: 'القيمة أكبر من المسموح.', en: 'The value is too large.' })
     const kinds = { ...defaultKinds, ...richText({ nodes: richTextNodes }).kinds, upload }
     assert.deepEqual(
-      Object.keys(floor).filter((key) => key.endsWith('.invalid')),
-      Object.keys(kinds).sort().map((kind) => `kinds.${kind}.invalid`),
+      Object.keys(floor.kinds),
+      Object.keys(kinds).sort(),
     )
     for (const kind of Object.keys(kinds)) {
-      assert.deepEqual(floor[`kinds.${kind}.invalid`], kinds[kind as keyof typeof kinds].message, `kinds.${kind}.invalid`)
+      assert.deepEqual(floor.kinds[kind].invalid, kinds[kind as keyof typeof kinds].message, `kinds.${kind}.invalid`)
     }
-    assert.deepEqual(floor['kinds.text.invalid'], { ar: 'هذا ليس نصا.', en: 'This is not text.' })
+    assert.deepEqual(floor.kinds.text.invalid, { ar: 'هذا ليس نصا.', en: 'This is not text.' })
     assert.deepEqual(refusals(await generateMessages({ registry: asas.messages, directory, check: true })), [])
   })
 })
@@ -827,14 +861,14 @@ test("a per-field key still equal to the scope's default is a seed, so a changed
     await generateMessages({ registry: asas.messages, directory })
     const before = await writtenIn(directory)
     const seeded = Object.entries(before).flatMap(([scope, keys]) =>
-      Object.keys(keys).filter((key) => key.endsWith('.maxLength')).map((key) => [scope, key] as const),
+      Object.keys(keys).filter((key) => keys[key]?.maxLength).map((key) => [scope, key] as const),
     )
     assert.ok(seeded.length > 1, 'more than one field binds maxLength')
     const [edited, ...rest] = seeded
     const theirs = { ar: 'اسم قصير من فضلك.', en: 'A short name, please.' }
-    await writeFile(new URL(`${edited![0]}.json`, directory), `${JSON.stringify({ ...before[edited![0]], [edited![1]]: theirs }, null, 2)}\n`)
+    await writeFile(new URL(`${edited![0]}.json`, directory), `${JSON.stringify({ ...before[edited![0]], [edited![1]]: { ...before[edited![0]]![edited![1]], maxLength: theirs } }, null, 2)}\n`)
     const changedDefault = { ar: 'النص أطول من المسموح.', en: 'This is longer than allowed.' }
-    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ ...before.mithaq, 'rules.maxLength': changedDefault }, null, 2)}\n`)
+    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ ...before.mithaq, rules: { ...before.mithaq!.rules, maxLength: changedDefault } }, null, 2)}\n`)
 
     // A seed that no longer matches its default is what a run would rewrite, so the check reports
     // it rather than reading it as an override.
@@ -843,9 +877,9 @@ test("a per-field key still equal to the scope's default is a seed, so a changed
 
     await generateMessages({ registry: asas.messages, directory })
     const after = await writtenIn(directory)
-    assert.deepEqual(after.mithaq!['rules.maxLength'], changedDefault, 'what is on disk wins in the scope')
-    for (const [scope, key] of rest) assert.deepEqual(after[scope]![key], changedDefault, `${scope}.${key} reseeded`)
-    assert.deepEqual(after[edited![0]]![edited![1]], theirs, "the person's sentence is kept")
+    assert.deepEqual(after.mithaq!.rules.maxLength, changedDefault, 'what is on disk wins in the scope')
+    for (const [scope, key] of rest) assert.deepEqual(after[scope]![key].maxLength, changedDefault, `${scope}.${key} reseeded`)
+    assert.deepEqual(after[edited![0]]![edited![1]].maxLength, theirs, "the person's sentence is kept")
     assert.deepEqual(refusals(await generateMessages({ registry: asas.messages, directory, check: true })), [])
   })
 })
@@ -861,15 +895,16 @@ test('a locale the language adds is refused on the mithaq scope first, and once 
 
     await generateMessages({ registry, directory })
     const floor = (await writtenIn(directory)).mithaq!
-    const french = Object.fromEntries(Object.entries(floor).map(([key, entry]) => [key, { ...entry, fr: `${entry.en} (fr)` }]))
+    const translated = (entry: Record<string, any>): Record<string, any> => typeof entry.en === 'string' ? { ...entry, fr: `${entry.en} (fr)` } : Object.fromEntries(Object.entries(entry).map(([key, value]) => [key, translated(value)]))
+    const french = translated(floor)
     await writeFile(new URL('mithaq.json', directory), `${JSON.stringify(french, null, 2)}\n`)
     await generateMessages({ registry, directory })
 
     const courses = (await writtenIn(directory)).courses!
-    assert.equal(courses['summary.maxLength']!.fr, 'The value is too long. (fr)')
-    assert.equal(courses['summary.required']!.fr, 'This field is required. (fr)')
-    assert.equal(courses['summary.invalid']!.fr, 'This is not text. (fr)')
-    assert.equal(courses['createdAt.invalid'], undefined)
+    assert.equal(courses.summary.maxLength!.fr, 'The value is too long. (fr)')
+    assert.equal(courses.summary.required!.fr, 'This field is required. (fr)')
+    assert.equal(courses.summary.invalid!.fr, 'This is not text. (fr)')
+    assert.equal(courses.createdAt?.invalid, undefined)
     // Every per-field refusal key a rule or kind seeds carries `fr`; what is left is copy the
     // project wrote itself, which no default reaches.
     const left = (await generateMessages({ registry, directory, check: true })).missing.filter((line) =>
@@ -907,13 +942,13 @@ test("a project rule carrying its own sentence seeds mithaq.rules.<name>, and it
   })
   await inTemporary(async (directory) => {
     await generateMessages({ registry: messages, directory })
-    assert.deepEqual((await writtenIn(directory)).mithaq!['rules.positive'], message)
-    assert.deepEqual((await writtenIn(directory)).scores!['score.positive'], message)
+    assert.deepEqual((await writtenIn(directory)).mithaq!.rules.positive, message)
+    assert.deepEqual((await writtenIn(directory)).scores!.score.positive, message)
     const theirs = { ar: 'يجب أن تكون النتيجة موجبة.', en: 'A score is above zero.' }
     const floor = (await writtenIn(directory)).mithaq!
-    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ ...floor, 'rules.positive': theirs }, null, 2)}\n`)
+    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ ...floor, rules: { ...floor.rules, positive: theirs } }, null, 2)}\n`)
     await generateMessages({ registry: messages, directory })
-    assert.deepEqual((await writtenIn(directory)).scores!['score.positive'], theirs)
+    assert.deepEqual((await writtenIn(directory)).scores!.score.positive, theirs)
   })
 })
 test('a run keeps entries with no source and a check refuses them by name', async () => {
@@ -927,13 +962,13 @@ test('a run keeps entries with no source and a check refuses them by name', asyn
     assert.deepEqual((await generateMessages({ registry, directory })).changed, ['mithaq.json', 'courses.json'])
     assert.deepEqual((await generateMessages({ registry, directory })).changed, [], 'a rerun writes nothing')
 
-    await writeFile(new URL('courses.json', directory), JSON.stringify({ 'createdAt.required': { ar: 'x', en: 'y' }, title: { ar: 'عنوان', en: 'Title' } }))
+    await writeFile(new URL('courses.json', directory), JSON.stringify({ createdAt: { required: { ar: 'x', en: 'y' } }, title: { ar: 'عنوان', en: 'Title' } }))
     const report = await generateMessages({ registry, directory, check: true })
     assert.deepEqual(refusals(report), ['courses.createdAt.required is an entry with no source. Delete it; a run keeps it.'])
     await generateMessages({ registry, directory })
     assert.deepEqual(JSON.parse(await readFile(new URL('courses.json', directory), 'utf8')), {
       title: { ar: 'عنوان', en: 'Title' },
-      'createdAt.required': { ar: 'x', en: 'y' },
+      createdAt: { required: { ar: 'x', en: 'y' } },
     })
   })
 })
@@ -957,7 +992,7 @@ test('a declared locale with no entry is refused by name, and writing it closes 
     assert.deepEqual(await readdir(directory), [], '--check writes nothing')
 
     await generateMessages({ registry, directory })
-    await writeFile(new URL('mithaq.json', directory), JSON.stringify({ 'kinds.text': { ar: 'نص', en: 'Text', fr: 'Texte' } }, null, 2) + '\n')
+    await writeFile(new URL('mithaq.json', directory), JSON.stringify({ kinds: { text: { ar: 'نص', en: 'Text', fr: 'Texte' } } }, null, 2) + '\n')
     assert.deepEqual(refusals(await generateMessages({ registry, directory, check: true })), [])
   })
 })
@@ -1030,10 +1065,10 @@ test('a label written as a function is reported unverifiable rather than refused
     assert.deepEqual(report.missing, [], 'a function has no locale to be short of')
     assert.deepEqual(refusals(report).filter((line) => line.includes('hatches.title')), [])
     await generateMessages({ registry: messages, directory })
-    const written = JSON.parse(await readFile(new URL('hatches.json', directory), 'utf8')) as Record<string, unknown>
-    assert.equal(written.title, null, 'the function label is a marker rather than a hole')
+    const written = JSON.parse(await readFile(new URL('hatches.json', directory), 'utf8'))
+    assert.equal(written.title.$value, null, 'the function label is a marker rather than a hole')
     // The seeded refusal keys are the kind's and the rules' sentences, not this field's label.
-    assert.deepEqual(written['title.invalid'], defaultKinds.text.message)
+    assert.deepEqual(written.title.invalid, defaultKinds.text.message)
   })
 })
 
@@ -1089,7 +1124,7 @@ test("the project's own resolver rides on buildAsas, is called with nothing, and
     assert.deepEqual(report.resolver, [], 'every key the floor claims came back')
     assert.equal(report.unverifiable.length, Object.keys(project.keys).length)
     await generateMessages({ registry: messages, directory })
-    assert.equal(JSON.parse(await readFile(new URL('project.json', directory), 'utf8'))['fields.id'], 'resolved:field.id')
+    assert.equal(JSON.parse(await readFile(new URL('project.json', directory), 'utf8')).fields.id, 'resolved:field.id')
   })
 })
 
@@ -1234,7 +1269,7 @@ test('a locale the project deliberately left empty is kept and reported, rather 
   await inTemporary(async (directory) => {
     const registry = registryOf()
     await generateMessages({ registry, directory })
-    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ 'kinds.text': { ar: '', en: 'Text' } }, null, 2)}\n`)
+    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ kinds: { text: { ar: '', en: 'Text' } } }, null, 2)}\n`)
     const report = await generateMessages({ registry, directory, check: true })
     assert.deepEqual(report.changed, [], 'the empty string is what a run would write, so nothing changed')
     assert.deepEqual(report.missing, ['mithaq.kinds.text has no "ar".'])
@@ -1693,8 +1728,8 @@ test('a no-source copy entry tells a person to delete it on checks and writes', 
   try {
     const directory = new URL('src/messages/', root)
     await mkdir(directory)
-    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ 'kinds.text': { ar: 'نص', en: 'Text' } }, null, 2)}\n`)
-    const courses = { 'createdAt.required': { ar: 'x', en: 'y' }, title: { ar: 'العنوان', en: 'Title' } }
+    await writeFile(new URL('mithaq.json', directory), `${JSON.stringify({ kinds: { text: { ar: 'نص', en: 'Text' } } }, null, 2)}\n`)
+    const courses = { createdAt: { required: { ar: 'x', en: 'y' } }, title: { ar: 'العنوان', en: 'Title' } }
     await writeFile(new URL('courses.json', directory), `${JSON.stringify(courses, null, 2)}\n`)
     const sentence = 'courses.createdAt.required is an entry with no source. Delete it; a run keeps it.'
     const checked = await command(root, 'generate', 'messages', '--check')
@@ -1706,7 +1741,7 @@ test('a no-source copy entry tells a person to delete it on checks and writes', 
     assert.ok(written.stdout.includes(sentence))
     assert.deepEqual(JSON.parse(await readFile(new URL('courses.json', directory), 'utf8')), courses)
 
-    await writeFile(new URL('courses.json', directory), `${JSON.stringify({ 'createdAt.required': courses['createdAt.required'] }, null, 2)}\n`)
+    await writeFile(new URL('courses.json', directory), `${JSON.stringify({ createdAt: { required: courses.createdAt.required } }, null, 2)}\n`)
     const otherGap = await command(root, 'generate', 'messages', '--check')
     assert.equal(otherGap.code, 1)
     assert.match(otherGap.stderr, /courses\.json is not what a run would write\./)

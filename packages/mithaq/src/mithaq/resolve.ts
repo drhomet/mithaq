@@ -282,6 +282,10 @@ const tenantField = ({ where, field, language }: { where: string; field: Runtime
 }
 
 // A key written flat is refused with the nesting spelled out. A node holding both a
+const messageName = (where: string, name: string) => {
+  if (name.startsWith('$')) throw new Error(`${where} "${name}" is reserved: names starting with "$" are reserved for message-file values.`)
+}
+
 // sentence and a group, or nothing, is refused: either reading would destroy copy.
 const flattenMessages = (where: string, messages: MessageTree, locales: readonly string[], parts: readonly string[] = []): MessageMap =>
   // `Object.fromEntries`, not assignment: a key named `__proto__` assigned with `[]`
@@ -289,6 +293,7 @@ const flattenMessages = (where: string, messages: MessageTree, locales: readonly
   Object.fromEntries(
     Object.entries(messages).flatMap(([key, value]): [string, Localized | LabelFunction][] => {
       const path = [...parts, ...key.split('.')]
+      if (key.startsWith('$')) throw new Error(`Kayan "${where}" message key "${path.join('.')}" is reserved: names starting with "$" are reserved for message-file values.`)
       if (key.includes('.')) {
         throw new Error(
           `Kayan "${where}" writes the message key "${path.join('.')}" flat. Nest it under "${key.split('.')[0]}": messages: ${path.map((part) => `{ ${part}: `).join('')}...${' }'.repeat(path.length)}.`,
@@ -370,12 +375,14 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
   // For a table written as plain data, which `kind` does not type. A rule may ship no
   // sentence; every kind refuses the value it is handed.
   for (const [name, kind] of Object.entries(language.kinds as Record<string, { message?: unknown }>)) {
+    messageName("The language's kind", name)
     if (!kind.message) {
       throw new Error(`The language's kind "${name}" declares no message, so a value it refuses has no sentence to show.`)
     }
   }
   // A typo would otherwise exclude nothing in silence.
   for (const [name, one] of Object.entries(language.rules)) {
+    messageName("The language's rule", name)
     const missing = one.excludes?.find((other) => !Object.hasOwn(language.rules, other))
     if (missing) {
       throw new Error(`The language's rule "${name}" excludes "${missing}", which is not a rule the language names.`)
@@ -612,6 +619,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       // the kayan's own record, so it is refused by name.
       operations: Object.fromEntries(
         Object.entries(resolveOperations(own.operations, service)).filter(([operation, declaration]) => {
+          messageName(`Kayan "${kayan.name}" operation`, operation)
           if ((declaration as unknown) === false) {
             throw new Error(
               `Kayan "${kayan.name}" operation "${operation}" is false, and false is no operation. Leave "${operation}" out of the object instead: const { ${operation}, ...rest } = defaultOperations.`,
@@ -737,6 +745,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
     targetOf(`Kayan "${kayan.name}"`, kayan.schema, language, 'schema')
     for (const field of Object.values(kayan.fields)) {
       const where = `Kayan "${kayan.name}" field "${field.name}"`
+      messageName(`Kayan "${kayan.name}" field`, field.name)
       declaredTargets(where, field.targets)
       // The field found must be a relationship pointing back here, or the join would read
       // a column that is no pointer back and answer another row's rows.
@@ -1035,6 +1044,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
       )
       for (const [name, field] of inputs) {
         const where = `Kayan "${kayan.name}" operation "${operation}" field "${name}"`
+        messageName(`Kayan "${kayan.name}" operation "${operation}" field`, name)
         declaredTargets(where, field.targets)
         optionsNamed(where, field.kind, field)
         affixesNamed(where, field.kind, field)

@@ -1,6 +1,7 @@
 // Every runtime import of this entry imports nothing but types, so a browser
 // receives no server code and no framework.
 
+export { flattenMessageFile } from '../mithaq/message-file.ts'
 export { afterCommitHeader } from '../asas/runner/errors.ts'
 export { allowedType } from '../storage/allowed-type.ts'
 export { compareDecimals, decimalDigits, isDecimal } from '../base/decimal.ts'

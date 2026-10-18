@@ -399,6 +399,8 @@ packages/asas/
 
 **`src/messages/`** holds `<kayanName>.json` for each kayan, keyed by the kayan's name (`courses.json`, `auditLog.json`), and `mithaq.json` for the copy every kayan shares, such as the default fields' labels. `mithaq generate messages` writes them from the labels and `messages` in the kayan. The apps import them as `asas/messages/<name>.json`.
 
+Message files nest dotted key paths and use `$value` only when a key has both its own value and children; names starting with `$` are reserved.
+
 **`src/migrations/`** holds one folder per migration, `<timestamp>_<slug>/` with `migration.sql` and `snapshot.json`, and two files `mithaq migrate` writes and the project commits: `schema.ts`, which names every table, and `drizzle.config.ts`, which `drizzle-kit migrate --config src/migrations/drizzle.config.ts` reads. `mithaq migrate --name <slug>` sets the slug.
 
 **The rest.** `backoffice-http.ts` is the one hand-written route, renaming an organization, which writes a Better Auth table no managed operation may write. `seed.ts` fills a database for a first look, run with `bun run seed`.
@@ -500,6 +502,8 @@ In one organization, nobody founds another organization or leaves the one over H
 - `'open'` to `'invite'`: every account and membership stays, and nobody joins without an invitation from then on. `'invite'` to `'open'`: accounts that exist with no membership are not joined; new ones are.
 
 ## Upgrading
+
+Run `bunx mithaq generate messages` to rewrite existing message files as nested objects; this release still reads flat files.
 
 A generated auth kayan can take extra operations from a sibling `<kayan>.operations.ts` exporting `operations`; run `bunx mithaq generate auth` after adding it.
 
