@@ -281,11 +281,11 @@ const tenantField = ({ where, field, language }: { where: string; field: Runtime
   return bound
 }
 
-// A key written flat is refused with the nesting spelled out. A node holding both a
 const messageName = (where: string, name: string) => {
   if (name.startsWith('$')) throw new Error(`${where} "${name}" is reserved: names starting with "$" are reserved for message-file values.`)
 }
 
+// A key written flat is refused with the nesting spelled out. A node holding both a
 // sentence and a group, or nothing, is refused: either reading would destroy copy.
 const flattenMessages = (where: string, messages: MessageTree, locales: readonly string[], parts: readonly string[] = []): MessageMap =>
   // `Object.fromEntries`, not assignment: a key named `__proto__` assigned with `[]`

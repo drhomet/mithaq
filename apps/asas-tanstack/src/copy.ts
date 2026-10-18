@@ -35,7 +35,6 @@ export const copyFile = (file: Record<string, unknown>): Record<string, Record<s
   Object.fromEntries(Object.entries(flattenMessageFile({ file, locales })).map(([key, value]) =>
     [key, typeof value === 'string' ? Object.fromEntries(locales.map((locale) => [locale, value])) : value ?? {}]))
 
-
 /** One of the locales this project declares. */
 export type Locale = (typeof locales)[number]
 

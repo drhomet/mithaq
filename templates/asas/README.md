@@ -503,7 +503,7 @@ In one organization, nobody founds another organization or leaves the one over H
 
 ## Upgrading
 
-Run `bunx mithaq generate messages` to rewrite existing message files as nested objects; this release still reads flat files.
+In the project's own `copy.ts`, wrap each imported message file with `copyFile` as in the template, using `flattenMessageFile` from `mithaq/admin`; otherwise nested keys stop resolving. Then run `bunx mithaq generate messages` to rewrite existing message files as nested objects; this release still reads flat files.
 
 A generated auth kayan can take extra operations from a sibling `<kayan>.operations.ts` exporting `operations`; run `bunx mithaq generate auth` after adding it.
 

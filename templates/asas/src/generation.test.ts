@@ -273,9 +273,7 @@ export const { defineKayan, buildAsas } = language
     assert.equal(typeof built.kayan.member.operations.create, 'function')
     assert.deepEqual(await generateAuth({ ...settings, check: true }), [])
   } finally {
-    await mkdir(new URL('file://' + process.env.HOME + '/.Trash/'), { recursive: true })
-    const { rename } = await import('node:fs/promises')
-    await rename(root, new URL('file://' + process.env.HOME + '/.Trash/' + root.pathname.split('/').at(-2)))
+    await rm(root, { recursive: true, force: true })
   }
 })
 
@@ -762,6 +760,15 @@ test('nested message files round-trip operation fields, refusals and values with
       operations: { create: { initialBalance: { ar: 'الرصيد الأولي', en: 'Initial balance' } } },
     })
     assert.deepEqual(refusals(await generateMessages({ registry, directory, check: true })), [])
+    await writeFile(new URL('customer.json', directory), JSON.stringify({
+      computed: null, 'computed.invalid': { ar: 'غير صالح', en: 'Invalid' },
+      customerType: { ar: 'النوع', en: 'Type' }, 'customerType.invalid': { ar: 'نوع غير صالح', en: 'Invalid type' },
+      hint: 'A hint', 'hint.more': { ar: 'المزيد', en: 'More' },
+      'operations.create.initialBalance': { ar: 'الرصيد الأولي', en: 'Initial balance' },
+    }, null, 2) + '\n')
+    assert.deepEqual((await generateMessages({ registry, directory, check: true })).changed, ['customer.json'])
+    await generateMessages({ registry, directory })
+    assert.deepEqual((await writtenIn(directory)).customer, file, 'a run rewrites the flat file as the same nested copy')
     const { copyFile, scopes, translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
     try {
       scopes.messageFixture = copyFile(file)
