@@ -22,17 +22,11 @@ export const flattenMessageFile = ({ file, locales }: { file: Record<string, unk
 /** A value gets `$value` only when another key needs to pass through it. */
 export const nestMessageFile = (entries: Record<string, MessageEntry>): Branch => {
   const result: Branch = Object.create(null)
-  for (const key of Object.keys(entries).sort()) {
-    const parts = key.split('.')
-    let into = result
-    for (let at = 0; at < parts.length - 1; at++) {
-      const part = parts[at]!
-      const prefix = parts.slice(0, at + 1).join('.')
-      if (!Object.hasOwn(into, part)) into[part] = Object.create(null)
-      else if (Object.hasOwn(entries, prefix) && (!branch(into[part]) || !Object.hasOwn(into[part], '$value'))) into[part] = Object.assign(Object.create(null), { $value: into[part] as MessageEntry })
-      into = into[part] as Branch
-    }
-    into[parts.at(-1)!] = entries[key]!
+  const keys = Object.keys(entries).sort()
+  for (const key of keys) {
+    const parts = [...key.split('.'), ...(keys.some((other) => other.startsWith(`${key}.`)) ? ['$value'] : [])]
+    const last = parts.pop()!
+    parts.reduce((node, part) => (node[part] ??= Object.create(null)) as Branch, result)[last] = entries[key]!
   }
   return result
 }

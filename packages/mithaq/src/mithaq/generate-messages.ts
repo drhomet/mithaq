@@ -1,10 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import type { Copy, MessageRegistry } from './messages.ts'
 import { Refusal } from './refusal.ts'
-import { flattenMessageFile, nestMessageFile, type MessageEntry } from './message-file.ts'
-
-// `null` for a label written as a function, which has no string to write down.
-type Entry = MessageEntry
+import { flattenMessageFile, nestMessageFile, type MessageEntry as Entry } from './message-file.ts'
 
 /**
  * What a run found: `changed`, the files a run writes, and the refusals, each naming what is wrong
