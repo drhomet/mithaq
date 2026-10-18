@@ -1940,6 +1940,19 @@ type GlobalUpdateMaintenance = Expect<Equal<GlobalUpdateData['maintenance'], boo
 type GlobalUpdateHasNoId = Expect<Equal<'id' extends keyof GlobalUpdateData ? true : false, false>>
 type GlobalReadInput = Expect<Equal<Parameters<typeof asas.global.settings.operations.findOne>[0], { depth?: number } | undefined>>
 
+const guardedGlobal = defineGlobal({
+  name: 'guardedGlobal',
+  fields: { ...defaultFields, ...defaultGlobalFields, title: { kind: 'text' } },
+  targets: { service: { operations: {
+    ...defaultGlobalOperations,
+    update: { ...defaultGlobalOperations.update, input: ({ update }) => update.extend({ expectedUpdatedAt: z.coerce.date() }) },
+  } } },
+})
+const guardedGlobalAsas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], global: [guardedGlobal] })
+// @ts-expect-error the declared input requires expectedUpdatedAt
+void guardedGlobalAsas.global.guardedGlobal.operations.update({ title: 'Missing expected update' })
+void guardedGlobalAsas.global.guardedGlobal.operations.update({ title: 'Declared input', expectedUpdatedAt: new Date() })
+
 // @ts-expect-error a global has no create operation
 type NoGlobalCreate = (typeof asas.global.settings.operations)['create']
 // @ts-expect-error a global has no findByID operation

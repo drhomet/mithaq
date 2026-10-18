@@ -1601,7 +1601,7 @@ type Built<K, List extends Registry, L extends LanguageValues, Operations> = {
 // answers null until the first update makes the row.
 type GlobalOperations<K extends Registry[number], List extends Registry, L extends LanguageValues, Actor> = {
   findOne(...args: CallArgs<L, Actor, { depth?: number }>): Promise<Row<K['fields'], L, List> | null>
-  update(...args: CallArgs<L, Actor, UpdateInput<K['fields'], L, List>>): Promise<Row<K['fields'], L, List>>
+  update(...args: CallArgs<L, Actor, Omit<OperationData<OwnOperation<K, 'update'>, UpdateInput<K['fields'], L, List>>, 'id'>>): Promise<Row<K['fields'], L, List>>
 }
 
 /** What `asas.global` holds: one built global per name, of the shape a kayan has. */
