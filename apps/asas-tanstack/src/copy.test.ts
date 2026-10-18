@@ -45,3 +45,9 @@ test('a retry conflict tells the caller to try again in both locales', async () 
   assert.equal(translator('en')('error.conflict.retry'), 'Another write interrupted this transaction. Try again.')
   assert.equal(translator('ar')('error.conflict.retry'), 'تعارضت هذه المعاملة مع عملية أخرى. حاول مرة أخرى.')
 })
+
+test('a target conflict explains the authorized record refusal in both locales', async () => {
+  const { translator } = await import('./copy.ts')
+  assert.equal(translator('en')('error.conflict.target'), 'The authorized record cannot change.')
+  assert.equal(translator('ar')('error.conflict.target'), 'لا يمكن تغيير السجل المصرح به.')
+})
