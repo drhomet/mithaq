@@ -277,10 +277,9 @@ const keepOnly = ({ project, chosen }) => {
   const copy = join(project, 'packages/asas/src/messages/mithaq.json')
   const shared = readJson(copy)
   for (const [name, { copy: keys }] of Object.entries(addOns)) if (!chosen.includes(name)) for (const key of keys) {
-    delete shared[key]
     const parts = key.split('.')
-    const parent = parts.slice(0, -1).reduce((branch, part) => branch?.[part], shared)
-    if (parent) delete parent[parts.at(-1)]
+    const last = parts.pop()
+    delete parts.reduce((branch, part) => branch?.[part], shared)?.[last]
   }
   writeJson(copy, shared)
   if (Object.entries(addOns).every(([name, { tables }]) => !tables || chosen.includes(name))) return
