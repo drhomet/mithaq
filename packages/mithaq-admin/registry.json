@@ -1654,7 +1654,7 @@
       "name": "mithaq-role-form",
       "type": "registry:component",
       "title": "Mithaq role form",
-      "description": "Role identity and grouped permission checkboxes with search and selected-only filtering.",
+      "description": "Role identity and grouped permission checkboxes with expandable field access.",
       "registryDependencies": [
         "badge",
         "card",

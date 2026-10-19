@@ -641,7 +641,6 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     },
     removeTitle: { en: 'Remove {name}?', ar: 'إزالة {name}؟' },
     inviteExpires: { en: 'Expires', ar: 'تنتهي في' },
-    membersEdit: { en: 'Edit roles', ar: 'تعديل الأدوار' },
     membersFixed: { en: 'Fixed roles', ar: 'الأدوار الثابتة' },
     membersCustom: { en: 'Custom roles', ar: 'الأدوار المخصصة' },
     membersNoRoles: { en: 'There is no role you may read to assign.', ar: 'لا يوجد دور يمكنك قراءته لإسناده.' },

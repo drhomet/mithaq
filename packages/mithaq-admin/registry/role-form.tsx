@@ -135,7 +135,6 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
   if (held.includes('*') && !onChange) return <Badge variant="outline">{t('dashboard.everyPermission', 'Every permission')}</Badge>
   return (
     <div data-permissions="" className="grid gap-4">
-
       {groups.map((group) => {
         const operations = choices(group.operations)
         const fields = choices(group.fields)

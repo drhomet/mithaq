@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDate, noValue } from 'mithaq-admin/format.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
+import { openRow } from 'mithaq-admin/list.tsx'
 import { ListMessage } from 'mithaq-admin/list-header.tsx'
 import { ListTable } from 'mithaq-admin/list-table.tsx'
 import { Search } from 'mithaq-admin/list-toolbar.tsx'
@@ -627,7 +628,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                       onSort={(value) => { setSort(value); setPage(1) }}
                       href={(id) => `${path}/members/${encodeURIComponent(id)}`}
                       openHint={openHint}
-                      openRow={(id) => [...(table.current?.querySelectorAll<HTMLAnchorElement>('a[data-row-link]') ?? [])].find((one) => one.dataset.rowLink === id)?.click()}
+                      openRow={(id) => openRow(table, id)}
                       table={table}
                       unreadable={false}
                       actions={(row) => {
