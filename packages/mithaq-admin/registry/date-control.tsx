@@ -37,7 +37,7 @@ export function DatePicker(props: ControlProps): ReactElement {
   }
   const label = labelFor({ kayan: props.kayan, field, copy: { t, locale } })
   const shown = held
-    ? !mounted ? (moment ? new Date(value as string).toISOString().slice(0, 10) : String(value))
+    ? !mounted ? <span aria-hidden="true" className="inline-block h-[1lh] w-40" />
       : new Intl.DateTimeFormat(locale || undefined, { dateStyle: 'long' }).format(held)
     : placeholder ?? t('admin.pickDate', 'Pick a date')
   return (

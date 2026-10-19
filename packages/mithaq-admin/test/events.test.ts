@@ -8309,14 +8309,40 @@ test('audit F22: Arabic date pickers hydrate across ICU punctuation differences'
   }
 })
 
-test('audit: read-only values omit editing hints while controls retain them', async () => {
+test('read-only values and controls retain inherited field descriptions', async () => {
   const { FieldValue } = await import('../registry/field-value.tsx')
   const { LeafControl } = await import('../registry/leaf-control.tsx')
-  const field = fieldOf({ name: 'title', kind: 'text', description: { en: 'Choose the customer.' } })
+  const field = fieldOf({ name: 'title', kind: 'text', description: { en: 'The course name shown to students.' } })
   const value = await render(createElement(FieldValue, { kayan: courses, field, row: { title: 'Buyer' }, copy: { t, locale: 'en' } }))
-  assert.equal(value.textContent?.includes('Choose the customer.'), false)
+  assert.equal(value.textContent?.includes('The course name shown to students.'), true)
   const control = await render(createElement(LeafControl, { kayan: courses, field, value: '', copy: { t, locale: 'en' },
     form: 'create', values: {}, setValue: () => {}, onChange: () => {}, readOnly: false,
   }))
-  assert.ok(control.textContent?.includes('Choose the customer.'))
+  assert.ok(control.textContent?.includes('The course name shown to students.'))
+})
+
+
+test('date pickers show no day before mount and hydrate to the local day across midnight', async () => {
+  const { DatePicker } = await import('../registry/date-control.tsx')
+  const { renderToString } = await import('react-dom/server')
+  const { hydrateRoot } = await import('react-dom/client')
+  const host = mount()
+  const problems: unknown[] = []
+  const draw = () => createElement(DatePicker, { kayan: courses, field: fieldOf({ name: 'at', kind: 'datetime' }),
+    id: 'at', value: '2026-10-19T22:00:00Z', locale: 'en', t, readOnly: false, values: {}, setValue: () => {}, onChange: () => {},
+  })
+  let root: ReturnType<typeof hydrateRoot> | undefined
+  try {
+    process.env.TZ = 'UTC'
+    host.innerHTML = renderToString(draw())
+    assert.equal(host.querySelector('#at-day')?.textContent, '')
+    assert.ok(host.querySelector('#at-day [aria-hidden="true"]'))
+    process.env.TZ = 'Asia/Riyadh'
+    await act(async () => { root = hydrateRoot(host, draw(), { onRecoverableError: (error) => problems.push(error) }) })
+    assert.deepEqual(problems, [])
+    assert.equal(host.querySelector('#at-day')?.textContent, 'October 20, 2026')
+  } finally {
+    process.env.TZ = homeZone
+    await act(async () => root?.unmount())
+  }
 })

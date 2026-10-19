@@ -8,8 +8,7 @@
 - Create forms display and send declared defaults. Publishing a new record leaves its status to the server.
 - `ControlProps` gains optional `id`, `describedBy` and `form` props. Custom controls should put them on their input as `id`, `aria-describedby` and `form`.
 - Time controls show Latin digits in every locale.
-- Date pickers hydrate consistently across server and browser locale formats.
-- Read-only fields omit inherited editing hints.
+- Date pickers wait until mount to show the local day and hydrate consistently across locale formats.
 - Refusal copy may use `{param}` placeholders for the server's message parameters.
 - Apps may delete the unused `admin.toolbarWarning` and `admin.operationWarning` copy keys.
 

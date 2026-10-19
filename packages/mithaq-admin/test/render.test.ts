@@ -1616,7 +1616,7 @@ test('68. the shell lists a permissions row only where the host gave it one, bes
   assert.ok(!shell().includes('>Permissions<'), 'nor its words')
 })
 
-test('69. the two temporal kinds draw deterministic server dates and no native box; a moment adds its time of day on the reader\'s clock', () => {
+test('69. the two temporal kinds reserve date space before mount and draw no native box; a moment adds its time of day on the reader\'s clock', () => {
   // The browser's own `dd/mm/yyyy, --:--` box reads in the browser's locale, not the page's.
   const drawn = (kind: string, value: unknown, locale = 'en') =>
     renderToStaticMarkup(
@@ -1634,11 +1634,11 @@ test('69. the two temporal kinds draw deterministic server dates and no native b
     )
   const moment = drawn('datetime', new Date('2026-01-02T03:04:00Z'))
   assert.equal(/type="(?:datetime-local|date)"/.test(moment), false, 'a datetime draws no native box')
-  assert.match(moment, /<button[^>]*id="at"[^>]*>[\s\S]*2026-01-02/, 'the day button starts with a deterministic UTC date before mounting')
+  assert.equal(moment.includes('2026-01-02'), false, 'the day button waits for the viewer before showing a date')
   assert.ok(moment.includes('data-time-field=""') && !moment.includes('type="time"'), 'and the time of day as its own boxes, never the native one, drawn on the reader\'s own clock once mounted')
   const day = drawn('date', '2026-09-21', 'ar')
   assert.equal(/type="date"/.test(day), false, 'a date draws no native box')
-  assert.ok(day.includes('2026-09-21'), `an Arabic page starts with the same ISO day: ${day}`)
+  assert.ok(!day.includes('2026-09-21'), 'an Arabic page also waits for the viewer before showing a day')
   assert.equal(day.includes('data-time-field'), false, 'with no time of day')
 })
 

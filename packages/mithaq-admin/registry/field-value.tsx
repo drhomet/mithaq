@@ -2,7 +2,7 @@ import { useId, type ReactElement } from 'react'
 import type { ClientField, ClientKayan, LeafClient } from 'mithaq/admin'
 import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
 import type { FindApi } from 'mithaq-admin/control-props.ts'
-import { labelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { descriptionFor, labelFor, type Copy } from 'mithaq-admin/copy.ts'
 import { useKayanField } from 'mithaq-admin/form-context.tsx'
 import { LeafControl } from 'mithaq-admin/leaf-control.tsx'
 import { refOf, type ScreenPage } from 'mithaq-admin/screen-refs.ts'
@@ -90,7 +90,7 @@ export function FieldValue({
   const { cells } = useComponents()
   // The screen's own component draws first, so the map is asked only for what it does not.
   const Cell = Ref && screen ? undefined : cellFor({ cells, field, column: leaf?.cell })
-  const description = leaf?.description?.[copy.locale]
+  const description = leaf?.description?.[copy.locale] ?? descriptionFor({ kayan, field, copy })
   const width = leaf?.width ?? field.width
   return (
     <div role="group" aria-labelledby={label} data-field-value={field.name} className="grid gap-1.5" style={width ? { width } : undefined}>
