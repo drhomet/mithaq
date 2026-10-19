@@ -567,6 +567,7 @@
             "ar": "الحالة"
           },
           "rules": {
+            "defaultValue": "draft",
             "index": true,
             "required": false
           },
@@ -586,7 +587,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "@asas/courses:./courses/ui/status-cell.tsx#StatusCell"
         },
         {
@@ -3733,7 +3734,8 @@
             "ar": "النوع العام"
           },
           "rules": {
-            "required": true
+            "required": true,
+            "defaultValue": "settings"
           },
           "component": "text",
           "cell": "text"

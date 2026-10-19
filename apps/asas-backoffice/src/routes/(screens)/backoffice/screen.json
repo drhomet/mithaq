@@ -1105,7 +1105,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "text"
         },
         {
@@ -1162,7 +1162,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "text"
         },
         {
@@ -1191,7 +1191,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "text"
         },
         {
@@ -1336,6 +1336,7 @@
             "ar": "الحالة"
           },
           "rules": {
+            "defaultValue": "draft",
             "index": true,
             "required": false
           },
@@ -1355,7 +1356,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "text"
         },
         {
@@ -1592,14 +1593,14 @@
                                   },
                                   {
                                     "field": "currency",
-                                    "component": "text",
+                                    "component": "select",
                                     "decided": "table"
                                   }
                                 ]
                               },
                               {
                                 "field": "audience",
-                                "component": "text",
+                                "component": "select",
                                 "decided": "table"
                               },
                               {
@@ -1618,7 +1619,7 @@
                             "fields": [
                               {
                                 "field": "delivery",
-                                "component": "text",
+                                "component": "select",
                                 "decided": "table"
                               },
                               {
@@ -1911,7 +1912,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "text"
         },
         {
@@ -1940,7 +1941,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "text"
         },
         {
@@ -2178,12 +2179,12 @@
                                 "row": [
                                   {
                                     "field": "venue",
-                                    "component": "text",
+                                    "component": "select",
                                     "decided": "table"
                                   },
                                   {
                                     "field": "format",
-                                    "component": "text",
+                                    "component": "select",
                                     "decided": "table"
                                   }
                                 ]
@@ -3510,6 +3511,7 @@
             "ar": "موثق"
           },
           "rules": {
+            "defaultValue": false,
             "required": false
           },
           "component": "checkbox",
@@ -3784,7 +3786,7 @@
               }
             }
           ],
-          "component": "text",
+          "component": "select",
           "cell": "text"
         },
         {
