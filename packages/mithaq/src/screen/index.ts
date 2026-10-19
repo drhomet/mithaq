@@ -564,11 +564,13 @@ export const screensOf = (
         throw new Error(`Kayan "${kayan.name}" writes targets.${key}, and ${screen.toLowerCase()} does not list it in kayan.`)
       }
     }
-    const fieldOf = (where: string, name: string, field: RuntimeField & Pick<ResolvedField, 'sortable'>): ClientField => {
+    const fieldOf = (where: string, name: string, field: RuntimeField & Pick<ResolvedField, 'sortable'>, create = true): ClientField => {
       const data = clientFieldOf(name, field)
+      if (!create) data.rules = Object.fromEntries(Object.entries(data.rules).filter(([rule]) => rule !== 'defaultValue'))
       const own = (field.targets?.[key] ?? {}) as ScreenField
       const component = own.component ? ref(`${where} targets.${key}.component`, 'control', own.component, field.kind)
         : field.options?.length && field.kind === 'text' && controls[field.kind]!.control === field.kind ? 'select'
+        : field.options?.length && field.kind === 'textArray' && controls[field.kind]!.control === field.kind ? 'checkboxGroup'
         : controls[field.kind]!.control
       needsOptions(where, component, field)
       return {
@@ -946,7 +948,7 @@ export const screensOf = (
           return {
             name: operation,
             effect: declared.effect,
-            ...(input && { fields: Object.entries(input).map(([field, one]) => fieldOf(`${where} operation "${operation}" field "${field}"`, field, one)) }),
+            ...(input && { fields: Object.entries(input).map(([field, one]) => fieldOf(`${where} operation "${operation}" field "${field}"`, field, one, declared.effect === 'create')) }),
             // A box left empty leaves each row's value as it is.
             ...(declared.steps.some((step) => sealOf(step) === 'updateMany') && { updatesMany: true }),
           }

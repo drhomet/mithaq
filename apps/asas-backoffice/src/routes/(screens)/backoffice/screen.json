@@ -1259,7 +1259,7 @@
               }
             }
           ],
-          "component": "textArray",
+          "component": "checkboxGroup",
           "cell": "textArray"
         },
         {
@@ -1605,7 +1605,7 @@
                               },
                               {
                                 "field": "topics",
-                                "component": "textArray",
+                                "component": "checkboxGroup",
                                 "decided": "table"
                               }
                             ]

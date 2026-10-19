@@ -406,7 +406,7 @@
               }
             }
           ],
-          "component": "textArray",
+          "component": "checkboxGroup",
           "cell": "textArray"
         },
         {

@@ -955,7 +955,7 @@ test("courses and sessions declare a real control for every field the screen's d
   const overridden = [...dashboard.kayan.courses!.fields, ...dashboard.kayan.sessions!.fields]
     .filter((field) => field.component !== dashboard.controls[field.kind as keyof typeof dashboard.controls]?.control)
     .map((field) => field.component)
-  assert.deepEqual([...overridden].sort(), ['switch', 'radio', 'toggleGroup', 'select', 'nativeSelect', 'slider', 'otp', 'combobox'].sort())
+  assert.deepEqual([...overridden].sort(), ['switch', 'radio', 'toggleGroup', 'select', 'select', 'checkboxGroup', 'nativeSelect', 'slider', 'otp', 'combobox'].sort())
 })
 
 test('a tab holding an accordion and a separator, and a section with a width, collapsed and a when, each reach the projection as written', () => {
@@ -1029,11 +1029,18 @@ test("a field carries its label and the rules that are data, in the kayan's own 
   assert.deepEqual(courses.fields.map((field) => field.name), Object.keys(asas.kayan.courses.fields))
 })
 
-test('the screen projection leaves off every defaultValue and never names the actor', () => {
+test('the screen projection carries literal create defaults and never names the actor or application defaults', () => {
+  const declared = { ...asas.kayan, ...asas.global } as Record<string, { fields: Record<string, { rules?: Readonly<Record<string, unknown>> }> }>
   for (const screen of ['dashboard', 'portal'] as const) {
     const client = asas.targets[screen].client
     for (const kayan of Object.values(client.kayan)) {
-      for (const field of kayan.fields) assert.equal('defaultValue' in field.rules, false, `field "${kayan.name}.${field.name}" carries a defaultValue`)
+      for (const field of kayan.fields) {
+        const rules = declared[kayan.name]!.fields[field.name]!.rules
+        const value = rules?.defaultValue
+        const provider = (rules?.providedBy as { create?: string } | undefined)?.create ?? 'client'
+        const expected = typeof value === 'function' || (value && typeof value === 'object' && '$user' in value) || provider !== 'client' ? undefined : value
+        assert.deepEqual(field.rules.defaultValue, expected, `${kayan.name}.${field.name}`)
+      }
     }
     // A `Ref` default is `{ $user: <key> }`, so a field defaulting to a key
     // of the actor must never cross either. A `when` keyed on `$user.` names a
@@ -1042,6 +1049,48 @@ test('the screen projection leaves off every defaultValue and never names the ac
   }
   const tenant = asas.targets.dashboard.client.kayan.courses!.fields.find((field) => field.name === 'organization')!
   assert.equal('defaultValue' in tenant.rules, false)
+  assert.equal(asas.targets.dashboard.client.kayan.settings!.fields.find((field) => field.name === 'globalType')!.rules.defaultValue, 'settings')
+})
+
+test('literal defaults cross for create fields alone, excluding actor, function and application values', () => {
+  const language = screens()
+  const fields = {
+    active: { kind: 'checkbox', rules: { defaultValue: true } },
+    actor: { kind: 'text', rules: { defaultValue: { $user: 'id' } } },
+    computed: { kind: 'text', rules: { defaultValue: () => 'private' } },
+    secret: { kind: 'text', rules: { defaultValue: 'private', providedBy: { create: 'application' } } },
+  }
+  const client = language.buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [language.defineKayan({
+      name: 'courses', fields: { ...defaultFields, active: fields.active, actor: fields.actor, secret: fields.secret },
+      targets: { service: { operations: Object.fromEntries(['create', 'update', 'delete', 'find'].map((name) => [name, {
+        ...defaultOperations[name as keyof typeof defaultOperations], targets: { dashboard: { fields } },
+        input: () => z.object({ id: z.string().optional(), active: z.boolean().optional(), actor: z.string().optional(), computed: z.string().optional(), secret: z.string().optional() }),
+      }])) } },
+    } as never)],
+  }).targets.dashboard.client.kayan.courses!
+  const defaults = (fields: typeof client.fields) => fields.map((field) => field.rules.defaultValue)
+  assert.deepEqual(defaults(client.fields.filter((field) => ['active', 'actor', 'secret'].includes(field.name))), [true, undefined, undefined])
+  for (const operation of client.operations) {
+    assert.deepEqual(defaults(operation.fields!), operation.effect === 'create' ? [true, undefined, undefined, undefined] : [undefined, undefined, undefined, undefined], operation.name)
+  }
+})
+
+test('textArray options use checkboxGroup in base and operation fields', () => {
+  const language = screens()
+  const choices = { kind: 'textArray', options: [{ value: 'a', label: { en: 'A', ar: 'أ' } }] }
+  const client = language.buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [language.defineKayan({
+      name: 'courses', fields: { ...defaultFields, choices },
+      targets: { service: { operations: { ...defaultOperations, update: {
+        ...defaultOperations.update, targets: { dashboard: { fields: { choices } } },
+      } } } },
+    } as never)],
+  }).targets.dashboard.client.kayan.courses!
+  assert.equal(client.fields.find((field) => field.name === 'choices')!.component, 'checkboxGroup')
+  assert.equal(client.operations.find((operation) => operation.name === 'update')!.fields![0]!.component, 'checkboxGroup')
 })
 
 test('every dashboard create and edit page, and Settings, draws the record layout under its kayan\'s sentence with its fields in sections, and no create page draws what only an existing row has', () => {
@@ -1203,8 +1252,7 @@ test("a field's label, description or placeholder written as a function is left 
   assert.equal('placeholder' in title, false)
   assert.equal('width' in title, false)
   assert.equal(title.component, 'text')
-  // A `defaultValue` written as a function is left off by name, as a kayan's own
-  // field is: one function builds both, so neither can publish what the other does not.
+  // A non-create operation must leave untouched fields alone rather than sending create defaults.
   const touch = client.kayan.hatches!.operations.find((operation) => operation.name === 'touch')!
   assert.deepEqual(touch.fields, [{ name: 'note', kind: 'text', rules: {}, component: 'text', cell: 'text' }])
   assert.deepEqual(structuredClone(client), client)
