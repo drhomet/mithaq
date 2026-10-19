@@ -1,7 +1,7 @@
 import { defaultFields, defaultOperations, folderOf, uploadFields, withUploadReference, type Where } from 'mithaq'
 import { defineKayan, organization } from '@asas/mithaq'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
-import { appPage, danger } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, danger, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { storageConfig } from '@asas/mithaq/storage/index.ts'
 
 const ui = folderOf(new URL('./ui/', import.meta.url))
@@ -71,6 +71,7 @@ export const media = ({ reads }: { reads: readonly ImageRead[] }) => defineKayan
     // page draws them read-only, with the image, its size, Download and
     // Replace file beside the form, and above it on a phone.
     dashboard: {
+      nav: { group: navGroups.library },
       useAsTitle: 'filename',
       description: { en: 'The images this organization uses, each with the words a screen reader says for it.', ar: 'الصور التي تستخدمها هذه المؤسسة، ولكل منها الكلمات التي يقرؤها قارئ الشاشة.' },
       pages: {
@@ -89,8 +90,8 @@ export const media = ({ reads }: { reads: readonly ImageRead[] }) => defineKayan
               { section: 'file', label: { en: 'File', ar: 'الملف' }, fields: ['filename', 'mimeType', { row: ['width', 'height'] }] },
             ] }],
             side: [{ component: ui('preview.tsx#MediaPreview') }],
-            danger: danger(),
-          }]),
+
+          }], { more: danger() }),
         },
       },
     },

@@ -32,6 +32,7 @@ const { UploadDialog, typeName, typeNames } = await import('../registry/upload.t
 const { List } = await import('../registry/list.tsx')
 const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
 const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
+const { MoreActions } = await import('../../../templates/mithaq/src/ui/page-actions.tsx')
 const { scopes } = await import('../../../apps/asas-tanstack/src/copy.ts')
 
 const screen = asas.targets.dashboard.client
@@ -55,7 +56,7 @@ const stateOf = (locale: 'en' | 'ar', kayan = courses): ScreenState => ({
   record: null,
 })
 const render = (element: ReactElement, locale: 'en' | 'ar' = 'en', kayan = courses) => staticMarkup(createElement(ScreenContext, { value: stateOf(locale, kayan) }, element))
-const refs = { [screen.layouts.app!]: AppShell, [screen.layouts.record!]: RecordPage }
+const refs = { [screen.layouts.app!]: AppShell, [screen.layouts.more!]: MoreActions, [screen.layouts.record!]: RecordPage }
 const client = { create: async () => ({}), update: async () => ({}), delete: async () => ({}) }
 
 const textOf = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
@@ -247,9 +248,10 @@ test('217p. the edit page\'s own buttons name the record they run on, and an ope
     ...copyOf('en'),
     onDone: () => {},
   }))
-  const button = [...host.querySelectorAll('button')].find((one) => one.textContent === 'Archive')
+  await act(async () => click(host.querySelector('[aria-label="More actions"]')!))
+  const button = [...window.document.querySelectorAll('button')].find((one) => one.textContent === 'Archive')
   assert.ok(button, 'the archive button is drawn')
-  await act(async () => click(button!))
+  await act(async () => click(button! as unknown as Element))
   const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')
   assert.ok(dialog?.textContent?.includes('This archives \u2068Tajweed\u2069.'), dialog?.textContent ?? '')
   assert.equal(/\brow\b/.test(dialog?.textContent ?? ''), false, 'never "row"')

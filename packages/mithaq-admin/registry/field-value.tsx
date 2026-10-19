@@ -93,14 +93,14 @@ export function FieldValue({
   const description = leaf?.description?.[copy.locale] ?? descriptionFor({ kayan, field, copy })
   const width = leaf?.width ?? field.width
   return (
-    <div role="group" aria-labelledby={label} data-field-value={field.name} className="grid gap-1.5" style={width ? { width } : undefined}>
-      <span id={label} className="text-sm font-medium">{labelFor({ kayan, field, copy })}</span>
-      <span className="text-sm">
+    <dl aria-labelledby={label} data-field-value={field.name} className="grid gap-1.5" style={width ? { width } : undefined}>
+      <dt id={label} className="text-sm font-medium">{labelFor({ kayan, field, copy })}</dt>
+      <dd className="text-sm">
         {!Cell
           ? Ref && <Ref field={field} value={value} row={row ?? {}} />
           : <Cell kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} whole />}
-      </span>
-      {description ? <span className="text-muted-foreground text-sm">{description}</span> : null}
-    </div>
+      </dd>
+      {description ? <dd className="text-muted-foreground text-sm">{description}</dd> : null}
+    </dl>
   )
 }

@@ -1,3 +1,4 @@
+import { navGroups } from './mithaq/pages.ts'
 import {
   // add-on: audit-log
   audit,
@@ -331,6 +332,7 @@ const shared = {
   controls: screenKinds,
   layouts: {
     app: ui('app-shell.tsx#AppShell'),
+    more: ui('page-actions.tsx#MoreActions'),
     record: ui('record-page.tsx#RecordPage'),
     table: ui('table-page.tsx#TablePage'),
   },
@@ -449,7 +451,7 @@ export const dashboardScreen = screenTarget({
       path: '/members',
       component: dashboardUi('members.tsx#Members'),
       // With no organization shown, its members are the app's users.
-      nav: { label: showOrganization ? { en: 'Members', ar: 'الأعضاء' } : { en: 'Users', ar: 'المستخدمون' } },
+      nav: { group: navGroups.settings, order: 1, label: showOrganization ? { en: 'Members', ar: 'الأعضاء' } : { en: 'Users', ar: 'المستخدمون' } },
       permission: 'member.find',
     },
     // end add-on: roles
@@ -459,7 +461,7 @@ export const dashboardScreen = screenTarget({
     activity: {
       path: '/activity',
       component: ui('activity-page.tsx#ActivityPage'),
-      nav: { label: { en: 'Activity', ar: 'النشاط' } },
+      nav: { group: navGroups.settings, order: 4, label: { en: 'Activity', ar: 'النشاط' } },
       permission: 'auditLog.find',
     },
     // end add-on: audit-log
@@ -494,7 +496,7 @@ export const backofficeScreen = screenTarget({
   ...shared,
   // The dashboard's frame with no organization switcher, which staff have no
   // use for, and a record page with a link back to its list.
-  layouts: { ...shared.layouts, app: ui('app-shell.tsx#BackofficeShell'), record: backofficeUi('record-page.tsx#BackofficeRecordPage') },
+  layouts: { app: ui('app-shell.tsx#BackofficeShell'), record: backofficeUi('record-page.tsx#BackofficeRecordPage'), table: shared.layouts.table },
   path: '/backoffice',
   kayan: [
     'user',

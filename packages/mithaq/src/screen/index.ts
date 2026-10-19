@@ -44,12 +44,24 @@ export const folderOf = (folder: URL) => {
 /** A component named where a screen draws one: a name the screen registered, a bare built-in the registry ships, or a `ui()` reference. */
 export type ScreenRef<Registered extends string = string> = Registered | Ui
 
+/** Sidebar placement only; routes and access are independent of navigation. */
+export type ScreenNav<Locale extends string = string> = {
+  readonly hidden?: boolean
+  readonly order?: number
+  readonly group?: {
+    readonly name: string
+    readonly label: Localized<Locale>
+    readonly order?: number
+    readonly position?: 'bottom'
+  }
+}
+
 /** A page of the screen's own, which belongs to no kayan: one component drawing the whole page. */
 export type ScreenOwnPage<Locale extends string = string, Ref extends string | Ui = string | Ui> = {
   readonly path: string
   readonly component: Ref
   /** A nav entry for this page, under this label. */
-  readonly nav?: { readonly label: Localized<Locale> }
+  readonly nav?: ScreenNav<Locale> & { readonly label: Localized<Locale> }
   /** The catalog key an actor needs for the nav to list this page. */
   readonly permission?: string
 }
@@ -226,6 +238,7 @@ export type ScreenPage<Locale extends string = string, Ref extends string | Ui =
 
 /** What `targets.<screen>` on a kayan says, complete for that screen. */
 export type ScreenKayan<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string> = {
+  readonly nav?: ScreenNav<Locale>
   readonly useAsTitle?: FieldName
   readonly description?: Localized<Locale>
   /** The rows this screen lists of the kayan, ANDed with whatever a list asks. A list filter, not access: a row it leaves out is still read by its id. */
@@ -346,10 +359,10 @@ export type PageClient =
   | { path: string; component: string }
 
 /** A page of the screen's own, drawn whole by one component. */
-export type ScreenPageClient = { path: string; component: string; nav?: { label: Localized }; permission?: string }
+export type ScreenPageClient = { path: string; component: string; nav?: ScreenNav & { label: Localized }; permission?: string }
 
 /** One entry of the screen's nav: a kayan's page or a page of the screen's own, and the catalog key an actor needs to see it. */
-export type NavEntry = { path: string; page: string; kayan?: string; label?: Localized; permission?: string }
+export type NavEntry = ScreenNav & { path: string; page: string; kayan?: string; label?: Localized; permission?: string }
 
 export type ClientKayan<Pages extends string = string> = {
   name: string
@@ -602,17 +615,32 @@ export const screensOf = (
       paths.set(shape, owner)
       return path
     }
+    const navOf = (at: string, nav: ScreenNav): ScreenNav => {
+      named(at, nav, ['label', 'hidden', 'order', 'group'], 'nav')
+      if (nav.hidden !== undefined && typeof nav.hidden !== 'boolean') throw new Error(`${at} hidden is no boolean.`)
+      if (nav.order !== undefined && !Number.isFinite(nav.order)) throw new Error(`${at} order is no finite number.`)
+      if (nav.group) {
+        named(`${at} group`, nav.group, ['name', 'label', 'order', 'position'], 'nav group')
+        if (typeof nav.group.name !== 'string' || !nav.group.name) throw new Error(`${at} group needs a name.`)
+        if (nav.group.order !== undefined && !Number.isFinite(nav.group.order)) throw new Error(`${at} group order is no finite number.`)
+        if (nav.group.position !== undefined && nav.group.position !== 'bottom') throw new Error(`${at} group position must be bottom.`)
+      }
+      return {
+        ...(nav.hidden !== undefined && { hidden: nav.hidden }),
+        ...(nav.order !== undefined && { order: nav.order }),
+        ...(nav.group && { group: { ...nav.group, label: copy(`${at} group label`, nav.group.label) } }),
+      }
+    }
     const pages: Record<string, ScreenPageClient> = {}
     for (const [name, declared] of Object.entries(target.pages ?? {})) {
       const at = `${screen} page "${name}"`
       named(at, declared, ['path', 'component', 'nav', 'permission'], 'screen page')
       const path = route(at, declared.path, `of page "${name}"`)
-      if (declared.nav !== undefined) named(`${at} nav`, declared.nav, ['label'], 'nav')
       if (declared.permission !== undefined && typeof declared.permission !== 'string') throw new Error(`${at} permission is no catalog key.`)
       pages[name] = {
         path,
         component: ref(`${at} component`, 'component', declared.component),
-        ...(declared.nav !== undefined && { nav: { label: copy(`${at} nav label`, declared.nav.label) } }),
+        ...(declared.nav !== undefined && { nav: { ...navOf(`${at} nav`, declared.nav), label: copy(`${at} nav label`, declared.nav.label) } }),
         ...(declared.permission !== undefined && { permission: declared.permission }),
       }
     }
@@ -961,10 +989,10 @@ export const screensOf = (
         pages: kayanPages,
       }
       const listed = kayanPages.list ? (['list', kayanPages.list] as const) : kayan.single === true ? Object.entries(kayanPages)[0] : undefined
-      if (listed) client.nav.push({ path: listed[1].path, page: listed[0], kayan: name, permission: `${name}.${kayan.single === true ? 'findOne' : 'find'}` })
+      if (listed) client.nav.push({ ...(block.nav && navOf(`${where} nav`, block.nav)), path: listed[1].path, page: listed[0], kayan: name, permission: `${name}.${kayan.single === true ? 'findOne' : 'find'}` })
     }
     for (const [name, one] of Object.entries(pages)) {
-      if (one.nav) client.nav.push({ path: one.path, page: name, label: one.nav.label, ...(one.permission !== undefined && { permission: one.permission }) })
+      if (one.nav) client.nav.push({ path: one.path, page: name, ...one.nav, ...(one.permission !== undefined && { permission: one.permission }) })
     }
     // Data a browser receives, so only what survives the clone.
     screens[key] = structuredClone(client)

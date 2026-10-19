@@ -66,6 +66,7 @@ type PageClient = import('mithaq/admin').PageClient
 type ComponentProps = import('mithaq/admin').ComponentProps
 const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
 const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
+const { MoreActions } = await import('../../../templates/mithaq/src/ui/page-actions.tsx')
 const { Dashboard, loader: dashboardLoader } = await import('../../../templates/asas/src/ui-dashboard/dashboard.tsx')
 const { DeleteRole } = await import('../../../templates/features/roles/roles/ui/roles.tsx')
 const { loader: membersLoader } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
@@ -102,7 +103,7 @@ const state: ScreenState = {
   record: null,
 }
 const screenOf = (page: PageClient, kayan: ClientKayan = courses, refs: Record<string, unknown> = {}) => ({
-  refs: { [screen.layouts.app!]: AppShell, [screen.layouts.record!]: RecordPage, ...refs } as never,
+  refs: { [screen.layouts.app!]: AppShell, [screen.layouts.more!]: MoreActions, [screen.layouts.record!]: RecordPage, ...refs } as never,
   kayan,
   page: page as Extract<PageClient, { page: unknown }>,
 })
@@ -2771,10 +2772,11 @@ test('67. the button behind a confirm runs the operation by name with the row\'s
       t,
       locale: 'en',
       onDone: (row: unknown, effect?: string) => landed.push({ row, effect }),
-      operations: { archive: true },
+      operations: { archive: true, update: true },
     }),
   )
-  const button = (text: string) => [...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
+  await act(async () => click(host.querySelector('[aria-label="More actions"]')!))
+  const button = (text: string) => [...window.document.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
   assert.ok(button('Archive'), 'the operation this kayan declared a button for is drawn')
 
   // The confirm is the only control bound to the call, which is the delete's two-click rule.
@@ -3026,7 +3028,8 @@ test('73. the button\'s dialog draws the input the operation declared, sends wha
       operations: { archive: true },
     }),
   )
-  const button = (text: string) => [...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
+  await act(async () => click(host.querySelector('[aria-label="More actions"]')!))
+  const button = (text: string) => [...window.document.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
   await act(async () => {
     click(button('Archive') as unknown as Element)
   })
@@ -3106,7 +3109,8 @@ test('73a. the dialog draws its refusal in the viewer\'s own language, because t
     }),
   )
   // The button reads in the locale asked for, the label the declaration wrote, not anything this translator answers.
-  const named = (text: string) => [...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
+  await act(async () => click(host.querySelector('[aria-label="More actions"]')!))
+  const named = (text: string) => [...window.document.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
   await act(async () => {
     click(named('أرشفة') as unknown as Element)
   })
@@ -3288,11 +3292,13 @@ test('75. a component the host has no component for says so rather than drawing 
 })
 
 test('78. a page\'s button is drawn where its node sits, and the form draws its panels again once the operation returns', async () => {
-  // The courses edit page puts `archive` in the record layout's danger region, so its button is in the fenced card, not beside Save.
+  // A project's explicit danger region remains available beside the new header actions.
+  const header = (courses.pages.edit as Extract<PageClient, { page: unknown }>).page.header as { layout?: string; main?: unknown[] }[]
+  const danger = header.find((node) => node.layout === screen.layouts.more)!.main!
   const host = await render(
     createElement(Form, {
       kayan: courses,
-      screen: screenOf(panelled),
+      screen: screenOf(plus(recordPage([{ form: ['title'] }]), 'danger', ...danger)),
       client: {
         create: async () => ({}),
         update: async () => ({}),
@@ -3317,7 +3323,7 @@ test('78. a page\'s button is drawn where its node sits, and the form draws its 
     ...courses,
     operations: [...courses.operations, { name: 'publish', effect: 'update' }, { name: 'recount', effect: 'update' }],
   }
-  const danger = ((courses.pages.edit as unknown as { page: { main: { tabs: { fields: Record<string, unknown[]>[] }[] }[] } }).page.main)[0]!.tabs[0]!.fields[0]!.danger!
+
   const page = plus(
     recordPage([{ form: ['title', { button: 'recount', label: { en: 'Recount', ar: 'إعادة العد' } }] }, { button: 'publish', label: { en: 'Publish', ar: 'نشر' } }]),
     'danger',
@@ -3372,10 +3378,11 @@ test('78. a page\'s button is drawn where its node sits, and the form draws its 
       operations: { archive: true },
     }),
   )
+  await act(async () => click(reloading.querySelector('[aria-label="More actions"]')!))
   const before = drawnPanels
   const dialog = () => window.document.querySelector('[data-slot="alert-dialog-content"]')!
   await act(async () => {
-    click([...reloading.querySelectorAll('button')].find((one) => one.textContent?.trim() === 'Archive')! as unknown as Element)
+    click([...window.document.querySelectorAll('button')].find((one) => one.textContent?.trim() === 'Archive')! as unknown as Element)
   })
   await act(async () => {
     typeInto(dialog().querySelector('#courses-archive-reason') as unknown as Element, 'done with it')
@@ -3673,7 +3680,7 @@ test('the app shell lists the dashboard and every nav entry in the sidebar, name
     const host = await render(createElement(AppShell, { regions: { header: createElement('h1', null, 'Courses'), main: createElement('p', null, 'rows') } }), { kayan: undefined, user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'o1', name: 'Acme School' }], activeOrganizationId: 'o1' } })
     await act(async () => sleep(0))
     const hrefs = [...host.querySelectorAll('[data-slot="sidebar"] nav[aria-label="Navigation"] [data-slot="sidebar-content"] a')].map((one) => one.getAttribute('href'))
-    assert.deepEqual(hrefs, ['/dashboard', '/dashboard/members', '/dashboard/activity', ...screen.nav.filter((one) => one.kayan).map((one) => `/dashboard${one.path}`)], 'the dashboard, the screen\'s own pages, then every kayan, as tanstack-business orders its shell and entity items')
+    assert.deepEqual(hrefs, ['/dashboard', ...screen.nav.map((one) => `/dashboard${one.path}`)], 'the home entry, then the permission-pruned and ordered screen navigation')
     assert.equal(host.querySelector('[data-slot="sidebar"][data-side]')?.getAttribute('data-side'), 'left', 'on the left in a left-to-right document')
     assert.match(host.querySelector('[data-slot="sidebar-header"]')!.textContent!, /Acme School/, 'the switcher names the organization the session holds active')
     assert.match(host.querySelector('[data-region="header"]')!.textContent!, /Courses/, 'the page title sits in the site header')
@@ -4213,7 +4220,7 @@ test('150c. the form\'s footer holds Cancel and Save alone, and a page\'s delete
       locale: 'en',
       onDone: (_row: unknown, effect?: string) => landed.push(effect),
       onCancel: () => {},
-      operations: { delete: true },
+      operations: { delete: true, update: true },
     }),
   )
   const form = host.querySelector('form')!
@@ -5806,7 +5813,7 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
 })
 
 test('176c. the record layout puts main, then side, then the danger zone in the document, and places the danger zone back under the form from lg up', async () => {
-  const host = await render(createElement(Form, { kayan: courses, screen: screenOf(courses.pages.edit!), client: { ...draftClient([]), run: async () => ({}) }, value: draftRow, t, locale: 'en', onDone: () => {}, operations: { archive: true, delete: true } }), { record: draftRow })
+  const host = await render(createElement(RecordPage, { regions: { main: 'Main', side: 'Side', danger: createElement('button', {}, 'Delete') }, page: { path: '/courses/:id' } } as never), { record: draftRow })
   const layout = host.querySelector('[data-layout="record"]')!
   assert.deepEqual([...layout.children].map((one) => one.getAttribute('data-region')), ['main', 'side', 'danger'], 'stacked on a phone in the order a person reads them')
   assert.deepEqual(['lg:col-start-2', 'lg:row-span-2'].map((one) => classesOf(layout.querySelector(':scope > [data-region="side"]')).includes(one)), [true, true], 'beside the form and the danger zone from lg up')
@@ -5915,7 +5922,8 @@ test('177a. a list page\'s header names the kayan by its plural and an edit page
     const host = await render(createElement('div', null, drawPage(drawn, { kayan: courses, copy: keyed, issues: {}, scope: {}, component: () => null, layout: () => null, control: () => null })))
     return [...host.querySelectorAll('[data-node="title"]')].map((one) => one.textContent)
   }
-  assert.deepEqual(await titles(courses.pages.list!), ['courses.plural'], 'the list page')
+  const list = courses.pages.list as Extract<PageClient, { page: unknown }>
+  assert.deepEqual(await titles({ ...list, page: { ...list.page, header: [{ title: {} }] } }), ['courses.plural'], 'an explicit list title node')
   assert.deepEqual(await titles(courses.pages.edit!), ['courses.singular'], 'the edit page, which lists the course\'s sessions and is still one course')
 })
 
@@ -6319,7 +6327,7 @@ test('182c. the nav marks the page\'s own kayan current, Home only on a page of 
   assert.deepEqual(['w-12', 'sm:w-56'].map((one) => classesOf(menu).includes(one)), [true, true], 'the user menu is its avatar alone on a phone and the whole card from sm up')
 })
 
-test('182d. a list on a screen\'s page draws no heading of its own, since the page\'s title node is its one h1, and a list off a screen keeps it', async () => {
+test('182d. a list with no external title keeps its heading beside the primary action on and off a screen', async () => {
   const props = {
     kayan: courses,
     page: { docs: [draftRow], hasNextPage: false, hasPrevPage: false, limit: 10, nextPage: null, page: 1, prevPage: null, totalDocs: 1, totalPages: 1 },
@@ -6330,7 +6338,7 @@ test('182d. a list on a screen\'s page draws no heading of its own, since the pa
     href: (id: string) => `/courses/${id}`,
     newHref: '/courses/new',
   }
-  assert.equal((await render(createElement(List, { ...props, screen: screenOf(courses.pages.list!) }))).querySelectorAll('h1').length, 0, 'on a screen the page\'s title is the heading')
+  assert.equal((await render(createElement(List, { ...props, screen: screenOf(courses.pages.list!) }))).querySelectorAll('h1').length, 1, 'on a screen its own header holds the title')
   assert.equal((await render(createElement(List, props))).querySelectorAll('h1').length, 1, 'off one the list heads itself')
 })
 
@@ -6823,7 +6831,8 @@ test('192b. the rich text toolbar sticks under the page header on a solid tint, 
   }))
   await act(async () => sleep(20))
   const card = form.querySelector('[data-rich-text]')?.closest('[data-slot="card"]')
-  assert.equal(card?.classList.contains('overflow-visible') && !card.classList.contains('overflow-hidden'), true, 'and the card that holds the editor does not clip it, or the toolbar would stick to the card')
+  assert.ok(card?.className.includes('overflow-visible'), 'the host card does not clip the sticky editor toolbar')
+  assert.equal(form.querySelector('[data-rich-text]')?.closest('.overflow-hidden'), null, 'no ancestor clips the sticky toolbar')
 })
 
 test('214a. a relationship field whose held rows the server refuses names each one as a row the viewer cannot see, never by its raw id', async () => {
@@ -6846,7 +6855,7 @@ test('214a. a relationship field whose held rows the server refuses names each o
   assert.equal(await noted(undefined), true, 'and a target the screen does not cross reads the same')
 })
 
-test('214b. a danger zone none of whose operations the viewer may run is not drawn, and one holding a single allowed operation is', async () => {
+test('214b. More is absent when no secondary operation is allowed, and exposes only permitted actions', async () => {
   const zone = async (operations: Record<string, boolean>) => {
     const host = await render(createElement(Form, {
       kayan: courses,
@@ -6858,10 +6867,13 @@ test('214b. a danger zone none of whose operations the viewer may run is not dra
       onDone: () => {},
       operations,
     }))
-    return host.querySelector('[data-region="danger"]')?.textContent ?? null
+    const trigger = host.querySelector('[aria-label="More actions"]')
+    if (!trigger) return null
+    await act(async () => click(trigger))
+    return window.document.querySelector('[data-slot="popover-content"]')?.textContent ?? null
   }
   assert.equal(await zone({}), null, 'no danger zone for a viewer who may neither archive nor delete')
-  assert.match((await zone({ delete: true })) ?? '', /^Danger zone/, 'and the zone for one who may delete')
+  assert.match((await zone({ delete: true })) ?? '', /Delete/, 'More exposes Delete for one who may delete')
 })
 
 test('214c. a relationship cell never draws its id: loading in the server render, settled with no screen around it, and a dash for a read that failed, beside the picker\'s same dash', async () => {
@@ -7804,12 +7816,13 @@ test('240a. a save, a create, a publish, a draft save, a delete and a kayan\'s o
     onDone: () => {},
     operations,
   })), { record: draftRow })
-  await act(async () => click(buttonNamed(host, 'Archive')!))
+  await act(async () => click(host.querySelector('[aria-label="More actions"]')!))
+  await act(async () => click([...window.document.querySelectorAll('button')].find((button) => button.textContent === 'Archive')! as unknown as Element))
   await act(async () => typeInto(window.document.querySelector('[data-slot="alert-dialog-content"] form :is(textarea, input)') as unknown as Element, 'Retired'))
   await act(async () => fire(window.document.querySelector('[data-slot="alert-dialog-content"] form') as unknown as Element, 'submit'))
   assert.deepEqual(ran, ['archive'])
   assert.deepEqual(await toasted(), ['success: Course archived'], 'a kayan\'s own operation, in its own words')
-  await act(async () => click(host.querySelector('[data-button="delete"]')!))
+  await act(async () => click(window.document.querySelector('[data-button="delete"]') as unknown as Element))
   await act(async () => click(dialogButton('Delete this course')!))
   assert.deepEqual(await toasted(), ['success: Course deleted'], 'a delete')
 })
@@ -8302,7 +8315,7 @@ test('audit F02: a refreshed row replaces touched form values even when its upda
   }
   const host = await render(createElement(Parent))
   await act(async () => typeInto(host.querySelector('input[name="title"]')!, 'Typed'))
-  await act(async () => click([...host.querySelectorAll('button')].find((button) => button.textContent === 'Archive')!))
+  await act(async () => click([...host.querySelectorAll('button')].find((button) => button.textContent === 'Archive')! as unknown as Element))
   const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')!
   await act(async () => fire(dialog.querySelector('form') as unknown as Element, 'submit'))
   assert.equal((host.querySelector('input[name="title"]') as HTMLInputElement).value, 'After')
@@ -8416,4 +8429,67 @@ test('date pickers show no day before mount and hydrate to the local day across 
     process.env.TZ = homeZone
     await act(async () => root?.unmount())
   }
+})
+
+test('record tabs restore a URL selection, keep values mounted and follow hash navigation', async () => {
+  window.history.replaceState(null, '', '/dashboard/courses/c1?search=kept#tab.details=activity')
+  const host = mount()
+  const root = createRoot(host)
+  const { TabsNode } = await import('../registry/node-groups.tsx')
+  const node = { tabs: [
+    { tab: 'details', label: { en: 'Details' }, fields: [{ field: 'title' }] },
+    { tab: 'activity', label: { en: 'Activity' }, fields: [{ field: 'fee' }] },
+  ] }
+  const draw = { kayan: courses, copy: { t, locale: 'en' }, issues: {}, scope: {}, control: (leaf: { field: string }) => createElement('input', { name: leaf.field, defaultValue: 'Kept' }) }
+  try {
+    await act(async () => root.render(withComponents(createElement(TabsNode, { node, draw, index: 0, inRow: false } as never))))
+    const tabs = () => [...host.querySelectorAll<HTMLElement>('[role=tab]')]
+    assert.equal(tabs().find((tab) => tab.getAttribute('aria-selected') === 'true')?.textContent, 'Activity')
+    assert.equal(host.querySelectorAll('input').length, 2, 'inactive fields remain mounted')
+    await act(async () => click(tabs()[0]!))
+    assert.equal(new URLSearchParams(window.location.hash.slice(1)).get('tab.details'), 'details')
+    assert.equal(window.location.search, '?search=kept')
+    await act(async () => {
+      window.history.replaceState(null, '', '#tab.details=activity')
+      window.dispatchEvent(new window.HashChangeEvent('hashchange'))
+    })
+    assert.equal(tabs().find((tab) => tab.getAttribute('aria-selected') === 'true')?.textContent, 'Activity')
+    await act(async () => {
+      window.history.replaceState(null, '', '#tab.details=forbidden')
+      window.dispatchEvent(new window.HashChangeEvent('hashchange'))
+    })
+    assert.equal(tabs().find((tab) => tab.getAttribute('aria-selected') === 'true')?.textContent, 'Details', 'an unknown or pruned tab falls back to the first visible one')
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    window.history.replaceState(null, '', '/')
+  }
+})
+
+test('backoffice header actions omit More when no action is permitted', async () => {
+  const { UserHeaderActions } = await import('../../../templates/asas/src/ui-backoffice/user-actions.tsx')
+  const own = { id: 'staff', email: state.user.email, role: 'super_admin' }
+  const denied = await render(createElement(UserHeaderActions), { record: own, access: { permissions: '*' } })
+  assert.equal(denied.querySelector('[aria-label="More actions"]'), null, 'the viewer has no actions on their own record')
+  const allowed = await render(createElement(UserHeaderActions), { record: { ...own, id: 'other', email: 'other@example.test', role: 'user' }, access: { permissions: '*' } })
+  const more = allowed.querySelector('[aria-label="More actions"]')!
+  assert.ok(more)
+  await act(async () => click(more))
+  assert.deepEqual([...window.document.querySelectorAll('[data-person-actions] [data-action]')].map((button) => button.getAttribute('data-action')), ['set-role', 'ban', 'impersonate'])
+})
+
+test('a custom role record denied update reads values and permissions without disabled editor controls', async () => {
+  const { RoleForm } = await import('../../../templates/features/roles/roles/ui/role-form.tsx')
+  const roles = screen.kayan.roles!
+  const value = { id: 'r1', name: 'reader', label: { en: 'Reader', ar: 'قارئ' }, permissions: ['tags.find'] }
+  const custom = recordPage([{ form: [{ field: 'name' }, { field: 'label' }, { field: 'permissions' }], component: 'role-form' }])
+  const host = await render(createElement(Form, {
+    kayan: roles, value, client: draftClient([]), screen: screenOf(custom, roles, { 'role-form': RoleForm }),
+    operations: { update: false }, t, locale: 'en', onDone: () => {},
+  }), { kayan: roles, record: value, access: { collections: { roles: { operations: { update: false } } } } as never })
+  assert.equal(host.querySelectorAll('dl[data-field-value]').length, 3)
+  assert.ok(host.textContent?.includes('Reader'))
+  assert.ok(host.querySelector('[data-permissions] [data-key="tags.find"]'))
+  assert.equal(host.querySelector('input, textarea, button[data-key]'), null)
+  assert.equal([...host.querySelectorAll('button')].some((button) => button.textContent === 'Save'), false)
 })

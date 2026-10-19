@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ComponentProps, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from 'mithaq-admin/page-header.tsx'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { DraftBanner } from 'mithaq-admin/draft-banner.tsx'
 import { ViewSwitch, type Views } from 'mithaq-admin/form-actions.tsx'
@@ -91,7 +92,7 @@ export function FormChrome({ about, draft, headed, problems, refused, stale, t, 
     <>
       {headed ? (
         <header className="max-w-3xl">
-          {title === undefined ? null : <h1 className="text-2xl font-bold tracking-tight">{title}</h1>}
+          <PageHeader t={t} title={title === undefined ? null : <h1 className="text-2xl font-bold tracking-tight">{title}</h1>} />
           {about ? <p className="text-muted-foreground mt-1 text-sm">{about}</p> : null}
         </header>
       ) : null}

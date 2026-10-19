@@ -8,6 +8,7 @@ import { holds, type CellProps, type MenuProps, type Row } from 'mithaq/admin'
 import { useAccess, useLocale, useRecord, useUser } from 'mithaq/admin/react'
 import { backofficeRoles } from '@asas/mithaq/auth/backoffice-roles'
 import { authArm } from '@/api.ts'
+import { MoreActions } from 'mithaq-admin/page-header.tsx'
 import { toast } from 'mithaq-admin/toast.tsx'
 import {
   AlertDialog,
@@ -246,4 +247,12 @@ export function UserButtons() {
       {asking ? <PersonDialog row={row} action={asking} onClose={() => setAsking(undefined)} /> : null}
     </div>
   )
+}
+
+
+/** The header offers no empty menu on a record the viewer cannot act on. */
+export function UserHeaderActions() {
+  const { t } = useLocale()
+  const { actions } = usePerson(useRecord() ?? {})
+  return actions.length ? <div className="ms-auto" data-person-actions={actions.join(' ')}><MoreActions t={t}><UserButtons /></MoreActions></div> : null
 }

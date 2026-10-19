@@ -420,9 +420,10 @@ test('the template screens share their controls and layouts through one const, r
   // two, so the test below builds one that does.
   assert.deepEqual([...kinds].sort(), ['button', 'button confirm', 'component', 'controls', 'field', 'form', 'form component', 'layout', 'list', 'list component', 'nav', 'row', 'section', 'shell', 'tabs', 'title'].sort())
   assert.deepEqual(Object.keys(dashboard.pages), ['dashboard', 'members', 'activity'], 'a dashboard and the pages that belong to no kayan: the members and the organization\'s activity')
-  assert.deepEqual(dashboard.pages.activity, { path: '/activity', component: '@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage', nav: { label: { en: 'Activity', ar: 'النشاط' } }, permission: 'auditLog.find' }, 'which the log\'s key serves')
-  assert.deepEqual(dashboard.nav.at(-2), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find' }, 'listed in the nav behind its own key')
-  assert.deepEqual(dashboard.nav.at(-1), { path: '/activity', page: 'activity', label: { en: 'Activity', ar: 'النشاط' }, permission: 'auditLog.find' }, 'and the activity behind the log\'s')
+  const settingsGroup = { name: 'settings', label: { en: 'Settings', ar: 'الإعدادات' }, position: 'bottom' }
+  assert.deepEqual(dashboard.pages.activity, { path: '/activity', component: '@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage', nav: { label: { en: 'Activity', ar: 'النشاط' }, group: settingsGroup, order: 4 }, permission: 'auditLog.find' }, 'which the log\'s key serves')
+  assert.deepEqual(dashboard.nav.at(-2), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find', group: settingsGroup, order: 1 }, 'listed in the nav behind its own key')
+  assert.deepEqual(dashboard.nav.at(-1), { path: '/activity', page: 'activity', label: { en: 'Activity', ar: 'النشاط' }, permission: 'auditLog.find', group: settingsGroup, order: 4 }, 'and the activity behind the log\'s')
 })
 
 test('a screen with no page at / is refused, and so are folder, shell and dashboard, which left the screen', () => {
@@ -976,9 +977,9 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   const dashboard = asas.targets.dashboard.client
   const page = (name: 'create' | 'edit' | 'list') => (dashboard.kayan.courses!.pages[name] as { page: Record<string, unknown[]> }).page
   const edit = page('edit')
-  assert.deepEqual(edit.header, [{ title: {} }, { component: '@asas/courses:./courses/ui/archived-badge.tsx#ArchivedBadge', when: { 'record.archived': { equals: true } } }, { controls: {} }], 'the edit page\'s header holds its title, the Archived badge over an archived course, and the form\'s controls')
+  assert.deepEqual(edit.header!.slice(0, 3), [{ title: {} }, { component: '@asas/courses:./courses/ui/archived-badge.tsx#ArchivedBadge', when: { 'record.archived': { equals: true } } }, { controls: {} }], 'the edit page\'s header holds its title, the Archived badge over an archived course, and the form\'s controls')
   assert.deepEqual(page('create').header, [{ title: {} }, { controls: {} }], 'and so does the create page\'s')
-  assert.deepEqual(page('list').header, [{ title: {} }], 'while a page holding no form has no controls')
+  assert.deepEqual(page('list').header, [], 'the list draws its title beside New in its own header')
   const [tabs, ...rest] = edit.main as { tabs: { tab: string; fields: Record<string, any>[] }[] }[]
   assert.deepEqual(rest, [], 'the edit page\'s main region holds its tabs and nothing else')
   assert.deepEqual(tabs!.tabs.map((tab) => tab.tab), ['details', 'sessions', 'versions', 'activity'])
@@ -991,7 +992,10 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   assert.ok(JSON.stringify(layout.main[0].form[2].fields).includes('"field":"notifications"'), 'Teaching holds notifications')
   assert.deepEqual(layout.side.map((node: { section?: string; component?: string }) => node.section ?? node.component), ['catalogue', '@asas/mithaq:./src/ui/activity.tsx#Activity'], 'its side Catalogue and the activity')
   assert.deepEqual(layout.side.at(-1), { component: '@asas/mithaq:./src/ui/activity.tsx#Activity', when: { '$user.collections.auditLog.operations.find': { equals: true } } })
-  assert.deepEqual(layout.danger.map((node: { button: string }) => node.button), ['unpublish', 'archive', 'unarchive', 'delete'], 'and its danger zone')
+  assert.equal(layout.danger, undefined, 'secondary actions sit above the tabs')
+  const more = edit.header![3] as { layout: string; main: { button: string }[] }
+  assert.equal(more.layout, dashboard.layouts.more)
+  assert.deepEqual(more.main.map((node) => node.button), ['unpublish', 'archive', 'unarchive', 'delete'], 'More keeps each declared operation')
   assert.deepEqual(sessions!.fields.map((node) => Object.keys(node)), [['list']], 'Sessions holds its list alone, at the full width')
   assert.deepEqual(versions!.fields.map((node) => node.component), [dashboard.components.versions], 'and Versions its panel alone')
   assert.deepEqual(activity!.fields, [{ component: dashboard.components.activityLog, when: { '$user.collections.auditLog.operations.find': { equals: true } } }], 'and Activity the record\'s whole history, for a reader of the log alone')
@@ -1194,7 +1198,7 @@ test("a kayan's own operations project their name and effect, an operation's own
   assert.deepEqual(dashboard.kayan.settings!.operations, [{ name: 'update', effect: 'update' }, { name: 'findOne', effect: 'read' }])
   // The button's own copy lives on the node that draws it, not on the operation,
   // and where the node sits is where it is drawn.
-  assert.deepEqual(((treeOf(courses.pages.edit).main[0] as unknown as { tabs: { fields: { danger: Record<string, unknown>[] }[] }[] }).tabs[0]!.fields[0]!.danger).map(({ confirm: _confirm, when: _when, ...button }) => button), [
+  assert.deepEqual(((courses.pages.edit as unknown as { page: { header: { main: Record<string, unknown>[] }[] } }).page.header[3]!.main).map(({ confirm: _confirm, when: _when, ...button }) => button), [
     { button: 'unpublish', label: { en: 'Unpublish', ar: 'إلغاء النشر' }, component: '@asas/courses:./courses/ui/unpublish-button.tsx#UnpublishButton', reload: true },
     { button: 'archive', label: { en: 'Archive', ar: 'أرشفة' }, fields: ['reason'], reload: true },
     { button: 'unarchive', label: { en: 'Unarchive', ar: 'إلغاء الأرشفة' }, fields: ['reason'], reload: true },

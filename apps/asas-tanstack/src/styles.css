@@ -18,6 +18,8 @@
    each links the package elsewhere. */
 @source '../../../templates';
 
+@import 'mithaq-admin/theme.css';
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

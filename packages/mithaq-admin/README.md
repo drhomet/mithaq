@@ -38,6 +38,34 @@ policy: the screen host (`mithaq-screens-host`), the storage adapters and defaul
 `expectedUpdatedAt` step (`mithaq-expected-updated-at`) and `ui/directional-icon.tsx`. They are the project's
 to edit.
 
+## Page headers and tabs
+
+`mithaq-admin/page-header.tsx` exports `PageHeader` with optional `breadcrumb`
+containing `href` and `label`, `title`, `status`, `primary` and `more` slots.
+Pass `t` for translated actions. `MoreActions` also draws secondary buttons
+on their own, retaining each button's confirmation. The template's
+`appPage(main, { more, status })` puts secondary actions and status nodes in
+the record header; lists keep their title and New action together.
+
+`TabStrip` in `mithaq-admin/tab-strip.tsx` is the shared list and record strip.
+It scrolls horizontally within its own width and keeps the active or focused
+tab visible. List selection stays in the list query. Record selection uses
+`#tab.<first-declared-tab>=<selected-tab>`, preserving the query and mounted
+form fields. Unknown or hidden selections show the first visible tab.
+
+Read-only values use description lists. A form given an operations report
+that denies its create or update draws values and no Save control. Server
+authorization still decides every write.
+
+The opt-in `mithaq-admin/theme.css` supplies the tenant canvas, dark surfaces,
+native color scheme, 8px controls and 12px cards, uniform tabs and unboxed loose
+fields. Only the tenant app imports it. The backoffice keeps its own theme,
+component styles, spacing and `components.json`, while sharing navigation,
+headers, tab behaviour and read-only description lists. Keep
+the theme provider's system default when adopting these styles. Simple record
+layouts styled by this sheet stop at 840px, lists and records with side columns at 1200px; use a
+custom layout where a dense table needs the full available width.
+
 ## Eject a piece
 
 `mithaq eject <item>`, run in the app, writes the item's own files into `src/components/mithaq/` byte for byte,

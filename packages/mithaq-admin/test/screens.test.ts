@@ -396,7 +396,7 @@ test('a nav node draws the screen\'s nav as handed, each entry linked under the 
   assert.deepEqual(links, [['/dashboard/courses', 'courses'], ['/dashboard/members', 'Members']])
 })
 
-test('a tabs node outside every card draws the line bar across the page, and one inside a section, an accordion or a pill strip draws the pill strip', async () => {
+test('record tabs share scrolling behaviour while retaining the host presentation', async () => {
   const { drawNodes } = await import('../registry/nodes.tsx')
   const group = (fields: unknown[]) => ({ label: { en: 'G', ar: 'م' }, fields })
   const tabs = (inner: unknown[] = [{ field: 'title' }]) => ({ tabs: [{ tab: 'a', ...group(inner) }, { tab: 'b', ...group([{ field: 'fee' }]) }] })
@@ -425,12 +425,13 @@ test('a tabs node outside every card draws the line bar across the page, and one
   assert.deepEqual(lists(await drawn([{ layout: 'L', main: [tabs()] }])), ['line'], 'tabs in a layout region draw the line bar')
   assert.deepEqual(lists(await drawn([{ form: [tabs()] }])), ['line'], 'and so do tabs straight in a form node, which draws no card around what it holds')
 
-  assert.deepEqual(lists(await drawn([{ section: 's', ...group([tabs()]) }])), ['default'], 'tabs inside a section keep the pill strip')
+  assert.deepEqual(lists(await drawn([{ section: 's', ...group([tabs()]) }])), ['default'], 'tabs inside a section retain their preset variant')
   assert.deepEqual(lists(await drawn([{ accordion: [{ item: 'i', ...group([tabs()]) }] }])), ['default'], 'and inside an accordion')
-  assert.deepEqual(lists(await drawn([{ section: 's', ...group([tabs([tabs()])]) }])), ['default', 'default'], 'and inside a pill strip')
+  assert.deepEqual(lists(await drawn([{ section: 's', ...group([tabs([tabs()])]) }])), ['default', 'default'], 'and for nested tabs')
   assert.deepEqual(lists(await drawn([tabs([tabs()])])), ['line', 'line'], 'while tabs in a line bar\'s panel sit on the page, outside every card')
   const pill = (await drawn([{ section: 's', ...group([tabs()]) }])).querySelector('[data-node="tabs"]')!
-  assert.match(pill.className, /\brounded-lg border\b/, 'the pill strip keeps its bordered box')
+  assert.match(pill.className, /\bborder\b/, 'the host keeps its existing nested tab frame unless it opts into tenant styling')
+  assert.ok(pill.querySelector('[data-tab-strip]'), 'the same strip handles nested tabs')
 })
 
 const dialog = () => document.querySelector('[data-slot="alert-dialog-content"]')

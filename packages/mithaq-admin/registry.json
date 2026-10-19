@@ -1615,6 +1615,39 @@
           "target": "@components/ui/directional-icon.tsx"
         }
       ]
+    },
+    {
+      "name": "mithaq-tab-strip",
+      "type": "registry:component",
+      "title": "Mithaq tab strip",
+      "description": "The shared scrollable list and record tab strip, with record selection kept in the URL fragment.",
+      "registryDependencies": [
+        "tabs"
+      ],
+      "files": [
+        {
+          "path": "registry/tab-strip.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/tab-strip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-page-header",
+      "type": "registry:component",
+      "title": "Mithaq page header",
+      "description": "The shared list and record header with a breadcrumb, title, status, primary action and secondary actions popover.",
+      "registryDependencies": [
+        "button",
+        "popover"
+      ],
+      "files": [
+        {
+          "path": "registry/page-header.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/page-header.tsx"
+        }
+      ]
     }
   ]
 }

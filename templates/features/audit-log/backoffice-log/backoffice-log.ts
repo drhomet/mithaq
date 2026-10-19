@@ -1,6 +1,6 @@
 import { defaultFields, defaultOperations } from 'mithaq'
 import { defineKayan, rows } from '@asas/mithaq'
-import { backofficeList } from '@asas/mithaq/mithaq/pages.ts'
+import { backofficeList, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { backofficeReads } from '@asas/mithaq/roles/tenant-access.ts'
 
 /** Who did what to whom on the backoffice, as `action` names it. */
@@ -42,6 +42,7 @@ export const backofficeLog = defineKayan({
       operations: { find: defaultOperations.find, findByID: defaultOperations.findByID, count: defaultOperations.count },
     },
     backoffice: {
+      nav: { group: navGroups.audit },
       pages: {
         ...backofficeList('/history', {
           columns: ['createdAt', 'action', 'actorEmail', 'targetEmail', 'previousRole', 'role', 'banReason'],

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+### Upgrade notes
+
+- Screen navigation accepts `nav.hidden`, `nav.order` and `nav.group` on kayan screen targets, and the same placement keys beside an own page's `nav.label`. Groups carry a name, localized label, optional order and optional `position: 'bottom'`. Permission pruning precedes grouping; hidden entries keep their routes and authorization. Regenerate screens and update shells to use the ordered navigation instead of sorting it again.
+- Tenant and backoffice examples group their navigation, with tenant Settings at the bottom. Port the template's `ui/app-shell.tsx` grouping and `mithaq/pages.ts` declarations when adopting this layout.
+- The tenant example imports `mithaq-admin/theme.css` for a neutral canvas, raised dark content and cards, readable dark separators and native `color-scheme`. The system theme remains the default. Import this opt-in stylesheet in tenant hosts only; keep app-specific accent colours and light tokens. The backoffice retains its own preset, tokens, component styles, spacing and `components.json`.
+- The tenant stylesheet gives controls 8px corners, cards 12px, and 44px phone targets. It removes the visual boxes around loose fields and form actions. Merge ejected `nodes.tsx`, `form.tsx` and field renderers, and review custom styles that depend on their old wrappers.
+- In the tenant stylesheet, lists stop at 1200px and simple records at 840px. Records with a side column use 1200px. Desktop gutters are 24px, phone gutters 16px with no outer inset frame. Port the shell markers and import the tenant stylesheet; dense tables may use a custom full-width layout.
+- `PageHeader` and `MoreActions` in `mithaq-admin/page-header.tsx` share breadcrumb, title, status, primary action and secondary actions. Template records put secondary actions in More above their tabs; lists put title and New together. Adopt `appPage(main, { more, status })` and register the template's `more` layout. Backoffice breadcrumbs now come from the shared shell.
+- `FieldValue` renders a description list. Forms denied their create or update operation render values without Save, and do not autosave. Merge ejected `field-value.tsx`, `form.tsx` and the corresponding empty-value CSS. The template role form also reads names and permissions without editor controls when update is denied; merge its `roles/ui/role-form.tsx`.
+- Record tabs and list status tabs use `TabStrip`, with a uniform line style in the tenant stylesheet and the backoffice's existing presentation. Record selection lives in `#tab.<first-declared-tab>=<selected-tab>`; inactive values stay mounted, hidden or unknown selections fall back to the first visible tab, and focus or selection scrolls within the strip. Merge ejected `node-groups.tsx` and `list.tsx`; list tab query URLs remain valid.
+- Add translations for `admin.more` and `admin.moreActions` when porting the header into an existing project. Run `mithaq upgrade --check`, merge any ejected pieces above, then regenerate screens and review both hosts at desktop and phone widths.
+
 ## 0.2.2
 
 ### Upgrade notes

@@ -3,7 +3,7 @@ import { user as users } from '@asas/auth'
 import { assignedCount, managerRemains, memberRoles } from '../member-roles/member-roles.ts'
 import { managesRoles } from '@asas/mithaq/roles/grants.ts'
 import { defineKayan, rows, organization } from '@asas/mithaq'
-import { appPage, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, backofficeList, backofficeRecord, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { systemRoles } from '@asas/mithaq/roles/system-roles.ts'
 import { backofficeReads } from '@asas/mithaq/roles/tenant-access.ts'
 
@@ -110,6 +110,7 @@ export const roles = defineKayan({
   targets: {
     /** Every organization's rows on the backoffice, read-only. */
     backoffice: {
+      nav: { group: navGroups.access },
       useAsTitle: 'label',
       pages: {
         // A role by its label, never its slug, and its keys grouped as the
@@ -136,6 +137,7 @@ export const roles = defineKayan({
      * The fixed roles list first, from their code, each with a lock and its keys; a custom role opens its form, where its keys are picked as badges, and its delete names the members who still hold it.
      */
     dashboard: {
+      nav: { group: navGroups.settings },
       useAsTitle: 'label',
       description: {
         en: 'What each role in this organization may see and do.',
@@ -150,9 +152,9 @@ export const roles = defineKayan({
             {
               layout: 'record',
               main: [{ form: ['name', 'label', 'permissions'], component: rolesUi('role-form.tsx#RoleForm') }],
-              danger: [{ button: 'delete', label: { en: 'Delete', ar: 'حذف' }, component: rolesUi('roles.tsx#DeleteRole') }],
+
             },
-          ]),
+          ], { more: [{ button: 'delete', label: { en: 'Delete', ar: 'حذف' }, component: rolesUi('roles.tsx#DeleteRole') }] }),
         },
       },
     },

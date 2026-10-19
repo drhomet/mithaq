@@ -1,6 +1,6 @@
 // The frame both screens may put at the root of a page: a collapsible sidebar holding the organization switcher, the nav and the user menu, and an inset holding the site header over the page.
 // A row that goes nowhere is not drawn, so there are no quick-create or inbox buttons, documents group, or help and search rows: none has a destination in this template.
-import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { use, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import {
   ArrowUpRight,
   BookOpen,
@@ -19,9 +19,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { ShellProps } from 'mithaq/admin'
-import { useLocale, useNav, useScreen, useUser } from 'mithaq/admin/react'
+import { ScreenContext, useLocale, useNav, useScreen, useUser } from 'mithaq/admin/react'
 import { authArm } from '@/api.ts'
 import { locales, switchLocale } from '@/copy.ts'
+import { PageHeader } from 'mithaq-admin/page-header.tsx'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
 import { NavSidebar } from 'mithaq-admin/nav.tsx'
 import { NavUserMenu } from 'mithaq-admin/nav-user.tsx'
@@ -33,6 +34,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -125,29 +127,24 @@ function NavMain({ home }: { home?: string }) {
   const screen = useScreen()
   const pathname = usePathname()
   const entries = [
-    { path: '/', label: home ?? t('dashboard.dashboard', 'Dashboard') },
-    ...[...useNav()].sort((one, other) => Number(!!one.kayan) - Number(!!other.kayan)).map((entry) => ({ path: entry.path, label: navLabel({ entry, screen, locale, t }) })),
+    { path: '/', page: 'home', label: { [locale]: home ?? t('dashboard.dashboard', 'Dashboard') ?? 'Dashboard' } },
+    ...useNav(),
   ]
-  return (
-    <SidebarGroup>
-      <SidebarGroupContent className="flex flex-col gap-2">
+  return [...Map.groupBy(entries, (entry) => entry.group?.name ?? '').values()].map((group) => (
+    <SidebarGroup key={group[0]!.group?.name ?? ''} data-nav-group={group[0]!.group?.name} data-nav-position={group[0]!.group?.position} className={group[0]!.group?.position === 'bottom' ? 'mt-auto' : undefined}>
+      {group[0]!.group ? <SidebarGroupLabel>{group[0]!.group!.label[locale]}</SidebarGroupLabel> : null}
+      <SidebarGroupContent>
         <SidebarMenu>
-          {entries.map((entry) => {
+          {group.map((entry) => {
             const href = entry.path === '/' ? screen.path : `${screen.path}${entry.path}`
             const Icon = iconOf(entry.path)
             const isActive = pathname !== undefined && (pathname === href || (entry.path !== '/' && pathname.startsWith(`${href}/`)))
             return (
               <SidebarMenuItem key={entry.path}>
-                {/* A 44 pixel row wherever the sidebar is the phone's sheet. */}
                 <SidebarMenuButton
                   isActive={isActive}
                   className="max-md:h-11"
-                  render={
-                    <a href={href}>
-                      <Icon />
-                      <span>{entry.label}</span>
-                    </a>
-                  }
+                  render={<a href={href} aria-current={isActive ? 'page' : undefined}><Icon /><span>{navLabel({ entry, screen, locale, t })}</span></a>}
                 />
               </SidebarMenuItem>
             )
@@ -155,10 +152,10 @@ function NavMain({ home }: { home?: string }) {
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
-  )
+  ))
 }
 
-export const frame = { '--sidebar-width': 'calc(var(--spacing) * 72)', '--header-height': 'calc(var(--spacing) * 12)' } as CSSProperties
+export const frame = { '--sidebar-width': 'var(--app-sidebar-width, calc(var(--spacing) * 72))', '--header-height': 'calc(var(--spacing) * 12)' } as CSSProperties
 
 /**
  * The site header's bar, with the page's own title. It is sticky: its trigger is the only way back to a hidden sidebar, so it stays on screen however far the page is scrolled.
@@ -207,8 +204,15 @@ export function BackofficeLink() {
 }
 
 /** The sidebar on the side the document's direction starts from. */
-export function AppShell({ regions, brand, home }: ShellProps<readonly ['header', 'main'], ReactNode> & { brand?: ReactNode; home?: string }) {
+export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['header', 'main'], ReactNode> & { brand?: ReactNode; home?: string; page?: { path: string } }) {
   const { dir, t } = useLocale()
+  const state = use(ScreenContext)
+  const list = state?.kayan?.pages.list
+  const listed = state?.screen.nav.some((entry) => entry.kayan === state.kayan?.name)
+  const breadcrumb = page && list && listed && page.path !== list.path ? {
+    href: `${state!.screen.path}${list.path}`,
+    label: t(`${state!.kayan!.name}.plural`, state!.kayan!.name) ?? state!.kayan!.name,
+  } : undefined
   return (
     <SidebarProvider data-shell="app" style={frame}>
       <NavSidebar variant="inset" side={dir === 'rtl' ? 'right' : 'left'} t={t}>
@@ -234,14 +238,14 @@ export function AppShell({ regions, brand, home }: ShellProps<readonly ['header'
           wide table scrolls in its own frame instead. */}
       <SidebarInset className="min-w-0">
         <header data-region="header" ref={measureHeader} className={headerBar}>
-          <div className={headerRow}>
+          <div data-header-row="" className={headerRow}>
             <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 max-md:size-11" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-            {regions.header}
+            <PageHeader t={t} breadcrumb={breadcrumb}>{regions.header}</PageHeader>
             <BackofficeLink />
           </div>
         </header>
-        <div className="flex min-w-0 flex-1 flex-col px-4 py-4 lg:px-6">
+        <div data-page-body="" className="flex min-w-0 flex-1 flex-col px-4 py-4 lg:px-6">
           {/* `min-w-0` so a table wider than the page scrolls rather than
               pushing the sidebar off it. A div and not a `main`, because the
               inset around it is already the page's one main landmark. */}

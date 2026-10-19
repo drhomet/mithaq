@@ -3211,7 +3211,7 @@ withScreen.defineKayan({
 type ScreenTargetKeys = Expect<
   Equal<keyof import('mithaq').ScreenTarget, 'capability' | 'type' | 'path' | 'kayan' | 'controls' | 'providers' | 'pages' | 'layouts' | 'components'>
 >
-type ScreenKayanKeys = Expect<Equal<keyof import('mithaq').ScreenKayan, 'useAsTitle' | 'description' | 'baseFilter' | 'pages'>>
+type ScreenKayanKeys = Expect<Equal<keyof import('mithaq').ScreenKayan, 'nav' | 'useAsTitle' | 'description' | 'baseFilter' | 'pages'>>
 type ScreenPageKeys = Expect<Equal<keyof import('mithaq').ScreenPage, 'path' | 'page' | 'mode' | 'component'>>
 type ScreenOwnPageKeys = Expect<Equal<keyof import('mithaq').ScreenOwnPage, 'path' | 'component' | 'nav' | 'permission'>>
 type ScreenLeafKeys = Expect<

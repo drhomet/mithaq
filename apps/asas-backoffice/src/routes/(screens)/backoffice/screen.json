@@ -13,66 +13,154 @@
   },
   "nav": [
     {
+      "group": {
+        "name": "people",
+        "label": {
+          "en": "People",
+          "ar": "الأشخاص"
+        },
+        "order": 1
+      },
       "path": "/users",
       "page": "list",
       "kayan": "user",
       "permission": "user.find"
     },
     {
+      "group": {
+        "name": "organizations",
+        "label": {
+          "en": "Organizations",
+          "ar": "المؤسسات"
+        },
+        "order": 2
+      },
       "path": "/organizations",
       "page": "list",
       "kayan": "organization",
       "permission": "organization.find"
     },
     {
+      "group": {
+        "name": "access",
+        "label": {
+          "en": "Access",
+          "ar": "الوصول"
+        },
+        "order": 3
+      },
       "path": "/members",
       "page": "list",
       "kayan": "member",
       "permission": "member.find"
     },
     {
+      "group": {
+        "name": "work",
+        "label": {
+          "en": "Work",
+          "ar": "العمل"
+        },
+        "order": 1
+      },
       "path": "/courses",
       "page": "list",
       "kayan": "courses",
       "permission": "courses.find"
     },
     {
+      "group": {
+        "name": "work",
+        "label": {
+          "en": "Work",
+          "ar": "العمل"
+        },
+        "order": 1
+      },
       "path": "/sessions",
       "page": "list",
       "kayan": "sessions",
       "permission": "sessions.find"
     },
     {
+      "group": {
+        "name": "work",
+        "label": {
+          "en": "Work",
+          "ar": "العمل"
+        },
+        "order": 1
+      },
       "path": "/enrollments",
       "page": "list",
       "kayan": "enrollments",
       "permission": "enrollments.find"
     },
     {
+      "group": {
+        "name": "library",
+        "label": {
+          "en": "Library",
+          "ar": "المكتبة"
+        },
+        "order": 2
+      },
       "path": "/tags",
       "page": "list",
       "kayan": "tags",
       "permission": "tags.find"
     },
     {
+      "group": {
+        "name": "access",
+        "label": {
+          "en": "Access",
+          "ar": "الوصول"
+        },
+        "order": 3
+      },
       "path": "/roles",
       "page": "list",
       "kayan": "roles",
       "permission": "roles.find"
     },
     {
+      "group": {
+        "name": "access",
+        "label": {
+          "en": "Access",
+          "ar": "الوصول"
+        },
+        "order": 3
+      },
       "path": "/member-roles",
       "page": "list",
       "kayan": "memberRoles",
       "permission": "memberRoles.find"
     },
     {
+      "group": {
+        "name": "access",
+        "label": {
+          "en": "Access",
+          "ar": "الوصول"
+        },
+        "order": 3
+      },
       "path": "/local-users",
       "page": "list",
       "kayan": "localUsers",
       "permission": "localUsers.find"
     },
     {
+      "group": {
+        "name": "audit",
+        "label": {
+          "en": "Audit",
+          "ar": "التدقيق"
+        },
+        "order": 4
+      },
       "path": "/history",
       "page": "list",
       "kayan": "backofficeLog",
@@ -298,11 +386,7 @@
           "path": "/users",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -363,15 +447,15 @@
             "header": [
               {
                 "title": {}
+              },
+              {
+                "component": "./src/ui-backoffice/user-actions.tsx#UserHeaderActions"
               }
             ],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
-                  {
-                    "component": "./src/ui-backoffice/user-actions.tsx#UserButtons"
-                  },
                   {
                     "section": "person",
                     "label": {
@@ -588,11 +672,7 @@
           "path": "/organizations",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -828,11 +908,7 @@
           "path": "/members",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -1476,11 +1552,7 @@
           "path": "/courses",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2067,11 +2139,7 @@
           "path": "/sessions",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2454,11 +2522,7 @@
           "path": "/enrollments",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2704,11 +2768,7 @@
           "path": "/tags",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2968,11 +3028,7 @@
           "path": "/roles",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3218,11 +3274,7 @@
           "path": "/member-roles",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3576,11 +3628,7 @@
           "path": "/local-users",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3900,11 +3948,7 @@
           "path": "/history",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [
-              {
-                "title": {}
-              }
-            ],
+            "header": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",

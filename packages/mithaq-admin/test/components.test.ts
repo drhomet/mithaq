@@ -197,7 +197,7 @@ test('a node kind the map leaves out stops the start and the page, naming the ki
   const { title: _title, ...untitled } = defaultComponents.nodes
   assert.throws(
     () => checkComponents({ client: screen, components: { ...defaultComponents, nodes: untitled as Components['nodes'] } }),
-    /components\.nodes has no node "title", which screen \/dashboard courses page "list" draws\./,
+    /components\.nodes has no node "title", which screen \/dashboard courses page "create" draws\./,
   )
   assert.doesNotThrow(() => checkComponents({ client: screen, components: { ...defaultComponents, nodes: { ...defaultComponents.nodes, section: () => null } } }), 'a replaced node is a node the map carries')
 })

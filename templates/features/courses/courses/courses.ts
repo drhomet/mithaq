@@ -1,7 +1,7 @@
 import { defaultFields, draftFields, folderOf, invalid, type Ctx, type ReadTools, type WriteTools } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '@asas/mithaq'
-import { activity, activityTab, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, activityTab, appPage, danger, backofficeList, backofficeRecord, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { sessions } from '../sessions/sessions.ts'
 import { seatsTaken } from '../sessions/seats.ts'
@@ -161,6 +161,7 @@ export const courses = defineKayan({
   targets: {
     /** Every organization's rows on the backoffice, read-only, with each row's record page and its sessions. */
     backoffice: {
+      nav: { group: navGroups.work },
       useAsTitle: 'title',
       pages: {
         ...backofficeList('/courses', { columns: ['title', 'organization', 'fee', 'archived', 'createdAt'], filters: ['organization', 'title', 'fee', 'archived'], search: ['title'], sort: '-createdAt' }),
@@ -285,6 +286,7 @@ export const courses = defineKayan({
       }),
     },
     dashboard: {
+      nav: { group: navGroups.work },
       // What this kayan is for, drawn under the list heading and the form title.
       // One string per declared locale, keyed `courses.page.description`.
       description: {
@@ -351,41 +353,7 @@ export const courses = defineKayan({
               main: [{ form: details }],
               // Beside the form, what was done to this row, by whom and when.
               side: [archivedCatalogue, activity],
-              // Where a button sits is where it is drawn: in the record layout's danger
-              // zone, Unpublish over a published course, Archive over one not archived and
-              // Unarchive over one that is, each asking before it runs, before the delete
-              // every edit page ends its danger zone with.
-              danger: danger({
-                button: 'unpublish',
-                when: { 'record._status': { equals: 'published' } },
-                label: { en: 'Unpublish', ar: 'إلغاء النشر' },
-                component: ui('unpublish-button.tsx#UnpublishButton'),
-                reload: true,
-                confirm: {
-                  title: { en: 'Unpublish this course?', ar: 'إلغاء نشر هذه الدورة؟' },
-                  body: { en: 'It goes back to a draft that no student sees, until it is published again.', ar: 'تعود مسودة لا يراها أي طالب حتى تُنشر مجددا.' },
-                },
-              }, {
-                button: 'archive',
-                when: unarchived,
-                label: { en: 'Archive', ar: 'أرشفة' },
-                fields: ['reason'],
-                reload: true,
-                confirm: {
-                  title: { en: 'Archive this course?', ar: 'أرشفة هذه الدورة؟' },
-                  body: { en: 'It leaves the catalogue for every student.', ar: 'تخرج من الدليل لكل الطلاب.' },
-                },
-              }, {
-                button: 'unarchive',
-                when: archivedRow,
-                label: { en: 'Unarchive', ar: 'إلغاء الأرشفة' },
-                fields: ['reason'],
-                reload: true,
-                confirm: {
-                  title: { en: 'Unarchive this course?', ar: 'إلغاء أرشفة هذه الدورة؟' },
-                  body: { en: 'It is back in the catalogue as it was.', ar: 'تعود إلى الدليل كما كانت.' },
-                },
-              }),
+
             }] },
             // The sessions are rows of another kayan pointing at this one: a list of
             // `sessions` whose `course` is this row, searched, filtered and paged on
@@ -415,7 +383,37 @@ export const courses = defineKayan({
             ] },
             // Beside them, the row's whole activity, searched and filtered; the side column keeps the last few.
             activityTab,
-          ] }]), header: [{ title: {} }, archivedBadge, { controls: {} }] },
+          ] }], { more: danger({
+                button: 'unpublish',
+                when: { 'record._status': { equals: 'published' } },
+                label: { en: 'Unpublish', ar: 'إلغاء النشر' },
+                component: ui('unpublish-button.tsx#UnpublishButton'),
+                reload: true,
+                confirm: {
+                  title: { en: 'Unpublish this course?', ar: 'إلغاء نشر هذه الدورة؟' },
+                  body: { en: 'It goes back to a draft that no student sees, until it is published again.', ar: 'تعود مسودة لا يراها أي طالب حتى تُنشر مجددا.' },
+                },
+              }, {
+                button: 'archive',
+                when: unarchived,
+                label: { en: 'Archive', ar: 'أرشفة' },
+                fields: ['reason'],
+                reload: true,
+                confirm: {
+                  title: { en: 'Archive this course?', ar: 'أرشفة هذه الدورة؟' },
+                  body: { en: 'It leaves the catalogue for every student.', ar: 'تخرج من الدليل لكل الطلاب.' },
+                },
+              }, {
+                button: 'unarchive',
+                when: archivedRow,
+                label: { en: 'Unarchive', ar: 'إلغاء الأرشفة' },
+                fields: ['reason'],
+                reload: true,
+                confirm: {
+                  title: { en: 'Unarchive this course?', ar: 'إلغاء أرشفة هذه الدورة؟' },
+                  body: { en: 'It is back in the catalogue as it was.', ar: 'تعود إلى الدليل كما كانت.' },
+                },
+              }), status: [archivedBadge] }) },
         },
         board: {
           path: '/courses/board',

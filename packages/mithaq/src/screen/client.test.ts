@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { matchesWhere, same } from './client.ts'
+import { matchesWhere, same, navOf } from './client.ts'
 
 test('two stored values are the same by what they hold: a moment by its time, an object whatever its key order, absent as null', () => {
   assert.equal(same(new Date(5), new Date(5)), true)
@@ -40,4 +40,20 @@ test('a when over a decimal compares the values the text holds, padded or not, a
   // A text field holding the same characters is compared as the text it is.
   assert.equal(holds({ code: { equals: '7' } }), false)
   assert.equal(holds({ code: { equals: '7.00' } }), true)
+})
+
+
+test('navigation prunes permissions and hidden entries before ordering visible groups', () => {
+  const work = { name: 'work', label: { en: 'Work' }, order: 1 }
+  const settings = { name: 'settings', label: { en: 'Settings' }, position: 'bottom' as const }
+  const nav = [
+    { path: '/settings', page: 'list', group: settings },
+    { path: '/second', page: 'list', group: work, order: 2 },
+    { path: '/denied', page: 'list', permission: 'private.find', group: work },
+    { path: '/hidden', page: 'list', hidden: true },
+    { path: '/first', page: 'list', group: work, order: 1 },
+    { path: '/ungrouped', page: 'home' },
+  ]
+  assert.deepEqual(navOf({ nav }, {}).map((entry) => entry.path), ['/ungrouped', '/first', '/second', '/settings'])
+  assert.equal(nav.length, 6, 'presentation never removes a route or mutates the projection')
 })

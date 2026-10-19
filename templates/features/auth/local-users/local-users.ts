@@ -10,7 +10,7 @@ import {
   type Ctx,
 } from 'mithaq'
 import { defineKayan, requestContext } from '@asas/mithaq'
-import { appPage, backofficeList } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, backofficeList, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { superAdmin } from '@asas/mithaq/roles/tenant-access.ts'
 
 /**
@@ -92,6 +92,7 @@ export const localUsers = defineKayan({
      * alone. The protected columns are named by no page, so no list offers one as a column or a filter.
      */
     backoffice: {
+      nav: { group: navGroups.access },
       useAsTitle: 'email',
       pages: {
         ...backofficeList('/local-users', {

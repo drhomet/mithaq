@@ -3,13 +3,14 @@
 // every organization's members, each by the person's and the organization's name,
 // filtered to one organization from that organization's row.
 import { backofficeUi } from '@asas/mithaq'
-import { appPage } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 
 /** The provider's governance role by the project's word for it, never its slug. */
 const role = { field: 'role', cell: backofficeUi('role-cells.tsx#MembershipRole') } as const
 
 export const screens = {
   backoffice: {
+    nav: { group: navGroups.access },
     // A membership's record is titled by its person.
     useAsTitle: 'userId',
     pages: {
