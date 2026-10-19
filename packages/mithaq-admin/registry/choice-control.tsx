@@ -12,7 +12,7 @@ export function SelectControl(props: ControlProps): ReactElement {
   const options = props.field.options ?? []
   return <Select value={typeof props.value === 'string' ? props.value : null} onValueChange={changeOf(props)} disabled={props.readOnly}>
     <SelectTrigger id={props.id} className="w-full max-sm:data-[size=default]:h-11" aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)}><SelectValue>{options.find((one) => one.value === props.value)?.label[props.locale ?? ''] ?? props.placeholder ?? ''}</SelectValue></SelectTrigger>
-    <SelectContent>{options.map((one) => <SelectItem key={one.value} value={one.value}>{one.label[props.locale ?? ''] ?? one.value}</SelectItem>)}</SelectContent>
+    <SelectContent>{props.field.rules.required !== true ? <SelectItem value={null}>{props.t('admin.clear', 'Clear')}</SelectItem> : null}{options.map((one) => <SelectItem key={one.value} value={one.value}>{one.label[props.locale ?? ''] ?? one.value}</SelectItem>)}</SelectContent>
   </Select>
 }
 

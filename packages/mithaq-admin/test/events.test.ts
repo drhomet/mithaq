@@ -176,6 +176,37 @@ test('the select override reports the chosen option value', async () => {
   assert.ok(reported.length > 0 && reported.every((value) => value === 'USD'))
 })
 
+test('an optional select can return to empty after a choice, while a required select cannot', async () => {
+  const reported: unknown[] = []
+  const field = fieldOf({ name: 'currency', kind: 'text', options: [
+    { value: 'SAR', label: { en: 'Riyal' } }, { value: 'USD', label: { en: 'Dollar' } },
+  ] })
+  function Pick({ required = false, readOnly = false }: { required?: boolean; readOnly?: boolean }) {
+    const [value, setValue] = useState<unknown>(null)
+    return createElement(controls.select!, {
+      field: { ...field, rules: { required } }, kayan: courses, id: 'currency', t, locale: 'en', value,
+      values: {}, setValue: () => {}, placeholder: 'Choose currency', readOnly,
+      onChange: (next: unknown) => { reported.push(next); setValue(next) },
+    })
+  }
+  const host = await render(createElement(Pick))
+  const choose = async (label: string) => {
+    await act(async () => click(host.querySelector('[data-slot="select-trigger"]')!))
+    const item = [...window.document.querySelectorAll('[data-slot="select-item"]')].find((one) => one.textContent === label)
+    assert.ok(item, `the select offers ${label}`)
+    await act(async () => click(item as unknown as Element))
+  }
+  await choose('Dollar')
+  await choose('Clear')
+  assert.deepEqual(reported, ['USD', null])
+  assert.equal(host.querySelector('[data-slot="select-trigger"]')!.textContent, 'Choose currency')
+  const required = await render(createElement(Pick, { required: true }))
+  await act(async () => click(required.querySelector('[data-slot="select-trigger"]')!))
+  assert.deepEqual([...window.document.querySelectorAll('[data-slot="select-item"]')].map((one) => one.textContent), ['Riyal', 'Dollar'])
+  const locked = await render(createElement(Pick, { readOnly: true }))
+  assert.equal((locked.querySelector('[data-slot="select-trigger"]') as HTMLButtonElement).disabled, true)
+})
+
 test('the native-select override is the select itself, one trigger and one border, and reports a string option', async () => {
   const reported: unknown[] = []
   const host = await render(createElement(controls.nativeSelect!, {
