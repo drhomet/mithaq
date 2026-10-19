@@ -9,7 +9,7 @@
 - Create forms display and send declared defaults. Publishing a new record leaves its status to the server. Datetime defaults serialized into screens are restored as `Date` values.
 - New, the relationship picker's "+" and uploads require an operation named `create`. Another operation with a create effect does not enable them.
 - Create-effect operation dialogs start from declared defaults, with `false` for checkboxes and `[]` for required text arrays. Their fields scroll within the viewport while the footer stays reachable, with room for input focus rings. Standalone dialogs drop the generic row-selection sentence.
-- Optional selects offer Clear to return to an empty `null` value after a choice.
+- Optional selects offer Clear to return to an empty `null` value after a choice. Bulk-update selects, including required fields, offer Leave as is. Clearing a bulk field leaves each ticked row unchanged.
 - Phone layouts use `min-w-0` to keep nested tables within the page and scrolling tab strips with space for the active underline.
 - `ControlProps` gains optional `id`, `describedBy` and `form` props. Custom controls should put them on their input as `id`, `aria-describedby` and `form`.
 - Time controls show Latin digits in every locale.

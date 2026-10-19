@@ -2606,6 +2606,42 @@ test('65. a bulk update writes the fields its button names over the same ids, as
   )
 })
 
+test('a bulk update can leave required and optional selects and cleared text unchanged', async () => {
+  const { OperationButton } = await import('../registry/operation-button.tsx')
+  for (const locale of ['en', 'ar']) {
+    const sent: Record<string, unknown>[] = []
+    await render(createElement(OperationButton, {
+      busy: false, copy: { t: appCopy(locale), locale }, open: true, onOpenChange: () => {},
+      kayan: courses, inputOf: (values) => ({ where: { id: { in: ['c1', 'c2'] } }, data: values }),
+      operation: { name: 'updateMany', effect: 'update', updatesMany: true, label: { en: 'Update', ar: 'تحديث' }, fields: [
+        ...[true, false].map((required) => fieldOf({ name: required ? 'currency' : 'venue', kind: 'text', component: 'select', rules: { required }, options: [{ value: 'SAR', label: { en: 'Riyal', ar: 'ريال' } }] })),
+        fieldOf({ name: 'title', kind: 'text' }), fieldOf({ name: 'fee', kind: 'number' }),
+      ] },
+      run: async (input) => (sent.push(input), true),
+    }))
+    const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')! as unknown as Element
+    const choose = async (name: string, label: string) => {
+      await act(async () => click(dialog.querySelector(`#courses-updateMany-${name}`)!))
+      const item = [...window.document.querySelectorAll('[data-slot="select-item"]')].find((one) => one.textContent === label)
+      assert.ok(item, `the bulk select offers ${label}`)
+      await act(async () => click(item as unknown as Element))
+    }
+    for (const name of ['currency', 'venue']) {
+      await choose(name, locale === 'en' ? 'Riyal' : 'ريال')
+      await choose(name, locale === 'en' ? 'Leave as is' : 'اتركه كما هو')
+    }
+    const title = dialog.querySelector('#courses-updateMany-title')!
+    await act(async () => typeInto(title, 'Changed'))
+    await act(async () => typeInto(title, ''))
+    await act(async () => fire(dialog.querySelector('form')!, 'submit'))
+    assert.deepEqual(sent, [], 'returning every field to empty leaves nothing to write')
+    assert.ok(dialog.querySelector('[role="alert"]'), 'the empty bulk remains open with a refusal')
+    await act(async () => typeInto(dialog.querySelector('#courses-updateMany-fee')!, '450'))
+    await act(async () => fire(dialog.querySelector('form')!, 'submit'))
+    assert.deepEqual(sent, [{ where: { id: { in: ['c1', 'c2'] } }, data: { fee: 450 } }], 'cleared fields are omitted from the data sent to every ticked row')
+  }
+})
+
 test('65b. a bulk button that asks for fields and carries a confirm says both what it asks and how many rows it runs on', async () => {
   // The confirm's body and the ticked count are one dialog's two sentences, neither in place of the other.
   const { listOf } = await import('../registry/node-tree.ts')
@@ -8173,7 +8209,7 @@ test('audit F01: an operation keeps its footer outside its scrolling fields with
   const body = dialog.querySelector('form > [data-operation-fields]')!
   assert.ok(body)
   assert.match(body.className, /overflow-y-auto/)
-  assert.ok(body.classList.contains('-mx-1') && body.classList.contains('px-1'), 'the scrolling fields leave room around a full-width input focus ring')
+  assert.ok(body.classList.contains('-m-1') && body.classList.contains('p-1'), 'the scrolling fields leave room around a full-width input focus ring')
   assert.equal(body.contains(dialog.querySelector('[data-slot="alert-dialog-footer"]')!), false)
 })
 
@@ -8224,6 +8260,7 @@ test('audit F04: status tabs scroll within the list instead of widening the page
   assert.match(strip.className, /overflow-x-auto/)
   assert.ok(strip.classList.contains('overflow-y-hidden'), 'the strip scrolls only sideways')
   assert.ok(strip.classList.contains('pb-2'), 'bottom space keeps the active underline inside the scrolling strip')
+  assert.ok(strip.classList.contains('max-sm:h-auto'), 'the strip grows around phone-height triggers and their focus rings')
   assert.match(strip.className, /justify-start/)
 })
 

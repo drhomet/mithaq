@@ -123,7 +123,7 @@ export function OperationButton({
         ) : null}
         {/* A form and not a div, so Enter in a one-box dialog submits. */}
         <form className="flex min-h-0 flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
-          <div data-operation-fields="" className="-mx-1 grid min-h-0 gap-4 overflow-y-auto px-1">
+          <div data-operation-fields="" className="-m-1 grid min-h-0 gap-4 overflow-y-auto p-1">
           {fields.map((field) => {
             const Control = controlFor(controls, field)
             const inputId = `${kayan.name}-${operation.name}-${field.name}`
@@ -152,17 +152,17 @@ export function OperationButton({
                     value={values[field.name]}
                   />
                 ) : <Control
-                  field={field}
+                  field={writesData ? { ...field, rules: { ...field.rules, required: false } } : field}
                   kayan={kayan}
                   client={kayans}
                   api={api}
-                  t={t}
+                  t={writesData ? (key, fallback) => key === 'admin.clear' ? t('admin.leaveAsIs', 'Leave as is') : t(key, fallback) : t}
                   locale={copy.locale}
                   id={inputId}
                   value={values[field.name]}
                   values={values}
                   setValue={setValue}
-                  onChange={(next) => setValue(field.name, next)}
+                  onChange={(next) => setValue(field.name, writesData && next === null ? undefined : next)}
                   readOnly={busy}
                   error={failed}
                   describedBy={describedBy({ id: inputId, description: undefined, error: failed })}
