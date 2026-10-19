@@ -46,7 +46,7 @@ const clientOf = (asked: { operation: string; input: Record<string, unknown> }[]
 const apiOf = (client: FetchClient) => ({ media: { find: (input: Record<string, unknown>) => client({ kayan: 'media', operation: 'find', input }) as never } })
 
 let mounted: ReturnType<typeof createRoot> | undefined
-const mayCreate = { collections: { media: { create: true, fields: { alt: { create: true } } } } } as unknown as ScreenState['access']
+const mayCreate = { collections: { media: { create: true, operations: { create: true }, fields: { alt: { create: true } } } } } as unknown as ScreenState['access']
 const render = async (element: ReactElement, client: FetchClient = clientOf([]), access: ScreenState['access'] = mayCreate) => {
   const previous = mounted
   if (previous) await act(async () => previous.unmount())
@@ -346,7 +346,7 @@ test('214. the upload cell and control never show a file\'s id: loading until th
 })
 
 test('214a. Upload new is not offered to an actor who may create a file and set none of its fields but the ones the server fills', async () => {
-  const host = await render(controlOf({ value: null }), clientOf([]), { collections: { media: { create: true, fields: { id: { create: true }, createdAt: { create: true }, updatedAt: { create: true } } } } } as unknown as ScreenState['access'])
+  const host = await render(controlOf({ value: null }), clientOf([]), { collections: { media: { create: true, operations: { create: true }, fields: { id: { create: true }, createdAt: { create: true }, updatedAt: { create: true } } } } } as unknown as ScreenState['access'])
   assert.equal(host.querySelector('[data-upload-new]') === null, true)
 })
 

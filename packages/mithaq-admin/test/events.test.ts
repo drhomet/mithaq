@@ -897,11 +897,11 @@ test('27. a field cleared to empty is written as empty, and a field nothing touc
   const created = written[1]!
   assert.deepEqual(
     Object.keys(created).sort(),
-    ['_status', 'notifications', 'selfEnroll', 'title'],
+    ['notifications', 'selfEnroll', 'title'],
     'a create carries the typed field and the defaults it drew; archived is never a create\'s',
   )
   assert.equal(created.title, 'New course')
-  assert.equal(created._status, 'draft')
+  assert.equal('_status' in created, false, 'Publish leaves the status to the server')
   // A create still carries an untouched checkbox (drawn unchecked, which is a value) and a required list of text; an optional list stays out.
   assert.equal(created.notifications, false)
 })
@@ -7875,7 +7875,7 @@ test('240h. a relationship picker offers a + beside it, for a viewer who may cre
     return { id: 'tag-new', ...input }
   }
   const tags = screen.kayan.tags!
-  const access = { collections: { tags: { create: true, read: true, fields: { name: { create: true, read: true } } } } }
+  const access = { collections: { tags: { create: true, read: true, operations: { create: true }, fields: { name: { create: true, read: true } } } } }
   const draw = (over: Partial<ScreenState>) => render(withToaster(createElement(Form, {
     kayan: courses, screen: screenOf(recordPage([{ form: ['title', 'tags'] }])), client: recording().client, value: draftRow, t: english, locale: 'en', onDone: () => {},
     kayans, api: fakeApi({ tags: [] }).api,
@@ -7909,6 +7909,18 @@ test('240i. a record never published is published with Publish, one already publ
   assert.deepEqual(await named({ status: 'published' }), ['Publish changes', 'Cancel'], 'a published record')
   assert.deepEqual(await named({ status: 'changed' }), ['Publish changes', 'Cancel'], 'and one with a draft pending')
   assert.deepEqual(await named({ status: 'draft', autosave: 2000 }), ['Publish', 'Back to list'], 'a draft that saves itself has nothing to cancel, so the button says where it goes')
+})
+
+test('audit F09: Publish on a new course sends no draft status', async () => {
+  const calls: DraftCall[] = []
+  const host = await render(createElement(Form, { kayan: courses, client: draftClient(calls), value: null, t: english, locale: 'en', onDone: () => {}, drafts: {} }))
+  await act(async () => typeInto(host.querySelector('#courses-title')!, 'New course'))
+  assert.equal(publishOf(host)?.textContent?.trim(), 'Publish')
+  await act(async () => click(publishOf(host)!))
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0]!.operation, 'create')
+  assert.equal('_status' in calls[0]!.input, false)
+  assert.equal(calls[0]!.options?.draft, undefined)
 })
 
 test('240k. a yes-or-no field on a record page reads its own word for yes or no under its label, an unset one its no, never a dash', async () => {
@@ -7971,7 +7983,7 @@ test('240m. a hovered list row tints every cell itself, the pinned title and act
 })
 
 test('240n. a picker for an upload offers no + of its own, which its Upload new already is', async () => {
-  const access = { collections: { media: { create: true, fields: { alt: { create: true }, file: { create: true } } }, tags: { create: true, fields: { name: { create: true } } } } }
+  const access = { collections: { media: { create: true, operations: { create: true }, fields: { alt: { create: true }, file: { create: true } } }, tags: { create: true, operations: { create: true }, fields: { name: { create: true } } } } }
   const host = await render(createElement(Form, {
     kayan: courses, screen: screenOf(recordPage([{ form: ['cover', 'tags'] }])), client: recording().client, value: draftRow, t: english, locale: 'en', onDone: () => {},
     kayans, api: fakeApi({ tags: [], media: [] }).api,
@@ -8103,7 +8115,7 @@ test('240t. a list\'s refused run is said in a red toast and drawn nowhere else,
 test('240u. the + of a relationship to a kayan that keeps drafts makes its row as Payload\'s drawer does, with Save draft beside Publish, and an answer naming no id picks nothing', async () => {
   await toasted()
   const made: Record<string, unknown>[] = []
-  const access = { collections: { courses: { create: true, read: true, operations: { findVersions: true }, fields: { title: { create: true, read: true } } } } }
+  const access = { collections: { courses: { create: true, read: true, operations: { create: true, findVersions: true }, fields: { title: { create: true, read: true } } } } }
   const host = await render(withToaster(createElement(Form, {
     kayan: sessions, screen: screenOf(recordPage([{ form: ['course'] }], '/sessions/new'), sessions), client: recording().client, value: null, t: english, locale: 'en', onDone: () => {},
     kayans, api: fakeApi({ courses: [] }).api,

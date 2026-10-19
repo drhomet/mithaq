@@ -1962,9 +1962,12 @@ test('audit F09: create fields start from their declared literal defaults withou
 test('audit F07: a child without a create operation never offers New even with a broad access report', async () => {
   const { createsIn } = await import('../registry/field-values.ts')
   const readonly = { ...courses, operations: courses.operations.filter((operation) => operation.name !== 'create') }
-  const report = { create: true, fields: { title: { create: true } } }
-  assert.equal(createsIn({ kayan: readonly, report }), false)
+  const report = { create: true, operations: { create: true }, fields: { title: { create: true } } }
+  assert.equal(createsIn({ kayan: readonly, report: { ...report, operations: { import: true } } }), false)
   assert.equal(createsIn({ kayan: courses, report }), true)
+  assert.equal(createsIn({ kayan: courses, report: { ...report, operations: { create: false, import: true } } }), false)
+  assert.equal(createsIn({ kayan: courses, report: { ...report, operations: undefined } }), false)
+  assert.equal(createsIn({ kayan: courses, report: { ...report, create: false } }), true)
 })
 
 

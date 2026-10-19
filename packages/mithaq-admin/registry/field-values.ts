@@ -11,7 +11,7 @@ export const readOnlyField = (field: ClientField, on: 'create' | 'update'): bool
  * Whether the report lets this actor create a row of a kayan with something to write: the create, and at least one client-provided field they may set. A role that may set only server-filled fields meets no New.
  */
 export const createsIn = ({ kayan, report }: { kayan: ClientKayan; report: NonNullable<AccessReport['collections']>[string] }): boolean =>
-  kayan.operations.some((operation) => operation.name === 'create') && report?.create === true && kayan.fields.some((field) => !readOnlyField(field, 'create') && report.fields?.[field.name]?.create === true)
+  report?.operations?.create === true && kayan.fields.some((field) => !readOnlyField(field, 'create') && report.fields?.[field.name]?.create === true)
 
 /**
  * What a form starts holding: the row's values, one key per field, so a control is controlled from its first render. A field the row does not carry starts `undefined` and stays out of the write until something sets it.
@@ -24,7 +24,7 @@ export const seedOf = (fields: readonly ClientField[], value?: Record<string, un
       // unseeded, since it is a column this actor may not read and seeding it would overwrite the row.
       field.kind === 'datetime' && typeof value?.[field.name] === 'string' && !Number.isNaN(new Date(value[field.name] as string).getTime())
         ? new Date(value[field.name] as string)
-        : value?.[field.name] ?? (value ? undefined : field.rules.defaultValue !== undefined ? structuredClone(field.rules.defaultValue) : field.kind === 'checkbox' ? false : field.kind === 'textArray' && field.rules.required === true ? [] : undefined),
+        : value?.[field.name] ?? (value || field.name === '_status' ? undefined : field.rules.defaultValue !== undefined ? structuredClone(field.rules.defaultValue) : field.kind === 'checkbox' ? false : field.kind === 'textArray' && field.rules.required === true ? [] : undefined),
     ]),
   )
 
