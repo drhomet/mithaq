@@ -66,7 +66,6 @@ type PageClient = import('mithaq/admin').PageClient
 type ComponentProps = import('mithaq/admin').ComponentProps
 const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
 const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
-const { MoreActions } = await import('../../../templates/mithaq/src/ui/page-actions.tsx')
 const { Dashboard, loader: dashboardLoader } = await import('../../../templates/asas/src/ui-dashboard/dashboard.tsx')
 const { DeleteRole } = await import('../../../templates/features/roles/roles/ui/roles.tsx')
 const { loader: membersLoader } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
@@ -103,7 +102,7 @@ const state: ScreenState = {
   record: null,
 }
 const screenOf = (page: PageClient, kayan: ClientKayan = courses, refs: Record<string, unknown> = {}) => ({
-  refs: { [screen.layouts.app!]: AppShell, [screen.layouts.more!]: MoreActions, [screen.layouts.record!]: RecordPage, ...refs } as never,
+  refs: { [screen.layouts.app!]: AppShell, [screen.layouts.record!]: RecordPage, ...refs } as never,
   kayan,
   page: page as Extract<PageClient, { page: unknown }>,
 })
@@ -3293,8 +3292,8 @@ test('75. a component the host has no component for says so rather than drawing 
 
 test('78. a page\'s button is drawn where its node sits, and the form draws its panels again once the operation returns', async () => {
   // A project's explicit danger region remains available beside the new header actions.
-  const header = (courses.pages.edit as Extract<PageClient, { page: unknown }>).page.header as { layout?: string; main?: unknown[] }[]
-  const danger = header.find((node) => node.layout === screen.layouts.more)!.main!
+  const danger = (courses.pages.edit as Extract<PageClient, { page: unknown }>).page.more!
+  assert.ok(Array.isArray(danger))
   const host = await render(
     createElement(Form, {
       kayan: courses,
@@ -5296,7 +5295,7 @@ function LeavingHost({ client, left, block, deletes = true }: { client: Record<s
   block.it = () => setBlocked(true)
   return createElement(Form, {
     kayan: courses,
-    screen: screenOf(row ? courses.pages.edit! : courses.pages.create!),
+    // Standalone forms keep Cancel; the app shell supplies its own breadcrumb instead.
     client: client as never,
     value: row,
     t,
@@ -5789,7 +5788,9 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
   assert.equal(title?.getAttribute('title'), title?.textContent, 'the header\'s title, cut short on a phone, carries its whole text')
   const form = host.querySelector('form')!
   assert.equal(bar.querySelector('[data-button="publish"]')?.getAttribute('form'), form.id, 'Publish changes is in the bar and still submits the page\'s form by its id')
-  assert.deepEqual(['Save draft', 'Back to list'].map((words) => bar.contains(buttonNamed(host, words) ?? null)), [true, true], 'Save draft and Back to list are in the bar')
+  assert.ok(bar.contains(buttonNamed(host, 'Save draft') ?? null), 'Save draft stays in the bar')
+  assert.equal(buttonNamed(host, 'Back to list'), undefined, 'the breadcrumb already supplies the way back')
+  assert.ok(host.querySelector('[data-back]'))
   // The switch is not in the phone's bar, where it took a quarter of the screen: it sits at the top of the form below xl, and beside the actions from xl up.
   const switches = [...host.querySelectorAll('[data-view-switch]')]
   assert.equal(switches.length, 2, 'the Draft | Published switch is drawn for each width')
@@ -7699,7 +7700,6 @@ test('223b. Discard on a create page sends the delete the instant this page\'s l
       const [row, setRow] = useState<Record<string, unknown> | null>(null)
       return createElement(Form, {
         kayan: courses,
-        screen: screenOf(row ? courses.pages.edit! : courses.pages.create!),
         client: client as never,
         value: row,
         t,
@@ -8466,15 +8466,13 @@ test('record tabs restore a URL selection, keep values mounted and follow hash n
   }
 })
 
-test('backoffice header actions omit More when no action is permitted', async () => {
-  const { UserHeaderActions } = await import('../../../templates/asas/src/ui-backoffice/user-actions.tsx')
+test('backoffice record actions remain visible and omit actions the viewer cannot run', async () => {
+  const { UserButtons } = await import('../../../templates/asas/src/ui-backoffice/user-actions.tsx')
   const own = { id: 'staff', email: state.user.email, role: 'super_admin' }
-  const denied = await render(createElement(UserHeaderActions), { record: own, access: { permissions: '*' } })
+  const denied = await render(createElement(UserButtons), { record: own, access: { permissions: '*' } })
   assert.equal(denied.querySelector('[aria-label="More actions"]'), null, 'the viewer has no actions on their own record')
-  const allowed = await render(createElement(UserHeaderActions), { record: { ...own, id: 'other', email: 'other@example.test', role: 'user' }, access: { permissions: '*' } })
-  const more = allowed.querySelector('[aria-label="More actions"]')!
-  assert.ok(more)
-  await act(async () => click(more))
+  const allowed = await render(createElement(UserButtons), { record: { ...own, id: 'other', email: 'other@example.test', role: 'user' }, access: { permissions: '*' } })
+  assert.equal(allowed.querySelector('[aria-label="More actions"]'), null)
   assert.deepEqual([...window.document.querySelectorAll('[data-person-actions] [data-action]')].map((button) => button.getAttribute('data-action')), ['set-role', 'ban', 'impersonate'])
 })
 

@@ -722,6 +722,11 @@ test('the nav lists each kayan list page in kayan order and each screen page tha
   build({ pages }, undefined, { dashboard: screenTarget({ ...dashboardBase, kayan: ['courses'], pages: { ...pagesOf, members: { ...pagesOf.members, permission: 'courses.archive' } } }) })
 })
 
+test('a kayan navigation label survives the screen projection', () => {
+  const built = build({ pages, nav: { label } })
+  assert.deepEqual(built.targets.dashboard.client.nav[0]!.label, label)
+})
+
 test('the portal lists sessions for their title alone, so an enrollment\'s session reads by its start there as on the dashboard, with no page and no nav entry', () => {
   const portal = asas.targets.portal.client
   assert.equal(portal.kayan.sessions?.useAsTitle, asas.targets.dashboard.client.kayan.sessions?.useAsTitle)
@@ -977,8 +982,8 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   const dashboard = asas.targets.dashboard.client
   const page = (name: 'create' | 'edit' | 'list') => (dashboard.kayan.courses!.pages[name] as { page: Record<string, unknown[]> }).page
   const edit = page('edit')
-  assert.deepEqual(edit.header!.slice(0, 3), [{ title: {} }, { component: '@asas/courses:./courses/ui/archived-badge.tsx#ArchivedBadge', when: { 'record.archived': { equals: true } } }, { controls: {} }], 'the edit page\'s header holds its title, the Archived badge over an archived course, and the form\'s controls')
-  assert.deepEqual(page('create').header, [{ title: {} }, { controls: {} }], 'and so does the create page\'s')
+  assert.deepEqual(edit.header, [{ title: {} }, { component: '@asas/courses:./courses/ui/archived-badge.tsx#ArchivedBadge', when: { 'record.archived': { equals: true } } }], 'the edit header holds its title and the Archived badge over an archived course')
+  assert.deepEqual(page('create').header, [{ title: {} }], 'and so does the create page\'s')
   assert.deepEqual(page('list').header, [], 'the list draws its title beside New in its own header')
   const [tabs, ...rest] = edit.main as { tabs: { tab: string; fields: Record<string, any>[] }[] }[]
   assert.deepEqual(rest, [], 'the edit page\'s main region holds its tabs and nothing else')
@@ -993,9 +998,9 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   assert.deepEqual(layout.side.map((node: { section?: string; component?: string }) => node.section ?? node.component), ['catalogue', '@asas/mithaq:./src/ui/activity.tsx#Activity'], 'its side Catalogue and the activity')
   assert.deepEqual(layout.side.at(-1), { component: '@asas/mithaq:./src/ui/activity.tsx#Activity', when: { '$user.collections.auditLog.operations.find': { equals: true } } })
   assert.equal(layout.danger, undefined, 'secondary actions sit above the tabs')
-  const more = edit.header![3] as { layout: string; main: { button: string }[] }
-  assert.equal(more.layout, dashboard.layouts.more)
-  assert.deepEqual(more.main.map((node) => node.button), ['unpublish', 'archive', 'unarchive', 'delete'], 'More keeps each declared operation')
+  assert.deepEqual(edit.primary, [{ controls: {} }])
+  assert.deepEqual(page('create').primary, [{ controls: {} }])
+  assert.deepEqual(edit.more!.map((node) => (node as { button: string }).button), ['unpublish', 'archive', 'unarchive', 'delete'], 'More keeps each declared operation')
   assert.deepEqual(sessions!.fields.map((node) => Object.keys(node)), [['list']], 'Sessions holds its list alone, at the full width')
   assert.deepEqual(versions!.fields.map((node) => node.component), [dashboard.components.versions], 'and Versions its panel alone')
   assert.deepEqual(activity!.fields, [{ component: dashboard.components.activityLog, when: { '$user.collections.auditLog.operations.find': { equals: true } } }], 'and Activity the record\'s whole history, for a reader of the log alone')
@@ -1198,7 +1203,7 @@ test("a kayan's own operations project their name and effect, an operation's own
   assert.deepEqual(dashboard.kayan.settings!.operations, [{ name: 'update', effect: 'update' }, { name: 'findOne', effect: 'read' }])
   // The button's own copy lives on the node that draws it, not on the operation,
   // and where the node sits is where it is drawn.
-  assert.deepEqual(((courses.pages.edit as unknown as { page: { header: { main: Record<string, unknown>[] }[] } }).page.header[3]!.main).map(({ confirm: _confirm, when: _when, ...button }) => button), [
+  assert.deepEqual(((courses.pages.edit as unknown as { page: { more: Record<string, unknown>[] } }).page.more).map(({ confirm: _confirm, when: _when, ...button }) => button), [
     { button: 'unpublish', label: { en: 'Unpublish', ar: 'إلغاء النشر' }, component: '@asas/courses:./courses/ui/unpublish-button.tsx#UnpublishButton', reload: true },
     { button: 'archive', label: { en: 'Archive', ar: 'أرشفة' }, fields: ['reason'], reload: true },
     { button: 'unarchive', label: { en: 'Unarchive', ar: 'إلغاء الأرشفة' }, fields: ['reason'], reload: true },

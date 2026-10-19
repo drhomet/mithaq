@@ -100,9 +100,8 @@ export const sessions = defineKayan({
             ] }],
             // Whether it is archived and why, read only: a session is archived through its own operations.
             side: [{ ...course, fields: [...course.fields, { field: 'archived', readOnly: true }, { field: 'archiveReason', readOnly: true }] }, activity],
-            // Archived and brought back as a course is, each with its reason, before the delete.
-
           }], { more: danger({
+              // Archived and brought back as a course is, each with its reason, before the delete.
               button: 'archive',
               when: unarchived,
               label: { en: 'Archive', ar: 'أرشفة' },

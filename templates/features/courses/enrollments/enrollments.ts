@@ -289,7 +289,6 @@ export const enrollments = defineKayan({
             layout: 'record',
             main: [{ form: enrollment }],
             side: [{ section: 'record', label: { en: 'Record', ar: 'السجل' }, fields: [{ field: 'createdAt', readOnly: true }] }, activity],
-
           }], { more: danger() }),
         },
       },

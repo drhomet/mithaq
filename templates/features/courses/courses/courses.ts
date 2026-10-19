@@ -353,7 +353,6 @@ export const courses = defineKayan({
               main: [{ form: details }],
               // Beside the form, what was done to this row, by whom and when.
               side: [archivedCatalogue, activity],
-
             }] },
             // The sessions are rows of another kayan pointing at this one: a list of
             // `sessions` whose `course` is this row, searched, filtered and paged on

@@ -90,7 +90,6 @@ export const media = ({ reads }: { reads: readonly ImageRead[] }) => defineKayan
               { section: 'file', label: { en: 'File', ar: 'الملف' }, fields: ['filename', 'mimeType', { row: ['width', 'height'] }] },
             ] }],
             side: [{ component: ui('preview.tsx#MediaPreview') }],
-
           }], { more: danger() }),
         },
       },

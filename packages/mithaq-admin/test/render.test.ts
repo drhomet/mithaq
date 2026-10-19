@@ -49,7 +49,6 @@ const { pageButtonOf } = await import('../registry/node-buttons.tsx')
 const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
 const { TablePage } = await import('../../../templates/mithaq/src/ui/table-page.tsx')
 const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
-const { MoreActions } = await import('../../../templates/mithaq/src/ui/page-actions.tsx')
 
 const screen = asas.targets.dashboard.client
 const kayans = Object.values(screen.kayan)
@@ -93,7 +92,7 @@ const translator = (locale: string) => (key: string, fallback?: string) => {
 
 const copy = { t: translator('en'), locale: 'en' }
 
-const refs = { [screen.layouts.app!]: AppShell, [screen.layouts.more!]: MoreActions, [screen.layouts.record!]: RecordPage, [screen.layouts.table!]: TablePage }
+const refs = { [screen.layouts.app!]: AppShell, [screen.layouts.record!]: RecordPage, [screen.layouts.table!]: TablePage }
 const state: ScreenState = {
   t: copy.t,
   locale: 'en',
@@ -1594,7 +1593,7 @@ test('66. a page\'s button runs a kayan\'s own operation on the edit page, under
   const tree = edit as Extract<PageClient, { page: unknown }>
   const [tabs] = tree.page.main as unknown as { tabs: { fields: Record<string, unknown>[] }[] }[]
   const layout = tabs!.tabs[0]!.fields[0]!
-  assert.ok(!drawn({ operations: { archive: true }, screen: screenOf({ ...tree, page: { ...tree.page, header: [{ title: {} }, { controls: {} }], main: [layout as never] } }) }).includes('aria-label="More actions"'), 'a page that holds no button draws none')
+  assert.ok(!drawn({ operations: { archive: true }, screen: screenOf({ ...tree, page: { ...tree.page, header: [{ title: {} }, { controls: {} }], more: [], main: [layout as never] } }) }).includes('aria-label="More actions"'), 'a page that holds no button draws none')
 
   // On an edit alone: a create has no row, and every operation takes the row's id.
   const created = drawn({ value: null, operations: { archive: true } })
@@ -1985,11 +1984,13 @@ test('audit F05: refusals resolve in the kayan scope with their translated param
 test('the shared shell labels permitted groups and keeps settings at the bottom', () => {
   const before = state.screen
   state.screen = { ...screen, nav: [
+    { path: '/hidden', page: 'list', kayan: 'courses', hidden: true },
     { path: '/courses', page: 'list', kayan: 'courses', group: { name: 'work', label: { en: 'Work' } } },
     { path: '/settings', page: 'edit', kayan: 'settings', group: { name: 'settings', label: { en: 'Settings' }, position: 'bottom' } },
   ] }
   try {
     const html = renderToStaticMarkup(createElement(AppShell, { regions: { header: 'Header', main: 'Body' } }))
+    assert.doesNotMatch(html, /href="\/dashboard\/hidden"/)
     assert.match(html, /data-nav-group="work"/)
     assert.match(html, /data-nav-group="settings"/)
     assert.match(html, /data-nav-position="bottom"/)
@@ -2016,19 +2017,17 @@ test('shared page layouts leave width to each host stylesheet', () => {
   assert.doesNotMatch(renderToStaticMarkup(createElement(TablePage, props as never)), /max-w-/)
 })
 
-test('the shared page header names the breadcrumb, title, status, primary action and More', async () => {
+test('the shared page header names the breadcrumb, title, primary action and More', async () => {
   const { PageHeader } = await import('../registry/page-header.tsx')
   const html = renderToStaticMarkup(createElement(PageHeader, {
     breadcrumb: { href: '/dashboard/tags', label: 'Tags' },
     title: createElement('h1', {}, 'Tajweed'),
-    status: 'Active',
     primary: createElement('button', {}, 'Save'),
     more: createElement('button', {}, 'Archive'),
     t: copy.t,
   }))
   assert.match(html, /href="\/dashboard\/tags"/)
   assert.match(html, /<h1>Tajweed<\/h1>/)
-  assert.match(html, /data-header-status=""[^>]*>Active</)
   assert.match(html, />Save</)
   assert.match(html, /aria-label="More actions"/)
 })
@@ -2052,4 +2051,14 @@ test('tenant styling is opt-in and the backoffice keeps its own design', () => {
   const html = renderToStaticMarkup(createElement(AppShell, { regions: { header: 'Title', main: 'Body' } }))
   assert.match(html, /--sidebar-width:var\(--app-sidebar-width, calc\(var\(--spacing\) \* 72\)\)/)
   assert.match(html, /lg:px-6/, 'the host keeps its original gutter breakpoint without tenant styling')
+})
+
+
+test('record controls share the header action row with More and keep only the breadcrumb back link', () => {
+  const html = formMarkup({ kayan: { ...courses, drafts: { autosave: { interval: 2000 } } }, screen: screenOf(courses.pages.edit!), operations: { update: true, archive: true }, onCancel: () => {}, client: { update: async () => ({}), run: async () => ({}) } })
+  assert.match(html, /data-back=""/)
+  assert.doesNotMatch(html, />Back to list</)
+  assert.match(html, /data-header-actions=""/)
+  const actionRow = html.slice(html.indexOf('data-header-actions=""'))
+  assert.ok(actionRow.indexOf('data-action-bar=""') < actionRow.indexOf('aria-label="More actions"'))
 })

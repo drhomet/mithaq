@@ -41,15 +41,16 @@ to edit.
 ## Page headers and tabs
 
 `mithaq-admin/page-header.tsx` exports `PageHeader` with optional `breadcrumb`
-containing `href` and `label`, `title`, `status`, `primary` and `more` slots.
+containing `href` and `label`, `title`, `primary` and `more` slots.
 Pass `t` for translated actions. `MoreActions` also draws secondary buttons
 on their own, retaining each button's confirmation. The template's
-`appPage(main, { more, status })` puts secondary actions and status nodes in
-the record header; lists keep their title and New action together.
+`appPage(main, { more, status })` puts status nodes in the record header,
+form controls in the shell's `primary` region and secondary actions in `more`.
+Lists keep their title and New action together.
 
 `TabStrip` in `mithaq-admin/tab-strip.tsx` is the shared list and record strip.
-It scrolls horizontally within its own width and keeps the active or focused
-tab visible. List selection stays in the list query. Record selection uses
+It keeps the active tab visible by scrolling its own width, without moving
+the document vertically. List selection stays in the list query. Record selection uses
 `#tab.<first-declared-tab>=<selected-tab>`, preserving the query and mounted
 form fields. Unknown or hidden selections show the first visible tab.
 
@@ -59,12 +60,16 @@ authorization still decides every write.
 
 The opt-in `mithaq-admin/theme.css` supplies the tenant canvas, dark surfaces,
 native color scheme, 8px controls and 12px cards, uniform tabs and unboxed loose
-fields. Only the tenant app imports it. The backoffice keeps its own theme,
+fields. Its defaults live in the `components` CSS layer under `[data-shell="app"]`,
+so app utilities win. Only the tenant app imports it. The backoffice keeps its own theme,
 component styles, spacing and `components.json`, while sharing navigation,
 headers, tab behaviour and read-only description lists. Keep
 the theme provider's system default when adopting these styles. Simple record
 layouts styled by this sheet stop at 840px, lists and records with side columns at 1200px; use a
 custom layout where a dense table needs the full available width.
+
+For a host using `@theme inline`, port the tenant host's `--radius-4xl` mapping
+through `--app-control-radius`, so its controls use the sheet's 8px default.
 
 ## Eject a piece
 

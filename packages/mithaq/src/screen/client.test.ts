@@ -43,7 +43,7 @@ test('a when over a decimal compares the values the text holds, padded or not, a
 })
 
 
-test('navigation prunes permissions and hidden entries before ordering visible groups', () => {
+test('navigation prunes permissions and orders groups while keeping hidden destinations', () => {
   const work = { name: 'work', label: { en: 'Work' }, order: 1 }
   const settings = { name: 'settings', label: { en: 'Settings' }, position: 'bottom' as const }
   const nav = [
@@ -54,6 +54,6 @@ test('navigation prunes permissions and hidden entries before ordering visible g
     { path: '/first', page: 'list', group: work, order: 1 },
     { path: '/ungrouped', page: 'home' },
   ]
-  assert.deepEqual(navOf({ nav }, {}).map((entry) => entry.path), ['/ungrouped', '/first', '/second', '/settings'])
+  assert.deepEqual(navOf({ nav }, {}).map((entry) => entry.path), ['/hidden', '/ungrouped', '/first', '/second', '/settings'])
   assert.equal(nav.length, 6, 'presentation never removes a route or mutates the projection')
 })

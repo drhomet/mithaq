@@ -1,7 +1,8 @@
 /* Theme copied wholesale from tanstack-business:apps/web/src/styles.css:
    imports, custom-variant, :root and .dark variables, the @theme inline
-   block and the @layer base rules, unchanged. Only the @source line below
-   differs, pointing at this project's template instead of TB's monorepo.
+   block and the @layer base rules. The control radius below stays a runtime
+   variable so tenant defaults leave explicit app utilities in charge.
+   The @source line points at this project's template instead of TB's monorepo.
    Tailwind finds this app's own files, an ejected `src/components/mithaq`
    among them, without one. */
 @import 'tailwindcss';
@@ -131,7 +132,7 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-4xl: var(--app-control-radius, calc(var(--radius) + 16px));
 }
 
 @layer base {

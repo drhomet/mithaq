@@ -152,7 +152,6 @@ export const roles = defineKayan({
             {
               layout: 'record',
               main: [{ form: ['name', 'label', 'permissions'], component: rolesUi('role-form.tsx#RoleForm') }],
-
             },
           ], { more: [{ button: 'delete', label: { en: 'Delete', ar: 'حذف' }, component: rolesUi('roles.tsx#DeleteRole') }] }),
         },

@@ -38,7 +38,7 @@ export const screens = {
           ],
           // No id: a person reads the record by its name, and the address bar holds the id.
           side: [{ section: 'record', label: { en: 'Record', ar: 'السجل' }, fields: ['createdAt', 'updatedAt'] }],
-        }]), header: [{ title: {} }, { component: backofficeUi('user-actions.tsx#UserHeaderActions') }] },
+        }]), header: [{ title: {} }, { component: backofficeUi('user-actions.tsx#UserButtons') }] },
       },
     },
   },

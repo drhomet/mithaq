@@ -387,6 +387,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -449,9 +451,11 @@
                 "title": {}
               },
               {
-                "component": "./src/ui-backoffice/user-actions.tsx#UserHeaderActions"
+                "component": "./src/ui-backoffice/user-actions.tsx#UserButtons"
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -673,6 +677,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -722,6 +728,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -909,6 +917,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -964,6 +974,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -1553,6 +1565,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -1612,6 +1626,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -2140,6 +2156,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2200,6 +2218,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -2523,6 +2543,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2573,6 +2595,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -2769,6 +2793,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2814,6 +2840,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -3029,6 +3057,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3069,6 +3099,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -3275,6 +3307,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3323,6 +3357,8 @@
                 "title": {}
               }
             ],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -3629,6 +3665,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3705,11 +3743,14 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
               }
             ],
+            "more": [],
             "main": [
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
@@ -3949,6 +3990,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",

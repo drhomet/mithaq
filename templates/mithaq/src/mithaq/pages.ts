@@ -19,10 +19,11 @@ export const appPage = <const Main extends readonly unknown[], const More extend
     // A list keeps its title and New action together in its own header.
     ...(main.some((node) => !!node && typeof node === 'object' && 'layout' in node && node.layout === 'table') ? [] : [{ title: {} }]),
     ...(options?.status ?? []),
-    ...(holdsForm(main) ? [{ controls: {} }] : []),
-    // Hosts without secondary actions need not register the More layout.
-    ...((options?.more ? [{ layout: 'more' as const, main: options.more }] : []) as unknown as More extends readonly [] ? readonly [] : readonly { layout: 'more'; main: More }[]),
-  ], main }) as const
+  ],
+    primary: holdsForm(main) ? [{ controls: {} }] : [],
+    more: options?.more ?? [],
+    main,
+  }) as const
 
 /** Secondary record actions, with Delete last and its irreversible confirmation kept. */
 export const danger = <const Before extends readonly unknown[]>(...before: Before) =>

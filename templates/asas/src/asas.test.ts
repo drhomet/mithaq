@@ -19043,7 +19043,7 @@ test('sidebar metadata survives projection and hiding a list keeps its route and
   const client = built.targets.dashboard.client
   assert.equal(client.kayan.notes!.pages.list!.path, '/notes')
   assert.deepEqual(client.nav[0], { ...nav, path: '/notes', page: 'list', kayan: 'notes', permission: 'notes.find' })
-  assert.deepEqual(navOf(client, { permissions: '*' }), [])
+  assert.deepEqual(navOf(client, { permissions: '*' }), client.nav, 'hidden destinations stay available outside the sidebar')
   assert.ok(built.kayan.notes.operations.find, 'the authorized read operation still exists')
   assert.throws(() => build({ order: Infinity }), /order is no finite number/)
   assert.throws(() => build({ group: { name: '', label: { en: 'Settings', ar: 'الإعدادات' } } }), /group needs a name/)

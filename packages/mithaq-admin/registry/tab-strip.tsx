@@ -27,11 +27,17 @@ export function useRecordTab({ name, keys }: { name: string; keys: readonly stri
   }
 }
 
-/** Record and list tabs share one scroll boundary and keep the focused or active tab in view. */
+/** Record and list tabs share one scroll boundary and keep the active tab in view. */
 export function TabStrip({ value, variant = 'line', className, ...props }: ComponentProps<typeof TabsList> & { value?: string }) {
   const strip = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    strip.current?.querySelector<HTMLElement>('[role=tab][aria-selected=true]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    const list = strip.current
+    const active = list?.querySelector<HTMLElement>('[role=tab][aria-selected=true]')
+    if (!list || !active) return
+    const bounds = list.getBoundingClientRect()
+    const tab = active.getBoundingClientRect()
+    // Moving only this strip leaves the document's vertical reading position alone, including in RTL.
+    list.scrollLeft += tab.left < bounds.left ? tab.left - bounds.left : tab.right > bounds.right ? tab.right - bounds.right : 0
   }, [value])
   return (
     <TabsList
@@ -39,8 +45,7 @@ export function TabStrip({ value, variant = 'line', className, ...props }: Compo
       ref={strip}
       variant={variant}
       data-tab-strip=""
-      className={`max-w-full overflow-x-auto overflow-y-hidden [&>[role=tab]]:flex-none ${className ?? ''}`}
-      onFocus={(event) => (event.target as HTMLElement).closest<HTMLElement>('[role=tab]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })}
+      className={`[&>[role=tab][data-active]]:after:opacity-100 max-w-full overflow-x-auto overflow-y-hidden [&>[role=tab]]:flex-none ${className ?? ''}`}
     />
   )
 }

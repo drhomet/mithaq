@@ -46,7 +46,7 @@ import {
 import { navLabel } from './screen-nav.tsx'
 import { nameIn, showOrganization } from '../mithaq/auth/organizations.ts'
 
-export const regions = ['header', 'main'] as const
+export const regions = ['header', 'primary', 'more', 'main'] as const
 
 /** One icon per nav entry, keyed by the entry's path under the screen, and `Table2` for any other. */
 const icons: Record<string, LucideIcon> = {
@@ -128,7 +128,7 @@ function NavMain({ home }: { home?: string }) {
   const pathname = usePathname()
   const entries = [
     { path: '/', page: 'home', label: { [locale]: home ?? t('dashboard.dashboard', 'Dashboard') ?? 'Dashboard' } },
-    ...useNav(),
+    ...useNav().filter((entry) => !entry.hidden),
   ]
   return [...Map.groupBy(entries, (entry) => entry.group?.name ?? '').values()].map((group) => (
     <SidebarGroup key={group[0]!.group?.name ?? ''} data-nav-group={group[0]!.group?.name} data-nav-position={group[0]!.group?.position} className={group[0]!.group?.position === 'bottom' ? 'mt-auto' : undefined}>
@@ -204,7 +204,7 @@ export function BackofficeLink() {
 }
 
 /** The sidebar on the side the document's direction starts from. */
-export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['header', 'main'], ReactNode> & { brand?: ReactNode; home?: string; page?: { path: string } }) {
+export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['header', 'main'], ReactNode> & { regions: { primary?: ReactNode; more?: ReactNode } } & { brand?: ReactNode; home?: string; page?: { path: string } }) {
   const { dir, t } = useLocale()
   const state = use(ScreenContext)
   const list = state?.kayan?.pages.list
@@ -241,7 +241,7 @@ export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['h
           <div data-header-row="" className={headerRow}>
             <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 max-md:size-11" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-            <PageHeader t={t} breadcrumb={breadcrumb}>{regions.header}</PageHeader>
+            <PageHeader t={t} breadcrumb={breadcrumb} primary={regions.primary} more={regions.more}>{regions.header}</PageHeader>
             <BackofficeLink />
           </div>
         </header>
@@ -260,7 +260,7 @@ export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['h
  * The backoffice's frame, the dashboard's with two changes: the app's name where the organization switcher sits, since staff work above every organization and switch to none of them,
  * and the home entry named as its page names itself, so the nav and the page say one word.
  */
-export function BackofficeShell(props: ShellProps<readonly ['header', 'main'], ReactNode>) {
+export function BackofficeShell(props: ShellProps<readonly ['header', 'main'], ReactNode> & { regions: { primary?: ReactNode; more?: ReactNode } }) {
   const { t } = useLocale()
   return (
     <AppShell

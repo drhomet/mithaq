@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { use, useEffect, useState, type ReactElement } from 'react'
 import { Check } from 'lucide-react'
+import { PageBreadcrumb } from 'mithaq-admin/page-header.tsx'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -129,6 +130,7 @@ export function FormActions({
   viewing,
   views,
 }: FormActionsProps): ReactElement {
+  const breadcrumb = use(PageBreadcrumb)
   const size = header ? 'sm' : 'default'
   const tall = header ? 'max-sm:h-11' : ''
   const actions = (
@@ -160,7 +162,7 @@ export function FormActions({
       ) : null}
       {/* A dirty form asks before Cancel: the router's navigation raises no `beforeunload`, so the browser's
           guard does not see it. A clean form's Cancel is a plain button. */}
-      {onCancel ? (
+      {onCancel && !(autosaves && breadcrumb) ? (
         <Button
           type="button"
           variant="outline"

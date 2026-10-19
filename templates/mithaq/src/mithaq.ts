@@ -332,7 +332,6 @@ const shared = {
   controls: screenKinds,
   layouts: {
     app: ui('app-shell.tsx#AppShell'),
-    more: ui('page-actions.tsx#MoreActions'),
     record: ui('record-page.tsx#RecordPage'),
     table: ui('table-page.tsx#TablePage'),
   },

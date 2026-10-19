@@ -1,8 +1,11 @@
-import type { ReactNode } from 'react'
+import { createContext, type ReactNode } from 'react'
 import { ArrowLeft, Ellipsis } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Translate } from 'mithaq-admin/copy.ts'
+
+/** A breadcrumb already supplies the exit an autosaving form would otherwise draw. */
+export const PageBreadcrumb = createContext(false)
 
 /** Secondary actions stay beside the primary action and retain their own confirmations. */
 export function MoreActions({ children, t }: { children?: ReactNode; t: Translate }) {
@@ -21,29 +24,29 @@ export function MoreActions({ children, t }: { children?: ReactNode; t: Translat
 }
 
 /** One header contract for a list or record, with status above the page's tabs. */
-export function PageHeader({ breadcrumb, children, more, primary, status, t, title }: {
+export function PageHeader({ breadcrumb, children, more, primary, t, title }: {
   breadcrumb?: { href: string; label: string }
   title?: ReactNode
-  status?: ReactNode
   primary?: ReactNode
   more?: ReactNode
   children?: ReactNode
   t: Translate
 }) {
   return (
-    <div data-page-header="" className="flex min-w-0 flex-1 flex-col gap-2">
-      {breadcrumb ? (
-        <a href={breadcrumb.href} data-back="" className="text-muted-foreground flex w-fit items-center gap-1.5 text-sm hover:text-foreground max-sm:min-h-11">
-          <ArrowLeft aria-hidden="true" className="size-4 rtl:-scale-x-100" />
-          <span>{breadcrumb.label}</span>
-        </a>
-      ) : null}
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {title}
-        {status ? <span data-header-status="" className="rounded-md bg-muted px-2 py-0.5 text-xs">{status}</span> : null}
-        {children}
-        {primary || more ? <div className="ms-auto flex flex-wrap items-center gap-2">{primary}<MoreActions t={t}>{more}</MoreActions></div> : null}
+    <PageBreadcrumb value={!!breadcrumb}>
+      <div data-page-header="" className="flex min-w-0 flex-1 flex-col gap-2">
+        {breadcrumb ? (
+          <a href={breadcrumb.href} data-back="" className="text-muted-foreground flex w-fit items-center gap-1.5 text-sm hover:text-foreground max-sm:min-h-11">
+            <ArrowLeft aria-hidden="true" className="size-4 rtl:-scale-x-100" />
+            <span>{breadcrumb.label}</span>
+          </a>
+        ) : null}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {title}
+          {children}
+          {primary || more ? <div data-header-actions="" className="ms-auto flex items-center gap-2">{primary}<MoreActions t={t}>{more}</MoreActions></div> : null}
+        </div>
       </div>
-    </div>
+    </PageBreadcrumb>
   )
 }

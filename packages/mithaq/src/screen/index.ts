@@ -46,6 +46,7 @@ export type ScreenRef<Registered extends string = string> = Registered | Ui
 
 /** Sidebar placement only; routes and access are independent of navigation. */
 export type ScreenNav<Locale extends string = string> = {
+  readonly label?: Localized<Locale>
   readonly hidden?: boolean
   readonly order?: number
   readonly group?: {
@@ -626,6 +627,7 @@ export const screensOf = (
         if (nav.group.position !== undefined && nav.group.position !== 'bottom') throw new Error(`${at} group position must be bottom.`)
       }
       return {
+        ...(nav.label !== undefined && { label: copy(`${at} label`, nav.label) }),
         ...(nav.hidden !== undefined && { hidden: nav.hidden }),
         ...(nav.order !== undefined && { order: nav.order }),
         ...(nav.group && { group: { ...nav.group, label: copy(`${at} group label`, nav.group.label) } }),

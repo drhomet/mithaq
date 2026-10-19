@@ -15,6 +15,10 @@
       "path": "/members",
       "component": "./src/ui-dashboard/members.tsx#Members",
       "nav": {
+        "label": {
+          "en": "Members",
+          "ar": "الأعضاء"
+        },
         "order": 1,
         "group": {
           "name": "settings",
@@ -23,10 +27,6 @@
             "ar": "الإعدادات"
           },
           "position": "bottom"
-        },
-        "label": {
-          "en": "Members",
-          "ar": "الأعضاء"
         }
       },
       "permission": "member.find"
@@ -35,6 +35,10 @@
       "path": "/activity",
       "component": "@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage",
       "nav": {
+        "label": {
+          "en": "Activity",
+          "ar": "النشاط"
+        },
         "order": 4,
         "group": {
           "name": "settings",
@@ -43,10 +47,6 @@
             "ar": "الإعدادات"
           },
           "position": "bottom"
-        },
-        "label": {
-          "en": "Activity",
-          "ar": "النشاط"
         }
       },
       "permission": "auditLog.find"
@@ -155,6 +155,10 @@
     {
       "path": "/members",
       "page": "members",
+      "label": {
+        "en": "Members",
+        "ar": "الأعضاء"
+      },
       "order": 1,
       "group": {
         "name": "settings",
@@ -164,15 +168,15 @@
         },
         "position": "bottom"
       },
-      "label": {
-        "en": "Members",
-        "ar": "الأعضاء"
-      },
       "permission": "member.find"
     },
     {
       "path": "/activity",
       "page": "activity",
+      "label": {
+        "en": "Activity",
+        "ar": "النشاط"
+      },
       "order": 4,
       "group": {
         "name": "settings",
@@ -182,16 +186,11 @@
         },
         "position": "bottom"
       },
-      "label": {
-        "en": "Activity",
-        "ar": "النشاط"
-      },
       "permission": "auditLog.find"
     }
   ],
   "layouts": {
     "app": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
-    "more": "@asas/mithaq:./src/ui/page-actions.tsx#MoreActions",
     "record": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
     "table": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
     "top": "@asas/mithaq:./src/ui/top-shell.tsx#TopShell"
@@ -838,6 +837,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -1044,11 +1045,14 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
               }
             ],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
@@ -1179,106 +1183,105 @@
                     "equals": true
                   }
                 }
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
+              }
+            ],
+            "more": [
+              {
+                "button": "unpublish",
+                "label": {
+                  "en": "Unpublish",
+                  "ar": "إلغاء النشر"
+                },
+                "reload": true,
+                "component": "@asas/courses:./courses/ui/unpublish-button.tsx#UnpublishButton",
+                "confirm": {
+                  "title": {
+                    "en": "Unpublish this course?",
+                    "ar": "إلغاء نشر هذه الدورة؟"
+                  },
+                  "body": {
+                    "en": "It goes back to a draft that no student sees, until it is published again.",
+                    "ar": "تعود مسودة لا يراها أي طالب حتى تُنشر مجددا."
+                  }
+                },
+                "when": {
+                  "record._status": {
+                    "equals": "published"
+                  }
+                }
               },
               {
-                "layout": "@asas/mithaq:./src/ui/page-actions.tsx#MoreActions",
-                "main": [
-                  {
-                    "button": "unpublish",
-                    "label": {
-                      "en": "Unpublish",
-                      "ar": "إلغاء النشر"
-                    },
-                    "reload": true,
-                    "component": "@asas/courses:./courses/ui/unpublish-button.tsx#UnpublishButton",
-                    "confirm": {
-                      "title": {
-                        "en": "Unpublish this course?",
-                        "ar": "إلغاء نشر هذه الدورة؟"
-                      },
-                      "body": {
-                        "en": "It goes back to a draft that no student sees, until it is published again.",
-                        "ar": "تعود مسودة لا يراها أي طالب حتى تُنشر مجددا."
-                      }
-                    },
-                    "when": {
-                      "record._status": {
-                        "equals": "published"
-                      }
-                    }
+                "button": "archive",
+                "label": {
+                  "en": "Archive",
+                  "ar": "أرشفة"
+                },
+                "fields": [
+                  "reason"
+                ],
+                "reload": true,
+                "confirm": {
+                  "title": {
+                    "en": "Archive this course?",
+                    "ar": "أرشفة هذه الدورة؟"
                   },
-                  {
-                    "button": "archive",
-                    "label": {
-                      "en": "Archive",
-                      "ar": "أرشفة"
-                    },
-                    "fields": [
-                      "reason"
-                    ],
-                    "reload": true,
-                    "confirm": {
-                      "title": {
-                        "en": "Archive this course?",
-                        "ar": "أرشفة هذه الدورة؟"
-                      },
-                      "body": {
-                        "en": "It leaves the catalogue for every student.",
-                        "ar": "تخرج من الدليل لكل الطلاب."
-                      }
-                    },
-                    "when": {
-                      "or": [
-                        {
-                          "record.archived": {
-                            "exists": false
-                          }
-                        },
-                        {
-                          "record.archived": {
-                            "equals": false
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "button": "unarchive",
-                    "label": {
-                      "en": "Unarchive",
-                      "ar": "إلغاء الأرشفة"
-                    },
-                    "fields": [
-                      "reason"
-                    ],
-                    "reload": true,
-                    "confirm": {
-                      "title": {
-                        "en": "Unarchive this course?",
-                        "ar": "إلغاء أرشفة هذه الدورة؟"
-                      },
-                      "body": {
-                        "en": "It is back in the catalogue as it was.",
-                        "ar": "تعود إلى الدليل كما كانت."
-                      }
-                    },
-                    "when": {
-                      "record.archived": {
-                        "equals": true
-                      }
-                    }
-                  },
-                  {
-                    "button": "delete",
-                    "label": {
-                      "en": "Delete",
-                      "ar": "حذف"
-                    }
+                  "body": {
+                    "en": "It leaves the catalogue for every student.",
+                    "ar": "تخرج من الدليل لكل الطلاب."
                   }
-                ]
+                },
+                "when": {
+                  "or": [
+                    {
+                      "record.archived": {
+                        "exists": false
+                      }
+                    },
+                    {
+                      "record.archived": {
+                        "equals": false
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "button": "unarchive",
+                "label": {
+                  "en": "Unarchive",
+                  "ar": "إلغاء الأرشفة"
+                },
+                "fields": [
+                  "reason"
+                ],
+                "reload": true,
+                "confirm": {
+                  "title": {
+                    "en": "Unarchive this course?",
+                    "ar": "إلغاء أرشفة هذه الدورة؟"
+                  },
+                  "body": {
+                    "en": "It is back in the catalogue as it was.",
+                    "ar": "تعود إلى الدليل كما كانت."
+                  }
+                },
+                "when": {
+                  "record.archived": {
+                    "equals": true
+                  }
+                }
+              },
+              {
+                "button": "delete",
+                "label": {
+                  "en": "Delete",
+                  "ar": "حذف"
+                }
               }
             ],
             "main": [
@@ -1889,6 +1892,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -1942,11 +1947,14 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
               }
             ],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
@@ -2041,82 +2049,81 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
+              }
+            ],
+            "more": [
+              {
+                "button": "archive",
+                "label": {
+                  "en": "Archive",
+                  "ar": "أرشفة"
+                },
+                "fields": [
+                  "reason"
+                ],
+                "reload": true,
+                "confirm": {
+                  "title": {
+                    "en": "Archive this session?",
+                    "ar": "أرشفة هذه الجلسة؟"
+                  },
+                  "body": {
+                    "en": "It stays on the course, marked archived.",
+                    "ar": "تبقى في الدورة، معلمة بأنها مؤرشفة."
+                  }
+                },
+                "when": {
+                  "or": [
+                    {
+                      "record.archived": {
+                        "exists": false
+                      }
+                    },
+                    {
+                      "record.archived": {
+                        "equals": false
+                      }
+                    }
+                  ]
+                }
               },
               {
-                "layout": "@asas/mithaq:./src/ui/page-actions.tsx#MoreActions",
-                "main": [
-                  {
-                    "button": "archive",
-                    "label": {
-                      "en": "Archive",
-                      "ar": "أرشفة"
-                    },
-                    "fields": [
-                      "reason"
-                    ],
-                    "reload": true,
-                    "confirm": {
-                      "title": {
-                        "en": "Archive this session?",
-                        "ar": "أرشفة هذه الجلسة؟"
-                      },
-                      "body": {
-                        "en": "It stays on the course, marked archived.",
-                        "ar": "تبقى في الدورة، معلمة بأنها مؤرشفة."
-                      }
-                    },
-                    "when": {
-                      "or": [
-                        {
-                          "record.archived": {
-                            "exists": false
-                          }
-                        },
-                        {
-                          "record.archived": {
-                            "equals": false
-                          }
-                        }
-                      ]
-                    }
+                "button": "unarchive",
+                "label": {
+                  "en": "Unarchive",
+                  "ar": "إلغاء الأرشفة"
+                },
+                "fields": [
+                  "reason"
+                ],
+                "reload": true,
+                "confirm": {
+                  "title": {
+                    "en": "Unarchive this session?",
+                    "ar": "إلغاء أرشفة هذه الجلسة؟"
                   },
-                  {
-                    "button": "unarchive",
-                    "label": {
-                      "en": "Unarchive",
-                      "ar": "إلغاء الأرشفة"
-                    },
-                    "fields": [
-                      "reason"
-                    ],
-                    "reload": true,
-                    "confirm": {
-                      "title": {
-                        "en": "Unarchive this session?",
-                        "ar": "إلغاء أرشفة هذه الجلسة؟"
-                      },
-                      "body": {
-                        "en": "It is open again as it was.",
-                        "ar": "تعود مفتوحة كما كانت."
-                      }
-                    },
-                    "when": {
-                      "record.archived": {
-                        "equals": true
-                      }
-                    }
-                  },
-                  {
-                    "button": "delete",
-                    "label": {
-                      "en": "Delete",
-                      "ar": "حذف"
-                    }
+                  "body": {
+                    "en": "It is open again as it was.",
+                    "ar": "تعود مفتوحة كما كانت."
                   }
-                ]
+                },
+                "when": {
+                  "record.archived": {
+                    "equals": true
+                  }
+                }
+              },
+              {
+                "button": "delete",
+                "label": {
+                  "en": "Delete",
+                  "ar": "حذف"
+                }
               }
             ],
             "main": [
@@ -2446,6 +2453,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2491,11 +2500,14 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
               }
             ],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
@@ -2535,21 +2547,20 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
-              },
+              }
+            ],
+            "more": [
               {
-                "layout": "@asas/mithaq:./src/ui/page-actions.tsx#MoreActions",
-                "main": [
-                  {
-                    "button": "delete",
-                    "label": {
-                      "en": "Delete",
-                      "ar": "حذف"
-                    }
-                  }
-                ]
+                "button": "delete",
+                "label": {
+                  "en": "Delete",
+                  "ar": "حذف"
+                }
               }
             ],
             "main": [
@@ -2750,6 +2761,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -2785,11 +2798,14 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
               }
             ],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
@@ -2816,21 +2832,20 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
-              },
+              }
+            ],
+            "more": [
               {
-                "layout": "@asas/mithaq:./src/ui/page-actions.tsx#MoreActions",
-                "main": [
-                  {
-                    "button": "delete",
-                    "label": {
-                      "en": "Delete",
-                      "ar": "حذف"
-                    }
-                  }
-                ]
+                "button": "delete",
+                "label": {
+                  "en": "Delete",
+                  "ar": "حذف"
+                }
               }
             ],
             "main": [
@@ -3128,6 +3143,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3183,21 +3200,20 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
-              },
+              }
+            ],
+            "more": [
               {
-                "layout": "@asas/mithaq:./src/ui/page-actions.tsx#MoreActions",
-                "main": [
-                  {
-                    "button": "delete",
-                    "label": {
-                      "en": "Delete",
-                      "ar": "حذف"
-                    }
-                  }
-                ]
+                "button": "delete",
+                "label": {
+                  "en": "Delete",
+                  "ar": "حذف"
+                }
               }
             ],
             "main": [
@@ -3435,6 +3451,8 @@
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#AppShell",
             "header": [],
+            "primary": [],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/table-page.tsx#TablePage",
@@ -3474,11 +3492,14 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
               }
             ],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",
@@ -3515,22 +3536,21 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
-              },
+              }
+            ],
+            "more": [
               {
-                "layout": "@asas/mithaq:./src/ui/page-actions.tsx#MoreActions",
-                "main": [
-                  {
-                    "button": "delete",
-                    "label": {
-                      "en": "Delete",
-                      "ar": "حذف"
-                    },
-                    "component": "@asas/roles:./roles/ui/roles.tsx#DeleteRole"
-                  }
-                ]
+                "button": "delete",
+                "label": {
+                  "en": "Delete",
+                  "ar": "حذف"
+                },
+                "component": "@asas/roles:./roles/ui/roles.tsx#DeleteRole"
               }
             ],
             "main": [
@@ -3851,11 +3871,14 @@
             "header": [
               {
                 "title": {}
-              },
+              }
+            ],
+            "primary": [
               {
                 "controls": {}
               }
             ],
+            "more": [],
             "main": [
               {
                 "layout": "@asas/mithaq:./src/ui/record-page.tsx#RecordPage",

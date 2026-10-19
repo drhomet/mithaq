@@ -911,7 +911,7 @@ test('39. the dashboard course pages draw every control a course field they name
   assert.match(await screenHtml(`/dashboard/courses/${screenCourse}`), /data-slot="input-otp-slot"/, 'otp')
 })
 
-test('40. the dashboard edit page carries the row, a leaf read-only on this page alone, and the danger zone its button asks for', async () => {
+test('40. the dashboard edit page carries the row, a read-only leaf, and secondary actions beside the form controls', async () => {
   const html = await screenHtml(`/dashboard/courses/${screenCourse}`)
   assert.match(html, /data-record="row"/, 'the layout gets the row')
   assert.match(html, /data-field-value="archived"/, 'archived is read-only here, read as text')
@@ -919,7 +919,8 @@ test('40. the dashboard edit page carries the row, a leaf read-only on this page
   assert.ok(!html.includes('data-region="danger"'), 'the template keeps secondary actions out of a permanent danger panel')
   assert.match(html, /aria-label="More actions"/, 'the secondary actions open from More')
   const header = html.slice(html.indexOf('data-region="header"'), html.indexOf('</header>'))
-  assert.ok(header.includes('>Publish changes<') && header.includes('>Back to list<') && header.includes('>Save draft<') && !header.includes('>Delete<'), 'and the controls hold Back to list beside the autosaved draft, Save draft and Publish changes, and no delete')
+  assert.ok(header.includes('>Publish changes<') && header.includes('>Save draft<') && !header.includes('>Back to list<') && !header.includes('>Delete<'), 'the controls keep Save draft and Publish changes while the breadcrumb supplies the way back')
+  assert.ok(header.includes('data-back=""') && header.includes('data-header-actions=""'), 'the breadcrumb and shared action row belong to the header')
   const form = html.slice(html.indexOf('<form'), html.indexOf('</form>'))
   assert.ok(!form.includes('type="submit"') && !form.includes('>Delete<'), 'while the form draws no save and no delete of its own')
   assert.ok(!html.includes('courseActivityPanel'), 'with no placeholder panel on the page')
@@ -1045,11 +1046,6 @@ const walkScreen = async (name: 'dashboard' | 'portal') => {
       const kind = 'layout' in node ? 'layout' : ['form', 'list', 'button', 'title', 'nav', 'controls', 'component', 'row', 'separator', 'section', 'tabs', 'accordion'].find((one) => one in node)!
       expected.push([`node ${kind}`, new RegExp(`data-node="${kind}"`)])
       if (kind === 'layout') {
-        // A popover draws its children after hydration, covered by the mounted menu tests.
-        if (node.layout === screen.layouts.more) {
-          expected.push(['secondary action trigger', /aria-label="More actions"/])
-          continue
-        }
         for (const nodes of regionsOf(node)) walk(kayan, nodes, inForm)
         continue
       }
@@ -1075,11 +1071,19 @@ const walkScreen = async (name: 'dashboard' | 'portal') => {
       if (!page.page) continue
       const shell = Object.entries(screen.layouts).find(([, file]) => file === page.page!.shell)![0]
       expected.push([`shell ${shell}`, new RegExp(`data-shell="${shell}"`)])
-      for (const [region] of Object.entries(page.page).filter(([key]) => key !== 'shell')) expected.push([`${shell} region ${region}`, new RegExp(`data-region="${region}"`)])
+      for (const [region] of Object.entries(page.page).filter(([key]) => !['shell', 'primary', 'more'].includes(key))) expected.push([`${shell} region ${region}`, new RegExp(`data-region="${region}"`)])
       // A page whose tree holds a form is drawn by the form from its shell
       // down, so every leaf on it is a control.
       const holdsForm = JSON.stringify(page.page).includes('"form":[')
-      for (const nodes of regionsOf(page.page)) walk(kayan, nodes, holdsForm)
+      for (const [region, nodes] of Object.entries(page.page)) {
+        if (!Array.isArray(nodes)) continue
+        // Secondary buttons live in a popover after hydration; mounted tests exercise their confirmations.
+        if (region === 'more') {
+          if (nodes.length) expected.push(['secondary action trigger', /aria-label="More actions"/])
+          continue
+        }
+        walk(kayan, nodes, holdsForm)
+      }
     }
   }
   for (const page of Object.values(screen.pages)) html += await screenHtml(`${screen.path}${page.path === '/' ? '' : page.path}`)
@@ -2228,7 +2232,7 @@ test('64. the course edit page draws its tabs at page level as the line bar, Det
     assert.ok(header.includes('data-node="controls"'), `${locale}: the header holds the form's controls`)
     assert.match(header, new RegExp(`data-slot="badge"[^>]*data-status="published"[^>]*>${words.published}<|data-status="published"[^>]*data-slot="badge"[^>]*>${words.published}<`), `${locale}: where the row stands, as a pill`)
     assert.ok(header.includes(`>${words.updated}`), `${locale}: when it was last saved`)
-    assert.ok(header.includes(`>${words.cancel}<`), `${locale}: Back to list, beside a draft that saves itself`)
+    assert.ok(!header.includes(`>${words.cancel}<`) && header.includes('data-back=""'), `${locale}: the breadcrumb supplies the only way back`)
     const formId = html.match(/<form id="([^"]+)"/)?.[1]
     assert.ok(formId, 'the page holds one form')
     assert.match(header, new RegExp(`<button[^>]*type="submit"[^>]*form="${formId}"[^>]*data-button="publish"|<button[^>]*form="${formId}"[^>]*type="submit"`), `${locale}: and a submit naming the page's form by its id`)

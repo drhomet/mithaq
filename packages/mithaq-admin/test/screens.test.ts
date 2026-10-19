@@ -995,3 +995,31 @@ test('a field keeps its box when a when hides a node before it, so typing never 
   assert.equal(host.querySelector('#courses-title') === title, true, 'the title is the same box, not a new one')
   assert.equal(host.querySelector('#courses-currency') === later, true, 'and so is a field in a later run whose own earlier node was hidden')
 })
+
+
+test('selecting a distant record tab moves only its strip in both directions', async () => {
+  const { Tabs, TabsTrigger } = await import('../registry/ui/tabs.tsx')
+  const { TabStrip } = await import('../registry/tab-strip.tsx')
+  const prototype = window.HTMLElement.prototype
+  const rectangle = prototype.getBoundingClientRect
+  const scroll = prototype.scrollIntoView
+  let pageScrolls = 0
+  prototype.scrollIntoView = () => { pageScrolls++ }
+  prototype.getBoundingClientRect = function () {
+    const left = this.getAttribute('role') === 'tab' ? (this.textContent === 'left' ? -80 : 340) : 0
+    const width = this.hasAttribute('data-tab-strip') ? 300 : 100
+    const bounds = rectangle.call(this)
+    Object.assign(bounds, { x: left, width })
+    return bounds
+  }
+  try {
+    for (const [side, expected] of [['right', 140], ['left', -80]] as const) {
+      const host = await render(createElement(Tabs, { defaultValue: 'distant' }, createElement(TabStrip, { value: side }, createElement(TabsTrigger, { value: 'distant' }, side))))
+      assert.equal(host.querySelector<HTMLElement>('[data-tab-strip]')!.scrollLeft, expected)
+      assert.equal(pageScrolls, 0, 'selection never asks an ancestor to scroll')
+    }
+  } finally {
+    prototype.getBoundingClientRect = rectangle
+    prototype.scrollIntoView = scroll
+  }
+})

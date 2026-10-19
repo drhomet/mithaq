@@ -20,18 +20,24 @@ export function ListHeader({ about, create, of, t, title }: {
   return (
     // `flex-wrap`: on a phone the title and the button share 320 pixels.
     <header className="flex min-w-0 flex-wrap">
-    <PageHeader t={t} title={<div className="grid min-w-0 gap-1">
-        {title === undefined ? null : <Heading className={of ? 'text-lg font-semibold' : 'text-2xl font-bold tracking-tight'}>{title}</Heading>}
-        {about ? <p className="text-muted-foreground text-sm">{about}</p> : null}
-      </div>} primary={create === undefined ? null : 'onAdd' in create ? (
-        <Button type="button" className="max-sm:h-11" onClick={create.onAdd}>
-          <Plus className="me-2 h-4 w-4" />{create.label}
-        </Button>
-      ) : (
-        <Button nativeButton={false} className="max-sm:h-11" render={<a href={create.href} />}>
-          <Plus className="me-2 h-4 w-4" />{create.label}
-        </Button>
-      )} />
+      <PageHeader
+        t={t}
+        title={<div className="grid min-w-0 gap-1">
+          {title === undefined ? null : <Heading className={of ? 'text-lg font-semibold' : 'text-2xl font-bold tracking-tight'}>{title}</Heading>}
+          {about ? <p className="text-muted-foreground text-sm">{about}</p> : null}
+        </div>}
+        primary={create === undefined ? null : 'onAdd' in create ? (
+          // A list of another kayan adds a row in place, below the table.
+          <Button type="button" className="max-sm:h-11" onClick={create.onAdd}>
+            <Plus className="me-2 h-4 w-4" />{create.label}
+          </Button>
+        ) : (
+          // `render` keeps the destination an anchor; base-ui must not treat it as a native button.
+          <Button nativeButton={false} className="max-sm:h-11" render={<a href={create.href} />}>
+            <Plus className="me-2 h-4 w-4" />{create.label}
+          </Button>
+        )}
+      />
     </header>
   )
 }
