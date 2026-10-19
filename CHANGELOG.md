@@ -1,8 +1,19 @@
 # Changelog
 
+## 0.2.2
+
+### Upgrade notes
+
+- Regenerate screens. Text fields with declared options now use selects, text arrays with options use checkbox groups, and literal create defaults are projected into screens.
+- Create forms display and send declared defaults. Publishing a new record leaves its status to the server.
+- `ControlProps` gains optional `id`, `describedBy` and `form` props. Custom controls should put them on their input as `id`, `aria-describedby` and `form`.
+- Time controls show Latin digits in every locale.
+- Refusal copy may use `{param}` placeholders for the server's message parameters.
+- Apps may delete the unused `admin.toolbarWarning` and `admin.operationWarning` copy keys.
+
 ## 0.2.1
 
-Documentation only; no code changed. The guides that ship in the package now cover every 0.2.0 change: the [0.1.1 to 0.2.0 upgrade guide](templates/asas/README.md#011-to-020), the whole store contract, why `drizzleTarget` became `drizzleAdapter`'s named defaults, the nested message format with `$value`, and the query limits. This changelog starts.
+Documentation only; no code changed. The guides that ship in the package now cover every 0.2.0 change: the [0.1.1 to 0.2.0 upgrade guide](templates/asas/README.md#011-to-020), the whole store contract, the store adapter's named defaults, the nested message format with `$value`, and the query limits. This changelog starts.
 
 ## 0.2.0
 

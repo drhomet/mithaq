@@ -249,7 +249,6 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     bulkLeft_few: { en: '{count} of the ticked rows were left as they are, because they have never been published.', ar: 'تُركت {count} صفوف محددة كما هي، لأنها لم تُنشر قط.' },
     bulkLeft_many: { en: '{count} of the ticked rows were left as they are, because they have never been published.', ar: 'تُرك {count} صفا محددا كما هي، لأنها لم تُنشر قط.' },
     bulkLeft_other: { en: '{count} of the ticked rows were left as they are, because they have never been published.', ar: 'تُرك {count} صف محدد كما هي، لأنها لم تُنشر قط.' },
-    toolbarWarning: { en: 'This runs on no row of the list.', ar: 'لا يعمل هذا على أي صف من القائمة.' },
     rowWarning: { en: 'This applies to this row.', ar: 'ينطبق هذا على هذا الصف.' },
     rowNamedWarning: { en: 'This applies to {name}.', ar: 'ينطبق هذا على {name}.' },
     noColumns: {
@@ -260,7 +259,6 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       en: 'This link asks the list for something it does not offer, so nothing was read.',
       ar: 'يطلب هذا الرابط من القائمة ما لا تقدمه، فلم يُقرأ شيء.',
     },
-    operationWarning: { en: 'This runs on the row you are editing.', ar: 'يعمل هذا على الصف الذي تحرره.' },
     permissions: { en: 'Permissions', ar: 'الصلاحيات' },
     record: { en: 'Record', ar: 'السجل' },
     invalidFields: { en: 'Fields needing attention: {count}', ar: 'حقول تحتاج إلى مراجعة: {count}' },
