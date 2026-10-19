@@ -7,6 +7,7 @@ import { type Where } from '../mithaq/where.ts'
 import { bulkSeals, readSeals, sealOf, storeSeals } from '../asas/runner/steps.ts'
 import { kindOf, type NodeKind } from './studio.ts'
 import { implementationOf } from '../mithaq/rukn.ts'
+import { isRef } from '../mithaq/user.ts'
 
 /** What one kind is drawn by on a screen: its form control and its list cell, each a name or a `ui()` reference. */
 export type ScreenKind = { readonly cell: string | Ui; readonly control: string | Ui }
@@ -249,8 +250,7 @@ type FieldData = {
   // The label function is left off: the projection is built once per boot, so calling
   // it would freeze one locale into every request. The browser resolves `<kayan>.<field>`.
   label?: Localized
-  // Data rules only: a project rule's value may be a closure. `defaultValue` is left
-  // off, since it may name the actor's keys or carry a value for a field nobody may read.
+  // Actor defaults and application-provided values stay on the server.
   rules: Readonly<Record<string, unknown>>
   /** Relationship and join only: the name of the kayan this field points at. */
   relationTo?: string
@@ -388,7 +388,8 @@ export const clientFieldOf = (name: string, field: RuntimeField & { target?: { n
   ...(typeof field.label === 'object' && { label: field.label }),
   rules: Object.fromEntries(
     Object.entries(field.rules ?? {}).filter(
-      ([rule, value]) => rule !== 'defaultValue' && typeof value !== 'function',
+      ([rule, value]) => typeof value !== 'function' && (rule !== 'defaultValue'
+        || (!isRef(value) && ((field.rules?.providedBy as { create?: string } | undefined)?.create ?? 'client') === 'client')),
     ),
   ),
   // A declared operation input field is resolved nowhere, so its target is read off the declaration.

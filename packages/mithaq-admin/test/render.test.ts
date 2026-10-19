@@ -1945,3 +1945,15 @@ test('56. every control a form draws has a name a screen reader says: a radio gr
   const nameless = controls.filter((one) => !nameOf(one)).map((one) => one.outerHTML.slice(0, 160))
   assert.deepEqual(nameless, [], 'and no control is left without a name')
 })
+
+
+test('audit F09: create fields start from their declared literal defaults without changing missing update fields', async () => {
+  const { clientFieldOf } = await import('../../../packages/mithaq/src/screen/index.ts')
+  const projected = clientFieldOf('active', { kind: 'checkbox', rules: { defaultValue: true } })
+  const field = fieldOf({ ...projected, component: 'checkbox', cell: 'checkbox' })
+  assert.equal(seedOf([field], null).active, true)
+  assert.equal(seedOf([field], { id: 'hidden' }).active, undefined)
+  assert.equal(seedOf([field], { active: false }).active, false)
+  assert.equal(clientFieldOf('actor', { kind: 'text', rules: { defaultValue: { $user: 'id' } } }).rules.defaultValue, undefined)
+  assert.equal(clientFieldOf('secret', { kind: 'text', rules: { defaultValue: 'hidden', providedBy: { create: 'application' } } }).rules.defaultValue, undefined)
+})

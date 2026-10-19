@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { besideLabel, controlFor, useComponents } from 'mithaq-admin/components.tsx'
 import type { FindApi } from 'mithaq-admin/control-props.ts'
 import { operationFieldLabelFor, operationLabelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { seedOf } from 'mithaq-admin/field-values.ts'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { issuesOf, refusalWords } from 'mithaq-admin/form-rules.tsx'
 import { BulkChoice, type PageButton } from 'mithaq-admin/node-buttons.tsx'
@@ -58,9 +59,10 @@ export function OperationButton({
   const [held, setHeld] = useState(false)
   const open = controlled.open ?? held
   const setOpen = (next: boolean) => (controlled.onOpenChange ?? setHeld)(next)
-  const [values, setValues] = useState<Record<string, unknown>>({})
-  const [refused, setRefused] = useState<unknown>(undefined)
   const fields = operation.fields ?? []
+  const initial = () => operation.effect === 'create' ? seedOf(fields) : {}
+  const [values, setValues] = useState<Record<string, unknown>>(initial)
+  const [refused, setRefused] = useState<unknown>(undefined)
   const setValue = (name: string, next: unknown) => {
     if (!busy && fields.some((field) => field.name === name)) setValues((already) => ({ ...already, [name]: next }))
   }
@@ -68,7 +70,7 @@ export function OperationButton({
   const close = () => {
     setOpen(false)
     setRefused(undefined)
-    setValues({})
+    setValues(initial())
   }
   const label = operationLabelFor({ kayan, operation, copy })
   const shown = refusalKeyOf(refused)
@@ -157,6 +159,7 @@ export function OperationButton({
                   client={kayans}
                   api={api}
                   t={t}
+                  locale={copy.locale}
                   id={inputId}
                   value={values[field.name]}
                   values={values}

@@ -20,11 +20,11 @@ export const seedOf = (fields: readonly ClientField[], value?: Record<string, un
   Object.fromEntries(
     fields.map((field) => [
       field.name,
-      // On a create a checkbox starts `false` and a required text list `[]`, as drawn; an update leaves a missing key
+      // A create starts from its declared default, else false or [] where drawn; an update leaves a missing key
       // unseeded, since it is a column this actor may not read and seeding it would overwrite the row.
       field.kind === 'datetime' && typeof value?.[field.name] === 'string' && !Number.isNaN(new Date(value[field.name] as string).getTime())
         ? new Date(value[field.name] as string)
-        : value?.[field.name] ?? (value ? undefined : field.kind === 'checkbox' ? false : field.kind === 'textArray' && field.rules.required === true ? [] : undefined),
+        : value?.[field.name] ?? (value ? undefined : field.rules.defaultValue !== undefined ? structuredClone(field.rules.defaultValue) : field.kind === 'checkbox' ? false : field.kind === 'textArray' && field.rules.required === true ? [] : undefined),
     ]),
   )
 
