@@ -8173,6 +8173,7 @@ test('audit F01: an operation keeps its footer outside its scrolling fields with
   const body = dialog.querySelector('form > [data-operation-fields]')!
   assert.ok(body)
   assert.match(body.className, /overflow-y-auto/)
+  assert.ok(body.classList.contains('-mx-1') && body.classList.contains('px-1'), 'the scrolling fields leave room around a full-width input focus ring')
   assert.equal(body.contains(dialog.querySelector('[data-slot="alert-dialog-footer"]')!), false)
 })
 
