@@ -7,7 +7,7 @@ import { useDirection } from '@/components/ui/direction'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ariaRequired, changeOf, type ControlProps } from 'mithaq-admin/control-props.ts'
 import { labelFor } from 'mithaq-admin/copy.ts'
-import { asMoment, formatDate } from 'mithaq-admin/format.tsx'
+import { asMoment } from 'mithaq-admin/format.tsx'
 import { TimeField } from 'mithaq-admin/time-field.tsx'
 
 const dayPickerLocales: Record<string, typeof enUS> = { ar, en: enUS }
@@ -28,7 +28,7 @@ export function DatePicker(props: ControlProps): ReactElement {
   const time = clock.slice(11)
   // A moment is held only when both its day and its time are set: a day picked before any time is typed stays here and writes nothing.
   const [picked, setPicked] = useState<Date | undefined>()
-  // False only while hydrating, so the server and the first client render agree on a moment's day (UTC); the viewer's own day follows once mounted.
+  // ICU punctuation differs across runtimes even in UTC; only the mounted viewer formats the date.
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false)
   const held = moment ? (clock ? new Date(clock) : picked) : dayOf(value)
   const at = (day: Date, text: string) => {
@@ -37,7 +37,8 @@ export function DatePicker(props: ControlProps): ReactElement {
   }
   const label = labelFor({ kayan: props.kayan, field, copy: { t, locale } })
   const shown = held
-    ? (moment && clock && !mounted ? formatDate({ value, locale, day: true }) : undefined) ?? new Intl.DateTimeFormat(locale || undefined, { dateStyle: 'long' }).format(held)
+    ? !mounted ? (moment ? new Date(value as string).toISOString().slice(0, 10) : String(value))
+      : new Intl.DateTimeFormat(locale || undefined, { dateStyle: 'long' }).format(held)
     : placeholder ?? t('admin.pickDate', 'Pick a date')
   return (
     // Wraps, so a phone puts the time under the day.

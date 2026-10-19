@@ -8284,3 +8284,39 @@ test('audit F02b: a child refresh updates clean touched fields and keeps unsaved
   assert.equal(title().value, 'Unsaved')
   assert.equal((host.querySelector('[name="summary"]') as HTMLTextAreaElement).value, 'Fresh summary 2')
 })
+
+test('audit F22: Arabic date pickers hydrate across ICU punctuation differences', async () => {
+  const { DatePicker } = await import('../registry/date-control.tsx')
+  const { renderToString } = await import('react-dom/server')
+  const { hydrateRoot } = await import('react-dom/client')
+  const descriptor = Object.getOwnPropertyDescriptor(Intl.DateTimeFormat.prototype, 'format')!
+  const host = mount()
+  const problems: unknown[] = []
+  const draw = () => createElement(DatePicker, { kayan: courses, field: fieldOf({ name: 'at', kind: 'datetime' }),
+    id: 'at', value: '2026-10-19T08:00:00Z', locale: 'ar', t, readOnly: false, values: {}, setValue: () => {}, onChange: () => {},
+  })
+  let root: ReturnType<typeof hydrateRoot> | undefined
+  try {
+    Object.defineProperty(Intl.DateTimeFormat.prototype, 'format', { configurable: true, get() { return () => '19 أكتوبر، 2026' } })
+    host.innerHTML = renderToString(draw())
+    Object.defineProperty(Intl.DateTimeFormat.prototype, 'format', { configurable: true, get() { return () => '19 أكتوبر 2026' } })
+    await act(async () => { root = hydrateRoot(host, draw(), { onRecoverableError: (error) => problems.push(error) }) })
+    assert.deepEqual(problems, [])
+    assert.equal(host.querySelector('#at-day')?.textContent, '19 أكتوبر 2026')
+  } finally {
+    Object.defineProperty(Intl.DateTimeFormat.prototype, 'format', descriptor)
+    await act(async () => root?.unmount())
+  }
+})
+
+test('audit: read-only values omit editing hints while controls retain them', async () => {
+  const { FieldValue } = await import('../registry/field-value.tsx')
+  const { LeafControl } = await import('../registry/leaf-control.tsx')
+  const field = fieldOf({ name: 'title', kind: 'text', description: { en: 'Choose the customer.' } })
+  const value = await render(createElement(FieldValue, { kayan: courses, field, row: { title: 'Buyer' }, copy: { t, locale: 'en' } }))
+  assert.equal(value.textContent?.includes('Choose the customer.'), false)
+  const control = await render(createElement(LeafControl, { kayan: courses, field, value: '', copy: { t, locale: 'en' },
+    form: 'create', values: {}, setValue: () => {}, onChange: () => {}, readOnly: false,
+  }))
+  assert.ok(control.textContent?.includes('Choose the customer.'))
+})
