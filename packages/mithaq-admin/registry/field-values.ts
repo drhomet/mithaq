@@ -18,14 +18,12 @@ export const createsIn = ({ kayan, report }: { kayan: ClientKayan; report: NonNu
  */
 export const seedOf = (fields: readonly ClientField[], value?: Record<string, unknown> | null): Record<string, unknown> =>
   Object.fromEntries(
-    fields.map((field) => [
-      field.name,
+    fields.map((field) => {
       // A create starts from its declared default, else false or [] where drawn; an update leaves a missing key
       // unseeded, since it is a column this actor may not read and seeding it would overwrite the row.
-      field.kind === 'datetime' && typeof value?.[field.name] === 'string' && !Number.isNaN(new Date(value[field.name] as string).getTime())
-        ? new Date(value[field.name] as string)
-        : value?.[field.name] ?? (value || field.name === '_status' ? undefined : field.rules.defaultValue !== undefined ? structuredClone(field.rules.defaultValue) : field.kind === 'checkbox' ? false : field.kind === 'textArray' && field.rules.required === true ? [] : undefined),
-    ]),
+      const held = value?.[field.name] ?? (value || field.name === '_status' ? undefined : field.rules.defaultValue !== undefined ? structuredClone(field.rules.defaultValue) : field.kind === 'checkbox' ? false : field.kind === 'textArray' && field.rules.required === true ? [] : undefined)
+      return [field.name, field.kind === 'datetime' && typeof held === 'string' && !Number.isNaN(new Date(held).getTime()) ? new Date(held) : held]
+    }),
   )
 
 /**

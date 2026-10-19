@@ -178,6 +178,14 @@ test('a datetime read enters form values as a Date', () => {
   assert.equal(values.startsAt.toISOString(), '2026-01-02T03:04:00.000Z')
 })
 
+test('a datetime default serialized into a screen enters create values as a Date without filling an unread update', () => {
+  const field: ClientField = JSON.parse(JSON.stringify(fieldOf({ name: 'startsAt', kind: 'datetime', rules: { defaultValue: new Date('2026-01-02T03:04:00.000Z') } })))
+  const made = seedOf([field])
+  assert.ok(made.startsAt instanceof Date)
+  assert.equal(made.startsAt.toISOString(), '2026-01-02T03:04:00.000Z')
+  assert.equal(seedOf([field], { id: 'hidden' }).startsAt, undefined)
+})
+
 test('a create seeds a required list of text as the empty list it draws, and leaves an optional one out so its defaultValue still fills it on the server', () => {
   const lists = [fieldOf({ name: 'permissions', kind: 'textArray', rules: { required: true } }), fieldOf({ name: 'tags', kind: 'textArray' })]
   const made = seedOf(lists, null)
