@@ -4,8 +4,13 @@
 
 ### Upgrade notes
 
+- Run `mithaq upgrade --check` and merge the changes into the held `src/screens.tsx` and any ejected `list.tsx`, `operation-button.tsx`, `form.tsx`, `node-groups.tsx` and `list-table.tsx`. Record-action dialogs and parent refreshes after child writes live in the screen host; an older copy still compiles but misses these fixes.
 - Regenerate screens. Text fields with declared options now use selects, text arrays with options use checkbox groups, and literal create defaults are projected into screens.
-- Create forms display and send declared defaults. Publishing a new record leaves its status to the server.
+- Create forms display and send declared defaults. Publishing a new record leaves its status to the server. Datetime defaults serialized into screens are restored as `Date` values.
+- New, the relationship picker's "+" and uploads require an operation named `create`. Another operation with a create effect does not enable them.
+- Create-effect operation dialogs start from declared defaults, with `false` for checkboxes and `[]` for required text arrays. Their fields scroll within the viewport while the footer stays reachable, with room for input focus rings. Standalone dialogs drop the generic row-selection sentence.
+- Optional selects offer Clear to return to an empty `null` value after a choice.
+- Phone layouts use `min-w-0` to keep nested tables within the page and scrolling tab strips with space for the active underline.
 - `ControlProps` gains optional `id`, `describedBy` and `form` props. Custom controls should put them on their input as `id`, `aria-describedby` and `form`.
 - Time controls show Latin digits in every locale.
 - Date pickers wait until mount to show the local day and hydrate consistently across locale formats.
