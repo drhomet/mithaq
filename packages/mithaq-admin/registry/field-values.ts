@@ -11,7 +11,7 @@ export const readOnlyField = (field: ClientField, on: 'create' | 'update'): bool
  * Whether the report lets this actor create a row of a kayan with something to write: the create, and at least one client-provided field they may set. A role that may set only server-filled fields meets no New.
  */
 export const createsIn = ({ kayan, report }: { kayan: ClientKayan; report: NonNullable<AccessReport['collections']>[string] }): boolean =>
-  report?.create === true && kayan.fields.some((field) => !readOnlyField(field, 'create') && report.fields?.[field.name]?.create === true)
+  kayan.operations.some((operation) => operation.name === 'create') && report?.create === true && kayan.fields.some((field) => !readOnlyField(field, 'create') && report.fields?.[field.name]?.create === true)
 
 /**
  * What a form starts holding: the row's values, one key per field, so a control is controlled from its first render. A field the row does not carry starts `undefined` and stays out of the write until something sets it.
