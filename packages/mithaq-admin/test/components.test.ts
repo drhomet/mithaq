@@ -235,7 +235,7 @@ test('audit F08: declared options use a select in field and operation projection
   const { language, notes } = await import('./plain-language.ts')
   const choice = { kind: 'text' as const, label: { en: 'Stage', ar: 'المرحلة' }, options: [{ value: 'ready', label: { en: 'Ready', ar: 'جاهز' } }] }
   const declared = language.defineKayan({
-    ...notes,
+    name: notes.name,
     fields: { ...notes.fields, stage: choice },
     targets: { ...notes.targets, service: { operations: {
       ...notes.targets.service.operations,

@@ -79,6 +79,7 @@ export function OperationButton({
   // with every box empty there is nothing to write, which the server refuses too.
   const writesData = operation.updatesMany === true && fields.length > 0
   const popup = useRef<HTMLDivElement>(null)
+  const about = [description, operation.confirm?.body[copy.locale], writesData && t('admin.bulkFilledOnly', 'Only the fields you fill in change.')].filter(Boolean).join(' ')
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -113,10 +114,7 @@ export function OperationButton({
       <AlertDialogContent ref={popup} initialFocus={initialFocusIn(popup)} className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden">
         <AlertDialogHeader>
           <AlertDialogTitle>{operation.confirm?.title[copy.locale] ?? label}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {[description, operation.confirm?.body[copy.locale], writesData && t('admin.bulkFilledOnly', 'Only the fields you fill in change.')].filter(Boolean).join(' ')
-              || (t('admin.operationWarning', 'This runs on the row you are editing.') ?? 'This runs on the row you are editing.')}
-          </AlertDialogDescription>
+          {about ? <AlertDialogDescription>{about}</AlertDialogDescription> : null}
         </AlertDialogHeader>
         {shown ? (
           <p role="alert" className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive">

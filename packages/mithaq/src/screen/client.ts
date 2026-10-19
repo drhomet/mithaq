@@ -129,6 +129,10 @@ export type LayoutProps<Regions extends readonly string[] = readonly string[], N
 export type ComponentProps = { page: PageClient }
 /** A field's control: the field, its value and the one way to change it. */
 export type ControlProps = {
+  /** The input id its visible label names, and the ids of its description and refusal. */
+  id: string
+  describedBy?: string
+  form?: string
   field: ClientField
   value: unknown
   onChange: (value: unknown) => void

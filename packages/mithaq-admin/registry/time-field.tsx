@@ -11,12 +11,9 @@ type Period = 'AM' | 'PM'
 /** Whether a locale reads the time of day on a 12-hour clock, as `en` and `ar` do. */
 const twelveHour = (locale: string) => ['h11', 'h12'].includes(new Intl.DateTimeFormat(locale || undefined, { hour: 'numeric' }).resolvedOptions().hourCycle ?? '')
 
-/**
- * A segment's digits in the locale's own numerals, `09` or `٠٩`. Arabic is asked for its Arabic-Indic digits by name,
- * since recent CLDR answers Latin ones for a bare `ar`.
- */
+/** Latin digits keep the time consistent with the admin's numeric inputs. */
 const shown = (value: string, locale: string) =>
-  value === '' ? '' : new Intl.NumberFormat(locale || undefined, { minimumIntegerDigits: 2, useGrouping: false, ...(locale.split('-')[0] === 'ar' && { numberingSystem: 'arab' }) }).format(Number(value))
+  value === '' ? '' : new Intl.NumberFormat(locale || undefined, { minimumIntegerDigits: 2, useGrouping: false, numberingSystem: 'latn' }).format(Number(value))
 
 /** The locale's word for the morning or the evening: `AM` and `PM`, `ص` and `م`. */
 const periodWord = (period: Period, locale: string) =>
@@ -53,7 +50,7 @@ const fromClock = (value: string, twelve: boolean): { hours: string; minutes: st
 
 /**
  * The time of day of a moment, drawn the same in every browser in place of the native `<input type="time">`, which
- * Safari hands back empty: hours, minutes and, on a 12-hour clock, AM or PM, in the locale's numerals and words. It
+ * Safari hands back empty: hours, minutes and, on a 12-hour clock, AM or PM, in Latin digits and the locale's period words. It
  * reports `HH:MM` on the 24-hour clock once both segments hold a value, and `''` when a complete time is cleared;
  * a time half typed reports nothing.
  */

@@ -115,8 +115,8 @@ export function List(props: ListProps): ReactElement {
       />
       {node?.tabs?.length ? (
         // The list's tabs, each a `where` the list holds every page to, the first where the URL names none.
-        <Tabs value={query.tab ?? node.tabs[0]!.tab} onValueChange={(tab) => refine({ tab: String(tab) })}>
-          <TabsList variant="line" className="max-sm:min-h-12">
+        <Tabs className="min-w-0 max-w-full" value={query.tab ?? node.tabs[0]!.tab} onValueChange={(tab) => refine({ tab: String(tab) })}>
+          <TabsList variant="line" className="w-full max-w-full justify-start overflow-x-auto max-sm:min-h-12">
             {node.tabs.map((one) => (
               <TabsTrigger key={one.tab} value={one.tab} data-list-tab={one.tab} className="flex-none max-sm:min-h-11">
                 {one.label[locale] ?? one.tab}
@@ -138,7 +138,7 @@ export function List(props: ListProps): ReactElement {
               onWhere={(where) => refine({ where })}
               columns={unreadable ? null : <Columns kayan={kayan} columns={columns} t={t} locale={locale} onChange={(next) => onQuery(withColumns(query, next))} />}
             >
-              {allowed(node?.toolbar).filter((one) => holds(one.node, scope)).map((one, at) => button(one.operation, (values) => values, `toolbar-${at}`, { description: t('admin.toolbarWarning', 'This runs on no row of the list.') ?? 'This runs on no row of the list.', onRan: () => toast.success(doneWords({ kayan, copy, operation: one.operation })) }))}
+              {allowed(node?.toolbar).filter((one) => holds(one.node, scope)).map((one, at) => button(one.operation, (values) => values, `toolbar-${at}`, { onRan: () => toast.success(doneWords({ kayan, copy, operation: one.operation })) }))}
               {picks ? (
                 <BulkBar
                   ticked={ticked.length}

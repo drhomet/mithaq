@@ -39,7 +39,17 @@ export const useFormSeed = ({ kayan, onDirty, status: opened, value }: {
     focused.current = box?.id ? { id: box.id, start: box.selectionStart ?? null, end: box.selectionEnd ?? null } : undefined
     setSeed(seeded({ values: seedOf(kayan.fields, value) }))
   }
+  const form = useForm({ defaultValues: seed.values })
+  const previous = useRef(seed)
   useLayoutEffect(() => {
+    const before = previous.current
+    previous.current = seed
+    if (before.row !== seed.row) {
+      // TanStack keeps touched values on a new default; preserve only edits nobody saved.
+      const edits = form.state.isTouched ? Object.entries(form.state.values).filter(([name, value]) => JSON.stringify(value) !== JSON.stringify(before.saved[name])) : []
+      form.reset(seed.values)
+      for (const [name, value] of edits) form.setFieldValue(name, value)
+    }
     const was = focused.current
     focused.current = undefined
     if (!was || document.activeElement?.id === was.id) return
@@ -47,7 +57,6 @@ export const useFormSeed = ({ kayan, onDirty, status: opened, value }: {
     box?.focus()
     if (was.start !== null) box?.setSelectionRange(was.start, was.end)
   }, [seed])
-  const form = useForm({ defaultValues: seed.values })
   const values = useStore(form.store, (state) => state.values as Record<string, unknown>)
 
   // TanStack's per-field `isDefaultValue` over the whole form, so a value typed back to its seed is no change.

@@ -41,7 +41,8 @@ export function ListButton({
     setBusy(true)
     onRefused(undefined)
     try {
-      onRan?.(await run(operation.name, input))
+      const written = await run(operation.name, input)
+      onRan?.(written)
       return true
     } catch (thrown) {
       refuse(thrown)

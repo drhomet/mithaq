@@ -58,7 +58,7 @@ function TabGroup({
   tabs: readonly { key: string; label: string; description?: string; invalid: ReactNode; body: ReactNode }[]
 }): ReactElement {
   return (
-    <Tabs defaultValue={tabs[0]?.key} data-node="tabs" className={line ? 'gap-4' : 'overflow-hidden rounded-lg border'}>
+    <Tabs defaultValue={tabs[0]?.key} data-node="tabs" className={line ? 'min-w-0 gap-4' : 'min-w-0 overflow-hidden rounded-lg border'}>
       <TabsList variant={line ? 'line' : 'default'} className={line ? 'w-full justify-start max-sm:min-h-12' : 'm-1 max-sm:min-h-12'}>
         {tabs.map((tab) => (
           <TabsTrigger key={tab.key} value={tab.key} className={line ? 'flex-none max-sm:min-h-11' : 'max-sm:min-h-11'}>
@@ -70,7 +70,7 @@ function TabGroup({
         ))}
       </TabsList>
       {tabs.map((tab) => (
-        <TabsContent key={tab.key} value={tab.key} keepMounted className={line ? 'flex flex-col gap-4' : 'flex flex-col gap-4 p-4'}>
+        <TabsContent key={tab.key} value={tab.key} keepMounted className={line ? 'flex min-w-0 flex-col gap-4' : 'flex min-w-0 flex-col gap-4 p-4'}>
           {tab.description ? <p className="text-sm text-muted-foreground">{tab.description}</p> : null}
           {tab.body}
         </TabsContent>

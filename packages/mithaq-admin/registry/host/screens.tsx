@@ -15,12 +15,15 @@ import type { Page } from 'mithaq-admin/list-types.tsx'
 import { QueryRefused, findOf, listRaw, prefixOf, readQuery, rulesOf, scopedTo, withList, type RawQuery } from 'mithaq-admin/list-query.ts'
 import { newTitleOf, titleOf } from 'mithaq-admin/copy.ts'
 import { createsIn } from 'mithaq-admin/field-values.ts'
+import { ListButton } from 'mithaq-admin/list-button.tsx'
+import { failedWords } from 'mithaq-admin/form-rules.tsx'
+import { toast } from 'mithaq-admin/toast.tsx'
 import { NavLinks } from 'mithaq-admin/nav-links.tsx'
-import { NodeButton, OwnButton, pageButtonOf } from 'mithaq-admin/node-buttons.tsx'
+import { pageButtonOf } from 'mithaq-admin/node-buttons.tsx'
 import { formIn, listIn, nodesOf, readsAsValues, relatedIn, scopeOf, type Draw } from 'mithaq-admin/node-tree.ts'
 import { frameOf, pageOf } from 'mithaq-admin/nodes.tsx'
 import { RecordFrame, holdFocus } from 'mithaq-admin/record-frame.tsx'
-import { rowTitle } from 'mithaq-admin/row-title.tsx'
+import { rowTitle, rowWarning } from 'mithaq-admin/row-title.tsx'
 import { refOf, type Refs, type TreePage } from 'mithaq-admin/screen-refs.ts'
 import { idsOf } from 'mithaq-admin/relationship-control.tsx'
 import { ScreenForm } from './screen-form.tsx'
@@ -691,6 +694,8 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   const written = <Written,>(write: Promise<Written>, name = kayan.name) =>
     write.then((out) => {
       void queries.invalidateQueries({ queryKey: rowsKey(name) })
+      // A child write can move the totals and balances held by this record.
+      if (name !== kayan.name && data.value) void router.invalidate()
       return out
     })
 
@@ -745,7 +750,7 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
         first={data.related[prefix]}
         scope={scopeTo(node, id)}
         find={(input, options) => arm[listed.name]!.find!(input, options) as Promise<Page>}
-        run={(operation, input) => arm[listed.name]![operation]!(input)}
+        run={(operation, input) => written(arm[listed.name]![operation]!(input), listed.name)}
         own={own}
       />
     )
@@ -816,17 +821,24 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
       button: (node, index) => {
         const button = pageButtonOf({ kayan, node, allowed: data.operations })
         if (!button) return null
-        const call = async (input: Row) => {
-          await written(arm[kayan.name]![button.name]!({ ...input, ...(data.value?.id !== undefined && { id: data.value.id }) }))
-          await router.invalidate()
-        }
-        // A project's button component is handed a run that asks the confirm
-        // first; the registry's own button asks it before calling.
-        const Own = node.component ? refOf({ screen: { refs }, place: 'button', path: node.component }) : undefined
-        return Own ? (
-          <OwnButton key={index} Own={Own} operation={button} busy={false} copy={{ t, locale }} call={call} />
-        ) : (
-          <NodeButton key={index} node={node} copy={{ t, locale }} busy={false} run={() => void call({})} />
+        return (
+          <ListButton
+            key={index}
+            kayan={kayan}
+            client={related}
+            api={readsOf(related)}
+            operation={button}
+            description={data.value ? rowWarning({ kayan, row: data.value, operation: button.name, copy: { t, locale } }) : undefined}
+            copy={{ t, locale }}
+            screen={{ refs, kayan, page: target }}
+            inputOf={(input) => ({ ...input, ...(data.value?.id !== undefined && { id: data.value.id }) })}
+            run={async (operation, input) => {
+              const out = await written(arm[kayan.name]![operation]!(input))
+              await router.invalidate()
+              return out
+            }}
+            onRefused={(thrown) => { if (thrown) toast.error(failedWords({ kayan: kayan.name, copy: { t, locale }, thrown })) }}
+          />
         )
       },
     }

@@ -870,7 +870,7 @@ test('27. a field cleared to empty is written as empty, and a field nothing touc
     assert.ok(!(server in sent), `${server} is the server's and is not in the write`)
   }
 
-  // A form over no row holds nothing, so an untouched field contributes no key rather than a null.
+  // A create carries its displayed defaults; a field with neither a default nor a value stays out.
   const madeHost = await render(
     createElement(Form, {
       kayan: courses,
@@ -897,10 +897,11 @@ test('27. a field cleared to empty is written as empty, and a field nothing touc
   const created = written[1]!
   assert.deepEqual(
     Object.keys(created).sort(),
-    ['notifications', 'selfEnroll', 'title'],
-    'a create carries the typed field and the checkbox values it drew, and nothing else: archived is never a create\'s',
+    ['_status', 'notifications', 'selfEnroll', 'title'],
+    'a create carries the typed field and the defaults it drew; archived is never a create\'s',
   )
   assert.equal(created.title, 'New course')
+  assert.equal(created._status, 'draft')
   // A create still carries an untouched checkbox (drawn unchecked, which is a value) and a required list of text; an optional list stays out.
   assert.equal(created.notifications, false)
 })
@@ -7921,7 +7922,7 @@ test('240k. a yes-or-no field on a record page reads its own word for yes or no 
   assert.equal((await render(createElement(FieldValue, { kayan: courses, field: verified, row: { id: 'c1', probe: true }, copy: { t: english, locale: 'en' } }))).querySelector('[data-field-value="probe"]')?.textContent, 'probeYes', 'and a field with no words of its own reads Yes or No')
 })
 
-test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the same in every browser: digits fill hours then minutes, arrows step them, the moment is written once day and time are set and cleared with a complete time, and Arabic draws its own numerals and words', async () => {
+test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the same in every browser: digits fill hours then minutes, arrows step them, the moment is written once day and time are set and cleared with a complete time, and Arabic draws Latin digits and its own period words', async () => {
   const { client, written } = recording()
   const page = (path: string) => screenOf(recordPage([{ form: [{ field: 'startsAt' }, { field: 'capacity' }] }], path), sessions)
   const host = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/new'), client, value: null, t: english, locale: 'en', onDone: () => {} }))
@@ -7952,7 +7953,7 @@ test('240l. a moment\'s time of day is two shadcn boxes and an AM or PM, the sam
 
   const arabic = await render(createElement(Form, { kayan: sessions, screen: page('/sessions/:id'), client, value: { id: 's1', course: 'c1', startsAt: new Date(2026, 9, 15, 13, 5).toISOString() }, t: appCopy('ar'), locale: 'ar', onDone: () => {} }))
   const arabicSegment = (name: string) => arabic.querySelector(`[data-time-field] [data-segment="${name}"]`) as HTMLInputElement
-  assert.deepEqual([arabicSegment('hours').value, arabicSegment('minutes').value, arabicSegment('period').textContent], ['٠١', '٠٥', 'م'], 'Arabic numerals and its own word for the evening')
+  assert.deepEqual([arabicSegment('hours').value, arabicSegment('minutes').value, arabicSegment('period').textContent], ['01', '05', 'م'], 'Latin digits and its own word for the evening')
   assert.equal(arabicSegment('hours').closest('[dir]')?.getAttribute('dir'), 'ltr', 'the clock reads hours then minutes, as a clock does, on a page right to left')
   await act(async () => typeInto(arabicSegment('hours') as unknown as Element, '٠٢'))
   assert.equal(arabic.querySelector('[data-time-field]')?.getAttribute('data-value'), '14:05', 'and Arabic digits typed are read')
@@ -8122,12 +8123,152 @@ test('audit F01: an operation keeps its footer outside its scrolling fields with
   const { OperationButton } = await import('../registry/operation-button.tsx')
   await render(createElement(OperationButton, {
     busy: false, copy: { t, locale: 'en' }, open: true, inputOf: (values) => values,
-    kayan: courses, operation: { name: 'create', label: { en: 'Create' }, fields: courses.fields.filter((field) => field.kind !== 'join') }, run: async () => true,
+    kayan: courses, operation: { name: 'create', effect: 'create', label: { en: 'Create' }, fields: courses.fields.filter((field) => field.kind !== 'join') }, run: async () => true,
   }))
   const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')!
   assert.match(dialog.className, /max-h-\[calc\(100dvh-/)
   const body = dialog.querySelector('form > [data-operation-fields]')!
   assert.ok(body)
   assert.match(body.className, /overflow-y-auto/)
-  assert.equal(body.contains(dialog.querySelector('[data-slot="alert-dialog-footer"]')), false)
+  assert.equal(body.contains(dialog.querySelector('[data-slot="alert-dialog-footer"]')!), false)
+})
+
+
+test('audit F06: a record action asks for its fields and holds a refused operation in its dialog', async () => {
+  const { ListButton } = await import('../registry/list-button.tsx')
+  const sent: Record<string, unknown>[] = []
+  const host = await render(createElement(ListButton, {
+    kayan: courses, copy: { t, locale: 'en' }, onRefused: () => {},
+    operation: { name: 'void', effect: 'update', label: { en: 'Void' }, fields: [fieldOf({ name: 'reason', kind: 'text' })] },
+    inputOf: (values) => ({ ...values, id: 'payment' }),
+    run: async (_operation, input) => { sent.push(input); throw { data: { key: 'error.invalid.reason' } } },
+  }))
+  await act(async () => click(host.querySelector('button')!))
+  const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')!
+  assert.equal(sent.length, 0)
+  await act(async () => typeInto(dialog.querySelector('input') as unknown as Element, 'Duplicate payment'))
+  await act(async () => fire(dialog.querySelector('form') as unknown as Element, 'submit'))
+  assert.deepEqual(sent, [{ id: 'payment', reason: 'Duplicate payment' }])
+  assert.ok(window.document.querySelector('[data-slot="alert-dialog-content"] [role="alert"]'))
+  const source = readFileSync(new URL('../registry/host/screens.tsx', import.meta.url), 'utf8')
+  assert.match(source, /<ListButton/)
+})
+
+
+test('audit F03: nested tables can shrink through the record form and its tabs', async () => {
+  const host = await render(createElement(Form, {
+    kayan: courses, screen: screenOf(courses.pages.edit!), client: draftClient([]),
+    value: { id: 'c1', title: 'Tajweed' }, t: english, locale: 'en', onDone: () => {},
+    related: ({ node }) => createElement(List, {
+      kayan: sessions, node, page: pageOf([{ id: 's1', course: 'c1' }]), query: {}, t, locale: 'en', onQuery: () => {}, href: () => '#', newHref: '#', creates: false,
+    }),
+  }))
+  assert.match(host.querySelector('form')!.className, /min-w-0/)
+  assert.match(host.querySelector('[data-node="tabs"]')!.className, /min-w-0/)
+  const frame = host.querySelector('table')!.parentElement!.parentElement!
+  assert.match(frame.className, /max-w-full/)
+})
+
+
+test('audit F04: status tabs scroll within the list instead of widening the page', async () => {
+  const host = await render(createElement(List, {
+    kayan: courses, page: pageOf([]), query: {}, t, locale: 'ar', onQuery: () => {}, href: () => '#', newHref: '#', creates: false,
+    node: { columns: [{ field: 'title' }], tabs: ['all', 'draft', 'issued', 'cancelled'].map((tab) => ({ tab, label: { ar: tab } })) },
+  }))
+  const strip = host.querySelector('[data-slot="tabs-list"]')!
+  assert.match(strip.className, /max-w-full/)
+  assert.match(strip.className, /overflow-x-auto/)
+  assert.match(strip.className, /justify-start/)
+})
+
+
+test('audit F21: standalone operation dialogs omit row-selection plumbing', async () => {
+  const { OperationButton } = await import('../registry/operation-button.tsx')
+  await render(createElement(OperationButton, {
+    kayan: courses, busy: false, copy: { t, locale: 'en' }, open: true, inputOf: (values) => values,
+    operation: { name: 'create', effect: 'create', label: { en: 'Create' } }, run: async () => true,
+  }))
+  assert.equal(window.document.querySelector('[data-slot="alert-dialog-description"]') === null, true)
+  const source = readFileSync(new URL('../registry/list.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /admin\.toolbarWarning/)
+})
+
+
+test('audit F25: custom field controls receive the label and refusal ids for their input', async () => {
+  const { LeafControl } = await import('../registry/leaf-control.tsx')
+  const custom = 'custom.tsx#Control'
+  const Input = (props: import('mithaq/admin').ControlProps & { id?: string; describedBy?: string }) => createElement('input', { id: props.id, 'aria-describedby': props.describedBy })
+  const host = await render(createElement(LeafControl, {
+    kayan: courses, field: fieldOf({ name: 'amount', kind: 'decimal', component: custom, description: { en: 'Amount in riyals' } }),
+    screen: screenOf(recordPage([]), courses, { [custom]: Input }), copy: { t, locale: 'en' }, value: '12.50', values: {}, setValue: () => {}, onChange: () => {}, readOnly: false, error: 'Invalid amount',
+  }))
+  const input = host.querySelector('input')!
+  assert.equal(input.id, host.querySelector('label')!.htmlFor)
+  assert.equal(input.getAttribute('aria-describedby'), 'courses-amount-description courses-amount-error')
+})
+
+
+test('audit F02: a refreshed row replaces touched form values even when its updatedAt did not move', async () => {
+  function Parent() {
+    const [value, setValue] = useState({ id: 'c1', title: 'Before', updatedAt: '2026-10-19T10:00:00Z' })
+    return createElement(Form, {
+      kayan: courses, screen: screenOf(recordPage([{ form: [{ field: 'title' }] }, { button: 'archive', label: { en: 'Archive' } }])),
+      client: { ...draftClient([]), run: async () => ({ id: 'c1' }) }, value, t, locale: 'en', operations: { archive: true, update: true },
+      onDone: () => setValue({ ...value, title: 'After' }),
+    })
+  }
+  const host = await render(createElement(Parent))
+  await act(async () => typeInto(host.querySelector('input[name="title"]')!, 'Typed'))
+  await act(async () => click([...host.querySelectorAll('button')].find((button) => button.textContent === 'Archive')!))
+  const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')!
+  await act(async () => fire(dialog.querySelector('form') as unknown as Element, 'submit'))
+  assert.equal((host.querySelector('input[name="title"]') as HTMLInputElement).value, 'After')
+  const source = readFileSync(new URL('../registry/host/screens.tsx', import.meta.url), 'utf8')
+  assert.match(source, /name !== kayan\.name.*router\.invalidate/s)
+})
+
+
+test('audit F22: delayed hydration of the generic updated timestamp reports no mismatch', async () => {
+  const { FormActions } = await import('../registry/form-actions.tsx')
+  const { renderToString } = await import('react-dom/server')
+  const { hydrateRoot } = await import('react-dom/client')
+  let now = Date.parse('2026-10-19T10:01:00Z')
+  const clock = mock.method(Date, 'now', () => now)
+  const draw = () => createElement(FormActions, {
+    header: true, t, locale: 'en', updated: new Date('2026-10-19T10:00:00Z'), busy: false, dirty: false, updating: true,
+    viewing: false, drafts: false, formId: 'probe', onAsk: () => {}, onSaveDraft: () => {},
+  })
+  const host = mount()
+  const problems: unknown[] = []
+  let root: ReturnType<typeof hydrateRoot> | undefined
+  try {
+    host.innerHTML = renderToString(draw())
+    now += 120_000
+    await act(async () => { root = hydrateRoot(host, draw(), { onRecoverableError: (error) => problems.push(error) }) })
+    assert.equal(problems.length, 0, problems.map(String).join(' | '))
+  } finally {
+    await act(async () => root?.unmount())
+    clock.mock.restore()
+  }
+})
+
+
+test('audit F02b: a child refresh updates clean touched fields and keeps unsaved parent edits', async () => {
+  function Parent() {
+    const [value, setValue] = useState({ id: 'c1', title: 'Before', summary: 'Old summary', updatedAt: '2026-10-19T10:00:00Z' })
+    return createElement('div', null,
+      createElement('button', { id: 'refresh-parent', onClick: () => setValue({ ...value, title: 'After', summary: value.summary === 'Old summary' ? 'Fresh summary 1' : 'Fresh summary 2' }) }, 'Refresh'),
+      createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: [{ field: 'title' }, { field: 'summary' }] }])), client: draftClient([]), value, t, locale: 'en', onDone: () => {} }),
+    )
+  }
+  const host = await render(createElement(Parent))
+  const title = () => host.querySelector('input[name="title"]') as HTMLInputElement
+  await act(async () => typeInto(title(), 'Edited'))
+  await act(async () => typeInto(title(), 'Before'))
+  await act(async () => click(host.querySelector('#refresh-parent')!))
+  assert.equal(title().value, 'After')
+  await act(async () => typeInto(title(), 'Unsaved'))
+  await act(async () => click(host.querySelector('#refresh-parent')!))
+  assert.equal(title().value, 'Unsaved')
+  assert.equal((host.querySelector('[name="summary"]') as HTMLTextAreaElement).value, 'Fresh summary 2')
 })

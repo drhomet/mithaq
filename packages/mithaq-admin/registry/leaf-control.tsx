@@ -103,7 +103,7 @@ export function LeafControl({
       width={leaf?.width ?? field.width}
     >
       {Ref && screen ? (
-        <Ref field={field} value={props.value} onChange={props.onChange} readOnly={readOnly} issue={error ?? null} />
+        <Ref id={inputId} describedBy={describedBy({ id: inputId, description, error })} form={props.form} field={field} value={props.value} onChange={props.onChange} readOnly={readOnly} issue={error ?? null} />
       ) : (
         <Control
           {...props}

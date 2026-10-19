@@ -238,7 +238,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     // a leaf elsewhere on the page is still this form's value. A page with a controls node draws the actions there.
     // `noValidate` so the browser's own bubble never stands in for the field's refusal in the page's language.
     form: (children) => (
-      <form id={formId} noValidate onSubmit={submit} className="flex flex-col gap-6">
+      <form id={formId} noValidate onSubmit={submit} className="flex min-w-0 flex-col gap-6">
         {chrome}
         <div className={headed ? 'flex flex-col gap-4 border-t pt-6' : 'flex flex-col gap-4'}>
           {children}
@@ -305,7 +305,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
           onDiscard={() => void saving.discard(blocked ? blocked.proceed : onCancel ?? (() => {}))}
         />
         {nodes || screen ? (
-          <div className="flex flex-1 flex-col gap-6">{nodes ? drawNodes({ nodes: [{ form: [...nodes] }], draw }) : pageOf(screen!, draw)}</div>
+          <div className="flex min-w-0 flex-1 flex-col gap-6">{nodes ? drawNodes({ nodes: [{ form: [...nodes] }], draw }) : pageOf(screen!, draw)}</div>
         ) : (
           <FormLayout {...{ api, chrome, control, copy, formId, kayan, kayans, values }} row={value} actions={actionsOf(false)} onSubmit={submit} provided={unnamed.filter(owned)} rest={unnamed.filter((field) => !owned(field))} />
         )}

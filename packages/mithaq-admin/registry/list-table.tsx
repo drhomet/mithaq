@@ -105,7 +105,7 @@ export function ListTable({
   return (
     // Held to the screen below the page's header so it scrolls both ways and the head row can stay (a printed page
     // holds every row). It isolates, so pinned cells never paint over the page's sticky header or take its clicks.
-    <div className="bg-card relative isolate overflow-hidden rounded-lg border [&>div:first-child]:max-h-[calc(100dvh-var(--header-height,0px))] print:[&>div:first-child]:max-h-none">
+    <div className="bg-card relative isolate min-w-0 max-w-full overflow-hidden rounded-lg border [&>div:first-child]:max-h-[calc(100dvh-var(--header-height,0px))] print:[&>div:first-child]:max-h-none">
       {unreadable ? null : (
         <Table ref={table}>
           {/* The head rule is each head cell's own inset shadow, since a collapsed border scrolls away from a sticky
