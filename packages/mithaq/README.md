@@ -567,8 +567,10 @@ is `templates/asas/src/asas.ts`.
 
 ### Defaults are explicit
 
-Core never falls back to a behaviour of its own. Each default is a named
-`default<Name>` that the project spreads or names, so the project sees and owns
+Core never falls back to a behaviour of its own. Each default has an exported
+name that the project spreads or names. Most start with `default`; the target
+maps are `drizzleKinds`, `drizzleRules`, `drizzleIdKinds`, `zodKinds`, `zodRules`
+and `zodIdKinds`. The project sees and owns
 every behaviour it might change. `buildAsas` refuses a config that leaves a
 required one out:
 
@@ -921,7 +923,7 @@ A target of an existing capability can be the project's own and spreads into `ta
 
 #### The rules
 
-1. **Every default has a name, and the project passes it.** Core never writes `config.verify ?? coreVerify`. A default's name starts with `default`.
+1. **Every default has a name, and the project passes it.** Core never writes `config.verify ?? coreVerify`. Most exports start with `default`; the target maps are `drizzleKinds`, `drizzleRules`, `drizzleIdKinds`, `zodKinds`, `zodRules` and `zodIdKinds`.
 2. **`buildAsas` refuses a config that leaves a default out**, naming the key. The storage target refuses a config with no `verify`, saying "storage names no "verify" function", and the build refuses a config with no `http` plug.
 3. **A default that holds policy lives in the project.** What a valid file is, how a key is built and which orphans the sweep deletes are registry files copied to `templates/mithaq/src/<target>/defaults.ts`, not core code.
 4. **Operations are spread, never injected.** A target ships `<target>Operations` built from exported `default*` steps, and a kayan spreads it beside `defaultOperations`, as `versionOperations` is spread into `courses`.
@@ -960,3 +962,13 @@ Storage adapters, auth strategies, rich-text nodes, the service target's limits 
 - **Core never falls back.** A missing piece is refused when the project builds, never filled in. A storage config without `verify`, a build without `http`, or a service target without `authorize` is a configuration error, not a default.
 
 Tenancy has no default to replace. Scoping a per-organization kayan to the active organization is not a choice, so core enforces it on every managed operation and nothing turns it off. See [Tenancy](src/asas/runner/README.md).
+
+## Upgrading
+
+In 0.2.0, `drizzleTarget` is removed. `drizzleAdapter` is already the store
+target, so a separate object of implicit maps hid which defaults a project
+used. Pass `kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds`
+to `drizzleAdapter` instead. It is an adapter because it connects mithaq's
+store contract to Postgres through Drizzle; it still has the `store` capability.
+The [0.1.1 to 0.2.0 upgrade guide](../../templates/asas/README.md#011-to-020)
+covers the other breaking changes.

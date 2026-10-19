@@ -49,7 +49,38 @@ bunx mithaq generate auth
 
 ## `generate messages`
 
-Writes the project's copy to one JSON file per scope: each kayan, plus `mithaq.json` for shared copy. Each file holds every label and message with one string per locale. The folder is `generate.messages` in `src/mithaq.ts` (`src/messages/` in the template). A run adds missing keys and never rewrites or deletes one you have translated.
+Writes the project's copy to one JSON file per scope: each kayan, plus `mithaq.json` for shared copy. Each file holds every label and message with one string per locale. The folder is `generate.messages` in `src/mithaq.ts` (`src/messages/` in the template). A run adds missing keys and rewrites flat files into nested form, keeping every translation, including entries with no source. It reports those entries for you to remove.
+
+A locale leaf holds a message's translations. When a key has both its own message and children, `$value` holds the parent's message, so `name` and `name.required` can both resolve:
+
+```json
+{
+  "name": {
+    "$value": { "en": "Name", "ar": "الاسم" },
+    "required": { "en": "A name is required.", "ar": "الاسم مطلوب." }
+  },
+  "page": {
+    "description": { "en": "Manage rooms.", "ar": "إدارة القاعات." }
+  }
+}
+```
+
+Names starting with `$` are reserved for the file format. A declaration cannot use them for fields, kinds, rules, operations or message parts; `$value` above belongs to the generated JSON, not to a kayan's `messages` declaration. This release still reads flat files, but a check fails until a run has nested them.
+
+The app's `copy.ts` flattens each imported JSON file before adding it to its scope. Copy the template's helper, with the project's locales, so the resolver still sees keys such as `name.required`:
+
+<!-- from: apps/asas-tanstack/src/copy.ts -->
+```ts
+import { flattenMessageFile } from 'mithaq/admin'
+
+export const locales = ['ar', 'en'] as const
+
+export const copyFile = (file: Record<string, unknown>): Record<string, Record<string, string>> =>
+  Object.fromEntries(Object.entries(flattenMessageFile({ file, locales })).map(([key, value]) =>
+    [key, typeof value === 'string' ? Object.fromEntries(locales.map((locale) => [locale, value])) : value ?? {}]))
+```
+
+For example, import `rooms` from `asas/messages/rooms.json` and put `rooms: copyFile(rooms)` in the scope map, or spread `...copyFile(rooms)` inside that scope beside the app's own copy. The backoffice app re-exports the tenant app's `copy.ts`.
 
 | Flag | Meaning |
 | --- | --- |

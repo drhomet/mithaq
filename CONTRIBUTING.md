@@ -45,7 +45,7 @@ bunx mithaq upgrade --check    # in each of the other three
 ## Rules
 
 - **The vocabulary is frozen.** The vocabulary of `defineMithaq` (its locales, kinds, rules, target names and capabilities, and root keys) changes only with the maintainer's signed decision. Open an issue first and explain what should change and why. Do not run `mithaq lock` or edit a `mithaq.lock` in a pull request. Everything in `defineKayan`, `defineGlobal` and `buildAsas` is open to change.
-- **Defaults are explicit.** Each default is an exported `default<Name>` that a project spreads or names. Core never falls back to a hidden behaviour, and `buildAsas` refuses a config that leaves a required default out.
+- **Defaults are explicit.** Each default is named and a project spreads or names it. Most exports start with `default`; the target maps are `drizzleKinds`, `drizzleRules`, `drizzleIdKinds`, `zodKinds`, `zodRules` and `zodIdKinds`. Core never falls back to a hidden behaviour, and `buildAsas` refuses a config that leaves a required default out.
 - **One object for three or more parameters.** A function a project calls or implements takes one object once it has three or more parameters. `bun run lint:args` checks it.
 - **Comments say why**, never what. A `ponytail:` comment marks a deliberate shortcut and names its limit.
 - **Tenant enforcement stays in core.** No change may add a way around the organization scope. See [packages/mithaq/src/asas/runner/README.md](packages/mithaq/src/asas/runner/README.md).
@@ -162,6 +162,8 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 - **Copied snippets.** A snippet copied from a file of the repository is marked by the line `<!-- from: <path from the repository root> -->` right above its fence. The test reads each of its lines, trimmed of indentation, in order in that file, so an excerpt may leave lines out, and a line `// ...` says where it does. A snippet that no longer matches is fixed in the guide, never by changing the code to fit it. `create-mithaq` removes the marker from a created project's guide, whose paths differ. A snippet written for the guide alone, such as a kayan the template does not hold, carries no marker.
 
 ## Release
+
+Before tagging each future release, add an entry to [CHANGELOG.md](CHANGELOG.md), grouped into breaking changes, additions and fixes. The 0.2.0 entry records what changed since 0.1.1; its upgrade link gives the steps a project takes.
 
 The three packages share one version, `publishConfig.version` in `packages/mithaq/package.json`. The maintainer releases:
 

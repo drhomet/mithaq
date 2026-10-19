@@ -29,7 +29,7 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | `courses` | The worked example: courses, sessions and enrollments, each course with a cover from the media, and the business roles that work them. Needs `media`, `roles`, `audit-log` and `rich-text`. |
 | `backoffice` | The backoffice console, `apps/asas-backoffice`. A single package cannot hold it. |
 
-It also asks how the project holds its people, or takes `--organizations`, `--show-organization`, `--sign-up` and `--organization-name` (with `--organization-name-ar`): one organization made by its owner on first run and joined by invitation (the default, and the worked example's: a school), named in code and shown by name or never (`--show-organization no`), or many, each sign-up founding its own. [Organization modes](#organization-modes) has the whole story.
+It also asks how the project holds its people, or takes `--organizations`, `--show-organization`, `--sign-up` and `--organization-name` (with `--organization-name-ar`): one organization made by its owner on first run and joined by invitation (the default, and the worked example's: a school), named in code and shown by name or never (`--show-organization no`), or many, where a person signs up, proves their address and then creates an organization or joins one by invitation. [Organization modes](#organization-modes) has the whole story.
 
 `rich-text` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
 
@@ -82,7 +82,7 @@ bun run dev:setup --seed
 `dev:setup` makes a fresh development database usable in one command:
 
 - It pushes the schema: in development, `asas.connect()` creates or changes the tables to match your kayan, and refuses any change that would lose data.
-- It makes the dev admin that `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` in `.env` name, with its address proved: the owner of "Dev admin's workspace" (with one organization through first-run's own path) and, with the backoffice console, its `super_admin`. The output names the two variables, never their values.
+- It makes the dev admin that `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD` in `.env` name, with its address proved: with many organizations, the owner of "Dev admin's workspace"; with one, the owner of the organization named by `organizationName`, through first-run's own path. With the backoffice console it also makes the dev admin its `super_admin`. The output names the two variables, never their values.
 - With `--seed`, it fills that organization with sample rows (step 5).
 
 It refuses unless `NODE_ENV` is `development` or unset and `DATABASE_URL`, `BETTER_AUTH_URL` and, with the backoffice console, `BACKOFFICE_URL` are on this machine, since every project's `.env.example` holds the same development password and a deploy run with plain `node` sets no `NODE_ENV`. It refuses a database that already holds a user, saying how to sign in instead, and a `DEV_ADMIN_PASSWORD` of a length sign-up would refuse.
@@ -112,7 +112,7 @@ Each `dev` script first runs `mithaq lock --check`. The template has no `mithaq.
 
 Sign in to the tenant app at `http://localhost:5173`, and to the backoffice console at `http://localhost:5174`, with `DEV_ADMIN_EMAIL` and `DEV_ADMIN_PASSWORD`.
 
-A deploy has no dev admin, and is set up by hand, as you can here on a database `dev:setup` did not set up. With one organization, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization (you name it there, unless it is never shown) and, with the backoffice console, is its first `super_admin` too. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
+A deploy has no dev admin, and is set up by hand, as you can here on a database `dev:setup` did not set up. With one organization, open `http://localhost:5173/auth/first-run`: the account made there owns the one organization, named by `organizationName` in code, and, with the backoffice console, is its first `super_admin` too. First-run asks for the person's name, never the organization's. Until then every sign-up is refused, and the sign-in page sends you there. `vite dev` on this machine asks no setup code; anywhere else first-run asks the `SETUP_CODE` the server was started with.
 
 With many organizations, open `http://localhost:5173/auth/sign-up` and sign up, then open the link the server log shows to choose your password, which proves your address. Signed in and in no organization yet, you are offered your invitations and a box to create an organization: creating it makes you its owner. The backoffice console's first administrator is made on its own `/auth/create-first-user`.
 
@@ -503,11 +503,24 @@ In one organization, nobody founds another organization or leaves the one over H
 
 ## Upgrading
 
-In the project's own `copy.ts`, wrap each imported message file with `copyFile` as in the template, using `flattenMessageFile` from `mithaq/admin`; otherwise nested keys stop resolving. Then run `bunx mithaq generate messages` to rewrite existing message files as nested objects; this release still reads flat files.
+### 0.1.1 to 0.2.0
 
-Move page about text from `<kayan>.description` to `<kayan>.page.description` in the project's message copy.
+Keep `mithaq` and `mithaq-admin` at the same version. The breaking changes and the steps for existing projects follow.
 
-A generated auth kayan can take extra operations from a sibling `<kayan>.operations.ts` exporting `operations`; run `bunx mithaq generate auth` after adding it.
+- **Message files are nested.** In the project's own `copy.ts`, wrap each imported message file with `copyFile` as in the template, using `flattenMessageFile` from `mithaq/admin`; otherwise nested keys stop resolving. Then run `bunx mithaq generate messages` to rewrite existing message files, keeping every translation. This release still reads flat files. A parent with its own copy and children keeps its copy under `$value`; names starting with `$` are reserved for this format, so rename any field, kind, rule, operation or declared message part that starts with `$`. The [message-file example](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#generate-messages) shows the shape and loader.
+- **Page about text has its own key.** Move it from `<kayan>.description` to `<kayan>.page.description` in the project's message copy, so it cannot take a field's description.
+- **A changed target answers a conflict.** Add `error.conflict.target` to the app's `copy.ts` in every locale, as the template does: a step that changes the authorized target id is refused with 409 under this key.
+- **A global's update uses its declared input type.** Extra keys declared by `update.input`, such as `expectedUpdatedAt`, now appear in the call's type. The first save still uses the create shape, which can reject those update-only keys even when the type requires them. This remains open in [issue #10](https://github.com/drhomet/mithaq/issues/10); the type change does not fix first-save validation.
+- **Core lower-cases UUIDs.** UUID ids and relationship values are lower-cased before access and steps. UUID filters are normalized too, including version reads. Hand-written lower-casing for these managed calls can be removed; ordinary text and JSON values keep their case.
+- **HTTP reads are paged.** An explicit `limit` must be an integer from `1` through the service target's `maxLimit`. `limit: 0` is refused over HTTP; read page by page instead of asking for every row. Server-side managed reads and the store still accept `0`.
+
+What a project made before the admin package and layout changes:
+
+- **The admin draws through the components map.** Install `mithaq-admin`, add `mithaq/vite`, move the map to `src/components.ts` and migrate held copies in the order in [the admin migration guide](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md#migrate-a-project-that-holds-copies). Merge edited controls, cells and nodes against the package's current pieces; rich-text and upload components are maps the app spreads explicitly.
+- **Rich text is an optional peer.** Import `richText` and its Lexical pieces from `mithaq/rich-text`, rather than `mithaq`, and declare the Lexical peers where the language uses them. A project without rich text installs none. The [rich-text setup](https://github.com/drhomet/mithaq/blob/main/packages/mithaq-admin/README.md#rich-text-and-files) names the client imports.
+- **The starter separates the language, features and asas.** If adopting that layout, move files as [Project structure](#project-structure) shows and update the `generate` paths and package imports before regenerating. Existing layouts can keep their own configured paths.
+
+A generated auth kayan can also take extra operations from a sibling `<kayan>.operations.ts` exporting `operations`; run `bunx mithaq generate auth` after adding it. Keep custom operations there because regeneration replaces the generated file.
 
 What a project made before the store additions changes when it takes this version:
 
@@ -515,7 +528,7 @@ What a project made before the store additions changes when it takes this versio
 - **`zodTarget` is a function.** Write `zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds })`.
 - **`betterAuthTenant` requires `newRows: 'active'`.** Name it in the tenant target's config.
 - **A step's `tools.store` call takes the kayan declaration.** Write `kayan: products`, not its string name, which now throws.
-- **A custom store implements `upsert`, `sum` and the `share` lock mode.** A build refuses a store without `upsert` or `sum`.
+- **A custom store implements `upsert`, `sum` and every lock mode.** These are `update`, `noKeyUpdate`, `share` and `keyShare`. A build refuses a store without `upsert` or `sum`; the [whole store contract](#the-store-contract) lists what an adapter implements.
 
 What a project made before the sign-up round changes when it takes this version:
 
@@ -533,6 +546,7 @@ What a project made before the organization lifecycle round changes when it take
 - **'none' is gone.** Write `organizations = 'one'` and `showOrganization = false` in `packages/mithaq/src/mithaq/auth/organizations.ts`; nothing else moves.
 - **Many organizations prove every address.** Set `verifyEmail = true`: `'many'` with `false` refuses to load anywhere, development included. Every account made before is unproved and is refused at sign-in until its owner chooses a password from a reset link (Forgot password), which proves the address; tell your people before you deploy.
 - **Every production start needs a mailer.** `RESEND_API_KEY` and `MAIL_FROM`, with many organizations and with one by invitation as with an open sign-up; a deploy without them stops starting. The check runs as the auth setup loads, so a start missing both a mailer and `DATABASE_URL` names the mailer first.
+- **Remote hosts need a secret in every environment.** Set `BETTER_AUTH_SECRET` when either auth URL is off this machine. The backoffice must also have its own origin and, off this machine, its own host. These checks run with `NODE_ENV` unset or `development` too.
 - **The host's `/unauthorized` imports `src/no-organization.tsx`** from the app. Copy the tenant app's from the template into `apps/asas-tanstack/src/`, and the backoffice's, which draws nothing, into `apps/asas-backoffice/src/`, before you eject the screen host again.
 - **Organization names are one line of at most 100 characters.** A name stored before with a line break, a control character or a direction override, or longer, is refused on its next rename until it is put right: rename it on the backoffice, or once in SQL, `update organization set name = btrim(regexp_replace(name, '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]+', ' ', 'g')) where name ~ '[[:cntrl:]\u2028\u2029\u202a-\u202e\u2066-\u2069]'`, and shorten any past 100 by hand.
 - **`src/mail/`.** `configuredMailer` in `src/mail/index.ts` is a function the auth setup calls as it loads, and `resendMailer` takes `baseURL`; `bunx mithaq upgrade --check` names `src/mail/mailers.ts` as differing.
@@ -553,6 +567,7 @@ What a project made before the json kind changes, in every project:
 - **Every plug names its `onError`.** `fetchHttp` no longer falls back to `console.error`: each plug requires the function it hands a fault it answers 500, as `auth.onError` and `storage.onError` already were. The template hands one `report` to both plugs and to `auth`.
 - **A json field's `maxBytes` counts bytes.** It held a value's JSON to that many characters, and now to that many UTF-8 bytes, so a value written in a script past ASCII may be refused where it was taken. Raise a field's `maxBytes` where its values need the room.
 - **A `like` holds at most 1000 words.** A caller's `like` with more words than an `in` lists values is refused as a 400.
+- **The `json` kind adds vocabulary.** A project with a signed `mithaq.lock` reviews and approves the added kind through `bunx mithaq lock`; never edit the lock by hand.
 
 What a project made before the json kind changes, with the audit-log add-on:
 
@@ -782,11 +797,13 @@ The step store's words have these meanings, on shared kayan as well as tenant-ow
 
 - `find({ tx, kayan, args: { limit, page, sort, where, lock } })` reads rows past access and field masks. Core ANDs the active organization onto a tenant-owned kayan's filter. These rows can contain fields the actor may not read; never copy them into output or messages. `lock` is optional; any lock requires a transaction and holds the returned rows until it ends. `update` excludes every competing lock. `noKeyUpdate` keeps their values unchanged by others while allowing `keyShare` readers. `share` keeps them as read while allowing other `share` and `keyShare` readers. `keyShare` keeps their identity and unique keys while allowing other values to change.
 - `hold({ tx, kayan, ids, mode })` keeps the named rows held in that mode until the transaction ends, taking them in ascending id order and ignoring duplicates. It returns nothing. A missing id and another organization's id both answer the same 404. Order across different kayan remains the step's responsibility.
+- `insert({ tx, kayan, data })` makes a row and returns it. Core fills a tenant-owned kayan's organization from the active organization and refuses another value. It checks declared fields and references, but skips the kayan's access, operation steps, input validation and audit.
 - `update({ tx, kayan, id, data: { quantity: { $inc: n }, ...plainValues } })` adds `n` in the database and returns the changed row. The field must be an integer and `n` a safe integer. An increment writes a stored integer field; arithmetic in a draft snapshot is refused. Store writes skip validation, including a field's minimum rule; a quantity that must never go negative needs a database `CHECK`.
+- `remove({ tx, kayan, id })` deletes the named row and returns what it deleted. Core seals the selection to the active organization. On another kayan it is a hard delete, skipping that kayan's operation steps, soft delete and audit. A write to the operation's own row keeps its managed access, version and soft-delete guards.
 - `sum({ tx, kayan, field, where })` returns the exact total of an integer, number or decimal field as a decimal string, including for integer totals, so no aggregate passes through a float. No matching values returns `'0'`. A non-numeric field is refused; core seals the selection to the active organization just as for `find`.
 - `upsert({ tx, kayan, on: ['organization', 'code'], data: { code: 'MAIN', quantity: { $inc: n } } })` inserts a row or updates the row with the same unique key, and returns it. `on` names all fields of a unique index the kayan declares, including indexes from `unique` rules; `on: ['id']` is also accepted without a declared unique index, and another set of fields is refused. Key values are plain values in `data`. Core fills a tenant-owned kayan's tenant field from the active organization and refuses any other value, whether or not the field appears in `on`. A conflict can never change another organization's row, even through a globally unique index. An increment inserts `n` if the row is new or adds `n` if it exists; plain values replace their fields, and an existing row keeps its id. Null keys follow the declared index's null uniqueness. While saving a draft, an upsert of the operation's own versioned kayan is refused; use `update` for that snapshot. Like the other store writes, upsert skips access, steps, validation and audit.
 
-`find`, `hold`, `sum` and `upsert` are available inside the operation's transaction, as the existing store writes are; outside steps use managed operations. A store implements these promises itself. The drizzle store maps lock modes to its database's row locks and binds increment amounts as parameters.
+These helpers use the operation's transaction; outside steps use managed operations. Core does not expose `transaction` or the adapter's client through `tools.store`. The drizzle store maps lock modes to its database's row locks and binds increment amounts as parameters.
 
 Add a new store word only when at least two real callers need it, every store could keep its promise, and it is documented by meaning with a test that breaks when the promise breaks.
 
@@ -799,6 +816,26 @@ Where a step goes:
 - in the service target's `beforeSteps`, `afterSteps` or `afterCommit` in `packages/mithaq/src/mithaq.ts`, for every write of the project. `audit` sits in `afterSteps`. A webhook or an email belongs in `afterCommit`, where the row is durable.
 
 A step that refuses throws `invalid`, `denied`, `missing` or `conflict` from `mithaq`, each taking one object with a `message`, a copy `key` and `params`. Add the key to the copy in every locale.
+
+### The store contract
+
+An adapter implements `Store` from `mithaq`. It declares `capability: 'store'`, a `kinds` map that builds columns and a `rules` map that applies rules. Its optional metadata is `type`, `commands`, `idKinds` and `sql`; `sql: 'drizzle'` says its database and tables are Drizzle's, which local auth uses. These are all its methods:
+
+| Method | Promise |
+| --- | --- |
+| `init(kayan)` | Prepare one build from its resolved kayan; return a store for that build, or prepare this one in place. |
+| `connect({ readOnly? })` | Reach and prepare the database. With `readOnly: true`, write nothing, including no schema push, seed or marker. |
+| `transaction(fn)` | Run `fn(tx)` with one transaction and return its result. Commit its writes together on success; roll them all back if it throws. The runner supplies this `tx` to the operation and its nested calls. |
+| `insert({ tx, kayan, data })` | Insert one row and return it. |
+| `update({ tx, kayan, id, data, where? })` | Change the named row only where the extra filter admits it and return it; support safe integer `$inc` alongside plain values. |
+| `upsert({ tx, kayan, on, data, where? })` | Insert or update on the unique key, keeping an existing row's id; apply the filter to a conflicting update and support `$inc`. |
+| `remove({ tx, kayan, id, where? })` | Delete the named row only where the extra filter admits it and return the deleted row. |
+| `find({ tx?, kayan, args })` | Return `{ docs, totalDocs }` for `args.where`, `sort`, `limit` and `page`. Store-level `limit: 0` reads all matches. Honor all four lock modes described above, and refuse a lock without a transaction. |
+| `sum({ tx?, kayan, field, where? })` | Return an exact numeric total as a decimal string, or `'0'` for no values. |
+| `destroy()` | Close the store's resources. |
+| `count({ tx?, kayan, args: { where? } })`, optional | Count matches without loading rows. Without it, core uses `find` with `limit: 0`. |
+
+Here `kayan` is the string name behind the step boundary. `hold` is a core helper built from `find`, not another method an adapter implements. Steps get the sealed helpers in [Add a step](#add-a-step), with kayan declarations, rather than the adapter's lifecycle or transaction methods. The full type is `Store` in `packages/mithaq/src/mithaq/language.ts` in the mithaq repository.
 
 ### Add a screen component
 
@@ -907,7 +944,7 @@ Start both built apps with `NODE_ENV=production`. That one setting decides sever
 
 - `server.ts` calls `connect()` only in production, so only then are migrations checked or applied before serving. The apps read it from `process.env` at run time, so the build cannot bake it in.
 - The drizzle store pushes the schema on `connect()` whenever `NODE_ENV` is not `production`. A production database must never be reached by a process without it.
-- The production checks for `DATABASE_URL`, the auth URLs and secret, and the storage settings run only in production. Without it, those settings quietly fall back to their development values.
+- Production requires `DATABASE_URL`, the auth URLs and secret, and the storage settings. Outside production, development values can fill missing settings, but an auth URL off this machine still requires `BETTER_AUTH_SECRET`. The backoffice's separate-origin and separate-host checks also run in every environment.
 
 ### Storage adapters
 
