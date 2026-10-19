@@ -452,6 +452,8 @@ export const dashboardScreen = screenTarget({
       nav: { label: showOrganization ? { en: 'Members', ar: 'الأعضاء' } : { en: 'Users', ar: 'المستخدمون' } },
       permission: 'member.find',
     },
+    fixedRole: { path: '/roles/fixed/:name', component: dashboardUi('fixed-role.tsx#FixedRole'), permission: 'roles.find' },
+    member: { path: '/members/:id', component: dashboardUi('member.tsx#Member'), permission: 'member.find' },
     // end add-on: roles
     // add-on: audit-log
     // Every change in the organization, filtered and paged, for an actor holding the log's key,

@@ -115,6 +115,8 @@ export type PageProps<Data = unknown> = { loaderData?: Data }
  * access report. It reads the same rows on the server and in the browser.
  */
 export type LoaderTools = {
+  /** The matched screen page parameters, for provider-backed detail pages. */
+  params?: Readonly<Record<string, string>>
   client: FetchClient
   request: (path: string, init?: RequestInit) => Promise<Response>
   access: AccessReport

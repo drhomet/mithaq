@@ -133,7 +133,7 @@ export const roles = defineKayan({
       },
     },
     /**
-     * The fixed roles list first, from their code, each with a lock and its keys; a custom role opens its form, where its keys are picked as badges, and its delete names the members who still hold it.
+     * The fixed roles list first, from their code, each with a lock and a read-only page; a custom role opens its form, where its permissions are grouped checkboxes, and its delete names the members who still hold it.
      */
     dashboard: {
       useAsTitle: 'label',

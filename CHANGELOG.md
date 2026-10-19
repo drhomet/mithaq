@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+### Upgrade notes
+
+- The roles add-on's tenant directory now uses shared `mithaq-admin/members.tsx` components. It searches names and email, filters roles, sorts names and dates, counts matches and pages provider-backed rows. All custom-role pages are read for directory filters and role assignment. Existing apps can replace their copied presentation with `Members` and supply authorized rows and explicit `MembersOptions`.
+- Members open `/members/:id` under the screen path. Identity, role assignment and readable permission summaries are on this page. Held-role summaries open by default; other summaries can be expanded before assigning a role. `MemberPage` accepts children for app sections such as Shops. Adopt the template's member route and loader; update links that previously opened `?member=<id>` and remove the old role drawer.
+- Assignment guards remain enforced by the existing server operations. After a partial save failure, the page shows the actual applied assignments and the refusal. Successful saves remain on the member page.
+- Fixed and custom roles show assigned-member counts after authorized provider and assignment reads. Owners count toward their implicit administrator role. Unreadable or failed counts show a dash, with a message on failure. Fixed roles open `/roles/fixed/:name` read-only; custom roles open their existing editor.
+- Permission editing uses grouped checkboxes with search, selected-only filtering and expandable field access. Read-only summaries group the held permissions by area. An existing custom wildcard grant can be removed in the editor. Import `RoleForm`, `Permissions` and `RolesTable` from mithaq-admin and keep the app's grant policy and extra statements in its wrappers. Add Arabic and English copy for `dashboard.permissionsSearch`, `dashboard.permissionsSelected` and `dashboard.rolesCountsFailed`.
+- `LoaderTools.params` now supplies matched screen-page URL parameters. Run `mithaq upgrade --check` and merge the `src/screens.tsx` host change before using parameterized page loaders. Regenerate screens after adding the member and fixed-role routes. Ejected member and role components need the corresponding registry changes; no database migration is needed.
+
 ## 0.2.2
 
 ### Upgrade notes

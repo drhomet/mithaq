@@ -62,7 +62,7 @@ const once = (text, from, to, count = 1) => {
 export const addOns = {
   roles: {
     needs: [],
-    files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/ui-dashboard/members-card.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
+    files: ['packages/features/roles', 'packages/mithaq/src/roles/grants.ts', 'packages/asas/src/ui-dashboard/members.tsx', 'packages/asas/src/ui-dashboard/member.tsx', 'packages/asas/src/ui-dashboard/fixed-role.tsx', 'packages/asas/src/ui-dashboard/members-card.tsx', 'packages/asas/src/messages/roles.json', 'packages/asas/src/messages/memberRoles.json'],
     without: ['packages/mithaq/src/roles/default-member-roles.ts', 'packages/mithaq/src/roles/member-access.ts'],
     packages: [],
     copy: [],

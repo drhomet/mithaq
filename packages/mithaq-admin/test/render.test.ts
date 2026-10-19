@@ -535,6 +535,9 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-expected-updated-at',
       'mithaq-payload-password',
       'mithaq-directional-icon',
+      'mithaq-members',
+      'mithaq-role-form',
+      'mithaq-roles',
     ],
     'the registry declares the ninety-six items this file knows about',
   )

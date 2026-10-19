@@ -1615,6 +1615,76 @@
           "target": "@components/ui/directional-icon.tsx"
         }
       ]
+    },
+    {
+      "name": "mithaq-members",
+      "type": "registry:component",
+      "title": "Mithaq members",
+      "description": "Provider-backed member directory, detail page and authorized assignment counts.",
+      "registryDependencies": [
+        "alert-dialog",
+        "badge",
+        "button",
+        "button-group",
+        "card",
+        "checkbox",
+        "dropdown-menu",
+        "input",
+        "tabs"
+      ],
+      "files": [
+        {
+          "path": "registry/members.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/members.tsx"
+        },
+        {
+          "path": "registry/member-types.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/member-types.ts"
+        },
+        {
+          "path": "registry/member-counts.ts",
+          "type": "registry:lib",
+          "target": "@components/mithaq/member-counts.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-role-form",
+      "type": "registry:component",
+      "title": "Mithaq role form",
+      "description": "Role identity and grouped permission checkboxes with search and selected-only filtering.",
+      "registryDependencies": [
+        "badge",
+        "card",
+        "collapsible",
+        "input"
+      ],
+      "files": [
+        {
+          "path": "registry/role-form.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/role-form.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-roles",
+      "type": "registry:component",
+      "title": "Mithaq roles",
+      "description": "Fixed and custom roles with assigned-member counts and detail links.",
+      "registryDependencies": [
+        "button",
+        "table"
+      ],
+      "files": [
+        {
+          "path": "registry/roles.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/roles.tsx"
+        }
+      ]
     }
   ]
 }

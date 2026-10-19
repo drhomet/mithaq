@@ -419,7 +419,7 @@ test('the template screens share their controls and layouts through one const, r
   // component of the project's own (the Roles list). No real page holds the other
   // two, so the test below builds one that does.
   assert.deepEqual([...kinds].sort(), ['button', 'button confirm', 'component', 'controls', 'field', 'form', 'form component', 'layout', 'list', 'list component', 'nav', 'row', 'section', 'shell', 'tabs', 'title'].sort())
-  assert.deepEqual(Object.keys(dashboard.pages), ['dashboard', 'members', 'activity'], 'a dashboard and the pages that belong to no kayan: the members and the organization\'s activity')
+  assert.deepEqual(Object.keys(dashboard.pages), ['dashboard', 'members', 'fixedRole', 'member', 'activity'], 'a dashboard and the pages that belong to no kayan: the members and the organization\'s activity')
   assert.deepEqual(dashboard.pages.activity, { path: '/activity', component: '@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage', nav: { label: { en: 'Activity', ar: 'النشاط' } }, permission: 'auditLog.find' }, 'which the log\'s key serves')
   assert.deepEqual(dashboard.nav.at(-2), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find' }, 'listed in the nav behind its own key')
   assert.deepEqual(dashboard.nav.at(-1), { path: '/activity', page: 'activity', label: { en: 'Activity', ar: 'النشاط' }, permission: 'auditLog.find' }, 'and the activity behind the log\'s')

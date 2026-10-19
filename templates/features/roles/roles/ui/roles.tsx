@@ -1,9 +1,12 @@
 // A fixed role is one this project ships, whose keys are code and never a row, so nothing here
 // writes one.
-import { useState } from 'react'
-import { Lock } from 'lucide-react'
-import type { ButtonProps, CellProps, Row } from 'mithaq/admin'
-import { useClient, useList, useLocale, useRecord, useScreen } from 'mithaq/admin/react'
+import { useEffect, useState } from 'react'
+import { holds, type ButtonProps, type CellProps, type Row } from 'mithaq/admin'
+import { useAccess } from 'mithaq/admin/react'
+import { RolesTable as SharedRolesTable } from 'mithaq-admin/roles.tsx'
+import { memberCounts } from 'mithaq-admin/member-counts.ts'
+import { useClient, useLocale, useRecord, useScreen } from 'mithaq/admin/react'
+import { OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
 import { tenantRoles } from '@asas/mithaq/roles/tenant-roles.ts'
 import {
   AlertDialog,
@@ -15,10 +18,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Grants, PermissionBadges } from './role-form.tsx'
+import { PermissionBadges } from './role-form.tsx'
 
 /** A role's label in the viewer's locale, and its slug only where a row carries none. */
 export const labelOf = (row: Row | null | undefined, locale: string) => {
@@ -26,94 +27,26 @@ export const labelOf = (row: Row | null | undefined, locale: string) => {
   return label?.[locale] ?? String(row?.name ?? '')
 }
 
-/**
- * The list node's component: the fixed roles first, from their code, each with a lock, then the
- * organization's own. Each row names a role and counts what it grants, and opens to its keys and,
- * for a custom role, a link to its page. It draws no row menu; a custom role's delete is its page's.
- */
+/** Counts use the provider directory, including the owner's implicit administrator role. */
 export function RolesTable() {
-  const { page, creates, href, newHref } = useList()
-  const { locale, t } = useLocale()
-  return (
-    <div data-roles="" className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted-foreground">{t('dashboard.rolesAbout', 'Fixed roles ship with the project and cannot be changed here. Custom roles are this organization\'s own.')}</p>
-        {creates ? (
-          <Button size="sm" className="max-sm:h-11" nativeButton={false} render={<a href={newHref} />}>
-            {t('dashboard.rolesNew', 'New role')}
-          </Button>
-        ) : null}
-      </div>
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead scope="col">{t('roles.name', 'Name')}</TableHead>
-              <TableHead scope="col">{t('dashboard.rolesKind', 'Kind')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {Object.entries(tenantRoles).map(([name, role]) => (
-              <TableRow key={name} data-row={name} data-fixed="true">
-                <TableCell className="whitespace-normal">
-                  <Grants
-                    data-fixed-role=""
-                    label={
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Lock data-lock="" className="text-muted-foreground size-3.5" aria-hidden="true" />
-                        <span>{(role.label as Readonly<Record<string, string>>)[locale] ?? name}</span>
-                      </span>
-                    }
-                    held={role.permissions === '*' ? ['*'] : role.permissions}
-                  >
-                    <div className="grid gap-2">
-                      <p className="text-muted-foreground text-sm">{t('dashboard.rolesFixedAbout', 'This role ships with the project. What it holds is code, so it cannot be edited or deleted here.')}</p>
-                      <PermissionBadges held={role.permissions === '*' ? ['*'] : role.permissions} />
-                    </div>
-                  </Grants>
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge variant="secondary">{t('dashboard.rolesFixed', 'Fixed')}</Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-            {page.docs.map((row) => {
-              const id = String(row.id)
-              const label = labelOf(row, locale)
-              const open = (
-                <a href={href(id)} className="text-primary justify-self-start text-sm underline underline-offset-4 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
-                  {(t('dashboard.rolesOpen', 'Open {role}') ?? 'Open {role}').replace('{role}', () => label)}
-                </a>
-              )
-              return (
-                <TableRow key={id} data-row={id} data-fixed="false">
-                  <TableCell className="whitespace-normal">
-                    {/* A role whose keys the viewer may not read comes without them, so it is named and linked and counts nothing. */}
-                    {Array.isArray(row.permissions) ? (
-                      <Grants label={<span className="font-medium">{label}</span>} held={row.permissions as string[]}>
-                        <div className="grid gap-2">
-                          {open}
-                          <PermissionBadges held={row.permissions as string[]} />
-                        </div>
-                      </Grants>
-                    ) : (
-                      <div className="grid gap-1">
-                        <span className="font-medium">{label}</span>
-                        {open}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <Badge variant="outline">{t('dashboard.rolesCustom', 'Custom')}</Badge>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  )
+  const access = useAccess()
+  const client = useClient()
+  const { maxLimit } = useScreen()
+  const [counts, setCounts] = useState<Record<string, number>>()
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let active = true
+    if (!holds(access, 'member.find') || !holds(access, 'memberRoles.find')) return
+    void memberCounts({ client, request: fetch, maxLimit, ownerRole: OWNER_ROLE }).then((figures) => {
+      if (!active) return
+      setCounts(figures)
+    }).catch(() => {
+      if (active) setFailed(true)
+    })
+    return () => { active = false }
+  }, [access, client, maxLimit])
+  const roles = Object.entries(tenantRoles).map(([name, role]) => ({ name, label: role.label, fixed: true, permissions: role.permissions === '*' ? ['*'] : role.permissions }))
+  return <SharedRolesTable roles={roles} counts={counts} failed={failed} />
 }
 
 /**
@@ -169,7 +102,7 @@ export function DeleteRole({ run, busy }: ButtonProps) {
           <ul data-holders="" className="grid gap-1 text-sm">
             {holders.map((one) => (
               <li key={one.id}>
-                <a href={`${path}/members?member=${encodeURIComponent(one.id)}`} className="underline underline-offset-4">
+                <a href={`${path}/members/${encodeURIComponent(one.id)}`} className="underline underline-offset-4">
                   {one.name}
                 </a>
               </li>

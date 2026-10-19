@@ -22,6 +22,16 @@
       },
       "permission": "member.find"
     },
+    "fixedRole": {
+      "path": "/roles/fixed/:name",
+      "component": "./src/ui-dashboard/fixed-role.tsx#FixedRole",
+      "permission": "roles.find"
+    },
+    "member": {
+      "path": "/members/:id",
+      "component": "./src/ui-dashboard/member.tsx#Member",
+      "permission": "member.find"
+    },
     "activity": {
       "path": "/activity",
       "component": "@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage",
