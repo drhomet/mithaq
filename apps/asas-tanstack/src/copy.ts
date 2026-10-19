@@ -666,8 +666,6 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       en: 'A role a member holds is not deleted. Take it from each of them on the Members page first.',
       ar: 'لا يُحذف دور يشغله عضو. اسحبه من كل منهم في صفحة الأعضاء أولا.',
     },
-    permissionsSearch: { en: 'Search permissions', ar: 'بحث في الصلاحيات' },
-    permissionsSelected: { en: 'Selected only', ar: 'المحدد فقط' },
     rolesCountsFailed: { en: 'Member counts could not be loaded.', ar: 'تعذر تحميل أعداد الأعضاء.' },
     permissionsScreens: { en: 'Screens', ar: 'الشاشات' },
     permissionsFields: { en: 'Fields', ar: 'الحقول' },

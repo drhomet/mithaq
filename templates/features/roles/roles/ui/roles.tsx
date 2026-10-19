@@ -34,9 +34,13 @@ export function RolesTable() {
   const { maxLimit } = useScreen()
   const [counts, setCounts] = useState<Record<string, number>>()
   const [failed, setFailed] = useState(false)
+  const readsMembers = holds(access, 'member.find')
+  const readsAssignments = holds(access, 'memberRoles.find')
   useEffect(() => {
     let active = true
-    if (!holds(access, 'member.find') || !holds(access, 'memberRoles.find')) return
+    setCounts(undefined)
+    setFailed(false)
+    if (!readsMembers || !readsAssignments) return
     void memberCounts({ client, request: fetch, maxLimit, ownerRole: OWNER_ROLE }).then((figures) => {
       if (!active) return
       setCounts(figures)
@@ -44,7 +48,7 @@ export function RolesTable() {
       if (active) setFailed(true)
     })
     return () => { active = false }
-  }, [access, client, maxLimit])
+  }, [readsMembers, readsAssignments])
   const roles = Object.entries(tenantRoles).map(([name, role]) => ({ name, label: role.label, fixed: true, permissions: role.permissions === '*' ? ['*'] : role.permissions }))
   return <SharedRolesTable roles={roles} counts={counts} failed={failed} />
 }

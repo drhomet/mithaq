@@ -191,6 +191,7 @@ export function MemberRoles({ member, roles, onClose, onHeld, options }: { optio
   const client = useClient()
   const access = useAccess()
   const me = useUser().email
+  const edits = access.collections?.memberRoles?.create === true || access.collections?.memberRoles?.delete === true
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set(member.roles.map((one) => one.role)))
   const [busy, setBusy] = useState(false)
   const [refusal, setRefusal] = useState<string>()
@@ -248,7 +249,7 @@ export function MemberRoles({ member, roles, onClose, onHeld, options }: { optio
             )}
           </span>
         </label>
-        {role.permissions ? <details data-role-summary="" open={owned || chosen.has(role.name)} className="ps-7">
+        {holds(access, 'roles.find') && role.permissions ? <details data-role-summary="" open={owned || chosen.has(role.name)} className="ps-7">
           <summary className="text-muted-foreground cursor-pointer text-sm max-sm:min-h-11">{t('roles.permissions', 'Permissions')}</summary>
           <div className="pt-2"><Permissions held={role.permissions} /></div>
         </details> : null}
@@ -274,15 +275,19 @@ export function MemberRoles({ member, roles, onClose, onHeld, options }: { optio
           void save()
         }}
       >
-        <p className="text-muted-foreground"><bdi>{member.name}</bdi> · <bdi dir="ltr">{member.email}</bdi></p>
+        <p className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+          <bdi>{member.name}</bdi><bdi dir="ltr">{member.email}</bdi>
+          <span>{t('dashboard.membersJoined', 'Joined')}: {formatDate({ value: member.joined, locale, day: true }) ?? noValue}</span>
+          {holds(access, 'member.fields.lastSeenAt') ? <span>{t('member.lastSeenAt', 'Last seen')}: {formatDate({ value: member.lastSeen, locale, day: true }) ?? noValue}</span> : null}
+        </p>
         {roles.length === 0 ? <p className="text-muted-foreground">{t('dashboard.membersNoRoles', 'There is no role you may read to assign.')}</p> : null}
         {group(true, t('dashboard.membersFixed', 'Fixed roles'))}
         {group(false, t('dashboard.membersCustom', 'Custom roles'))}
         {refusal ? <p role="alert" className="text-destructive">{refusal}</p> : null}
-        <footer className="bg-background sticky bottom-0 flex justify-end gap-2 border-t py-3">
+        {edits ? <footer className="bg-background sticky bottom-0 flex justify-end gap-2 border-t py-3">
           <Button type="button" variant="outline" className="max-sm:h-11" onClick={onClose}>{t('admin.cancel', 'Cancel')}</Button>
           <Button type="submit" className="max-sm:h-11" disabled={busy || !changed}>{t('admin.save', 'Save')}</Button>
-        </footer>
+        </footer> : null}
       </form>
     </section>
   )
@@ -386,9 +391,6 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
   const inviteTableRef = useRef<HTMLTableElement>(null)
   const openHint = useId()
   const roleFilter = useId()
-  // A member's roles are changed where the report lets this actor add or remove an assignment; the guard on each
-  // write still decides every role.
-  const edits = assignments?.create === true || assignments?.delete === true
   // A member is removed, and an invitation cancelled, by whoever holds the key the auth template gates the provider's
   // route by; the provider's own governance role still decides, and its refusal is worded below.
   const removes = holds(access, 'member.delete')
@@ -625,7 +627,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                       onSort={(value) => { setSort(value); setPage(1) }}
                       href={(id) => `${path}/members/${encodeURIComponent(id)}`}
                       openHint={openHint}
-                      openRow={(id) => { window.location.href = `${path}/members/${encodeURIComponent(id)}` }}
+                      openRow={(id) => [...(table.current?.querySelectorAll<HTMLAnchorElement>('a[data-row-link]') ?? [])].find((one) => one.dataset.rowLink === id)?.click()}
                       table={table}
                       unreadable={false}
                       actions={(row) => {
@@ -633,9 +635,8 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                         if (!member) return null
                         const linkable = adds && member.email !== me
                         const takes = removable(member)
-                        return edits || linkable || takes ? (
+                        return linkable || takes ? (
                           <RowActions id={member.userId} label={rowActionsLabel(member.name)}>
-                            {edits ? <DropdownMenuItem data-row-action="edit-roles" className="max-sm:min-h-11" render={<a href={`${path}/members/${encodeURIComponent(member.userId)}`} />}>{t('dashboard.membersEdit', 'Edit roles')}</DropdownMenuItem> : null}
                             {linkable ? <DropdownMenuItem data-row-action="password-link" className="max-sm:min-h-11" onClick={() => void sendLink(member)}>{t('dashboard.passwordLink', 'Send a new password link')}</DropdownMenuItem> : null}
                             {takes ? <DropdownMenuItem data-row-action="remove" variant="destructive" className="max-sm:min-h-11" disabled={busy} onClick={() => setRemoving(member)}>{t('dashboard.removeMember', 'Remove from organization')}</DropdownMenuItem> : null}
                           </RowActions>
@@ -806,12 +807,13 @@ export function MemberPage({ member, roles, options, children }: { member?: Memb
   const [held, setHeld] = useState(member?.roles ?? [])
   useEffect(() => setHeld(member?.roles ?? []), [member])
   const back = `${path}/members`
+  const backLink = useRef<HTMLAnchorElement>(null)
   return <AppShell regions={{
     header: <h1>{member?.name ?? t('admin.notFoundTitle', 'Page not found')}</h1>,
     main: <div className="mx-auto grid w-full max-w-3xl gap-4">
-      <a href={back} className="text-sm underline underline-offset-4 max-sm:min-h-11">{t('dashboard.members', 'Members')}</a>
+      <a ref={backLink} href={back} className="text-sm underline underline-offset-4 max-sm:min-h-11">{t('dashboard.members', 'Members')}</a>
       {member ? <>
-        <MemberRoles key={member.userId} member={{ ...member, roles: held }} roles={roles} options={options} onHeld={setHeld} onClose={() => { window.location.href = back }} />
+        <MemberRoles key={member.userId} member={{ ...member, roles: held }} roles={roles} options={options} onHeld={setHeld} onClose={() => backLink.current?.click()} />
         {children}
       </> : <p>{t('admin.notFound', 'That page does not exist.')}</p>}
     </div>,

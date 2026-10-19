@@ -313,6 +313,8 @@ writes still use the `memberRoles` kayan. A refused save shows the assignments
 that succeeded before the refusal.
 
 `MemberPage` takes one authorized member, the readable roles and the same options.
+It shows joined date and authorized last seen, and permission summaries only
+with `roles.find`. Save and Cancel appear only with assignment write access.
 Its `children` appear after roles so an app can add a section such as shop
 assignments. A page loader receives its matched URL parameters in
 `LoaderTools.params`. Resolve the member from the provider's authorized directory,
@@ -321,8 +323,8 @@ how to register these routes without adding navigation entries.
 
 `mithaq-admin/role-form.tsx` exports `RoleForm`, `Permissions` and `Grants`.
 `PermissionOptions` supplies the app's extra permission statements and its
-`canGrant` callback. Editable permissions use grouped checkboxes, search,
-selected-only filtering and expandable field access. Read-only permissions show
+`canGrant` callback. Editable permissions use grouped checkboxes and
+expandable field access. Read-only permissions show
 only the keys held, grouped by area. Unrecognized held keys remain visible and
 survive edits.
 
@@ -330,7 +332,8 @@ survive edits.
 optional authorized member counts. Fixed roles link to `/roles/fixed/:name`;
 custom roles use the list's normal record links. `memberCounts` from
 `mithaq-admin/member-counts.ts` pages the provider and assignment reads, includes
-implicit owner grants and counts each member once per role. Call it only when
+implicit owner grants and counts each member once per role. Masked assignment
+user or role fields make the counts unavailable. Call it only when
 the actor can read both memberships and assignments. Omit unavailable counts;
 the list shows a dash rather than claiming zero.
 

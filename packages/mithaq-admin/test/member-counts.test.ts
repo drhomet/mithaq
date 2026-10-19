@@ -25,3 +25,13 @@ test('role counts page both authorized reads, deduplicate assignments and includ
 test('a refused provider read leaves role counts unavailable rather than reporting zero', async () => {
   await assert.rejects(memberCounts({ maxLimit: 10, ownerRole: 'administrator', request: async () => new Response(null, { status: 403 }), client: async () => { throw new Error('must not read assignments') } }), /list-members answered 403/)
 })
+
+for (const field of ['user', 'role']) test(`a masked assignment ${field} leaves role counts unavailable`, async () => {
+  const row: Record<string, string> = { user: 'person', role: 'teacher' }
+  delete row[field]
+  await assert.rejects(memberCounts({
+    maxLimit: 10, ownerRole: 'administrator',
+    request: async () => Response.json({ members: [{ userId: 'person', role: 'member' }], total: 1 }),
+    client: async () => ({ docs: [row], totalDocs: 1 }),
+  }), /unreadable assignment/)
+})

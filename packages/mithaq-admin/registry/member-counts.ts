@@ -13,7 +13,10 @@ export const memberCounts = async ({ client, request, maxLimit, ownerRole }: Pic
   }
   for (let page = 1; ; page++) {
     const found = await client({ kayan: 'memberRoles', operation: 'find', input: { limit: maxLimit, page, depth: 0 } }) as { docs: { user: string; role: string }[]; totalDocs: number }
-    for (const row of found.docs) members.get(row.user)?.add(row.role)
+    for (const row of found.docs) {
+      if (typeof row.user !== 'string' || typeof row.role !== 'string') throw new Error('unreadable assignment')
+      members.get(row.user)?.add(row.role)
+    }
     if (!found.docs.length || page * maxLimit >= found.totalDocs) break
   }
   const counts: Record<string, number> = Object.create(null)

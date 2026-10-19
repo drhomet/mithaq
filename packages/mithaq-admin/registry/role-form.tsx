@@ -3,7 +3,7 @@
 // values; this reads and writes them through `useForm()`, and reads each box's
 // refusal through `useKayanField`, so a box says it is required, says what is
 // wrong under itself once left or refused, and marks itself invalid.
-import { useState, type ComponentProps as ElementProps, type ReactNode } from 'react'
+import { type ComponentProps as ElementProps, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useAccess, useForm, useKayan, useLocale, useScreen } from 'mithaq/admin/react'
 import { Badge } from '@/components/ui/badge'
@@ -93,8 +93,6 @@ export function Grants({ label, named, held, heading, defaultOpen, children, ...
 /** Unknown held keys stay visible so editing a screen's projected catalog never silently drops them. */
 export function Permissions({ held, onChange, busy, options }: { held: readonly string[]; onChange?: (keys: string[]) => void; busy?: boolean; options: PermissionOptions }) {
   const { t } = useLocale()
-  const [search, setSearch] = useState('')
-  const [selectedOnly, setSelectedOnly] = useState(false)
   // Read only, every screen the role enters is named, whichever the viewer
   // enters: the backoffice reads a tenant's role, which holds `screen.dashboard`.
   const groups = useGroups(options.statements).map((group) =>
@@ -117,7 +115,7 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
   }
   const toggle = (key: string) => onChange?.(held.includes(key) ? held.filter((one) => one !== key) : [...held, key])
   const choices = (keys: Key[]) => {
-    const shown = keys.filter((one) => (onChange && !selectedOnly || held.includes(one.key)) && (!search || `${one.label} ${one.key}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())))
+    const shown = keys.filter((one) => onChange || held.includes(one.key))
     return shown.length ? (
       <ul className="grid gap-1 sm:grid-cols-2">
         {shown.map(({ key, label }) => {
@@ -137,10 +135,7 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
   if (held.includes('*') && !onChange) return <Badge variant="outline">{t('dashboard.everyPermission', 'Every permission')}</Badge>
   return (
     <div data-permissions="" className="grid gap-4">
-      {onChange ? <div className="flex flex-wrap items-center gap-3">
-        <Input type="search" aria-label={t('dashboard.permissionsSearch', 'Search permissions')} placeholder={t('dashboard.permissionsSearch', 'Search permissions')} value={search} onChange={(event) => setSearch(event.target.value)} className="max-sm:h-11 sm:max-w-sm" />
-        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" data-selected-only="" checked={selectedOnly} onChange={(event) => setSelectedOnly(event.target.checked)} className="accent-primary size-4" />{t('dashboard.permissionsSelected', 'Selected only')}</label>
-      </div> : null}
+
       {groups.map((group) => {
         const operations = choices(group.operations)
         const fields = choices(group.fields)
@@ -150,7 +145,7 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
             <div className="grid gap-1.5">
               {operations}
               {fields ? (
-                <details data-field-access={group.name} open={search ? true : undefined} className="rounded-md border p-3">
+                <details data-field-access={group.name} className="rounded-md border p-3">
                   <summary className="cursor-pointer text-sm max-sm:min-h-11">{t('dashboard.permissionsFields', 'Fields')}</summary>
                   <div className="pt-2">{fields}</div>
                 </details>
