@@ -130,7 +130,7 @@ export type ComponentProps = { page: PageClient }
 /** A field's control: the field, its value and the one way to change it. */
 export type ControlProps = {
   /** The input id its visible label names, and the ids of its description and refusal. */
-  id: string
+  id?: string
   describedBy?: string
   form?: string
   field: ClientField

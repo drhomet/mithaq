@@ -42,6 +42,11 @@ import type { Components, ComponentsOf, Nodes } from '../registry/components.tsx
 import type { NodeProps } from '../registry/node-tree.ts'
 import type { Cell, Control } from '../registry/control-props.ts'
 
+export const directControlProps: ControlProps = {
+  field: { name: 'title', kind: 'text', rules: {}, component: 'text', cell: 'text' },
+  value: '', onChange: () => {}, readOnly: false, issue: null,
+}
+
 export const probes: { [Place in keyof Places]: Places[Place] } = {
   provider: ({ children }: ProviderProps<ReactNode>) => children,
   shell: ({ regions }: ShellProps<readonly ['main'], ReactNode>) => [useNav().length, useScreen().path, regions.main],
@@ -54,7 +59,7 @@ export const probes: { [Place in keyof Places]: Places[Place] } = {
   menu: ({ row, open }: MenuProps<ReactNode>) => (open(null), String(row.id ?? useLocale().t('x'))),
   button: ({ operation, run, busy }: ButtonProps) => (busy ? null : (void run({}), void useClient(), operation)),
 }
-// @ts-expect-error a control is handed no `form` prop
+// @ts-expect-error a control may be drawn without a `form` prop
 export const formless: Places['control'] = ({ form }: ControlProps & { form: string }) => form
 // @ts-expect-error a cell is handed the row it sits in, never a setter
 export const setterless: Places['cell'] = ({ setValue }: CellProps & { setValue: () => void }) => String(setValue)
