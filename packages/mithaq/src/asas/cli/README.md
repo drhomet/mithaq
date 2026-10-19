@@ -56,11 +56,11 @@ A locale leaf holds a message's translations. When a key has both its own messag
 ```json
 {
   "name": {
-    "$value": { "en": "Name", "ar": "الاسم" },
-    "required": { "en": "A name is required.", "ar": "الاسم مطلوب." }
+    "$value": { "ar": "الاسم", "en": "Name" },
+    "required": { "ar": "الاسم مطلوب.", "en": "A name is required." }
   },
   "page": {
-    "description": { "en": "Manage rooms.", "ar": "إدارة القاعات." }
+    "description": { "ar": "إدارة القاعات.", "en": "Manage rooms." }
   }
 }
 ```
