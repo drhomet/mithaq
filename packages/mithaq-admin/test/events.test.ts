@@ -8441,12 +8441,14 @@ test('B2 role permission editing uses grouped checkboxes with search, selected-o
 
 test('B2 the roles list counts assigned members and links fixed roles to read-only pages', async () => {
   const { RolesTable } = await import('../registry/roles.tsx')
-  const list = { page: { docs: [{ id: 'r1', name: 'teacher', label: { en: 'Teacher' }, permissions: ['courses.find'] }] }, creates: false, href: (id: string) => `/dashboard/roles/${id}` }
+  const list = { page: { docs: [{ id: 'r1', name: 'teacher', label: { en: 'Teacher' }, permissions: ['courses.find'] }, { id: 'r2', label: { en: 'Unread name' } }, { id: 'r3', name: 'constructor', label: { en: 'No assignments' } }] }, creates: false, href: (id: string) => `/dashboard/roles/${id}` }
   const host = await render(createElement(ListContext, { value: list as never }, createElement(RolesTable, { roles: [administrator], counts: { administrator: 1, teacher: 2 } })), { t: english })
   assert.equal(host.querySelector('[data-row="administrator"] a')?.getAttribute('href'), '/dashboard/roles/fixed/administrator')
   assert.equal(host.querySelector('[data-row="administrator"] [data-member-count]')?.textContent, '1')
   assert.equal(host.querySelector('[data-row="r1"] [data-member-count]')?.textContent, '2')
   assert.equal(host.querySelector('[data-row="r1"] a')?.getAttribute('href'), '/dashboard/roles/r1')
+  assert.equal(host.querySelector('[data-row="r2"] [data-member-count]')?.textContent, '—', 'a masked role name cannot be joined to its assignment count')
+  assert.equal(host.querySelector('[data-row="r3"] [data-member-count]')?.textContent, '0', 'role names do not read inherited object properties as counts')
 })
 
 

@@ -9,7 +9,7 @@ export function RolesTable({ roles, counts, failed }: { roles: readonly Role[]; 
   const { page, creates, href, newHref } = useList()
   const { path } = useScreen()
   const { locale, t } = useLocale()
-  const rows = [...roles.filter((role) => role.fixed).map((role) => ({ ...role, id: role.name })), ...page.docs.map((row) => ({ id: String(row.id), name: String(row.name), label: row.label as Record<string, string> | undefined, fixed: false, permissions: Array.isArray(row.permissions) ? row.permissions as string[] : undefined }))]
+  const rows = [...roles.filter((role) => role.fixed).map((role) => ({ ...role, id: role.name })), ...page.docs.map((row) => ({ id: String(row.id), name: typeof row.name === 'string' ? row.name : '', label: row.label as Record<string, string> | undefined, fixed: false, permissions: Array.isArray(row.permissions) ? row.permissions as string[] : undefined }))]
   return <div data-roles="" className="grid gap-4">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-muted-foreground">{t('dashboard.rolesAbout', "Fixed roles ship with the project and cannot be changed here. Custom roles are this organization's own.")}</p>
@@ -31,7 +31,7 @@ export function RolesTable({ roles, counts, failed }: { roles: readonly Role[]; 
             </a>
           </TableCell>
           <TableCell>{role.fixed ? t('dashboard.rolesFixed', 'Fixed') : t('dashboard.rolesCustom', 'Custom')}</TableCell>
-          <TableCell data-member-count="" className="tabular-nums">{counts ? new Intl.NumberFormat(locale).format(counts[role.name] ?? 0) : '—'}</TableCell>
+          <TableCell data-member-count="" className="tabular-nums">{counts && role.name ? new Intl.NumberFormat(locale).format(Object.hasOwn(counts, role.name) ? counts[role.name]! : 0) : '—'}</TableCell>
         </TableRow>)}</TableBody>
       </Table>
     </div>
