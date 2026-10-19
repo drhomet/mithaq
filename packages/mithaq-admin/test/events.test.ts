@@ -8116,3 +8116,18 @@ test('240u. the + of a relationship to a kayan that keeps drafts makes its row a
   assert.deepEqual(made.map((one) => [one.kayan, one.operation, one.draft]), [['courses', 'create', true]], 'and its draft save is a draft create')
   assert.equal(host.querySelectorAll('[data-slot="combobox-chip"], [data-control="relationship"] input[value]:not([value=""])').length, 0, 'an answer with no id picks nothing')
 })
+
+
+test('audit F01: an operation keeps its footer outside its scrolling fields within the viewport', async () => {
+  const { OperationButton } = await import('../registry/operation-button.tsx')
+  await render(createElement(OperationButton, {
+    busy: false, copy: { t, locale: 'en' }, open: true, inputOf: (values) => values,
+    kayan: courses, operation: { name: 'create', label: { en: 'Create' }, fields: courses.fields.filter((field) => field.kind !== 'join') }, run: async () => true,
+  }))
+  const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')!
+  assert.match(dialog.className, /max-h-\[calc\(100dvh-/)
+  const body = dialog.querySelector('form > [data-operation-fields]')!
+  assert.ok(body)
+  assert.match(body.className, /overflow-y-auto/)
+  assert.equal(body.contains(dialog.querySelector('[data-slot="alert-dialog-footer"]')), false)
+})

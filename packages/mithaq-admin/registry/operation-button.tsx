@@ -108,7 +108,7 @@ export function OperationButton({
         />
       ) : null}
       {/* On a phone the dialog takes focus, not its first box, so the keyboard stays down. */}
-      <AlertDialogContent ref={popup} initialFocus={initialFocusIn(popup)}>
+      <AlertDialogContent ref={popup} initialFocus={initialFocusIn(popup)} className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden">
         <AlertDialogHeader>
           <AlertDialogTitle>{operation.confirm?.title[copy.locale] ?? label}</AlertDialogTitle>
           <AlertDialogDescription>
@@ -122,7 +122,8 @@ export function OperationButton({
           </p>
         ) : null}
         {/* A form and not a div, so Enter in a one-box dialog submits. */}
-        <form className="grid gap-4" noValidate onSubmit={(event) => void submit(event)}>
+        <form className="flex min-h-0 flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+          <div data-operation-fields="" className="grid min-h-0 gap-4 overflow-y-auto">
           {fields.map((field) => {
             const Control = controlFor(controls, field)
             const inputId = `${kayan.name}-${operation.name}-${field.name}`
@@ -168,7 +169,8 @@ export function OperationButton({
               </FieldShell>
             )
           })}
-          <AlertDialogFooter className="max-sm:[&_button]:h-11">
+          </div>
+          <AlertDialogFooter className="shrink-0 max-sm:[&_button]:h-11">
             <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
             <AlertDialogAction type="submit" disabled={busy}>
               {label}
