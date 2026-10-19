@@ -566,7 +566,9 @@ export const screensOf = (
     const fieldOf = (where: string, name: string, field: RuntimeField & Pick<ResolvedField, 'sortable'>): ClientField => {
       const data = clientFieldOf(name, field)
       const own = (field.targets?.[key] ?? {}) as ScreenField
-      const component = own.component ? ref(`${where} targets.${key}.component`, 'control', own.component, field.kind) : controls[field.kind]!.control
+      const component = own.component ? ref(`${where} targets.${key}.component`, 'control', own.component, field.kind)
+        : field.options?.length && ['text', 'textArray'].includes(field.kind) && controls[field.kind]!.control === field.kind ? 'select'
+        : controls[field.kind]!.control
       needsOptions(where, component, field)
       return {
         ...data,

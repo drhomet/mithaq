@@ -229,3 +229,23 @@ test('the start reads every kind of node a page holds, nested in a group or on a
   assert.throws(() => checkComponents({ client, components: nodeless as Components }), /components\.nodes has no node "tabs"/)
   assert.throws(() => sectioned(nodeless as Components), /components\.nodes has no node "form"\. Spread defaultComponents\.nodes into the map/)
 })
+
+
+test('audit F08: declared options use a select in field and operation projections', async () => {
+  const { language, notes } = await import('./plain-language.ts')
+  const choice = { kind: 'text' as const, label: { en: 'Stage', ar: 'المرحلة' }, options: [{ value: 'ready', label: { en: 'Ready', ar: 'جاهز' } }] }
+  const declared = language.defineKayan({
+    ...notes,
+    fields: { ...notes.fields, stage: choice },
+    targets: { ...notes.targets, service: { operations: {
+      ...notes.targets.service.operations,
+      create: { ...notes.targets.service.operations.create, targets: { dashboard: { fields: { stage: choice } } } },
+    } } },
+  })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [declared] })
+  try {
+    const kayan = built.targets.dashboard.client.kayan.notes!
+    assert.equal(kayan.fields.find((field) => field.name === 'stage')?.component, 'select')
+    assert.equal(kayan.operations.find((operation) => operation.name === 'create')?.fields?.[0]?.component, 'select')
+  } finally { await built.destroy() }
+})
