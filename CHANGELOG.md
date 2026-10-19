@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+Documentation only; no code changed. The guides that ship in the package now cover every 0.2.0 change: the [0.1.1 to 0.2.0 upgrade guide](templates/asas/README.md#011-to-020), the whole store contract, why `drizzleTarget` became `drizzleAdapter`'s named defaults, the nested message format with `$value`, and the query limits. This changelog starts.
+
 ## 0.2.0
 
 Changes since 0.1.1. Existing projects should follow the [0.1.1 to 0.2.0 upgrade guide](templates/asas/README.md#011-to-020) before deploying.
