@@ -120,7 +120,7 @@ export function OperationButton({
         </AlertDialogHeader>
         {shown ? (
           <p role="alert" className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive">
-            {refusalWords({ kayan: kayan.name, shown, fallback: (refused as { fallback?: string }).fallback, labels: fields.filter((field) => issues[field.name] !== undefined).map((field) => operationFieldLabelFor({ kayan, operation, field, copy })), copy })}
+            {refusalWords({ kayan: kayan.name, shown, params: (refused as { data?: { params?: Record<string, unknown> } }).data?.params, fallback: (refused as { fallback?: string }).fallback, labels: fields.filter((field) => issues[field.name] !== undefined).map((field) => operationFieldLabelFor({ kayan, operation, field, copy })), copy })}
           </p>
         ) : null}
         {/* A form and not a div, so Enter in a one-box dialog submits. */}

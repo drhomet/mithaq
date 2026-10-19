@@ -1966,3 +1966,12 @@ test('audit F07: a child without a create operation never offers New even with a
   assert.equal(createsIn({ kayan: readonly, report }), false)
   assert.equal(createsIn({ kayan: courses, report }), true)
 })
+
+
+test('audit F05: refusals resolve in the kayan scope with their translated parameters', async () => {
+  const { failedWords } = await import('../registry/form-rules.tsx')
+  const words: Record<string, string> = { 'sale.invalid.cap': 'Line {line} exceeds {limit}%', 'error.invalid.shared': 'Try {amount}' }
+  const copy = { t: (key: string, fallback?: string) => words[key] ?? fallback, locale: 'en' }
+  assert.equal(failedWords({ kayan: 'sale', copy, thrown: { data: { key: 'error.invalid.cap', params: { line: 2, limit: 10 } } } }), 'Line 2 exceeds 10%')
+  assert.equal(failedWords({ kayan: 'profile', copy, thrown: { data: { key: 'error.invalid.shared', params: { amount: '$5' } } } }), 'Try $5')
+})
