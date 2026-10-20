@@ -16,7 +16,7 @@ export function ScreenNav() {
   const kayan = use(ScreenContext)?.kayan?.name
   return (
     <ul className="flex flex-col gap-1">
-      {screen.nav.map((entry) => (
+      {screen.nav.filter((entry) => !entry.hidden).map((entry) => (
         <li key={entry.page + entry.path}>
           <a href={`${screen.path}${entry.path}`} aria-current={currentOf(entry, kayan)} className="text-sm">
             {navLabel({ entry, screen, locale, t })}

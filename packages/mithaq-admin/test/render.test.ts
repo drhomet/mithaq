@@ -1876,7 +1876,7 @@ test('219b. record breadcrumbs share the header on both screens and use the view
     const kayan = screen.kayan.tags!
     for (const locale of ['en', 'ar']) {
       const word = locale === 'ar' ? 'الوسوم' : 'Tags'
-      const props = { regions: { header: createElement('h1', {}, 'A tag'), main: 'Body' }, page: { path: '/tags/:id' } }
+      const props = { regions: { primary: null, more: null, header: createElement('h1', {}, 'A tag'), main: 'Body' }, page: { path: '/tags/:id' } }
       const html = staticMarkup(createElement(ScreenContext, { value: { ...state, screen, kayan, locale, t: (_key: string, fallback?: string) => _key === 'tags.plural' ? word : fallback } }, createElement(AppShell, props)))
       assert.match(html, new RegExp(`href="${screen.path}/tags"[^>]*data-back`))
       assert.ok(html.indexOf(word) < html.indexOf('A tag'), 'the breadcrumb is above the record title')
@@ -1989,7 +1989,7 @@ test('the shared shell labels permitted groups and keeps settings at the bottom'
     { path: '/settings', page: 'edit', kayan: 'settings', group: { name: 'settings', label: { en: 'Settings' }, position: 'bottom' } },
   ] }
   try {
-    const html = renderToStaticMarkup(createElement(AppShell, { regions: { header: 'Header', main: 'Body' } }))
+    const html = renderToStaticMarkup(createElement(AppShell, { regions: { primary: null, more: null, header: 'Header', main: 'Body' } }))
     assert.doesNotMatch(html, /href="\/dashboard\/hidden"/)
     assert.match(html, /data-nav-group="work"/)
     assert.match(html, /data-nav-group="settings"/)
@@ -2036,7 +2036,7 @@ test('a record header offers no list breadcrumb when the host pruned that destin
   const before = state.screen
   state.screen = { ...screen, nav: [] }
   try {
-    const html = renderToStaticMarkup(createElement(AppShell, { regions: { header: 'Record', main: 'Body' }, page: { path: '/courses/:id' } }))
+    const html = renderToStaticMarkup(createElement(AppShell, { regions: { primary: null, more: null, header: 'Record', main: 'Body' }, page: { path: '/courses/:id' } }))
     assert.doesNotMatch(html, /data-back=/)
   } finally { state.screen = before }
 })
@@ -2048,7 +2048,7 @@ test('tenant styling is opt-in and the backoffice keeps its own design', () => {
   const backoffice = readFileSync(new URL('apps/asas-backoffice/src/styles.css', root), 'utf8')
   assert.match(tenant, /@import 'mithaq-admin\/theme.css'/)
   assert.doesNotMatch(backoffice, /mithaq-admin\/theme.css/)
-  const html = renderToStaticMarkup(createElement(AppShell, { regions: { header: 'Title', main: 'Body' } }))
+  const html = renderToStaticMarkup(createElement(AppShell, { regions: { primary: null, more: null, header: 'Title', main: 'Body' } }))
   assert.match(html, /--sidebar-width:var\(--app-sidebar-width, calc\(var\(--spacing\) \* 72\)\)/)
   assert.match(html, /lg:px-6/, 'the host keeps its original gutter breakpoint without tenant styling')
 })
@@ -2061,4 +2061,22 @@ test('record controls share the header action row with More and keep only the br
   assert.match(html, /data-header-actions=""/)
   const actionRow = html.slice(html.indexOf('data-header-actions=""'))
   assert.ok(actionRow.indexOf('data-action-bar=""') < actionRow.indexOf('aria-label="More actions"'))
+})
+
+
+test('hidden destinations leave the shared and template navigation menus', async () => {
+  const { NavLinks } = await import('../registry/nav-links.tsx')
+  const { ScreenNav } = await import('../../../templates/mithaq/src/ui/screen-nav.tsx')
+  const before = state.screen
+  state.screen = { ...screen, nav: [
+    { path: '/hidden', page: 'list', kayan: 'courses', hidden: true },
+    { path: '/tags', page: 'list', kayan: 'tags' },
+  ] }
+  try {
+    for (const Menu of [NavLinks, ScreenNav]) {
+      const html = renderToStaticMarkup(createElement(Menu))
+      assert.doesNotMatch(html, /href="\/dashboard\/hidden"/)
+      assert.match(html, /href="\/dashboard\/tags"/)
+    }
+  } finally { state.screen = before }
 })

@@ -3668,7 +3668,7 @@ const stubbed = async (step: (calls: string[], assigned: string[]) => Promise<vo
 
 test('the app shell names the organization in the reader\'s language, and in its one name where it has none in that language', async () => {
   const user = { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'o1', name: 'Acme School', names: JSON.stringify({ en: 'Acme School', ar: 'مدرسة أكمي' }) }], activeOrganizationId: 'o1' }
-  const header = async (locale: string, over = user) => (await render(createElement(AppShell, { regions: { header: null, main: null } }), { kayan: undefined, locale, user: over })).querySelector('[data-slot="sidebar-header"]')!.textContent!
+  const header = async (locale: string, over = user) => (await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: null } }), { kayan: undefined, locale, user: over })).querySelector('[data-slot="sidebar-header"]')!.textContent!
   assert.match(await header('ar'), /مدرسة أكمي/, 'in Arabic')
   assert.match(await header('en'), /Acme School/, 'in English')
   assert.match(await header('ar', { ...user, organizations: [{ id: 'o1', name: 'Acme School', names: JSON.stringify({ en: 'Acme School' }) }] }), /Acme School/, 'and in its one name where it has no Arabic one')
@@ -3676,7 +3676,7 @@ test('the app shell names the organization in the reader\'s language, and in its
 
 test('the app shell lists the dashboard and every nav entry in the sidebar, names the active organization, and its user menu offers each locale and signs out', async () => {
   await stubbed(async (calls, assigned) => {
-    const host = await render(createElement(AppShell, { regions: { header: createElement('h1', null, 'Courses'), main: createElement('p', null, 'rows') } }), { kayan: undefined, user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'o1', name: 'Acme School' }], activeOrganizationId: 'o1' } })
+    const host = await render(createElement(AppShell, { regions: { primary: null, more: null, header: createElement('h1', null, 'Courses'), main: createElement('p', null, 'rows') } }), { kayan: undefined, user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'o1', name: 'Acme School' }], activeOrganizationId: 'o1' } })
     await act(async () => sleep(0))
     const hrefs = [...host.querySelectorAll('[data-slot="sidebar"] nav[aria-label="Navigation"] [data-slot="sidebar-content"] a')].map((one) => one.getAttribute('href'))
     assert.deepEqual(hrefs, ['/dashboard', ...screen.nav.map((one) => `/dashboard${one.path}`)], 'the home entry, then the permission-pruned and ordered screen navigation')
@@ -3693,7 +3693,7 @@ test('the app shell lists the dashboard and every nav entry in the sidebar, name
     assert.ok(calls.includes('POST /api/auth/user/sign-out'), `sign-out posts to the provider: ${calls.join(', ')}`)
     assert.deepEqual(assigned, ['replace /auth/sign-in'], 'and lands on sign-in in place of the page, so Back does not return to it')
 
-    const rtl = await render(createElement(AppShell, { regions: { header: null, main: null } }), { kayan: undefined, dir: 'rtl' })
+    const rtl = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: null } }), { kayan: undefined, dir: 'rtl' })
     assert.equal(rtl.querySelector('[data-slot="sidebar"][data-side]')?.getAttribute('data-side'), 'right', 'and on the right in a right-to-left one')
   })
 })
@@ -3702,7 +3702,7 @@ test('the site header\'s trigger stays in view over a page wider than the phone,
   await stubbed(async () => {
     // A page wider than any phone, as the courses list is at 375 px: the document scrolled sideways under it and took the header and trigger off the screen in a right-to-left document.
     const wide = createElement('div', { style: { width: '2000px' } }, 'rows')
-    const host = await render(createElement(AppShell, { regions: { header: createElement('h1', null, 'Courses'), main: wide } }), { kayan: undefined, dir: 'rtl' })
+    const host = await render(createElement(AppShell, { regions: { primary: null, more: null, header: createElement('h1', null, 'Courses'), main: wide } }), { kayan: undefined, dir: 'rtl' })
     await act(async () => sleep(0))
     const header = host.querySelector('[data-region="header"]')!
     const trigger = header.querySelector('[data-sidebar="trigger"]')!
@@ -3723,7 +3723,7 @@ test('the site header\'s trigger stays in view over a page wider than the phone,
     const width = window.innerWidth
     window.happyDOM.setViewport({ width: 375 })
     try {
-      const phone = await render(createElement(AppShell, { regions: { header: null, main: wide } }), { kayan: undefined })
+      const phone = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: wide } }), { kayan: undefined })
       await act(async () => sleep(0))
       assert.equal(window.document.querySelector('[data-mobile="true"]'), null, 'a phone draws no sheet until asked')
       await act(async () => click(phone.querySelector('[data-region="header"] [data-sidebar="trigger"]')!))
@@ -3742,7 +3742,7 @@ test('276c. the sidebar on a phone is titled and described in the viewer\'s lang
   window.happyDOM.setViewport({ width: 375 })
   try {
     for (const [locale, dir, title, about] of [['en', 'ltr', 'Navigation', 'The pages you can open.'], ['ar', 'rtl', 'التنقل', 'الصفحات التي يمكنك فتحها.']] as const) {
-      const phone = await render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { kayan: undefined, locale, dir, t: translator(locale) })
+      const phone = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { kayan: undefined, locale, dir, t: translator(locale) })
       await act(async () => sleep(0))
       await act(async () => click(phone.querySelector('[data-region="header"] [data-sidebar="trigger"]')!))
       await act(async () => sleep(0))
@@ -7017,7 +7017,7 @@ test('220h. a dashboard page and a portal page each hold one main landmark: the 
 test('220i. the sidebar header draws the organizations the session came with, never a skeleton, and one organization is its name with nothing to open', async () => {
   const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
   const shell = (organizations?: { id: string; name: string }[]) =>
-    render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', ...(organizations && { organizations, activeOrganizationId: 'b' }) } })
+    render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', ...(organizations && { organizations, activeOrganizationId: 'b' }) } })
   const two = await shell([{ id: 'a', name: 'First org' }, { id: 'b', name: 'Second org' }])
   const header = () => two.querySelector('[data-slot="sidebar-header"]')!
   assert.equal(header().querySelectorAll('[data-slot="skeleton"]').length, 0, 'no skeleton in the first paint')
@@ -7125,7 +7125,7 @@ test('231c. the registry\'s sidebar is one named navigation landmark that holds 
 })
 
 test('231i. the template\'s sidebar is one named navigation landmark holding its switcher, its links and its user menu', async () => {
-  const host = await render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'a', name: 'Acme' }], activeOrganizationId: 'a' } })
+  const host = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'a', name: 'Acme' }], activeOrganizationId: 'a' } })
   const navs = [...host.querySelectorAll('[data-slot="sidebar"] nav[aria-label="Navigation"]')]
   assert.equal(navs.length, 1, 'one nav in the sidebar, named')
   assert.deepEqual(['header', 'content', 'footer'].map((one) => navs[0]!.querySelector(`[data-slot="sidebar-${one}"]`) !== null), [true, true, true], 'holding the header, the content and the footer')
@@ -7146,7 +7146,7 @@ test('231d. the portal\'s two navs are named differently', async () => {
 
 test('231e. the organization switcher marks the current organization with a radio item, draws no empty box beside the others, and is 44 pixels on a phone', async () => {
   await stubbed(async (calls) => {
-    const host = await render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'a', name: 'First org' }, { id: 'b', name: 'Second org' }], activeOrganizationId: 'b' } })
+    const host = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', organizations: [{ id: 'a', name: 'First org' }, { id: 'b', name: 'Second org' }], activeOrganizationId: 'b' } })
     await act(async () => click(host.querySelector('[data-slot="sidebar-header"] [data-slot="dropdown-menu-trigger"]')!))
     const radios = [...window.document.querySelectorAll('[role="menuitemradio"]')]
     assert.deepEqual(radios.map((one) => [one.textContent, one.getAttribute('aria-checked')]), [['First org', 'false'], ['Second org', 'true']], 'the current one is checked, the other is not')
@@ -7161,7 +7161,7 @@ test('231e. the organization switcher marks the current organization with a radi
 test('229e. two organizations of one name are told apart in the switcher by their slugs, and a name that does not repeat shows none', async () => {
   await stubbed(async () => {
     const organizations = [{ id: 'a', name: 'Admin org', slug: 'admin-org-a1' }, { id: 'b', name: 'Admin org', slug: 'admin-org-b2' }, { id: 'c', name: 'Other', slug: 'other-c3' }]
-    const host = await render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', organizations, activeOrganizationId: 'b' } })
+    const host = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com', organizations, activeOrganizationId: 'b' } })
     assert.equal(host.querySelector('[data-slot="sidebar-header"] [data-slug]')?.textContent, 'admin-org-b2', 'the active one carries its slug')
     await act(async () => click(host.querySelector('[data-slot="sidebar-header"] [data-slot="dropdown-menu-trigger"]')!))
     const rows = [...window.document.querySelectorAll('[role="menuitemradio"]')].map((one) => one.querySelector('[data-slug]')?.textContent ?? null)
@@ -7172,7 +7172,7 @@ test('229e. two organizations of one name are told apart in the switcher by thei
 test('231f. the user menu offers Light, Dark and System as radio items, marks the stored one, and sets the class and the stored key the first paint reads', async () => {
   const { ThemeProvider } = await import(appTheme)
   window.localStorage.setItem('vite-ui-theme', 'light')
-  const host = await render(createElement(ThemeProvider, { defaultTheme: 'system', storageKey: 'vite-ui-theme', children: createElement(AppShell, { regions: { header: null, main: 'x' } }) }))
+  const host = await render(createElement(ThemeProvider, { defaultTheme: 'system', storageKey: 'vite-ui-theme', children: createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }) }))
   await act(async () => click(host.querySelector('[data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"]')!))
   const themes = () => [...window.document.querySelectorAll('[role="menuitemradio"]')].map((one) => [one.textContent, one.getAttribute('aria-checked')])
   assert.deepEqual(themes(), [['Light', 'true'], ['Dark', 'false'], ['System', 'false']], 'the stored theme is the checked one')
@@ -7188,7 +7188,7 @@ test('231f. the user menu offers Light, Dark and System as radio items, marks th
 test('231g. a person who may enter another screen finds a link to it in the user menu, and one who may enter no other finds none', async () => {
   const items = async (screens?: { name: string; path: string }[]) => {
     const named = (key: string, fallback?: string) => (key === 'screens.portal' ? 'Portal' : fallback)
-    const host = await render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { t: named, user: { name: 'Admin', email: 'admin@example.com', ...(screens && { screens }) } })
+    const host = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { t: named, user: { name: 'Admin', email: 'admin@example.com', ...(screens && { screens }) } })
     await act(async () => click(host.querySelector('[data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"]')!))
     const links = [...window.document.querySelectorAll('[role="menuitem"]')].filter((one) => one.getAttribute('href') !== null).map((one) => [one.textContent, one.getAttribute('href')])
     await act(async () => press(window.document.body as unknown as Element, 'Escape'))
@@ -7376,7 +7376,7 @@ test('233j. the user menu asks before it switches the language over a form holdi
   const reload = window.location.reload
   Object.defineProperty(window.location, 'reload', { configurable: true, value: () => reloads.push(1) })
   const chooseArabic = async () => {
-    const host = await render(createElement(AppShell, { regions: { header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com' } })
+    const host = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { user: { name: 'Admin', email: 'admin@example.com' } })
     await act(async () => click(host.querySelector('[data-slot="sidebar-footer"] [data-slot="dropdown-menu-trigger"]')!))
     await act(async () => click([...window.document.querySelectorAll('[role="menuitem"]')].find((one) => one.textContent?.includes('العربية')) as unknown as Element))
   }
@@ -8272,7 +8272,7 @@ test('audit F04: status tabs scroll within the list instead of widening the page
   assert.match(strip.className, /max-w-full/)
   assert.match(strip.className, /overflow-x-auto/)
   assert.ok(strip.classList.contains('overflow-y-hidden'), 'the strip scrolls only sideways')
-  assert.ok(strip.classList.contains('pb-2'), 'bottom space keeps the active underline inside the scrolling strip')
+  assert.ok(strip.classList.contains('data-[variant=line]:pb-2'), 'bottom space keeps the active underline inside the scrolling strip')
   assert.ok(strip.classList.contains('max-sm:h-auto'), 'the strip grows around phone-height triggers and their focus rings')
   assert.match(strip.className, /justify-start/)
 })
@@ -8490,4 +8490,23 @@ test('a custom role record denied update reads values and permissions without di
   assert.ok(host.querySelector('[data-permissions] [data-key="tags.find"]'))
   assert.equal(host.querySelector('input, textarea, button[data-key]'), null)
   assert.equal([...host.querySelectorAll('button')].some((button) => button.textContent === 'Save'), false)
+})
+
+
+test('More shares the responsive form action bar while status stays in the header', async () => {
+  const { PageHeader } = await import('../registry/page-header.tsx')
+  const { FormActions } = await import('../registry/form-actions.tsx')
+  const host = await render(createElement(PageHeader, {
+    t, title: 'Record', more: createElement('button', {}, 'Archive'),
+    primary: createElement(FormActions, {
+      header: true, t, locale: 'en', status: 'draft', busy: false, dirty: true,
+      updating: true, viewing: false, drafts: true, formId: 'record-form',
+      onAsk: () => {}, onSaveDraft: () => {},
+    }),
+  }))
+  const bar = host.querySelector('[data-action-bar]')!
+  assert.ok(bar.querySelector('[data-button=publish]'))
+  assert.ok(bar.querySelector('[aria-label="More actions"]'))
+  assert.equal(bar.querySelector('[data-status]'), null)
+  assert.ok(host.querySelector('[data-status=draft]'))
 })

@@ -29,16 +29,17 @@ export const screens = {
       // column drawn by its cell, under the actions the row's menu offers, as buttons.
       view: {
         path: '/users/:id',
-        page: { ...appPage([{
+        page: appPage([{
           layout: 'record',
           main: [
+            { component: backofficeUi('user-actions.tsx#UserButtons') },
             { section: 'person', label: { en: 'Person', ar: 'الشخص' }, fields: ['name', 'email', 'emailVerified', 'image'] },
             // The role by its label, where the column holds the slugs.
             { section: 'standing', label: { en: 'Standing in the backoffice', ar: 'الوضع في لوحة الإدارة الخلفية' }, fields: [{ field: 'role', cell: backofficeUi('user-actions.tsx#BackofficeRole') }, 'banned', 'banReason', 'banExpires'] },
           ],
           // No id: a person reads the record by its name, and the address bar holds the id.
           side: [{ section: 'record', label: { en: 'Record', ar: 'السجل' }, fields: ['createdAt', 'updatedAt'] }],
-        }]), header: [{ title: {} }, { component: backofficeUi('user-actions.tsx#UserButtons') }] },
+        }]),
       },
     },
   },

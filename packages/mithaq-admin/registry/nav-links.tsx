@@ -16,7 +16,7 @@ export function NavLinks(): ReactElement {
   const current = use(ScreenContext)?.kayan?.name
   return (
     <ul className="flex flex-col gap-1">
-      {screen.nav.map((entry) => (
+      {screen.nav.filter((entry) => !entry.hidden).map((entry) => (
         <li key={`${entry.page}${entry.path}`}>
           <a href={`${screen.path}${entry.path}`} aria-current={currentOf(entry, current)} className="text-sm">
             {entry.label?.[copy.locale] ?? titleOf({ kayan: { name: entry.kayan ?? entry.page }, copy, many: !screen.kayan[entry.kayan ?? '']?.single })}

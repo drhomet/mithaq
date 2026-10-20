@@ -204,7 +204,7 @@ export function BackofficeLink() {
 }
 
 /** The sidebar on the side the document's direction starts from. */
-export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['header', 'main'], ReactNode> & { regions: { primary?: ReactNode; more?: ReactNode } } & { brand?: ReactNode; home?: string; page?: { path: string } }) {
+export function AppShell({ regions: content, brand, home, page }: ShellProps<typeof regions, ReactNode> & { brand?: ReactNode; home?: string; page?: { path: string } }) {
   const { dir, t } = useLocale()
   const state = use(ScreenContext)
   const list = state?.kayan?.pages.list
@@ -241,7 +241,7 @@ export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['h
           <div data-header-row="" className={headerRow}>
             <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 max-md:size-11" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-            <PageHeader t={t} breadcrumb={breadcrumb} primary={regions.primary} more={regions.more}>{regions.header}</PageHeader>
+            <PageHeader t={t} breadcrumb={breadcrumb} primary={content.primary} more={content.more}>{content.header}</PageHeader>
             <BackofficeLink />
           </div>
         </header>
@@ -249,7 +249,7 @@ export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['h
           {/* `min-w-0` so a table wider than the page scrolls rather than
               pushing the sidebar off it. A div and not a `main`, because the
               inset around it is already the page's one main landmark. */}
-          <div data-region="main" className="@container/main flex min-w-0 flex-1 flex-col gap-2">{regions.main}</div>
+          <div data-region="main" className="@container/main flex min-w-0 flex-1 flex-col gap-2">{content.main}</div>
         </div>
       </SidebarInset>
     </SidebarProvider>
@@ -260,7 +260,7 @@ export function AppShell({ regions, brand, home, page }: ShellProps<readonly ['h
  * The backoffice's frame, the dashboard's with two changes: the app's name where the organization switcher sits, since staff work above every organization and switch to none of them,
  * and the home entry named as its page names itself, so the nav and the page say one word.
  */
-export function BackofficeShell(props: ShellProps<readonly ['header', 'main'], ReactNode> & { regions: { primary?: ReactNode; more?: ReactNode } }) {
+export function BackofficeShell(props: ShellProps<typeof regions, ReactNode>) {
   const { t } = useLocale()
   return (
     <AppShell

@@ -68,7 +68,7 @@ const usePlaces = () => {
     entry.kayan === 'enrollments' && !holds(access, 'enrollments.others') ? t('portal.myEnrollments', 'My enrollments')! : navLabel({ entry, screen, locale, t })!
   return [
     { path: '/', href: screen.path, label: t('portal.home', 'Home')!, current: state?.path === screen.path },
-    ...useNav().map((entry) => ({ path: entry.path, href: `${screen.path}${entry.path}`, label: label(entry), current: currentOf(entry, state?.kayan?.name) === 'page' })),
+    ...useNav().filter((entry) => !entry.hidden).map((entry) => ({ path: entry.path, href: `${screen.path}${entry.path}`, label: label(entry), current: currentOf(entry, state?.kayan?.name) === 'page' })),
   ]
 }
 

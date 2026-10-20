@@ -449,9 +449,6 @@
             "header": [
               {
                 "title": {}
-              },
-              {
-                "component": "./src/ui-backoffice/user-actions.tsx#UserButtons"
               }
             ],
             "primary": [],
@@ -460,6 +457,9 @@
               {
                 "layout": "./src/ui-backoffice/record-page.tsx#BackofficeRecordPage",
                 "main": [
+                  {
+                    "component": "./src/ui-backoffice/user-actions.tsx#UserButtons"
+                  },
                   {
                     "section": "person",
                     "label": {

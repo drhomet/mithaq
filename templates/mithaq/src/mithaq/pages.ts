@@ -15,11 +15,12 @@ const holdsForm = (value: unknown): boolean =>
  * on every tab.
  */
 export const appPage = <const Main extends readonly unknown[], const More extends readonly unknown[] = readonly [], const Status extends readonly unknown[] = readonly []>(main: Main, options?: { more?: More; status?: Status }) =>
-  ({ shell: 'app', header: [
-    // A list keeps its title and New action together in its own header.
-    ...(main.some((node) => !!node && typeof node === 'object' && 'layout' in node && node.layout === 'table') ? [] : [{ title: {} }]),
-    ...(options?.status ?? []),
-  ],
+  ({ shell: 'app',
+    header: [
+      // A list keeps its title and New action together in its own header.
+      ...(main.some((node) => !!node && typeof node === 'object' && 'layout' in node && node.layout === 'table') ? [] : [{ title: {} }]),
+      ...(options?.status ?? []),
+    ],
     primary: holdsForm(main) ? [{ controls: {} }] : [],
     more: options?.more ?? [],
     main,

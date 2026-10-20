@@ -590,7 +590,7 @@ export function Members({ loaderData }: PageProps<MembersData>) {
 
   return (
     <AppShell
-      regions={{
+      regions={{ primary: null, more: null,
         header: (
           <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
             <h1 className="truncate">

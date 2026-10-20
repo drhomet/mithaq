@@ -25,7 +25,7 @@ export function Home({ loaderData: counts }: PageProps<Record<string, number | u
   const screen = useScreen()
   return (
     <BackofficeShell
-      regions={{
+      regions={{ primary: null, more: null,
         header: <h1>{t('backoffice.title', 'Backoffice')}</h1>,
         main: (
           <section data-dashboard="backoffice" className="@container grid gap-4">

@@ -119,7 +119,7 @@ export function NewImage(_props: ComponentProps) {
   const list = `${path}${kayan.media?.pages.list?.path ?? ''}`
   return (
     <AppShell
-      regions={{
+      regions={{ primary: null, more: null,
         header: <h1>{t('media.new', 'New image')}</h1>,
         main: (
           <div data-media-new="" className="grid justify-items-start gap-4">
