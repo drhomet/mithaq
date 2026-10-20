@@ -117,7 +117,7 @@ export function List(props: ListProps): ReactElement {
       {node?.tabs?.length ? (
         // The list's tabs, each a `where` the list holds every page to, the first where the URL names none.
         <Tabs className="min-w-0 max-w-full" value={query.tab ?? node.tabs[0]!.tab} onValueChange={(tab) => refine({ tab: String(tab) })}>
-          <TabStrip value={query.tab ?? node.tabs[0]!.tab} className="w-full max-w-full justify-start pb-2 max-sm:h-auto max-sm:min-h-12">
+          <TabStrip value={query.tab ?? node.tabs[0]!.tab} className="w-full max-w-full overflow-x-auto overflow-y-hidden justify-start pb-2 max-sm:h-auto max-sm:min-h-12">
             {node.tabs.map((one) => (
               <TabsTrigger key={one.tab} value={one.tab} data-list-tab={one.tab} className="flex-none max-sm:min-h-11">
                 {one.label[locale] ?? one.tab}

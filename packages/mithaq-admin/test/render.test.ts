@@ -2082,3 +2082,14 @@ test('hidden destinations leave the shared and template navigation menus', async
     }
   } finally { state.screen = before }
 })
+
+
+test('shared record tabs leave padding and overflow to their host', async () => {
+  const { TabStrip } = await import('../registry/tab-strip.tsx')
+  const { Tabs, TabsTrigger } = await import('../registry/ui/tabs.tsx')
+  const html = renderToStaticMarkup(createElement(Tabs, { defaultValue: 'main' },
+    createElement(TabStrip, { value: 'main' }, createElement(TabsTrigger, { value: 'main' }, 'Main'))))
+  assert.match(html, /data-tab-strip=""/)
+  const strip = html.match(/<div[^>]*data-tab-strip=""[^>]*>/)![0]
+  assert.doesNotMatch(strip, /data-\[variant=line\]:pb-2|overflow-x-auto|overflow-y-hidden/)
+})

@@ -45,7 +45,7 @@ export function TabStrip({ value, variant = 'line', className, ...props }: Compo
       ref={strip}
       variant={variant}
       data-tab-strip=""
-      className={`max-w-full overflow-x-auto overflow-y-hidden data-[variant=line]:pb-2 [&>[role=tab]]:flex-none ${className ?? ''}`}
+      className={`max-w-full [&>[role=tab]]:flex-none ${className ?? ''}`}
     />
   )
 }

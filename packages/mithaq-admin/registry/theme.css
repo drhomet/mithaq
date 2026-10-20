@@ -3,7 +3,6 @@
   color-scheme: light;
   --canvas: oklch(0.97 0.002 60);
   --app-sidebar-width: 16rem;
-  --app-control-radius: 0.5rem;
 }
 :root.dark {
   color-scheme: dark;
@@ -23,6 +22,9 @@
   --input: oklch(0.43 0.004 60);
   --sidebar-border: var(--border);
 }
+[data-shell='app'] :is([data-slot='button'], [data-slot='input'], [data-slot='input-group'], [data-slot='textarea'], [data-slot='select-trigger']) {
+  --app-control-radius: 0.5rem;
+}
 [data-shell='app'] {
   background: var(--canvas);
   [data-slot='input']:not([data-slot='input-group'] *),
@@ -34,10 +36,6 @@
   }
   [data-slot='card'], [data-region='danger'] {
     border-radius: 0.75rem;
-  }
-  [data-field-value] > dd:empty::before {
-    content: '—' / '';
-    color: var(--muted-foreground);
   }
   @media (max-width: 639px) {
     [data-slot='sidebar-inset'] {
@@ -83,6 +81,8 @@
   [data-tab-strip] {
     width: 100%;
     max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
     justify-content: start;
     margin: 0;
     border-bottom: 1px solid var(--border);
@@ -111,20 +111,9 @@
   }
 }
 
-/* Generic controls remain overridable by explicit app utilities. */
+/* Typography and target sizes remain overridable by explicit app utilities. */
 @layer components {
   [data-shell='app'] {
-    button:not([role='tab']):not([role='switch']):not([role='checkbox']):not([role='radio']),
-    select,
-    [data-slot='button'],
-    [data-slot='input'],
-    [data-slot='input-group'],
-    [data-slot='textarea'],
-    [data-slot='select-trigger'],
-    [data-slot='native-select'],
-    [data-slot='combobox-input'] {
-      border-radius: 0.5rem;
-    }
     [data-slot='button'] {
       text-transform: none;
       letter-spacing: normal;
