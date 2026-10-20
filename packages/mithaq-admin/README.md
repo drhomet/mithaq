@@ -60,16 +60,25 @@ authorization still decides every write.
 
 The opt-in `mithaq-admin/theme.css` supplies the tenant canvas, dark surfaces,
 native color scheme, 8px controls and 12px cards, uniform tabs and unboxed loose
-fields. Its defaults live in the `components` CSS layer under `[data-shell="app"]`,
-so app utilities win. Only the tenant app imports it. The backoffice keeps its own theme,
+fields. Palette variables and `color-scheme` live on `:root` and `:root.dark`
+so portaled controls inherit them. Layout and tab rules are unlayered under
+`[data-shell="app"]`. Control typography and target sizes live in the `components`
+layer, so app utilities win. The unlayered control selector sets
+`--app-control-radius: 0.5rem` only on tenant buttons, inputs, input groups,
+textareas and select triggers. Badges, toggles and tab lists keep their own radii;
+explicit utilities such as `rounded-full` still choose their own shape.
+Only the tenant app imports this sheet. The backoffice keeps its own theme,
 component styles, spacing and `components.json`, while sharing navigation,
-headers, tab behaviour and read-only description lists. Keep
-the theme provider's system default when adopting these styles. Simple record
-layouts styled by this sheet stop at 840px, lists and records with side columns at 1200px; use a
-custom layout where a dense table needs the full available width.
+headers, tab behaviour and read-only description lists. Shared record tabs add
+no padding or overflow rules; lists retain their own overflow utilities and the
+tenant sheet supplies tab-strip scrolling. Keep the theme provider's system
+default. Simple records stop at 840px, lists and records with side columns at
+1200px; use a custom layout for a dense table that needs the full width.
 
-For a host using `@theme inline`, port the tenant host's `--radius-4xl` mapping
-through `--app-control-radius`, so its controls use the sheet's 8px default.
+For a host using `@theme inline`, port the tenant host's mapping:
+`--radius-4xl: var(--app-control-radius, calc(var(--radius) + 16px))`.
+Do not set `--app-control-radius` on `:root` or the shell; the sheet sets it on
+controls so other rounded elements retain the host's radius.
 
 ## Eject a piece
 
