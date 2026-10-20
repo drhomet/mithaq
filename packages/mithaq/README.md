@@ -842,8 +842,8 @@ A kayan's `targets.<screen>.nav` controls its sidebar entry. It accepts
 `order`, `hidden` and `group`. A group names `name`, a localized `label`,
 optional `order` and optional `position: 'bottom'`. A screen's own page puts
 the same keys beside its `nav.label`. `navOf(screen, report)` removes entries
-without permission and hidden entries before ordering the remaining groups
-and their entries. Omitted orders keep declaration order. Empty groups never
+without permission, keeps hidden entries, and orders the groups and their
+entries. Navigation menus filter hidden entries when drawing. Omitted orders keep declaration order. Empty groups never
 render. Use the same group metadata wherever a group is named.
 
 `hidden: true` changes the sidebar alone. The list route, its read operation

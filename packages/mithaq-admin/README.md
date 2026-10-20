@@ -44,9 +44,9 @@ to edit.
 containing `href` and `label`, `title`, `primary` and `more` slots.
 Pass `t` for translated actions. `MoreActions` also draws secondary buttons
 on their own, retaining each button's confirmation. The template's
-`appPage(main, { more, status })` puts status nodes in the record header,
-form controls in the shell's `primary` region and secondary actions in `more`.
-Lists keep their title and New action together.
+`appPage(main, { more })` puts form controls in the shell's `primary` region and secondary actions in `more`.
+Tenant lists keep their title and New action together; backoffice lists keep
+their title in the shell header.
 
 `TabStrip` in `mithaq-admin/tab-strip.tsx` is the shared list and record strip.
 It keeps the active tab visible by scrolling its own width, without moving
@@ -65,9 +65,12 @@ so portaled controls inherit them. Layout and tab rules are unlayered under
 `[data-shell="app"]`. Control typography and target sizes live in the `components`
 layer, so app utilities win. The unlayered control selector sets
 `--app-control-radius: 0.5rem` only on tenant buttons, inputs, input groups,
-textareas, select triggers and button triggers for popovers and dropdown menus.
+textareas, combobox chips, select triggers and button triggers for popovers and dropdown menus.
 Badges, toggles and tab lists keep their own radii;
-explicit utilities such as `rounded-full` still choose their own shape.
+explicit utilities such as `rounded-full` still choose their own shape on controls
+whose radius reads the variable. Textareas receive an unlayered 8px radius.
+The unlayered tenant input, textarea and select-trigger rules also override app
+utilities for border, inline padding and background.
 Only the tenant app imports this sheet. The backoffice keeps its own theme,
 component styles, spacing and `components.json`, while sharing navigation,
 headers, tab behaviour and read-only description lists. Shared record tabs add
@@ -393,3 +396,11 @@ A registry item is a piece mithaq ships for every project. Its source lives in `
 ### A registry step
 
 A step every project may want, and may want to change, ships as a registry file rather than as core code. `expectedUpdatedAt` is one: it lives in `packages/mithaq-admin/registry/steps/expected-updated-at.ts` in the mithaq repository, `mithaq eject mithaq-expected-updated-at` writes it to `src/steps/expected-updated-at.ts`, and a project edits its copy in place. Write a new one the same way, and follow [Add a registry item](#add-a-registry-item). Put the step's tests beside it so a replacement can run them.
+
+`ScreenNav` in the template's `ui/screen-nav.tsx` renders an app's own page
+navigation from the permission-pruned entries, filtering hidden destinations.
+`openRow(tableRef, id)` from `mithaq-admin/list.tsx` clicks the matching row's
+host-routed anchor. Lists use it for row activation.
+The template's `AppShell` accepts `breadcrumb: { href, label }` for app pages.
+Member pages put Save and Cancel in its `primary` region, with Save naming the
+member form's id, and move these actions to a fixed bar on phones.
