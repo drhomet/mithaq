@@ -473,7 +473,7 @@ export const pageLoader = async ({
     const component = found.screen.pages[found.page]?.component
     const module = component ? ((await files[component.slice(0, component.indexOf('#'))]?.()) as { loader?: unknown } | undefined) : undefined
     if (typeof module?.loader === 'function') {
-      return { ...found, loaderData: (await (module.loader as (tools: LoaderTools) => Promise<unknown>)(await toolsOf({ access: found.access, maxLimit: found.screen.maxLimit }))) as unknown }
+      return { ...found, loaderData: (await (module.loader as (tools: LoaderTools) => Promise<unknown>)({ ...await toolsOf({ access: found.access, maxLimit: found.screen.maxLimit }), params: matchPage(found.screen, path)?.params })) as unknown }
     }
   }
   return found

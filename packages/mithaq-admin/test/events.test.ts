@@ -1271,42 +1271,34 @@ test('229c. invitations: a tab counting them, Email, Role, Sent by and Expires, 
   assert.deepEqual(await toasted(), ['success: Invitation sent to new@example.com'])
 })
 
-test('216c. Edit roles opens the full-page drawer listing every role with what it grants, grouped by kayan and screen; a role the viewer may not hand over is disabled with its reason, the owner\'s administrator is locked and only its name dimmed, and Save writes through the assignment kayan', async () => {
+test('216c. the member page keeps grant limits, the owner role and assignment writes', async () => {
   await toasted()
+  const { MemberPage } = await import('../registry/members.tsx')
+  const { membersOptions } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
   const written: string[] = []
   const client: ScreenState['client'] = async ({ kayan, operation, input }) => (written.push(`${kayan}.${operation} ${String(input.id ?? input.role)}`), { id: 'r9' })
-  const owner = { ...omar, owner: true }
-  const { host, item } = await membersPage({
-    loaderData: { members: [layla, owner], roles: [administrator, teacher] },
-    permissions: ['member.find', 'memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'courses.find', 'courses.fields.title'],
-    collections: { memberRoles: { create: true, delete: true } },
-    over: { client },
-  })
-  await item('u1', 'edit-roles')
-  const drawer = onPage('[data-document-drawer]')!
-  assert.equal(drawer.getAttribute('data-mithaq-inline-edit'), 'u1', 'the full-page drawer, on that member')
-  const role = (name: string) => drawer.querySelector(`[data-role="${name}"]`)!
-  assert.equal(role('teacher').querySelector('[data-permissions] [data-group="courses"]') !== null, true, 'a role lists what it grants, grouped by kayan')
-  assert.equal(role('teacher').querySelector('[data-slot="collapsible-trigger"]')?.getAttribute('aria-expanded'), 'false', 'closed at first, behind a row that counts it, as the Roles page draws it')
-  assert.match(role('teacher').querySelector('[data-slot="collapsible-trigger"]')?.getAttribute('aria-label') ?? '', /^Teacher/, 'and named for its role, so each row says whose permissions it opens')
-  assert.equal(role('administrator').textContent!.includes('Every permission'), true, 'and the administrator, every permission')
-  assert.equal(role('administrator').getAttribute('data-disabled'), 'true', 'a role holding keys the viewer lacks is disabled')
-  assert.ok(role('administrator').querySelector('[data-locked]'), 'and says why')
-  const save = () => [...drawer.querySelectorAll('button')].find((one) => one.textContent === 'Save')!
-  assert.equal(save().hasAttribute('disabled'), true, 'Save is off while nothing changed')
+  const access = { permissions: ['member.find', 'roles.find', 'memberRoles.find', 'memberRoles.create', 'memberRoles.delete', 'courses.find', 'courses.fields.title'], collections: { memberRoles: { create: true, delete: true } } } as never
+  const host = await render(withToaster(createElement(MemberPage, { member: layla, roles: [administrator, teacher], options: membersOptions })), { t: english, access, client })
+  const role = (name: string) => host.querySelector(`[data-role="${name}"]`)!
+  assert.ok(role('teacher').querySelector('[data-group="courses"]'))
+  assert.equal(role('teacher').querySelector('[data-role-summary]')?.hasAttribute('open'), true)
+  assert.equal(role('administrator').querySelector('[data-role-summary]')?.hasAttribute('open'), false)
+  assert.equal(role('administrator').getAttribute('data-disabled'), 'true')
+  assert.ok(role('administrator').querySelector('[data-locked]'))
+  const save = () => [...host.querySelectorAll('button')].find((one) => one.textContent === 'Save')!
+  assert.equal(save().hasAttribute('disabled'), true)
   await act(async () => click(role('teacher').querySelector('.font-medium')!))
-  assert.equal(save().hasAttribute('disabled'), false, 'and on once a role is unticked')
+  assert.equal(save().hasAttribute('disabled'), false)
   await act(async () => click(save()))
-  await act(async () => sleep(10))
-  assert.deepEqual(written, ['memberRoles.delete a1'], 'unticking removes the assignment through its own kayan')
-  assert.equal(onPage('[data-document-drawer]'), null, 'the drawer closes')
+  assert.deepEqual(written, ['memberRoles.delete a1'])
+  assert.ok(host.querySelector('[data-member-page]'), 'saving keeps the member page open')
+  assert.equal(save().hasAttribute('disabled'), true, 'the saved roles are now the baseline')
   assert.deepEqual(await toasted(), ['success: Roles saved for Layla'])
-
-  await item('u2', 'edit-roles')
-  const admin = onPage('[data-document-drawer] [data-role="administrator"]')!
+  const owned = await render(createElement(MemberPage, { member: { ...omar, owner: true }, roles: [administrator, teacher], options: membersOptions }), { t: english, access, client })
+  const admin = owned.querySelector('[data-role="administrator"]')!
   const dimmed = (element: Element | null) => (element?.className ?? '').split(' ').some((one) => one.includes('opacity-50'))
-  assert.ok(admin.querySelector('[data-owner]'), 'the owner always holds administrator, and says so')
-  assert.deepEqual([dimmed(admin), dimmed(admin.querySelector('[data-owner]')), dimmed(admin.querySelector('.font-medium'))], [false, false, true], 'only the name beside the disabled box is dimmed')
+  assert.ok(admin.querySelector('[data-owner]'))
+  assert.deepEqual([dimmed(admin), dimmed(admin.querySelector('[data-owner]')), dimmed(admin.querySelector('.font-medium'))], [false, false, true])
 })
 
 test('229g. Remove is offered only where the viewer may take every role the member holds, asks in a dialog, and takes each role through the assignment kayan before the membership; one refused part way keeps the member', async (t) => {
@@ -1321,14 +1313,13 @@ test('229g. Remove is offered only where the viewer may take every role the memb
     sent.push(`${kayan}.${operation} ${String(input.id)}`)
     return {}
   }
-  const { host, menu, item, rows } = await membersPage({
+  const { host, item, rows } = await membersPage({
     loaderData: { members: [layla, boss, both], roles: [administrator, teacher, aide] },
     permissions: ['member.find', 'memberRoles.find', 'memberRoles.delete', 'member.delete', 'courses.find', 'courses.fields.title'],
     collections: { memberRoles: { delete: true } },
     over: { client },
   })
-  assert.ok(!(await menu('u3')).includes('remove'), 'no Remove for an administrator whose every key the viewer does not hold')
-  await act(async () => press(window.document.activeElement as unknown as Element, 'Escape'))
+  assert.equal(host.querySelector('[data-row-menu="u3"]'), null, 'no actions for an administrator whose every key the viewer does not hold')
   await item('u1', 'remove')
   assert.deepEqual(sent, [], 'Remove only asks')
   assert.ok(onPage('[data-remove-member]')?.textContent?.includes('Remove Layla?'), 'naming the member')
@@ -1401,7 +1392,7 @@ test('240j. the dashboard\'s Members card counts the members and, to a reader of
 })
 
 test('240z. the members page reads in Arabic: its heading, tabs, columns, filter and menus', async () => {
-  const { host, menu } = await membersPage({
+  const { host } = await membersPage({
     loaderData: { members: [layla], roles: [teacher], invites: [pendingInvite] },
     permissions: ['member.find', 'memberRoles.find', 'invitation.create', 'invitation.cancel'],
     collections: { memberRoles: { create: true } },
@@ -1411,8 +1402,7 @@ test('240z. the members page reads in Arabic: its heading, tabs, columns, filter
   assert.deepEqual([...host.querySelectorAll('[data-members-tab]')].map((one) => one.textContent), ['الأعضاء', `الدعوات (${new Intl.NumberFormat('ar').format(1)})`])
   assert.deepEqual([...host.querySelectorAll('[data-members] table')[0]!.querySelectorAll('thead th')].map((one) => one.textContent), ['الاسم', 'الأدوار', 'تاريخ الانضمام', 'الإجراءات'])
   assert.equal(host.querySelector('[data-role-filter] option')?.textContent, 'كل الأدوار')
-  assert.deepEqual(await menu('u1'), ['edit-roles'])
-  assert.equal(onPage('[data-row-action="edit-roles"]')?.textContent, 'تعديل الأدوار')
+  assert.ok(!host.querySelector('[data-row-menu="u1"]'), 'the row link already opens roles')
 })
 
 test('229d. a role\'s delete names a holder it may not read as a member, never by id', async () => {
@@ -1421,39 +1411,18 @@ test('229d. a role\'s delete names a holder it may not read as a member, never b
   await act(async () => click(deleting.querySelector('[data-button="delete"]') as Element))
   const holders = [...window.document.querySelectorAll('[data-holders] a')]
   assert.deepEqual(holders.map((one) => one.textContent), ['A member'], 'a holder the viewer may not read is a member')
-  assert.equal(holders[0]?.getAttribute('href')?.endsWith('?member=u-unread'), true, 'and the link still opens their roles')
+  assert.equal(holders[0]?.getAttribute('href')?.endsWith('/members/u-unread'), true, 'and the link still opens their roles')
 })
 
-test('229h. the Roles page lists each role closed, its row naming it and counting what it grants, and opens it to its permissions, each group closed in turn', async () => {
-  const { RolesTable } = await import('../../../templates/features/roles/roles/ui/roles.tsx')
-  const { tenantRoles } = await import('../../../templates/mithaq/src/roles/tenant-roles.ts')
-  const teacher = { id: 'r1', name: 'teacher', label: { en: 'Teacher', ar: 'معلم' }, permissions: ['screen.dashboard', 'courses.find', 'courses.fields.title'] }
-  // A role whose keys the viewer may not read comes without them.
-  const aide = { id: 'r2', name: 'aide', label: { en: 'Aide', ar: 'مساعد' } }
-  const list = { page: { docs: [teacher, aide], totalDocs: 2 }, creates: true, href: (id: string) => `/dashboard/roles/${id}`, newHref: '/dashboard/roles/new' }
-  const host = await render(createElement(ListContext, { value: list as never }, createElement(RolesTable)), { t: english as never, kayan: screen.kayan.roles!, access: { screens: ['dashboard'], permissions: '*' } as never })
-  const row = (name: string) => host.querySelector(`[data-row="${name}"]`)!
-  const trigger = (within: Element) => within.querySelector('[data-slot="collapsible-trigger"]')!
-  const shown = (element: Element | null) => element !== null && element.closest('[hidden]') === null
-  const registrar = tenantRoles.registrar.permissions as readonly string[]
-  assert.deepEqual(
-    [trigger(row('registrar')).textContent, trigger(row('r1')).textContent],
-    [`Registrar${registrar.length} permissions`, 'Teacher3 permissions'],
-    'each role\'s row names it by its label and counts what it grants',
-  )
-  assert.deepEqual([row('administrator').querySelector('[data-fixed-role]')?.textContent, trigger(row('administrator'))], ['AdministratorEvery permission', null], 'and the administrator, every permission, with nothing to open')
-  assert.deepEqual([...host.querySelectorAll('[data-row] > td > [data-slot="collapsible"] > [data-slot="collapsible-trigger"]')].map((one) => one.getAttribute('aria-expanded')), [...Object.keys(tenantRoles).filter((one) => one !== 'administrator'), 'r1'].map(() => 'false'), 'every other role is closed at first')
-  assert.equal(shown(row('r1').querySelector('[data-key="courses.find"]')), false, 'so its keys are not shown')
-  assert.equal(row('r1').querySelector('[data-slot="collapsible-content"]')?.getAttribute('hidden'), 'until-found', 'though a find on the page reaches them')
-  assert.deepEqual([trigger(row('r2')), row('r2').querySelector('a')?.getAttribute('href'), row('r2').textContent?.includes('permissions')], [null, '/dashboard/roles/r2', false], 'a role whose keys the viewer may not read counts none, and links its page')
-  await act(async () => click(trigger(row('r1'))))
-  const courses = row('r1').querySelector('[data-group="courses"]')!
-  assert.deepEqual([trigger(courses).getAttribute('aria-expanded'), trigger(courses).textContent], ['false', 'Courses2 permissions'], 'opened, each group is a closed row naming it and counting its keys')
-  assert.equal(shown(row('r1').querySelector('a[href="/dashboard/roles/r1"]')), true, 'and a custom role links its page')
-  assert.equal(row('r1').querySelector('a[href="/dashboard/roles/r1"]')?.textContent, 'Open Teacher', 'by its own name, so no two links on the page read alike')
-  assert.equal(shown(courses.querySelector('[data-key="courses.find"]')), false)
-  await act(async () => click(trigger(courses)))
-  assert.equal(shown(courses.querySelector('[data-key="courses.find"]')), true, 'a group opened shows its keys')
+test('229h. a fixed role opens a read-only page with its permission summary', async () => {
+  const { FixedRole, loader } = await import('../../../templates/asas/src/ui-dashboard/fixed-role.tsx')
+  const data = await loader({ params: { name: 'instructor' } } as never)
+  const host = await render(createElement(FixedRole, { loaderData: data }), { t: english })
+  const summary = host.querySelector('[data-fixed-role]')!
+  assert.ok(summary.querySelector('[data-key="courses.find"]'))
+  assert.equal(summary.querySelector('form'), null)
+  assert.equal(summary.querySelector('[data-button]'), null)
+  assert.equal((await loader({ params: { name: '__proto__' } } as never)).role, undefined)
 })
 
 test('229f. a role\'s form refused on save marks its name and both labels required and refused, each with its sentence under it, and its permissions group refused where the server names it', async () => {
@@ -8416,4 +8385,143 @@ test('date pickers show no day before mount and hydrate to the local day across 
     process.env.TZ = homeZone
     await act(async () => root?.unmount())
   }
+})
+
+
+test('B2 the provider member directory pages, sorts and links each member to their own page', async () => {
+  const people = Array.from({ length: 26 }, (_, at) => ({ ...omar, userId: `p${at}`, name: `Person ${String(at).padStart(2, '0')}` }))
+  const { host, rows } = await membersPage({ loaderData: { members: people, roles: [] }, permissions: ['member.find'] })
+  assert.equal(rows().length, 25)
+  assert.equal(host.querySelector('[data-mithaq-range]')?.getAttribute('data-mithaq-range'), '1-25/26')
+  assert.equal(host.querySelector('tbody a')?.getAttribute('href'), '/dashboard/members/p0')
+  const name = [...host.querySelectorAll('thead button')].find((one) => one.textContent?.includes('Name'))!
+  await act(async () => click(name))
+  await act(async () => click(name))
+  assert.equal(rows()[0], 'p25')
+  const next = [...host.querySelectorAll('button')].find((one) => one.textContent === 'Next')!
+  await act(async () => click(next))
+  assert.deepEqual(rows(), ['p0'])
+})
+
+
+test('B2 a member page shows identity, role permissions and an application section without an overlay', async () => {
+  const { MemberPage } = await import('../registry/members.tsx')
+  const { membersOptions } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  const host = await render(createElement(MemberPage, { member: layla, roles: [teacher], options: membersOptions, children: createElement('section', { 'data-shops': '' }, 'Shops') }), { t: english, access: { permissions: '*', collections: { memberRoles: { create: true, delete: true } } } as never })
+  assert.equal(host.querySelector('h1')?.textContent, 'Layla')
+  assert.ok(host.querySelector('[data-member-page]')?.textContent?.includes('layla@example.com'))
+  assert.ok(host.querySelector('[data-role="teacher"] [data-group="courses"]'))
+  assert.equal(host.querySelector('[data-document-drawer]'), null)
+  assert.ok(host.querySelector('[data-shops]'))
+})
+
+
+test('B2 role permission editing uses plain grouped checkboxes and expandable fields', async () => {
+  const { PermissionBadges } = await import('../../../templates/features/roles/roles/ui/role-form.tsx')
+  const chosen: string[][] = []
+  const host = await render(createElement(PermissionBadges, { held: ['courses.find', 'courses.fields.title'], onChange: (keys: string[]) => chosen.push(keys) }), { t: english, access: { screens: ['dashboard'], permissions: ['courses.find', 'courses.fields.title'] } as never })
+  const find = host.querySelector('[data-key="courses.find"] input[type="checkbox"]')!
+  assert.ok(find)
+  assert.equal((find as HTMLInputElement).checked, true)
+  await act(async () => click(find.parentElement!.querySelector('span')!))
+  assert.deepEqual(chosen, [['courses.fields.title']])
+  assert.equal(host.querySelector('[data-key="courses.create"] input[type="checkbox"]')?.hasAttribute('disabled'), true)
+  assert.ok(host.querySelector('details[data-field-access="courses"]'))
+  assert.ok(host.querySelector('input[type="search"]') === null)
+  assert.ok(host.querySelector('[data-selected-only]') === null)
+})
+
+
+test('B2 the roles list counts assigned members and links fixed roles to read-only pages', async () => {
+  const { RolesTable } = await import('../registry/roles.tsx')
+  const list = { page: { docs: [{ id: 'r1', name: 'teacher', label: { en: 'Teacher' }, permissions: ['courses.find'] }, { id: 'r2', label: { en: 'Unread name' } }, { id: 'r3', name: 'constructor', label: { en: 'No assignments' } }] }, creates: false, href: (id: string) => `/dashboard/roles/${id}` }
+  const host = await render(createElement(ListContext, { value: list as never }, createElement(RolesTable, { roles: [administrator], counts: { administrator: 1, teacher: 2 } })), { t: english })
+  assert.equal(host.querySelector('[data-row="administrator"] a')?.getAttribute('href'), '/dashboard/roles/fixed/administrator')
+  assert.equal(host.querySelector('[data-row="administrator"] [data-member-count]')?.textContent, '1')
+  assert.equal(host.querySelector('[data-row="r1"] [data-member-count]')?.textContent, '2')
+  assert.equal(host.querySelector('[data-row="r1"] a')?.getAttribute('href'), '/dashboard/roles/r1')
+  assert.equal(host.querySelector('[data-row="r2"] [data-member-count]')?.textContent, '—', 'a masked role name cannot be joined to its assignment count')
+  assert.equal(host.querySelector('[data-row="r3"] [data-member-count]')?.textContent, '0', 'role names do not read inherited object properties as counts')
+})
+
+
+test('B2 a partial assignment save reports the refusal and shows only the writes that landed', async () => {
+  const { MemberPage } = await import('../registry/members.tsx')
+  const { membersOptions } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  const writes: string[] = []
+  const roles = [teacher, { name: 'aide', fixed: false, permissions: ['tags.find'] }]
+  const host = await render(createElement(MemberPage, { member: layla, roles, options: membersOptions }), { t: english, access: { permissions: '*', collections: { memberRoles: { create: true, delete: true } } } as never, client: async ({ operation }) => {
+    writes.push(operation)
+    if (operation === 'create') throw { data: { key: 'refused' } }
+    return {}
+  } })
+  for (const name of ['teacher', 'aide']) await act(async () => click(host.querySelector(`[data-role="${name}"] .font-medium`)!))
+  await act(async () => click([...host.querySelectorAll('button')].find((one) => one.textContent === 'Save')!))
+  assert.deepEqual(writes, ['delete', 'create'])
+  assert.ok(host.querySelector('[role="alert"]'))
+  assert.equal(host.querySelector('[data-role="teacher"] [role="checkbox"]')?.getAttribute('aria-checked'), 'false')
+  assert.equal(host.querySelector('[data-role="aide"] [role="checkbox"]')?.getAttribute('aria-checked'), 'false')
+})
+
+
+test('B2 a custom role holding every permission can replace that grant through its editor', async () => {
+  const { PermissionBadges } = await import('../../../templates/features/roles/roles/ui/role-form.tsx')
+  const changed: string[][] = []
+  const host = await render(createElement(PermissionBadges, { held: ['*'], onChange: (keys: string[]) => changed.push(keys) }), { t: english, access: { permissions: '*' } as never })
+  const all = host.querySelector('[data-key="*"] input')!
+  assert.ok(all)
+  await act(async () => click(all))
+  assert.deepEqual(changed, [[]])
+})
+
+
+test('B2 member identity dates and permission summaries follow the actor access', async () => {
+  const { MemberPage } = await import('../registry/members.tsx')
+  const { membersOptions } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  for (const permissions of [['member.find'], ['member.find', 'roles.find', 'member.fields.lastSeenAt']]) {
+    const readsRoles = permissions.includes('roles.find')
+    const host = await render(createElement(MemberPage, { member: layla, roles: [administrator, teacher], options: membersOptions }), { t: english, access: { permissions } as never })
+    assert.equal(Boolean(host.querySelector('[data-role-summary]')), readsRoles)
+    assert.ok(![...host.querySelectorAll('button')].some((one) => ['Save', 'Cancel'].includes(one.textContent ?? '')))
+    const identity = host.querySelector('[data-member-sheet] > p')!.textContent!
+    assert.ok(identity.includes('Joined') && identity.includes('October 1, 2026'))
+    assert.equal(identity.includes('Last seen'), readsRoles)
+    assert.equal(identity.includes('October 14, 2026'), readsRoles)
+  }
+})
+
+
+test('B2 role counts survive host renders with a rebuilt client and access report', async () => {
+  const { RolesTable } = await import('../../../templates/features/roles/roles/ui/roles.tsx')
+  const fetched = mock.method(globalThis, 'fetch', async () => Response.json({ members: [{ userId: 'u1', role: 'member' }], total: 1 }))
+  const reads: string[] = []
+  const tree = (permissions: string[]) => createElement(ScreenContext, { value: { ...state, access: { permissions } as never, client: async () => {
+    reads.push('assignments')
+    return { docs: [{ user: 'u1', role: 'instructor' }], totalDocs: 1 }
+  } } }, createElement(ListContext, { value: { page: { docs: [] }, creates: false, href: () => '#' } as never }, createElement(RolesTable)))
+  try {
+    const permissions = ['member.find', 'memberRoles.find']
+    const host = await render(tree(permissions), { t: english })
+    assert.equal(fetched.mock.callCount(), 1)
+    await act(async () => mounted!.render(createElement(ScreenContext, { value: { ...state, t: english } }, withComponents(tree([...permissions])))))
+    assert.equal(fetched.mock.callCount(), 1)
+    assert.deepEqual(reads, ['assignments'])
+    await act(async () => mounted!.render(createElement(ScreenContext, { value: { ...state, t: english } }, withComponents(tree(['member.find'])))))
+    assert.equal(host.querySelector('[data-member-count]')?.textContent, '—')
+  } finally { fetched.mock.restore() }
+})
+
+
+test('B2 member row opening and Cancel click the host links', async () => {
+  const { host } = await membersPage({ loaderData: { members: [layla], roles: [teacher] }, permissions: ['member.find'] })
+  const opened: string[] = []
+  host.querySelector('a[data-row-link]')!.addEventListener('click', (event) => { event.preventDefault(); opened.push('member') })
+  await act(async () => press(host.querySelector('tbody tr')!, 'Enter'))
+  assert.deepEqual(opened, ['member'])
+  const { MemberPage } = await import('../registry/members.tsx')
+  const { membersOptions } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  const page = await render(createElement(MemberPage, { member: layla, roles: [teacher], options: membersOptions }), { t: english, access: { permissions: '*', collections: { memberRoles: { create: true } } } as never })
+  page.querySelector('[data-member-page]')!.previousElementSibling!.addEventListener('click', (event) => { event.preventDefault(); opened.push('directory') })
+  await act(async () => click([...page.querySelectorAll('button')].find((one) => one.textContent === 'Cancel')!))
+  assert.deepEqual(opened, ['member', 'directory'])
 })

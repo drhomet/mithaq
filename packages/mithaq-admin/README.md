@@ -297,6 +297,46 @@ time its user signs in.
    password like 'payload-pbkdf2%'` leaves those users the password reset.
    Then remove `password` and `payloadRehash()` from `optionsFor`.
 
+## Members and roles
+
+`mithaq-admin/members.tsx` exports `Members`, `MemberPage` and `AddPerson`.
+The caller passes authorized provider-backed `Member[]` and `Role[]` from
+`mithaq-admin/member-types.ts`. `Members` adds search, role filtering, sortable
+name and date columns, a count and pagination. Its member links use the current
+screen path followed by `/members/:id`.
+
+Pass `MembersOptions` explicitly: the app's shell, organization mode, owner role,
+`grantable` and `managesRoles` policies, permission-summary component, auth request
+function and refusal translator. The provider remains the membership authority;
+the component creates no membership table and reads no shared users. Assignment
+writes still use the `memberRoles` kayan. A refused save shows the assignments
+that succeeded before the refusal.
+
+`MemberPage` takes one authorized member, the readable roles and the same options.
+It shows joined date and authorized last seen, and permission summaries only
+with `roles.find`. Save and Cancel appear only with assignment write access.
+Its `children` appear after roles so an app can add a section such as shop
+assignments. A page loader receives its matched URL parameters in
+`LoaderTools.params`. Resolve the member from the provider's authorized directory,
+never from a wider user lookup. The template's member and fixed-role pages show
+how to register these routes without adding navigation entries.
+
+`mithaq-admin/role-form.tsx` exports `RoleForm`, `Permissions` and `Grants`.
+`PermissionOptions` supplies the app's extra permission statements and its
+`canGrant` callback. Editable permissions use grouped checkboxes and
+expandable field access. Read-only permissions show
+only the keys held, grouped by area. Unrecognized held keys remain visible and
+survive edits.
+
+`mithaq-admin/roles.tsx` exports `RolesTable`, taking fixed role definitions and
+optional authorized member counts. Fixed roles link to `/roles/fixed/:name`;
+custom roles use the list's normal record links. `memberCounts` from
+`mithaq-admin/member-counts.ts` pages the provider and assignment reads, includes
+implicit owner grants and counts each member once per role. Masked assignment
+user or role fields make the counts unavailable. Call it only when
+the actor can read both memberships and assignments. Omit unavailable counts;
+the list shows a dash rather than claiming zero.
+
 ## Add a registry item
 
 A registry item is a piece mithaq ships for every project. Its source lives in `packages/mithaq-admin/registry/`:

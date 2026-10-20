@@ -473,7 +473,7 @@ export const pageLoader = async ({
     const component = found.screen.pages[found.page]?.component
     const module = component ? ((await files[component.slice(0, component.indexOf('#'))]?.()) as { loader?: unknown } | undefined) : undefined
     if (typeof module?.loader === 'function') {
-      return { ...found, loaderData: (await (module.loader as (tools: LoaderTools) => Promise<unknown>)(await toolsOf({ access: found.access, maxLimit: found.screen.maxLimit }))) as unknown }
+      return { ...found, loaderData: (await (module.loader as (tools: LoaderTools) => Promise<unknown>)({ ...await toolsOf({ access: found.access, maxLimit: found.screen.maxLimit }), params: matchPage(found.screen, path)?.params })) as unknown }
     }
   }
   return found
@@ -897,4 +897,4 @@ function PageBody({ files, data, query, onQuery }: PageViewProps): ReactElement 
   }
   return form
 }
-// mithaq-admin 0.0.0 8e32a398ce9292087ee017bd9e0458edc6925db3ab64354dc665f6b0d538b630
+// mithaq-admin 0.0.0 b7ef82c6b9f86c492170ccbece8aae5f5668e337980a879c1283698a105b0f56

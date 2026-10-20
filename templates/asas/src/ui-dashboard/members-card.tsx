@@ -8,16 +8,8 @@ import { isOwner, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
 import { tenantRoles } from '@asas/mithaq/roles/tenant-roles.ts'
 import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
 
-/**
- * One member as the page draws it: each role assignment by its row, whether they own the organization, which holds
- * `administrator` whatever the rows say, and when they were last seen, where the viewer may read it.
- */
-export type Member = { userId: string; name: string; email: string; joined: string; lastSeen?: string; owner: boolean; roles: { id: string; role: string }[] }
-/**
- * One role the drawer offers: its label in every locale, whether this project ships it, and its keys, which a fixed role's
- * code always says and a custom role's row says where the viewer may read them.
- */
-export type Role = { name: string; label?: Readonly<Record<string, string>>; fixed: boolean; permissions?: readonly string[] }
+import type { Member, Role } from 'mithaq-admin/member-types.ts'
+export type { Member, Role } from 'mithaq-admin/member-types.ts'
 /** An ISO timestamp, or `''` for a value that does not parse: `toISOString()` throws on an invalid date, and a row with no readable date is still worth drawing. */
 export const isoOf = (value: unknown): string => {
   const when = new Date(value as string)
@@ -31,7 +23,7 @@ export const isoOf = (value: unknown): string => {
  * The pages are offsets, so a row added or removed between two reads shifts the next page: a row then comes back twice,
  * and is kept once by `key`, or is missed until the page loads again.
  */
-// ponytail: every member is read and drawn at once, by offset; page the table itself, by a cursor, once an organization's size makes the page slow.
+// ponytail: provider reads use offsets and collect the directory in memory; use cursors when its size makes loading slow.
 export const everyPage = async <Row,>({ read, key }: { read: (offset: number) => Promise<{ rows: Row[]; total: number }>; key: (row: Row) => string }): Promise<Row[]> => {
   const rows = new Map<string, Row>()
   for (let offset = 0; ; ) {
@@ -69,8 +61,14 @@ export const readMembers = async ({ access, client, request, maxLimit }: LoaderT
     // Asked only of a viewer the report lets read roles, so the page still
     // draws for one who may read the assignments and not the roles.
     holds(access, 'roles.find')
-      ? (client({ kayan: 'roles', operation: 'find', input: { limit: maxLimit, depth: 0, sort: 'name' } }) as Promise<{ docs: { name: string; label?: Record<string, string> | null; permissions?: unknown }[] }>)
-      : { docs: [] },
+      ? everyPage({
+          key: (row) => row.name,
+          read: async (offset: number) => {
+            const found = await client({ kayan: 'roles', operation: 'find', input: { limit: maxLimit, page: Math.ceil(offset / maxLimit) + 1, depth: 0, sort: 'name' } }) as { docs: { name: string; label?: Record<string, string> | null; permissions?: unknown }[]; totalDocs: number }
+            return { rows: found.docs, total: found.totalDocs }
+          },
+        })
+      : [],
   ])
   return {
     members: [...members].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((member) => ({
@@ -85,7 +83,7 @@ export const readMembers = async ({ access, client, request, maxLimit }: LoaderT
     })),
     roles: [
       ...Object.entries(tenantRoles).map(([name, role]): Role => ({ name, label: role.label, fixed: true, permissions: role.permissions === '*' ? ['*'] : role.permissions })),
-      ...roles.docs.map((row): Role => ({
+      ...roles.map((row): Role => ({
         name: row.name,
         ...(row.label && { label: row.label }),
         fixed: false,

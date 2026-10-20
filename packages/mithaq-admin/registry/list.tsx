@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import type { ButtonClient, Row } from 'mithaq/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -25,6 +25,10 @@ import { useRelationshipTitles } from 'mithaq-admin/relationship-cell.tsx'
 import { rowTitle, rowWarning } from 'mithaq-admin/row-title.tsx'
 import { refOf } from 'mithaq-admin/screen-refs.ts'
 import { useListState } from 'mithaq-admin/use-list-state.tsx'
+
+/** The host routes each row's own link, so opening a row needs no router import. */
+export const openRow = (table: RefObject<HTMLTableElement | null>, id: string) =>
+  [...(table.current?.querySelectorAll<HTMLAnchorElement>('a[data-row-link]') ?? [])].find((one) => one.dataset.rowLink === id)?.click()
 
 export function List(props: ListProps): ReactElement {
   const { access, api, client, edit, href, kayan, locale, onQuery, operations, page, query, reads, run, screen, t } = props
@@ -80,11 +84,6 @@ export function List(props: ListProps): ReactElement {
     return name ? (t('admin.rowActionsFor', 'Actions for {name}') ?? 'Actions for {name}').replace('{name}', () => `\u2068${name}\u2069`) : (t('admin.rowActions', 'Row actions') ?? 'Row actions')
   }
   const openHint = useId()
-  /**
-   * Opens a row by clicking its own link, so the host routes it as it routes every other link and the list imports no router.
-   */
-  const openRow = (id: string) =>
-    [...(table.current?.querySelectorAll<HTMLAnchorElement>('a[data-row-link]') ?? [])].find((one) => one.dataset.rowLink === id)?.click()
   /**
    * Whether no column the list opens with is one the viewer may read, which the projection says by leaving the field out. Such a list draws no rows, nor anything that acts on them.
    */
@@ -168,7 +167,8 @@ export function List(props: ListProps): ReactElement {
             </ListToolbar>
 
             <ListTable
-              {...{ cellOf: new Map(node?.columns.map((column) => [column.field, column.cell])), copy, href, kayan, openHint, openRow, screen, shown, table, titles, unreadable }}
+              {...{ cellOf: new Map(node?.columns.map((column) => [column.field, column.cell])), copy, href, kayan, openHint, screen, shown, table, titles, unreadable }}
+              openRow={(id) => openRow(table, id)}
               docs={page.docs}
               sort={query.sort}
               defaultSort={node?.sort}
@@ -193,7 +193,7 @@ export function List(props: ListProps): ReactElement {
                         {...{ copy, kayan, Menu, row, running }}
                         label={rowActionsLabel(row)}
                         opens={opens ? (views ? 'view' : 'edit') : undefined}
-                        onOpen={() => (!views && editsRows ? setEditing(row) : openRow(id))}
+                        onOpen={() => (!views && editsRows ? setEditing(row) : openRow(table, id))}
                         menu={menu.map((one) => one.operation)}
                         // A button that asks for values or carries a confirm opens its dialog over the row; any other runs.
                         onRun={(operation) => (operation.fields?.length || operation.confirm ? setAsking({ row, operation }) : void runOnRow({ operation: operation.name, input: { id: row.id } }))}

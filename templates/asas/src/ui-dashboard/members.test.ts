@@ -151,3 +151,18 @@ test('the loader lists the invitations still pending to a viewer who may invite,
     assert.equal(asked.some((path) => path.includes('list-invitations')), false, `and the provider is not asked for ${said}`)
   }
 })
+
+
+test('the directory reads custom roles beyond the first provider-sized page', async () => {
+  const custom = Array.from({ length: 125 }, (_, at) => ({ id: String(at), name: `role-${at}`, permissions: ['tags.find'] }))
+  const { roles } = await loader(tools([], { permissions: ['roles.find'] }, { roles: custom }))
+  assert.equal(roles.filter((role) => !role.fixed).length, 125)
+})
+
+test('a member detail loader resolves only the authorized provider directory, with no shared-user read', async () => {
+  const { loader: memberLoader } = await import('./member.tsx')
+  const scoped = tools([{ userId: 'inside', createdAt: '2026-01-01', user: { name: 'Inside', email: 'inside@example.com' } }])
+  assert.equal((await memberLoader({ ...scoped, params: { id: 'inside' } })).member?.name, 'Inside')
+  assert.equal((await memberLoader({ ...scoped, params: { id: 'outside' } })).member, undefined)
+  assert.ok(!scoped.asked.includes('user'))
+})

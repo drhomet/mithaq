@@ -1817,7 +1817,9 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
       }
     }
     const list = await drawn('/roles', cookie)
-    assert.ok(list.html.includes('data-fixed-role') && list.shown.includes(tenantRoles.registrar.label.ar) && list.shown.includes('الدورات'), 'a fixed role names itself and its permissions in Arabic on the list')
+    assert.ok(list.html.includes('/roles/fixed/registrar') && list.shown.includes(tenantRoles.registrar.label.ar), 'the list links the fixed role by its Arabic label')
+    const fixed = await drawn('/roles/fixed/registrar', cookie)
+    assert.ok(fixed.html.includes('data-fixed-role') && fixed.shown.includes('الدورات'), 'its read-only page explains its permissions in Arabic')
     assert.ok(list.shown.includes('ثابت') && list.shown.includes('مخصص'), 'the Roles list names each kind in Arabic')
     assert.ok(list.shown.includes(tenantRoles.administrator.label.ar) && !list.shown.includes('administrator'), 'and each role by its Arabic label, never its slug')
   })
@@ -2124,7 +2126,7 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
       assert.equal((refused.body.data as { key?: string }).key, 'error.forbidden.assign', 'under the assignment guard\'s own key')
     }
     const picker = await screenHtml(`/dashboard/roles/${custom.id}`)
-    const badge = (key: string) => new RegExp(`<button[^>]*data-key="${key.replace('.', '\\.')}"[^>]*>`).exec(picker)?.[0] ?? ''
+    const badge = (key: string) => new RegExp(`<li[^>]*data-key="${key.replace('.', '\\.')}"[^>]*>`).exec(picker)?.[0] ?? ''
     assert.match(badge('tags.find'), /data-disabled="false"/, 'a key the delegate holds is offered')
     assert.match(badge('tags.create'), /data-disabled="true"/, 'a key it does not hold is offered disabled')
     assert.ok(!picker.includes('data-key="courses.find"'), 'and a kayan it may not read is offered nowhere')
@@ -2136,17 +2138,16 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   assert.ok(new RegExp(`<tr[^>]*data-fixed="false"[^>]*>(?:(?!</tr>)[\\s\\S])*>Teacher 62<`).test(list), 'a custom role without one')
   assert.ok(!list.includes(`>${custom.name}<`) && !list.includes('>registrar<'), 'and no slug is drawn')
   assert.ok(!list.includes('data-row-menu'), 'and no row carries a menu, so no role is deleted from the list')
-  // A fixed role is code, so it has no row and no page of its own: its row on the list holds its keys, read only.
-  const locked = list.slice(list.indexOf('data-row="instructor"')).split('</tr>')[0]!
-  assert.ok(locked.includes('data-fixed-role') && !locked.includes('href=') && !locked.includes('data-button='), 'a fixed role opens no page, and offers no save and no delete')
-  assert.ok(locked.includes(`>${tenantRoles.instructor.label.en}<`) && !locked.includes('>instructor<'), 'named by its label')
-  assert.ok(locked.includes('data-group="courses"') && locked.includes('data-key="courses.find"') && !locked.includes('data-key="courses.delete"'), 'its keys as badges grouped by kayan, the ones it holds alone')
+  const locked = await screenHtml('/dashboard/roles/fixed/instructor')
+  assert.ok(locked.includes('data-fixed-role') && !locked.includes('data-button='), 'a fixed role has its own read-only page')
+  assert.ok(locked.includes(tenantRoles.instructor.label.en) && !locked.includes('>instructor<'), 'named by its label')
+  assert.ok(locked.includes('data-group="courses"') && locked.includes('data-key="courses.find"') && !locked.includes('data-key="courses.delete"'), 'its summary includes only the keys it holds')
   assert.equal(((await post('/api/roles/find', { where: { name: { equals: 'instructor' } } }, { cookie })).body.docs as unknown[]).length, 0, 'and no row of the roles kayan names it')
   const opened = await screenHtml(`/dashboard/roles/${custom.id}`)
   assert.ok(opened.includes('data-role-form') && opened.includes('data-button="delete"'), 'a custom role opens its form and its delete')
   assert.ok(!opened.includes('id="roles-permissions"') && !opened.includes('<textarea'), 'with no box to type a key into')
   assert.ok(opened.includes('value="Teacher 62"') && opened.includes('value="معلم 62"'), 'a box per locale holding its label')
-  const keys = [...opened.matchAll(/<button[^>]*data-key="([^"]+)"[^>]*>/g)].map((hit) => [hit[1]!, hit[0]] as const)
+  const keys = [...opened.matchAll(/<li[^>]*data-key="([^"]+)"[^>]*>/g)].map((hit) => [hit[1]!, hit[0]] as const)
   for (const group of ['screen', 'courses', 'tags', 'roles']) assert.ok(opened.includes(`data-group="${group}"`), `the badges hold a ${group} group`)
   assert.ok(keys.length > 100, `a badge per key: ${keys.length}`)
   for (const [key] of keys) assert.ok(asas.catalog.includes(key), `every badge is a key of the catalog: ${key}`)
