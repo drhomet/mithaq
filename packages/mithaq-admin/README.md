@@ -84,6 +84,14 @@ For a host using `@theme inline`, port the tenant host's mapping:
 Do not set `--app-control-radius` on `:root` or the shell; the sheet sets it on
 controls so other rounded elements retain the host's radius.
 
+`ScreenNav` in the template's `ui/screen-nav.tsx` renders an app's own page
+navigation from the permission-pruned entries, filtering hidden destinations.
+`openRow(tableRef, id)` from `mithaq-admin/list.tsx` clicks the matching row's
+host-routed anchor. Lists use it for row activation.
+The template's `AppShell` accepts `breadcrumb: { href, label }` for app pages.
+Member pages put Save and Cancel in its `primary` region, with Save naming the
+member form's id, and move these actions to a fixed bar on phones.
+
 ## Eject a piece
 
 `mithaq eject <item>`, run in the app, writes the item's own files into `src/components/mithaq/` byte for byte,
@@ -396,11 +404,3 @@ A registry item is a piece mithaq ships for every project. Its source lives in `
 ### A registry step
 
 A step every project may want, and may want to change, ships as a registry file rather than as core code. `expectedUpdatedAt` is one: it lives in `packages/mithaq-admin/registry/steps/expected-updated-at.ts` in the mithaq repository, `mithaq eject mithaq-expected-updated-at` writes it to `src/steps/expected-updated-at.ts`, and a project edits its copy in place. Write a new one the same way, and follow [Add a registry item](#add-a-registry-item). Put the step's tests beside it so a replacement can run them.
-
-`ScreenNav` in the template's `ui/screen-nav.tsx` renders an app's own page
-navigation from the permission-pruned entries, filtering hidden destinations.
-`openRow(tableRef, id)` from `mithaq-admin/list.tsx` clicks the matching row's
-host-routed anchor. Lists use it for row activation.
-The template's `AppShell` accepts `breadcrumb: { href, label }` for app pages.
-Member pages put Save and Cancel in its `primary` region, with Save naming the
-member form's id, and move these actions to a fixed bar on phones.

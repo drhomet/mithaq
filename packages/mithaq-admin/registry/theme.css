@@ -33,10 +33,10 @@
   [data-slot='input']:not([data-slot='input-group'] *),
   [data-slot='textarea'],
   [data-slot='select-trigger'] {
-    border-radius: var(--app-control-radius);
     border: 1px solid var(--input);
     padding-inline: 0.75rem;
     background-color: var(--background);
+    &[data-slot='textarea'] { border-radius: var(--app-control-radius); }
   }
   [data-slot='card'] {
     border-radius: 0.75rem;
