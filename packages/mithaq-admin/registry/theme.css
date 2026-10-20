@@ -24,11 +24,14 @@
 }
 [data-shell='app'] :is(
   [data-slot='button'], [data-slot='input'], [data-slot='input-group'], [data-slot='textarea'],
-  [data-slot='select-trigger'], button[data-slot='popover-trigger'], button[data-slot='dropdown-menu-trigger']
+  [data-slot='combobox-chips'], [data-slot='select-trigger'], button[data-slot='popover-trigger'], button[data-slot='dropdown-menu-trigger']
 ) {
   --app-control-radius: 0.5rem;
 }
 [data-shell='app'] {
+  [data-slot='textarea'] {
+    border-radius: var(--app-control-radius);
+  }
   background: var(--canvas);
   [data-slot='input']:not([data-slot='input-group'] *),
   [data-slot='textarea'],
