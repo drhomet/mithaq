@@ -65,7 +65,8 @@ so portaled controls inherit them. Layout and tab rules are unlayered under
 `[data-shell="app"]`. Control typography and target sizes live in the `components`
 layer, so app utilities win. The unlayered control selector sets
 `--app-control-radius: 0.5rem` only on tenant buttons, inputs, input groups,
-textareas and select triggers. Badges, toggles and tab lists keep their own radii;
+textareas, select triggers and button triggers for popovers and dropdown menus.
+Badges, toggles and tab lists keep their own radii;
 explicit utilities such as `rounded-full` still choose their own shape.
 Only the tenant app imports this sheet. The backoffice keeps its own theme,
 component styles, spacing and `components.json`, while sharing navigation,

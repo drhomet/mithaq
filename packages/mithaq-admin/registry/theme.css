@@ -22,7 +22,10 @@
   --input: oklch(0.43 0.004 60);
   --sidebar-border: var(--border);
 }
-[data-shell='app'] :is([data-slot='button'], [data-slot='input'], [data-slot='input-group'], [data-slot='textarea'], [data-slot='select-trigger']) {
+[data-shell='app'] :is(
+  [data-slot='button'], [data-slot='input'], [data-slot='input-group'], [data-slot='textarea'],
+  [data-slot='select-trigger'], button[data-slot='popover-trigger'], button[data-slot='dropdown-menu-trigger']
+) {
   --app-control-radius: 0.5rem;
 }
 [data-shell='app'] {
