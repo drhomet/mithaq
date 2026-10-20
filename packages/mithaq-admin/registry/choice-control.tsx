@@ -6,13 +6,13 @@ import { Combobox, ComboboxContent, ComboboxInput, ComboboxItem, ComboboxList } 
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ariaRequired, changeOf, checkboxSize, comboboxPhone, labelledBy, type ControlProps } from 'mithaq-admin/control-props.ts'
+import { ariaRequired, changeOf, checkboxSize, labelledBy, type ControlProps } from 'mithaq-admin/control-props.ts'
 
 export function SelectControl(props: ControlProps): ReactElement {
   const options = props.field.options ?? []
   return <Select value={typeof props.value === 'string' ? props.value : null} onValueChange={changeOf(props)} disabled={props.readOnly}>
-    <SelectTrigger id={props.id} className="w-full data-[size=default]:min-h-11 sm:data-[size=default]:min-h-0" aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)}><SelectValue>{options.find((one) => one.value === props.value)?.label[props.locale ?? ''] ?? props.placeholder ?? ''}</SelectValue></SelectTrigger>
-    <SelectContent>{props.field.rules.required !== true ? <SelectItem className="min-h-11 sm:min-h-0" value={null}>{props.t('admin.clear', 'Clear')}</SelectItem> : null}{options.map((one) => <SelectItem className="min-h-11 sm:min-h-0" key={one.value} value={one.value}>{one.label[props.locale ?? ''] ?? one.value}</SelectItem>)}</SelectContent>
+    <SelectTrigger id={props.id} className="w-full" aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)}><SelectValue>{options.find((one) => one.value === props.value)?.label[props.locale ?? ''] ?? props.placeholder ?? ''}</SelectValue></SelectTrigger>
+    <SelectContent>{props.field.rules.required !== true ? <SelectItem value={null}>{props.t('admin.clear', 'Clear')}</SelectItem> : null}{options.map((one) => <SelectItem key={one.value} value={one.value}>{one.label[props.locale ?? ''] ?? one.value}</SelectItem>)}</SelectContent>
   </Select>
 }
 
@@ -20,8 +20,8 @@ export function ComboboxControl(props: ControlProps): ReactElement {
   const options = props.field.options ?? []
   const label = (value: string) => options.find((one) => one.value === value)?.label[props.locale ?? ''] ?? value
   return <Combobox items={options.map((one) => one.value)} value={typeof props.value === 'string' ? props.value : null} onValueChange={changeOf(props)} itemToStringLabel={label} disabled={props.readOnly}>
-    <ComboboxInput id={props.id} className={comboboxPhone} placeholder={props.placeholder} clearLabel={props.t('admin.clear', 'Clear')} triggerLabel={props.t('admin.open', 'Open')} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} />
-    <ComboboxContent><ComboboxList>{options.map((one) => <ComboboxItem className="min-h-11 sm:min-h-0" key={one.value} value={one.value}>{label(one.value)}</ComboboxItem>)}</ComboboxList></ComboboxContent>
+    <ComboboxInput id={props.id} placeholder={props.placeholder} clearLabel={props.t('admin.clear', 'Clear')} triggerLabel={props.t('admin.open', 'Open')} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} />
+    <ComboboxContent><ComboboxList>{options.map((one) => <ComboboxItem key={one.value} value={one.value}>{label(one.value)}</ComboboxItem>)}</ComboboxList></ComboboxContent>
   </Combobox>
 }
 

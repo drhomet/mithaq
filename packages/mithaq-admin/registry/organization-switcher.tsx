@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 
-/** A radio row: a 44 pixel target on a phone, and the tick on the inline end in right-to-left pages, where the primitive draws it at the right. */
-const radioRow = 'min-h-11 sm:min-h-0 rtl:pr-3 rtl:pl-8 rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:right-auto rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:left-2'
+/** The primitive pins its tick to the right, so RTL menus move it to the inline end. */
+const radioRow = 'rtl:pr-3 rtl:pl-8 rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:right-auto rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:left-2'
 
 /**
  * One organization the switcher lists. Two may share a name, so each carries a slug, which the
@@ -89,7 +89,7 @@ export function OrganizationSwitcher({
             )}
           />
           <DropdownMenuContent
-            className="min-w-56 rounded-lg **:data-[slot$=item]:min-h-11 sm:**:data-[slot$=item]:min-h-0"
+            className="min-w-56 rounded-lg"
             align="start"
             side={isMobile ? 'bottom' : 'right'}
             sideOffset={4}

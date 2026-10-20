@@ -50,7 +50,7 @@ export const DecimalControl = typed('text')
 export function OtpControl(props: ControlProps): ReactElement {
   const length = typeof props.field.rules.maxLength === 'number' ? props.field.rules.maxLength : 6
   return <InputOTP id={props.id} value={asText(props.value)} onChange={changeOf(props)} maxLength={length} pattern={REGEXP_ONLY_DIGITS} disabled={props.readOnly} aria-describedby={props.describedBy}>
-    <InputOTPGroup>{Array.from({ length }, (_, index) => <InputOTPSlot key={index} index={index} />)}</InputOTPGroup>
+    <InputOTPGroup className="min-h-11 sm:min-h-0 [&_[data-slot=input-otp-slot]]:min-h-11 sm:[&_[data-slot=input-otp-slot]]:min-h-0">{Array.from({ length }, (_, index) => <InputOTPSlot key={index} index={index} />)}</InputOTPGroup>
   </InputOTP>
 }
 

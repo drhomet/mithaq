@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/combobox'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { ariaRequired, changeOf, comboboxPhone, missingRow, type ControlProps, type FindApi } from 'mithaq-admin/control-props.ts'
+import { ariaRequired, changeOf, missingRow, type ControlProps, type FindApi } from 'mithaq-admin/control-props.ts'
 import { titleOf } from 'mithaq-admin/copy.ts'
 import { createsIn } from 'mithaq-admin/field-values.ts'
 import { KayanForm } from 'mithaq-admin/form-context.tsx'
@@ -334,7 +334,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
         {options.map((option) => {
           const row = drawRow && rows.find((one) => String(one.id ?? '') === option.value)
           return (
-            <ComboboxItem className="min-h-11 sm:min-h-0" key={option.value} value={option}>
+            <ComboboxItem key={option.value} value={option}>
               {row ? drawRow(row, option.label) : option.label}
             </ComboboxItem>
           )
@@ -408,7 +408,6 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
     <Combobox {...root} value={selected[0] ?? null} onValueChange={(next) => pick(next ? [next] : [])}>
       <ComboboxInput
         id={id}
-        className={comboboxPhone}
         placeholder={placeholder ?? searchLabel}
         disabled={readOnly}
         // A target whose title cannot take `like` offers a list and no search, so the box takes no term

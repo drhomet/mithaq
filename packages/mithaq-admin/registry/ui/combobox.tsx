@@ -40,7 +40,7 @@ function ComboboxClear({ className, ...props }: ComboboxPrimitive.Clear.Props) {
     <ComboboxPrimitive.Clear
       data-slot="combobox-clear"
       render={<InputGroupButton variant="ghost" size="icon-xs" />}
-      className={cn(className)}
+      className={cn("min-h-11 min-w-11 sm:min-h-0 sm:min-w-0", className)}
       {...props}
     >
       <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="pointer-events-none" />
@@ -65,19 +65,19 @@ function ComboboxInput({
   triggerLabel?: string
 }) {
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <InputGroup className={cn("w-auto min-h-11 sm:min-h-0", className)}>
       <ComboboxPrimitive.Input
-        render={(inputProps) => <InputGroupInput {...inputProps} className="min-w-0 text-ellipsis" title={inputProps.title ?? String((inputProps as React.ComponentProps<"input">).value ?? "")} disabled={disabled} />}
+        render={(inputProps) => <InputGroupInput {...inputProps} className="min-w-0 min-h-11 sm:min-h-0 text-ellipsis" title={inputProps.title ?? String((inputProps as React.ComponentProps<"input">).value ?? "")} disabled={disabled} />}
         {...props}
       />
-      <InputGroupAddon align="inline-end">
+      <InputGroupAddon align="inline-end" className="py-0 sm:py-2">
         {showTrigger && (
           <InputGroupButton
             size="icon-xs"
             variant="ghost"
             render={<ComboboxTrigger aria-label={triggerLabel} />}
             data-slot="input-group-button"
-            className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
+            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
             disabled={disabled}
           />
         )}
@@ -144,7 +144,7 @@ function ComboboxItem({
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        "data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:data-highlighted:**:text-accent-foreground gap-2.5 rounded-xl py-2 pr-8 pl-3 text-sm [&_svg:not([class*='size-'])]:size-4 relative flex w-full whitespace-normal wrap-anywhere cursor-default items-center outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "min-h-11 sm:min-h-0 data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:data-highlighted:**:text-accent-foreground gap-2.5 rounded-xl py-2 pr-8 pl-3 text-sm [&_svg:not([class*='size-'])]:size-4 relative flex w-full whitespace-normal wrap-anywhere cursor-default items-center outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className
       )}
       {...props}

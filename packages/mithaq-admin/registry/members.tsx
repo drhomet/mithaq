@@ -228,11 +228,13 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
   const choice = (role: Role) => {
     const { own, owned, locked } = lockOf({ access, me, member, role, options })
     const disabled = busy || locked
+    const canGrant = grantable(access, role.permissions)
+    const described = owned || own || !canGrant
     return (
       // Only the box and the name are dimmed when the box is locked: the sentence saying why and what the role grants
       // stay at their own contrast.
       <div key={role.name} data-role={role.name} data-disabled={disabled} className="grid gap-2 rounded-md border p-3">
-        <label className="flex min-h-11 items-start gap-3 sm:min-h-0">
+        <label className={`flex min-h-11 gap-3 sm:min-h-0 ${described ? 'items-start' : 'items-center sm:items-start'}`}>
           <Checkbox
             className="mt-0.5"
             checked={owned || chosen.has(role.name)}
@@ -248,7 +250,7 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
               <span data-owner="" className="text-muted-foreground text-xs">{t('dashboard.membersOwnerRole', 'The owner of the organization always holds this role.')}</span>
             ) : own ? (
               <span data-own="" className="text-muted-foreground text-xs">{t('dashboard.membersOwnRole', 'This role lets you manage roles, so only another member who may manage roles takes it from you.')}</span>
-            ) : grantable(access, role.permissions) ? null : (
+            ) : canGrant ? null : (
               <span data-locked="" className="text-muted-foreground text-xs">{t('dashboard.membersNotGrantable', 'It grants keys you do not hold, so only someone who holds them gives or takes it.')}</span>
             )}
           </span>
@@ -592,7 +594,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                       <ChevronDown className="size-4" aria-hidden="true" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem data-invite="" className="min-h-11 sm:min-h-0" onClick={() => inviteSheet.current?.showModal()}>
+                      <DropdownMenuItem data-invite="" onClick={() => inviteSheet.current?.showModal()}>
                         {t('dashboard.inviteByLink', 'Invite by link')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -649,8 +651,8 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                         const takes = removable(member)
                         return linkable || takes ? (
                           <RowActions id={member.userId} label={rowActionsLabel(member.name)}>
-                            {linkable ? <DropdownMenuItem data-row-action="password-link" className="min-h-11 sm:min-h-0" onClick={() => void sendLink(member)}>{t('dashboard.passwordLink', 'Send a new password link')}</DropdownMenuItem> : null}
-                            {takes ? <DropdownMenuItem data-row-action="remove" variant="destructive" className="min-h-11 sm:min-h-0" disabled={busy} onClick={() => setRemoving(member)}>{t('dashboard.removeMember', 'Remove from organization')}</DropdownMenuItem> : null}
+                            {linkable ? <DropdownMenuItem data-row-action="password-link" onClick={() => void sendLink(member)}>{t('dashboard.passwordLink', 'Send a new password link')}</DropdownMenuItem> : null}
+                            {takes ? <DropdownMenuItem data-row-action="remove" variant="destructive" disabled={busy} onClick={() => setRemoving(member)}>{t('dashboard.removeMember', 'Remove from organization')}</DropdownMenuItem> : null}
                           </RowActions>
                         ) : null
                       }}
@@ -696,9 +698,9 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                           return one ? (
                             <RowActions id={one.id} label={rowActionsLabel(one.email)}>
                               {/* A link run out joins nobody, so it is sent again rather than copied. */}
-                              {one.expired ? null : <DropdownMenuItem data-row-action="copy-link" className="min-h-11 sm:min-h-0" onClick={() => void copyLink(one)}>{t('dashboard.inviteCopy', 'Copy link')}</DropdownMenuItem>}
-                              <DropdownMenuItem data-row-action="resend" className="min-h-11 sm:min-h-0" onClick={() => void resend(one)}>{t('dashboard.inviteResend', 'Resend')}</DropdownMenuItem>
-                              {cancels ? <DropdownMenuItem data-row-action="cancel" variant="destructive" className="min-h-11 sm:min-h-0" onClick={() => void cancel(one)}>{t('dashboard.inviteCancel', 'Cancel invitation')}</DropdownMenuItem> : null}
+                              {one.expired ? null : <DropdownMenuItem data-row-action="copy-link" onClick={() => void copyLink(one)}>{t('dashboard.inviteCopy', 'Copy link')}</DropdownMenuItem>}
+                              <DropdownMenuItem data-row-action="resend" onClick={() => void resend(one)}>{t('dashboard.inviteResend', 'Resend')}</DropdownMenuItem>
+                              {cancels ? <DropdownMenuItem data-row-action="cancel" variant="destructive" onClick={() => void cancel(one)}>{t('dashboard.inviteCancel', 'Cancel invitation')}</DropdownMenuItem> : null}
                             </RowActions>
                           ) : null
                         }}

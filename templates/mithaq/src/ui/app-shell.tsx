@@ -21,6 +21,7 @@ import {
 import type { ShellProps } from 'mithaq/admin'
 import { ScreenContext, useLocale, useNav, useScreen, useUser } from 'mithaq/admin/react'
 import { authArm } from '@/api.ts'
+import { cn } from '@/lib/utils'
 import { locales, switchLocale } from '@/copy.ts'
 import { PageHeader } from 'mithaq-admin/page-header.tsx'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
@@ -202,7 +203,7 @@ export function BackofficeLink() {
   const backoffice = useUser().screens?.find((one) => one.name === 'backoffice')
   if (!backoffice) return null
   return (
-    <a href={backoffice.path} data-backoffice-link="" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'text-muted-foreground ms-auto min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 px-0 sm:px-2.5 xl:px-3 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
+    <a href={backoffice.path} data-backoffice-link="" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'text-muted-foreground ms-auto min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 px-0 has-data-[icon=inline-end]:pr-0 sm:px-2.5 sm:has-data-[icon=inline-end]:pr-2 xl:pl-3 xl:pr-2 [[data-node=controls]:not(:empty)~&]:ms-0')}>
       <span className="sr-only xl:not-sr-only">{t('dashboard.openBackoffice', 'Open the backoffice')}</span>
       <ArrowUpRight data-icon="inline-end" className="rtl:-scale-x-100" />
     </a>

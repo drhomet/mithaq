@@ -41,7 +41,7 @@ function ComboboxClear({ className, ...props }: ComboboxPrimitive.Clear.Props) {
     <ComboboxPrimitive.Clear
       data-slot="combobox-clear"
       render={<InputGroupButton variant="ghost" size="icon-xs" />}
-      className={cn(className)}
+      className={cn("min-h-11 min-w-11 sm:min-h-0 sm:min-w-0", className)}
       {...props}
     >
       <XIcon className="pointer-events-none" />
@@ -66,19 +66,19 @@ function ComboboxInput({
   triggerLabel?: string
 }) {
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <InputGroup className={cn("w-auto min-h-11 sm:min-h-0", className)}>
       <ComboboxPrimitive.Input
-        render={(inputProps) => <InputGroupInput {...inputProps} className="min-w-0 text-ellipsis" title={inputProps.title ?? String((inputProps as React.ComponentProps<"input">).value ?? "")} disabled={disabled} />}
+        render={(inputProps) => <InputGroupInput {...inputProps} className="min-w-0 min-h-11 sm:min-h-0 text-ellipsis" title={inputProps.title ?? String((inputProps as React.ComponentProps<"input">).value ?? "")} disabled={disabled} />}
         {...props}
       />
-      <InputGroupAddon align="inline-end">
+      <InputGroupAddon align="inline-end" className="py-0 sm:py-2">
         {showTrigger && (
           <InputGroupButton
             size="icon-xs"
             variant="ghost"
             render={<ComboboxTrigger aria-label={triggerLabel} />}
             data-slot="input-group-button"
-            className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
+            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
             disabled={disabled}
           />
         )}

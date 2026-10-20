@@ -69,7 +69,7 @@ export function Home() {
             <section aria-labelledby="join" className="grid gap-4">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 id="join" className={`${display} text-xl sm:text-2xl`}>{t('portal.canJoin', 'Courses you can join')}</h2>
-                <a href={`${screen.path}/courses`} className="text-primary text-[15px] font-medium underline-offset-4 hover:underline">{t('portal.seeAll', 'See all courses')}</a>
+                <a href={`${screen.path}/courses`} className="text-primary inline-flex min-h-11 items-center text-[15px] font-medium underline-offset-4 hover:underline sm:min-h-0">{t('portal.seeAll', 'See all courses')}</a>
               </div>
               {catalogue.isError ? <ReadFailed retry={() => void catalogue.refetch()} /> : !open ? <CardsLoading /> : open.length ? (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-5">

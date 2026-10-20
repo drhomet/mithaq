@@ -140,7 +140,7 @@ export function PortalShell({ regions }: ShellProps<readonly ['header', 'main'],
     <SidebarProvider data-shell="top" data-portal="" style={frame} className={`bg-background text-foreground min-h-svh flex-col ${tokens}`}>
       <header className="bg-card border-b">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <a href={places[0]!.href} className="flex min-w-0 items-center gap-2.5 font-semibold">
+          <a href={places[0]!.href} className="flex min-h-11 min-w-0 items-center gap-2.5 font-semibold sm:min-h-0">
             <span aria-hidden className="bg-primary text-primary-foreground grid size-9 shrink-0 place-items-center rounded-[10px]">{[...site][0]}</span>
             <span className="truncate">{site}</span>
           </a>

@@ -63,7 +63,7 @@ Reads that reach further (`tenant: 'mine' | 'all'`), what is refused, and the in
 
 ## Rules
 
-Mobile first: every screen is designed for the phone (390px) first and widened with min-width breakpoints (sm:, md:, lg:); max-* overrides only where no min-width form exists, each with a comment saying why.
+- Mobile first: every screen is designed for the phone (390px) first and widened with min-width breakpoints (sm:, md:, lg:); max-* overrides only where no min-width form exists, each with a comment saying why.
 
 - The vocabulary of `defineMithaq` in `packages/mithaq/src/mithaq.ts` (its locales, kinds, rules, target names and capabilities, and root keys) changes only when the developer asks for that change. When a task needs it, tell the developer what and why first. If the project has a `mithaq.lock`, `mithaq lock` shows a popup the developer approves; never edit the lock by hand. Everything in `defineKayan`, `defineGlobal` and `buildAsas` is yours to change. With a lock, `bunx mithaq lock --check`, part of `bunx mithaq generate --check`, fails on a word the lock does not record.
 - The backoffice is served on a subdomain of its own (`backoffice.example.com` beside `app.example.com`), never mounted under a path of the customer app: browsers isolate scripts by origin and send cookies by host, so on one host a script flaw in the customer app would reach staff sessions. Start refuses when `BACKOFFICE_URL` and `BETTER_AUTH_URL` share an origin, or a host off this machine. The backoffice's Origin checks are the barrier between the two subdomains: keep one on every route that changes state. `README.md`, "Deploying both apps on one domain", shows the proxy. The start's refusal checks the first; review checks the Origin checks.

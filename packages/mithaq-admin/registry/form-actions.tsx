@@ -133,7 +133,7 @@ export function FormActions({
   const breadcrumb = use(PageBreadcrumb)
   const actionTarget = use(PageActionTarget)
   const size = header ? 'sm' : 'default'
-  const tall = header ? 'min-h-11 sm:min-h-0' : ''
+  const tall = 'min-h-11 min-w-11 sm:min-h-0 sm:min-w-0'
   const actions = (
     <>
       {status && !header ? (

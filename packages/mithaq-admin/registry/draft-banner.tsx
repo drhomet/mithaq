@@ -50,7 +50,7 @@ export function DraftBanner({
         <AlertDialog>
           <AlertDialogTrigger
             render={
-              <Button type="button" variant="link" size="sm" className="text-destructive h-auto p-0" disabled={busy}>
+              <Button type="button" variant="link" size="sm" className="text-destructive h-auto min-h-11 p-0 sm:min-h-0" disabled={busy}>
                 {t('admin.discard', 'Discard changes')}
               </Button>
             }

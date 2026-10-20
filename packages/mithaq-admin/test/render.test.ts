@@ -2133,3 +2133,15 @@ test('phone radio options give their wrapping label a full touch target', async 
   assert.ok(label.includes('min-h-11'))
   assert.ok(label.includes('sm:min-h-0'))
 })
+
+test('the staff backoffice link centres its phone icon and restores each desktop padding', async () => {
+  const { BackofficeLink } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
+  const before = state.user
+  state.user = { ...before, screens: [{ name: 'backoffice', path: 'http://127.0.0.1:55822/backoffice' }] }
+  try {
+    const html = renderToStaticMarkup(createElement(BackofficeLink))
+    const classes = /class="([^"]+)"/.exec(html)![1]!.split(' ')
+    for (const token of ['px-0', 'has-data-[icon=inline-end]:pr-0', 'sm:px-2.5', 'sm:has-data-[icon=inline-end]:pr-2', 'xl:pl-3', 'xl:pr-2']) assert.ok(classes.includes(token), token)
+    assert.ok(!classes.includes('xl:px-3'))
+  } finally { state.user = before }
+})

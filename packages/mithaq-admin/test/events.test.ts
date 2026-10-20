@@ -4236,7 +4236,7 @@ test('171a. a controls node draws the form\'s controls where it sits, the course
   assert.equal(controls.querySelector('[data-updated]')?.textContent, 'Updated 2 hours ago', 'when it was last saved, from the row\'s updatedAt, in the viewer\'s words')
   assert.ok(!controls.querySelector('[data-updated]')!.hasAttribute('title'), 'with no tooltip, whose time zone the server would choose')
   assert.ok(controls.firstElementChild!.className.split(' ').includes('sm:flex-wrap'), 'the row wraps under a header that grows rather than runs past its end, between 640 and 1280 pixels')
-  assert.ok(!pill.classList.contains('hidden') && controls.querySelector('[data-updated]')!.className.includes('hidden'), 'and gives up its updated line below xl, keeping its pill (, #228)')
+  assert.ok(!pill.classList.contains('hidden') && controls.querySelector('[data-updated]')!.classList.contains('hidden') && controls.querySelector('[data-updated]')!.classList.contains('xl:inline'), 'and gives up its updated line below xl, keeping its pill (, #228)')
   assert.ok(controls.firstElementChild!.className.split(' ').includes('min-w-min'), 'and may shrink inside the header to the narrowest it can be drawn, so a long sentence beside it wraps rather than pushes, and never further, so nothing in it is drawn over the title')
   const form = host.querySelector('form')!
   const publish = controls.querySelector('[data-button="publish"]') as HTMLButtonElement
@@ -7378,9 +7378,9 @@ test('233k. the upcoming sessions fold the venue and the capacity under the cour
   const folded = (row: Element) => row.querySelector('td:first-child .sm\\:hidden')?.textContent ?? null
   assert.equal(folded(rows[0]!), 'Campus · Capacity: 20', 'the venue and the capacity under the course\'s name')
   assert.equal(folded(rows[1]!), null, 'and nothing where a session has neither')
-  const heads = [...host.querySelectorAll('[data-home-table="sessions"] th')].map((one) => [one.textContent, one.classList.contains('hidden')])
-  assert.deepEqual(heads, [['Course', false], ['Starts at', false], ['Venue', true], ['Capacity', true]], 'the two columns are hidden below sm')
-  assert.deepEqual([...rows[0]!.querySelectorAll('td')].map((one) => one.classList.contains('hidden')), [false, false, true, true])
+  const heads = [...host.querySelectorAll('[data-home-table="sessions"] th')].map((one) => [one.textContent, one.classList.contains('hidden'), one.classList.contains('sm:table-cell')])
+  assert.deepEqual(heads, [['Course', false, false], ['Starts at', false, false], ['Venue', true, true], ['Capacity', true, true]], 'the two columns are hidden below sm')
+  assert.deepEqual([...rows[0]!.querySelectorAll('td')].map((one) => [one.classList.contains('hidden'), one.classList.contains('sm:table-cell')]), [[false, false], [false, false], [true, true], [true, true]])
 })
 
 test('233l. a session\'s Enrollments tab is drawn, and its list read, only for an actor the report lets read enrollments', async () => {

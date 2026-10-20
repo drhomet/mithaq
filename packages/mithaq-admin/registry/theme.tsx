@@ -94,7 +94,7 @@ export function ModeToggle({ t }: { t: Translate }) {
         />
         <span className="sr-only">{t('admin.theme', 'Toggle theme')}</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="**:data-[slot$=item]:min-h-11 sm:**:data-[slot$=item]:min-h-0">
+      <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => setTheme('light')}>{t('admin.themeLight', 'Light')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme('dark')}>{t('admin.themeDark', 'Dark')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme('system')}>

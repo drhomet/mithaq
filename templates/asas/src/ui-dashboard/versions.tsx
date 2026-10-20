@@ -337,7 +337,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
             <div className="grid gap-1.5">
               <span className="text-muted-foreground text-xs">{t('version.comparingAgainst', 'Comparing against')}</span>
               <Select value={against} disabled={prior === undefined} onValueChange={(value) => setAgainst(String(value ?? ''))}>
-                <SelectTrigger className="w-full data-[size=default]:min-h-11 sm:data-[size=default]:min-h-0"><SelectValue>{options.find((one) => one.value === against)?.label}</SelectValue></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue>{options.find((one) => one.value === against)?.label}</SelectValue></SelectTrigger>
                 <SelectContent>
                   {options.map((one) => (
                     <SelectItem key={one.value} value={one.value}>{one.label}</SelectItem>
@@ -356,7 +356,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
           </div>
           <div className="flex items-center gap-2">
             <Checkbox id={`${version.id}-modified-only`} data-modified-only checked={modifiedOnly} onCheckedChange={(checked) => setModifiedOnly(checked === true)} />
-            <Label htmlFor={`${version.id}-modified-only`}>{t('version.modifiedOnly', 'Modified only')}</Label>
+            <Label className="min-h-11 sm:min-h-0" htmlFor={`${version.id}-modified-only`}>{t('version.modifiedOnly', 'Modified only')}</Label>
           </div>
           {prior === undefined ? (
             <p className="text-muted-foreground text-sm">{t('version.loading', 'Loading versions…')}</p>

@@ -121,6 +121,41 @@ own `ui/rich-text-nodes.tsx`, and spread `richTextComponents` and
 `uploadComponents` into your components map (see
 [Rich text and files](#rich-text-and-files)).
 
+### Upgrading 0.3.0 projects to 0.3.1
+
+Install both packages at 0.3.1, then run `mithaq upgrade --check` in every host
+and in the language package. The report does not merge files. Keep the host's
+colors, fonts, radii and `components.json` while merging these changes:
+
+- Merge `select.tsx`, `combobox.tsx` and `tabs.tsx` in the host's
+  `src/components/ui/` from the corresponding 0.3.1 starter host. These primitives
+  are excluded from the mithaq-admin tarball, so updating the dependency does
+  not change them. Select values need `text-start` for RTL, an ellipsis and a
+  complete title; option labels wrap in a popup bounded by the viewport. Select,
+  combobox and dropdown menu items own the 44px phone minimum and its desktop
+  reset. Merge `dropdown-menu.tsx` too before removing item sizing from callers.
+- Replace unedited copies of `src/auth-frame.tsx`, `src/locale-switch.tsx` and
+  `src/routes/unauthorized.tsx` with the installed `screens-host` item's files.
+  Merge edited copies by hand. Delete only a file you have checked is unedited
+  before running `mithaq eject screens-host`; eject never overwrites a file.
+- Merge an ejected, edited `src/components/mithaq/form-actions.tsx` by hand.
+  Preserve the project's actions while moving the phone bar into the base
+  classes and restoring the header row with min-width breakpoints.
+- Port the language's shell copies in `src/ui/`: `app-shell.tsx`, `top-shell.tsx`,
+  `record-page.tsx`, `kpi-card.tsx` and `activity.tsx`. These are project files,
+  not registry items, so upgrade does not replace them. Keep project-specific
+  navigation, regions and behavior. The backoffice link must retain its desktop
+  padding and centre its phone icon, including in RTL.
+
+For TB these paths are under `apps/asas-tanstack/` and `packages/mithaq/`.
+Its edited `components/mithaq/form-actions.tsx` and custom shell pieces need a
+merge, not a replacement. Apply the equivalent changes to each other host's own
+primitives; the tenant and backoffice starter designs are different.
+
+Run the project's checks after merging. Verify short and long values in both
+text directions, open option menus on a phone, and compare desktop and tablet
+screens before accepting the upgrade.
+
 ## Migrate a project that holds copies
 
 A project made before the package holds every piece as a copy under `src/components/mithaq/`. In this order:

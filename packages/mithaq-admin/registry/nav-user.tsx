@@ -16,8 +16,8 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/c
 import { localeEntries } from 'mithaq-admin/locale-menu.ts'
 import { defaultThemes, useTheme, type Theme } from 'mithaq-admin/theme.tsx'
 
-/** A radio row: a 44 pixel target on a phone, and the tick on the inline end in right-to-left pages, where the primitive draws it at the right. */
-const radioRow = 'min-h-11 sm:min-h-0 rtl:pr-3 rtl:pl-8 rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:right-auto rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:left-2'
+/** The primitive pins its tick to the right, so RTL menus move it to the inline end. */
+const radioRow = 'rtl:pr-3 rtl:pl-8 rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:right-auto rtl:[&>[data-slot=dropdown-menu-radio-item-indicator]]:left-2'
 
 /** What the shell is told about the viewer, which is the two strings the user menu draws. */
 export type NavUser = {
@@ -87,7 +87,7 @@ export function NavUserMenu({
             )}
           />
           <DropdownMenuContent
-            className="min-w-56 rounded-lg w-56 **:data-[slot$=item]:min-h-11 sm:**:data-[slot$=item]:min-h-0"
+            className="min-w-56 rounded-lg w-56"
             side={isMobile ? 'bottom' : 'top'}
             align="end"
             sideOffset={4}
@@ -110,7 +110,7 @@ export function NavUserMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   {screens.map((one) => (
-                    <DropdownMenuItem key={one.name} className="min-h-11 sm:min-h-0" render={<a href={one.path} />}>
+                    <DropdownMenuItem key={one.name} render={<a href={one.path} />}>
                       <LayoutGrid className="me-2 h-4 w-4" />
                       {t(`screens.${one.name}`, one.name) ?? one.name}
                     </DropdownMenuItem>
@@ -123,7 +123,7 @@ export function NavUserMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   {localeEntries(locales, locale ?? '').map((entry) => (
-                    <DropdownMenuItem key={entry.locale} className="min-h-11 sm:min-h-0" onClick={() => onLocale(entry.locale)}>
+                    <DropdownMenuItem key={entry.locale} onClick={() => onLocale(entry.locale)}>
                       <Languages className="me-2 h-4 w-4" />
                       {entry.label}
                       {entry.active ? <Check className="ms-auto h-4 w-4" /> : null}
@@ -157,7 +157,7 @@ export function NavUserMenu({
               </>
             ) : null}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="min-h-11 sm:min-h-0" onClick={onSignOut}>
+            <DropdownMenuItem onClick={onSignOut}>
               <LogOut className="me-2 h-4 w-4" />
               {t('admin.signOut', 'Sign out')}
             </DropdownMenuItem>
