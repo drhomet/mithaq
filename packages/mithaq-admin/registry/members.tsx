@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs'
 import { formatDate, noValue } from 'mithaq-admin/format.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { openRow } from 'mithaq-admin/list.tsx'
@@ -18,6 +18,7 @@ import { ListMessage } from 'mithaq-admin/list-header.tsx'
 import { ListTable } from 'mithaq-admin/list-table.tsx'
 import { Search } from 'mithaq-admin/list-toolbar.tsx'
 import type { ScreenPage } from 'mithaq-admin/screen-refs.ts'
+import { TabStrip } from 'mithaq-admin/tab-strip.tsx'
 import { toast } from 'mithaq-admin/toast.tsx'
 import type { ComponentType } from 'react'
 import { Pagination } from 'mithaq-admin/list-pagination.tsx'
@@ -25,7 +26,7 @@ import { useScreen } from 'mithaq/admin/react'
 import type { Member, Role } from 'mithaq-admin/member-types.ts'
 
 export type MembersOptions = {
-  shell: ComponentType<ShellProps<readonly ['header', 'primary', 'more', 'main'], ReactNode>>
+  shell: ComponentType<ShellProps<readonly ['header', 'primary', 'more', 'main'], ReactNode> & { breadcrumb?: { href: string; label: string } }>
   organizations: 'one' | 'many'
   ownerRole: string
   grantable: (access: AccessReport, keys: readonly string[] | undefined) => boolean
@@ -39,8 +40,8 @@ export type MembersOptions = {
 export type Invite = { id: string; email: string; role: string; inviter?: string; expiresAt: string; expired: boolean }
 /** `invites` is there only for a viewer who may invite, and lists what is pending, run out or not. */
 export type MembersData = { members: Member[]; roles: Role[]; invites?: Invite[] }
-const inviteOf = (one: { id: string; email: string; role?: string | null; expiresAt: string }, inviter?: string): Invite => ({
-  id: one.id, email: one.email, role: one.role || 'member', expiresAt: one.expiresAt,
+export const inviteOf = (one: { id: string; email: string; role?: string | null; expiresAt: string }, inviter?: string): Invite => ({
+  id: one.id, email: one.email, role: one.role || 'member', expiresAt: Number.isNaN(new Date(one.expiresAt).getTime()) ? '' : new Date(one.expiresAt).toISOString(),
   expired: !(new Date(one.expiresAt).getTime() > Date.now()), ...(inviter !== undefined && { inviter }),
 })
 
@@ -186,8 +187,10 @@ const lockOf = ({ access, me, member, role, options }: { options: MembersOptions
  * Locked choices keep their explanation readable. Saving writes `memberRoles` rows through that kayan's own operations, so its guards judge each one:
  * removals first, then additions, stopping at the first refusal, and whatever landed before it stays shown.
  */
-export function MemberRoles({ member, roles, onClose, onHeld, options }: { options: MembersOptions; member: Member; roles: Role[]; onClose: () => void; onHeld: (held: Member['roles']) => void }) {
-  const { grantable, permissions: Permissions } = options
+export function MemberRoles({ member, roles, onHeld, options, children }: { options: MembersOptions; member: Member; roles: Role[]; onHeld: (held: Member['roles']) => void; children?: ReactNode }) {
+  const { grantable, permissions: Permissions, shell: AppShell } = options
+  const back = `${useScreen().path}/members`
+  const formId = useId()
   const { locale, t } = useLocale()
   const client = useClient()
   const access = useAccess()
@@ -267,30 +270,38 @@ export function MemberRoles({ member, roles, onClose, onHeld, options }: { optio
     ) : null
   }
   return (
-    <section data-member-page={member.userId}>
-      <form
-        data-member-sheet={member.userId}
-        className="mx-auto grid w-full max-w-3xl gap-4 text-sm"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void save()
-        }}
-      >
-        <p className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
-          <bdi>{member.name}</bdi><bdi dir="ltr">{member.email}</bdi>
-          <span>{t('dashboard.membersJoined', 'Joined')}: {formatDate({ value: member.joined, locale, day: true }) ?? noValue}</span>
-          {holds(access, 'member.fields.lastSeenAt') ? <span>{t('member.lastSeenAt', 'Last seen')}: {formatDate({ value: member.lastSeen, locale, day: true }) ?? noValue}</span> : null}
-        </p>
-        {roles.length === 0 ? <p className="text-muted-foreground">{t('dashboard.membersNoRoles', 'There is no role you may read to assign.')}</p> : null}
-        {group(true, t('dashboard.membersFixed', 'Fixed roles'))}
-        {group(false, t('dashboard.membersCustom', 'Custom roles'))}
-        {refusal ? <p role="alert" className="text-destructive">{refusal}</p> : null}
-        {edits ? <footer className="bg-background sticky bottom-0 flex justify-end gap-2 border-t py-3">
-          <Button type="button" variant="outline" className="max-sm:h-11" onClick={onClose}>{t('admin.cancel', 'Cancel')}</Button>
-          <Button type="submit" className="max-sm:h-11" disabled={busy || !changed}>{t('admin.save', 'Save')}</Button>
-        </footer> : null}
-      </form>
-    </section>
+    <AppShell breadcrumb={{ href: back, label: t('dashboard.members', 'Members') ?? 'Members' }} regions={{
+      header: <h1>{member.name}</h1>,
+      primary: edits ? <div data-action-bar="" className="flex items-center justify-end gap-2 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:border-t max-sm:bg-background max-sm:px-4 max-sm:pt-2 max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <a href={back} className={buttonVariants({ variant: 'outline', size: 'sm', className: 'max-sm:h-11' })}>{t('admin.cancel', 'Cancel')}</a>
+        <Button type="submit" form={formId} size="sm" className="max-sm:h-11" disabled={busy || !changed}>{t('admin.save', 'Save')}</Button>
+      </div> : null,
+      more: null,
+      main: <div className={`mx-auto grid w-full max-w-3xl gap-4${edits ? ' max-sm:pb-20' : ''}`}>
+        <section data-member-page={member.userId}>
+          <form
+            id={formId}
+            data-member-sheet={member.userId}
+            className="mx-auto grid w-full max-w-3xl gap-4 text-sm"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void save()
+            }}
+          >
+            <p className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+              <bdi>{member.name}</bdi><bdi dir="ltr">{member.email}</bdi>
+              <span>{t('dashboard.membersJoined', 'Joined')}: {formatDate({ value: member.joined, locale, day: true }) ?? noValue}</span>
+              {holds(access, 'member.fields.lastSeenAt') ? <span>{t('member.lastSeenAt', 'Last seen')}: {formatDate({ value: member.lastSeen, locale, day: true }) ?? noValue}</span> : null}
+            </p>
+            {roles.length === 0 ? <p className="text-muted-foreground">{t('dashboard.membersNoRoles', 'There is no role you may read to assign.')}</p> : null}
+            {group(true, t('dashboard.membersFixed', 'Fixed roles'))}
+            {group(false, t('dashboard.membersCustom', 'Custom roles'))}
+            {refusal ? <p role="alert" className="text-destructive">{refusal}</p> : null}
+          </form>
+        </section>
+        {children}
+    </div>,
+    }} />
   )
 }
 
@@ -597,12 +608,12 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
             {noMailer}
             <Tabs value={tab} onValueChange={(next) => setTab(String(next))}>
               {invites ? (
-                <TabsList variant="line" className="max-sm:min-h-12">
+                <TabStrip value={tab} className="max-sm:min-h-12">
                   <TabsTrigger value="members" data-members-tab="members" className="flex-none max-sm:min-h-11">{t('dashboard.members', 'Members')}</TabsTrigger>
                   <TabsTrigger value="invitations" data-members-tab="invitations" className="flex-none max-sm:min-h-11">
                     {(t('dashboard.invitationsTab', 'Invitations ({count})') ?? 'Invitations ({count})').replace('{count}', () => new Intl.NumberFormat(locale).format(pending.length))}
                   </TabsTrigger>
-                </TabsList>
+                </TabStrip>
               ) : null}
               {/* Both stay in the first paint, so a server render carries every word and every row of either. */}
               <TabsContent value="members" keepMounted className="data-[hidden]:hidden">
@@ -808,15 +819,9 @@ export function MemberPage({ member, roles, options, children }: { member?: Memb
   const [held, setHeld] = useState(member?.roles ?? [])
   useEffect(() => setHeld(member?.roles ?? []), [member])
   const back = `${path}/members`
-  const backLink = useRef<HTMLAnchorElement>(null)
-  return <AppShell regions={{ primary: null, more: null,
-    header: <h1>{member?.name ?? t('admin.notFoundTitle', 'Page not found')}</h1>,
-    main: <div className="mx-auto grid w-full max-w-3xl gap-4">
-      <a ref={backLink} href={back} className="text-sm underline underline-offset-4 max-sm:min-h-11">{t('dashboard.members', 'Members')}</a>
-      {member ? <>
-        <MemberRoles key={member.userId} member={{ ...member, roles: held }} roles={roles} options={options} onHeld={setHeld} onClose={() => backLink.current?.click()} />
-        {children}
-      </> : <p>{t('admin.notFound', 'That page does not exist.')}</p>}
-    </div>,
+  if (member) return <MemberRoles key={member.userId} member={{ ...member, roles: held }} roles={roles} options={options} onHeld={setHeld}>{children}</MemberRoles>
+  return <AppShell breadcrumb={{ href: back, label: t('dashboard.members', 'Members') ?? 'Members' }} regions={{ primary: null, more: null,
+    header: <h1>{t('admin.notFoundTitle', 'Page not found')}</h1>,
+    main: <p>{t('admin.notFound', 'That page does not exist.')}</p>,
   }} />
 }

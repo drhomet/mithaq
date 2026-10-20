@@ -130,7 +130,13 @@ function NavMain({ home }: { home?: string }) {
     { path: '/', page: 'home', label: { [locale]: home ?? t('dashboard.dashboard', 'Dashboard') ?? 'Dashboard' } },
     ...useNav().filter((entry) => !entry.hidden),
   ]
-  return [...Map.groupBy(entries, (entry) => entry.group?.name ?? '').values()].map((group) => (
+  const groups: (typeof entries)[] = []
+  for (const entry of entries) {
+    const group = groups.find((one) => one[0]!.group?.name === entry.group?.name)
+    if (group) group.push(entry)
+    else groups.push([entry])
+  }
+  return groups.map((group) => (
     <SidebarGroup key={group[0]!.group?.name ?? ''} data-nav-group={group[0]!.group?.name} data-nav-position={group[0]!.group?.position} className={group[0]!.group?.position === 'bottom' ? 'mt-auto' : undefined}>
       {group[0]!.group ? <SidebarGroupLabel>{group[0]!.group!.label[locale]}</SidebarGroupLabel> : null}
       <SidebarGroupContent>
@@ -204,15 +210,15 @@ export function BackofficeLink() {
 }
 
 /** The sidebar on the side the document's direction starts from. */
-export function AppShell({ regions: content, backoffice = false, brand, home, page }: ShellProps<typeof regions, ReactNode> & { backoffice?: boolean; brand?: ReactNode; home?: string; page?: { path: string } }) {
+export function AppShell({ regions: content, backoffice = false, brand, home, page, breadcrumb: ownBreadcrumb }: ShellProps<typeof regions, ReactNode> & { backoffice?: boolean; brand?: ReactNode; home?: string; page?: { path: string }; breadcrumb?: { href: string; label: string } }) {
   const { dir, t } = useLocale()
   const state = use(ScreenContext)
   const list = state?.kayan?.pages.list
   const listed = state?.screen.nav.some((entry) => entry.kayan === state.kayan?.name)
-  const breadcrumb = page && list && listed && page.path !== list.path ? {
+  const breadcrumb = ownBreadcrumb ?? (page && list && listed && page.path !== list.path ? {
     href: `${state!.screen.path}${list.path}`,
     label: t(`${state!.kayan!.name}.plural`, state!.kayan!.name) ?? state!.kayan!.name,
-  } : undefined
+  } : undefined)
   return (
     <SidebarProvider data-shell="app" style={frame}>
       <NavSidebar variant="inset" side={dir === 'rtl' ? 'right' : 'left'} t={t}>

@@ -2071,16 +2071,15 @@ test('61. each dashboard edit page draws the record\'s activity beside its form 
   assert.equal((await post('/api/auditLog/find?tenant=mine', { where: { record: { equals: course.id } } }, { cookie })).response.status, 403, 'and no read widened past the active organization')
 })
 
-test('62. a member\'s roles are changed on the members page: its sheet offers every role of the tenant and no backoffice role, an administrator adds and removes one through the assignment kayan, a role the actor may not grant is offered disabled and refused anyway, and the Roles page locks each fixed role and counts a custom one\'s holders', async () => {
+test('62. a member\'s roles are changed on their page: it offers every role of the tenant and no backoffice role, an administrator adds and removes one through the assignment kayan, a role the actor may not grant is offered disabled and refused anyway, and the Roles page locks each fixed role and counts a custom one\'s holders', async () => {
   const server = (asas.auth.strategies.find((one) => one.name === 'user') as unknown as { server: { api: { addMember(args: unknown): Promise<unknown> } } }).server
   const organization = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { session: { activeOrganizationId: string } }).session.activeOrganizationId
-  const member = await signedUpHere('sheet')
+  const member = await signedUpHere('member-page')
   await server.api.addMember({ body: { userId: member.id, organizationId: organization, role: 'member' } })
   const custom = (await post('/api/roles/create', { name: `teacher-${Date.now()}`, label: { en: 'Teacher 62', ar: 'معلم 62' }, permissions: ['screen.dashboard', 'tags.find', 'tags.fields.id'] }, { cookie })).body as { id: string; name: string }
   assert.equal(typeof custom.id, 'string', JSON.stringify(custom))
 
   const page = await screenHtml('/dashboard/members')
-  // The roles the filter offers are the roles the Edit roles drawer offers: the page's one list of them.
   const offered = [...page.slice(page.indexOf('data-role-filter'), page.indexOf('</select>', page.indexOf('data-role-filter'))).matchAll(/<option value="([^"]+)"/g)].map((hit) => hit[1]!)
   for (const role of ['administrator', 'registrar', 'instructor', custom.name]) assert.ok(offered.includes(role), `the page offers ${role}`)
   for (const role of Object.keys(backofficeRoles)) assert.ok(!offered.includes(role), `and never the backoffice role ${role}`)
@@ -2102,7 +2101,7 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
     assert.equal(data.key, 'error.conflict.role_held')
     assert.deepEqual(data.params?.members?.map((one) => one.id), [member.id], 'naming the member who holds it')
   }
-  assert.equal((await fetch(`${origin}/dashboard/members?member=${member.id}`, { headers: { cookie } })).status, 200, 'and the page each name links to, the members page on that member, answers')
+  assert.equal((await fetch(`${origin}/dashboard/members/${member.id}`, { headers: { cookie } })).status, 200, 'and the page each name links to, the members page on that member, answers')
   const mine = ((await post('/api/memberRoles/find', { where: { role: { equals: 'administrator' } } }, { cookie })).body.docs as { id: string; user: string }[])
   const me = ((await (await fetch(`${origin}/api/auth/user/get-session?disableRefresh=true`, { headers: { cookie } })).json()) as { user: { id: string } }).user.id
   const own = await post('/api/memberRoles/delete', { id: mine.find((one) => one.user === me)!.id }, { cookie })
@@ -2124,7 +2123,6 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   }, { cookie })
   assert.equal(assigner.response.status, 200, JSON.stringify(assigner.body))
   await holding('assigner', async () => {
-    // Which boxes the Edit roles drawer disables is the page's own test; here the server refuses whatever it draws.
     const delegated = await screenHtml('/dashboard/members')
     assert.ok(delegated.includes(`data-row="${member.id}"`) && !delegated.includes('>Last seen<'), 'the delegate lists the members, and without member.fields.lastSeenAt no one\'s last seen')
     const listed = (await (await fetch(`${origin}/api/auth/user/organization/list-members`, { headers: { cookie } })).json()) as { members: Record<string, unknown>[] }
@@ -2140,6 +2138,18 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
     const updateRefused = await post('/api/roles/update', { id: custom.id, label: { en: 'Changed', ar: 'تعديل' } }, { cookie })
     assert.equal(updateRefused.response.status, 403, 'and the server refuses the update')
 
+  })
+
+  const editor = await post('/api/roles/create', {
+    name: 'limited-role-editor', label: { en: 'Limited editor', ar: 'محرر محدود' },
+    permissions: [...(assigner.body.permissions as string[]), 'roles.create'],
+  }, { cookie })
+  assert.equal(editor.response.status, 200, JSON.stringify(editor.body))
+  await holding('limited-role-editor', async () => {
+    const picker = await screenHtml('/dashboard/roles/new')
+    const key = (name: string) => new RegExp(`<li[^>]*data-key="${name.replace('.', '\\.')}"[^>]*>[\\s\\S]*?</li>`).exec(picker)?.[0] ?? ''
+    assert.match(key('tags.find'), /data-disabled="false"/, 'a held key is grantable')
+    assert.match(key('tags.create'), /data-disabled="true"[\s\S]*<input[^>]*disabled/, 'a key the granter lacks is disabled')
   })
 
   const list = await screenHtml('/dashboard/roles')

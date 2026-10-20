@@ -57,3 +57,22 @@ test('navigation prunes permissions and orders groups while keeping hidden desti
   assert.deepEqual(navOf({ nav }, {}).map((entry) => entry.path), ['/hidden', '/ungrouped', '/first', '/second', '/settings'])
   assert.equal(nav.length, 6, 'presentation never removes a route or mutates the projection')
 })
+
+
+test('navigation sorts group ties by first appearance before entry order without Map.groupBy', () => {
+  const groupBy = Map.groupBy
+  try {
+    Map.groupBy = undefined as never
+    const first = { name: 'first', label: { en: 'First' }, order: 1 }
+    const second = { name: 'second', label: { en: 'Second' }, order: 1 }
+    const nav = [
+      { path: '/a2', page: 'list', group: first, order: 2 },
+      { path: '/b1', page: 'list', group: second, order: 1 },
+      { path: '/a1', page: 'list', group: first, order: 1 },
+      { path: '/b0', page: 'list', group: second },
+    ]
+    assert.deepEqual(navOf({ nav }, {}).map((entry) => entry.path), ['/a1', '/a2', '/b0', '/b1'])
+  } finally {
+    Map.groupBy = groupBy
+  }
+})

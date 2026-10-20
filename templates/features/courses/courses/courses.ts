@@ -412,7 +412,7 @@ export const courses = defineKayan({
                   title: { en: 'Unarchive this course?', ar: 'إلغاء أرشفة هذه الدورة؟' },
                   body: { en: 'It is back in the catalogue as it was.', ar: 'تعود إلى الدليل كما كانت.' },
                 },
-              }), status: [archivedBadge] }) },
+              }) }), header: [{ title: {} }, archivedBadge] },
         },
         board: {
           path: '/courses/board',

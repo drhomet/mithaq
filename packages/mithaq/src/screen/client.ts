@@ -103,13 +103,19 @@ export const referencesIn = (value: unknown): string[] =>
     : value && typeof value === 'object' ? Object.values(value).flatMap(referencesIn) : []
 
 /** The screen's nav as one actor sees it: every entry whose key the actor holds, and every entry that names none. */
-export const navOf = (screen: Pick<ScreenClient, 'nav'>, report: AccessReport): NavEntry[] =>
-  [...Map.groupBy(
-    screen.nav.filter((entry) => entry.permission === undefined || holds(report, entry.permission)),
-    (entry) => entry.group?.name ?? '',
-  ).values()]
-    .sort((a, b) => Number(a[0]!.group?.position === 'bottom') - Number(b[0]!.group?.position === 'bottom') || (a[0]!.group?.order ?? 0) - (b[0]!.group?.order ?? 0))
-    .flatMap((entries) => entries.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))
+export const navOf = (screen: Pick<ScreenClient, 'nav'>, report: AccessReport): NavEntry[] => {
+  const entries = screen.nav.filter((entry) => entry.permission === undefined || holds(report, entry.permission))
+  const groups = new Map<string, { position: number; order: number; first: number }>()
+  for (const [first, entry] of entries.entries()) {
+    const name = entry.group?.name ?? ''
+    if (!groups.has(name)) groups.set(name, { position: Number(entry.group?.position === 'bottom'), order: entry.group?.order ?? 0, first })
+  }
+  return entries.sort((a, b) => {
+    const left = groups.get(a.group?.name ?? '')!
+    const right = groups.get(b.group?.name ?? '')!
+    return left.position - right.position || left.order - right.order || left.first - right.first || (a.order ?? 0) - (b.order ?? 0)
+  })
+}
 
 export type ProviderProps<Node = unknown> = { children: Node }
 /** A shell, at the root of a page's tree: its regions drawn. The nav is `mithaq/admin/react` `useNav()`. */

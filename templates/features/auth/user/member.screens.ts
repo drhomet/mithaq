@@ -15,11 +15,11 @@ export const screens = {
     useAsTitle: 'userId',
     pages: {
       ...backofficeList('/members', {
-          columns: ['userId', 'organizationId', role, 'createdAt'],
-          filters: ['organizationId', 'userId', 'role', 'createdAt'],
-          // A membership is looked for by its person.
-          search: ['userId.name', 'userId.email'],
-          sort: '-createdAt',
+        columns: ['userId', 'organizationId', role, 'createdAt'],
+        filters: ['organizationId', 'userId', 'role', 'createdAt'],
+        // A membership is looked for by its person.
+        search: ['userId.name', 'userId.email'],
+        sort: '-createdAt',
       }),
       // A membership's record, which a row opens and which only reads.
       view: {

@@ -1,5 +1,5 @@
 import type { LoaderTools, PageProps } from 'mithaq/admin'
-import { Members as Directory, AddPerson as SharedAddPerson, type MembersData, type MembersOptions } from 'mithaq-admin/members.tsx'
+import { Members as Directory, AddPerson as SharedAddPerson, inviteOf, type MembersData, type MembersOptions } from 'mithaq-admin/members.tsx'
 import { holds } from 'mithaq/admin'
 import { authArm } from '@/api.ts'
 import { refusalKey } from '@/copy.ts'
@@ -7,8 +7,7 @@ import { organizations } from '@asas/mithaq/auth/organizations'
 import { grantable, managesRoles, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
 import { AppShell } from '@asas/mithaq/ui/app-shell.tsx'
 import { PermissionBadges } from '@asas/roles/roles/ui/role-form.tsx'
-import { isoOf, readMembers } from './members-card.tsx'
-import type { Invite } from 'mithaq-admin/members.tsx'
+import { readMembers } from './members-card.tsx'
 import type { ComponentProps } from 'react'
 
 export type { Invite, MembersData } from 'mithaq-admin/members.tsx'
@@ -19,16 +18,6 @@ export const membersOptions: MembersOptions = { shell: AppShell, organizations, 
  * so the provider refuses a `member` the invitation whatever keys it holds.
  */
 const invitesAsGovernance = (role: unknown) => typeof role === 'string' && role.split(',').some((name) => name === 'owner' || name === 'admin')
-
-/** An invitation as the provider answers it and as the page holds it. */
-const inviteOf = (one: { id: string; email: string; role?: string | null; expiresAt: string }, inviter?: string): Invite => ({
-  id: one.id,
-  email: one.email,
-  role: one.role || 'member',
-  ...(inviter !== undefined && { inviter }),
-  expiresAt: isoOf(one.expiresAt),
-  expired: !(new Date(one.expiresAt).getTime() > Date.now()),
-})
 
 export const loader = async (tools: LoaderTools): Promise<MembersData> => {
   const { access, request } = tools

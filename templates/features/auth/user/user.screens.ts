@@ -15,12 +15,12 @@ export const screens = {
     useAsTitle: 'name',
     pages: {
       ...backofficeList('/users', {
-          columns: ['name', 'email', { field: 'role', cell: backofficeUi('user-actions.tsx#BackofficeRole') }, 'banned', 'createdAt'],
-          filters: ['name', 'email', 'role', 'banned', 'createdAt'],
-          search: ['name', 'email'],
-          sort: 'email',
-          // Set role, ban and impersonate, after the row menu's View.
-          menu: backofficeUi('user-actions.tsx#UserMenu'),
+        columns: ['name', 'email', { field: 'role', cell: backofficeUi('user-actions.tsx#BackofficeRole') }, 'banned', 'createdAt'],
+        filters: ['name', 'email', 'role', 'banned', 'createdAt'],
+        search: ['name', 'email'],
+        sort: 'email',
+        // Set role, ban and impersonate, after the row menu's View.
+        menu: backofficeUi('user-actions.tsx#UserMenu'),
       }),
       // A person's record, which a row opens and which only reads: every
       // column drawn by its cell, under the actions the row's menu offers, as buttons.

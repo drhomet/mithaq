@@ -8534,8 +8534,8 @@ test('B2 member row opening and Cancel click the host links', async () => {
   const { MemberPage } = await import('../registry/members.tsx')
   const { membersOptions } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
   const page = await render(createElement(MemberPage, { member: layla, roles: [teacher], options: membersOptions }), { t: english, access: { permissions: '*', collections: { memberRoles: { create: true } } } as never })
-  page.querySelector('[data-member-page]')!.previousElementSibling!.addEventListener('click', (event) => { event.preventDefault(); opened.push('directory') })
-  await act(async () => click([...page.querySelectorAll('button')].find((one) => one.textContent === 'Cancel')!))
+  page.querySelector('[data-header-actions] a')!.addEventListener('click', (event) => { event.preventDefault(); opened.push('directory') })
+  await act(async () => click(page.querySelector('[data-header-actions] a')!))
   assert.deepEqual(opened, ['member', 'directory'])
 })
 
@@ -8630,4 +8630,31 @@ test('backoffice role permissions keep collapsed badge groups', async () => {
   assert.equal(group.querySelector('button')?.getAttribute('aria-expanded'), 'false')
   assert.equal(group.querySelector('[data-key="courses.find"]')?.getAttribute('data-slot'), 'badge')
   assert.equal(group.querySelector('[data-key="courses.fields.title"]')?.getAttribute('data-slot'), 'badge')
+})
+
+
+test('member and fixed role pages use the shell breadcrumb and member header actions submit their form', async () => {
+  const { MemberPage } = await import('../registry/members.tsx')
+  const { membersOptions } = await import('../../../templates/asas/src/ui-dashboard/members.tsx')
+  const host = await render(createElement(MemberPage, { member: layla, roles: [teacher], options: membersOptions }), { t: english, access: { permissions: '*', collections: { memberRoles: { create: true, delete: true } } } as never })
+  assert.equal(host.querySelector('[data-page-header] [data-back]')?.getAttribute('href'), '/dashboard/members')
+  const save = host.querySelector<HTMLButtonElement>('[data-header-actions] button[type="submit"]')!
+  assert.ok(save)
+  assert.equal(save.getAttribute('form'), host.querySelector('form[data-member-sheet]')?.id)
+  assert.ok(save.closest('[data-action-bar]'))
+  assert.equal(save.disabled, true)
+  await act(async () => click(host.querySelector('[data-role="teacher"] .font-medium')!))
+  assert.equal(save.disabled, false)
+  const { FixedRole } = await import('../../../templates/asas/src/ui-dashboard/fixed-role.tsx')
+  const { tenantRoles } = await import('../../../templates/mithaq/src/roles/tenant-roles.ts')
+  const fixed = await render(createElement(FixedRole, { loaderData: { name: 'administrator', role: tenantRoles.administrator } } as never), { t: english })
+  assert.equal(fixed.querySelector('[data-page-header] [data-back]')?.getAttribute('href'), '/dashboard/roles')
+})
+
+
+test('permission checkboxes use canGrant for each key', async () => {
+  const { Permissions } = await import('../registry/role-form.tsx')
+  const host = await render(createElement(Permissions, { held: [], onChange: () => {}, options: { statements: {}, canGrant: (keys) => keys.every((key) => key === 'courses.find') } }))
+  assert.equal(host.querySelector<HTMLInputElement>('[data-key="courses.find"] input')?.disabled, false)
+  assert.equal(host.querySelector<HTMLInputElement>('[data-key="courses.create"] input')?.disabled, true)
 })

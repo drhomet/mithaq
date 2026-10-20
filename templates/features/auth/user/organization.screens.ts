@@ -14,10 +14,10 @@ export const screens = {
     useAsTitle: 'name',
     pages: {
       ...backofficeList('/organizations', {
-          columns: ['name', { field: 'slug', cell: backofficeUi('organization-actions.tsx#OrganizationActions') }, 'createdAt'],
-          filters: ['name', 'slug', 'createdAt'],
-          search: ['name', 'slug'],
-          sort: 'name',
+        columns: ['name', { field: 'slug', cell: backofficeUi('organization-actions.tsx#OrganizationActions') }, 'createdAt'],
+        filters: ['name', 'slug', 'createdAt'],
+        search: ['name', 'slug'],
+        sort: 'name',
       }),
       // An organization's record, which a row opens and which only reads; its
       // rename and its members stay on the list's slug column.
