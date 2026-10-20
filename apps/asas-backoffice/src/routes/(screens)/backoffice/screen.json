@@ -386,7 +386,11 @@
           "path": "/users",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -676,7 +680,11 @@
           "path": "/organizations",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -916,7 +924,11 @@
           "path": "/members",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -1564,7 +1576,11 @@
           "path": "/courses",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -2155,7 +2171,11 @@
           "path": "/sessions",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -2542,7 +2562,11 @@
           "path": "/enrollments",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -2792,7 +2816,11 @@
           "path": "/tags",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -3056,7 +3084,11 @@
           "path": "/roles",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -3306,7 +3338,11 @@
           "path": "/member-roles",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -3664,7 +3700,11 @@
           "path": "/local-users",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [
@@ -3989,7 +4029,11 @@
           "path": "/history",
           "page": {
             "shell": "@asas/mithaq:./src/ui/app-shell.tsx#BackofficeShell",
-            "header": [],
+            "header": [
+              {
+                "title": {}
+              }
+            ],
             "primary": [],
             "more": [],
             "main": [

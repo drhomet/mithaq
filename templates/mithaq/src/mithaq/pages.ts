@@ -14,12 +14,11 @@ const holdsForm = (value: unknown): boolean =>
  * header beside its title, so where the row stands and its save stay on screen
  * on every tab.
  */
-export const appPage = <const Main extends readonly unknown[], const More extends readonly unknown[] = readonly [], const Status extends readonly unknown[] = readonly []>(main: Main, options?: { more?: More; status?: Status }) =>
+export const appPage = <const Main extends readonly unknown[], const More extends readonly unknown[] = readonly []>(main: Main, options?: { more?: More }) =>
   ({ shell: 'app',
     header: [
       // A list keeps its title and New action together in its own header.
       ...(main.some((node) => !!node && typeof node === 'object' && 'layout' in node && node.layout === 'table') ? [] : [{ title: {} }]),
-      ...(options?.status ?? []),
     ],
     primary: holdsForm(main) ? [{ controls: {} }] : [],
     more: options?.more ?? [],
@@ -40,7 +39,7 @@ export const topPage = <const Main extends readonly unknown[]>(main: Main) =>
  * Each row opens its `backofficeRecord` below.
  */
 export const backofficeList = <const List extends { readonly columns: readonly unknown[] }>(path: string, list: List) =>
-  ({ list: { path, page: appPage([{ layout: 'table', main: [{ list }] }]) } }) as const
+  ({ list: { path, page: { ...appPage([{ layout: 'table', main: [{ list }] }]), header: [{ title: {} }] } } }) as const
 
 /**
  * What every tenant kayan's record on the backoffice ends its side column with:

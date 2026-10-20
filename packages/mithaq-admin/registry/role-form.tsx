@@ -94,6 +94,7 @@ export function Grants({ label, named, held, heading, defaultOpen, children, ...
 /** Unknown held keys stay visible so editing a screen's projected catalog never silently drops them. */
 export function Permissions({ held, onChange, busy, options }: { held: readonly string[]; onChange?: (keys: string[]) => void; busy?: boolean; options: PermissionOptions }) {
   const { t } = useLocale()
+  const readOnly = !onChange
   // Read only, every screen the role enters is named, whichever the viewer
   // enters: the backoffice reads a tenant's role, which holds `screen.dashboard`.
   const groups = useGroups(options.statements).map((group) =>
@@ -117,6 +118,9 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
   const toggle = (key: string) => onChange?.(held.includes(key) ? held.filter((one) => one !== key) : [...held, key])
   const choices = (keys: Key[]) => {
     const shown = keys.filter((one) => onChange || held.includes(one.key))
+    if (readOnly) return shown.length ? <div className="flex flex-wrap gap-1.5 max-sm:gap-2">
+      {shown.map(({ key, label }) => <Badge key={key} variant="outline" data-key={key}>{label}</Badge>)}
+    </div> : null
     return shown.length ? (
       <ul className="grid gap-1 sm:grid-cols-2">
         {shown.map(({ key, label }) => {
@@ -135,16 +139,19 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
   }
   if (held.includes('*') && !onChange) return <Badge variant="outline">{t('dashboard.everyPermission', 'Every permission')}</Badge>
   return (
-    <div data-permissions="" className="grid gap-4">
+    <div data-permissions="" className={readOnly ? 'grid gap-2' : 'grid gap-4'}>
       {groups.map((group) => {
         const operations = choices(group.operations)
         const fields = choices(group.fields)
         const keys = [...group.operations, ...group.fields].map((one) => one.key)
         return operations || fields ? (
-          <Grants key={group.name} data-group={group.name} heading defaultOpen label={<span>{group.label}</span>} held={held.filter((key) => keys.includes(key))}>
+          <Grants key={group.name} data-group={group.name} heading defaultOpen={!readOnly} label={<span>{group.label}</span>} held={held.filter((key) => keys.includes(key))}>
             <div className="grid gap-1.5">
               {operations}
-              {fields ? (
+              {fields && readOnly ? <>
+                <p className="text-muted-foreground text-xs">{t('dashboard.permissionsFields', 'Fields')}</p>
+                {fields}
+              </> : fields ? (
                 <details data-field-access={group.name} className="rounded-md border p-3">
                   <summary className="cursor-pointer text-sm max-sm:min-h-11">{t('dashboard.permissionsFields', 'Fields')}</summary>
                   <div className="pt-2">{fields}</div>
@@ -155,7 +162,7 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
         ) : null
       })}
       {other.length && onChange ? <section data-group="" className="grid gap-2"><h3 className="text-sm font-medium">{t('dashboard.permissionsOther', 'Other')}</h3>{choices(other.map((key) => ({ key, label: otherLabel(key) })))}</section> : other.length ? (
-        <Grants data-group="" heading defaultOpen label={<span>{t('dashboard.permissionsOther', 'Other')}</span>} held={other}>
+        <Grants data-group="" heading defaultOpen={!readOnly} label={<span>{t('dashboard.permissionsOther', 'Other')}</span>} held={other}>
           {choices(other.map((key) => ({ key, label: otherLabel(key) })))}
         </Grants>
       ) : null}

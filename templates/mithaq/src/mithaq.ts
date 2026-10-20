@@ -497,7 +497,7 @@ export const backofficeScreen = screenTarget({
   ...shared,
   // The dashboard's frame with no organization switcher, which staff have no
   // use for, and a record page with a link back to its list.
-  layouts: { app: ui('app-shell.tsx#BackofficeShell'), record: backofficeUi('record-page.tsx#BackofficeRecordPage'), table: shared.layouts.table },
+  layouts: { ...shared.layouts, app: ui('app-shell.tsx#BackofficeShell'), record: backofficeUi('record-page.tsx#BackofficeRecordPage') },
   path: '/backoffice',
   kayan: [
     'user',

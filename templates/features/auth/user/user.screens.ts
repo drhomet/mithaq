@@ -7,24 +7,21 @@
 // every person with the registry's list and acts on each from its row's menu
 // and its own page.
 import { backofficeUi } from '@asas/mithaq'
-import { appPage, navGroups } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, backofficeList, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 
 export const screens = {
   backoffice: {
     nav: { group: navGroups.people },
     useAsTitle: 'name',
     pages: {
-      list: {
-        path: '/users',
-        page: appPage([{ layout: 'table', main: [{ list: {
+      ...backofficeList('/users', {
           columns: ['name', 'email', { field: 'role', cell: backofficeUi('user-actions.tsx#BackofficeRole') }, 'banned', 'createdAt'],
           filters: ['name', 'email', 'role', 'banned', 'createdAt'],
           search: ['name', 'email'],
           sort: 'email',
           // Set role, ban and impersonate, after the row menu's View.
           menu: backofficeUi('user-actions.tsx#UserMenu'),
-        } }] }]),
-      },
+      }),
       // A person's record, which a row opens and which only reads: every
       // column drawn by its cell, under the actions the row's menu offers, as buttons.
       view: {

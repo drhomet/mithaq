@@ -8619,3 +8619,15 @@ test('More shares the responsive form action bar while status stays in the heade
   assert.ok(host.querySelector('[data-status=draft]'))
 
 })
+
+
+test('backoffice role permissions keep collapsed badge groups', async () => {
+  const { PermissionBadges } = await import('../../../templates/features/roles/roles/ui/role-form.tsx')
+  const host = await render(createElement(PermissionBadges, { held: ['screen.dashboard', 'courses.find', 'courses.fields.title'] }), {
+    screen: asas.targets.backoffice.client, t: english, access: { screens: ['backoffice'], permissions: '*' },
+  })
+  const group = host.querySelector('[data-group="courses"]')!
+  assert.equal(group.querySelector('button')?.getAttribute('aria-expanded'), 'false')
+  assert.equal(group.querySelector('[data-key="courses.find"]')?.getAttribute('data-slot'), 'badge')
+  assert.equal(group.querySelector('[data-key="courses.fields.title"]')?.getAttribute('data-slot'), 'badge')
+})

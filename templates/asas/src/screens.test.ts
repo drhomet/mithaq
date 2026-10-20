@@ -372,6 +372,13 @@ test('the template builds three screens, and generate screens holds each project
   assert.deepEqual(currency('dashboard').options, currency('portal').options)
 })
 
+test('backoffice lists keep the title in their shared header', () => {
+  for (const kayan of Object.values(asas.targets.backoffice.client.kayan)) {
+    const list = kayan.pages.list as { page?: { header?: unknown[] } } | undefined
+    if (list?.page) assert.deepEqual(list.page.header, [{ title: {} }], kayan.name)
+  }
+})
+
 test('the template screens share their controls and layouts through one const, register only the layouts their pages name, root pages at both shells, and between them use every node', () => {
   const dashboard = asas.targets.dashboard.client
   const portal = asas.targets.portal.client

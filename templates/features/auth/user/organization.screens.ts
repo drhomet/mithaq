@@ -6,22 +6,19 @@
 // backoffice lists every organization with the registry's list and renames it or
 // opens its members from the slug column.
 import { backofficeUi } from '@asas/mithaq'
-import { appPage, navGroups } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, backofficeList, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 
 export const screens = {
   backoffice: {
     nav: { group: navGroups.organizations },
     useAsTitle: 'name',
     pages: {
-      list: {
-        path: '/organizations',
-        page: appPage([{ layout: 'table', main: [{ list: {
+      ...backofficeList('/organizations', {
           columns: ['name', { field: 'slug', cell: backofficeUi('organization-actions.tsx#OrganizationActions') }, 'createdAt'],
           filters: ['name', 'slug', 'createdAt'],
           search: ['name', 'slug'],
           sort: 'name',
-        } }] }]),
-      },
+      }),
       // An organization's record, which a row opens and which only reads; its
       // rename and its members stay on the list's slug column.
       view: {
