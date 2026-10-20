@@ -273,7 +273,7 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
     <AppShell breadcrumb={{ href: back, label: t('dashboard.members', 'Members') ?? 'Members' }} regions={{
       header: <h1>{member.name}</h1>,
       primary: edits ? <div data-action-bar="" className="flex items-center justify-end gap-2 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:border-t max-sm:bg-background max-sm:px-4 max-sm:pt-2 max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <a href={back} className={buttonVariants({ variant: 'outline', size: 'sm', className: 'max-sm:h-11' })}>{t('admin.cancel', 'Cancel')}</a>
+        <Button nativeButton={false} variant="outline" size="sm" className="max-sm:h-11" render={<a href={back} />}>{t('admin.cancel', 'Cancel')}</Button>
         <Button type="submit" form={formId} size="sm" className="max-sm:h-11" disabled={busy || !changed}>{t('admin.save', 'Save')}</Button>
       </div> : null,
       more: null,
