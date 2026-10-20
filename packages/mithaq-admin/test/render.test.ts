@@ -48,7 +48,7 @@ type ButtonClient = import('mithaq/admin').ButtonClient
 const { pageButtonOf } = await import('../registry/node-buttons.tsx')
 const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
 const { TablePage } = await import('../../../templates/mithaq/src/ui/table-page.tsx')
-const { AppShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
+const { AppShell, BackofficeShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
 
 const screen = asas.targets.dashboard.client
 const kayans = Object.values(screen.kayan)
@@ -1871,15 +1871,17 @@ test('219a. the row link of a list whose first column is an email holds the addr
   assert.ok(!closed.includes('data-row-link') && closed.includes('href="mailto:learner@example.com"'), 'and so does the email of a list with no row page')
 })
 
-test('219b. record breadcrumbs share the header on both screens and use the viewer\'s language', () => {
+test('219b. record breadcrumbs keep each host placement and use the viewer\'s language', async () => {
+  const { BackofficeRecordPage } = await import('../../../templates/asas/src/ui-backoffice/record-page.tsx')
   for (const screen of [asas.targets.dashboard.client, asas.targets.backoffice.client]) {
     const kayan = screen.kayan.tags!
     for (const locale of ['en', 'ar']) {
       const word = locale === 'ar' ? 'الوسوم' : 'Tags'
-      const props = { regions: { primary: null, more: null, header: createElement('h1', {}, 'A tag'), main: 'Body' }, page: { path: '/tags/:id' } }
-      const html = staticMarkup(createElement(ScreenContext, { value: { ...state, screen, kayan, locale, t: (_key: string, fallback?: string) => _key === 'tags.plural' ? word : fallback } }, createElement(AppShell, props)))
+      const main = screen.path === '/backoffice' ? createElement(BackofficeRecordPage, { regions: { main: 'Body', side: null, danger: null }, page: { path: '/tags/:id' } } as never) : 'Body'
+      const props = { regions: { primary: null, more: null, header: createElement('h1', {}, 'A tag'), main }, page: { path: '/tags/:id' } }
+      const html = staticMarkup(createElement(ScreenContext, { value: { ...state, screen, kayan, locale, t: (_key: string, fallback?: string) => _key === 'tags.plural' ? word : fallback } }, createElement(screen.path === '/backoffice' ? BackofficeShell : AppShell, props)))
       assert.match(html, new RegExp(`href="${screen.path}/tags"[^>]*data-back`))
-      assert.ok(html.indexOf(word) < html.indexOf('A tag'), 'the breadcrumb is above the record title')
+      assert.equal(html.indexOf('data-back=""') < html.indexOf('A tag'), screen.path !== '/backoffice', 'the tenant breadcrumb stays in the header and the backoffice keeps its body breadcrumb')
     }
   }
 })

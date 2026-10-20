@@ -204,7 +204,7 @@ export function BackofficeLink() {
 }
 
 /** The sidebar on the side the document's direction starts from. */
-export function AppShell({ regions: content, brand, home, page }: ShellProps<typeof regions, ReactNode> & { brand?: ReactNode; home?: string; page?: { path: string } }) {
+export function AppShell({ regions: content, backoffice = false, brand, home, page }: ShellProps<typeof regions, ReactNode> & { backoffice?: boolean; brand?: ReactNode; home?: string; page?: { path: string } }) {
   const { dir, t } = useLocale()
   const state = use(ScreenContext)
   const list = state?.kayan?.pages.list
@@ -241,7 +241,9 @@ export function AppShell({ regions: content, brand, home, page }: ShellProps<typ
           <div data-header-row="" className={headerRow}>
             <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 max-md:size-11" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-            <PageHeader t={t} breadcrumb={breadcrumb} primary={content.primary} more={content.more}>{content.header}</PageHeader>
+            {backoffice ? <>{content.header}{content.primary}{content.more}</> : (
+              <PageHeader t={t} breadcrumb={breadcrumb} primary={content.primary} more={content.more}>{content.header}</PageHeader>
+            )}
             <BackofficeLink />
           </div>
         </header>
@@ -265,6 +267,7 @@ export function BackofficeShell(props: ShellProps<typeof regions, ReactNode>) {
   return (
     <AppShell
       {...props}
+      backoffice
       brand={<span data-brand="" className="truncate px-2 py-1.5 text-base font-semibold">{t('backoffice.brand', 'Asas backoffice')}</span>}
       home={t('backoffice.title', 'Backoffice')}
     />

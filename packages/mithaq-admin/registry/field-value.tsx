@@ -95,7 +95,7 @@ export function FieldValue({
   return (
     <dl role="group" aria-labelledby={label} data-field-value={field.name} className="grid gap-1.5" style={width ? { width } : undefined}>
       <dt id={label} className="text-sm font-medium">{labelFor({ kayan, field, copy })}</dt>
-      <dd className="text-sm">
+      <dd className="min-h-5 text-sm">
         {!Cell
           ? Ref && <Ref field={field} value={value} row={row ?? {}} />
           : <Cell kayan={kayan} field={field} value={value} t={copy.t} locale={copy.locale} titles={titles} whole />}
