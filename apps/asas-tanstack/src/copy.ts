@@ -282,6 +282,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     inbox: { en: 'Inbox', ar: 'صندوق الوارد' },
     documents: { en: 'Documents', ar: 'المستندات' },
     more: { en: 'More', ar: 'المزيد' },
+    moreActions: { en: 'More actions', ar: 'إجراءات أخرى' },
     open: { en: 'Open', ar: 'فتح' },
     share: { en: 'Share', ar: 'مشاركة' },
     trash: { en: 'Move to Trash', ar: 'نقل إلى المهملات' },

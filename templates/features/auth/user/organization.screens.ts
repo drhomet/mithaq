@@ -6,10 +6,11 @@
 // backoffice lists every organization with the registry's list and renames it or
 // opens its members from the slug column.
 import { backofficeUi } from '@asas/mithaq'
-import { appPage } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 
 export const screens = {
   backoffice: {
+    nav: { group: navGroups.organizations },
     useAsTitle: 'name',
     pages: {
       list: {

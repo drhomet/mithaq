@@ -25,7 +25,7 @@ import { useScreen } from 'mithaq/admin/react'
 import type { Member, Role } from 'mithaq-admin/member-types.ts'
 
 export type MembersOptions = {
-  shell: ComponentType<ShellProps<readonly ['header', 'main'], ReactNode>>
+  shell: ComponentType<ShellProps<readonly ['header', 'primary', 'more', 'main'], ReactNode>>
   organizations: 'one' | 'many'
   ownerRole: string
   grantable: (access: AccessReport, keys: readonly string[] | undefined) => boolean
@@ -562,7 +562,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
 
   return (
     <AppShell
-      regions={{
+      regions={{ primary: null, more: null,
         header: (
           <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
             <h1 className="truncate">
@@ -809,7 +809,7 @@ export function MemberPage({ member, roles, options, children }: { member?: Memb
   useEffect(() => setHeld(member?.roles ?? []), [member])
   const back = `${path}/members`
   const backLink = useRef<HTMLAnchorElement>(null)
-  return <AppShell regions={{
+  return <AppShell regions={{ primary: null, more: null,
     header: <h1>{member?.name ?? t('admin.notFoundTitle', 'Page not found')}</h1>,
     main: <div className="mx-auto grid w-full max-w-3xl gap-4">
       <a ref={backLink} href={back} className="text-sm underline underline-offset-4 max-sm:min-h-11">{t('dashboard.members', 'Members')}</a>

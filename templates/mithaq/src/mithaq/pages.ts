@@ -14,18 +14,19 @@ const holdsForm = (value: unknown): boolean =>
  * header beside its title, so where the row stands and its save stay on screen
  * on every tab.
  */
-export const appPage = <const Main extends readonly unknown[]>(main: Main) =>
-  ({ shell: 'app', header: holdsForm(main) ? [{ title: {} }, { controls: {} }] : [{ title: {} }], main }) as const
+export const appPage = <const Main extends readonly unknown[], const More extends readonly unknown[] = readonly [], const Status extends readonly unknown[] = readonly []>(main: Main, options?: { more?: More; status?: Status }) =>
+  ({ shell: 'app',
+    header: [
+      // A list keeps its title and New action together in its own header.
+      ...(main.some((node) => !!node && typeof node === 'object' && 'layout' in node && node.layout === 'table') ? [] : [{ title: {} }]),
+      ...(options?.status ?? []),
+    ],
+    primary: holdsForm(main) ? [{ controls: {} }] : [],
+    more: options?.more ?? [],
+    main,
+  }) as const
 
-/**
- * What an edit page's danger zone holds: the buttons a page passes, which
- * change the row for everyone and can be taken back, first, and the delete
- * last, which cannot. Every edit page of the dashboard ends its record layout
- * with it, so the destructive buttons of every kayan sit in one place drawn one
- * way, and the form's own footer holds Cancel and Save alone. The delete's
- * confirm is a two-step dialog that says in both locales that it cannot be
- * undone.
- */
+/** Secondary record actions, with Delete last and its irreversible confirmation kept. */
 export const danger = <const Before extends readonly unknown[]>(...before: Before) =>
   [...before, { button: 'delete', label: { en: 'Delete', ar: 'حذف' } }] as const
 
@@ -81,3 +82,15 @@ export const activityTab = {
   fields: [{ component: 'activityLog', when: activity.when }],
 } as const
 // end add-on: audit-log
+
+
+/** Shared labels keep a group identical wherever a feature contributes an entry. */
+export const navGroups = {
+  work: { name: 'work', label: { en: 'Work', ar: 'العمل' }, order: 1 },
+  library: { name: 'library', label: { en: 'Library', ar: 'المكتبة' }, order: 2 },
+  people: { name: 'people', label: { en: 'People', ar: 'الأشخاص' }, order: 1 },
+  organizations: { name: 'organizations', label: { en: 'Organizations', ar: 'المؤسسات' }, order: 2 },
+  access: { name: 'access', label: { en: 'Access', ar: 'الوصول' }, order: 3 },
+  audit: { name: 'audit', label: { en: 'Audit', ar: 'التدقيق' }, order: 4 },
+  settings: { name: 'settings', label: { en: 'Settings', ar: 'الإعدادات' }, position: 'bottom' },
+} as const

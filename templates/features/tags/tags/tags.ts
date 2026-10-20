@@ -1,7 +1,7 @@
 import { defaultFields } from 'mithaq'
 import { z } from 'zod'
 import { defineKayan, organization } from '@asas/mithaq'
-import { appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, danger, backofficeList, backofficeRecord, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { expectedUpdatedAt } from '@asas/mithaq/steps/expected-updated-at.ts'
 
 const tag = [{ section: 'tag', label: { en: 'Tag', ar: 'الوسم' }, fields: ['name'] }] as const
@@ -24,6 +24,7 @@ export const tags = defineKayan({
     // Every organization's rows on the backoffice, read-only, and each row's
     // record, which only reads.
     backoffice: {
+      nav: { group: navGroups.library },
       useAsTitle: 'name',
       pages: {
         ...backofficeList('/tags', { columns: ['name', 'organization', 'createdAt'], filters: ['organization'], search: ['name'] }),
@@ -34,6 +35,7 @@ export const tags = defineKayan({
     // as a label, so it is one string per locale, and every screen reads it in
     // the viewer's.
     dashboard: {
+      nav: { group: navGroups.library },
       useAsTitle: 'name',
       description: {
         en: 'Labels the organization groups its records by.',
@@ -44,7 +46,7 @@ export const tags = defineKayan({
         // The drawer's title says it makes a tag, so its one box is drawn
         // bare rather than under a second heading that says "Tag" again.
         create: { path: '/tags/new', mode: 'drawer', page: appPage([{ layout: 'record', main: [{ form: ['name'] }] }]) },
-        edit: { path: '/tags/:id', page: appPage([{ layout: 'record', main: [{ form: tag }], danger: danger() }]) },
+        edit: { path: '/tags/:id', page: appPage([{ layout: 'record', main: [{ form: tag }] }], { more: danger() }) },
       },
     },
     service: {

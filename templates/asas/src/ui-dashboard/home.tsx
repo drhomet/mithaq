@@ -42,7 +42,7 @@ export function Home({ loaderData }: PageProps<Awaited<ReturnType<typeof loader>
   // end without add-on: roles
   return (
     <AppShell
-      regions={{
+      regions={{ primary: null, more: null,
         header: <h1>{t('dashboard.dashboard', 'Dashboard')}</h1>,
         main: (
           <section data-dashboard="dashboard" className="@container grid gap-4">

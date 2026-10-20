@@ -19,7 +19,7 @@ export function ActivityPage() {
   useEffect(() => setQuery(filtersOf({ search: window.location.search, people })), [])
   return (
     <AppShell
-      regions={{
+      regions={{ primary: null, more: null,
         header: <h1>{t('auditLog.activity', 'Activity')}</h1>,
         main: (
           <section data-dashboard="activity" className="grid gap-4">

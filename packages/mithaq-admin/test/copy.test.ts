@@ -247,9 +247,10 @@ test('217p. the edit page\'s own buttons name the record they run on, and an ope
     ...copyOf('en'),
     onDone: () => {},
   }))
-  const button = [...host.querySelectorAll('button')].find((one) => one.textContent === 'Archive')
+  await act(async () => click(host.querySelector('[aria-label="More actions"]')!))
+  const button = [...window.document.querySelectorAll('button')].find((one) => one.textContent === 'Archive')
   assert.ok(button, 'the archive button is drawn')
-  await act(async () => click(button!))
+  await act(async () => click(button! as unknown as Element))
   const dialog = window.document.querySelector('[data-slot="alert-dialog-content"]')
   assert.ok(dialog?.textContent?.includes('This archives \u2068Tajweed\u2069.'), dialog?.textContent ?? '')
   assert.equal(/\brow\b/.test(dialog?.textContent ?? ''), false, 'never "row"')

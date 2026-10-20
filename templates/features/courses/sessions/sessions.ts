@@ -1,6 +1,6 @@
 import { defaultFields, defaultOperations, type Ctx, type Where } from 'mithaq'
 import { defineKayan, organization } from '@asas/mithaq'
-import { activity, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, appPage, danger, backofficeList, backofficeRecord, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { courses, runsCatalogue } from '../courses/courses.ts'
 import { archivedRow, marks, reason, reasonInput, unarchived } from '../domain/archive.ts'
 
@@ -42,6 +42,7 @@ export const sessions = defineKayan({
   dbName: 'course_sessions',
   targets: {
     backoffice: {
+      nav: { group: navGroups.work },
       useAsTitle: 'startsAt',
       pages: {
         ...backofficeList('/sessions', { columns: ['startsAt', 'organization', 'course', 'capacity', 'venue'], filters: ['organization', 'course', 'venue', 'archived'], search: ['venue', 'course.title'], sort: '-startsAt' }),
@@ -63,6 +64,7 @@ export const sessions = defineKayan({
     // does on the dashboard.
     portal: { useAsTitle: 'startsAt' },
     dashboard: {
+      nav: { group: navGroups.work },
       // What a session is shown by wherever it stands for itself: the picker on `enrollments.session`
       // and a relationship column pointing here. A session declares no name, and its start tells two
       // sessions of one course apart, drawn in the viewer's own format. The search boxes come to
@@ -98,8 +100,8 @@ export const sessions = defineKayan({
             ] }],
             // Whether it is archived and why, read only: a session is archived through its own operations.
             side: [{ ...course, fields: [...course.fields, { field: 'archived', readOnly: true }, { field: 'archiveReason', readOnly: true }] }, activity],
-            // Archived and brought back as a course is, each with its reason, before the delete.
-            danger: danger({
+          }], { more: danger({
+              // Archived and brought back as a course is, each with its reason, before the delete.
               button: 'archive',
               when: unarchived,
               label: { en: 'Archive', ar: 'أرشفة' },
@@ -113,8 +115,7 @@ export const sessions = defineKayan({
               fields: ['reason'],
               reload: true,
               confirm: { title: { en: 'Unarchive this session?', ar: 'إلغاء أرشفة هذه الجلسة؟' }, body: { en: 'It is open again as it was.', ar: 'تعود مفتوحة كما كانت.' } },
-            }),
-          }]),
+            }) }),
         },
       },
     },

@@ -7,10 +7,11 @@
 // every person with the registry's list and acts on each from its row's menu
 // and its own page.
 import { backofficeUi } from '@asas/mithaq'
-import { appPage } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 
 export const screens = {
   backoffice: {
+    nav: { group: navGroups.people },
     useAsTitle: 'name',
     pages: {
       list: {

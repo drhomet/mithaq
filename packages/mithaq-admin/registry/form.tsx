@@ -146,6 +146,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const id = String(value?.id ?? props.made ?? '')
   // A row with an id is being changed, one without is being made; a field may be the client's on one operation and the server's on the other.
   const on = id ? 'update' : 'create'
+  const readOnly = operations?.[on] === false
   // Whether the server owns this field on this operation (read-only, `uuid`, a non-client provider, or
   // access denied); it decides both the disabled control and whether the field is in the write.
   const owned = (field: ClientField) => readOnlyField(field, on) || (writes ? !writes(field.name, on) : false)
@@ -160,7 +161,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const { busy, run, save, readAt, asking, setAsking, leaving } = saving
   // Never while a discard question is open, which says the change is unsaved, nor once a write was refused because
   // the row changed since this form read it: every autosave after it would be refused the same way.
-  const interval = viewing || asking || blocked || leaving || shown === 'error.conflict.stale' ? undefined : drafts?.autosave
+  const interval = readOnly || viewing || asking || blocked || leaving || shown === 'error.conflict.stale' ? undefined : drafts?.autosave
   const autosaved = useAutosave({ ...props, ...saving, client, form, id, interval, owned, readAt: () => readAt(props.expectedUpdatedAt), refuse: quiet, seed, seeded, setSeed, values })
 
   const setValue = (name: string, next: unknown) => {
@@ -186,7 +187,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     event.preventDefault()
     // A form in a drawer over another is that form's child in React, whose submit would otherwise reach it too.
     event.stopPropagation()
-    save()
+    if (!readOnly) save()
   }
   const control = (leaf: string | LeafClient) => {
     const field = byName.get(typeof leaf === 'string' ? leaf : leaf.field)
@@ -198,7 +199,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     if (viewing) return <LeafControl key={`${field.name}-published`} {...shared} form={formId} value={showing[field.name]} values={showing} setValue={() => {}} onChange={() => {}} readOnly />
     // A leaf the page marks read-only is read as text with its cell's formatter. A field the server
     // provides keeps its control, which the side card draws.
-    if (shared.leaf?.readOnly === true) return <FieldValue key={`${field.name}-${revision}`} {...shared} row={values} />
+    if (readOnly || shared.leaf?.readOnly === true) return <FieldValue key={`${field.name}-${revision}`} {...shared} row={values} />
     return <BoundField key={`${field.name}-${revision}`} {...shared} form={formId} readOnly={busy || owned(field)} values={values} setValue={setValue} />
   }
   // A kayan's own operation can change anything the row touches, children included, so the panels are remounted after it.
@@ -242,11 +243,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
         {chrome}
         <div className={headed ? 'flex flex-col gap-4 border-t pt-6' : 'flex flex-col gap-4'}>
           {children}
-          {controlled ? null : (
-            <Card>
-              <CardContent>{actionsOf(false)}</CardContent>
-            </Card>
-          )}
+          {controlled || readOnly ? null : <Card data-auto-card="actions"><CardContent>{actionsOf(false)}</CardContent></Card>}
         </div>
       </form>
     ),
@@ -262,7 +259,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // The draft or the published copy, on a changed row only. Beside the actions from xl up; below xl a row at
   // the top of the form (`chrome`), so it is never in the phone's fixed bar.
   const views = status === 'changed' && client.findByID ? { viewing, choose } : undefined
-  const actionsOf = (header: boolean) => (
+  const actionsOf = (header: boolean) => readOnly ? null : (
     <FormActions {...{ autosaved, busy, dirty, formId, header, locale, onCancel, status, t, updated, viewing, views }} drafts={!!drafts} autosaves={!!drafts?.autosave} updating={!!id} onAsk={() => setAsking(true)} onSaveDraft={() => save({ draft: true })} />
   )
   // On a screen's page the title is the page's own `title` node, and a form handed its nodes sits in a drawer or a list
@@ -290,7 +287,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     // The provider is around the whole screen, not just the column of inputs, so a panel the project
     // registered binds a field of this form through `useKayanField` wherever the layout put it.
     <KayanForm.Provider value={{ check, forget, form, issues: sentences, locales: localesOf(held), on, writes, add: screenState ? (target, made) => setAdding({ target, made }) : undefined }}>
-      <FormContext value={{ getData: () => showing, setValue, disabled: busy || viewing, saves: saving.saves, expectedUpdatedAtOn: props.expectedUpdatedAtOn }}>
+      <FormContext value={{ getData: () => showing, setValue, disabled: busy || viewing || readOnly, saves: saving.saves, expectedUpdatedAtOn: props.expectedUpdatedAtOn }}>
         {/* One question for both ways out, Cancel and a blocked navigation, kept mounted so nothing but an answer closes it. */}
         <DiscardDialog
           t={t}

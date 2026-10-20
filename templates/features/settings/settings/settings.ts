@@ -1,7 +1,7 @@
 import { defaultFields, defaultGlobalFields, defaultGlobalOperations } from 'mithaq'
 import { defineGlobal, organization, rows } from '@asas/mithaq'
 import { backofficeClosed, tenantAccess } from '@asas/mithaq/roles/tenant-access.ts'
-import { appPage } from '@asas/mithaq/mithaq/pages.ts'
+import { appPage, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 
 /**
  * The project's settings, one row per tenant, because this global places
@@ -46,6 +46,7 @@ export const settings = defineGlobal({
     // updates the row there is. Its fields in sections under its sentence, and the
     // yes or no setting a switch with its label beside it.
     dashboard: {
+      nav: { group: navGroups.settings, order: -1 },
       description: {
         en: 'Where students reach the school, and whether the portal is open to them.',
         ar: 'أين يتواصل الطلاب مع المدرسة، وهل البوابة مفتوحة لهم.',

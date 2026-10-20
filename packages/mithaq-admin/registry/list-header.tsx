@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import type { ClientKayan } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from 'mithaq-admin/page-header.tsx'
 import type { Translate } from 'mithaq-admin/copy.ts'
 
 /** The list's heading, its sentence, and its New button: a link to the create page, or one that adds a row in place. */
@@ -18,25 +19,25 @@ export function ListHeader({ about, create, of, t, title }: {
   const Heading = of ? 'h2' : 'h1'
   return (
     // `flex-wrap`: on a phone the title and the button share 320 pixels.
-    <header className="flex flex-wrap items-start justify-between gap-4">
-      <div className="grid min-w-0 gap-1">
-        {title === undefined ? null : <Heading className={of ? 'text-lg font-semibold' : 'text-2xl font-bold tracking-tight'}>{title}</Heading>}
-        {about ? <p className="text-muted-foreground text-sm">{about}</p> : null}
-      </div>
-      {create === undefined ? null : 'onAdd' in create ? (
-        // A list of another kayan adds a row in place, below the table.
-        <Button type="button" className="max-sm:h-11" onClick={create.onAdd}>
-          <Plus className="me-2 h-4 w-4" />
-          {create.label}
-        </Button>
-      ) : (
-        // `render` keeps the destination an anchor; `nativeButton={false}` tells base-ui the rendered element is not
-        // a button.
-        <Button nativeButton={false} className="max-sm:h-11" render={<a href={create.href} />}>
-          <Plus className="me-2 h-4 w-4" />
-          {create.label}
-        </Button>
-      )}
+    <header className="flex min-w-0 flex-wrap">
+      <PageHeader
+        t={t}
+        title={<div className="grid min-w-0 gap-1">
+          {title === undefined ? null : <Heading className={of ? 'text-lg font-semibold' : 'text-2xl font-bold tracking-tight'}>{title}</Heading>}
+          {about ? <p className="text-muted-foreground text-sm">{about}</p> : null}
+        </div>}
+        primary={create === undefined ? null : 'onAdd' in create ? (
+          // A list of another kayan adds a row in place, below the table.
+          <Button type="button" className="max-sm:h-11" onClick={create.onAdd}>
+            <Plus className="me-2 h-4 w-4" />{create.label}
+          </Button>
+        ) : (
+          // `render` keeps the destination an anchor; base-ui must not treat it as a native button.
+          <Button nativeButton={false} className="max-sm:h-11" render={<a href={create.href} />}>
+            <Plus className="me-2 h-4 w-4" />{create.label}
+          </Button>
+        )}
+      />
     </header>
   )
 }

@@ -1,7 +1,7 @@
 import { conflict, defaultOperations, folderOf, invalid, type Ctx, type FilterOptions, type WriteTools } from 'mithaq'
 import { defineKayan, organization, serverTargets } from '@asas/mithaq'
 import { currentOrganization, readsPast, user as actor } from '@asas/mithaq/roles/tenant-access.ts'
-import { activity, appPage, danger, backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { activity, appPage, danger, backofficeList, backofficeRecord, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { sessions } from '../sessions/sessions.ts'
 import { holdSeats, seatsTaken, sessionHeld } from '../sessions/seats.ts'
 // add-on: settings
@@ -224,6 +224,7 @@ export const enrollments = defineKayan({
     // record, which only reads. A record is titled by its student, a person the
     // backoffice reads, where a session is titled only by its start.
     backoffice: {
+      nav: { group: navGroups.work },
       useAsTitle: 'student',
       pages: {
         ...backofficeList('/enrollments', { columns: ['session', 'student', 'organization', 'createdAt'], filters: ['organization', 'session', 'student'], sort: '-createdAt' }),
@@ -263,6 +264,7 @@ export const enrollments = defineKayan({
     // heading tell one seat from another; on the portal, where the student is most
     // often the viewer, by the session.
     dashboard: {
+      nav: { group: navGroups.work },
       useAsTitle: 'student',
       description: {
         en: 'Which student holds a seat in which session.',
@@ -287,8 +289,7 @@ export const enrollments = defineKayan({
             layout: 'record',
             main: [{ form: enrollment }],
             side: [{ section: 'record', label: { en: 'Record', ar: 'السجل' }, fields: [{ field: 'createdAt', readOnly: true }] }, activity],
-            danger: danger(),
-          }]),
+          }], { more: danger() }),
         },
       },
     },

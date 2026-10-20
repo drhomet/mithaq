@@ -19,6 +19,7 @@ export type {
   RegionsClient,
   ScreenClient,
   ScreenPageClient,
+  ScreenNav,
 } from './index.ts'
 import type { ClientField, NavEntry, PageClient, ScreenClient } from './index.ts'
 
@@ -103,7 +104,12 @@ export const referencesIn = (value: unknown): string[] =>
 
 /** The screen's nav as one actor sees it: every entry whose key the actor holds, and every entry that names none. */
 export const navOf = (screen: Pick<ScreenClient, 'nav'>, report: AccessReport): NavEntry[] =>
-  screen.nav.filter((entry) => entry.permission === undefined || holds(report, entry.permission))
+  [...Map.groupBy(
+    screen.nav.filter((entry) => entry.permission === undefined || holds(report, entry.permission)),
+    (entry) => entry.group?.name ?? '',
+  ).values()]
+    .sort((a, b) => Number(a[0]!.group?.position === 'bottom') - Number(b[0]!.group?.position === 'bottom') || (a[0]!.group?.order ?? 0) - (b[0]!.group?.order ?? 0))
+    .flatMap((entries) => entries.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)))
 
 export type ProviderProps<Node = unknown> = { children: Node }
 /** A shell, at the root of a page's tree: its regions drawn. The nav is `mithaq/admin/react` `useNav()`. */

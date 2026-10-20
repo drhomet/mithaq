@@ -164,7 +164,7 @@ export function Dashboard({ loaderData: figures }: PageProps<Figures>) {
 
   return (
     <AppShell
-      regions={{
+      regions={{ primary: null, more: null,
         header: <h1>{t('dashboard.dashboard', 'Dashboard')}</h1>,
         main: (
           <section data-dashboard="dashboard" className="@container flex flex-col gap-4 md:gap-6">

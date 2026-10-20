@@ -44,7 +44,7 @@ export const carded = (nodes: readonly Node[], draw: Draw): ReactNode[] => {
     // A separator divides what a card holds, so a card holding nothing else is not drawn.
     if (run.some((one) => kindOf(one) !== 'separator' && shown(one, draw.scope) && !blank(one, draw.kayan))) {
       drawn.push(
-        <Card key={`card-${at - run.length}`} className="overflow-visible rounded-lg">
+        <Card data-auto-card="fields" key={`card-${at - run.length}`} className="overflow-visible rounded-lg">
           <CardContent className="flex flex-col gap-4">{drawNodes({ nodes: run, draw: { ...draw, inCard: true } })}</CardContent>
         </Card>,
       )

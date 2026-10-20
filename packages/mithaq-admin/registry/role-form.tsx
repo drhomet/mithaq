@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { ariaRequired } from 'mithaq-admin/control-props.ts'
+import { FieldValue } from 'mithaq-admin/field-value.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { useKayanField } from 'mithaq-admin/form-context.tsx'
 export type PermissionOptions = { statements: Readonly<Record<string, readonly string[]>>; canGrant: (keys: readonly string[]) => boolean }
@@ -164,13 +165,28 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
 
 export function RoleForm({ options }: { options: PermissionOptions }) {
   const { disabled: readOnly, getData, setValue } = useForm()
-  const { t } = useLocale()
-  const fields = useKayan().fields
+  const { t, locale } = useLocale()
+  const kayan = useKayan()
+  const fields = kayan.fields
+  const access = useAccess()
   const labelField = fields.find((field) => field.name === 'label')
   const values = getData()
   const label = (values.label ?? {}) as Record<string, string>
   const permissions = Array.isArray(values.permissions) ? (values.permissions as string[]) : []
   const named = { name: useKayanField('name'), label: useKayanField('label'), permissions: useKayanField('permissions') }
+  if (values.id && access.collections?.[kayan.name]?.operations?.update === false) {
+    return (
+      <div className="grid gap-6">
+        {fields.filter((field) => field.name === 'name' || field.name === 'label').map((field) => (
+          <FieldValue key={field.name} field={field} kayan={kayan} row={values} copy={{ t, locale }} />
+        ))}
+        <dl data-field-value="permissions" className="grid gap-2">
+          <dt className="text-sm font-medium">{t('roles.permissions', 'Permissions')}</dt>
+          <dd><Permissions options={options} held={permissions} /></dd>
+        </dl>
+      </div>
+    )
+  }
   const required = (name: string) => ariaRequired(fields.find((field) => field.name === name) ?? { rules: {} })
   /** Whether one locale's label box is the one refused: those the refusal names, or every one where it names none. */
   const labelWrong = (locale: string) => (named.label.error && (named.label.locales?.includes(locale) ?? true) ? named.label.error : undefined)

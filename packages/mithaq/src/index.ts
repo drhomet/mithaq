@@ -109,6 +109,7 @@ export {
   type ScreenFrame,
   type ScreenLayout,
   type ScreenOwnPage,
+  type ScreenNav,
   type ScreenRegions,
   type Ui,
   type ScreenField,

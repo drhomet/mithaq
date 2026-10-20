@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs'
+import { TabStrip, useRecordTab } from 'mithaq-admin/tab-strip.tsx'
 import type { Copy } from 'mithaq-admin/copy.ts'
 import { leavesOf, shown, type NodeProps } from 'mithaq-admin/node-tree.ts'
 import { carded, drawNodes } from 'mithaq-admin/nodes.tsx'
@@ -51,24 +52,27 @@ const invalidIn = (nodes: Parameters<typeof leavesOf>[0], draw: NodeProps<'tabs'
  * still holds its value; base-ui unmounts a hidden panel otherwise.
  */
 function TabGroup({
+  name,
   line,
   tabs,
 }: {
+  name: string
   line: boolean
   tabs: readonly { key: string; label: string; description?: string; invalid: ReactNode; body: ReactNode }[]
 }): ReactElement {
+  const selection = useRecordTab({ name, keys: tabs.map((tab) => tab.key) })
   return (
-    <Tabs defaultValue={tabs[0]?.key} data-node="tabs" className={line ? 'min-w-0 gap-4' : 'min-w-0 overflow-hidden rounded-lg border'}>
-      <TabsList variant={line ? 'line' : 'default'} className={line ? 'w-full justify-start max-sm:min-h-12' : 'm-1 max-sm:min-h-12'}>
+    <Tabs value={selection.value} onValueChange={(value) => selection.choose(String(value))} data-node="tabs" className={line ? 'min-w-0 max-w-full gap-4' : 'min-w-0 max-w-full overflow-hidden rounded-lg border'}>
+      <TabStrip value={selection.value} variant={line ? 'line' : 'default'} className={line ? 'w-full justify-start max-sm:min-h-12' : 'm-1 max-sm:min-h-12'}>
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.key} value={tab.key} className={line ? 'flex-none max-sm:min-h-11' : 'max-sm:min-h-11'}>
+          <TabsTrigger key={tab.key} value={tab.key} className="flex-none max-sm:min-h-11">
             {tab.label}
             {/* How many of this tab's fields the refusal named, so a save refused over a field on a tab
                 nobody opened says so on the tab. */}
             {tab.invalid}
           </TabsTrigger>
         ))}
-      </TabsList>
+      </TabStrip>
       {tabs.map((tab) => (
         <TabsContent key={tab.key} value={tab.key} keepMounted className={line ? 'flex min-w-0 flex-col gap-4' : 'flex min-w-0 flex-col gap-4 p-4'}>
           {tab.description ? <p className="text-sm text-muted-foreground">{tab.description}</p> : null}
@@ -82,6 +86,7 @@ function TabGroup({
 export function TabsNode({ node, draw }: NodeProps<'tabs'>): ReactElement {
   return (
     <TabGroup
+      name={node.tabs[0]?.tab ?? 'main'}
       line={!draw.inCard}
       // A tab whose every node its `when` hides is left out, so no actor opens a tab that holds
       // nothing it may see.

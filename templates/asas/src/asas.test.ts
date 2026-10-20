@@ -12819,7 +12819,7 @@ test('203f. the backoffice lists local accounts for a super admin alone, by emai
   const client = asas.targets.backoffice.client
   const kayan = client.kayan.localUsers
   assert.ok(kayan, 'the backoffice screen lists localUsers')
-  assert.deepEqual(client.nav.find((entry) => entry.kayan === 'localUsers'), { path: '/local-users', page: 'list', kayan: 'localUsers', permission: 'localUsers.find' })
+  assert.deepEqual(client.nav.find((entry) => entry.kayan === 'localUsers'), { path: '/local-users', page: 'list', kayan: 'localUsers', permission: 'localUsers.find', group: { name: 'access', label: { en: 'Access', ar: 'الوصول' }, order: 3 } })
   const list = namedFields(kayan.pages.list)
   assert.deepEqual(list.filter((name, at) => list.indexOf(name) === at), ['email', '_verified', 'createdAt'], 'the list shows the email, the verified state and the date it was made')
   assert.deepEqual(namedFields(kayan.pages.edit), ['email', 'createdAt', '_verified'], 'and the edit page draws the toggle under which account it is')
@@ -15112,7 +15112,7 @@ test('161. the derived nav lists exactly the entries each actor may open, in dec
   assert.deepEqual(
     navOf(client, await report(ownerHeaders)).map((entry) => entry.path),
     // No '/member-roles': a member's roles are changed on the members page.
-    ['/courses', '/sessions', '/enrollments', '/tags', '/media', '/roles', '/settings', '/members', '/activity'],
+    ['/courses', '/sessions', '/enrollments', '/tags', '/media', '/settings', '/roles', '/members', '/activity'],
     "the tenant's administrator holds '*' and sees every entry, in the screen's kayan order, then the screen's own pages, the activity behind the log's key",
   )
 
@@ -19020,4 +19020,31 @@ test('R7k. bulk enrollment moves keep capacity and bulk withdrawals keep the sta
   const leaving = await tenant.as('student', 'enrollments/deleteMany', { where: { id: { equals: kept.id } } })
   assert.equal(keyOf(leaving.body), 'error.invalid.session_started', JSON.stringify(leaving.body))
   assert.equal((await enrollments.operations.findByID({ id: kept.id }, tenant.options)).session, original.id)
+})
+
+test('sidebar metadata survives projection and hiding a list keeps its route and permission', () => {
+  const language = screened('notes')
+  const build = (nav: unknown) => language.buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [language.defineKayan({
+      name: 'notes',
+      fields: { id: defaultFields.id, title: { kind: 'text' } },
+      targets: {
+        service: { operations: defaultOperations },
+        dashboard: {
+          nav: nav as never,
+          pages: { list: { path: '/notes', page: { shell: 'app', main: [{ list: { columns: ['title'] } }] } } },
+        },
+      },
+    })],
+  })
+  const nav = { hidden: true, order: 4, group: { name: 'settings', label: { en: 'Settings', ar: 'الإعدادات' }, order: 2, position: 'bottom' } }
+  const built = build(nav)
+  const client = built.targets.dashboard.client
+  assert.equal(client.kayan.notes!.pages.list!.path, '/notes')
+  assert.deepEqual(client.nav[0], { ...nav, path: '/notes', page: 'list', kayan: 'notes', permission: 'notes.find' })
+  assert.deepEqual(navOf(client, { permissions: '*' }), client.nav, 'hidden destinations stay available outside the sidebar')
+  assert.ok(built.kayan.notes.operations.find, 'the authorized read operation still exists')
+  assert.throws(() => build({ order: Infinity }), /order is no finite number/)
+  assert.throws(() => build({ group: { name: '', label: { en: 'Settings', ar: 'الإعدادات' } } }), /group needs a name/)
 })

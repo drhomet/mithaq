@@ -2,7 +2,7 @@ import { sql } from 'mithaq/drizzle'
 import type { NodePgDatabase } from 'mithaq/drizzle/node-postgres'
 import { assignableRole, conflict, defaultFields, defaultOperations, denied, type Ctx, type WriteTools } from 'mithaq'
 import { defineKayan, backofficeUi, rows, organization } from '@asas/mithaq'
-import { backofficeList, backofficeRecord } from '@asas/mithaq/mithaq/pages.ts'
+import { backofficeList, backofficeRecord, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { tenantRoles } from '@asas/mithaq/roles/system-roles.ts'
 import { backofficeReads } from '@asas/mithaq/roles/tenant-access.ts'
 import { managesRoles, OWNER, OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
@@ -147,6 +147,7 @@ export const memberRoles = defineKayan({
     // record. An assignment is looked for by its person, is titled by them, and
     // reads its role by the role's label, never its slug.
     backoffice: {
+      nav: { group: navGroups.access },
       useAsTitle: 'user',
       pages: {
         ...backofficeList('/member-roles', { columns: ['user', role, 'organization'], filters: ['organization', 'user', 'role'], search: ['user.name', 'user.email'] }),

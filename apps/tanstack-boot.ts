@@ -846,11 +846,11 @@ test('36. each screen answers at its own path inside its providers and shell, an
   assert.match(screen, /data-provider="theme"/, 'the dashboard folds its provider')
   assert.ok(screen.indexOf('data-provider="theme"') < screen.indexOf('data-shell="app"'), 'around its shell')
   assert.match(screen, /data-dashboard="dashboard"/, 'and draws its dashboard at its own path')
-  const sidebar = /data-slot="sidebar-content"[\s\S]*?<\/ul>/.exec(screen.slice(screen.indexOf('data-slot="sidebar"')))?.[0] ?? ''
+  const sidebar = screen.slice(screen.indexOf('data-slot="sidebar-content"'), screen.indexOf('data-slot="sidebar-footer"'))
   assert.match(screen.slice(screen.indexOf('data-slot="sidebar"')), /^[\s\S]*?<nav aria-label="Navigation"[^>]*><div[^>]*data-slot="sidebar-header"/, 'the one named navigation landmark opens the sidebar around its header')
   assert.deepEqual(
     [...sidebar.matchAll(/href="([^"]+)"/g)].map((hit) => hit[1]),
-    ['/dashboard', '/dashboard/members', '/dashboard/activity', '/dashboard/courses', '/dashboard/sessions', '/dashboard/enrollments', '/dashboard/tags', '/dashboard/media', '/dashboard/roles', '/dashboard/settings'],
+    ['/dashboard', '/dashboard/courses', '/dashboard/sessions', '/dashboard/enrollments', '/dashboard/tags', '/dashboard/media', '/dashboard/settings', '/dashboard/roles', '/dashboard/members', '/dashboard/activity'],
     `the dashboard sidebar links the dashboard and every entry this administrator may open, and no Member roles:\n${sidebar.slice(0, 600)}`,
   )
   assert.match(screen, /data-slot="sidebar-footer"[\s\S]*data-slot="dropdown-menu-trigger"/, 'with the user menu at the sidebar\'s foot')
@@ -891,7 +891,7 @@ test('38. the dashboard create page draws the edit page\'s Details sections and 
   assert.ok(headings(edit).every((at) => at > 0), 'and so does the edit page')
   assert.ok(html.indexOf('for="courses-notifications"') > html.indexOf('>Teaching<'), 'notifications sit in Teaching')
   assert.ok(!html.includes('data-panel="activity"') && !html.includes('data-region="danger"') && !html.includes('data-slot="tabs-trigger"'), 'and a create draws no activity, no danger zone and no tab, Sessions and Versions among them')
-  assert.ok(edit.includes('data-panel="activity"') && edit.includes('data-region="danger"') && edit.includes('data-slot="tabs-trigger"'), 'which the edit page draws beside the same sections')
+  assert.ok(edit.includes('data-panel="activity"') && edit.includes('aria-label="More actions"') && edit.includes('data-slot="tabs-trigger"'), 'which the edit page draws beside the same sections')
   assert.ok(!html.includes('courseActivityPanel'), 'no placeholder panel')
   assert.ok(!html.includes('id="courses-archivedAt"'), 'and nothing the page names nowhere')
 })
@@ -911,16 +911,16 @@ test('39. the dashboard course pages draw every control a course field they name
   assert.match(await screenHtml(`/dashboard/courses/${screenCourse}`), /data-slot="input-otp-slot"/, 'otp')
 })
 
-test('40. the dashboard edit page carries the row, a leaf read-only on this page alone, and the danger zone its button asks for', async () => {
+test('40. the dashboard edit page carries the row, a read-only leaf, and secondary actions beside the form controls', async () => {
   const html = await screenHtml(`/dashboard/courses/${screenCourse}`)
   assert.match(html, /data-record="row"/, 'the layout gets the row')
   assert.match(html, /data-field-value="archived"/, 'archived is read-only here, read as text')
   assert.equal(html.includes('id="courses-archived"'), false, 'and no control')
-  assert.ok(html.includes('Danger zone') && html.includes('>Archive<'), 'and archive sits in the danger zone')
-  const zone = html.slice(html.indexOf('data-region="danger"'))
-  assert.ok(zone.indexOf('>Archive<') > 0 && zone.indexOf('data-button="delete"') > zone.indexOf('>Archive<'), 'the delete sits in the danger zone, after the archive')
+  assert.ok(!html.includes('data-region="danger"'), 'the template keeps secondary actions out of a permanent danger panel')
+  assert.match(html, /aria-label="More actions"/, 'the secondary actions open from More')
   const header = html.slice(html.indexOf('data-region="header"'), html.indexOf('</header>'))
-  assert.ok(header.includes('>Publish changes<') && header.includes('>Back to list<') && header.includes('>Save draft<') && !header.includes('>Delete<'), 'and the controls hold Back to list beside the autosaved draft, Save draft and Publish changes, and no delete')
+  assert.ok(header.includes('>Publish changes<') && header.includes('>Save draft<') && !header.includes('>Back to list<') && !header.includes('>Delete<'), 'the controls keep Save draft and Publish changes while the breadcrumb supplies the way back')
+  assert.ok(header.includes('data-back=""') && header.includes('data-header-actions=""'), 'the breadcrumb and shared action row belong to the header')
   const form = html.slice(html.indexOf('<form'), html.indexOf('</form>'))
   assert.ok(!form.includes('type="submit"') && !form.includes('>Delete<'), 'while the form draws no save and no delete of its own')
   assert.ok(!html.includes('courseActivityPanel'), 'with no placeholder panel on the page')
@@ -1071,11 +1071,19 @@ const walkScreen = async (name: 'dashboard' | 'portal') => {
       if (!page.page) continue
       const shell = Object.entries(screen.layouts).find(([, file]) => file === page.page!.shell)![0]
       expected.push([`shell ${shell}`, new RegExp(`data-shell="${shell}"`)])
-      for (const [region] of Object.entries(page.page).filter(([key]) => key !== 'shell')) expected.push([`${shell} region ${region}`, new RegExp(`data-region="${region}"`)])
+      for (const [region] of Object.entries(page.page).filter(([key]) => !['shell', 'primary', 'more'].includes(key))) expected.push([`${shell} region ${region}`, new RegExp(`data-region="${region}"`)])
       // A page whose tree holds a form is drawn by the form from its shell
       // down, so every leaf on it is a control.
       const holdsForm = JSON.stringify(page.page).includes('"form":[')
-      for (const nodes of regionsOf(page.page)) walk(kayan, nodes, holdsForm)
+      for (const [region, nodes] of Object.entries(page.page)) {
+        if (!Array.isArray(nodes)) continue
+        // Secondary buttons live in a popover after hydration; mounted tests exercise their confirmations.
+        if (region === 'more') {
+          if (nodes.length) expected.push(['secondary action trigger', /aria-label="More actions"/])
+          continue
+        }
+        walk(kayan, nodes, holdsForm)
+      }
     }
   }
   for (const page of Object.values(screen.pages)) html += await screenHtml(`${screen.path}${page.path === '/' ? '' : page.path}`)
@@ -1105,7 +1113,7 @@ test('47b. every kayan\'s list is the registry\'s one table, a form node that na
   // A confirm is the browser's own dialog, so a server render carries the button and nothing of the question.
   const course = await screenHtml(`/dashboard/courses/${screenCourse}`)
   // The Sessions tab's bulk archive is the sessions kayan's own and sits before it.
-  assert.ok(course.indexOf('>Archive<', course.indexOf('data-region="danger"')) > 0, 'the archive button sits in the danger region it was put in')
+  assert.match(course, /aria-label="More actions"/, 'secondary record actions open from More')
 })
 
 test('48. a screen load slides the session\'s expiry forward through the provider\'s own refresh', async () => {
@@ -1592,13 +1600,14 @@ test('52. a when decides what the dashboard draws: the access code follows the d
     assert.ok(other.includes('for="courses-delivery"'), `the ${screen} draws the delivery of a recorded course`)
     assert.ok(!other.includes('for="courses-accessCode"'), `and no access code beside it`)
   }
-  // Keyed on the record: an archived row has no archive button.
   const archived = await post('/api/courses/archive', { id, reason: 'Moved online' }, { cookie })
   assert.equal(archived.response.status, 200, JSON.stringify(archived.body))
-  // The danger region alone, since the Sessions tab draws the sessions' own bulk archive.
-  const danger = (html: string) => html.slice(html.indexOf('data-region="danger"'), html.indexOf('</section>', html.indexOf('data-region="danger"')))
-  assert.ok(danger(await screenHtml(`/dashboard/courses/${screenCourse}`)).includes('>Archive<'), 'a row not archived draws the archive button')
-  assert.ok(!danger(await screenHtml(`/dashboard/courses/${id}`)).includes('>Archive<'), 'and an archived one does not')
+  const activePage = await screenHtml(`/dashboard/courses/${screenCourse}`)
+  const archivedPage = await screenHtml(`/dashboard/courses/${id}`)
+  assert.match(activePage, /aria-label="More actions"/, 'an active row offers its secondary actions')
+  assert.match(archivedPage, /aria-label="More actions"/, 'an archived row keeps its permitted secondary actions')
+  assert.doesNotMatch(activePage, /data-status="archived"/, 'the active record has no archived status')
+  assert.match(archivedPage, /data-status="archived"/, 'the archived record names its status above the tabs')
   await holding('registrar', async () => {
     // What a page draws is no permission: the operation behind a button no
     // page draws is still the server's to refuse.
@@ -1796,7 +1805,7 @@ test('56. in Arabic, no page of the dashboard draws a word of the English copy: 
       assert.ok(html.includes('data-backoffice-link') && shown.includes('فتح لوحة الإدارة الخلفية'), `${path} draws the backoffice link in Arabic`)
       if (path === '/') assert.ok(html.includes('data-home-table="sessions"') && shown.includes('الجلسات القادمة'), 'the home draws its table in Arabic')
       if (path === '/courses') assert.ok(html.includes('data-row-menu=') && html.includes('aria-label="إجراءات '), 'a list draws each row\'s menu, named in Arabic')
-      if (/\/[0-9a-f-]{36}$/.test(path)) assert.ok(html.includes('data-button="delete"') && shown.includes('حذف'), `${path} draws its delete in Arabic`)
+      if (/\/[0-9a-f-]{36}$/.test(path)) assert.ok(html.includes('aria-label="إجراءات أخرى"') && shown.includes('المزيد'), `${path} draws More in Arabic`)
       if (/^\/(courses|sessions|enrollments)\/[0-9a-f-]{36}$/.test(path)) assert.ok(html.includes('data-panel="activity"') && shown.includes('النشاط'), `${path} draws its activity in Arabic`)
       if (/^\/courses\/[0-9a-f-]{36}$/.test(path)) {
         // Save draft shows beside the course's autosave, and the controls say when the course was last saved.
@@ -2126,10 +2135,11 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
       assert.equal((refused.body.data as { key?: string }).key, 'error.forbidden.assign', 'under the assignment guard\'s own key')
     }
     const picker = await screenHtml(`/dashboard/roles/${custom.id}`)
-    const badge = (key: string) => new RegExp(`<li[^>]*data-key="${key.replace('.', '\\.')}"[^>]*>`).exec(picker)?.[0] ?? ''
-    assert.match(badge('tags.find'), /data-disabled="false"/, 'a key the delegate holds is offered')
-    assert.match(badge('tags.create'), /data-disabled="true"/, 'a key it does not hold is offered disabled')
-    assert.ok(!picker.includes('data-key="courses.find"'), 'and a kayan it may not read is offered nowhere')
+    assert.match(picker, /data-field-value="permissions"/, 'the delegate reads the granted permissions')
+    assert.doesNotMatch(picker, /<button[^>]*data-key=|id="roles-name"|>Save</, 'a read-only role has values and no editor or Save')
+    const updateRefused = await post('/api/roles/update', { id: custom.id, label: { en: 'Changed', ar: 'تعديل' } }, { cookie })
+    assert.equal(updateRefused.response.status, 403, 'and the server refuses the update')
+
   })
 
   const list = await screenHtml('/dashboard/roles')
@@ -2144,7 +2154,7 @@ test('62. a member\'s roles are changed on the members page: its sheet offers ev
   assert.ok(locked.includes('data-group="courses"') && locked.includes('data-key="courses.find"') && !locked.includes('data-key="courses.delete"'), 'its summary includes only the keys it holds')
   assert.equal(((await post('/api/roles/find', { where: { name: { equals: 'instructor' } } }, { cookie })).body.docs as unknown[]).length, 0, 'and no row of the roles kayan names it')
   const opened = await screenHtml(`/dashboard/roles/${custom.id}`)
-  assert.ok(opened.includes('data-role-form') && opened.includes('data-button="delete"'), 'a custom role opens its form and its delete')
+  assert.ok(opened.includes('data-role-form') && opened.includes('aria-label="More actions"'), 'a custom role opens its form and its delete')
   assert.ok(!opened.includes('id="roles-permissions"') && !opened.includes('<textarea'), 'with no box to type a key into')
   assert.ok(opened.includes('value="Teacher 62"') && opened.includes('value="معلم 62"'), 'a box per locale holding its label')
   const keys = [...opened.matchAll(/<li[^>]*data-key="([^"]+)"[^>]*>/g)].map((hit) => [hit[1]!, hit[0]] as const)
@@ -2224,7 +2234,7 @@ test('64. the course edit page draws its tabs at page level as the line bar, Det
     assert.ok(header.includes('data-node="controls"'), `${locale}: the header holds the form's controls`)
     assert.match(header, new RegExp(`data-slot="badge"[^>]*data-status="published"[^>]*>${words.published}<|data-status="published"[^>]*data-slot="badge"[^>]*>${words.published}<`), `${locale}: where the row stands, as a pill`)
     assert.ok(header.includes(`>${words.updated}`), `${locale}: when it was last saved`)
-    assert.ok(header.includes(`>${words.cancel}<`), `${locale}: Back to list, beside a draft that saves itself`)
+    assert.ok(!header.includes(`>${words.cancel}<`) && header.includes('data-back=""'), `${locale}: the breadcrumb supplies the only way back`)
     const formId = html.match(/<form id="([^"]+)"/)?.[1]
     assert.ok(formId, 'the page holds one form')
     assert.match(header, new RegExp(`<button[^>]*type="submit"[^>]*form="${formId}"[^>]*data-button="publish"|<button[^>]*form="${formId}"[^>]*type="submit"`), `${locale}: and a submit naming the page's form by its id`)
@@ -2311,7 +2321,7 @@ test('67. every dashboard list reads cleanly in both locales: its title is the p
     assert.equal(response.status, 200, `${path} answers 200 in ${locale}`)
     return response.text()
   }
-  const heading = (html: string) => /<h1[^>]*data-node="title"[^>]*>([^<]*)</.exec(html)?.[1]
+  const heading = (html: string) => /<h1[^>]*>([^<]*)</.exec(html)?.[1]
   const rowOf = (html: string) => [...html.matchAll(/<tr[\s\S]*?<\/tr>/g)].map((one) => one[0]).find((one) => one.includes(`>${title}<`)) ?? ''
   for (const [locale, words] of [['en', { many: 'Courses', month: 'July', sar: 'SAR' }], ['ar', { many: 'الدورات', month: 'يوليو', sar: 'ر.س' }]] as const) {
     const list = await page(`/courses?where[title][like]=${encodeURIComponent(title)}`, locale)
@@ -2360,7 +2370,7 @@ test('68. every dashboard create and edit page and Settings reads cleanly in bot
       holds.forEach((one, index) => assert.match(parts[index]!, one, `${at} puts its fields in ${roles ? 'card' : 'section'} ${index + 1}`))
       // A page that draws a row is about that row, so only a create draws the kayan's sentence, and a global's page
       // is the one place its sentence is drawn.
-      const sentence = /<header class="max-w-3xl"><p[^>]*>[^<]+<\/p><\/header>/
+      const sentence = /<header class="max-w-3xl">(?:(?!<\/header>)[\s\S])*?<p[^>]*>[^<]+<\/p><\/header>/
       if (path.endsWith('/new') || path === '/settings') assert.match(html, sentence, `${at} draws its kayan's sentence under the title`)
       else assert.doesNotMatch(html, sentence, `${at} draws no sentence of its kayan's on a page of one row`)
       assert.equal(/type="(?:date|datetime-local)"/.test(html), false, `${at} draws no browser date box`)
@@ -2607,7 +2617,7 @@ test('73. the backoffice reads by name in both locales: its sign-in is the tenan
     const person = await page(`/backoffice/users/${me.user.id}`, 'en')
     assert.match(person, /<h1[^>]*data-node="title"[^>]*>Boot<\/h1>/, 'a person\'s record is titled by their name')
     assert.ok(person.includes('Backoffice administrator') && !/data-field-value="role"[\s\S]{0,400}>user</.test(person), 'and reads the backoffice role by its label')
-    assert.ok(/data-field-value="emailVerified"[^>]*>[\s\S]*?<span class="text-sm">No<\/span>/.test(person), 'and an unticked box as a no')
+    assert.ok(/data-field-value="emailVerified"[^>]*>[\s\S]*?<dd[^>]*>No<\/dd>/.test(person), 'and an unticked box as a no')
     assert.ok(!person.includes('data-field-value="id"'), 'and draws no id')
     // A tenant's own role, since the roles this project ships are code and never a row.
     const role = (await db.execute(`select id, name, label_en, label_ar from roles where permissions @> array['courses.find']::text[] order by created_at limit 1`)).rows[0] as { id: string; name: string; label_en: string; label_ar: string }

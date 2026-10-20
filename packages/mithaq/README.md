@@ -838,6 +838,18 @@ A file is named `ui('file.tsx#Export')` off a folder URL from `folderOf`, and
 a missing file or export fails the build. Where it lives:
 `packages/mithaq/src/screen/index.ts` `screenTarget`.
 
+A kayan's `targets.<screen>.nav` controls its sidebar entry. It accepts
+`order`, `hidden` and `group`. A group names `name`, a localized `label`,
+optional `order` and optional `position: 'bottom'`. A screen's own page puts
+the same keys beside its `nav.label`. `navOf(screen, report)` removes entries
+without permission and hidden entries before ordering the remaining groups
+and their entries. Omitted orders keep declaration order. Empty groups never
+render. Use the same group metadata wherever a group is named.
+
+`hidden: true` changes the sidebar alone. The list route, its read operation
+and its permission remain declared and authorized as before. Regenerate
+screens after changing navigation metadata.
+
 **The admin package.** The controls, cells, forms, lists and shells a screen draws with, `mithaq eject`, and `mithaq upgrade --check`, which compares the files a project holds with them, are described in [The admin package](../mithaq-admin/README.md).
 
 **`mithaq generate screens`** writes each screen's route files into the host
