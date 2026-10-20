@@ -170,7 +170,7 @@ export function TimeField({ describedBy, disabled, error, form, id, label, local
       placeholder="--"
       aria-label={`${label} ${segment === 'hours' ? t('admin.hours', 'Hours') : t('admin.minutes', 'Minutes')}`}
       {...aria}
-      className="w-12 text-center tabular-nums caret-transparent max-sm:h-11"
+      className="w-12 text-center tabular-nums caret-transparent min-h-11 sm:min-h-0"
       onKeyDown={keyed(segment)}
       // What a keyboard that names no key types, as Android's does, and a paste arrive here.
       onChange={(event) => {
@@ -201,7 +201,7 @@ export function TimeField({ describedBy, disabled, error, form, id, label, local
             disabled={disabled}
             aria-label={`${label} ${t('admin.period', 'AM or PM')}: ${periodWord(held.period, locale)}`}
             {...aria}
-            className="min-w-12 max-sm:h-11"
+            className="min-w-12 min-h-11 sm:min-h-0"
             onClick={flip}
             onKeyDown={(event) => {
               if (event.key === 'ArrowUp' || event.key === 'ArrowDown') return (event.preventDefault(), flip())

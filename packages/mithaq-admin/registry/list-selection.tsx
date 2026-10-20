@@ -6,10 +6,10 @@ import type { Translate } from 'mithaq-admin/copy.ts'
 import { readOnlyField } from 'mithaq-admin/field-values.ts'
 
 /**
- * The list's checkbox size, with the invisible hit layer grown to 44 pixels below `sm`. Only for
- * the list: a checkbox group's options sit 28 pixels apart, so a 44 pixel layer there would tick the option above.
+ * A list has no wrapping label to take the press, so its box owns a 44 pixel hit layer on a phone.
+ * Groups use their labels instead; growing the box's layer would reach the next desktop option.
  */
-export const selectBox = `${checkboxSize} after:-inset-x-3.5 max-sm:after:-inset-y-3.5`
+export const selectBox = `${checkboxSize} after:-inset-x-3.5 after:-inset-y-3.5 sm:after:-inset-y-2`
 
 /** Which fields a bulk update may offer: the ones a person could edit on a row of this kayan. Chrome only: the runner refuses whatever the list draws. */
 export const writableFields = (

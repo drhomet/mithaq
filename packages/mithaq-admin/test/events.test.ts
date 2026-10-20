@@ -3726,7 +3726,7 @@ test('276c. the sidebar on a phone is titled and described in the viewer\'s lang
   }
   const { RecordFrame } = await import('../registry/record-frame.tsx')
   await render(createElement(RecordFrame, { mode: 'sheet', title: 'Edit', closeLabel: 'Close', onClose: () => {}, children: 'x' }))
-  assert.match(window.document.querySelector('[data-slot="sheet-content"]')!.className, /data-\[side=right\]:max-sm:w-full/, 'the record sheet is full width below sm')
+  assert.match(window.document.querySelector('[data-slot="sheet-content"]')!.className, /data-\[side=right\]:w-full/, 'the record sheet is full width below sm')
 })
 
 test('the theme provider hands its consumers one value from the first render on, stored theme or not, so nothing it holds changes a screen still hydrating', async () => {
@@ -4236,7 +4236,7 @@ test('171a. a controls node draws the form\'s controls where it sits, the course
   assert.equal(controls.querySelector('[data-updated]')?.textContent, 'Updated 2 hours ago', 'when it was last saved, from the row\'s updatedAt, in the viewer\'s words')
   assert.ok(!controls.querySelector('[data-updated]')!.hasAttribute('title'), 'with no tooltip, whose time zone the server would choose')
   assert.ok(controls.firstElementChild!.className.split(' ').includes('sm:flex-wrap'), 'the row wraps under a header that grows rather than runs past its end, between 640 and 1280 pixels')
-  assert.ok(!pill.className.includes('max-sm:hidden') && controls.querySelector('[data-updated]')!.className.includes('max-xl:hidden'), 'and gives up its updated line below xl, keeping its pill (, #228)')
+  assert.ok(!pill.classList.contains('hidden') && controls.querySelector('[data-updated]')!.className.includes('hidden'), 'and gives up its updated line below xl, keeping its pill (, #228)')
   assert.ok(controls.firstElementChild!.className.split(' ').includes('min-w-min'), 'and may shrink inside the header to the narrowest it can be drawn, so a long sentence beside it wraps rather than pushes, and never further, so nothing in it is drawn over the title')
   const form = host.querySelector('form')!
   const publish = controls.querySelector('[data-button="publish"]') as HTMLButtonElement
@@ -5024,7 +5024,7 @@ test('172e. the status pill is coloured by status, always with its word, and sho
     const pill = host.querySelector('[data-node="controls"] [data-status]')
     assert.equal(pill?.textContent?.trim(), words, `a ${status} row reads ${words}`)
     assert.equal(pill?.className.split(' ').includes(colour), true, `in ${colour}`)
-    assert.equal(pill?.className.includes('max-sm:hidden'), false, 'and is not hidden on a phone')
+    assert.equal(pill?.classList.contains('hidden'), false, 'and is not hidden on a phone')
   }
 })
 
@@ -5749,10 +5749,10 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
   const controls = host.querySelector('[data-region="header"] [data-node="controls"]')!
   const bar = controls.querySelector('[data-action-bar]')
   assert.ok(bar, 'the actions sit in a bar inside the controls')
-  for (const one of ['max-sm:fixed', 'max-sm:inset-x-0', 'max-sm:bottom-0', 'max-sm:flex-wrap', 'sm:contents']) assert.equal(classesOf(bar).includes(one), true, `the bar carries ${one}`)
-  assert.equal(classesOf(bar).some((one) => one.startsWith('max-sm:pb-') && one.includes('safe-area-inset-bottom')), true, 'and clears the phone\'s bottom inset')
+  for (const one of ['fixed', 'inset-x-0', 'bottom-0', 'flex-wrap', 'sm:contents']) assert.equal(classesOf(bar).includes(one), true, `the bar carries ${one}`)
+  assert.equal(classesOf(bar).some((one) => one.startsWith('pb-') && one.includes('safe-area-inset-bottom')), true, 'and clears the phone\'s bottom inset')
   assert.equal(bar.contains(controls.querySelector('[data-status]')), false, 'the pill stays in the header')
-  assert.deepEqual(['ms-auto', 'flex', 'items-center', 'max-sm:fixed'].map((one) => classesOf(controls.firstElementChild).includes(one)), [true, true, true, false], 'which at sm and up is the one row it was')
+  assert.deepEqual(['ms-auto', 'flex', 'items-center', 'fixed'].map((one) => classesOf(controls.firstElementChild).includes(one)), [true, true, true, false], 'which at sm and up is the one row it was')
   const title = host.querySelector('[data-region="header"] h1')
   assert.equal(title?.getAttribute('title'), title?.textContent, 'the header\'s title, cut short on a phone, carries its whole text')
   const form = host.querySelector('form')!
@@ -5763,8 +5763,8 @@ test('176b. below sm the header keeps the trigger, the title and the pill, the f
   // The switch is not in the phone's bar, where it took a quarter of the screen: it sits at the top of the form below xl, and beside the actions from xl up.
   const switches = [...host.querySelectorAll('[data-view-switch]')]
   assert.equal(switches.length, 2, 'the Draft | Published switch is drawn for each width')
-  assert.equal(bar.contains(switches.find((one) => classesOf(one).includes('max-xl:hidden')) ?? null), true, 'the one in the bar is hidden below xl')
-  const phone = switches.find((one) => classesOf(one).includes('xl:hidden') && !classesOf(one).includes('max-xl:hidden'))
+  assert.equal(bar.contains(switches.find((one) => classesOf(one).includes('hidden')) ?? null), true, 'the one in the bar is hidden below xl')
+  const phone = switches.find((one) => classesOf(one).includes('xl:hidden') && !classesOf(one).includes('hidden'))
   assert.equal(!!phone && form.contains(phone) && !controls.contains(phone), true, 'and the phone\'s sits in the form, out of the fixed bar')
   assert.equal(classesOf(controls.querySelector('[data-status]')).some((one) => one.startsWith('max-sm:text-')), false, 'the pill keeps its 12 pixel text on a phone')
 
@@ -6771,7 +6771,7 @@ test('192a. the sheet\'s close button sits at the inline end and the header keep
   await act(async () => sleep(0))
   await openVersion(host, 'v3')
   const close = sheet()?.querySelector('[data-slot="sheet-close"]')?.className ?? ''
-  assert.equal(/(^| )end-4( |$)/.test(close) && !/(^| )(left|right)-4( |$)/.test(close), true, `the close button is placed by the inline end: ${close}`)
+  assert.equal(/(^| )end-2( |$)/.test(close) && /(^| )sm:end-4( |$)/.test(close) && !/(^| )(left|right)-4( |$)/.test(close), true, `the close button is placed by the inline end: ${close}`)
   assert.equal(/(^| )pe-12( |$)/.test(sheet()?.querySelector('[data-slot="sheet-header"]')?.className ?? ''), true, 'and the header keeps room for it')
 })
 
@@ -7120,7 +7120,7 @@ test('231e. the organization switcher marks the current organization with a radi
     const radios = [...window.document.querySelectorAll('[role="menuitemradio"]')]
     assert.deepEqual(radios.map((one) => [one.textContent, one.getAttribute('aria-checked')]), [['First org', 'false'], ['Second org', 'true']], 'the current one is checked, the other is not')
     assert.equal(radios.some((one) => one.querySelector('.border') !== null), false, 'and no row draws a bordered box that reads as an unticked checkbox')
-    assert.equal(radios.every((one) => classesOf(one as unknown as Element).includes('max-sm:min-h-11')), true, 'each row is 44 pixels on a phone')
+    assert.equal(radios.every((one) => classesOf(one as unknown as Element).includes('min-h-11')), true, 'each row is 44 pixels on a phone')
     await act(async () => click(radios[0] as unknown as Element))
     await act(async () => sleep(0))
     assert.ok(calls.includes('POST /api/auth/user/organization/set-active'), `choosing another posts the switch: ${calls.join(', ')}`)
@@ -7378,9 +7378,9 @@ test('233k. the upcoming sessions fold the venue and the capacity under the cour
   const folded = (row: Element) => row.querySelector('td:first-child .sm\\:hidden')?.textContent ?? null
   assert.equal(folded(rows[0]!), 'Campus · Capacity: 20', 'the venue and the capacity under the course\'s name')
   assert.equal(folded(rows[1]!), null, 'and nothing where a session has neither')
-  const heads = [...host.querySelectorAll('[data-home-table="sessions"] th')].map((one) => [one.textContent, one.classList.contains('max-sm:hidden')])
+  const heads = [...host.querySelectorAll('[data-home-table="sessions"] th')].map((one) => [one.textContent, one.classList.contains('hidden')])
   assert.deepEqual(heads, [['Course', false], ['Starts at', false], ['Venue', true], ['Capacity', true]], 'the two columns are hidden below sm')
-  assert.deepEqual([...rows[0]!.querySelectorAll('td')].map((one) => one.classList.contains('max-sm:hidden')), [false, false, true, true])
+  assert.deepEqual([...rows[0]!.querySelectorAll('td')].map((one) => one.classList.contains('hidden')), [false, false, true, true])
 })
 
 test('233l. a session\'s Enrollments tab is drawn, and its list read, only for an actor the report lets read enrollments', async () => {
@@ -8242,7 +8242,7 @@ test('audit F04: status tabs scroll within the list instead of widening the page
   assert.match(strip.className, /overflow-x-auto/)
   assert.ok(strip.classList.contains('overflow-y-hidden'), 'the strip scrolls only sideways')
   assert.ok(strip.classList.contains('pb-2'), 'bottom space keeps the active underline inside the scrolling strip')
-  assert.ok(strip.classList.contains('max-sm:h-auto'), 'the strip grows around phone-height triggers and their focus rings')
+  assert.ok(strip.classList.contains('min-h-12'), 'the strip grows around phone-height triggers and their focus rings')
   assert.match(strip.className, /justify-start/)
 })
 
@@ -8657,4 +8657,33 @@ test('permission checkboxes use canGrant for each key', async () => {
   const host = await render(createElement(Permissions, { held: [], onChange: () => {}, options: { statements: {}, canGrant: (keys) => keys.every((key) => key === 'courses.find') } }))
   assert.equal(host.querySelector<HTMLInputElement>('[data-key="courses.find"] input')?.disabled, false)
   assert.equal(host.querySelector<HTMLInputElement>('[data-key="courses.create"] input')?.disabled, true)
+})
+
+
+test('a long Arabic select value exposes its full label before and after a selection', async () => {
+  const long = 'الضريبة الافتراضية للمنشأة'
+  const field = fieldOf({ name: 'tax', kind: 'text', options: [
+    { value: 'default', label: { ar: long } }, { value: 'other', label: { ar: `${long} الأخرى` } },
+  ] })
+  function Pick() {
+    const [value, onChange] = useState<unknown>('default')
+    return createElement(controls.select!, { field, kayan: courses, id: 'tax', t, locale: 'ar', value, values: {}, setValue: () => {}, readOnly: false, onChange })
+  }
+  const host = await render(createElement(Pick))
+  assert.equal(host.querySelector('[data-slot=select-value]')?.getAttribute('title'), long)
+  await act(async () => click(host.querySelector('[data-slot=select-trigger]')!))
+  await act(async () => click([...window.document.querySelectorAll('[data-slot=select-item]')].find((node) => node.textContent === `${long} الأخرى`)! as unknown as Element))
+  assert.equal(host.querySelector('[data-slot=select-value]')?.getAttribute('title'), `${long} الأخرى`)
+})
+
+
+test('a long Arabic combobox exposes the complete input value', async () => {
+  const long = 'الضريبة الافتراضية للمنشأة'
+  const host = await render(createElement(controls.combobox!, {
+    field: fieldOf({ name: 'tax', kind: 'text', options: [{ value: 'default', label: { ar: long } }] }),
+    kayan: courses, id: 'tax', t, locale: 'ar', value: 'default', values: {}, setValue: () => {}, readOnly: false, onChange: () => {},
+  }))
+  const input = host.querySelector('[role=combobox]') as HTMLInputElement
+  assert.equal(input.value, long)
+  assert.equal(input.title, long)
 })

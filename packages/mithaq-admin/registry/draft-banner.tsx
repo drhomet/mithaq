@@ -62,7 +62,7 @@ export function DraftBanner({
                 {t('version.aboutToRevertToPublished', 'You are about to revert this document\'s changes to its published state. Are you sure?')}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="max-sm:[&_button]:h-11">
+            <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
               <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
               <AlertDialogAction variant="destructive" data-button="confirm-discard-draft" disabled={busy} onClick={onRestore}>
                 {t('admin.discard', 'Discard changes')}

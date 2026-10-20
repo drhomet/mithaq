@@ -133,7 +133,7 @@ export function FormActions({
   const breadcrumb = use(PageBreadcrumb)
   const actionTarget = use(PageActionTarget)
   const size = header ? 'sm' : 'default'
-  const tall = header ? 'max-sm:h-11' : ''
+  const tall = header ? 'min-h-11 sm:min-h-0' : ''
   const actions = (
     <>
       {status && !header ? (
@@ -142,7 +142,7 @@ export function FormActions({
         </span>
       ) : null}
       {/* Below xl it leaves the header for the top of the form (`chrome`). */}
-      {views ? <ViewSwitch className={header ? 'max-xl:hidden' : ''} {...views} t={t} /> : null}
+      {views ? <ViewSwitch className={header ? 'hidden xl:flex' : ''} {...views} t={t} /> : null}
       {autosaved ? (
         <span
           role="status"
@@ -157,7 +157,7 @@ export function FormActions({
       ) : null}
       {/* Read off the browser's clock, so it can differ from the server's render. */}
       {header && updated && !Number.isNaN(updated.getTime()) ? (
-        <span data-updated="" className="text-muted-foreground text-sm max-xl:hidden" suppressHydrationWarning>
+        <span data-updated="" className="text-muted-foreground text-sm hidden xl:inline" suppressHydrationWarning>
           <UpdatedAgo at={updated} t={t} locale={locale} />
         </span>
       ) : null}
@@ -205,7 +205,7 @@ export function FormActions({
   // Below sm the header keeps the trigger, title and pill, and the rest moves to a bar fixed to the bottom of the
   // screen; from sm up the bar is `contents`. Inside a sheet or dialog the row sticks to the popup's foot instead.
   return (
-    <div className="ms-auto flex min-w-min items-center justify-end gap-2 sm:flex-wrap max-sm:in-[[role=dialog]]:bg-background max-sm:in-[[role=dialog]]:sticky max-sm:in-[[role=dialog]]:bottom-0 max-sm:in-[[role=dialog]]:z-20 max-sm:in-[[role=dialog]]:order-last max-sm:in-[[role=dialog]]:w-full max-sm:in-[[role=dialog]]:border-t">
+    <div className="ms-auto flex min-w-min items-center justify-end gap-2 sm:flex-wrap in-[[role=dialog]]:bg-background in-[[role=dialog]]:sticky in-[[role=dialog]]:bottom-0 in-[[role=dialog]]:z-20 in-[[role=dialog]]:order-last in-[[role=dialog]]:w-full in-[[role=dialog]]:border-t sm:in-[[role=dialog]]:bg-transparent sm:in-[[role=dialog]]:static sm:in-[[role=dialog]]:z-auto sm:in-[[role=dialog]]:order-none sm:in-[[role=dialog]]:w-auto sm:in-[[role=dialog]]:border-t-0">
       {/* Coloured by status and always carrying its word, never the colour alone. The row shrinks no further
           than the narrowest it can be drawn, so the title beside it wraps rather than sitting under it. */}
       {status ? (
@@ -216,7 +216,7 @@ export function FormActions({
       <div
         data-action-bar=""
         ref={measureBar}
-        className="max-sm:bg-background max-sm:fixed max-sm:in-[[role=dialog]]:static max-sm:in-[[role=dialog]]:flex-1 max-sm:in-[[role=dialog]]:border-t-0 max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:justify-end max-sm:gap-2 max-sm:border-t max-sm:px-4 max-sm:pt-2 max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:contents"
+        className="bg-background fixed in-[[role=dialog]]:static in-[[role=dialog]]:flex-1 in-[[role=dialog]]:border-t-0 inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-end gap-2 border-t px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:contents"
       >
         {actions}
         {actionTarget ? <span ref={actionTarget} className="contents" /> : null}

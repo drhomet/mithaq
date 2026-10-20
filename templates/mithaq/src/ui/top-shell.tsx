@@ -37,7 +37,7 @@ function Top({ regions, backoffice }: ShellProps<readonly ['header', 'nav', 'mai
   const home = use(ScreenContext)?.path === screen.path
   return (
     <SidebarProvider data-shell="top" style={frame} className="flex-col">
-      <nav data-region="nav" aria-label={t('admin.mainNavigation', 'Main navigation')} className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-x-4 gap-y-1 px-6 pt-4 text-sm [&_a]:text-muted-foreground [&_a:hover]:text-foreground [&_a[aria-current=page]]:font-semibold [&_a[aria-current=page]]:text-foreground [&_ul]:flex [&_ul]:flex-row [&_ul]:flex-wrap [&_ul]:gap-x-4 [&_ul]:gap-y-1 max-sm:[&_a]:inline-flex max-sm:[&_a]:min-h-11 max-sm:[&_a]:min-w-11 max-sm:[&_a]:items-center max-sm:[&_a]:justify-center">
+      <nav data-region="nav" aria-label={t('admin.mainNavigation', 'Main navigation')} className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-x-4 gap-y-1 px-6 pt-4 text-sm [&_a]:text-muted-foreground [&_a:hover]:text-foreground [&_a[aria-current=page]]:font-semibold [&_a[aria-current=page]]:text-foreground [&_ul]:flex [&_ul]:flex-row [&_ul]:flex-wrap [&_ul]:gap-x-4 [&_ul]:gap-y-1 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:min-w-11 [&_a]:items-center [&_a]:justify-center sm:[&_a]:inline sm:[&_a]:min-h-0 sm:[&_a]:min-w-0">
         <a href={screen.path} aria-current={home ? 'page' : undefined}>{t('portal.home', 'Home')}</a>
         {regions.nav}
       </nav>

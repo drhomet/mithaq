@@ -135,7 +135,7 @@ export const ariaRequired = (field: Pick<ControlProps['field'], 'rules'>): true 
 /**
  * The input group classes that make a combobox's box and its addon buttons 44 pixels on a phone, because the shadcn primitive sizes them at 36 and 24.
  */
-export const comboboxPhone = 'max-sm:h-11 max-sm:[&_[data-slot=input-group-addon]]:py-0 max-sm:[&_[data-slot=input-group-button]]:size-11 max-sm:[&_[data-slot=combobox-clear]]:size-11 max-sm:[&_[data-slot=input-group-control]]:h-11'
+export const comboboxPhone = 'min-h-11 sm:min-h-0 [&_[data-slot=input-group-addon]]:py-0 sm:[&_[data-slot=input-group-addon]]:py-2 [&_[data-slot=input-group-button]]:min-h-11 [&_[data-slot=input-group-button]]:min-w-11 sm:[&_[data-slot=input-group-button]]:min-h-0 sm:[&_[data-slot=input-group-button]]:min-w-0 [&_[data-slot=combobox-clear]]:min-h-11 [&_[data-slot=combobox-clear]]:min-w-11 sm:[&_[data-slot=combobox-clear]]:min-h-0 sm:[&_[data-slot=combobox-clear]]:min-w-0 [&_[data-slot=input-group-control]]:min-h-11 sm:[&_[data-slot=input-group-control]]:min-h-0'
 
 /**
  * The one size every checkbox of a screen is drawn at, so a box in a list, a form and the column picker match.

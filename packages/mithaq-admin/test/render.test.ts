@@ -2097,3 +2097,39 @@ test('shared record tabs leave padding and overflow to their host', async () => 
   const strip = html.match(/<div[^>]*data-tab-strip=""[^>]*>/)![0]
   assert.doesNotMatch(strip, /data-\[variant=line\]:pb-2|overflow-x-auto|overflow-y-hidden/)
 })
+
+
+test('phone record actions have a fixed base layout and widen into the header', async () => {
+  const { FormActions } = await import('../registry/form-actions.tsx')
+  const html = renderToStaticMarkup(createElement(FormActions, {
+    header: true, t: copy.t, locale: 'en', busy: false, dirty: true,
+    updating: false, viewing: false, drafts: false, formId: 'phone-form',
+    onAsk: () => {}, onSaveDraft: () => {},
+  }))
+  const bar = /data-action-bar="" class="([^"]+)"/.exec(html)?.[1]?.split(' ')
+  assert.ok(bar?.includes('fixed'), 'the phone action bar is the base layout')
+  assert.ok(bar?.includes('sm:contents'), 'the wider header owns its actions')
+})
+
+
+test('backoffice buttons start with a phone target and keep the host desktop size', async () => {
+  const { Button } = await import('../../../apps/asas-backoffice/src/components/ui/button.tsx')
+  const html = renderToStaticMarkup(createElement(Button, {}, 'Sign in'))
+  const classes = /class="([^"]+)"/.exec(html)![1]!.split(' ')
+  assert.ok(classes.includes('min-h-11'))
+  assert.ok(classes.includes('h-10'))
+  assert.ok(classes.includes('sm:min-h-0'))
+  assert.ok(classes.includes('rounded-none'), 'the backoffice keeps its own design')
+})
+
+
+test('phone radio options give their wrapping label a full touch target', async () => {
+  const { RadioControl } = await import('../registry/choice-control.tsx')
+  const html = renderToStaticMarkup(createElement(RadioControl, {
+    id: 'delivery', field: fieldOf({ name: 'delivery', kind: 'text', options: [{ value: 'live', label: { en: 'Live' } }] }),
+    kayan: courses, value: 'live', values: {}, setValue: () => {}, onChange: () => {}, readOnly: false, t: copy.t, locale: 'en',
+  }))
+  const label = /<label[^>]+class="([^"]+)"/.exec(html)![1]!.split(' ')
+  assert.ok(label.includes('min-h-11'))
+  assert.ok(label.includes('sm:min-h-0'))
+})

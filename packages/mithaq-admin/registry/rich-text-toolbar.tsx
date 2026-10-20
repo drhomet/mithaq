@@ -32,7 +32,7 @@ function LinkButton({ t, setLinkEditMode }: { t: Translate; setLinkEditMode: (ed
   })
   const name = isLink ? (t('admin.richText.removeLink', 'Remove link') ?? 'Remove link') : (t('admin.richText.addLink', 'Add link') ?? 'Add link')
   return (
-    <Toggle variant="outline" size="sm" className="max-sm:h-11 max-sm:min-w-11" title={name} aria-label={name} pressed={isLink} onPressedChange={() => {
+    <Toggle variant="outline" size="sm" className="min-h-11 sm:min-h-0 min-w-11 sm:min-w-0" title={name} aria-label={name} pressed={isLink} onPressedChange={() => {
       setLinkEditMode(!isLink)
       // `LinkPlugin`'s own check refuses the placeholder, so it is made past it; `dropPlaceholders` removes it once the link editor is no longer open on it.
       if (isLink) editor.dispatchCommand(TOGGLE_LINK_COMMAND, null)
@@ -68,17 +68,17 @@ function AlignButtons({ t }: { t: Translate }) {
         {alignments.map(({ format, Icon, label }) => {
           const name = label(t) ?? format
           return (
-            <Toggle key={format} variant="outline" size="sm" className="max-sm:h-11 max-sm:min-w-11" title={name} aria-label={name} pressed={current === format} onPressedChange={() => (setCurrent(format), editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, format))}>
+            <Toggle key={format} variant="outline" size="sm" className="min-h-11 sm:min-h-0 min-w-11 sm:min-w-0" title={name} aria-label={name} pressed={current === format} onPressedChange={() => (setCurrent(format), editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, format))}>
               <Icon className="size-4" />
             </Toggle>
           )
         })}
       </ButtonGroup>
       <ButtonGroup>
-        <Button type="button" variant="outline" size="icon-sm" className="max-sm:size-11" title={outdent} aria-label={outdent} onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND, undefined)}>
+        <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" title={outdent} aria-label={outdent} onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND, undefined)}>
           <IndentDecreaseIcon className="size-4 rtl:-scale-x-100" />
         </Button>
-        <Button type="button" variant="outline" size="icon-sm" className="max-sm:size-11" title={indent} aria-label={indent} onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND, undefined)}>
+        <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" title={indent} aria-label={indent} onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND, undefined)}>
           <IndentIncreaseIcon className="size-4 rtl:-scale-x-100" />
         </Button>
       </ButtonGroup>
@@ -138,7 +138,7 @@ export function ToolbarRow({ t, locale, picks, setLinkEditMode, direction }: { t
   return (
     // Sticky under the page's header, so no ancestor may scroll or clip (the editor box uses overflow-clip). The tint is opaque so scrolling text never shows through.
     // On a phone it is one sideways-scrolling line, with contained width so it does not widen the page.
-    <div ref={bar} role="toolbar" aria-label={t('admin.richText.toolbar', 'Formatting')} aria-orientation="horizontal" onKeyDown={move} className="border-border bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))] sticky top-[var(--header-bar-height,var(--header-height,0px))] z-9 flex flex-wrap items-center gap-1.5 border-b px-2 py-2 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:contain-inline-size max-sm:[&>*]:shrink-0">
+    <div ref={bar} role="toolbar" aria-label={t('admin.richText.toolbar', 'Formatting')} aria-orientation="horizontal" onKeyDown={move} className="border-border bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))] sticky top-[var(--header-bar-height,var(--header-height,0px))] z-9 flex flex-nowrap items-center gap-1.5 overflow-x-auto contain-inline-size border-b px-2 py-2 [&>*]:shrink-0 sm:flex-wrap sm:overflow-x-visible sm:contain-none sm:[&>*]:shrink">
       <HistoryButtons activeEditor={activeEditor} t={t} />
       <BlockDropdown toolbar={{ activeEditor, blockType, setBlockType }} t={t} locale={locale} picks={picks} />
       <FormatButtons t={t} />

@@ -46,7 +46,7 @@ export function Home({ loaderData: counts }: PageProps<Record<string, number | u
                     value={counted === undefined ? '—' : new Intl.NumberFormat(locale).format(counted)}
                     // Underlined, with an arrow that follows the reading direction, so it reads as a link.
                     footer={
-                      <a href={`${screen.path}${entry.path}`} className="text-foreground inline-flex items-center gap-1 underline underline-offset-4 max-sm:min-h-11">
+                      <a href={`${screen.path}${entry.path}`} className="text-foreground inline-flex items-center gap-1 underline underline-offset-4 min-h-11 sm:min-h-0">
                         {t('portal.open', 'Open the list')}
                         <ArrowRight className="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
                       </a>

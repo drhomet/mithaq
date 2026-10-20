@@ -40,7 +40,7 @@ type Action = 'set-role' | 'ban' | 'unban' | 'impersonate'
 
 /** What a native choice looks like beside the underline `Input`: no box, no corners, the line under it. */
 const choiceClass =
-  'h-10 w-full rounded-none border border-transparent border-b-input bg-transparent px-0 text-sm outline-none focus-visible:border-b-ring [&>option]:bg-popover [&>option]:text-popover-foreground'
+  'h-11 sm:h-10 w-full rounded-none border border-transparent border-b-input bg-transparent px-0 text-sm outline-none focus-visible:border-b-ring [&>option]:bg-popover [&>option]:text-popover-foreground'
 
 const refusalsByCode: Record<string, [key: string, fallback: string]> = {
   BANNED_USER: ['backoffice.refusedBanned', 'This person is banned, so they cannot be impersonated.'],
@@ -202,7 +202,7 @@ function PersonDialog({ row, action, onClose }: { row: Row; action: Action; onCl
             {refusal}
           </p>
         ) : null}
-        <AlertDialogFooter className="max-sm:[&_button]:h-11">
+        <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
           <AlertDialogCancel data-button="close">{t('admin.cancel', 'Cancel')}</AlertDialogCancel>
           <AlertDialogAction
             data-button="confirm"

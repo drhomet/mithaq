@@ -792,6 +792,8 @@ table is `templates/mithaq/src/roles/tenant-access.ts` `tenantAccess`.
 
 ## Screens
 
+Mobile first: every screen is designed for the phone (390px) first and widened with min-width breakpoints (sm:, md:, lg:); max-* overrides only where no min-width form exists, each with a comment saying why.
+
 A screen is a target of capability `screen`: one admin app's pages over the
 kayan it lists. It names its path, its kayan, the control and cell that draw
 each kind (`screenKinds` and the project's own), its providers, its own pages,

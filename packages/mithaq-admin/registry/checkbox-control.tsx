@@ -29,7 +29,7 @@ export function SwitchControl(props: ControlProps): ReactElement {
 }
 
 export function ToggleControl(props: ControlProps): ReactElement {
-  return <Toggle id={props.id} variant="outline" pressed={props.value === true} onPressedChange={(pressed) => changeOf(props)(pressed)} disabled={props.readOnly} aria-describedby={props.describedBy}>
+  return <Toggle className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" id={props.id} variant="outline" pressed={props.value === true} onPressedChange={(pressed) => changeOf(props)(pressed)} disabled={props.readOnly} aria-describedby={props.describedBy}>
     {labelFor({ kayan: props.kayan, field: props.field, copy: { t: props.t, locale: props.locale ?? '' } })}
   </Toggle>
 }

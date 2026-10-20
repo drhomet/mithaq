@@ -68,10 +68,10 @@ export function Columns({ columns, kayan, locale, onChange, t }: ColumnsProps): 
               </Label>
             </span>
             <span className="flex gap-1">
-              <Button type="button" variant="outline" size="icon-xs" className="max-sm:size-11" disabled={neighbour({ columns, at, by: -1 }) < 0} onClick={() => onChange(move({ columns, at, by: -1 }))} aria-label={`${t('columns.up', 'Move up') ?? 'Move up'}: ${nameOf(column.name)}`}>
+              <Button type="button" variant="outline" size="icon-xs" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" disabled={neighbour({ columns, at, by: -1 }) < 0} onClick={() => onChange(move({ columns, at, by: -1 }))} aria-label={`${t('columns.up', 'Move up') ?? 'Move up'}: ${nameOf(column.name)}`}>
                 ↑
               </Button>
-              <Button type="button" variant="outline" size="icon-xs" className="max-sm:size-11" disabled={neighbour({ columns, at, by: 1 }) < 0} onClick={() => onChange(move({ columns, at, by: 1 }))} aria-label={`${t('columns.down', 'Move down') ?? 'Move down'}: ${nameOf(column.name)}`}>
+              <Button type="button" variant="outline" size="icon-xs" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" disabled={neighbour({ columns, at, by: 1 }) < 0} onClick={() => onChange(move({ columns, at, by: 1 }))} aria-label={`${t('columns.down', 'Move down') ?? 'Move down'}: ${nameOf(column.name)}`}>
                 ↓
               </Button>
             </span>
@@ -85,7 +85,7 @@ export function Columns({ columns, kayan, locale, onChange, t }: ColumnsProps): 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
-          <Button type="button" variant="outline" size="sm" className="max-sm:h-11">
+          <Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-0">
             <LayoutColumns />
             <span className="hidden lg:inline">{t('columns.customize', 'Customize Columns') ?? 'Customize Columns'}</span>
             <span className="lg:hidden">{t('columns.title', 'Columns') ?? 'Columns'}</span>

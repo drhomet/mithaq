@@ -54,7 +54,7 @@ export function DeleteButton({
       {given === undefined ? (
         <AlertDialogTrigger
           render={
-            <Button type="button" variant="destructive" className="max-sm:h-11" data-button="delete" disabled={busy}>
+            <Button type="button" variant="destructive" className="min-h-11 sm:min-h-0" data-button="delete" disabled={busy}>
               {label}
             </Button>
           }
@@ -72,7 +72,7 @@ export function DeleteButton({
             {deleteRefusal({ refused, copy })}
           </p>
         )}
-        <AlertDialogFooter className="max-sm:[&_button]:h-11">
+        <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
           <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"

@@ -326,7 +326,7 @@ export function Activity(_: ComponentProps) {
           <div className="grid gap-4">
             <ActivityEntries entries={entries} kayan={kayan} titles={titles} t={t} locale={locale} viewer={viewer} people={people} />
             {shown.more && all ? (
-              <a data-all-activity href={all} className="text-foreground text-sm underline underline-offset-4 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
+              <a data-all-activity href={all} className="text-foreground text-sm underline underline-offset-4 inline-flex sm:inline min-h-11 sm:min-h-0 items-center sm:items-start">
                 {t('auditLog.all', 'All activity')}
               </a>
             ) : null}
@@ -351,7 +351,7 @@ function Labelled({ id, label, children }: { id: string; label: string; children
 function Choice({ id, value, options, any, onChange }: { id: string; value: string | undefined; options: readonly { value: string; label: string }[]; any: string; onChange: (value: string | undefined) => void }) {
   return (
     <Select value={value ?? ''} onValueChange={(next: string | null) => onChange(next || undefined)}>
-      <SelectTrigger id={id} className="w-full max-sm:data-[size=default]:h-11">
+      <SelectTrigger id={id} className="w-full data-[size=default]:min-h-11 sm:data-[size=default]:min-h-0">
         <SelectValue>{options.find((one) => one.value === value)?.label ?? any}</SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -487,7 +487,7 @@ export function ActivityLog({ kayan: fixed, record, query, onQuery, refresh = 0 
         {filtered ? (
           <div className="flex flex-wrap items-center gap-2">
             {!fixed && query.record ? <p className="text-muted-foreground text-sm">{t('auditLog.oneRecord', 'One record\'s activity.')}</p> : null}
-            <Button type="button" variant="outline" size="sm" className="max-sm:h-11" onClick={() => onQuery({ page: 1, limit: query.limit })}>
+            <Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-0" onClick={() => onQuery({ page: 1, limit: query.limit })}>
               {t('auditLog.clear', 'Clear filters')}
             </Button>
           </div>

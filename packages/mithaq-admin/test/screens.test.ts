@@ -725,10 +725,10 @@ test('216a. a sheet or a dialog opens on the first field of its own form, and on
   inner.remove()
 })
 
-test('216b. only the list\'s boxes grow to a 44 pixel target, and only on a phone, so a checkbox group\'s options 28 pixels apart never take a press meant for the one above', async () => {
+test('216b. list checkboxes have a 44 pixel phone hit layer while checkbox groups use their labels', async () => {
   const { SelectAll } = await import('../registry/list-selection.tsx')
   const head = renderToStaticMarkup(createElement(SelectAll, { ids: ['a'], selected: new Set<string>(), onSelect: () => {}, t }))
-  assert.equal(head.includes('after:-inset-x-3.5') && head.includes('max-sm:after:-inset-y-3.5'), true, `the list's box is 44 wide, and 44 tall on a phone:\n${head}`)
+  assert.equal(head.includes('after:-inset-x-3.5') && head.includes('after:-inset-y-3.5'), true, `the list's box is 44 wide, and 44 tall on a phone:\n${head}`)
   const group = await render(createElement(controls.checkboxGroup!, {
     field: { name: 'tags', kind: 'textArray', rules: {}, options: [{ value: 'a', label: { en: 'A', ar: 'أ' } }, { value: 'b', label: { en: 'B', ar: 'ب' } }] } as never,
     kayan: courses, id: 'tags', t, locale: 'en', value: [], values: {}, setValue: () => {}, readOnly: false, onChange: () => {},

@@ -24,7 +24,7 @@ const edge = 'shadow-[-10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%
 const edgeHead = 'shadow-[inset_0_-1px_0_var(--border),-10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)]! rtl:shadow-[inset_0_-1px_0_var(--border),10px_0_10px_-6px_color-mix(in_oklab,var(--foreground)_35%,transparent)]!'
 // Exactly a touch target wide, so the first column pins right after it; on a phone as tall, so the box's 44 pixel layer
 // stays inside its own row.
-const selection = 'w-11 min-w-11 p-0 max-sm:h-11 [&>*]:mx-auto [&>[role=checkbox]]:translate-y-0'
+const selection = 'w-11 min-w-11 p-0 h-11 sm:h-auto [&>*]:mx-auto [&>[role=checkbox]]:translate-y-0'
 
 const nextSort = (name: string, sort: string | undefined) =>
   sort === name ? `-${name}` : sort === `-${name}` ? undefined : name
@@ -133,7 +133,7 @@ export function ListTable({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="-ms-2 h-8 px-2 max-sm:h-11 max-sm:min-w-11"
+                        className="-ms-2 h-8 px-2 min-h-11 sm:min-h-0 min-w-11 sm:min-w-0"
                         onClick={() => onSort(nextSort(field.name, urlSort))}
                       >
                         {labelFor({ kayan, field, copy })}

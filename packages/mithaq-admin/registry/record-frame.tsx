@@ -11,7 +11,7 @@ import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/she
  */
 export function CloseButton({ Close, label }: { Close: typeof SheetClose | typeof DialogClose; label: string }): ReactElement {
   return (
-    <Close render={<Button variant="ghost" size="icon-sm" className="absolute top-4 end-4 max-sm:top-2 max-sm:end-2 max-sm:size-11" />}>
+    <Close render={<Button variant="ghost" size="icon-sm" className="absolute top-2 end-2 sm:top-4 sm:end-4 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" />}>
       <XIcon aria-hidden="true" />
       <span className="sr-only">{label}</span>
     </Close>
@@ -99,10 +99,10 @@ export function DocumentDrawer({ children, closeLabel, edit, onClose, title, tit
         initialFocus={initialFocusIn(popup)}
         data-document-drawer=""
         data-mithaq-inline-edit={edit}
-        className="w-[calc(100%-2rem)] gap-0 data-[side=left]:w-[calc(100%-2rem)] data-[side=right]:w-[calc(100%-2rem)] data-[side=left]:sm:max-w-none data-[side=right]:sm:max-w-none max-sm:data-[side=left]:w-full max-sm:data-[side=right]:w-full"
+        className="w-full gap-0 data-[side=left]:w-full data-[side=right]:w-full sm:w-[calc(100%-2rem)] sm:data-[side=left]:w-[calc(100%-2rem)] sm:data-[side=right]:w-[calc(100%-2rem)] sm:data-[side=left]:max-w-none sm:data-[side=right]:max-w-none"
       >
         <header className="flex items-center gap-2 border-b px-4 py-3">
-          <SheetClose render={<Button variant="ghost" size="icon-sm" className="max-sm:size-11" />}>
+          <SheetClose render={<Button variant="ghost" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" />}>
             <XIcon aria-hidden="true" />
             <span className="sr-only">{closeLabel}</span>
           </SheetClose>
@@ -140,7 +140,7 @@ export function RecordFrame({
   const frame =
     // The title is for a screen reader alone, as the page draws its own title node inside. The close
     // button is this file's own, as the primitive's is named in English.
-    mode === 'sheet' ? <Sheet open onOpenChange={change}><SheetContent ref={popup} showCloseButton={false} initialFocus={initialFocusIn(popup)} className="gap-4 overflow-y-auto p-4 data-[side=left]:max-sm:w-full data-[side=right]:max-sm:w-full"><SheetTitle className="sr-only">{title}</SheetTitle>{children}<CloseButton Close={SheetClose} label={closeLabel} /></SheetContent></Sheet>
+    mode === 'sheet' ? <Sheet open onOpenChange={change}><SheetContent ref={popup} showCloseButton={false} initialFocus={initialFocusIn(popup)} className="gap-4 overflow-y-auto p-4 data-[side=left]:w-full data-[side=right]:w-full sm:data-[side=left]:w-3/4 sm:data-[side=right]:w-3/4"><SheetTitle className="sr-only">{title}</SheetTitle>{children}<CloseButton Close={SheetClose} label={closeLabel} /></SheetContent></Sheet>
     : mode === 'drawer' ? <DocumentDrawer title={title} titled={false} closeLabel={closeLabel} onClose={onClose}>{children}</DocumentDrawer>
     : <Dialog open onOpenChange={change}><DialogContent ref={popup} showCloseButton={false} initialFocus={initialFocusIn(popup)}><DialogTitle className="sr-only">{title}</DialogTitle>{children}<CloseButton Close={DialogClose} label={closeLabel} /></DialogContent></Dialog>
   // A server render draws nothing of the popup, which is a portal, so the mode is said here.

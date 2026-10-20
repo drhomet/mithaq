@@ -104,7 +104,7 @@ export function OperationButton({
       {controlled.open === undefined ? (
         <AlertDialogTrigger
           render={
-            <Button type="button" variant="outline" className="max-sm:h-11" disabled={busy}>
+            <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" disabled={busy}>
               {label}
             </Button>
           }
@@ -171,7 +171,7 @@ export function OperationButton({
             )
           })}
           </div>
-          <AlertDialogFooter className="shrink-0 max-sm:[&_button]:h-11">
+          <AlertDialogFooter className="shrink-0 [&_button]:min-h-11 sm:[&_button]:min-h-0">
             <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
             <AlertDialogAction type="submit" disabled={busy}>
               {label}

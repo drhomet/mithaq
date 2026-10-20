@@ -42,7 +42,7 @@ export function DiscardDialog({
             {[t('admin.discardWarning', 'You have unsaved changes. Leave without saving?') ?? 'You have unsaved changes. Leave without saving?', note].filter(Boolean).join(' ')}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter className="max-sm:[&_button]:h-11">
+        <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
           <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" disabled={busy} onClick={onDiscard}>
             {t('admin.discard', 'Discard changes') ?? 'Discard changes'}

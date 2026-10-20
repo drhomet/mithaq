@@ -19,7 +19,7 @@ export function BackofficeRecordPage(props: LayoutProps<readonly ['main', 'side'
   return (
     <div className="grid gap-4">
       {list ? (
-        <a href={`${screen.path}${list.path}`} data-back="" className="inline-flex w-fit items-center gap-1.5 text-sm underline underline-offset-4 max-sm:min-h-11">
+        <a href={`${screen.path}${list.path}`} data-back="" className="inline-flex w-fit items-center gap-1.5 text-sm underline underline-offset-4 min-h-11 sm:min-h-0">
           <ArrowLeft className="size-4 rtl:-scale-x-100" aria-hidden="true" />
           <span>{navLabel({ entry: list, screen, locale, t })}</span>
         </a>

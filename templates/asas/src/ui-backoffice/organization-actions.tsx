@@ -61,7 +61,7 @@ export function OrganizationActions({ value, row }: CellProps) {
       {/* An identifier, read left to right in either locale. */}
       <span dir="ltr">{String(value ?? '')}</span>
       {renames ? (
-        <Button size="sm" variant="outline" className="max-sm:h-11" data-action="rename" onClick={() => setOpen(true)}>
+        <Button size="sm" variant="outline" className="min-h-11 sm:min-h-0" data-action="rename" onClick={() => setOpen(true)}>
           {t('backoffice.rename', 'Rename')}
         </Button>
       ) : null}
@@ -69,7 +69,7 @@ export function OrganizationActions({ value, row }: CellProps) {
         <Button
           size="sm"
           variant="outline"
-          className="max-sm:h-11"
+          className="min-h-11 sm:min-h-0"
           data-action="members"
           nativeButton={false}
           render={<a href={`${screen.path}${screen.kayan.member!.pages.list!.path}?${new URLSearchParams(writeQuery({ where: { or: [{ and: [{ organizationId: { equals: id } }] }] } }))}`} />}

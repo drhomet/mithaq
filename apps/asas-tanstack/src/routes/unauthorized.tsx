@@ -88,7 +88,7 @@ function Unauthorized() {
           <div className="grid gap-2">
             {screens.map((screen) => (
               // An anchor: the path is the screen's own data, not a route the router knows.
-              <Button key={screen.name} nativeButton={false} className="max-sm:h-11" render={<a href={screen.path} />}>
+              <Button key={screen.name} nativeButton={false} className="min-h-11 sm:min-h-0" render={<a href={screen.path} />}>
                 {screenName(screen.name)}
               </Button>
             ))}
@@ -123,7 +123,7 @@ function Unauthorized() {
         {failed ? <p role="alert" className="text-destructive text-sm">{failed}</p> : null}
         {/* `replace`, so Back does not return to the page signed out of. */}
         {impersonating ? null : (
-          <Button type="button" variant="outline" className="max-sm:h-11" onClick={() => void authArm('sign-out').then(() => window.location.replace('/auth/sign-in'))}>
+          <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => void authArm('sign-out').then(() => window.location.replace('/auth/sign-in'))}>
             {t('admin.signOut', 'Sign out')}
           </Button>
         )}
@@ -131,4 +131,4 @@ function Unauthorized() {
     </AuthFrame>
   )
 }
-// mithaq-admin 0.0.0 81d25978cdacbb38254854b0f64b738946ee27baca06a952aed51d35e6fb10af
+// mithaq-admin 0.0.0 2396066093ea60dbffa196bc2af7522f8a18d83246c96825804bbb7b2a50674f

@@ -60,7 +60,7 @@ export function Home({ loaderData: counts }: PageProps<Record<string, number | u
                     icon={icon}
                     title={navLabel({ entry, screen, locale, t })}
                     value={counted === undefined ? '—' : new Intl.NumberFormat(locale).format(counted)}
-                    footer={<a href={`${screen.path}${entry.path}`} className="text-foreground inline-flex items-center hover:underline max-sm:min-h-11">{t('portal.open', 'Open the list')}</a>}
+                    footer={<a href={`${screen.path}${entry.path}`} className="text-foreground inline-flex items-center hover:underline min-h-11 sm:min-h-0">{t('portal.open', 'Open the list')}</a>}
                   />
                 ) : null
               })}

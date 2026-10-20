@@ -335,9 +335,9 @@ test('232a. ticking a row on a phone draws the bulk bar fixed to the bottom, the
     run: async (_operation: string, input: Record<string, unknown>) => (calls.push(input), {}),
   }))
   const bar = () => host.querySelector('[data-mithaq-bulk-bar]')!.className
-  assert.equal(bar().includes('max-sm:fixed'), false, 'nothing ticked takes no room')
+  assert.equal(bar().includes('fixed'), false, 'nothing ticked takes no room')
   await act(async () => click(host.querySelector('[role="checkbox"]')!))
-  assert.equal(bar().includes('max-sm:fixed') && bar().includes('max-sm:bottom-[var(--action-bar-height,0px)]'), true, 'a tick draws the bar over the bottom of a phone, on the form\'s own bar where there is one, not in the toolbar above the table')
+  assert.equal(bar().includes('fixed') && bar().includes('bottom-[var(--action-bar-height,0px)]'), true, 'a tick draws the bar over the bottom of a phone, on the form\'s own bar where there is one, not in the toolbar above the table')
   const media = (globalThis as { matchMedia?: unknown }).matchMedia
   ;(globalThis as { matchMedia?: unknown }).matchMedia = (query: string) => ({ matches: query === '(pointer: coarse)' })
   try {
@@ -362,7 +362,7 @@ test('232a. ticking a row on a phone draws the bulk bar fixed to the bottom, the
   assert.equal(said?.getAttribute('aria-live'), 'polite', 'in the count\'s own live region')
   const region = host.querySelector('[data-mithaq-bulk-bar]')!
   assert.deepEqual([region.getAttribute('role'), region.getAttribute('aria-label')], ['region', 'Ticked rows'], 'inside a bar named for what it holds')
-  assert.equal(bar().includes('max-sm:flex-nowrap') && bar().includes('max-sm:overflow-x-auto'), true, 'one row that scrolls sideways, so the room kept for it is its height')
+  assert.equal(bar().includes('flex-nowrap') && bar().includes('overflow-x-auto'), true, 'one row that scrolls sideways, so the room kept for it is its height')
   await act(async () => click(host.querySelector('[role="checkbox"]')!))
   assert.equal(host.querySelector('[data-mithaq-done]'), null, 'and a new tick takes the result away at once')
 })

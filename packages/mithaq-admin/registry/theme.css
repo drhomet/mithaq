@@ -41,12 +41,17 @@
   [data-slot='card'] {
     border-radius: 0.75rem;
   }
-  @media (max-width: 639px) {
-    [data-slot='sidebar-inset'] {
-      margin: 0;
-      border: 0;
-      border-radius: 0;
-      box-shadow: none;
+  [data-slot='sidebar-inset'] {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    /* Each host's inset utilities supply its desktop frame. */
+    @media (min-width: 640px) {
+      margin: revert-layer;
+      border: revert-layer;
+      border-radius: revert-layer;
+      box-shadow: revert-layer;
     }
   }
   /* Search icons sit at the reading start in both directions. */
@@ -109,9 +114,11 @@
     background: currentColor;
     opacity: 1;
   }
-  @media (max-width: 639px) {
-    [data-tab-strip] { height: auto; min-height: 3rem; }
-    [data-tab-strip] > [role='tab'] { min-height: 2.75rem; }
+  [data-tab-strip] { height: auto; min-height: 3rem; }
+  [data-tab-strip] > [role='tab'] { min-height: 2.75rem; }
+  @media (min-width: 640px) {
+    [data-tab-strip] { height: revert-layer; min-height: revert-layer; }
+    [data-tab-strip] > [role='tab'] { min-height: revert-layer; }
   }
 }
 
@@ -124,13 +131,14 @@
       font-size: 0.875rem;
       font-weight: 500;
     }
-    [data-slot='input'], [data-slot='input-group'], [data-slot='select-trigger'] {
-      min-height: 2.25rem;
+    [data-slot='input'], [data-slot='input-group'], [data-slot='select-trigger'], [data-slot='button'] {
+      min-height: 2.75rem;
     }
-    @media (max-width: 639px) {
-      [data-slot='input'], [data-slot='input-group'], [data-slot='select-trigger'], [data-slot='button'] {
-        min-height: 2.75rem;
+    @media (min-width: 640px) {
+      [data-slot='input'], [data-slot='input-group'], [data-slot='select-trigger'] {
+        min-height: 2.25rem;
       }
+      [data-slot='button'] { min-height: revert-layer; }
     }
   }
 }

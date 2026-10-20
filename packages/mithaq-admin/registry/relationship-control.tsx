@@ -25,7 +25,7 @@ import { isForbidden } from 'mithaq-admin/refusal.ts'
  * A chip's remove button is 24 pixels and a phone's finger needs 44: its hit area is widened by an
  * inset over the chip, which the box around it keeps at 22 pixels.
  */
-const chipRemovePhone = 'max-sm:[&_[data-slot=combobox-chip-remove]]:relative max-sm:[&_[data-slot=combobox-chip-remove]]:after:absolute max-sm:[&_[data-slot=combobox-chip-remove]]:after:-inset-[11px]'
+const chipRemovePhone = '[&_[data-slot=combobox-chip-remove]]:relative [&_[data-slot=combobox-chip-remove]]:after:absolute [&_[data-slot=combobox-chip-remove]]:after:-inset-[11px] sm:[&_[data-slot=combobox-chip-remove]]:static sm:[&_[data-slot=combobox-chip-remove]]:after:content-none'
 
 /**
  * What a row of the target is shown as, and what a search runs over. `??` rather than `||` because
@@ -334,7 +334,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
         {options.map((option) => {
           const row = drawRow && rows.find((one) => String(one.id ?? '') === option.value)
           return (
-            <ComboboxItem key={option.value} value={option}>
+            <ComboboxItem className="min-h-11 sm:min-h-0" key={option.value} value={option}>
               {row ? drawRow(row, option.label) : option.label}
             </ComboboxItem>
           )
@@ -365,7 +365,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
     change(many ? [...held, one] : one)
   }
   const plus = adds ? (
-    <Button type="button" variant="outline" size="icon" data-add-new="" className="shrink-0 max-sm:size-11" aria-label={(t('admin.addNew', 'Add new {kind}') ?? 'Add new {kind}').replace('{kind}', () => titleOf({ kayan: target!, copy: { t, locale: locale ?? '' } }))} onClick={() => add!(target!, made)}>
+    <Button type="button" variant="outline" size="icon" data-add-new="" className="shrink-0 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" aria-label={(t('admin.addNew', 'Add new {kind}') ?? 'Add new {kind}').replace('{kind}', () => titleOf({ kayan: target!, copy: { t, locale: locale ?? '' } }))} onClick={() => add!(target!, made)}>
       <Plus aria-hidden="true" />
     </Button>
   ) : null
@@ -376,7 +376,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
   if (many) {
     return beside(
       <Combobox {...root} multiple value={selected} onValueChange={pick}>
-        <ComboboxChips ref={chipsRef} aria-invalid={error ? true : undefined}>
+        <ComboboxChips className="py-0 sm:py-1.5" ref={chipsRef} aria-invalid={error ? true : undefined}>
           {allRefused ? (
             <span className="text-muted-foreground px-1 text-sm">{selected[0]!.label}</span>
           ) : selected.map((one) => (
@@ -385,6 +385,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
             </ComboboxChip>
           ))}
           <ComboboxChipsInput
+            className="min-h-11 sm:min-h-0"
             id={id}
             // A hint is for an empty box: beside a chip it reads as a value nobody chose, so the box keeps
             // its name in `aria-label` and says nothing once a row is held.

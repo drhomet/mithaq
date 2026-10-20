@@ -14,6 +14,7 @@ export function LocaleSwitch({ locale }: { locale: Locale }) {
           type="button"
           variant={entry.active ? 'secondary' : 'ghost'}
           size="xs"
+          className="min-w-11 sm:min-w-0"
           aria-current={entry.active}
           aria-label={entry.label}
           onClick={() => void showLocale({ to: entry.locale, router })}

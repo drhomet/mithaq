@@ -137,7 +137,7 @@ export function MembersCard({ figures, href }: { figures: MembersFigures; href: 
               {figures.held.map((one) => `${number.format(one.count)} ${one.label?.[locale] ?? one.role}`).join(' · ')}
             </span>
           ) : null}
-          <a href={href} className="text-foreground inline-flex items-center hover:underline max-sm:min-h-11">{t('portal.open', 'Open the list')}</a>
+          <a href={href} className="text-foreground inline-flex items-center hover:underline min-h-11 sm:min-h-0">{t('portal.open', 'Open the list')}</a>
         </span>
       }
     />

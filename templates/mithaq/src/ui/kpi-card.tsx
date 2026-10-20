@@ -12,14 +12,14 @@ import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/comp
 export function KpiCard({ kpi, icon, title, value, footer }: { kpi: string; icon: ReactNode; title?: string; value: ReactNode; footer: ReactNode }) {
   return (
     <Card data-kpi={kpi} className="@container/card min-w-0">
-      <CardHeader className="max-sm:px-4">
+      <CardHeader className="px-4 sm:px-6">
         <CardDescription className="flex items-center gap-2 text-sm font-medium">
           <span className="text-muted-foreground inline-flex">{icon}</span>
           <span>{title}</span>
         </CardDescription>
         <CardTitle className="min-w-0 text-base font-semibold tabular-nums wrap-break-word @[220px]/card:text-2xl @[250px]/card:text-3xl">{value}</CardTitle>
       </CardHeader>
-      <CardFooter className="text-muted-foreground pt-2 text-xs max-sm:px-4">{footer}</CardFooter>
+      <CardFooter className="text-muted-foreground pt-2 text-xs px-4 sm:px-6">{footer}</CardFooter>
     </Card>
   )
 }

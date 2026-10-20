@@ -96,7 +96,7 @@ export function AuthFrame({ title, description, children }: { title: string | un
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
         {/* An anchor: `/` is not a router route in an app whose start entry answers its home. */}
-        <a className="text-lg font-semibold" href="/">
+        <a className="text-lg inline-flex min-h-11 items-center font-semibold sm:min-h-0" href="/">
           {t(app, 'Asas')}
         </a>
         <LocaleSwitch locale={locale} />
@@ -147,4 +147,4 @@ export function AuthBox({
     </FieldShell>
   )
 }
-// mithaq-admin 0.0.0 e498423cf4a61adb8cf6358d043d31ae92d853de4c6939a9c0fe138c848b7211
+// mithaq-admin 0.0.0 98e2edd04abc7a45371f17b950d1739232e2c3a0ff77c955f9b73082fca73a06

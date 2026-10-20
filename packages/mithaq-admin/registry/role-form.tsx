@@ -77,7 +77,7 @@ export function Grants({ label, named, held, heading, defaultOpen, children, ...
     )
   }
   const trigger = (
-    <CollapsibleTrigger aria-label={named && `${named}: ${count}`} className="group flex w-full cursor-pointer items-center gap-2 text-start max-sm:min-h-11">
+    <CollapsibleTrigger aria-label={named && `${named}: ${count}`} className="group flex w-full cursor-pointer items-center gap-2 text-start min-h-11 sm:min-h-0">
       <ChevronDown aria-hidden="true" className="text-muted-foreground size-4 shrink-0 transition-transform group-data-[panel-open]:rotate-180" />
       {label}
       <span className="text-muted-foreground text-xs font-normal">{count}</span>
@@ -118,7 +118,7 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
   const toggle = (key: string) => onChange?.(held.includes(key) ? held.filter((one) => one !== key) : [...held, key])
   const choices = (keys: Key[]) => {
     const shown = keys.filter((one) => onChange || held.includes(one.key))
-    if (readOnly) return shown.length ? <div className="flex flex-wrap gap-1.5 max-sm:gap-2">
+    if (readOnly) return shown.length ? <div className="flex flex-wrap gap-2 sm:gap-1.5">
       {shown.map(({ key, label }) => <Badge key={key} variant="outline" data-key={key}>{label}</Badge>)}
     </div> : null
     return shown.length ? (
@@ -153,7 +153,7 @@ export function Permissions({ held, onChange, busy, options }: { held: readonly 
                 {fields}
               </> : fields ? (
                 <details data-field-access={group.name} className="rounded-md border p-3">
-                  <summary className="cursor-pointer text-sm max-sm:min-h-11">{t('dashboard.permissionsFields', 'Fields')}</summary>
+                  <summary className="cursor-pointer text-sm min-h-11 sm:min-h-0">{t('dashboard.permissionsFields', 'Fields')}</summary>
                   <div className="pt-2">{fields}</div>
                 </details>
               ) : null}

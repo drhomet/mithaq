@@ -36,17 +36,17 @@ export function RowMenu({ copy, kayan, label, Menu, menu, onDelete, onOpen, onRu
       <DropdownMenuTrigger
         data-row-menu={String(row.id ?? '')}
         aria-label={label}
-        className={buttonVariants({ variant: 'ghost', size: 'icon-sm', className: 'max-sm:size-11' })}
+        className={buttonVariants({ variant: 'ghost', size: 'icon-sm', className: 'min-h-11 min-w-11 sm:min-h-0 sm:min-w-0' })}
       >
         <MoreHorizontal className="size-4" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
         {opens === 'view' ? (
-          <DropdownMenuItem data-row-action="view" className="max-sm:min-h-11" onClick={onOpen}>
+          <DropdownMenuItem data-row-action="view" className="min-h-11 sm:min-h-0" onClick={onOpen}>
             {t('admin.view', 'View') ?? 'View'}
           </DropdownMenuItem>
         ) : opens === 'edit' ? (
-          <DropdownMenuItem data-row-action="edit" className="max-sm:min-h-11" onClick={onOpen}>
+          <DropdownMenuItem data-row-action="edit" className="min-h-11 sm:min-h-0" onClick={onOpen}>
             {t('admin.edit', 'Edit') ?? 'Edit'}
           </DropdownMenuItem>
         ) : null}
@@ -54,7 +54,7 @@ export function RowMenu({ copy, kayan, label, Menu, menu, onDelete, onOpen, onRu
           <DropdownMenuItem
             key={operation.name}
             data-row-action={operation.name}
-            className="max-sm:min-h-11"
+            className="min-h-11 sm:min-h-0"
             disabled={running}
             onClick={() => onRun(operation)}
           >
@@ -63,7 +63,7 @@ export function RowMenu({ copy, kayan, label, Menu, menu, onDelete, onOpen, onRu
         ))}
         {Menu ? <Menu row={row} open={open} /> : null}
         {onDelete ? (
-          <DropdownMenuItem data-row-action="delete" variant="destructive" className="max-sm:min-h-11" disabled={running} onClick={onDelete}>
+          <DropdownMenuItem data-row-action="delete" variant="destructive" className="min-h-11 sm:min-h-0" disabled={running} onClick={onDelete}>
             {t('admin.delete', 'Delete') ?? 'Delete'}
           </DropdownMenuItem>
         ) : null}

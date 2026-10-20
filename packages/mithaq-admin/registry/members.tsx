@@ -131,7 +131,7 @@ export function AddPerson({ sheet, roles, onInvited, options }: { options: Membe
               <Input id={emailId} type="email" dir="ltr" value={email} autoComplete="off" disabled={busy} onChange={(event) => setEmail(event.target.value)} />
             </FieldShell>
             <FieldShell id={roleId} label={t('dashboard.addPersonRole', 'Role') ?? 'Role'}>
-              <select id={roleId} value={role} disabled={busy} className="border-input bg-background h-9 rounded-md border px-3 max-sm:h-11" onChange={(event) => setRole(event.target.value)}>
+              <select id={roleId} value={role} disabled={busy} className="border-input bg-background h-9 rounded-md border px-3 min-h-11 sm:min-h-0" onChange={(event) => setRole(event.target.value)}>
                 <option value="">{t('dashboard.addPersonNoRole', 'No role yet')}</option>
                 {roles.map((one) => <option key={one.name} value={one.name}>{one.label?.[locale] ?? one.name}</option>)}
               </select>
@@ -140,8 +140,8 @@ export function AddPerson({ sheet, roles, onInvited, options }: { options: Membe
         )}
         {refusal ? <p role="alert" className="text-destructive">{refusal}</p> : null}
         <footer className="flex justify-end gap-2">
-          <Button type="button" variant="outline" className="max-sm:h-11" onClick={() => sheet.current?.close()}>{link ? t('admin.close', 'Close') : t('admin.cancel', 'Cancel')}</Button>
-          {link ? null : <Button type="submit" className="max-sm:h-11" disabled={busy}>{t('dashboard.addPersonSubmit', 'Add')}</Button>}
+          <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => sheet.current?.close()}>{link ? t('admin.close', 'Close') : t('admin.cancel', 'Cancel')}</Button>
+          {link ? null : <Button type="submit" className="min-h-11 sm:min-h-0" disabled={busy}>{t('dashboard.addPersonSubmit', 'Add')}</Button>}
         </footer>
       </form>
     </dialog>
@@ -155,7 +155,7 @@ function HandedLink({ link, said }: { link: string; said: ReactNode }) {
     <div data-handed-link="" className="grid gap-2">
       <p>{said}</p>
       <Input readOnly dir="ltr" value={link} aria-label={t('dashboard.link', 'Link')} onFocus={(event) => event.currentTarget.select()} />
-      <Button type="button" variant="outline" className="max-sm:h-11" onClick={() => void navigator.clipboard.writeText(link).then(() => toast.success(t('dashboard.inviteCopied', 'Link copied') ?? 'Link copied'))}>
+      <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => void navigator.clipboard.writeText(link).then(() => toast.success(t('dashboard.inviteCopied', 'Link copied') ?? 'Link copied'))}>
         {t('dashboard.inviteCopy', 'Copy link')}
       </Button>
     </div>
@@ -232,7 +232,7 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
       // Only the box and the name are dimmed when the box is locked: the sentence saying why and what the role grants
       // stay at their own contrast.
       <div key={role.name} data-role={role.name} data-disabled={disabled} className="grid gap-2 rounded-md border p-3">
-        <label className="flex items-start gap-3">
+        <label className="flex min-h-11 items-start gap-3 sm:min-h-0">
           <Checkbox
             className="mt-0.5"
             checked={owned || chosen.has(role.name)}
@@ -254,7 +254,7 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
           </span>
         </label>
         {holds(access, 'roles.find') && role.permissions ? <details data-role-summary="" open={owned || chosen.has(role.name)} className="ps-7">
-          <summary className="text-muted-foreground cursor-pointer text-sm max-sm:min-h-11">{t('roles.permissions', 'Permissions')}</summary>
+          <summary className="text-muted-foreground cursor-pointer text-sm min-h-11 sm:min-h-0">{t('roles.permissions', 'Permissions')}</summary>
           <div className="pt-2"><Permissions held={role.permissions} /></div>
         </details> : null}
       </div>
@@ -272,12 +272,12 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
   return (
     <AppShell breadcrumb={{ href: back, label: t('dashboard.members', 'Members') ?? 'Members' }} regions={{
       header: <h1>{member.name}</h1>,
-      primary: edits ? <div data-action-bar="" className="flex items-center justify-end gap-2 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:border-t max-sm:bg-background max-sm:px-4 max-sm:pt-2 max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <Button nativeButton={false} variant="outline" size="sm" className="max-sm:h-11" render={<a href={back} />}>{t('admin.cancel', 'Cancel')}</Button>
-        <Button type="submit" form={formId} size="sm" className="max-sm:h-11" disabled={busy || !changed}>{t('admin.save', 'Save')}</Button>
+      primary: edits ? <div data-action-bar="" className="flex items-center justify-end gap-2 fixed inset-x-0 bottom-0 z-20 border-t bg-background px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-t-0 sm:bg-transparent sm:p-0">
+        <Button nativeButton={false} variant="outline" size="sm" className="min-h-11 sm:min-h-0" render={<a href={back} />}>{t('admin.cancel', 'Cancel')}</Button>
+        <Button type="submit" form={formId} size="sm" className="min-h-11 sm:min-h-0" disabled={busy || !changed}>{t('admin.save', 'Save')}</Button>
       </div> : null,
       more: null,
-      main: <div className={`mx-auto grid w-full max-w-3xl gap-4${edits ? ' max-sm:pb-20' : ''}`}>
+      main: <div className={`mx-auto grid w-full max-w-3xl gap-4${edits ? ' pb-20 sm:pb-0' : ''}`}>
         <section data-member-page={member.userId}>
           <form
             id={formId}
@@ -366,7 +366,7 @@ const inviteTable = tableOf('invitations')
 function RowActions({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger data-row-menu={id} aria-label={label} className={buttonVariants({ variant: 'ghost', size: 'icon-sm', className: 'max-sm:size-11' })}>
+      <DropdownMenuTrigger data-row-menu={id} aria-label={label} className={buttonVariants({ variant: 'ghost', size: 'icon-sm', className: 'min-h-11 min-w-11 sm:min-h-0 sm:min-w-0' })}>
         <MoreHorizontal className="size-4" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">{children}</DropdownMenuContent>
@@ -566,7 +566,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
     </p>
   ) : null
   const inviteButton = (primary: boolean) => (
-    <Button type="button" size="sm" variant={primary ? 'default' : 'outline'} className="max-sm:h-11" data-invite="" onClick={() => inviteSheet.current?.showModal()}>
+    <Button type="button" size="sm" variant={primary ? 'default' : 'outline'} className="min-h-11 sm:min-h-0" data-invite="" onClick={() => inviteSheet.current?.showModal()}>
       {t('dashboard.invite', 'Invite')}
     </Button>
   )
@@ -583,16 +583,16 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
               // Add person first, and inviting by a link to copy beside it, for someone who already has an account
               // elsewhere or whom the mail does not reach.
               <ButtonGroup aria-label={t('dashboard.addPerson', 'Add person')}>
-                <Button type="button" size="sm" className="max-sm:h-11" data-add-person="" onClick={() => addSheet.current?.showModal()}>
+                <Button type="button" size="sm" className="min-h-11 sm:min-h-0" data-add-person="" onClick={() => addSheet.current?.showModal()}>
                   {t('dashboard.addPerson', 'Add person')}
                 </Button>
                 {invites ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger data-invite-menu="" aria-label={t('dashboard.inviteByLink', 'Invite by link')} className={buttonVariants({ size: 'sm', className: 'border-s border-s-primary-foreground/30 max-sm:h-11' })}>
+                    <DropdownMenuTrigger data-invite-menu="" aria-label={t('dashboard.inviteByLink', 'Invite by link')} className={buttonVariants({ size: 'sm', className: 'border-s border-s-primary-foreground/30 min-h-11 sm:min-h-0' })}>
                       <ChevronDown className="size-4" aria-hidden="true" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem data-invite="" className="max-sm:min-h-11" onClick={() => inviteSheet.current?.showModal()}>
+                      <DropdownMenuItem data-invite="" className="min-h-11 sm:min-h-0" onClick={() => inviteSheet.current?.showModal()}>
                         {t('dashboard.inviteByLink', 'Invite by link')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -608,9 +608,9 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
             {noMailer}
             <Tabs value={tab} onValueChange={(next) => setTab(String(next))}>
               {invites ? (
-                <TabStrip value={tab} className="max-sm:min-h-12">
-                  <TabsTrigger value="members" data-members-tab="members" className="flex-none max-sm:min-h-11">{t('dashboard.members', 'Members')}</TabsTrigger>
-                  <TabsTrigger value="invitations" data-members-tab="invitations" className="flex-none max-sm:min-h-11">
+                <TabStrip value={tab} className="min-h-12 sm:min-h-0">
+                  <TabsTrigger value="members" data-members-tab="members" className="flex-none min-h-11 sm:min-h-0">{t('dashboard.members', 'Members')}</TabsTrigger>
+                  <TabsTrigger value="invitations" data-members-tab="invitations" className="flex-none min-h-11 sm:min-h-0">
                     {(t('dashboard.invitationsTab', 'Invitations ({count})') ?? 'Invitations ({count})').replace('{count}', () => new Intl.NumberFormat(locale).format(pending.length))}
                   </TabsTrigger>
                 </TabStrip>
@@ -622,7 +622,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
                       <Search value={search} fields={[t('dashboard.membersName', 'Name') ?? 'Name', t('dashboard.membersEmail', 'Email') ?? 'Email']} locale={locale} t={t} onSearch={(value) => { setSearch(value); setPage(1) }} />
                       <label htmlFor={roleFilter} className="sr-only">{t('dashboard.membersRoleFilter', 'Role')}</label>
-                      <select id={roleFilter} data-role-filter="" value={roleShown} className="border-input bg-background h-9 rounded-md border px-3 text-sm max-sm:h-11 lg:w-56" onChange={(event) => { setRoleShown(event.target.value); setPage(1) }}>
+                      <select id={roleFilter} data-role-filter="" value={roleShown} className="border-input bg-background h-9 rounded-md border px-3 text-sm min-h-11 sm:min-h-0 lg:w-56" onChange={(event) => { setRoleShown(event.target.value); setPage(1) }}>
                         <option value="">{t('dashboard.membersEveryRole', 'Every role')}</option>
                         {roles.map((one) => <option key={one.name} value={one.name}>{one.label?.[locale] ?? one.name}</option>)}
                       </select>
@@ -649,8 +649,8 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                         const takes = removable(member)
                         return linkable || takes ? (
                           <RowActions id={member.userId} label={rowActionsLabel(member.name)}>
-                            {linkable ? <DropdownMenuItem data-row-action="password-link" className="max-sm:min-h-11" onClick={() => void sendLink(member)}>{t('dashboard.passwordLink', 'Send a new password link')}</DropdownMenuItem> : null}
-                            {takes ? <DropdownMenuItem data-row-action="remove" variant="destructive" className="max-sm:min-h-11" disabled={busy} onClick={() => setRemoving(member)}>{t('dashboard.removeMember', 'Remove from organization')}</DropdownMenuItem> : null}
+                            {linkable ? <DropdownMenuItem data-row-action="password-link" className="min-h-11 sm:min-h-0" onClick={() => void sendLink(member)}>{t('dashboard.passwordLink', 'Send a new password link')}</DropdownMenuItem> : null}
+                            {takes ? <DropdownMenuItem data-row-action="remove" variant="destructive" className="min-h-11 sm:min-h-0" disabled={busy} onClick={() => setRemoving(member)}>{t('dashboard.removeMember', 'Remove from organization')}</DropdownMenuItem> : null}
                           </RowActions>
                         ) : null
                       }}
@@ -696,9 +696,9 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                           return one ? (
                             <RowActions id={one.id} label={rowActionsLabel(one.email)}>
                               {/* A link run out joins nobody, so it is sent again rather than copied. */}
-                              {one.expired ? null : <DropdownMenuItem data-row-action="copy-link" className="max-sm:min-h-11" onClick={() => void copyLink(one)}>{t('dashboard.inviteCopy', 'Copy link')}</DropdownMenuItem>}
-                              <DropdownMenuItem data-row-action="resend" className="max-sm:min-h-11" onClick={() => void resend(one)}>{t('dashboard.inviteResend', 'Resend')}</DropdownMenuItem>
-                              {cancels ? <DropdownMenuItem data-row-action="cancel" variant="destructive" className="max-sm:min-h-11" onClick={() => void cancel(one)}>{t('dashboard.inviteCancel', 'Cancel invitation')}</DropdownMenuItem> : null}
+                              {one.expired ? null : <DropdownMenuItem data-row-action="copy-link" className="min-h-11 sm:min-h-0" onClick={() => void copyLink(one)}>{t('dashboard.inviteCopy', 'Copy link')}</DropdownMenuItem>}
+                              <DropdownMenuItem data-row-action="resend" className="min-h-11 sm:min-h-0" onClick={() => void resend(one)}>{t('dashboard.inviteResend', 'Resend')}</DropdownMenuItem>
+                              {cancels ? <DropdownMenuItem data-row-action="cancel" variant="destructive" className="min-h-11 sm:min-h-0" onClick={() => void cancel(one)}>{t('dashboard.inviteCancel', 'Cancel invitation')}</DropdownMenuItem> : null}
                             </RowActions>
                           ) : null
                         }}
@@ -757,8 +757,8 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                   </FieldShell>
                   {inviteRefusal ? <p role="alert" className="text-destructive">{inviteRefusal}</p> : null}
                   <footer className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" className="max-sm:h-11" onClick={() => inviteSheet.current?.close()}>{t('admin.cancel', 'Cancel')}</Button>
-                    <Button type="submit" className="max-sm:h-11" disabled={inviting}>{t('dashboard.inviteSend', 'Send invitation')}</Button>
+                    <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => inviteSheet.current?.close()}>{t('admin.cancel', 'Cancel')}</Button>
+                    <Button type="submit" className="min-h-11 sm:min-h-0" disabled={inviting}>{t('dashboard.inviteSend', 'Send invitation')}</Button>
                   </footer>
                 </form>
               </dialog>
@@ -777,7 +777,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                     <HandedLink link={handed.link} said={(t('dashboard.passwordLinkHanded', 'No mailer is configured. Hand this link to {name} alone: it chooses their password and lasts 48 hours.') ?? '').replace('{name}', () => handed.name)} />
                   ) : null}
                   <footer className="flex justify-end">
-                    <Button type="button" variant="outline" className="max-sm:h-11" onClick={() => handedSheet.current?.close()}>{t('admin.close', 'Close')}</Button>
+                    <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => handedSheet.current?.close()}>{t('admin.close', 'Close')}</Button>
                   </footer>
                 </div>
               </dialog>
@@ -788,7 +788,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                   <AlertDialogTitle>{(t('dashboard.removeTitle', 'Remove {name}?') ?? 'Remove {name}?').replace('{name}', () => removing?.name ?? '')}</AlertDialogTitle>
                   <AlertDialogDescription>{t('dashboard.removeAbout', 'They lose access to this organization and every role they hold in it. Inviting them again does not give the roles back.')}</AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="max-sm:[&_button]:h-11">
+                <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
                   <AlertDialogCancel>{t('dashboard.removeKeep', 'Keep this member')}</AlertDialogCancel>
                   <AlertDialogAction
                     data-button="confirm-remove"

@@ -17,7 +17,7 @@ export const typed = (type: string, parse: (text: string) => unknown = cleared):
       form,
       name: field.name,
       type,
-      className: 'max-sm:h-11',
+      className: 'min-h-11 sm:min-h-0',
       dir: type === 'text' && field.kind !== 'decimal' ? 'auto' : 'ltr',
       step: field.kind === 'integer' ? '1' : undefined,
       inputMode: field.kind === 'decimal' ? ('decimal' as const) : undefined,
@@ -34,7 +34,7 @@ export const typed = (type: string, parse: (text: string) => unknown = cleared):
     const suffix = locale ? field.suffix?.[locale] : undefined
     if (prefix === undefined && suffix === undefined) return <Input {...input} />
     return (
-      <InputGroup className="max-sm:h-11">
+      <InputGroup className="min-h-11 sm:min-h-0">
         {prefix !== undefined ? <InputGroupAddon data-affix="prefix" className={`${affix} rounded-s-[inherit] border-e`}><InputGroupText className="text-foreground">{prefix}</InputGroupText></InputGroupAddon> : null}
         <InputGroupInput {...input} />
         {suffix !== undefined ? <InputGroupAddon data-affix="suffix" align="inline-end" className={`${affix} rounded-e-[inherit] border-s`}><InputGroupText className="text-foreground">{suffix}</InputGroupText></InputGroupAddon> : null}

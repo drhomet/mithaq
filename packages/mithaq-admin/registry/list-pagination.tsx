@@ -54,19 +54,19 @@ export function Pagination({ locale, onLimit, onPage, page, t }: PaginationProps
         {from.toLocaleString(locale)}–{to.toLocaleString(locale)} {t('admin.of', 'of') ?? 'of'} {page.totalDocs.toLocaleString(locale)}
       </span>
       {/* `contents` on a phone, so the size box joins the range's line and the rest wraps. */}
-      <div className="ms-auto flex items-center gap-8 max-sm:contents">
+      <div className="ms-auto contents items-center gap-8 sm:flex">
         <div className="flex items-center gap-2">
           <Label className="text-sm font-medium" htmlFor={perPageId}>
             {t('admin.perPage', 'Per page') ?? 'Per page'}
           </Label>
           {/* The size is the trigger's own child: the item list mounts only while open, so a server render would show an empty trigger. */}
           <Select value={String(page.limit)} onValueChange={(next: string | null) => next && onLimit(Number(next))}>
-            <SelectTrigger id={perPageId} size="sm" className="h-8 w-[70px] max-sm:data-[size=sm]:h-11">
+            <SelectTrigger id={perPageId} size="sm" className="h-8 w-[70px] data-[size=sm]:min-h-11 sm:data-[size=sm]:min-h-[revert-layer]">
               <SelectValue>{page.limit}</SelectValue>
             </SelectTrigger>
             <SelectContent side="top">
               {limitsUpTo(maxLimit).map((one) => (
-                <SelectItem key={one} value={String(one)}>
+                <SelectItem className="min-h-11 sm:min-h-0" key={one} value={String(one)}>
                   {one}
                 </SelectItem>
               ))}
@@ -75,7 +75,7 @@ export function Pagination({ locale, onLimit, onPage, page, t }: PaginationProps
         </div>
         <div className="flex w-fit items-center justify-center gap-2 text-sm font-medium">
           <Input
-            className="h-8 w-16 text-center max-sm:h-11"
+            className="h-8 w-16 text-center min-h-11 sm:min-h-[revert-layer]"
             type="number"
             min={1}
             max={Math.max(page.totalPages, 1)}
@@ -110,7 +110,7 @@ export function Pagination({ locale, onLimit, onPage, page, t }: PaginationProps
             type="button"
             variant="outline"
             size="icon"
-            className="size-8 max-sm:size-11"
+            className="size-8 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
             disabled={!page.hasPrevPage}
             onClick={() => onPage(page.prevPage ?? 1)}
           >
@@ -123,7 +123,7 @@ export function Pagination({ locale, onLimit, onPage, page, t }: PaginationProps
             type="button"
             variant="outline"
             size="icon"
-            className="size-8 max-sm:size-11"
+            className="size-8 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
             disabled={!page.hasNextPage}
             onClick={() => onPage(page.nextPage ?? page.page)}
           >

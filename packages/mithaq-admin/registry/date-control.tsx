@@ -53,7 +53,7 @@ export function DatePicker(props: ControlProps): ReactElement {
           aria-describedby={describedBy}
           aria-invalid={error ? true : undefined}
           aria-required={ariaRequired(field)}
-          render={<Button type="button" variant="outline" className="min-w-32 flex-1 justify-start font-normal max-sm:h-11" />}
+          render={<Button type="button" variant="outline" className="min-w-32 flex-1 justify-start font-normal min-h-11 sm:min-h-0" />}
         >
           <CalendarIcon aria-hidden="true" />
           <span id={`${id}-day`} className={held ? 'truncate' : 'text-muted-foreground truncate'}>{shown}</span>

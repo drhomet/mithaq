@@ -149,7 +149,7 @@ function NavMain({ home }: { home?: string }) {
               <SidebarMenuItem key={entry.path}>
                 <SidebarMenuButton
                   isActive={isActive}
-                  className="max-md:h-11"
+                  className="min-h-11 md:min-h-0"
                   render={<a href={href} aria-current={isActive ? 'page' : undefined}><Icon /><span>{navLabel({ entry, screen, locale, t })}</span></a>}
                 />
               </SidebarMenuItem>
@@ -170,7 +170,7 @@ export const frame = { '--sidebar-width': 'var(--app-sidebar-width, calc(var(--s
  * A bar that wrapped is taller than `--header-height`, so it measures itself into `--header-bar-height`, which what sticks under it reads.
  */
 export const headerBar = 'sticky top-0 z-10 bg-background rounded-t-[inherit] flex min-h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:min-h-(--header-height)'
-export const headerRow = 'flex w-full min-w-0 items-center gap-1 px-4 sm:flex-wrap sm:gap-y-2 sm:py-2 lg:gap-2 lg:px-6 [&_h1]:min-w-0 max-sm:[&_h1]:line-clamp-2 max-sm:[&_h1]:leading-tight max-sm:[&_h1]:wrap-break-word sm:[&_h1]:truncate [&_h1]:text-base [&_h1]:font-medium [&_h1]:tracking-normal'
+export const headerRow = 'flex w-full min-w-0 items-center gap-1 px-4 sm:flex-wrap sm:gap-y-2 sm:py-2 lg:gap-2 lg:px-6 [&_h1]:min-w-0 [&_h1]:line-clamp-2 [&_h1]:leading-tight [&_h1]:wrap-break-word sm:[&_h1]:line-clamp-none sm:[&_h1]:leading-normal sm:[&_h1]:wrap-normal sm:[&_h1]:truncate [&_h1]:text-base [&_h1]:font-medium [&_h1]:tracking-normal'
 
 /**
  * The header's own height on the document, as `--header-bar-height`, kept while the header is on screen and taken off with it.
@@ -202,8 +202,8 @@ export function BackofficeLink() {
   const backoffice = useUser().screens?.find((one) => one.name === 'backoffice')
   if (!backoffice) return null
   return (
-    <a href={backoffice.path} data-backoffice-link="" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'text-muted-foreground ms-auto max-sm:size-11 max-xl:px-2.5 max-sm:px-0 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
-      <span className="max-xl:sr-only">{t('dashboard.openBackoffice', 'Open the backoffice')}</span>
+    <a href={backoffice.path} data-backoffice-link="" className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'text-muted-foreground ms-auto min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 px-0 sm:px-2.5 xl:px-3 [[data-node=controls]:not(:empty)~&]:ms-0' })}>
+      <span className="sr-only xl:not-sr-only">{t('dashboard.openBackoffice', 'Open the backoffice')}</span>
       <ArrowUpRight data-icon="inline-end" className="rtl:-scale-x-100" />
     </a>
   )
@@ -245,7 +245,7 @@ export function AppShell({ regions: content, backoffice = false, brand, home, pa
       <SidebarInset className="min-w-0">
         <header data-region="header" ref={measureHeader} className={headerBar}>
           <div data-header-row="" className={headerRow}>
-            <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 max-md:size-11" />
+            <SidebarTrigger aria-label={t('admin.toggleSidebar', 'Toggle Sidebar')} className="-ms-1 min-h-11 min-w-11 md:min-h-0 md:min-w-0" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
             {backoffice ? <>{content.header}{content.primary}{content.more}</> : (
               <PageHeader t={t} breadcrumb={breadcrumb} primary={content.primary} more={content.more}>{content.header}</PageHeader>

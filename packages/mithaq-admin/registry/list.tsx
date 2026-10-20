@@ -103,7 +103,7 @@ export function List(props: ListProps): ReactElement {
 
   return (
     // `min-w-0` lets the list shrink inside the grid or flex row that holds it, whose items otherwise keep the width of their widest row.
-    <section className={`flex w-full min-w-0 flex-1 flex-col gap-4 ${ticked.length || done ? 'max-sm:pb-[calc(5rem+env(safe-area-inset-bottom))]' : ''}`}>
+    <section className={`flex w-full min-w-0 flex-1 flex-col gap-4 ${ticked.length || done ? 'pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-0' : ''}`}>
       <ListHeader
         // A title node on the screen's own list page is the page's one h1, so the list keeps only its sentence; a list
         // of another kayan keeps its heading.
@@ -116,9 +116,9 @@ export function List(props: ListProps): ReactElement {
       {node?.tabs?.length ? (
         // The list's tabs, each a `where` the list holds every page to, the first where the URL names none.
         <Tabs className="min-w-0 max-w-full" value={query.tab ?? node.tabs[0]!.tab} onValueChange={(tab) => refine({ tab: String(tab) })}>
-          <TabStrip value={query.tab ?? node.tabs[0]!.tab} className="w-full max-w-full overflow-x-auto overflow-y-hidden justify-start pb-2 max-sm:h-auto max-sm:min-h-12">
+          <TabStrip value={query.tab ?? node.tabs[0]!.tab} className="w-full max-w-full overflow-x-auto overflow-y-hidden justify-start pb-2 min-h-12 sm:min-h-0">
             {node.tabs.map((one) => (
-              <TabsTrigger key={one.tab} value={one.tab} data-list-tab={one.tab} className="flex-none max-sm:min-h-11">
+              <TabsTrigger key={one.tab} value={one.tab} data-list-tab={one.tab} className="flex-none min-h-11 sm:min-h-0">
                 {one.label[locale] ?? one.tab}
               </TabsTrigger>
             ))}

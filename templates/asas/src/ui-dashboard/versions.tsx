@@ -337,7 +337,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
             <div className="grid gap-1.5">
               <span className="text-muted-foreground text-xs">{t('version.comparingAgainst', 'Comparing against')}</span>
               <Select value={against} disabled={prior === undefined} onValueChange={(value) => setAgainst(String(value ?? ''))}>
-                <SelectTrigger className="w-full max-sm:data-[size=default]:h-11"><SelectValue>{options.find((one) => one.value === against)?.label}</SelectValue></SelectTrigger>
+                <SelectTrigger className="w-full data-[size=default]:min-h-11 sm:data-[size=default]:min-h-0"><SelectValue>{options.find((one) => one.value === against)?.label}</SelectValue></SelectTrigger>
                 <SelectContent>
                   {options.map((one) => (
                     <SelectItem key={one.value} value={one.value}>{one.label}</SelectItem>
@@ -410,11 +410,11 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
           // activity line and change nothing. Sticky at the popup's foot, so Restore stays in reach however long the diff is.
           <SheetFooter className="bg-inherit sticky bottom-0 flex-row flex-wrap justify-end border-t">
             {'_status' in version.version && version.version._status !== 'draft' ? (
-              <Button type="button" variant="outline" className="max-sm:h-11" data-button="restore-as-draft" disabled={restoring} onClick={() => setConfirming({ draft: true })}>
+              <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" data-button="restore-as-draft" disabled={restoring} onClick={() => setConfirming({ draft: true })}>
                 {t('version.restoreAsDraft', 'Restore as draft')}
               </Button>
             ) : null}
-            <Button type="button" className="max-sm:h-11" data-button="restore" disabled={restoring} onClick={() => setConfirming({ draft: false })}>
+            <Button type="button" className="min-h-11 sm:min-h-0" data-button="restore" disabled={restoring} onClick={() => setConfirming({ draft: false })}>
               {t('version.restoreThisVersion', 'Restore this version')}
             </Button>
           </SheetFooter>
@@ -429,7 +429,7 @@ function Compare({ version, versions, parent, onClose }: { version: Version; ver
                   .replace('{versionDate}', when(version.updatedAt))}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="max-sm:[&_button]:h-11">
+            <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
               <AlertDialogCancel>{t('admin.cancel', 'Cancel')}</AlertDialogCancel>
               <AlertDialogAction data-button="confirm-restore" disabled={restoring} onClick={() => confirming && void restore(confirming.draft)}>
                 {confirming?.draft ? t('version.restoreAsDraft', 'Restore as draft') : t('version.restore', 'Restore')}

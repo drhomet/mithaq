@@ -53,7 +53,7 @@ export function FieldShell({ beside, children, control, description, error, id, 
         <>
           {children}
           {/* 44 pixels tall on a phone: the label is the tap target for a switch or box smaller than that. */}
-          <FieldLabel htmlFor={id} id={`${id}-label`} className="max-sm:min-h-11 max-sm:items-center">{label}</FieldLabel>
+          <FieldLabel htmlFor={id} id={`${id}-label`} className="min-h-11 sm:min-h-0 items-center">{label}</FieldLabel>
         </>
       ) : (
         <>

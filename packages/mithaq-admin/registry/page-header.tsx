@@ -16,7 +16,7 @@ export function MoreActions({ children, t }: { children?: ReactNode; t: Translat
   if (!children) return null
   return (
     <Popover>
-      <PopoverTrigger render={<Button type="button" variant="outline" size="sm" className="max-sm:min-h-11" aria-label={t('admin.moreActions', 'More actions')} />}>
+      <PopoverTrigger render={<Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-0" aria-label={t('admin.moreActions', 'More actions')} />}>
         <Ellipsis aria-hidden="true" />
         {t('admin.more', 'More')}
       </PopoverTrigger>
@@ -43,7 +43,7 @@ export function PageHeader({ breadcrumb, children, more, primary, t, title }: {
       <PageBreadcrumb value={!!breadcrumb}>
         <div data-page-header="" className="flex min-w-0 flex-1 flex-col gap-2">
           {breadcrumb ? (
-            <a href={breadcrumb.href} data-back="" className="text-muted-foreground flex w-fit items-center gap-1.5 text-sm hover:text-foreground max-sm:min-h-11">
+            <a href={breadcrumb.href} data-back="" className="text-muted-foreground flex w-fit items-center gap-1.5 text-sm hover:text-foreground min-h-11 sm:min-h-0">
               <ArrowLeft aria-hidden="true" className="size-4 rtl:-scale-x-100" />
               <span>{breadcrumb.label}</span>
             </a>

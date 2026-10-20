@@ -40,7 +40,7 @@ export function Search({
         <SearchIcon className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" aria-hidden="true" />
         <Input
           type="search"
-          className="ps-9 max-sm:h-11"
+          className="ps-9 min-h-11 sm:min-h-0"
           placeholder={placeholder}
           aria-label={label}
           value={text}
@@ -48,7 +48,7 @@ export function Search({
         />
       </span>
       {text ? (
-        <Button type="button" variant="outline" size="icon-sm" className="max-sm:size-11" onClick={() => setText('')} aria-label={t('admin.clearSearch', 'Clear search') ?? 'Clear search'}>
+        <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" onClick={() => setText('')} aria-label={t('admin.clearSearch', 'Clear search') ?? 'Clear search'}>
           <X />
         </Button>
       ) : null}
@@ -79,7 +79,7 @@ export function BulkBar({ children, done, said, t, ticked }: {
       data-mithaq-bulk-bar=""
       role="region"
       aria-label={t('admin.bulkBar', 'Ticked rows') ?? 'Ticked rows'}
-      className={ticked || done ? 'contents max-sm:bg-background max-sm:fixed max-sm:inset-x-0 max-sm:bottom-[var(--action-bar-height,0px)] max-sm:z-30 max-sm:flex max-sm:flex-nowrap max-sm:items-center max-sm:gap-2 max-sm:overflow-x-auto max-sm:border-t max-sm:p-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:[&_button]:shrink-0 max-sm:[&>span]:shrink-0' : 'contents'}
+      className={ticked || done ? 'bg-background fixed inset-x-0 bottom-[var(--action-bar-height,0px)] z-30 flex flex-nowrap items-center gap-2 overflow-x-auto border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [&_button]:shrink-0 [&>span]:shrink-0 sm:contents sm:[&>span]:shrink' : 'contents'}
     >
       {/* `aria-live`: the count changes as boxes are ticked and nothing else announces it. */}
       <span className={ticked || done ? 'text-muted-foreground text-sm' : 'sr-only'} aria-live="polite" data-mithaq-selected={ticked || undefined} data-mithaq-done={!ticked && done ? done.count : undefined}>
@@ -150,7 +150,7 @@ export function ListToolbar({ api, children, client, columns, copy, kayan, onSea
             <Button
               type="button"
               variant={open || where ? 'secondary' : 'outline'}
-              className="max-sm:h-11"
+              className="min-h-11 sm:min-h-0"
               aria-controls={open ? filtersId : undefined}
               aria-expanded={open}
               onClick={() => setFiltering(!open)}

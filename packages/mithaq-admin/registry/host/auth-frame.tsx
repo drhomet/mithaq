@@ -96,7 +96,7 @@ export function AuthFrame({ title, description, children }: { title: string | un
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
         {/* An anchor: `/` is not a router route in an app whose start entry answers its home. */}
-        <a className="text-lg font-semibold" href="/">
+        <a className="text-lg inline-flex min-h-11 items-center font-semibold sm:min-h-0" href="/">
           {t(app, 'Asas')}
         </a>
         <LocaleSwitch locale={locale} />

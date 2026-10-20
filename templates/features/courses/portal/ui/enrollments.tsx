@@ -120,7 +120,7 @@ function Leave({ seat }: { seat: Seat }) {
             <AlertDialogTitle>{t('portal.leaveTitle', 'Cancel this enrollment?')}</AlertDialogTitle>
             <AlertDialogDescription>{t('portal.leaveBody', 'Your seat goes back to the session, and someone else may take it.')}</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="max-sm:[&_button]:h-11">
+          <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
             <AlertDialogCancel>{t('portal.keep', 'Keep it')}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={() => {
               setAsking(false)

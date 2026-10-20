@@ -28,12 +28,12 @@ export function ListHeader({ about, create, of, t, title }: {
         </div>}
         primary={create === undefined ? null : 'onAdd' in create ? (
           // A list of another kayan adds a row in place, below the table.
-          <Button type="button" className="max-sm:h-11" onClick={create.onAdd}>
+          <Button type="button" className="min-h-11 sm:min-h-0" onClick={create.onAdd}>
             <Plus className="me-2 h-4 w-4" />{create.label}
           </Button>
         ) : (
           // `render` keeps the destination an anchor; base-ui must not treat it as a native button.
-          <Button nativeButton={false} className="max-sm:h-11" render={<a href={create.href} />}>
+          <Button nativeButton={false} className="min-h-11 sm:min-h-0" render={<a href={create.href} />}>
             <Plus className="me-2 h-4 w-4" />{create.label}
           </Button>
         )}
@@ -65,7 +65,7 @@ export function ListMessage({ count, empty, filtered, kayan, onClear, t, unreada
         {filtered ? (
           <span className="flex flex-col items-center gap-2">
             {t('admin.noMatches', 'No rows match this filter.') ?? 'No rows match this filter.'}
-            <Button type="button" variant="outline" size="sm" className="max-sm:h-11" onClick={onClear}>
+            <Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-0" onClick={onClear}>
               {t('admin.clearFilters', 'Clear filters') ?? 'Clear filters'}
             </Button>
           </span>

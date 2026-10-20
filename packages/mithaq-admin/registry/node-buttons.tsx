@@ -65,7 +65,7 @@ export function NodeButton({ node, copy, busy, run, description }: { node: Pick<
   const { ask, dialog } = useConfirm({ confirm: node.confirm, confirmLabel: label ?? '', description, copy })
   return (
     <>
-      <Button type="button" variant="outline" className="max-sm:h-11" disabled={busy} onClick={() => void ask().then((yes) => yes && run())}>
+      <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" disabled={busy} onClick={() => void ask().then((yes) => yes && run())}>
         {label}
       </Button>
       {dialog}

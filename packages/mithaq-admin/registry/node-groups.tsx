@@ -63,9 +63,9 @@ function TabGroup({
   const selection = useRecordTab({ name, keys: tabs.map((tab) => tab.key) })
   return (
     <Tabs value={selection.value} onValueChange={(value) => selection.choose(String(value))} data-node="tabs" className={line ? 'min-w-0 max-w-full gap-4' : 'min-w-0 max-w-full overflow-hidden rounded-lg border'}>
-      <TabStrip value={selection.value} variant={line ? 'line' : 'default'} className={line ? 'w-full justify-start max-sm:min-h-12' : 'm-1 max-sm:min-h-12'}>
+      <TabStrip value={selection.value} variant={line ? 'line' : 'default'} className={line ? 'w-full justify-start min-h-12 sm:min-h-0' : 'm-1 min-h-12 sm:min-h-0'}>
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.key} value={tab.key} className="flex-none max-sm:min-h-11">
+          <TabsTrigger key={tab.key} value={tab.key} className="flex-none min-h-11 sm:min-h-0">
             {tab.label}
             {/* How many of this tab's fields the refusal named, so a save refused over a field on a tab
                 nobody opened says so on the tab. */}
@@ -132,7 +132,7 @@ export function SectionNode({ node, draw, inRow }: NodeProps<'section'>): ReactE
         <CardHeader>
           <CardTitle>
             <h2 className="text-base font-medium">
-              <CollapsibleTrigger className="group flex w-full cursor-pointer items-center justify-between gap-2 text-start max-sm:min-h-11">
+              <CollapsibleTrigger className="group flex w-full cursor-pointer items-center justify-between gap-2 text-start min-h-11 sm:min-h-0">
                 <span className="flex items-center gap-2">
                   {label}
                   <ErrorPill count={invalidIn(node.fields, draw)} t={draw.copy.t} />

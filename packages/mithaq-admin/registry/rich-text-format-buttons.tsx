@@ -45,10 +45,10 @@ export function HistoryButtons({ activeEditor, t }: { activeEditor: LexicalEdito
   const redo = t('admin.richText.redo', 'Redo') ?? 'Redo'
   return (
     <ButtonGroup>
-      <Button type="button" variant="outline" size="icon-sm" className="max-sm:size-11" title={undo} aria-label={undo} disabled={!canUndo} onClick={() => activeEditor.dispatchCommand(UNDO_COMMAND, undefined)}>
+      <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" title={undo} aria-label={undo} disabled={!canUndo} onClick={() => activeEditor.dispatchCommand(UNDO_COMMAND, undefined)}>
         <UndoIcon className="size-4 rtl:-scale-x-100" />
       </Button>
-      <Button type="button" variant="outline" size="icon-sm" className="max-sm:size-11" title={redo} aria-label={redo} disabled={!canRedo} onClick={() => activeEditor.dispatchCommand(REDO_COMMAND, undefined)}>
+      <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" title={redo} aria-label={redo} disabled={!canRedo} onClick={() => activeEditor.dispatchCommand(REDO_COMMAND, undefined)}>
         <RedoIcon className="size-4 rtl:-scale-x-100" />
       </Button>
     </ButtonGroup>
@@ -79,7 +79,7 @@ export function BlockDropdown({ toolbar, t, locale, picks }: { toolbar: Toolbar;
   const name = (t('admin.richText.blockFormatCurrent', 'Block format: {block}') ?? 'Block format: {block}').replace('{block}', () => pickLabel(current, locale))
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" className="gap-1 px-2 max-sm:h-11" title={name} aria-label={name} />}>
+      <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" className="gap-1 px-2 min-h-11 sm:min-h-0" title={name} aria-label={name} />}>
         <current.Icon className="size-4" />
         <span className="text-sm">{pickLabel(current, locale)}</span>
         <ChevronDownIcon className="size-3" />
@@ -116,7 +116,7 @@ export function FormatButtons({ t }: { t: Translate }) {
       {formats.map(({ format, Icon, label }) => {
         const name = label(t) ?? format
         return (
-          <Toggle key={format} variant="outline" size="sm" className="max-sm:h-11 max-sm:min-w-11" title={name} aria-label={name} pressed={active.includes(format)} onPressedChange={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, format as TextFormatType)}>
+          <Toggle key={format} variant="outline" size="sm" className="min-h-11 sm:min-h-0 min-w-11 sm:min-w-0" title={name} aria-label={name} pressed={active.includes(format)} onPressedChange={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, format as TextFormatType)}>
             <Icon className="size-4" />
           </Toggle>
         )
@@ -157,7 +157,7 @@ export function ClearFormatting({ t }: { t: Translate }) {
   }, [editor])
   const name = t('admin.richText.clearFormatting', 'Clear formatting') ?? 'Clear formatting'
   return (
-    <Button type="button" variant="outline" size="icon-sm" className="max-sm:size-11" title={name} aria-label={name} onClick={clear}>
+    <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" title={name} aria-label={name} onClick={clear}>
       <EraserIcon className="size-4" />
     </Button>
   )

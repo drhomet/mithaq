@@ -64,7 +64,7 @@ export function UploadControl(props: ControlProps): ReactElement {
   const creates = target !== undefined && createsIn({ kayan: target, report: screen?.access.collections?.[target.name] })
   const upload = !readOnly && target?.storage && screen && creates ? (
     <>
-      <Button type="button" variant="outline" className="max-sm:h-11" onClick={() => setUploading(true)} data-upload-new="">
+      <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => setUploading(true)} data-upload-new="">
         <UploadIcon className="size-4" aria-hidden />
         {t('admin.upload.new', 'Upload new') ?? 'Upload new'}
       </Button>

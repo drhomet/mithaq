@@ -224,7 +224,7 @@ export function Dashboard({ loaderData: figures }: PageProps<Figures>) {
                   <CardDescription>{inRange}</CardDescription>
                   <div className="flex items-center gap-1 pt-2">
                     {ranges.map((one) => (
-                      <Button key={one} size="sm" variant={one === range ? 'secondary' : 'ghost'} className="max-sm:h-11" aria-pressed={one === range} onClick={() => choose(one)}>
+                      <Button key={one} size="sm" variant={one === range ? 'secondary' : 'ghost'} className="min-h-11 sm:min-h-0" aria-pressed={one === range} onClick={() => choose(one)}>
                         {counted({ t, locale, key: 'dashboard.chartDays', count: one, fallback: '{count} days' })}
                       </Button>
                     ))}
@@ -261,8 +261,8 @@ export function Dashboard({ loaderData: figures }: PageProps<Figures>) {
                           <TableRow>
                             <TableHead>{t('sessions.course', 'Course')}</TableHead>
                             <TableHead>{t('sessions.startsAt', 'Starts at')}</TableHead>
-                            <TableHead className="max-sm:hidden">{t('sessions.venue', 'Venue')}</TableHead>
-                            <TableHead className="text-end max-sm:hidden">{t('sessions.capacity', 'Capacity')}</TableHead>
+                            <TableHead className="hidden sm:table-cell">{t('sessions.venue', 'Venue')}</TableHead>
+                            <TableHead className="text-end hidden sm:table-cell">{t('sessions.capacity', 'Capacity')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -281,8 +281,8 @@ export function Dashboard({ loaderData: figures }: PageProps<Figures>) {
                               {/* The viewer's own clock, which the server's may not be, so the browser's reading replaces the server's without a warning.
                                   One line, so a phone does not break the date and the time over five. */}
                               <TableCell className="whitespace-nowrap tabular-nums" suppressHydrationWarning>{formatDate({ value: session.startsAt, locale })}</TableCell>
-                              <TableCell className="max-sm:hidden">{session.venue ? venueOf(session.venue) : '—'}</TableCell>
-                              <TableCell className="text-end tabular-nums max-sm:hidden">{session.capacity === undefined ? '—' : count(session.capacity)}</TableCell>
+                              <TableCell className="hidden sm:table-cell">{session.venue ? venueOf(session.venue) : '—'}</TableCell>
+                              <TableCell className="text-end tabular-nums hidden sm:table-cell">{session.capacity === undefined ? '—' : count(session.capacity)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

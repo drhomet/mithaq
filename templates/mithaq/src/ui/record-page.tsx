@@ -20,7 +20,7 @@ export function RecordPage({ regions, page }: LayoutProps<readonly ['main', 'sid
       <div data-region="main" className="grid min-w-0 gap-4 lg:col-start-1">
         {regions.main}
       </div>
-      {regions.side ? <aside data-region="side" className="grid h-fit gap-4 max-lg:has-[[data-lead]]:order-first lg:col-start-2 lg:row-span-2 lg:row-start-1">{regions.side}</aside> : null}
+      {regions.side ? <aside data-region="side" className="grid h-fit gap-4 has-[[data-lead]]:order-first lg:has-[[data-lead]]:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1">{regions.side}</aside> : null}
       {/* The danger zone, fenced by the destructive border, under the form rather than in its row. */}
       {regions.danger ? (
         <section data-region="danger" className="grid h-fit min-w-0 gap-2 rounded-lg border border-destructive/50 p-4 lg:col-start-1">

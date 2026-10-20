@@ -13,7 +13,7 @@ export function RolesTable({ roles, counts, failed }: { roles: readonly Role[]; 
   return <div data-roles="" className="grid gap-4">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-muted-foreground">{t('dashboard.rolesAbout', "Fixed roles ship with the project and cannot be changed here. Custom roles are this organization's own.")}</p>
-      {creates ? <Button size="sm" className="max-sm:h-11" nativeButton={false} render={<a href={newHref} />}>{t('dashboard.rolesNew', 'New role')}</Button> : null}
+      {creates ? <Button size="sm" className="min-h-11 sm:min-h-0" nativeButton={false} render={<a href={newHref} />}>{t('dashboard.rolesNew', 'New role')}</Button> : null}
     </div>
     {failed ? <p role="status">{t('dashboard.rolesCountsFailed', 'Member counts could not be loaded.')}</p> : null}
     <div className="overflow-x-auto rounded-lg border">
