@@ -2615,7 +2615,7 @@ test('73. the backoffice reads by name in both locales: its sign-in is the tenan
     const person = await page(`/backoffice/users/${me.user.id}`, 'en')
     assert.match(person, /<h1[^>]*data-node="title"[^>]*>Boot<\/h1>/, 'a person\'s record is titled by their name')
     assert.ok(person.includes('Backoffice administrator') && !/data-field-value="role"[\s\S]{0,400}>user</.test(person), 'and reads the backoffice role by its label')
-    assert.ok(/data-field-value="emailVerified"[^>]*>[\s\S]*?<dd class="text-sm">No<\/dd>/.test(person), 'and an unticked box as a no')
+    assert.ok(/data-field-value="emailVerified"[^>]*>[\s\S]*?<dd[^>]*>No<\/dd>/.test(person), 'and an unticked box as a no')
     assert.ok(!person.includes('data-field-value="id"'), 'and draws no id')
     // A tenant's own role, since the roles this project ships are code and never a row.
     const role = (await db.execute(`select id, name, label_en, label_ar from roles where permissions @> array['courses.find']::text[] order by created_at limit 1`)).rows[0] as { id: string; name: string; label_en: string; label_ar: string }
