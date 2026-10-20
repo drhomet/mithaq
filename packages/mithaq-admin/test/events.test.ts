@@ -8272,7 +8272,7 @@ test('audit F04: status tabs scroll within the list instead of widening the page
   assert.match(strip.className, /max-w-full/)
   assert.match(strip.className, /overflow-x-auto/)
   assert.ok(strip.classList.contains('overflow-y-hidden'), 'the strip scrolls only sideways')
-  assert.ok(strip.classList.contains('data-[variant=line]:pb-2'), 'bottom space keeps the active underline inside the scrolling strip')
+  assert.ok(strip.classList.contains('pb-2'), 'bottom space keeps the active underline inside the scrolling strip')
   assert.ok(strip.classList.contains('max-sm:h-auto'), 'the strip grows around phone-height triggers and their focus rings')
   assert.match(strip.className, /justify-start/)
 })
