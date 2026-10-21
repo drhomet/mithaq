@@ -224,7 +224,7 @@ export const enrollments = defineKayan({
     // record, which only reads. A record is titled by its student, a person the
     // backoffice reads, where a session is titled only by its start.
     backoffice: {
-      nav: { group: navGroups.work },
+      nav: { icon: 'clipboard-list', group: navGroups.work },
       useAsTitle: 'student',
       pages: {
         ...backofficeList('/enrollments', { columns: ['session', 'student', 'organization', 'createdAt'], filters: ['organization', 'session', 'student'], sort: '-createdAt' }),
@@ -264,7 +264,7 @@ export const enrollments = defineKayan({
     // heading tell one seat from another; on the portal, where the student is most
     // often the viewer, by the session.
     dashboard: {
-      nav: { group: navGroups.work },
+      nav: { icon: 'clipboard-list', group: navGroups.work },
       useAsTitle: 'student',
       description: {
         en: 'Which student holds a seat in which session.',

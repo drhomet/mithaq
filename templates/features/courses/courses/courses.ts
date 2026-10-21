@@ -161,7 +161,7 @@ export const courses = defineKayan({
   targets: {
     /** Every organization's rows on the backoffice, read-only, with each row's record page and its sessions. */
     backoffice: {
-      nav: { group: navGroups.work },
+      nav: { icon: 'book-open', group: navGroups.work },
       useAsTitle: 'title',
       pages: {
         ...backofficeList('/courses', { columns: ['title', 'organization', 'fee', 'archived', 'createdAt'], card: ['fee', 'organization', 'archived'], filters: ['organization', 'title', 'fee', 'archived'], search: ['title'], sort: '-createdAt' }),
@@ -287,7 +287,7 @@ export const courses = defineKayan({
       }),
     },
     dashboard: {
-      nav: { group: navGroups.work },
+      nav: { icon: 'book-open', group: navGroups.work },
       // What this kayan is for, drawn under the list heading and the form title.
       // One string per declared locale, keyed `courses.page.description`.
       description: {

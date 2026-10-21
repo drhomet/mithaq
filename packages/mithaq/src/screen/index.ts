@@ -47,6 +47,8 @@ export type ScreenRef<Registered extends string = string> = Registered | Ui
 /** Sidebar placement only; routes and access are independent of navigation. */
 export type ScreenNav<Locale extends string = string> = {
   readonly label?: Localized<Locale>
+  /** A name in the app's components.icons map, checked when its host starts. */
+  readonly icon?: string
   readonly hidden?: boolean
   readonly order?: number
   readonly group?: {
@@ -646,7 +648,8 @@ export const screensOf = (
       return path
     }
     const navOf = (at: string, nav: ScreenNav): ScreenNav => {
-      named(at, nav, ['label', 'hidden', 'order', 'group'], 'nav')
+      named(at, nav, ['label', 'icon', 'hidden', 'order', 'group'], 'nav')
+      if (nav.icon !== undefined && (typeof nav.icon !== 'string' || !nav.icon.trim())) throw new Error(`${at} icon must be a non-empty string naming an icon in components.icons.`)
       if (nav.hidden !== undefined && typeof nav.hidden !== 'boolean') throw new Error(`${at} hidden is no boolean.`)
       if (nav.order !== undefined && !Number.isFinite(nav.order)) throw new Error(`${at} order is no finite number.`)
       if (nav.group) {
@@ -657,6 +660,7 @@ export const screensOf = (
       }
       return {
         ...(nav.label !== undefined && { label: copy(`${at} label`, nav.label) }),
+        ...(nav.icon !== undefined && { icon: nav.icon }),
         ...(nav.hidden !== undefined && { hidden: nav.hidden }),
         ...(nav.order !== undefined && { order: nav.order }),
         ...(nav.group && { group: { ...nav.group, label: copy(`${at} group label`, nav.group.label) } }),

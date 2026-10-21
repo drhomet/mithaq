@@ -92,7 +92,7 @@ export const localUsers = defineKayan({
      * alone. The protected columns are named by no page, so no list offers one as a column or a filter.
      */
     backoffice: {
-      nav: { group: navGroups.access },
+      nav: { icon: 'table-2', group: navGroups.access },
       useAsTitle: 'email',
       pages: {
         ...backofficeList('/local-users', {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- Kayan and own-page navigation can declare `nav.icon`, a serializable name in the app's optional `components.icons` map. Named imports keep unused icons out of the bundle. `checkComponents` refuses unregistered names at boot, including hidden entries.
+- The starter declares its existing icons and draws them in the sidebar, phone sheet and backoffice. Entries without a declaration keep the previous path icon, then `Table2`. Existing projects can adopt the starter's `ui/nav-icons.ts`, register their icons in each host's components map and merge the resolver in `ui/app-shell.tsx`. No migration is needed.
+
 ## 0.3.3
 
 - Fixed native auth submissions before hydration or with JavaScript disabled. Passwords, confirmation, setup codes and personal values now submit in POST bodies rather than URL queries. Other shipped native forms also explicitly use POST.

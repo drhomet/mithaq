@@ -1,5 +1,5 @@
 import { createContext, use, type ComponentType, type ReactElement, type ReactNode } from 'react'
-import type { builtInScreenKinds, ClientField, ClientKayan, NodeKind, registryCells, registryControls } from 'mithaq/admin'
+import type { builtInScreenKinds, ClientField, ClientKayan, NavEntry, NodeKind, registryCells, registryControls } from 'mithaq/admin'
 import type { Cell, Control } from 'mithaq-admin/control-props.ts'
 import { kindsIn, nodesOf, type NodeProps } from 'mithaq-admin/node-tree.ts'
 import type { TreePage } from 'mithaq-admin/screen-refs.ts'
@@ -48,11 +48,16 @@ export type CellsOf<L> = Cells & { readonly [Name in AddOnsOf<L, 'cell'> | OwnCe
  */
 export type Nodes = { readonly [Kind in NodeKind]: ComponentType<NodeProps<Kind>> }
 
+export type NavIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+export type Icons = Readonly<Record<string, NavIcon>>
+
 /** Every piece of the admin a project may replace or add to, each a map of named defaults it spreads. */
 export type ComponentsOf<L> = {
   controls: ControlsOf<L>
   cells: CellsOf<L>
   nodes: Nodes
+  /** Only the icons this app uses, imported by name so the rest are never bundled. */
+  icons?: Icons
 }
 
 /** The map of a language that adds no kind of its own, which `defaultComponents` is. */
@@ -78,6 +83,20 @@ const named = <Drawn,>(map: object, name: string | undefined): Drawn | undefined
   name !== undefined && Object.hasOwn(map, name) ? (map as Readonly<Record<string, Drawn>>)[name] : undefined
 export const namedControl = (controls: Controls, name: string | undefined) => named<Control>(controls, name)
 export const namedCell = (cells: Cells, name: string | undefined) => named<Cell>(cells, name)
+
+/** A declared name never silently falls back to a different icon. */
+export const navIconFor = ({ icons, name, at }: { icons?: Icons; name: string; at: string }): NavIcon => {
+  const found = icons && named<NavIcon>(icons, name)
+  if (!found) throw new Error(`components.icons has no icon "${name}", which ${at} names. Import that icon and register it in components.icons.`)
+  return found
+}
+
+/** An undeclared entry keeps its shell's fallback even outside a components provider. */
+export function NavigationIcon({ name, fallback, at }: { name?: string; fallback: NavIcon; at: string }): ReactElement {
+  const components = use(ComponentsContext)
+  const Icon = name === undefined ? fallback : navIconFor({ icons: components?.icons, name, at })
+  return <Icon aria-hidden />
+}
 
 const addOnMaps: Readonly<Record<AddOn, string>> = { richText: 'richTextComponents', upload: 'uploadComponents' }
 /** What a missing name of an add-on adds to its error: the map that installs it. */
@@ -134,7 +153,7 @@ const namedCells = (node: unknown, at: string): { cell: string; at: string }[] =
 /**
  * Every field a screen draws, every cell its pages name and every kind of node they hold, checked against the map once, so an app that calls this as it starts fails there, naming each kind and field, and not on the page that first draws one. A join is drawn by no form, so it needs no control; an operation's box is drawn by no list, so it needs no cell.
  */
-export const checkComponents = ({ client, components }: { client: { path?: string; kayan: Readonly<Record<string, Pick<ClientKayan, 'name' | 'fields' | 'operations' | 'pages'>>> }; components: Components }): void => {
+export const checkComponents = ({ client, components }: { client: { path?: string; nav?: readonly NavEntry[]; kayan: Readonly<Record<string, Pick<ClientKayan, 'name' | 'fields' | 'operations' | 'pages'>>> }; components: Components }): void => {
   const { cells, controls, nodes } = components
   const missing = Object.values(client.kayan).flatMap((kayan) => [
     ...Object.entries(kayan.pages ?? {}).flatMap(([page, drawn]) => ('page' in drawn && drawn.page ? kindsIn(nodesOf(drawn as TreePage)) : [])
@@ -150,6 +169,12 @@ export const checkComponents = ({ client, components }: { client: { path?: strin
       .filter((field) => !namedCell(cells, field.cell) && !namedCell(cells, field.kind))
       .map((field) => `components.cells has no cell for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.${installHint(field.cell, field.kind)}`),
   ])
+  for (const entry of client.nav ?? []) {
+    if (entry.icon !== undefined) {
+      try { navIconFor({ icons: components.icons, name: entry.icon, at: `screen ${client.path} nav "${entry.path}"` }) }
+      catch (error) { missing.push((error as Error).message) }
+    }
+  }
   if (missing.length) throw new Error(`${[...new Set(missing)].join('\n')}\nSpread defaultComponents.controls, defaultComponents.cells and defaultComponents.nodes into the map and add one under each name.`)
 }
 

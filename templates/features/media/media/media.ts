@@ -71,7 +71,7 @@ export const media = ({ reads }: { reads: readonly ImageRead[] }) => defineKayan
     // page draws them read-only, with the image, its size, Download and
     // Replace file beside the form, and above it on a phone.
     dashboard: {
-      nav: { group: navGroups.library },
+      nav: { icon: 'table-2', group: navGroups.library },
       useAsTitle: 'filename',
       description: { en: 'The images this organization uses, each with the words a screen reader says for it.', ar: 'الصور التي تستخدمها هذه المؤسسة، ولكل منها الكلمات التي يقرؤها قارئ الشاشة.' },
       pages: {

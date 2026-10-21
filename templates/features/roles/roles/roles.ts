@@ -110,7 +110,7 @@ export const roles = defineKayan({
   targets: {
     /** Every organization's rows on the backoffice, read-only. */
     backoffice: {
-      nav: { group: navGroups.access },
+      nav: { icon: 'shield-check', group: navGroups.access },
       useAsTitle: 'label',
       pages: {
         // A role by its label, never its slug, and its keys grouped as the
@@ -137,7 +137,7 @@ export const roles = defineKayan({
      * The fixed roles list first, from their code, each with a lock and a read-only page; a custom role opens its form, where its permissions are grouped checkboxes, and its delete names the members who still hold it.
      */
     dashboard: {
-      nav: { group: navGroups.settings },
+      nav: { icon: 'shield-check', group: navGroups.settings },
       useAsTitle: 'label',
       description: {
         en: 'What each role in this organization may see and do.',

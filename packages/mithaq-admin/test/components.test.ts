@@ -55,6 +55,17 @@ const form = () =>
 const drawn = (element: ReactElement) => renderToStaticMarkup(createElement(ScreenContext, { value: state }, element))
 const formWith = (components: Components) => drawn(createElement(ComponentsProvider, { components }, form()))
 
+test('boot refuses unregistered navigation icons, including hidden and prototype names', () => {
+  const client = { path: '/dashboard', kayan: {}, nav: [
+    { path: '/sales', page: 'list', icon: 'receipt', hidden: true },
+    { path: '/about', page: 'about', icon: 'constructor' },
+  ] }
+  assert.throws(() => checkComponents({ client, components: defaultComponents }), /components.icons has no icon "receipt".*\/sales/)
+  assert.throws(() => checkComponents({ client, components: { ...defaultComponents, icons: { receipt: () => null } } }), /components.icons has no icon "constructor"/)
+  assert.doesNotThrow(() => checkComponents({ client, components: { ...defaultComponents, icons: { receipt: () => null, constructor: () => null } } }))
+  assert.doesNotThrow(() => checkComponents({ client: { ...client, nav: [{ path: '/sales', page: 'list' }] }, components: defaultComponents }))
+})
+
 test('a kind\'s control is replaced through the components map, and the replacement draws in place of the default', () => {
   assert.match(formWith(defaultComponents), /<input[^>]*id="courses-title"/, 'the default map draws the text box')
   const Mine = ({ id, value }: ControlProps) => createElement('output', { id, 'data-mine': '' }, String(value))

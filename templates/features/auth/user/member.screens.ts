@@ -10,7 +10,7 @@ const role = { field: 'role', cell: backofficeUi('role-cells.tsx#MembershipRole'
 
 export const screens = {
   backoffice: {
-    nav: { group: navGroups.access },
+    nav: { icon: 'users', group: navGroups.access },
     // A membership's record is titled by its person.
     useAsTitle: 'userId',
     pages: {

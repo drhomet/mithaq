@@ -3711,11 +3711,12 @@ test('276c. the sidebar on a phone is titled and described in the viewer\'s lang
   window.happyDOM.setViewport({ width: 375 })
   try {
     for (const [locale, dir, title, about] of [['en', 'ltr', 'Navigation', 'The pages you can open.'], ['ar', 'rtl', 'التنقل', 'الصفحات التي يمكنك فتحها.']] as const) {
-      const phone = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { kayan: undefined, locale, dir, t: translator(locale) })
+      const phone = await render(createElement(AppShell, { regions: { primary: null, more: null, header: null, main: 'x' } }), { kayan: undefined, locale, dir, t: translator(locale), screen: { ...screen, nav: [{ path: '/tags', page: 'list', kayan: 'tags', icon: 'book-open' }] } })
       await act(async () => sleep(0))
       await act(async () => click(phone.querySelector('[data-region="header"] [data-sidebar="trigger"]')!))
       await act(async () => sleep(0))
       const popup = window.document.querySelector('[data-mobile="true"][data-slot="sidebar"]')!
+      assert.ok(popup.querySelector('a[href="/dashboard/tags"] svg.lucide-book-open'), 'the phone sheet draws the declared icon instead of the tags path icon')
       const titled = popup.getAttribute('aria-labelledby')
       assert.equal(window.document.getElementById(titled ?? '')?.textContent, title, `${locale}: the sheet is named in the page's language`)
       assert.equal(popup.getAttribute('aria-describedby') !== null && window.document.getElementById(popup.getAttribute('aria-describedby')!)?.textContent === about, true, `${locale}: and described in it`)

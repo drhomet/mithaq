@@ -11,7 +11,7 @@ import { appPage, backofficeList, navGroups } from '@asas/mithaq/mithaq/pages.ts
 
 export const screens = {
   backoffice: {
-    nav: { group: navGroups.people },
+    nav: { icon: 'user-round', group: navGroups.people },
     useAsTitle: 'name',
     pages: {
       ...backofficeList('/users', {

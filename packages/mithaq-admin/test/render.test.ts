@@ -50,6 +50,32 @@ const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-pag
 const { TablePage } = await import('../../../templates/mithaq/src/ui/table-page.tsx')
 const { AppShell, BackofficeShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
 
+test('declared navigation icons override paths in both app shells, with unchanged path and table fallbacks', () => {
+  for (const Shell of [AppShell, BackofficeShell]) {
+    const nav = [
+      { path: '/tags', page: 'list', icon: 'receipt' },
+      { path: '/courses', page: 'list' },
+      { path: '/custom', page: 'list' },
+    ]
+    const draw = (icons?: import('../registry/components.tsx').Icons) => staticMarkup(
+      createElement(ScreenContext, { value: { ...state, screen: { ...screen, nav } } },
+        createElement(AppComponents, { components: { ...appDefaults, icons } },
+          createElement(Shell, { regions: { primary: null, more: null, header: 'Header', main: 'Body' } }))),
+    )
+    const html = draw({ receipt: () => createElement('svg', { 'data-receipt': '' }) })
+    assert.match(html, /href="\/dashboard\/tags"[^>]*><svg data-receipt=""/)
+    assert.match(html, /href="\/dashboard\/courses"[^>]*><svg[^>]*lucide-book-open/)
+    assert.match(html, /href="\/dashboard\/custom"[^>]*><svg[^>]*lucide-table/)
+    assert.throws(() => draw(), /components.icons has no icon "receipt"/)
+  }
+})
+
+test('an app shell with no declared icons still renders without a components provider', () => {
+  const html = staticMarkup(createElement(ScreenContext, { value: { ...state, screen: { ...screen, nav: [{ path: '/tags', page: 'list' }] } } },
+    createElement(AppShell, { regions: { primary: null, more: null, header: 'Header', main: 'Body' } })))
+  assert.match(html, /href="\/dashboard\/tags"[^>]*><svg[^>]*lucide-tags/)
+})
+
 const screen = asas.targets.dashboard.client
 const kayans = Object.values(screen.kayan)
 const courses = screen.kayan.courses!
@@ -1883,7 +1909,7 @@ test('219b. record breadcrumbs keep each host placement and use the viewer\'s la
       const word = locale === 'ar' ? 'الوسوم' : 'Tags'
       const main = screen.path === '/backoffice' ? createElement(BackofficeRecordPage, { regions: { main: 'Body', side: null, danger: null }, page: { path: '/tags/:id' } } as never) : 'Body'
       const props = { regions: { primary: null, more: null, header: createElement('h1', {}, 'A tag'), main }, page: { path: '/tags/:id' } }
-      const html = staticMarkup(createElement(ScreenContext, { value: { ...state, screen, kayan, locale, t: (_key: string, fallback?: string) => _key === 'tags.plural' ? word : fallback } }, createElement(screen.path === '/backoffice' ? BackofficeShell : AppShell, props)))
+      const html = staticMarkup(createElement(ScreenContext, { value: { ...state, screen, kayan, locale, t: (_key: string, fallback?: string) => _key === 'tags.plural' ? word : fallback } }, createElement(AppComponents, { components: appDefaults }, createElement(screen.path === '/backoffice' ? BackofficeShell : AppShell, props))))
       assert.match(html, new RegExp(`href="${screen.path}/tags"[^>]*data-back`))
       assert.equal(html.indexOf('data-back=""') < html.indexOf('A tag'), screen.path !== '/backoffice', 'the tenant breadcrumb stays in the header and the backoffice keeps its body breadcrumb')
     }

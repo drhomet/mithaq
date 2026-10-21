@@ -12819,7 +12819,7 @@ test('203f. the backoffice lists local accounts for a super admin alone, by emai
   const client = asas.targets.backoffice.client
   const kayan = client.kayan.localUsers
   assert.ok(kayan, 'the backoffice screen lists localUsers')
-  assert.deepEqual(client.nav.find((entry) => entry.kayan === 'localUsers'), { path: '/local-users', page: 'list', kayan: 'localUsers', permission: 'localUsers.find', group: { name: 'access', label: { en: 'Access', ar: 'الوصول' }, order: 3 } })
+  assert.deepEqual(client.nav.find((entry) => entry.kayan === 'localUsers'), { path: '/local-users', page: 'list', kayan: 'localUsers', permission: 'localUsers.find', icon: 'table-2', group: { name: 'access', label: { en: 'Access', ar: 'الوصول' }, order: 3 } })
   const list = namedFields(kayan.pages.list)
   assert.deepEqual(list.filter((name, at) => list.indexOf(name) === at), ['email', '_verified', 'createdAt'], 'the list shows the email, the verified state and the date it was made')
   assert.deepEqual(namedFields(kayan.pages.edit), ['email', 'createdAt', '_verified'], 'and the edit page draws the toggle under which account it is')

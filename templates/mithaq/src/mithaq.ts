@@ -450,7 +450,7 @@ export const dashboardScreen = screenTarget({
       path: '/members',
       component: dashboardUi('members.tsx#Members'),
       // With no organization shown, its members are the app's users.
-      nav: { group: navGroups.settings, order: 1, label: showOrganization ? { en: 'Members', ar: 'الأعضاء' } : { en: 'Users', ar: 'المستخدمون' } },
+      nav: { icon: 'users', group: navGroups.settings, order: 1, label: showOrganization ? { en: 'Members', ar: 'الأعضاء' } : { en: 'Users', ar: 'المستخدمون' } },
       permission: 'member.find',
     },
     fixedRole: { path: '/roles/fixed/:name', component: dashboardUi('fixed-role.tsx#FixedRole'), permission: 'roles.find' },
@@ -462,7 +462,7 @@ export const dashboardScreen = screenTarget({
     activity: {
       path: '/activity',
       component: ui('activity-page.tsx#ActivityPage'),
-      nav: { group: navGroups.settings, order: 4, label: { en: 'Activity', ar: 'النشاط' } },
+      nav: { icon: 'history', group: navGroups.settings, order: 4, label: { en: 'Activity', ar: 'النشاط' } },
       permission: 'auditLog.find',
     },
     // end add-on: audit-log

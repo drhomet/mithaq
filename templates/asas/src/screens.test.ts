@@ -428,9 +428,9 @@ test('the template screens share their controls and layouts through one const, r
   assert.deepEqual([...kinds].sort(), ['button', 'button confirm', 'component', 'controls', 'field', 'form', 'form component', 'layout', 'list', 'list component', 'nav', 'row', 'section', 'shell', 'tabs', 'title'].sort())
   assert.deepEqual(Object.keys(dashboard.pages), ['dashboard', 'members', 'fixedRole', 'member', 'activity'], 'a dashboard and the pages that belong to no kayan: the members and the organization\'s activity')
   const settingsGroup = { name: 'settings', label: { en: 'Settings', ar: 'الإعدادات' }, position: 'bottom' }
-  assert.deepEqual(dashboard.pages.activity, { path: '/activity', component: '@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage', nav: { label: { en: 'Activity', ar: 'النشاط' }, group: settingsGroup, order: 4 }, permission: 'auditLog.find' }, 'which the log\'s key serves')
-  assert.deepEqual(dashboard.nav.at(-2), { path: '/members', page: 'members', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find', group: settingsGroup, order: 1 }, 'listed in the nav behind its own key')
-  assert.deepEqual(dashboard.nav.at(-1), { path: '/activity', page: 'activity', label: { en: 'Activity', ar: 'النشاط' }, permission: 'auditLog.find', group: settingsGroup, order: 4 }, 'and the activity behind the log\'s')
+  assert.deepEqual(dashboard.pages.activity, { path: '/activity', component: '@asas/mithaq:./src/ui/activity-page.tsx#ActivityPage', nav: { icon: 'history', label: { en: 'Activity', ar: 'النشاط' }, group: settingsGroup, order: 4 }, permission: 'auditLog.find' }, 'which the log\'s key serves')
+  assert.deepEqual(dashboard.nav.at(-2), { path: '/members', page: 'members', icon: 'users', label: { en: 'Members', ar: 'الأعضاء' }, permission: 'member.find', group: settingsGroup, order: 1 }, 'listed in the nav behind its own key')
+  assert.deepEqual(dashboard.nav.at(-1), { path: '/activity', page: 'activity', icon: 'history', label: { en: 'Activity', ar: 'النشاط' }, permission: 'auditLog.find', group: settingsGroup, order: 4 }, 'and the activity behind the log\'s')
 
 })
 
@@ -738,6 +738,20 @@ test('the nav lists each kayan list page in kayan order and each screen page tha
 test('a kayan navigation label survives the screen projection', () => {
   const built = build({ pages, nav: { label } })
   assert.deepEqual(built.targets.dashboard.client.nav[0]!.label, label)
+})
+
+test('navigation icon names survive projection on kayan and own pages as plain data', () => {
+  const built = build({ pages, nav: { icon: 'receipt' } }, undefined, {
+    dashboard: screenTarget({ ...dashboardBase, kayan: ['courses'], pages: {
+      ...dashboardBase.pages,
+      about: { path: '/about', component: dashboardUi('dashboard.tsx#Dashboard'), nav: { label, icon: 'info' } },
+    } }),
+  })
+  const nav = JSON.parse(JSON.stringify(built.targets.dashboard.client.nav))
+  assert.equal(nav[0].icon, 'receipt')
+  assert.equal(nav[1].icon, 'info')
+  assert.throws(() => build({ pages, nav: { icon: 42 } }), /nav icon.*non-empty string/)
+  assert.throws(() => build({ pages, nav: { icon: '' } }), /nav icon.*non-empty string/)
 })
 
 test('the portal lists sessions for their title alone, so an enrollment\'s session reads by its start there as on the dashboard, with no page and no nav entry', () => {

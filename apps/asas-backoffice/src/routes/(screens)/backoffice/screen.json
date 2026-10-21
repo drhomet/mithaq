@@ -13,6 +13,7 @@
   },
   "nav": [
     {
+      "icon": "user-round",
       "group": {
         "name": "people",
         "label": {
@@ -27,6 +28,7 @@
       "permission": "user.find"
     },
     {
+      "icon": "building-2",
       "group": {
         "name": "organizations",
         "label": {
@@ -41,6 +43,7 @@
       "permission": "organization.find"
     },
     {
+      "icon": "users",
       "group": {
         "name": "access",
         "label": {
@@ -55,6 +58,7 @@
       "permission": "member.find"
     },
     {
+      "icon": "book-open",
       "group": {
         "name": "work",
         "label": {
@@ -69,6 +73,7 @@
       "permission": "courses.find"
     },
     {
+      "icon": "calendar-days",
       "group": {
         "name": "work",
         "label": {
@@ -83,6 +88,7 @@
       "permission": "sessions.find"
     },
     {
+      "icon": "clipboard-list",
       "group": {
         "name": "work",
         "label": {
@@ -97,6 +103,7 @@
       "permission": "enrollments.find"
     },
     {
+      "icon": "tags",
       "group": {
         "name": "library",
         "label": {
@@ -111,6 +118,7 @@
       "permission": "tags.find"
     },
     {
+      "icon": "shield-check",
       "group": {
         "name": "access",
         "label": {
@@ -125,6 +133,7 @@
       "permission": "roles.find"
     },
     {
+      "icon": "user-cog",
       "group": {
         "name": "access",
         "label": {
@@ -139,6 +148,7 @@
       "permission": "memberRoles.find"
     },
     {
+      "icon": "table-2",
       "group": {
         "name": "access",
         "label": {
@@ -153,6 +163,7 @@
       "permission": "localUsers.find"
     },
     {
+      "icon": "history",
       "group": {
         "name": "audit",
         "label": {

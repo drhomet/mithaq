@@ -24,7 +24,7 @@ export const tags = defineKayan({
     // Every organization's rows on the backoffice, read-only, and each row's
     // record, which only reads.
     backoffice: {
-      nav: { group: navGroups.library },
+      nav: { icon: 'tags', group: navGroups.library },
       useAsTitle: 'name',
       pages: {
         ...backofficeList('/tags', { columns: ['name', 'organization', 'createdAt'], filters: ['organization'], search: ['name'] }),
@@ -35,7 +35,7 @@ export const tags = defineKayan({
     // as a label, so it is one string per locale, and every screen reads it in
     // the viewer's.
     dashboard: {
-      nav: { group: navGroups.library },
+      nav: { icon: 'tags', group: navGroups.library },
       useAsTitle: 'name',
       description: {
         en: 'Labels the organization groups its records by.',

@@ -19,6 +19,7 @@
           "en": "Members",
           "ar": "الأعضاء"
         },
+        "icon": "users",
         "order": 1,
         "group": {
           "name": "settings",
@@ -49,6 +50,7 @@
           "en": "Activity",
           "ar": "النشاط"
         },
+        "icon": "history",
         "order": 4,
         "group": {
           "name": "settings",
@@ -64,6 +66,7 @@
   },
   "nav": [
     {
+      "icon": "book-open",
       "group": {
         "name": "work",
         "label": {
@@ -78,6 +81,7 @@
       "permission": "courses.find"
     },
     {
+      "icon": "calendar-days",
       "group": {
         "name": "work",
         "label": {
@@ -92,6 +96,7 @@
       "permission": "sessions.find"
     },
     {
+      "icon": "clipboard-list",
       "group": {
         "name": "work",
         "label": {
@@ -106,6 +111,7 @@
       "permission": "enrollments.find"
     },
     {
+      "icon": "tags",
       "group": {
         "name": "library",
         "label": {
@@ -120,6 +126,7 @@
       "permission": "tags.find"
     },
     {
+      "icon": "table-2",
       "group": {
         "name": "library",
         "label": {
@@ -134,6 +141,7 @@
       "permission": "media.find"
     },
     {
+      "icon": "shield-check",
       "group": {
         "name": "settings",
         "label": {
@@ -148,6 +156,7 @@
       "permission": "roles.find"
     },
     {
+      "icon": "settings-2",
       "order": -1,
       "group": {
         "name": "settings",
@@ -169,6 +178,7 @@
         "en": "Members",
         "ar": "الأعضاء"
       },
+      "icon": "users",
       "order": 1,
       "group": {
         "name": "settings",
@@ -187,6 +197,7 @@
         "en": "Activity",
         "ar": "النشاط"
       },
+      "icon": "history",
       "order": 4,
       "group": {
         "name": "settings",

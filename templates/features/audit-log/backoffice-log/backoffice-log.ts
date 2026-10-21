@@ -42,7 +42,7 @@ export const backofficeLog = defineKayan({
       operations: { find: defaultOperations.find, findByID: defaultOperations.findByID, count: defaultOperations.count },
     },
     backoffice: {
-      nav: { group: navGroups.audit },
+      nav: { icon: 'history', group: navGroups.audit },
       pages: {
         ...backofficeList('/history', {
           columns: ['createdAt', 'action', 'actorEmail', 'targetEmail', 'previousRole', 'role', 'banReason'],

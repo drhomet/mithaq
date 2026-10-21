@@ -1,23 +1,8 @@
 // The frame both screens may put at the root of a page: a collapsible sidebar holding the organization switcher, the nav and the user menu, and an inset holding the site header over the page.
 // A row that goes nowhere is not drawn, so there are no quick-create or inbox buttons, documents group, or help and search rows: none has a destination in this template.
 import { use, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
-import {
-  ArrowUpRight,
-  BookOpen,
-  Building2,
-  CalendarDays,
-  ClipboardList,
-  History,
-  LayoutDashboard,
-  Settings2,
-  ShieldCheck,
-  Table2,
-  Tags,
-  UserCog,
-  UserRound,
-  Users,
-  type LucideIcon,
-} from 'lucide-react'
+import { ArrowUpRight, type LucideIcon } from 'lucide-react'
+import { navIcons } from './nav-icons.ts'
 import type { ShellProps } from 'mithaq/admin'
 import { ScreenContext, useLocale, useNav, useScreen, useUser } from 'mithaq/admin/react'
 import { authArm } from '@/api.ts'
@@ -26,6 +11,7 @@ import { locales, switchLocale } from '@/copy.ts'
 import { PageHeader } from 'mithaq-admin/page-header.tsx'
 import { DiscardDialog } from 'mithaq-admin/discard-dialog.tsx'
 import { NavSidebar } from 'mithaq-admin/nav.tsx'
+import { NavigationIcon } from 'mithaq-admin/components.tsx'
 import { NavUserMenu } from 'mithaq-admin/nav-user.tsx'
 import { OrganizationSwitcher, type NavOrganization } from 'mithaq-admin/organization-switcher.tsx'
 import { buttonVariants } from '@/components/ui/button'
@@ -51,21 +37,21 @@ export const regions = ['header', 'primary', 'more', 'main'] as const
 
 /** One icon per nav entry, keyed by the entry's path under the screen, and `Table2` for any other. */
 const icons: Record<string, LucideIcon> = {
-  '/': LayoutDashboard,
-  '/users': UserRound,
-  '/organizations': Building2,
-  '/members': Users,
-  '/courses': BookOpen,
-  '/sessions': CalendarDays,
-  '/enrollments': ClipboardList,
-  '/tags': Tags,
-  '/roles': ShieldCheck,
-  '/member-roles': UserCog,
-  '/settings': Settings2,
-  '/activity': History,
-  '/history': History,
+  '/': navIcons['layout-dashboard'],
+  '/users': navIcons['user-round'],
+  '/organizations': navIcons['building-2'],
+  '/members': navIcons['users'],
+  '/courses': navIcons['book-open'],
+  '/sessions': navIcons['calendar-days'],
+  '/enrollments': navIcons['clipboard-list'],
+  '/tags': navIcons['tags'],
+  '/roles': navIcons['shield-check'],
+  '/member-roles': navIcons['user-cog'],
+  '/settings': navIcons['settings-2'],
+  '/activity': navIcons['history'],
+  '/history': navIcons['history'],
 }
-export const iconOf = (path: string) => (Object.hasOwn(icons, path) ? icons[path]! : Table2)
+export const iconOf = (path: string) => (Object.hasOwn(icons, path) ? icons[path]! : navIcons['table-2'])
 
 /**
  * The path the browser is on. The server has no location, so nothing is
@@ -128,7 +114,7 @@ function NavMain({ home }: { home?: string }) {
   const screen = useScreen()
   const pathname = usePathname()
   const entries = [
-    { path: '/', page: 'home', label: { [locale]: home ?? t('dashboard.dashboard', 'Dashboard') ?? 'Dashboard' } },
+    { path: '/', page: 'home', icon: undefined, label: { [locale]: home ?? t('dashboard.dashboard', 'Dashboard') ?? 'Dashboard' } },
     ...useNav().filter((entry) => !entry.hidden),
   ]
   const groups: (typeof entries)[] = []
@@ -144,14 +130,13 @@ function NavMain({ home }: { home?: string }) {
         <SidebarMenu>
           {group.map((entry) => {
             const href = entry.path === '/' ? screen.path : `${screen.path}${entry.path}`
-            const Icon = iconOf(entry.path)
             const isActive = pathname !== undefined && (pathname === href || (entry.path !== '/' && pathname.startsWith(`${href}/`)))
             return (
               <SidebarMenuItem key={entry.path}>
                 <SidebarMenuButton
                   isActive={isActive}
                   className="min-h-11 md:min-h-0"
-                  render={<a href={href} aria-current={isActive ? 'page' : undefined}><Icon /><span>{navLabel({ entry, screen, locale, t })}</span></a>}
+                  render={<a href={href} aria-current={isActive ? 'page' : undefined}><NavigationIcon name={entry.icon} fallback={iconOf(entry.path)} at={`nav "${entry.path}"`} /><span>{navLabel({ entry, screen, locale, t })}</span></a>}
                 />
               </SidebarMenuItem>
             )

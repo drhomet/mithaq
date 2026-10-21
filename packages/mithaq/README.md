@@ -841,7 +841,7 @@ a missing file or export fails the build. Where it lives:
 `packages/mithaq/src/screen/index.ts` `screenTarget`.
 
 A kayan's `targets.<screen>.nav` controls its sidebar entry. It accepts
-`order`, `hidden` and `group`. A group names `name`, a localized `label`,
+`label`, `icon`, `order`, `hidden` and `group`. A group names `name`, a localized `label`,
 optional `order` and optional `position: 'bottom'`. A screen's own page puts
 the same keys beside its `nav.label`. `navOf(screen, report)` removes entries
 without permission, keeps hidden entries, and orders the groups and their
@@ -851,6 +851,29 @@ render. Use the same group metadata wherever a group is named.
 `hidden: true` changes the sidebar alone. The list route, its read operation
 and its permission remain declared and authorized as before. Regenerate
 screens after changing navigation metadata.
+
+`icon` is a name in the host app's `components.icons` map, for example
+`nav: { icon: 'receipt' }`. Import only the icons the app uses:
+
+```ts
+import { Receipt } from 'lucide-react'
+import { defaultComponents } from 'mithaq-admin/default-components.tsx'
+
+export const components = { ...defaultComponents, icons: { receipt: Receipt } }
+```
+
+The same map is mounted with `ComponentsProvider` and passed to
+`checkComponents({ client, components })` for every screen at boot. That check
+refuses an unregistered name, including one on a hidden entry, and names its
+screen and path. The generator checks that a name is a non-empty string; it
+cannot see a host's React map, so registration is checked at boot. Names remain
+strings in generated screens, and TypeScript accepts the same names boot does.
+The starter's sidebar and phone sheet draw the declared icon first, then the
+existing path icon when none is declared, then `Table2`. The backoffice uses
+the same resolver. Existing shells need to read `entry.icon` from `useNav()`
+and resolve it with `navIconFor` from `mithaq-admin/components.tsx` to adopt it.
+The starter's named imports live in `ui/nav-icons.ts`; no icon-library lookup
+or dynamic import pulls the whole library into the bundle.
 
 ### Lists
 

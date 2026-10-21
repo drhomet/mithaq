@@ -147,7 +147,7 @@ export const memberRoles = defineKayan({
     // record. An assignment is looked for by its person, is titled by them, and
     // reads its role by the role's label, never its slug.
     backoffice: {
-      nav: { group: navGroups.access },
+      nav: { icon: 'user-cog', group: navGroups.access },
       useAsTitle: 'user',
       pages: {
         ...backofficeList('/member-roles', { columns: ['user', role, 'organization'], filters: ['organization', 'user', 'role'], search: ['user.name', 'user.email'] }),

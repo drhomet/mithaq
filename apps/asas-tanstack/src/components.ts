@@ -1,4 +1,5 @@
 import type { Language } from 'asas'
+import { navIcons } from 'asas/ui-dashboard/nav-icons.ts'
 import type { ComponentsOf } from 'mithaq-admin/components.tsx'
 import { defaultComponents } from 'mithaq-admin/default-components.tsx'
 // add-on: rich-text
@@ -14,6 +15,7 @@ import { uploadComponents } from 'mithaq-admin/upload.tsx'
 // A file of its own, so the server entry reads the map without evaluating the router and its route tree.
 export const components: ComponentsOf<Language> = {
   ...defaultComponents,
+  icons: navIcons,
   controls: {
     ...defaultComponents.controls,
     // add-on: rich-text

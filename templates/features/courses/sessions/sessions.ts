@@ -42,7 +42,7 @@ export const sessions = defineKayan({
   dbName: 'course_sessions',
   targets: {
     backoffice: {
-      nav: { group: navGroups.work },
+      nav: { icon: 'calendar-days', group: navGroups.work },
       useAsTitle: 'startsAt',
       pages: {
         ...backofficeList('/sessions', { columns: ['startsAt', 'organization', 'course', 'capacity', 'venue'], phone: 'table', filters: ['organization', 'course', 'venue', 'archived'], search: ['venue', 'course.title'], sort: '-startsAt' }),
@@ -64,7 +64,7 @@ export const sessions = defineKayan({
     // does on the dashboard.
     portal: { useAsTitle: 'startsAt' },
     dashboard: {
-      nav: { group: navGroups.work },
+      nav: { icon: 'calendar-days', group: navGroups.work },
       // What a session is shown by wherever it stands for itself: the picker on `enrollments.session`
       // and a relationship column pointing here. A session declares no name, and its start tells two
       // sessions of one course apart, drawn in the viewer's own format. The search boxes come to

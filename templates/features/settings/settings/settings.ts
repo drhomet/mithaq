@@ -46,7 +46,7 @@ export const settings = defineGlobal({
     // updates the row there is. Its fields in sections under its sentence, and the
     // yes or no setting a switch with its label beside it.
     dashboard: {
-      nav: { group: navGroups.settings, order: -1 },
+      nav: { icon: 'settings-2', group: navGroups.settings, order: -1 },
       description: {
         en: 'Where students reach the school, and whether the portal is open to them.',
         ar: 'أين يتواصل الطلاب مع المدرسة، وهل البوابة مفتوحة لهم.',
