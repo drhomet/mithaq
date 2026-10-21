@@ -1,4 +1,3 @@
-import { useId } from 'react'
 import type { Role } from 'mithaq-admin/member-types.ts'
 import { Lock } from 'lucide-react'
 import { useList, useLocale, useScreen } from 'mithaq/admin/react'
@@ -7,7 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 /** Counts are omitted when the caller cannot read membership and assignments. */
 export function RolesTable({ roles, counts, failed }: { roles: readonly Role[]; counts?: Readonly<Record<string, number>>; failed?: boolean }) {
-  const headers = useId()
   const { page, creates, href, newHref } = useList()
   const { path } = useScreen()
   const { locale, t } = useLocale()
@@ -21,19 +19,19 @@ export function RolesTable({ roles, counts, failed }: { roles: readonly Role[]; 
     <div data-list-frame="" className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader className="bg-muted/50"><TableRow>
-          <TableHead id={`${headers}-name`} data-list-column-head="" scope="col">{t('roles.name', 'Name')}</TableHead>
-          <TableHead id={`${headers}-kind`} data-list-column-head="" scope="col">{t('dashboard.rolesKind', 'Kind')}</TableHead>
-          <TableHead id={`${headers}-members`} data-list-column-head="" scope="col">{t('dashboard.members', 'Members')}</TableHead>
+          <TableHead data-list-column-head="" scope="col">{t('roles.name', 'Name')}</TableHead>
+          <TableHead data-list-column-head="" scope="col">{t('dashboard.rolesKind', 'Kind')}</TableHead>
+          <TableHead data-list-column-head="" scope="col">{t('dashboard.members', 'Members')}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{rows.map((role) => <TableRow key={role.id} data-row={role.id} data-fixed={role.fixed} data-list-card="">
-          <TableCell headers={`${headers}-name`} data-list-title="" className="whitespace-normal">
+          <TableCell data-list-title="" className="whitespace-normal">
             <a data-list-stretched-link="" href={role.fixed ? `${path}/roles/fixed/${encodeURIComponent(role.name)}` : href(role.id)} className="inline-flex min-h-11 items-center gap-2 font-medium underline underline-offset-4">
               {role.fixed ? <Lock data-lock="" className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" /> : null}
               {role.label?.[locale] ?? role.name}
             </a>
           </TableCell>
-          <TableCell headers={`${headers}-kind`} data-list-detail=""><span aria-hidden="true" data-list-label="" className="sm:hidden">{t('dashboard.rolesKind', 'Kind')}:</span><div data-list-value="" className="sm:contents">{role.fixed ? t('dashboard.rolesFixed', 'Fixed') : t('dashboard.rolesCustom', 'Custom')}</div></TableCell>
-          <TableCell headers={`${headers}-members`} data-member-count="" data-list-detail="" className="tabular-nums"><span aria-hidden="true" data-list-label="" className="sm:hidden">{t('dashboard.members', 'Members')}:</span><div data-list-value="" className="sm:contents">{counts && role.name ? new Intl.NumberFormat(locale).format(Object.hasOwn(counts, role.name) ? counts[role.name]! : 0) : '—'}</div></TableCell>
+          <TableCell data-list-detail=""><span aria-hidden="true" data-list-label="" className="sm:hidden">{t('dashboard.rolesKind', 'Kind')}:</span><div data-list-value="" className="sm:contents">{role.fixed ? t('dashboard.rolesFixed', 'Fixed') : t('dashboard.rolesCustom', 'Custom')}</div></TableCell>
+          <TableCell data-member-count="" data-list-detail="" className="tabular-nums"><span aria-hidden="true" data-list-label="" className="sm:hidden">{t('dashboard.members', 'Members')}:</span><div data-list-value="" className="sm:contents">{counts && role.name ? new Intl.NumberFormat(locale).format(Object.hasOwn(counts, role.name) ? counts[role.name]! : 0) : '—'}</div></TableCell>
         </TableRow>)}</TableBody>
       </Table>
     </div>

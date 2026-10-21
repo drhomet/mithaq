@@ -10,8 +10,9 @@
   }
   [data-list-frame] > div:first-child { max-height: none; overflow: visible; }
   [data-list-frame] table { display: block; }
-  /* Keep the real column headers available to table navigation without drawing them over the cards. */
-  [data-list-frame] thead {
+  /* Chromium assigns column headers by cell position, so clipped columns must stay in its table. */
+  [data-list-frame] thead,
+  [data-list-card] > [data-list-extra] {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -55,7 +56,8 @@
   [data-list-card] > [data-list-select-row] { display: flex; grid-row: 1; grid-column: 1; align-items: center; justify-content: center; }
   [data-list-card] > [data-list-actions] { display: flex; grid-row: 1; grid-column: -2 / -1; align-items: center; justify-content: end; }
   [data-list-card] > [data-list-detail] { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr); gap: 0.5rem; align-items: baseline; }
-  [data-list-card] > [data-list-extra] { display: none; }
+  /* Clipped cells keep their column positions, but their controls must never become invisible tab stops. */
+  [data-list-extra] :is(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]) { display: none; }
   [data-list-label] { color: var(--muted-foreground); font-size: 0.75rem; }
   [data-list-value] { min-width: 0; }
   [data-list-value] [data-slot=badge] { max-width: 100%; height: auto; white-space: normal; overflow-wrap: anywhere; }

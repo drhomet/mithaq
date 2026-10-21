@@ -8731,11 +8731,6 @@ test('phone cards keep one row link and checkbox, labelled details, and independ
   assert.ok(row.querySelector('[data-list-extra]'), 'further columns stay available to the desktop table')
   assert.equal(row.querySelectorAll('[role="checkbox"]').length, 1)
   assert.equal(host.querySelectorAll('thead [role="checkbox"]').length, 1)
-  for (const cell of row.querySelectorAll('td')) {
-    const header = host.querySelector(`[id="${cell.getAttribute('headers')}"]`)
-    assert.equal(header?.tagName, 'TH', 'each card cell keeps its own real column header')
-    assert.equal(header?.getAttribute('scope'), 'col')
-  }
   assert.ok([...row.querySelectorAll('[data-list-label]')].every((label) => label.getAttribute('aria-hidden') === 'true'), 'visible labels do not repeat the accessible column header')
   let opened = 0
   row.querySelector('a[data-row-link]')!.addEventListener('click', (event) => { event.preventDefault(); opened++ })
@@ -8757,7 +8752,6 @@ test('the dedicated roles list uses the same labelled phone card layout without 
   const card = host.querySelector('[data-roles] [data-list-card]')
   assert.ok(card)
   assert.equal(card.closest('table') !== null, true)
-  for (const cell of card.querySelectorAll('td')) assert.equal(host.querySelector(`[id="${cell.getAttribute('headers')}"]`)?.getAttribute('scope'), 'col')
   assert.ok([...card.querySelectorAll('[data-list-label]')].every((label) => label.getAttribute('aria-hidden') === 'true'))
   assert.equal(card.querySelector('[data-list-title] a')?.getAttribute('href'), '/roles/r1')
   assert.deepEqual([...card.querySelectorAll('[data-list-label]')].map((one) => one.textContent), ['Kind:', 'Members:'])

@@ -139,8 +139,10 @@ colors, fonts, radii and `components.json` while merging these changes:
   the column picker's order chooses those details. Keep the host's
   `mithaq-admin/source.css` import for the card layout. Sorting and select-all
   sit before the list frame below `sm`. Keep the real column headers visually
-  hidden there, with each cell linked by `headers`; hide repeated card labels
-  from screen readers. The table keeps its original layout from `sm` upward.
+  hidden there. Extra cells also stay visually hidden in the table, preserving
+  Chromium's column order; their controls stay outside the phone tab order. Hide
+  repeated card labels from screen readers. The table keeps its original layout
+  from `sm` upward.
   Add translations for `admin.sortBy`, `admin.defaultOrder`, `admin.ascending`
   and `admin.descending` to the host's copy. If a host styles `td:empty`, extend
   that rule to `[data-list-value]:empty::after` too, as the backoffice starter
