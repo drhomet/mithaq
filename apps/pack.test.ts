@@ -38,3 +38,9 @@ test('the skills and the license notices staged are exactly the files git tracks
   assert.deepEqual(filesUnder('skills'), tracked('templates/asas/.claude/skills'))
   assert.deepEqual(filesUnder('LICENSES'), tracked('LICENSES'))
 })
+
+test('the staged mithaq package ships the release changelog and includes it in the npm file list', () => {
+  assert.equal(readFileSync(join(staged, 'CHANGELOG.md'), 'utf8'), readFileSync(join(root, 'CHANGELOG.md'), 'utf8'))
+  const manifest = JSON.parse(readFileSync(join(staged, 'package.json'), 'utf8')) as { files: string[] }
+  assert.ok(manifest.files.includes('CHANGELOG.md'))
+})

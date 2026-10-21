@@ -59,6 +59,7 @@ stageLicenses(stagedAdmin)
 console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
 
 cpSync(join(root, 'README.md'), join(staged, 'README.md'))
+cpSync(join(root, 'CHANGELOG.md'), join(staged, 'CHANGELOG.md'))
 // The user guides at their repository paths, so each relative link between them resolves as it does on GitHub, and a
 // project's agent reads the ones that match the version it installed. The contributor AGENTS.md files stay out.
 for (const guide of tracked(...guides)) {
