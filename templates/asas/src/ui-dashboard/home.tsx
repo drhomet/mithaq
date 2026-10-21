@@ -7,6 +7,7 @@ import type { LoaderTools, PageProps } from 'mithaq/admin'
 import { useLocale, useScreen } from 'mithaq/admin/react'
 import { AppShell, iconOf } from '@asas/mithaq/ui/app-shell.tsx'
 import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
+import { NavigationIcon } from 'mithaq-admin/components.tsx'
 import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 // add-on: roles
 import { MembersCard, membersFigures } from './members-card.tsx'
@@ -50,13 +51,12 @@ export function Home({ loaderData }: PageProps<Awaited<ReturnType<typeof loader>
             <div className="grid grid-cols-2 items-start gap-4 @2xl:grid-cols-4">
               {screen.nav.flatMap((entry) => {
                 if (!entry.kayan) return []
-                const Icon = iconOf(entry.path)
                 const counted = counts?.[entry.kayan]
                 return [
                   <KpiCard
                     key={entry.kayan}
                     kpi={entry.kayan}
-                    icon={<Icon className="size-4" />}
+                    icon={<NavigationIcon name={entry.icon} fallback={iconOf(entry.path)} className="size-4" at={`home nav "${entry.path}"`} />}
                     title={navLabel({ entry, screen, locale, t })}
                     value={counted === undefined ? '—' : new Intl.NumberFormat(locale).format(counted)}
                     footer={<a href={`${screen.path}${entry.path}`} className="text-foreground inline-flex items-center hover:underline min-h-11 sm:min-h-0">{t('portal.open', 'Open the list')}</a>}

@@ -38,7 +38,7 @@ export const language = defineMithaq({
     drizzle: drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
-    dashboard: screenTarget({ ...dashboardScreen, kayan: ['swatches'], controls: screenKinds, pages: { home: { path: '/', component: dashboardScreen.pages.dashboard!.component } } }),
+    dashboard: screenTarget({ ...dashboardScreen, icons: [], kayan: ['swatches'], controls: screenKinds, pages: { home: { path: '/', component: dashboardScreen.pages.dashboard!.component } } }),
   },
 })
 

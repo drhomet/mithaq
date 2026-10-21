@@ -2,8 +2,8 @@
 
 ## 0.3.4
 
-- Kayan and own-page navigation can declare `nav.icon`, a serializable name in the app's optional `components.icons` map. Named imports keep unused icons out of the bundle. `checkComponents` refuses unregistered names at boot, including hidden entries.
-- The starter declares its existing icons and draws them in the sidebar, phone sheet and backoffice. Entries without a declaration keep the previous path icon, then `Table2`. Existing projects can adopt the starter's `ui/nav-icons.ts`, register their icons in each host's components map and merge the resolver in `ui/app-shell.tsx`. No migration is needed.
+- Kayan and own-page navigation can declare `nav.icon`, a serializable name from `screenTarget.icons`, implemented in the app's `components.icons` map. Screen builds refuse undeclared names before generation, and the language's typed components map requires every declared icon. Named imports keep unused icons out of the bundle. `checkComponents` refuses unregistered names at boot, including hidden entries.
+- The starter declares its existing icons and draws them in the sidebar, phone sheet, home summary cards and backoffice. Entries without a declaration keep the previous path icon, then `Table2`. Existing projects can adopt the starter's `ui/nav-icons.ts`, register their icons in each host's components map and merge the resolver in `ui/app-shell.tsx`. No migration is needed.
 
 ## 0.3.3
 

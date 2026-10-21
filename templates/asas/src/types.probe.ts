@@ -3143,9 +3143,23 @@ const withScreen = defineMithaq({
   targets: {
     ...localeTargets,
     service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'drizzle', schema: 'zod', authorize: defaultAuthorize }),
-    portal: screenTarget({ path: '/portal', kayan: ['screenProbe'], controls: screenKinds, providers: [], pages: { home: { path: '/', component: probeUi('home.tsx#Home') } }, layouts: { shell: probeUi('shell.tsx#Shell'), page: probeUi('page.tsx#Page') }, components: {} }),
+    portal: screenTarget({ icons: ['receipt'], path: '/portal', kayan: ['screenProbe'], controls: screenKinds, providers: [], pages: { home: { path: '/', component: probeUi('home.tsx#Home') } }, layouts: { shell: probeUi('shell.tsx#Shell'), page: probeUi('page.tsx#Page') }, components: {} }),
   },
 })
+withScreen.defineKayan({ name: 'iconProbe', fields: { id: defaultFields.id }, targets: { portal: { nav: { icon: 'receipt' } } } })
+withScreen.defineKayan({ name: 'unknownIconProbe', fields: { id: defaultFields.id }, targets: {
+  // @ts-expect-error a kayan icon must be in its screen's names
+  portal: { nav: { icon: 'typo' } },
+} })
+screenTarget({ path: '/icons', kayan: [], controls: screenKinds, icons: ['receipt'], providers: [], layouts: {}, components: {}, pages: {
+  home: { path: '/', component: probeUi('home.tsx#Home'), nav: { label: { en: 'Home' }, icon: 'receipt' } },
+  // @ts-expect-error own pages use the declared names without widening them from this reference
+  typo: { path: '/typo', component: probeUi('home.tsx#Home'), nav: { label: { en: 'Typo' }, icon: 'typo' } },
+} })
+screenTarget({ path: '/icons', kayan: [], controls: screenKinds, providers: [], layouts: {}, components: {}, pages: {
+  // @ts-expect-error omitting the list declares no icon names
+  home: { path: '/', component: probeUi('home.tsx#Home'), nav: { label: { en: 'Home' }, icon: 'receipt' } },
+} })
 withScreen.defineKayan({
   name: 'screenProbe',
   fields: { id: defaultFields.id, title: { kind: 'text', targets: { portal: { component: 'text' } } } },
@@ -3209,7 +3223,7 @@ withScreen.defineKayan({
 // `mithaq screens` reads the projection and nothing else, so none of these types gains a key beside
 // the ones listed.
 type ScreenTargetKeys = Expect<
-  Equal<keyof import('mithaq').ScreenTarget, 'capability' | 'type' | 'path' | 'kayan' | 'controls' | 'providers' | 'pages' | 'layouts' | 'components'>
+  Equal<keyof import('mithaq').ScreenTarget, 'capability' | 'type' | 'path' | 'kayan' | 'controls' | 'icons' | 'providers' | 'pages' | 'layouts' | 'components'>
 >
 type ScreenKayanKeys = Expect<Equal<keyof import('mithaq').ScreenKayan, 'nav' | 'useAsTitle' | 'description' | 'baseFilter' | 'pages'>>
 type ScreenPageKeys = Expect<Equal<keyof import('mithaq').ScreenPage, 'path' | 'page' | 'mode' | 'component'>>

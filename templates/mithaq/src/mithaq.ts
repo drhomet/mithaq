@@ -330,6 +330,7 @@ const coursesPortal = folderOf(new URL('courses/portal/ui/', featuresFolder))
  */
 const shared = {
   controls: screenKinds,
+  icons: ['layout-dashboard', 'user-round', 'building-2', 'users', 'book-open', 'calendar-days', 'clipboard-list', 'tags', 'shield-check', 'user-cog', 'settings-2', 'history', 'table-2'] as const,
   layouts: {
     app: ui('app-shell.tsx#AppShell'),
     record: ui('record-page.tsx#RecordPage'),

@@ -8,6 +8,7 @@ import type { LoaderTools, PageProps } from 'mithaq/admin'
 import { useLocale, useScreen } from 'mithaq/admin/react'
 import { BackofficeShell, iconOf } from '@asas/mithaq/ui/app-shell.tsx'
 import { KpiCard } from '@asas/mithaq/ui/kpi-card.tsx'
+import { NavigationIcon } from 'mithaq-admin/components.tsx'
 import { navLabel } from '@asas/mithaq/ui/screen-nav.tsx'
 
 /** How many rows of each kayan the viewer may count, read as the viewer, keyed by its kayan. */
@@ -35,13 +36,12 @@ export function Home({ loaderData: counts }: PageProps<Record<string, number | u
             <div className="grid grid-cols-2 items-start gap-4 @2xl:grid-cols-3 @5xl:grid-cols-4 [&_[data-slot=card]]:[--card-spacing:--spacing(4)]">
               {screen.nav.flatMap((entry) => {
                 if (!entry.kayan) return []
-                const Icon = iconOf(entry.path)
                 const counted = counts?.[entry.kayan]
                 return [
                   <KpiCard
                     key={entry.kayan}
                     kpi={entry.kayan}
-                    icon={<Icon className="size-4" />}
+                    icon={<NavigationIcon name={entry.icon} fallback={iconOf(entry.path)} className="size-4" at={`home nav "${entry.path}"`} />}
                     title={navLabel({ entry, screen, locale, t })}
                     value={counted === undefined ? '—' : new Intl.NumberFormat(locale).format(counted)}
                     // Underlined, with an arrow that follows the reading direction, so it reads as a link.

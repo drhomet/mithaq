@@ -49,6 +49,8 @@ const { pageButtonOf } = await import('../registry/node-buttons.tsx')
 const { RecordPage } = await import('../../../templates/mithaq/src/ui/record-page.tsx')
 const { TablePage } = await import('../../../templates/mithaq/src/ui/table-page.tsx')
 const { AppShell, BackofficeShell } = await import('../../../templates/mithaq/src/ui/app-shell.tsx')
+const { Home: DashboardHome } = await import('../../../templates/asas/src/ui-dashboard/home.tsx')
+const { Home: BackofficeHome } = await import('../../../templates/asas/src/ui-backoffice/home.tsx')
 
 test('declared navigation icons override paths in both app shells, with unchanged path and table fallbacks', () => {
   for (const Shell of [AppShell, BackofficeShell]) {
@@ -67,6 +69,16 @@ test('declared navigation icons override paths in both app shells, with unchange
     assert.match(html, /href="\/dashboard\/courses"[^>]*><svg[^>]*lucide-book-open/)
     assert.match(html, /href="\/dashboard\/custom"[^>]*><svg[^>]*lucide-table/)
     assert.throws(() => draw(), /components.icons has no icon "receipt"/)
+  }
+})
+
+test('both home summary cards draw the declared icon at the card size', () => {
+  for (const [Home, loaderData] of [[DashboardHome, { counts: { sales: 3 } }], [BackofficeHome, { sales: 3 }]] as const) {
+    const nav = [{ path: '/sales', page: 'list', kayan: 'sales', icon: 'receipt' }]
+    const receipt = ({ className }: { className?: string }) => createElement('svg', { 'data-receipt': '', className })
+    const html = staticMarkup(createElement(ScreenContext, { value: { ...state, screen: { ...screen, nav } } },
+      createElement(AppComponents, { components: { ...appDefaults, icons: { receipt } } }, createElement(Home as typeof DashboardHome, { loaderData } as never))))
+    assert.match(html, /data-kpi="sales"[^]*?<svg data-receipt="" class="size-4"/)
   }
 })
 

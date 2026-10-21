@@ -45,10 +45,10 @@ export const folderOf = (folder: URL) => {
 export type ScreenRef<Registered extends string = string> = Registered | Ui
 
 /** Sidebar placement only; routes and access are independent of navigation. */
-export type ScreenNav<Locale extends string = string> = {
+export type ScreenNav<Locale extends string = string, Icon extends string = string> = {
   readonly label?: Localized<Locale>
-  /** A name in the app's components.icons map, checked when its host starts. */
-  readonly icon?: string
+  /** A name the screen declares and the host registers in components.icons. */
+  readonly icon?: Icon
   readonly hidden?: boolean
   readonly order?: number
   readonly group?: {
@@ -60,11 +60,11 @@ export type ScreenNav<Locale extends string = string> = {
 }
 
 /** A page of the screen's own, which belongs to no kayan: one component drawing the whole page. */
-export type ScreenOwnPage<Locale extends string = string, Ref extends string | Ui = string | Ui> = {
+export type ScreenOwnPage<Locale extends string = string, Ref extends string | Ui = string | Ui, Icon extends string = string> = {
   readonly path: string
   readonly component: Ref
   /** A nav entry for this page, under this label. */
-  readonly nav?: ScreenNav<Locale> & { readonly label: Localized<Locale> }
+  readonly nav?: ScreenNav<Locale, Icon> & { readonly label: Localized<Locale> }
   /** The catalog key an actor needs for the nav to list this page. */
   readonly permission?: string
 }
@@ -74,6 +74,7 @@ export type ScreenTarget<
   Controls extends Record<string, ScreenKind> = Record<string, ScreenKind>,
   Layouts extends Record<string, Ui> = Record<string, Ui>,
   Components extends Record<string, Ui> = Record<string, Ui>,
+  IconNames extends readonly string[] = readonly string[],
 > = {
   readonly capability: 'screen'
   readonly type: 'screen'
@@ -83,10 +84,12 @@ export type ScreenTarget<
   readonly kayan: readonly string[]
   /** One row per kind of the language: what draws its value in a form and in a list. */
   readonly controls: Controls
+  /** Names only: each host supplies the icon components in its own map. */
+  readonly icons?: IconNames
   /** Outermost first, each handed `{ children }`. */
   readonly providers: readonly ScreenRef<keyof Components & string>[]
   /** The pages that belong to no kayan, each drawn whole by one component. One of them is at `/`. */
-  readonly pages: Readonly<Record<string, ScreenOwnPage<string, ScreenRef<keyof Components & string>>>>
+  readonly pages: Readonly<Record<string, ScreenOwnPage<string, ScreenRef<keyof Components & string>, NoInfer<IconNames[number]>>>>
   /** The shells and layouts a page tree names, by a short name. */
   readonly layouts: Layouts
   /** The components a page names, by a short name. */
@@ -97,7 +100,8 @@ export const screenTarget = <
   const Controls extends Record<string, ScreenKind>,
   const Layouts extends Record<string, Ui>,
   const Components extends Record<string, Ui>,
->(target: Omit<ScreenTarget<Controls, Layouts, Components>, 'capability' | 'type'>): ScreenTarget<Controls, Layouts, Components> => ({
+  const IconNames extends readonly string[] = readonly [],
+>(target: Omit<ScreenTarget<Controls, Layouts, Components, IconNames>, 'capability' | 'type'>): ScreenTarget<Controls, Layouts, Components, IconNames> => ({
   capability: 'screen',
   type: 'screen',
   ...target,
@@ -267,8 +271,8 @@ export type ScreenPage<Locale extends string = string, Ref extends string | Ui =
   | { readonly path: string; readonly component: Ref; readonly page?: never; readonly mode?: never }
 
 /** What `targets.<screen>` on a kayan says, complete for that screen. */
-export type ScreenKayan<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string> = {
-  readonly nav?: ScreenNav<Locale>
+export type ScreenKayan<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string, Icon extends string = string> = {
+  readonly nav?: ScreenNav<Locale, Icon>
   readonly useAsTitle?: FieldName
   readonly description?: Localized<Locale>
   /** The rows this screen lists of the kayan, ANDed with whatever a list asks. A list filter, not access: a row it leaves out is still read by its id. */
@@ -286,6 +290,8 @@ export type ScreenKeys<Targets> = {
 export type RefOf<Target, Kinds = {}> = Target extends { layouts: infer Layouts; components: infer Components }
   ? ScreenRef<(keyof Layouts | keyof Components | keyof typeof builtInScreenKinds | keyof typeof defaultKinds | OwnScreenNames<Kinds>) & string>
   : string | Ui
+
+type IconOf<Target> = Target extends { icons?: readonly (infer Name extends string)[] } ? Name : never
 
 type FieldData = {
   name: string
@@ -452,7 +458,7 @@ export const clientFieldOf = (name: string, field: RuntimeField & { target?: { n
 
 
 const word = /^[\p{ID_Start}$_][\p{ID_Continue}$]*$/u
-const targetKeys = ['capability', 'type', 'path', 'kayan', 'controls', 'providers', 'pages', 'layouts', 'components']
+const targetKeys = ['capability', 'type', 'path', 'kayan', 'controls', 'icons', 'providers', 'pages', 'layouts', 'components']
 const leafKeys = ['field', 'component', 'cell', 'placeholder', 'description', 'readOnly', 'width', 'when']
 const buttonKeys = ['button', 'label', 'fields', 'reload', 'component', 'confirm', 'when']
 const listKeys = ['columns', 'phone', 'card', 'filters', 'search', 'empty', 'menu', 'toolbar', 'bulk', 'row', 'sort', 'limit', 'tabs', 'of', 'where']
@@ -557,6 +563,9 @@ export const screensOf = (
     const screen = `Screen "${key}"`
     // Refused by name rather than carried unread.
     named(screen, target, targetKeys, 'screen')
+    if (target.icons !== undefined && (!Array.isArray(target.icons) || target.icons.some((name) => typeof name !== 'string' || !name.trim()))) {
+      throw new Error(`${screen} icons must be a list of non-empty names.`)
+    }
     const rootPage = Object.values(target.pages ?? {}).find((page) => page?.path === '/')?.component
     const rootUrl = rootPage instanceof URL ? rootPage : typeof rootPage === 'string' && Object.hasOwn(target.components ?? {}, rootPage) ? target.components?.[rootPage] : undefined
     home = rootUrl instanceof URL ? packageOf(rootUrl) : undefined
@@ -650,6 +659,7 @@ export const screensOf = (
     const navOf = (at: string, nav: ScreenNav): ScreenNav => {
       named(at, nav, ['label', 'icon', 'hidden', 'order', 'group'], 'nav')
       if (nav.icon !== undefined && (typeof nav.icon !== 'string' || !nav.icon.trim())) throw new Error(`${at} icon must be a non-empty string naming an icon in components.icons.`)
+      if (nav.icon !== undefined && !target.icons?.includes(nav.icon)) throw new Error(`${at} icon "${nav.icon}" is no name in this screen's icons. Declare it in screenTarget({ icons: [...] }).`)
       if (nav.hidden !== undefined && typeof nav.hidden !== 'boolean') throw new Error(`${at} hidden is no boolean.`)
       if (nav.order !== undefined && !Number.isFinite(nav.order)) throw new Error(`${at} order is no finite number.`)
       if (nav.group) {
@@ -1055,6 +1065,6 @@ export const screensOf = (
 
 declare module '../mithaq/rukn.ts' {
   interface KayanConfigs<L, F, T> {
-    screen: ScreenKayan<LocalesOf<L>, RefOf<T, L extends { kinds: infer Kinds } ? Kinds : {}>, keyof F & string>
+    screen: ScreenKayan<LocalesOf<L>, RefOf<T, L extends { kinds: infer Kinds } ? Kinds : {}>, keyof F & string, IconOf<T>>
   }
 }

@@ -159,6 +159,7 @@ export const wrongColor: ComponentsOf<ColorLanguage> = {
 // Rich text and files are add-ons: their controls and cells are asked for only by a language that declares their kinds.
 type PlainLanguage = typeof import('./plain-language.ts').language
 type TemplateLanguage = import('asas').Language
+declare const templateIcons: typeof import('../../../templates/mithaq/src/ui/nav-icons.ts').navIcons
 declare const richTextComponents: typeof import('../registry/rich-text.tsx').richTextComponents
 declare const uploadComponents: typeof import('../registry/upload.tsx').uploadComponents
 export const plain: ComponentsOf<PlainLanguage> = components
@@ -170,19 +171,35 @@ export const needlessRichText: ComponentsOf<PlainLanguage> = {
 // @ts-expect-error a language with rich text and files needs both add-on maps
 export const bare: ComponentsOf<TemplateLanguage> = components
 export const fileless: ComponentsOf<TemplateLanguage> = {
+  icons: templateIcons,
   nodes: components.nodes,
   // @ts-expect-error a language with files needs uploadComponents.controls besides rich text's
   controls: { ...components.controls, ...richTextComponents.controls },
   cells: { ...components.cells, ...richTextComponents.cells, ...uploadComponents.cells },
 }
 export const cellless: ComponentsOf<TemplateLanguage> = {
+  icons: templateIcons,
   nodes: components.nodes,
   controls: { ...components.controls, ...richTextComponents.controls, ...uploadComponents.controls },
   // @ts-expect-error and richTextComponents.cells besides the files'
   cells: { ...components.cells, ...uploadComponents.cells },
 }
 export const installed: ComponentsOf<TemplateLanguage> = {
+  icons: templateIcons,
   nodes: components.nodes,
   controls: { ...components.controls, ...richTextComponents.controls, ...uploadComponents.controls },
   cells: { ...components.cells, ...richTextComponents.cells, ...uploadComponents.cells },
+}
+
+type IconLanguage = { targets: {
+  dashboard: { capability: 'screen'; icons: readonly ['receipt', 'constructor'] }
+  backoffice: { capability: 'screen'; icons: readonly ['info'] }
+} }
+declare const ReceiptIcon: import('../registry/components.tsx').NavIcon
+export const iconComponents: ComponentsOf<IconLanguage> = { ...components, icons: { receipt: ReceiptIcon, constructor: ReceiptIcon, info: ReceiptIcon } }
+// @ts-expect-error a language declaring icons requires its map
+export const missingIcons: ComponentsOf<IconLanguage> = components
+export const missingIcon: ComponentsOf<IconLanguage> = { ...components,
+  // @ts-expect-error every screen's names need components, including an own prototype name
+  icons: { receipt: ReceiptIcon },
 }

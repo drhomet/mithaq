@@ -852,8 +852,10 @@ render. Use the same group metadata wherever a group is named.
 and its permission remain declared and authorized as before. Regenerate
 screens after changing navigation metadata.
 
-`icon` is a name in the host app's `components.icons` map, for example
-`nav: { icon: 'receipt' }`. Import only the icons the app uses:
+A screen may declare `icons: ['receipt']` in `screenTarget`. Its kayan and own
+pages can then write `nav: { icon: 'receipt' }`, typed from that list. Omitting
+the list declares no names. Import only the icons the app uses into its host's
+`components.icons` map:
 
 ```ts
 import { Receipt } from 'lucide-react'
@@ -862,12 +864,15 @@ import { defaultComponents } from 'mithaq-admin/default-components.tsx'
 export const components = { ...defaultComponents, icons: { receipt: Receipt } }
 ```
 
+`screensOf` refuses a name outside the screen's list before generation, so
+`generate --check` fails on unknown names. `ComponentsOf<Language>` requires
+an icon component for every name the language's screens declare, as it requires
+their controls. Names remain strings in generated screens, and no type refuses a name boot accepts.
+
 The same map is mounted with `ComponentsProvider` and passed to
-`checkComponents({ client, components })` for every screen at boot. That check
-refuses an unregistered name, including one on a hidden entry, and names its
-screen and path. The generator checks that a name is a non-empty string; it
-cannot see a host's React map, so registration is checked at boot. Names remain
-strings in generated screens, and TypeScript accepts the same names boot does.
+`checkComponents({ client, components })` for every screen at boot. That
+backstop refuses an unregistered name, including one on a hidden entry, and
+names its screen and path. It catches maps that bypass TypeScript too.
 The starter's sidebar and phone sheet draw the declared icon first, then the
 existing path icon when none is declared, then `Table2`. The backoffice uses
 the same resolver. Existing shells need to read `entry.icon` from `useNav()`

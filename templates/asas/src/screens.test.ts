@@ -442,7 +442,7 @@ test('a screen with no page at / is refused, and so are folder, shell and dashbo
   for (const [key, value] of [['folder', new URL('./ui-portal/', import.meta.url)], ['shell', 'portal'], ['dashboard', portalUi('home.tsx#Home')]] as const) {
     assert.throws(
       () => build(undefined, undefined, { portal: { ...screenTarget({ ...portalBase, kayan: [] }), [key]: value } }),
-      new RegExp(`Screen "portal" carries "${key}", which a screen does not take\\. A screen takes capability, type, path, kayan, controls, providers, pages, layouts, components\\.`),
+      new RegExp(`Screen "portal" carries "${key}", which a screen does not take\\. A screen takes capability, type, path, kayan, controls, icons, providers, pages, layouts, components\\.`),
     )
   }
 })
@@ -742,7 +742,7 @@ test('a kayan navigation label survives the screen projection', () => {
 
 test('navigation icon names survive projection on kayan and own pages as plain data', () => {
   const built = build({ pages, nav: { icon: 'receipt' } }, undefined, {
-    dashboard: screenTarget({ ...dashboardBase, kayan: ['courses'], pages: {
+    dashboard: screenTarget({ ...dashboardBase, kayan: ['courses'], icons: ['receipt', 'info'], pages: {
       ...dashboardBase.pages,
       about: { path: '/about', component: dashboardUi('dashboard.tsx#Dashboard'), nav: { label, icon: 'info' } },
     } }),
@@ -752,6 +752,15 @@ test('navigation icon names survive projection on kayan and own pages as plain d
   assert.equal(nav[1].icon, 'info')
   assert.throws(() => build({ pages, nav: { icon: 42 } }), /nav icon.*non-empty string/)
   assert.throws(() => build({ pages, nav: { icon: '' } }), /nav icon.*non-empty string/)
+})
+
+test('screen builds refuse undeclared navigation icons on kayan and own pages, including hidden entries', () => {
+  const target = { ...dashboardBase, kayan: ['courses'], icons: ['receipt'] }
+  assert.throws(() => build({ pages, nav: { icon: 'typo', hidden: true } }, undefined, { dashboard: screenTarget(target) }), /nav icon "typo".*screen's icons/)
+  assert.throws(() => build({ pages, nav: { icon: 'receipt' } }), /nav icon "receipt".*screen's icons/)
+  assert.throws(() => build({ pages }, undefined, { dashboard: screenTarget({ ...target, pages: {
+    ...target.pages, about: { path: '/about', component: dashboardUi('dashboard.tsx#Dashboard'), nav: { label, icon: 'typo', hidden: true } } as never,
+  } }) }), /page "about" nav icon "typo".*screen's icons/)
 })
 
 test('the portal lists sessions for their title alone, so an enrollment\'s session reads by its start there as on the dashboard, with no page and no nav entry', () => {

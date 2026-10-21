@@ -51,14 +51,15 @@ export type Nodes = { readonly [Kind in NodeKind]: ComponentType<NodeProps<Kind>
 export type NavIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
 export type Icons = Readonly<Record<string, NavIcon>>
 
+type IconNames<Screen> = Screen extends { icons?: readonly (infer Name extends string)[] } ? Name : never
+export type IconsOf<L> = IconNames<ScreensOf<L>>
+
 /** Every piece of the admin a project may replace or add to, each a map of named defaults it spreads. */
 export type ComponentsOf<L> = {
   controls: ControlsOf<L>
   cells: CellsOf<L>
   nodes: Nodes
-  /** Only the icons this app uses, imported by name so the rest are never bundled. */
-  icons?: Icons
-}
+} & ([IconsOf<L>] extends [never] ? { icons?: Icons } : { icons: Icons & { readonly [Name in IconsOf<L>]: NavIcon } })
 
 /** The map of a language that adds no kind of its own, which `defaultComponents` is. */
 export type Components = ComponentsOf<unknown>
@@ -92,10 +93,10 @@ export const navIconFor = ({ icons, name, at }: { icons?: Icons; name: string; a
 }
 
 /** An undeclared entry keeps its shell's fallback even outside a components provider. */
-export function NavigationIcon({ name, fallback, at }: { name?: string; fallback: NavIcon; at: string }): ReactElement {
+export function NavigationIcon({ name, fallback, at, className }: { name?: string; fallback: NavIcon; at: string; className?: string }): ReactElement {
   const components = use(ComponentsContext)
   const Icon = name === undefined ? fallback : navIconFor({ icons: components?.icons, name, at })
-  return <Icon aria-hidden />
+  return <Icon aria-hidden className={className} />
 }
 
 const addOnMaps: Readonly<Record<AddOn, string>> = { richText: 'richTextComponents', upload: 'uploadComponents' }
@@ -169,13 +170,14 @@ export const checkComponents = ({ client, components }: { client: { path?: strin
       .filter((field) => !namedCell(cells, field.cell) && !namedCell(cells, field.kind))
       .map((field) => `components.cells has no cell for kind "${field.kind}", which ${kayan.name}.${field.name} is drawn with.${installHint(field.cell, field.kind)}`),
   ])
+  const hint = missing.length ? '\nSpread defaultComponents.controls, defaultComponents.cells and defaultComponents.nodes into the map and add one under each name.' : ''
   for (const entry of client.nav ?? []) {
     if (entry.icon !== undefined) {
       try { navIconFor({ icons: components.icons, name: entry.icon, at: `screen ${client.path} nav "${entry.path}"` }) }
       catch (error) { missing.push((error as Error).message) }
     }
   }
-  if (missing.length) throw new Error(`${[...new Set(missing)].join('\n')}\nSpread defaultComponents.controls, defaultComponents.cells and defaultComponents.nodes into the map and add one under each name.`)
+  if (missing.length) throw new Error(`${[...new Set(missing)].join('\n')}${hint}`)
 }
 
 /** What a route that threw draws in place of its page, inside the shell above it: the error's own words, which name what to fix. */

@@ -60,7 +60,7 @@ test('boot refuses unregistered navigation icons, including hidden and prototype
     { path: '/sales', page: 'list', icon: 'receipt', hidden: true },
     { path: '/about', page: 'about', icon: 'constructor' },
   ] }
-  assert.throws(() => checkComponents({ client, components: defaultComponents }), /components.icons has no icon "receipt".*\/sales/)
+  assert.throws(() => checkComponents({ client, components: defaultComponents }), (error: Error) => /components.icons has no icon "receipt".*\/sales/.test(error.message) && !error.message.includes('Spread defaultComponents.controls'))
   assert.throws(() => checkComponents({ client, components: { ...defaultComponents, icons: { receipt: () => null } } }), /components.icons has no icon "constructor"/)
   assert.doesNotThrow(() => checkComponents({ client, components: { ...defaultComponents, icons: { receipt: () => null, constructor: () => null } } }))
   assert.doesNotThrow(() => checkComponents({ client: { ...client, nav: [{ path: '/sales', page: 'list' }] }, components: defaultComponents }))
