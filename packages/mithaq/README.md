@@ -867,7 +867,8 @@ export const components = { ...defaultComponents, icons: { receipt: Receipt } }
 `screensOf` refuses a name outside the screen's list before generation, so
 `generate --check` fails on unknown names. `ComponentsOf<Language>` requires
 an icon component for every name the language's screens declare, as it requires
-their controls. Names remain strings in generated screens, and no type refuses a name boot accepts.
+their controls. Names remain strings in generated screens. Every name a screen
+declares and its host registers passes the type, the build and boot.
 
 The same map is mounted with `ComponentsProvider` and passed to
 `checkComponents({ client, components })` for every screen at boot. That
