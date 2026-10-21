@@ -2,7 +2,7 @@ import { useState, type ComponentProps } from 'react'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
-import { AuthBox, AuthFrame, authGate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
+import { AuthBox, AuthForm, AuthFrame, authGate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
 import { documentHead } from '../copy.ts'
 import { firstUser } from '../first-user.ts'
 import { useCopy } from './__root.tsx'
@@ -59,7 +59,7 @@ function SignIn() {
 
   return (
     <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInBackofficeDescription', 'Sign in to reach the backoffice.')}>
-      <form className="grid gap-4" noValidate onSubmit={submit}>
+      <AuthForm className="grid gap-4" noValidate onSubmit={submit}>
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), { autoComplete: 'current-password', onChange: (event) => setPassword(event.target.value), type: 'password', value: password })}
         {/* `role="alert"` so a refusal is spoken when it appears; nothing moves the focus to it. */}
@@ -71,7 +71,7 @@ function SignIn() {
         <Button disabled={pending} type="submit">
           {pending ? t('auth.signInPending', 'Signing in…') : t('auth.signIn', 'Sign in')}
         </Button>
-      </form>
+      </AuthForm>
     </AuthFrame>
   )
 }

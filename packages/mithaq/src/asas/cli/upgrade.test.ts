@@ -61,6 +61,22 @@ const failed = (root: URL, ...args: string[]) =>
     (error: { code: number; stdout: string; stderr: string }) => error,
   )
 
+test('upgrade refuses an unfixed starter password form even when the old starter gave it no marker', async (t) => {
+  const root = await project({})
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const path = 'src/routes/auth.sign-in.tsx'
+  const old = 'export const SignIn = () => <form onSubmit={submit}><input name="password" type="password" /></form>\n'
+  await write(root, path, old)
+  const refused = await failed(root, 'upgrade', '--check')
+  assert.equal(refused.code, 1)
+  assert.match(refused.stdout, /auth.sign-in\.tsx.*method="post"/)
+  await write(root, path, old.replace('<form ', '<form method="post" '))
+  assert.equal((await upgradeCheck(root))!.some((one) => one.state === 'unsafe form'), false)
+  await mithaq(root, 'upgrade', '--check')
+  await write(root, path, old.replace('<form onSubmit={submit}>', '<form onSubmit={(event) => submit(event)} method={"post"}>'))
+  await mithaq(root, 'upgrade', '--check')
+})
+
 /** A `mithaq.lock` signed by a throwaway key over the language a fixture project's `src/mithaq.ts` defines. */
 const signedLock = async (root: URL) => {
   const { defineKayan } = (await import(new URL('src/mithaq.ts', root).href)) as { defineKayan: unknown }

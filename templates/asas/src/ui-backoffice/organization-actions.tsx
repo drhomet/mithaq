@@ -86,7 +86,7 @@ export function OrganizationActions({ value, row }: CellProps) {
               <DialogTitle>{t('backoffice.rename', 'Rename')}</DialogTitle>
               <DialogDescription>{t('backoffice.renameAbout', 'The new name and slug take the place of the old ones for everyone in this organization.')}</DialogDescription>
             </DialogHeader>
-            <form noValidate onSubmit={(event) => void save(event)} className="grid gap-4">
+            <form method="post" noValidate onSubmit={(event) => void save(event)} className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor={`organization-name-${id}`}>{t('organization.name', 'Name')}</Label>
                 <Input id={`organization-name-${id}`} name="name" required aria-required dir="auto" defaultValue={String(row.name ?? '')} aria-invalid={wrong.name ? true : undefined} aria-describedby={wrong.name ? `organization-name-${id}-error` : undefined} />

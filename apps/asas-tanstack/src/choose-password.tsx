@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
 import { authArm } from './api.ts'
-import { AlreadySignedIn, AuthBox, AuthFrame, authGate, redirectSearch, useRefusal } from './auth-frame.tsx'
+import { AlreadySignedIn, AuthBox, AuthForm, AuthFrame, authGate, redirectSearch, useRefusal } from './auth-frame.tsx'
 import { useCopy } from './routes/__root.tsx'
 
 /** The search keys of a page a mailed link opens: its token, and where to go after. */
@@ -119,7 +119,7 @@ export function ChoosePassword({ first, token, redirect, signedIn, home, screens
   }
   return (
     <AuthFrame title={title}>
-      <form className="grid gap-4" noValidate onSubmit={submit}>
+      <AuthForm className="grid gap-4" noValidate onSubmit={submit}>
         {/* The account the password is for, which a password manager saves it under. */}
         {email ? <AuthBox id="email" label={t('auth.email', 'Email')} type="email" autoComplete="username" readOnly value={email} onLeave={() => {}} /> : null}
         {box('password', t('auth.newPassword', 'New password'), {
@@ -143,7 +143,7 @@ export function ChoosePassword({ first, token, redirect, signedIn, home, screens
         <Button disabled={pending} type="submit">
           {first ? t('auth.setPasswordSubmit', 'Confirm and set password') : t('auth.resetPassword', 'Reset password')}
         </Button>
-      </form>
+      </AuthForm>
       {signIn}
     </AuthFrame>
   )

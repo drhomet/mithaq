@@ -87,7 +87,7 @@ for (const file of templateFiles) {
 // No `typescript` either: each workspace that type-checks names its own, because npm, seeing a root `typescript` 7 that an
 // optional peer of better-auth's would refuse, installs better-auth and mithaq again under every workspace, and two copies of
 // mithaq are two languages.
-const { engines, devDependencies: { typescript: _typescript, ...devDependencies } } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { engines: unknown; devDependencies: Record<string, string> }
+const { engines, devDependencies: { typescript: _typescript, 'playwright-core': _playwright, ...devDependencies } } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { engines: unknown; devDependencies: Record<string, string> }
 writeFileSync(join(creator, 'template/package.json'), `${JSON.stringify({ private: true, type: 'module', engines, workspaces: ['packages/mithaq', 'packages/features/*', 'packages/asas', 'apps/*'], devDependencies }, null, 2)}\n`)
 writeFileSync(join(creator, 'package.json'), `${JSON.stringify({ ...creatorManifest, ...creatorPublished, version: publishConfig.version }, null, 2)}\n`)
 cpSync(join(creatorSource, 'index.js'), join(creator, 'index.js'))

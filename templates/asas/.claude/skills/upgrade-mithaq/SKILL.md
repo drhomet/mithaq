@@ -30,6 +30,7 @@ Run each command from the project root. The installed mithaq, `$M` below, is `pa
    Then put back each of the developer's edits in `/tmp/mithaq-skill-edits.diff` that the new text lost, and ask the developer where an edit no longer fits the new text.
 5. From `packages/asas/`, with `DATABASE_URL` exported, run `bunx mithaq generate --check`. It also checks the lock and the migrations; rerun `generate auth`, `screens` or `messages` as it says.
 6. Run `bunx mithaq upgrade --check` in each folder holding a `components.json`: `packages/mithaq`, `apps/asas-tanstack` and, when the project has it, `apps/asas-backoffice`. Each file it reports as `differs` came from mithaq-admin: diff it against the package's and merge by hand, keeping the project's own edits.
+   For 0.3.3, merge the held auth forms and shared `AuthForm` in both hosts, including both ChoosePassword routes and setup-code branches. Installing dependencies does not rewrite them. Fix every `unsafe form` report and audit custom or renamed auth forms too. Passwords, setup codes and personal values need native POST before hydration and with JavaScript disabled. Preserve the project's handlers and server protections. Follow the mithaq-admin README's 0.3.3 upgrade note, including its private exposure assessment; never ask anyone to paste credential-bearing URLs or logs.
 7. From the project root, `bunx --package typescript tsc -p .` and the same with `-p` naming each app, then build and start each app once.
 
 In a project made with `--layout single`, read each path as `AGENTS.md` maps it.

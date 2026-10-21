@@ -230,10 +230,11 @@ A project holds the files it ejected and the ones that are always its own: the s
 - carries no marker, so its origin is unknown;
 - outside: the path resolves outside the project or the package, so it was not read;
 - removed: the package no longer has the item, so delete the file.
+- unsafe form: a known starter auth form has no explicit POST method. This also catches copies from before 0.3.3 that have no marker; merge the auth forms and shared `AuthForm` from the installed version.
 
 It reads `components.json` in the current folder, so run it in each folder that has one: `packages/mithaq`, `apps/asas-tanstack` and `apps/asas-backoffice`. It never writes. `--check` is required.
 
-Exit codes: 0 when nothing differs or there is nothing to check, and 1 when any file differs.
+Exit codes: 0 when nothing differs or there is nothing to check, and 1 when any file differs or an unsafe form remains.
 
 ```sh
 cd apps/asas-tanstack && bunx mithaq upgrade --check

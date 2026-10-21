@@ -2,7 +2,7 @@ import { useState, type ComponentProps } from 'react'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
-import { AuthBox, AuthFrame, authGate, notAnEmail, useRefusal } from '../auth-frame.tsx'
+import { AuthBox, AuthForm, AuthFrame, authGate, notAnEmail, useRefusal } from '../auth-frame.tsx'
 import { documentHead } from '../copy.ts'
 import { firstRun } from '../first-run.ts'
 import { useCopy } from './__root.tsx'
@@ -74,7 +74,7 @@ function FirstRun() {
   }
   return (
     <AuthFrame title={t('auth.firstRun', 'Set up this app')} description={t('auth.firstRunDescription', 'Nobody owns this app yet. The account made here becomes its owner and first administrator.')}>
-      <form className="grid gap-4" noValidate onSubmit={submit}>
+      <AuthForm className="grid gap-4" noValidate onSubmit={submit}>
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), {
@@ -108,7 +108,7 @@ function FirstRun() {
         <Button disabled={pending} type="submit">
           {pending ? t('auth.firstRunPending', 'Setting up…') : t('auth.firstRunSubmit', 'Set up the app')}
         </Button>
-      </form>
+      </AuthForm>
     </AuthFrame>
   )
 }

@@ -122,7 +122,7 @@ export function OperationButton({
           </p>
         ) : null}
         {/* A form and not a div, so Enter in a one-box dialog submits. */}
-        <form className="flex min-h-0 flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
+        <form method="post" className="flex min-h-0 flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
           <div data-operation-fields="" className="-m-1 grid min-h-0 gap-4 overflow-y-auto p-1">
           {fields.map((field) => {
             const Control = controlFor(controls, field)

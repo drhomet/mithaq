@@ -115,6 +115,11 @@ export function AuthFrame({ title, description, children }: { title: string | un
   )
 }
 
+/** Native submissions before hydration must keep passwords and personal values out of URLs and history. */
+export function AuthForm(props: Omit<ComponentProps<'form'>, 'method'>) {
+  return <form {...props} method="post" />
+}
+
 function PasswordInput(props: ComponentProps<'input'>) {
   const { t } = useCopy()
   const [shown, setShown] = useState(false)

@@ -76,7 +76,7 @@ const ejectedFolders = (items: readonly Item[], pathOf: (target: string) => stri
 export type Copied = {
   /** The file, relative to the project, or the target or package path that resolved outside it. */
   path: string
-  state: 'up to date' | 'up to date, edited' | 'differs' | 'differs, edited' | 'unknown' | 'outside' | 'removed'
+  state: 'up to date' | 'up to date, edited' | 'differs' | 'differs, edited' | 'unknown' | 'outside' | 'removed' | 'unsafe form'
   /** The version or commit the file's marker names, when it carries one. */
   from?: string
   /** The installed mithaq-admin's version. */
@@ -131,6 +131,12 @@ export const upgradeCheck = async (project: URL): Promise<Copied[] | undefined> 
       if (from) copied.push({ path, state: 'removed', from })
     }
   }
+  // Starters before 0.3.3 held these forms without registry markers, so a hash comparison cannot catch their default GET.
+  for (const file of ['choose-password.tsx', ...['sign-in', 'sign-up', 'first-run', 'forgot-password', 'create-first-user'].map((page) => `routes/auth.${page}.tsx`)]) {
+    const path = `src/${file}`
+    const text = await readFile(new URL(path, project), 'utf8').catch(() => '')
+    if ([...text.matchAll(/<form\b([\s\S]*?)(?<!=)>/g)].some((form) => !/\bmethod\s*=\s*(?:["']post["']|\{\s*["']post["']\s*\})/i.test(form[1]!))) copied.push({ path, state: 'unsafe form', to: installed.version })
+  }
   return copied
 }
 
@@ -143,6 +149,7 @@ const sentence = ({ path, state, from = '', to = 'unknown', item }: Copied) =>
     unknown: `${path} carries no mithaq-admin marker on its last line, so nothing says what it was ejected from.`,
     outside: `${path} resolves outside this project or the package, so it was not read.`,
     removed: `${path} was ejected from mithaq-admin ${from.slice(0, 12)}, and no item of the installed package names it any more: it was removed from the package, so delete it.`,
+    'unsafe form': `${path} contains a native auth form without method="post". Merge the 0.3.3 auth forms and shared AuthForm, keeping the project's handlers and auth policy; dependency installation alone does not update this file.`,
   })[state]
 
 const noComponents = 'No components.json here, so nothing says where mithaq-admin files go.'
@@ -162,11 +169,13 @@ export const run = async (project: URL): Promise<number> => {
   if (!copied.length) console.log('Nothing from mithaq-admin here.')
   for (const one of copied) console.log(sentence(one))
   const differing = copied.filter((one) => one.state.startsWith('differs')).length
+  const unsafe = copied.filter((one) => one.state === 'unsafe form').length
+  if (unsafe) console.error(`${unsafe} native auth ${unsafe === 1 ? 'form needs' : 'forms need'} an explicit POST method.`)
   if (differing) {
     console.error(`${differing} ${differing === 1 ? 'file differs' : 'files differ'} from the installed mithaq-admin.`)
     return 1
   }
-  return 0
+  return unsafe ? 1 : 0
 }
 
 /**

@@ -3,7 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
-import { AlreadySignedIn, AuthBox, AuthFrame, authGate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
+import { AlreadySignedIn, AuthBox, AuthForm, AuthFrame, authGate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
 import { useCopy } from './__root.tsx'
 
 // The sentence after a request is the same whether or not the address has an account, so
@@ -68,7 +68,7 @@ function ForgotPassword() {
       title={t('auth.forgotPassword', 'Forgot password')}
       description={t('auth.forgotPasswordInstructions', 'Please enter your email below. You will receive an email message with instructions on how to reset your password.')}
     >
-      <form className="grid gap-4" noValidate onSubmit={submit}>
+      <AuthForm className="grid gap-4" noValidate onSubmit={submit}>
         <AuthBox
           autoComplete="email"
           error={left ? wrong() : undefined}
@@ -87,7 +87,7 @@ function ForgotPassword() {
         <Button disabled={pending} type="submit">
           {t('auth.submit', 'Submit')}
         </Button>
-      </form>
+      </AuthForm>
       {back}
     </AuthFrame>
   )

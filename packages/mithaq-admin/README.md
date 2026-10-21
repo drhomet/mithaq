@@ -121,6 +121,43 @@ own `ui/rich-text-nodes.tsx`, and spread `richTextComponents` and
 `uploadComponents` into your components map (see
 [Rich text and files](#rich-text-and-files)).
 
+### Upgrading 0.3.2 projects to 0.3.3
+
+Install both packages at 0.3.3, then merge the auth forms each host holds.
+Installing the dependency does not rewrite starter files or ejected copies.
+Merge `src/auth-frame.tsx`, including its shared `AuthForm`, and use that
+component in the tenant's `src/routes/auth.sign-in.tsx`, `auth.first-run.tsx`,
+`auth.sign-up.tsx`, `auth.forgot-password.tsx` and `src/choose-password.tsx`.
+ChoosePassword serves both set-password and reset-password. Merge the
+backoffice's `src/routes/auth.sign-in.tsx` and `auth.create-first-user.tsx` too.
+The setup-code branch must submit with POST as well.
+
+Every password, setup code and personal value must stay in a POST body when
+JavaScript is disabled or a form is submitted before hydration. Keep the
+project's existing submit handlers and its Origin, cookie and rate-limit
+protections. `mithaq upgrade --check` reports changed held pieces and refuses
+old starter auth forms as `unsafe form`, even if they have no registry marker.
+It only reads files; merge them yourself. Check every other custom auth form
+too, including renamed files the starter check cannot identify.
+
+Merge ejected `form.tsx`, `form-layout.tsx`, `members.tsx`,
+`operation-button.tsx` and `upload-dialog.tsx`. The starter's
+`src/no-organization.tsx` and the asas's
+`src/ui-backoffice/organization-actions.tsx` are project files and also need
+explicit POST methods. Role editors use the shared record form. Filters and
+search controls have no native form and keep their existing behavior.
+
+Assess possible earlier exposure privately. Rotate any passwords or setup
+codes that may have entered URLs, revoke affected sessions and reset links,
+and restrict or remove retained browser history and request logs according to
+your retention requirements. Do not paste credential-bearing URLs or logs
+into issues, support messages or other shared channels.
+
+Run the project's checks, verify native POST method and body with dummy values
+before hydration and with JavaScript disabled, and verify hydrated sign-in in
+both hosts. Intercept native Document submissions before they reach the
+server while testing setup and password changes.
+
 ### Upgrading 0.3.1 projects to 0.3.2
 
 Install both packages at 0.3.2. Lists default to `phone: 'cards'`. A list with

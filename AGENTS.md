@@ -38,6 +38,7 @@ bun run test:tanstack    # builds and boots both TanStack apps
 bun run test:next        # builds and boots the Next host
 bun run pack             # stages the three published packages in .pack/
 bun run test:release     # creates a project from .pack/ and runs it
+AUTH_BROWSER_EXECUTABLE=/path/to/chromium bun run test:release # also checks native auth before hydration and hydrated sign-in
 ```
 
 `bun run test`, the boot tests and `test:release` need `DATABASE_URL` pointing at a local throwaway Postgres whose database is named `mithaq`, on any port except 5432 and 55439. `testDatabase` in `templates/asas/src/test-database.ts` refuses anything else, and the tests drop and rebuild that database.

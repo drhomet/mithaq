@@ -25,6 +25,15 @@ const backofficeSignIn = (await import('../../asas-backoffice/src/routes/auth.si
 const { signedInAs } = await import('./auth-frame.tsx')
 const { scopes } = await import('./copy.ts')
 
+test('choosing a password keeps native submissions out of the URL before hydration', async () => {
+  const { host, unmount } = await start('/auth/set-password?token=dummy-token', setPassword, { context: { email: 'dummy@example.com' } })
+  try {
+    assert.equal(host.querySelector('form')?.method, 'post')
+  } finally {
+    await unmount()
+  }
+})
+
 const start = async (path: string, component: typeof signUp, { locale = 'en', signedIn = false, home = { path: '/dashboard', name: 'dashboard' } as { path: string; name?: string }, context = {} as Record<string, unknown> } = {}) => {
   const root = createRootRoute({ beforeLoad: () => ({ dir: locale === 'ar' ? 'rtl' : 'ltr', locale, app: 'marketing.brand' }), component: () => createElement(Outlet) })
   const router = createRouter({

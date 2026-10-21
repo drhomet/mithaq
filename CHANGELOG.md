@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+- Fixed native auth submissions before hydration or with JavaScript disabled. Passwords, confirmation, setup codes and personal values now submit in POST bodies rather than URL queries. Other shipped native forms also explicitly use POST.
+- Existing projects must merge their held auth forms and shared `AuthForm`; installing dependencies does not rewrite starter or ejected files. `mithaq upgrade --check` flags old unmarked starter auth forms as `unsafe form` and reports changed held pieces. Follow the [0.3.3 upgrade guide](packages/mithaq-admin/README.md#upgrading-032-projects-to-033).
+- Operators should assess prior exposure privately, rotate passwords or setup codes that may have entered URLs, revoke affected sessions and reset links, and restrict or remove retained credential-bearing history and logs according to their retention requirements. Do not paste those URLs or logs into issues, support messages or other shared channels.
+
 ## 0.3.2
 
 - Lists default to `phone: 'cards'`. Declare `phone: 'table'` for a visible-header table that scrolls inside its frame below 640px, with 44px targets. It cannot declare `card`, and there is no runtime layout switch. The sessions examples use it in both hosts.

@@ -2,7 +2,7 @@ import { useState, type ComponentProps } from 'react'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
-import { AuthBox, AuthFrame, authGate, notAnEmail, useRefusal } from '../auth-frame.tsx'
+import { AuthBox, AuthForm, AuthFrame, authGate, notAnEmail, useRefusal } from '../auth-frame.tsx'
 import { documentHead } from '../copy.ts'
 import { firstUser } from '../first-user.ts'
 import { useCopy } from './__root.tsx'
@@ -73,7 +73,7 @@ function CreateFirstUser() {
       title={t('auth.createFirstUser', 'Create the first administrator')}
       description={t('auth.createFirstUserDescription', 'No one administers this backoffice yet. The account made here becomes its first administrator.')}
     >
-      <form className="grid gap-4" noValidate onSubmit={submit}>
+      <AuthForm className="grid gap-4" noValidate onSubmit={submit}>
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), {
@@ -107,7 +107,7 @@ function CreateFirstUser() {
         <Button disabled={pending} type="submit">
           {pending ? t('auth.createFirstUserPending', 'Creating…') : t('auth.createFirstUserSubmit', 'Create the administrator')}
         </Button>
-      </form>
+      </AuthForm>
     </AuthFrame>
   )
 }

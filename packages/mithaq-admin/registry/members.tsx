@@ -115,7 +115,7 @@ export function AddPerson({ sheet, roles, onInvited, options }: { options: Membe
         setRefusal(undefined)
       }}
     >
-      <form noValidate className="grid gap-4 p-6 text-sm" onSubmit={(event) => { event.preventDefault(); void add() }}>
+      <form method="post" noValidate className="grid gap-4 p-6 text-sm" onSubmit={(event) => { event.preventDefault(); void add() }}>
         <header className="grid gap-1.5">
           <h2 className="text-base font-medium">{t('dashboard.addPersonTitle', 'Add a person')}</h2>
           <p className="text-muted-foreground">{t('dashboard.addPersonAbout', 'They get an account here and a link by email to choose their password. Someone who already has an account is sent an invitation instead.')}</p>
@@ -282,7 +282,7 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
       main: <div className={`mx-auto grid w-full max-w-3xl gap-4${edits ? ' pb-20 sm:pb-0' : ''}`}>
         <section data-member-page={member.userId}>
           <form
-            id={formId}
+            id={formId} method="post"
             data-member-sheet={member.userId}
             className="mx-auto grid w-full max-w-3xl gap-4 text-sm"
             onSubmit={(event) => {
@@ -729,7 +729,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                   setInviteRefusal(undefined)
                 }}
               >
-                <form
+                <form method="post"
                   noValidate
                   className="grid gap-4 p-6 text-sm"
                   onSubmit={(event) => {

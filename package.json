@@ -23,7 +23,8 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/mithaq-admin && tsc -p apps/asas-tanstack && tsc -p apps/asas-backoffice"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "@types/node": "^24.12.3"
+    "@types/node": "^24.12.3",
+    "playwright-core": "1.64.1",
+    "typescript": "^7.0.2"
   }
 }

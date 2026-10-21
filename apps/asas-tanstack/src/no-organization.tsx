@@ -78,7 +78,7 @@ export function NoOrganization({ email, founds = organizations === 'many' }: { e
         </section>
       ) : null}
       {founds ? (
-        <form
+        <form method="post"
           data-create-organization=""
           className="grid gap-2"
           noValidate

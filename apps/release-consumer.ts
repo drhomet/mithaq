@@ -26,6 +26,7 @@ import { richText } from '../packages/mithaq/src/rich-text/index.ts'
 import { vocabularyOf } from '../packages/mithaq/src/mithaq/lock.ts'
 import { richTextNodes } from '../templates/mithaq/src/mithaq/rich-text-nodes.ts'
 import { storageConfig } from '../templates/mithaq/src/storage/index.ts'
+import { authPostBrowser } from './auth-post-browser.ts'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const database = process.env.DATABASE_URL
@@ -101,6 +102,7 @@ const linkMailed = async (email: string) => {
   }
   assert.fail(`no link was mailed to ${email}`)
 }
+const authBrowser = await authPostBrowser()
 try {
   command(process.execPath, ['apps/pack.ts'], root)
   for (const name of ['mithaq', 'mithaq-admin']) command('npm', ['pack', `.pack/${name}`, '--pack-destination', scratch], root)
@@ -122,6 +124,7 @@ try {
   ]) await release({ tarball, adminTarball, ...run })
   console.log('release consumer passed')
 } finally {
+  await authBrowser?.close()
   mailbox.close()
   rmSync(scratch, { recursive: true, force: true })
 }
@@ -356,6 +359,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const codeOf = async (response: Response) => [response.status, ((await response.json().catch(() => null)) as { code?: string } | null)?.code] as const
     const cookieOf = (response: Response) => response.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
     if (!many) {
+      if (full && !single && authBrowser) {
+        await authBrowser.native({ url: `${origin}/auth/first-run` })
+        await authBrowser.native({ url: `${backofficeOrigin}/auth/create-first-user` })
+      }
       // One organization: nothing signs up before its owner is made, and only the setup code makes them.
       const setUp = await (await fetch(`${origin}/auth/first-run`, { signal: AbortSignal.timeout(10_000) })).text()
       assert.ok(setUp.includes('The SETUP_CODE this server was started with.'), `first-run asks for the setup code:\n${setUp.slice(0, 600)}`)
@@ -367,6 +374,13 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       assert.equal(won.length, 1, `one first-run wins: ${JSON.stringify(runs)}\n${output}`)
       assert.deepEqual(runs.filter(([, [status]]) => status !== 200).map(([, answer]) => answer), [[403, 'FIRST_RUN_CLOSED'], [403, 'FIRST_RUN_CLOSED']])
       const owner = `owner-${won[0]![0]}-${stamp}@example.com`
+      if (full && !single && authBrowser) {
+        await authBrowser.native({ url: `${origin}/auth/sign-in` })
+        await authBrowser.native({ url: `${backofficeOrigin}/auth/sign-in` })
+        await authBrowser.native({ url: `${origin}/auth/forgot-password`, control: true })
+        await authBrowser.signIn({ origin, email: owner, password: 'release-test-password' })
+        await authBrowser.signIn({ origin: backofficeOrigin, email: owner, password: 'release-test-password' })
+      }
       const signedIn = await post('sign-in/email', { email: owner, password: 'release-test-password' })
       assert.equal(signedIn.status, 200, `the owner signs in\n${output}`)
       const session = (await (await fetch(`${origin}/api/auth/user/get-session`, { headers: { origin, cookie: cookieOf(signedIn) }, signal: AbortSignal.timeout(10_000) })).json()) as { session?: { activeOrganizationId?: string | null } } | null
@@ -383,6 +397,17 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const addedText = await added.text()
       assert.equal(added.status, 200, `${addedText}\n${output}`)
       const addedId = (JSON.parse(addedText) as { user?: { id?: string } }).user?.id
+      if (full && !single && authBrowser) {
+        const link = await linkMailed(person)
+        await authBrowser.native({ url: link.href })
+        link.pathname = '/auth/reset-password'
+        await authBrowser.native({ url: link.href })
+        const invitation = await post('organization/create-invitation', { email: `invited-${stamp}@example.com`, role: 'member' }, { cookie: cookieOf(signedIn) })
+        assert.equal(invitation.status, 200)
+        const { id } = await invitation.json() as { id: string }
+        await authBrowser.native({ url: `${origin}/auth/sign-up?redirect=${encodeURIComponent(`/auth/accept-invitation?id=${id}`)}` })
+        await authBrowser.native({ url: `${origin}/auth/forgot-password` })
+      }
       const chosen = await post('reset-password', { token: (await linkMailed(person)).searchParams.get('token'), newPassword: 'release-test-password' })
       assert.equal(chosen.status, 200, `the added person chooses their password from the mailed link: ${await chosen.text()}`)
       assert.equal((await post('sign-in/email', { email: person, password: 'release-test-password' })).status, 200, 'and signs in')

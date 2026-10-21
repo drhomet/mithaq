@@ -239,7 +239,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
     // a leaf elsewhere on the page is still this form's value. A page with a controls node draws the actions there.
     // `noValidate` so the browser's own bubble never stands in for the field's refusal in the page's language.
     form: (children) => (
-      <form id={formId} noValidate onSubmit={submit} className="flex min-w-0 flex-col gap-6">
+      <form id={formId} method="post" noValidate onSubmit={submit} className="flex min-w-0 flex-col gap-6">
         {chrome}
         <div className={headed ? 'flex flex-col gap-4 border-t pt-6' : 'flex flex-col gap-4'}>
           {children}

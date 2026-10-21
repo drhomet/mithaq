@@ -116,7 +116,7 @@ export function UploadDialog({ open, onOpenChange, target, client, t, locale, lo
               .replace('{types}', () => listed(typeNames(target.storage?.mimeTypes ?? []), locale))}
           </DialogDescription>
         </DialogHeader>
-        <form className="grid min-w-0 gap-4" noValidate onSubmit={submit}>
+        <form method="post" className="grid min-w-0 gap-4" noValidate onSubmit={submit}>
           <FieldShell id={inputId} label={t('admin.upload.file', 'File') ?? 'File'} error={noFile ? (t('admin.upload.required', 'Choose a file first.') ?? 'Choose a file first.') : undefined}>
             {/* The browser's own file box draws its button in the browser's language, so the box is kept for the keyboard and the picker and the button is drawn in the page's. */}
             <div className="flex min-w-0 items-center gap-3">

@@ -4,7 +4,7 @@ import { organizations, signUp, verifyEmail } from 'asas/organizations'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
-import { AuthBox, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
+import { AuthBox, AuthForm, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
 import { firstRun } from '../first-run.ts'
 import { landing, wanted } from '../redirect.ts'
 import { useCopy } from './__root.tsx'
@@ -112,7 +112,7 @@ function SignUp() {
       title={t('auth.signUp', 'Sign up')}
       description={invited ? t('auth.signUpInvitedDescription', 'Make an account with the email address the invitation was sent to.') : t('auth.signUpDescription', 'Make an account.')}
     >
-      <form className="grid gap-4" noValidate onSubmit={submit}>
+      <AuthForm className="grid gap-4" noValidate onSubmit={submit}>
         {box('name', t('auth.name', 'Name'), { autoComplete: 'name', onChange: (event) => setName(event.target.value), type: 'text', value: name })}
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {verifies ? null : box('password', t('auth.password', 'Password'), {
@@ -136,7 +136,7 @@ function SignUp() {
         <Button disabled={pending} type="submit">
           {pending ? t('auth.signUpPending', 'Signing up…') : t('auth.signUp', 'Sign up')}
         </Button>
-      </form>
+      </AuthForm>
       {toSignIn}
     </AuthFrame>
   )

@@ -115,6 +115,11 @@ export function AuthFrame({ title, description, children }: { title: string | un
   )
 }
 
+/** Native submissions before hydration must keep passwords and personal values out of URLs and history. */
+export function AuthForm(props: Omit<ComponentProps<'form'>, 'method'>) {
+  return <form {...props} method="post" />
+}
+
 function PasswordInput(props: ComponentProps<'input'>) {
   const { t } = useCopy()
   const [shown, setShown] = useState(false)
@@ -147,4 +152,4 @@ export function AuthBox({
     </FieldShell>
   )
 }
-// mithaq-admin 0.0.0 98e2edd04abc7a45371f17b950d1739232e2c3a0ff77c955f9b73082fca73a06
+// mithaq-admin 0.0.0 e664138e6363af559b8c005896c7894c08d2c04f14e062bad71df2f0e1b6027c

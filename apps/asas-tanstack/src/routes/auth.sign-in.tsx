@@ -4,7 +4,7 @@ import { organizations, signUp } from 'asas/organizations'
 import { Button } from '@/components/ui/button'
 import { authArm } from '../api.ts'
 import { documentHead } from '../copy.ts'
-import { AuthBox, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
+import { AuthBox, AuthForm, AuthFrame, authGate, gate, notAnEmail, redirectSearch, useRefusal } from '../auth-frame.tsx'
 import { firstRun } from '../first-run.ts'
 import { useCopy } from './__root.tsx'
 import { landing } from '../redirect.ts'
@@ -69,7 +69,7 @@ function SignIn() {
 
   return (
     <AuthFrame title={t('auth.signIn', 'Sign in')} description={t('auth.signInDescription', 'Welcome back. Sign in with your email and password.')}>
-      <form className="grid gap-4" noValidate onSubmit={submit}>
+      <AuthForm className="grid gap-4" noValidate onSubmit={submit}>
         {box('email', t('auth.email', 'Email'), { autoComplete: 'email', onChange: (event) => setEmail(event.target.value), type: 'email', value: email })}
         {box('password', t('auth.password', 'Password'), { autoComplete: 'current-password', onChange: (event) => setPassword(event.target.value), type: 'password', value: password })}
         <Link className="-mt-2 justify-self-end text-sm text-muted-foreground underline-offset-4 hover:underline" to="/auth/forgot-password" search={{ redirect: search.redirect }}>
@@ -84,7 +84,7 @@ function SignIn() {
         <Button disabled={pending} type="submit">
           {pending ? t('auth.signInPending', 'Signing in…') : t('auth.signIn', 'Sign in')}
         </Button>
-      </form>
+      </AuthForm>
       {offersSignUp ? (
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {t('auth.noAccount', 'No account yet?')}{' '}

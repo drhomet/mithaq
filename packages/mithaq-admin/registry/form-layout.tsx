@@ -49,7 +49,7 @@ export function FormLayout({ actions, api, chrome, control, copy, formId, kayan,
     )
   }
   return (
-    <form id={formId} noValidate onSubmit={onSubmit} className="flex flex-1 flex-col gap-6">
+    <form id={formId} method="post" noValidate onSubmit={onSubmit} className="flex flex-1 flex-col gap-6">
       {chrome}
       <div className="border-t pt-6">
         <div className={provided.length ? 'grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]' : 'max-w-3xl'}>
