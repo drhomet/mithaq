@@ -504,7 +504,8 @@ const main = async () => {
   // writes its own once the install has laid the bin down.
   const short = Object.entries(addOns).some(([one, { tables }]) => tables && !chosen.includes(one))
   // With no organization shown, the Members page is named Users, which the template's screens do not say.
-  const regenerate = short || !settings.showOrganization
+  // The template screens hold its full policy; selecting rich-text tools changes that policy even in a full project.
+  const regenerate = short || !settings.showOrganization || chosen.includes('rich-text')
   const bin = installed && regenerate ? binAbove(asas) : undefined
   const generated = bin !== undefined && spawnSync(bin, ['generate', 'screens'], { cwd: asas, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0
   if (regenerate && !generated) console.warn(`\nThe screens are not written for this project yet. Run mithaq generate screens in ${asas}, after the install.`)
