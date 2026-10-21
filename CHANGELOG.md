@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+
+- Lists default to `phone: 'cards'`. Declare `phone: 'table'` for a visible-header table that scrolls inside its frame below 640px, with 44px targets. It cannot declare `card`, and there is no runtime layout switch. The sessions examples use it in both hosts.
+
+- A list may name `card`, up to three of its non-title columns in phone detail order. Hidden or unreadable columns stay absent. Without it, cards keep the first three visible details. Tables from 640px upward are unchanged.
+- The published mithaq package now includes `CHANGELOG.md` beside its guides.
+- Projects with ejected lists merge `list.tsx`, `list-table.tsx` and `list-table.css` to use `card`; see the [upgrade guide](packages/mithaq-admin/README.md#upgrading-031-projects-to-032). The courses example declares card fields in both the tenant and backoffice lists.
+
 ## 0.3.1
 
 ### Upgrade notes

@@ -209,7 +209,38 @@ export type ScreenList<Locale extends string = string, Ref extends string | Ui =
   readonly limit?: number
   /** The list's tabs, each a `where` it holds every page to; the first is the one it opens on. */
   readonly tabs?: readonly { readonly tab: string; readonly label: Localized<Locale>; readonly where?: Where }[]
-}
+} & (
+  | { readonly phone?: 'cards'; readonly card?: readonly [] | readonly [FieldName] | readonly [FieldName, FieldName] | readonly [FieldName, FieldName, FieldName] }
+  | { readonly phone: 'table'; readonly card?: never }
+)
+
+type ColumnName<Column> = Column extends string ? Column : Column extends { readonly field: infer Name } ? Name : never
+type CardTitle<Columns extends readonly unknown[], Title> = [Title] extends [never]
+  ? ColumnName<Columns[0]>
+  : Title extends ColumnName<Columns[number]> ? Title : ColumnName<Columns[0]>
+
+type CheckedCard<List, Title> = List extends {
+  readonly columns: infer Columns extends readonly unknown[]
+  readonly card: infer Card extends readonly string[]
+} ? { readonly card: {
+    readonly [At in keyof Card]: Card[At] extends Exclude<ColumnName<Columns[number]>, CardTitle<Columns, Title>> ? Card[At] : never
+  } }
+  : unknown
+
+// Field names alone cannot reject a card field that this particular list leaves out.
+export type CheckedCardNodes<Node, Title = never, Locale extends string = string> = Node extends readonly unknown[]
+  ? { [At in keyof Node]: CheckedCardNodes<Node[At], Title, Locale> }
+  : Node extends object
+    ? { [Key in keyof Node]: Key extends 'list'
+        ? Node[Key] extends { readonly columns: readonly unknown[] }
+          ? CheckedCardNodes<Node[Key], Title, Locale> & CheckedCard<Node[Key], Node[Key] extends { readonly of: string } ? never : Title>
+          : CheckedCardNodes<Node[Key], Title, Locale>
+        : Key extends 'label' | 'description'
+          ? Node[Key] extends Readonly<Record<string, string>>
+            ? Node[Key] & { [Stray in Exclude<keyof Node[Key], Locale>]: never }
+            : CheckedCardNodes<Node[Key], Title, Locale>
+          : CheckedCardNodes<Node[Key], Node extends { readonly useAsTitle: infer Name } ? Name : Title, Locale> }
+    : Node
 
 /** A declared node of one kind; a leaf may be written as its bare field name. */
 type Declared<Kind extends NodeKind> = Extract<ScreenNode, Record<Kind, unknown>> | (Kind extends 'field' ? string : never)
@@ -318,6 +349,8 @@ export type ButtonClient = {
 /** A list node's own keys as `screen.json` prints them. */
 export type ListClient = {
   columns: LeafClient[]
+  card?: string[]
+  phone?: 'cards' | 'table'
   filters?: string[]
   search?: string[]
   empty?: string
@@ -424,7 +457,7 @@ const word = /^[\p{ID_Start}$_][\p{ID_Continue}$]*$/u
 const targetKeys = ['capability', 'type', 'path', 'kayan', 'controls', 'providers', 'pages', 'layouts', 'components']
 const leafKeys = ['field', 'component', 'cell', 'placeholder', 'description', 'readOnly', 'width', 'when']
 const buttonKeys = ['button', 'label', 'fields', 'reload', 'component', 'confirm', 'when']
-const listKeys = ['columns', 'filters', 'search', 'empty', 'menu', 'toolbar', 'bulk', 'row', 'sort', 'limit', 'tabs', 'of', 'where']
+const listKeys = ['columns', 'phone', 'card', 'filters', 'search', 'empty', 'menu', 'toolbar', 'bulk', 'row', 'sort', 'limit', 'tabs', 'of', 'where']
 const modes = ['dialog', 'sheet', 'drawer']
 /** Every key of `value` is one `known` names, so nothing reaches `screen.json` unnamed. */
 const named = (at: string, value: object, known: readonly string[], what: string) => {
@@ -808,7 +841,20 @@ export const screensOf = (
             return { ...drawn, list: { of, where: where as string, ...drawn.list } }
           }
           held.list++
-          const { columns, filters, search, empty, menu, sort, limit, tabs } = one.list
+          const { columns, phone, card, filters, search, empty, menu, sort, limit, tabs } = one.list
+          if (phone !== undefined && phone !== 'cards' && phone !== 'table') throw new Error(`${node} list phone takes "cards" or "table".`)
+          if (phone === 'table' && card !== undefined) throw new Error(`${node} list card cannot be declared with phone: "table".`)
+          if (card !== undefined) {
+            if (!Array.isArray(card)) throw new Error(`${node} list card must be an ordered list of column names.`)
+            if (card.length > 3) throw new Error(`${node} list card takes at most 3 details after the title.`)
+            const names = columns.map((column) => typeof column === 'string' ? column : column.field)
+            for (const [at, name] of card.entries()) {
+              if (!names.includes(name)) throw new Error(`${node} list card names "${name}", which is not a column of this list.`)
+              const title = (kayan.targets?.[key] as ScreenKayan | undefined)?.useAsTitle
+              if (name === (title && names.includes(title) ? title : names[0])) throw new Error(`${node} list card repeats "${name}", the title column.`)
+              if (card.indexOf(name) !== at) throw new Error(`${node} list card names "${name}" more than once.`)
+            }
+          }
           // Where a button sits decides which operations it may run: bulk over ticked rows,
           // row over its row, toolbar over none.
           const buttons = (region: 'toolbar' | 'bulk' | 'row') => {
@@ -851,6 +897,8 @@ export const screensOf = (
           return {
             list: {
               columns: columns.map((column) => leafOf(`${node} list column`, column, 'cell')),
+              ...(card !== undefined && { card: [...card] }),
+              ...(phone !== undefined && { phone }),
               ...(filters && { filters: filters.map((field) => fieldNamed(`${node} list filter`, field).name) }),
               ...(search && { search: search.map((field) => searchedPath(`${node} list search`, field)) }),
               ...(empty !== undefined && { empty: ref(`${node} list empty`, 'component', empty) }),

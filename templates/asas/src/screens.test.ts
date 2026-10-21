@@ -612,7 +612,7 @@ test('a list holds toolbar, bulk and row regions of buttons and a default sort a
   const smaller = { service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: 20, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }) }
   assert.throws(() => build(list({ limit: 25 }), undefined, smaller), (error: Error) => error.message === `${at} limit is 25, and a limit is a whole number from 1 to 20.`)
   assert.equal(build(list({ limit: 20 }), undefined, smaller).targets.dashboard.client.maxLimit, 20)
-  refused({ pageSize: 10 }, 'carries "pageSize", which a list does not take. A list takes columns, filters, search, empty, menu, toolbar, bulk, row, sort, limit, tabs, of, where.')
+  refused({ pageSize: 10 }, 'carries "pageSize", which a list does not take. A list takes columns, phone, card, filters, search, empty, menu, toolbar, bulk, row, sort, limit, tabs, of, where.')
   const menued = build(list({ menu: ui('kpi-card.tsx#KpiCard') })).targets.dashboard.client
   const menu = (treeOf(menued.kayan.courses!.pages.list).main[0]!.main[0] as { list: { menu?: string } }).list.menu
   assert.equal(menu, '@asas/mithaq:./src/ui/kpi-card.tsx#KpiCard', 'the projection carries the reference as every component\'s')
@@ -1302,4 +1302,34 @@ test('an option label, a placeholder, and a button, tab or section label short o
     () => build({ pages: { ...pages, create: create([{ section: 'about', label: { en: 'About' }, fields: ['title'] }]) } }),
     /form section "about" label is short of locale "ar"\./,
   )
+})
+
+
+test('a list preserves its declared phone card order and refuses fields outside its columns, its title and more than three details', () => {
+  const list = (card: unknown) => ({ pages: { ...pages, list: { ...pages.list, page: table([{ list: { columns: ['title', 'fee', { field: 'currency' }, 'summary', 'createdAt'], card } }]) } } })
+  const built = build(list(['summary', 'fee', 'currency']))
+  assert.deepEqual(treeOf(built.targets.dashboard.client.kayan.courses!.pages.list).main[0]!.main[0]!.list.card, ['summary', 'fee', 'currency'])
+  assert.throws(() => build(list(['updatedAt'])), /card.*updatedAt.*not.*column/)
+  assert.throws(() => build(list(['title'])), /card.*title.*title/)
+  assert.throws(() => build(list(['fee', 'summary', 'currency', 'createdAt'])), /card.*at most 3/)
+  assert.throws(() => build(list(['fee', 'fee'])), /card.*fee.*more than once/)
+  assert.throws(() => build(list('fee')), /card.*ordered list/)
+  assert.deepEqual(treeOf(build(list([])).targets.dashboard.client.kayan.courses!.pages.list).main[0]!.main[0]!.list.card, [])
+})
+
+test('a phone card excludes the named title even when its column is not first', () => {
+  const list = (card: string[]) => ({ useAsTitle: 'title', pages: { ...pages, list: { ...pages.list, page: table([{ list: { columns: ['fee', 'title', 'summary'], card } }]) } } })
+  assert.doesNotThrow(() => build(list(['summary', 'fee'])))
+  assert.throws(() => build(list(['title'])), /card.*title.*title/)
+})
+
+test('a list defaults to phone cards, may declare a phone table and refuses card fields with a table', () => {
+  const list = (extra: Record<string, unknown>) => ({ pages: { ...pages, list: { ...pages.list, page: table([{ list: { columns: ['title', 'fee'], ...extra } }]) } } })
+  const node = (extra: Record<string, unknown>) => treeOf(build(list(extra)).targets.dashboard.client.kayan.courses!.pages.list).main[0]!.main[0]!.list
+  assert.equal(node({}).phone, undefined, 'an omitted declaration keeps existing cards without changing generated clients')
+  assert.equal(node({ phone: 'cards', card: ['fee'] }).phone, 'cards')
+  assert.equal(node({ phone: 'table' }).phone, 'table')
+  assert.throws(() => node({ phone: 'table', card: ['fee'] }), /card.*phone.*table/)
+  assert.throws(() => node({ phone: 'table', card: [] }), /card.*phone.*table/)
+  assert.throws(() => node({ phone: 'tiles' }), /phone.*cards.*table/)
 })

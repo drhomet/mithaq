@@ -852,6 +852,29 @@ render. Use the same group metadata wherever a group is named.
 and its permission remain declared and authorized as before. Regenerate
 screens after changing navigation metadata.
 
+### Lists
+
+A list node declares `columns`, `filters`, `search`, `sort`, `limit`, `tabs`,
+`toolbar`, `bulk` and `row`. Its `phone` layout is `'cards'` by default.
+`phone: 'table'` keeps a visible header and scrolls the table inside its frame
+below 640px, with 44px targets and no page-level sideways scroll. This is a
+declaration, with no runtime layout switch. A phone table cannot declare `card`.
+
+A card list may declare `card` for phone details:
+
+```ts
+{ list: { columns: ['title', 'fee', 'opensOn', '_status'], card: ['_status', 'fee', 'opensOn'] } }
+```
+
+`card` orders up to three of this list's column names after its title. The
+screen's `useAsTitle` column is the title when listed; otherwise the first
+column is. Repeating the title, naming another field or listing more than three
+details fails typecheck and `mithaq generate --check`. A hidden or unreadable
+column stays absent, with no replacement from outside `card`. Without `card`,
+the first three visible non-title columns remain the details. An empty `card`
+shows the title alone. This applies to tenant and backoffice lists, including
+related lists. From 640px upward, each list keeps its table and column order.
+
 **The admin package.** The controls, cells, forms, lists and shells a screen draws with, `mithaq eject`, and `mithaq upgrade --check`, which compares the files a project holds with them, are described in [The admin package](../mithaq-admin/README.md).
 
 **`mithaq generate screens`** writes each screen's route files into the host

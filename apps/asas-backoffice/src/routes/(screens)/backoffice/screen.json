@@ -1616,6 +1616,11 @@
                           "decided": "table"
                         }
                       ],
+                      "card": [
+                        "fee",
+                        "organization",
+                        "archived"
+                      ],
                       "filters": [
                         "organization",
                         "title",
@@ -2211,6 +2216,7 @@
                           "decided": "table"
                         }
                       ],
+                      "phone": "table",
                       "filters": [
                         "organization",
                         "course",

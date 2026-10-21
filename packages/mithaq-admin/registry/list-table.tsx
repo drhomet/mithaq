@@ -36,6 +36,9 @@ export type ListTableProps = {
   screen?: ScreenPage
   /** The columns drawn, in order; the first carries the row's link. */
   shown: readonly ClientField[]
+  /** Ordered phone details; omitted lists keep the first three visible details. */
+  card?: readonly string[]
+  phone?: 'cards' | 'table'
   docs: readonly Row[]
   titles: RelationshipTitles
   /** The cell each column of the list node names, by field. */
@@ -63,6 +66,7 @@ export type ListTableProps = {
 export function ListTable({
   actions,
   cellOf,
+  card,
   children,
   copy,
   defaultSort,
@@ -72,6 +76,7 @@ export function ListTable({
   onSort,
   openHint,
   openRow,
+  phone,
   screen,
   selection: picked,
   shown,
@@ -85,6 +90,7 @@ export function ListTable({
   const picks = picked !== undefined
   // The first shown cell carries the row's link, so a hidden or unreadable title leaves a row reachable.
   const linked = shown[0]
+  const details = card ?? shown.slice(1, 4).map((field) => field.name)
   const sortable = shown.filter(canSort)
   const sort = urlSort ?? defaultSort
   const sorted = sortable.find((field) => field.name === sort?.replace(/^-/, ''))
@@ -109,7 +115,7 @@ export function ListTable({
   }, [])
   return (
     <>
-      {!unreadable && (sortable.length || picked) ? <div data-list-phone-controls="" className="flex items-center gap-2 sm:hidden">
+      {phone !== 'table' && !unreadable && (sortable.length || picked) ? <div data-list-phone-controls="" className="flex items-center gap-2 sm:hidden">
         {picked ? <div className="flex size-11 shrink-0 items-center justify-center"><SelectAll ids={picked.ids} selected={picked.selected} onSelect={picked.onSelect} t={t} /></div> : null}
         {sortable.length ? (
           <div className="min-w-0 flex-1">
@@ -130,7 +136,7 @@ export function ListTable({
       </div> : null}
     {/* Held to the screen below the page's header so it scrolls both ways and the head row can stay (a printed page
         holds every row). It isolates, so pinned cells never paint over the page's sticky header or take its clicks. */}
-    <div data-list-frame="" className="bg-card relative isolate min-w-0 max-w-full overflow-hidden rounded-lg border [&>div:first-child]:max-h-[calc(100dvh-var(--header-height,0px))] print:[&>div:first-child]:max-h-none">
+    <div data-list-frame="" data-list-phone={phone === 'table' ? 'table' : undefined} className="bg-card relative isolate min-w-0 max-w-full overflow-hidden rounded-lg border [&>div:first-child]:max-h-[calc(100dvh-var(--header-height,0px))] print:[&>div:first-child]:max-h-none">
       {unreadable ? null : (
         <Table ref={table}>
           {/* The head rule is each head cell's own inset shadow, since a collapsed border scrolls away from a sticky
@@ -214,7 +220,7 @@ export function ListTable({
                       <SelectRow id={id} selected={picked.selected} onSelect={picked.onSelect} t={t} />
                     </TableCell>
                   ) : null}
-                  {shown.map((field, column) => {
+                  {shown.map((field) => {
                     const Ref = refOf({ screen, place: 'cell', path: cellOf.get(field.name) ?? field.cell })
                     // An email cell is a mail link, and a link cannot sit in the row's link (`<a>` in `<a>` is a
                     // hydration error), so the linked column draws its text. Upload draws no anchor.
@@ -229,9 +235,10 @@ export function ListTable({
                     ) : (
                       Ref && <Ref field={field} value={row[field.name]} row={row} />
                     )
+                    // Grid rows order phone details without moving cells out of Chromium's table column order.
                     return (
-                      <TableCell key={field.name} data-list-title={field === linked ? '' : undefined} data-list-detail={field !== linked ? '' : undefined} data-list-extra={column > 3 || undefined} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : hovered}>
-                        {field !== linked ? <span aria-hidden="true" data-list-label="" className="sm:hidden">{labelFor({ kayan, field, copy })}:</span> : null}
+                      <TableCell key={field.name} data-list-title={field === linked ? '' : undefined} data-list-detail={field !== linked ? '' : undefined} data-list-extra={field !== linked && !details.includes(field.name) || undefined} data-list-card-order={card && field !== linked && details.includes(field.name) ? details.indexOf(field.name) : undefined} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : hovered}>
+                        {field !== linked ? <span aria-hidden="true" data-list-label="" className={phone === 'table' ? 'hidden' : 'sm:hidden'}>{labelFor({ kayan, field, copy })}:</span> : null}
                         {field === linked && opens ? (
                           // A real link, so it opens in a new tab and lists for a reader, but out of the tab
                           // order since the row is the stop. An untitled row's name holds the visible text.

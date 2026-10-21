@@ -8720,8 +8720,10 @@ test('phone list sorting offers readable sortable columns, both directions and t
 })
 
 test('phone cards keep one row link and checkbox, labelled details, and independent row actions', async () => {
+  const { listOf } = await import('../registry/node-tree.ts')
+  const node = { ...listOf(listScreen())!, card: undefined }
   const host = await render(createElement(List, {
-    kayan: courses, screen: listScreen(), page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300, currency: 'SAR', delivery: 'live' }]),
+    kayan: courses, screen: listScreen(), node, page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300, currency: 'SAR', delivery: 'live' }]),
     query: { cols: ['title', 'fee', 'currency', 'delivery', 'createdAt'] }, t: english, locale: 'en', onQuery: () => {},
     href: (id: string) => `/courses/${id}`, newHref: '/courses/new', operations: { deleteMany: true, delete: true }, run: async () => ({}),
   }))
@@ -8755,4 +8757,38 @@ test('the dedicated roles list uses the same labelled phone card layout without 
   assert.ok([...card.querySelectorAll('[data-list-label]')].every((label) => label.getAttribute('aria-hidden') === 'true'))
   assert.equal(card.querySelector('[data-list-title] a')?.getAttribute('href'), '/roles/r1')
   assert.deepEqual([...card.querySelectorAll('[data-list-label]')].map((one) => one.textContent), ['Kind:', 'Members:'])
+})
+
+for (const [name, cols, reads, expected] of [
+  ['declared order', ['title', 'fee', 'currency', 'delivery', 'createdAt'], undefined, ['Created at:', 'Delivery:', 'Fee:']],
+  ['hidden column', ['title', '-fee', 'currency', 'delivery', 'createdAt'], undefined, ['Created at:', 'Delivery:']],
+  ['unreadable column', ['title', 'fee', 'currency', 'delivery', 'createdAt'], (_kayan: string, field: string) => field !== 'delivery', ['Created at:', 'Fee:']],
+] as const) test(`phone card respects ${name} without filling from outside card`, async () => {
+  const screen = listScreen()
+  const { listIn, nodesOf } = await import('../registry/node-tree.ts')
+  const page = structuredClone(screen.page)
+  listIn(nodesOf(page))!.columns = ['title', 'fee', 'currency', 'delivery', 'createdAt'].map((field) => ({ field }))
+  listIn(nodesOf(page))!.card = ['createdAt', 'delivery', 'fee']
+  const host = await render(createElement(List, {
+    kayan: courses, screen: { ...screen, page }, page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300, currency: 'SAR', delivery: 'live' }]),
+    query: { cols: [...cols] }, reads, t: english, locale: 'en', onQuery: () => {},
+    href: (id: string) => `/courses/${id}`, newHref: '/courses/new',
+  }))
+  const row = host.querySelector('tr[data-row="c1"]')!
+  const details = [...row.querySelectorAll('[data-list-detail]:not([data-list-extra])')].sort((a, b) => Number(a.getAttribute('data-list-card-order')) - Number(b.getAttribute('data-list-card-order')))
+  assert.deepEqual(details.map((cell) => cell.querySelector('[data-list-label]')?.textContent), expected)
+  assert.equal(row.querySelectorAll('td').length, cols.filter((column) => !column.startsWith('-')).length + 1 - (reads ? 1 : 0), 'desktop retains every readable selected column and actions')
+})
+
+for (const phone of [undefined, 'cards', 'table'] as const) test(`a list declares its phone layout ${phone ?? 'by default'} without a runtime switch`, async () => {
+  const { listOf } = await import('../registry/node-tree.ts')
+  const node = { ...listOf(listScreen())!, card: undefined, ...(phone && { phone }) }
+  const host = await render(createElement(List, {
+    kayan: courses, node, page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300 }]),
+    query: {}, t: english, locale: 'en', onQuery: () => {}, href: (id: string) => `/courses/${id}`, newHref: '/courses/new',
+  }))
+  assert.equal(host.querySelector('[data-list-frame]')?.getAttribute('data-list-phone'), phone === 'table' ? 'table' : null)
+  assert.equal(host.querySelectorAll('[data-list-phone-controls]').length, phone === 'table' ? 0 : 1)
+  assert.ok(host.querySelector('table thead th button'), 'both layouts keep the real header controls')
+  assert.equal(host.querySelectorAll('[data-list-layout-switch]').length, 0)
 })

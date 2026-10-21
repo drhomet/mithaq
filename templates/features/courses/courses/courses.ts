@@ -164,7 +164,7 @@ export const courses = defineKayan({
       nav: { group: navGroups.work },
       useAsTitle: 'title',
       pages: {
-        ...backofficeList('/courses', { columns: ['title', 'organization', 'fee', 'archived', 'createdAt'], filters: ['organization', 'title', 'fee', 'archived'], search: ['title'], sort: '-createdAt' }),
+        ...backofficeList('/courses', { columns: ['title', 'organization', 'fee', 'archived', 'createdAt'], card: ['fee', 'organization', 'archived'], filters: ['organization', 'title', 'fee', 'archived'], search: ['title'], sort: '-createdAt' }),
         ...backofficeRecord({
           path: '/courses/:id',
           main: [{ tabs: [
@@ -307,6 +307,7 @@ export const courses = defineKayan({
             // `_status` says whether each row is a draft or published, since this
             // list reads every row's latest draft.
             columns: ['title', 'fee', 'opensOn', '_status', 'details', 'cover'],
+            card: ['_status', 'fee', 'opensOn'],
             filters: ['title', 'fee', 'archived'],
             // `details` is searched because this list names it: a rich text field
             // offers itself to no search box on its own.

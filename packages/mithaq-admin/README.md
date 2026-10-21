@@ -121,6 +121,17 @@ own `ui/rich-text-nodes.tsx`, and spread `richTextComponents` and
 `uploadComponents` into your components map (see
 [Rich text and files](#rich-text-and-files)).
 
+### Upgrading 0.3.1 projects to 0.3.2
+
+Install both packages at 0.3.2. Lists default to `phone: 'cards'`. A list with
+`phone: 'table'` keeps its header and scrolls inside its frame on phones, with
+44px targets. It cannot also declare `card`; there is no runtime layout switch. A project with ejected lists merges `list.tsx`,
+`list-table.tsx` and `list-table.css` to use `card`. This optional list key orders
+up to three of its own non-title columns on phones, filtered by read access and
+the column picker. Hidden fields get no replacement from outside `card`.
+Without `card`, lists keep their first three visible details. Tables from 640px
+upward are unchanged. See [Lists](../mithaq/README.md#lists).
+
 ### Upgrading 0.3.0 projects to 0.3.1
 
 Install both packages at 0.3.1, then run `mithaq upgrade --check` in every host

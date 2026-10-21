@@ -1,3 +1,4 @@
+import type { CheckedCardNodes } from '../screen/index.ts'
 import { applyRows, rowFields, rowsOf, type FieldList, type RowFieldWhere } from './rows.ts'
 import { isVersions, languageRows, serviceTargetOf, tenantDefaults } from './language.ts'
 import type { Ref } from './user.ts'
@@ -47,6 +48,14 @@ type KayanTargetsOf<
 > = {
   [Name in Exclude<keyof L['targets'], 'service'>]?: L['targets'][Name] extends { capability: 'tenant' } ? never : KayanConfigOf<L, Fields, L['targets'][Name]>
 } & Service
+
+type CheckedScreenCards<L extends Language, Targets> = {
+  [Name in keyof Targets]: Name extends keyof L['targets']
+    ? L['targets'][Name] extends { capability: 'screen' }
+      ? Targets[Name] & CheckedCardNodes<Targets[Name], never, LocalesOf<L>>
+      : unknown
+    : Name extends 'service' ? unknown : never
+}
 
 /** The language's tenant target, which is under the key `tenant` alone, or `never`. */
 type TenantOf<L extends Language> = L['targets'] extends { tenant: infer T extends { capability: 'tenant'; relationTo: string; field: { rules: object } } } ? T : never
@@ -233,6 +242,7 @@ export const defineKayan =
     const DbName extends string | undefined = undefined,
     const Kept extends KayanVersions | undefined = undefined,
     const R = Record<never, never>,
+    const TargetDeclarations = Record<never, never>,
   >(kayan: {
     name: Name
     /** The provider that authenticates this kayan: `betterAuth({ server })`, `local({ secret })`, or a strategy. */
@@ -255,7 +265,7 @@ export const defineKayan =
       store?: StoreName
       /** The target a write is validated against. One of the language's targets. */
       schema?: SchemaName
-    } }> & { [Name in VersionsKey<L>]?: Kept }
+    } }> & { [Name in VersionsKey<L>]?: Kept } & CheckedScreenCards<L, TargetDeclarations>
     /** This kayan's own open bag, for the project's own code. Nothing in mithaq reads it, and it stays on the server. */
     custom?: Record<string, unknown>
     access?: AccessDef & CheckedRows<AccessDef, Fields, L>
@@ -342,6 +352,7 @@ export const defineGlobal = <const L extends Language>(language: L) => {
     const SchemaName extends SchemaKeys<L['targets']> | undefined = undefined,
     const DbName extends string | undefined = undefined,
     const R = Record<never, never>,
+    const TargetDeclarations = Record<never, never>,
   >(global: {
     name: Name
     /** The fields, in column order: `{ ...defaultFields, ...defaultGlobalFields, siteTitle }`, or `({ defaults }) => ({ ...defaults, siteTitle })`. */
@@ -358,7 +369,7 @@ export const defineGlobal = <const L extends Language>(language: L) => {
       store?: StoreName
       /** The target a write is validated against. One of the language's targets. */
       schema?: SchemaName
-    } }>
+    } }> & CheckedScreenCards<L, TargetDeclarations>
     /** This global's own open bag, for the project's own code. Nothing in mithaq reads it, and it stays on the server. */
     custom?: Record<string, unknown>
     /** Read and update only: a create or delete key is refused by the type. */

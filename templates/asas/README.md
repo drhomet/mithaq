@@ -763,6 +763,10 @@ The operation's name is its permission key, `rooms.close`, so give it to the rol
 
 #### A column on a screen
 
+A list defaults to phone cards. Declare `phone: 'table'` for a visible-header table that scrolls inside its frame below 640px, with 44px targets. It cannot also declare `card`, and there is no runtime layout switch.
+
+A card list may also declare `card: ['status', 'total']`, an ordered list of up to three of its own non-title column names for phone details. Hidden or unreadable columns stay absent. Without `card`, the first three visible non-title columns remain the details. From 640px upward the table is unchanged. See [Lists](../../packages/mithaq/README.md#lists).
+
 Add the field name to the list's `columns`, and to `filters` or `search` if a person should filter or search by it. The build refuses `searchable` on a field whose kind cannot take `like` (only `text` and `email` can), on a localized field, and on a field no one may read. A column with a component of its own names it with `cell`, as `fee` does with `ui('fee-cell.tsx#FeeCell')`. Then run `bunx mithaq generate screens`. If a role should see the column, give it `<kayan>.fields.<field>`. If the backoffice lists the kayan, decide whether staff read it.
 
 ### Add a step

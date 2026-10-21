@@ -172,6 +172,8 @@ export function List(props: ListProps): ReactElement {
               openRow={(id) => openRow(table, id)}
               docs={page.docs}
               sort={query.sort}
+              card={node?.card}
+              phone={node?.phone}
               defaultSort={node?.sort}
               onSort={(sort) => refine({ sort })}
               selection={picks ? { ids: rowIds, selected, onSelect: setSelected } : undefined}

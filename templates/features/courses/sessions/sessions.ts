@@ -45,7 +45,7 @@ export const sessions = defineKayan({
       nav: { group: navGroups.work },
       useAsTitle: 'startsAt',
       pages: {
-        ...backofficeList('/sessions', { columns: ['startsAt', 'organization', 'course', 'capacity', 'venue'], filters: ['organization', 'course', 'venue', 'archived'], search: ['venue', 'course.title'], sort: '-startsAt' }),
+        ...backofficeList('/sessions', { columns: ['startsAt', 'organization', 'course', 'capacity', 'venue'], phone: 'table', filters: ['organization', 'course', 'venue', 'archived'], search: ['venue', 'course.title'], sort: '-startsAt' }),
         ...backofficeRecord({
           path: '/sessions/:id',
           main: [{ tabs: [
@@ -77,6 +77,7 @@ export const sessions = defineKayan({
       pages: {
         list: { path: '/sessions', page: appPage([{ layout: 'table', main: [{ list: {
           columns: ['course', 'startsAt', 'capacity', 'venue'],
+          phone: 'table',
           filters: ['course', 'startsAt', 'venue', 'format', 'archived'],
           search: ['course.title', 'details'],
         } }] }]) },

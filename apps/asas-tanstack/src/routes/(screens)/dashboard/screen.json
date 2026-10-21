@@ -887,6 +887,11 @@
                           "decided": "table"
                         }
                       ],
+                      "card": [
+                        "_status",
+                        "fee",
+                        "opensOn"
+                      ],
                       "filters": [
                         "title",
                         "fee",
@@ -1932,6 +1937,7 @@
                           "decided": "table"
                         }
                       ],
+                      "phone": "table",
                       "filters": [
                         "course",
                         "startsAt",

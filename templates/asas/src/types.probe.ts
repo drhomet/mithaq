@@ -3356,3 +3356,67 @@ drizzleAdapter({ connectionString: 'postgresql://never-connected', kinds: drizzl
 const { newRows: _newRows, ...tenantWithoutNewRows } = betterAuthTenant({ relationTo: 'organization', onDelete: 'restrict', organizations: 'many', newRows: 'active' })
 // @ts-expect-error A tenant target must name the new-row fill rule.
 const tenantNewRowsProbe: TenantTarget = tenantWithoutNewRows
+
+withScreen.defineKayan({
+  name: 'cardOutsideColumnProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
+  targets: { portal: { pages: { list: { path: '/cards', page: { shell: 'shell', main: [
+    { layout: 'page', main: [{ list: { columns: ['title', 'fee'],
+      // @ts-expect-error a card field belongs to its own columns
+      card: ['createdAt'],
+    } }] },
+  ] } } } } },
+})
+withScreen.defineKayan({
+  name: 'cardTitleProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
+  targets: { portal: { pages: { list: { path: '/cards', page: { shell: 'shell', main: [
+    { layout: 'page', main: [{ list: { columns: ['title', 'fee'],
+      // @ts-expect-error the title column is not repeated on a card
+      card: ['title'],
+    } }] },
+  ] } } } } },
+})
+withScreen.defineKayan({
+  name: 'cardTooManyProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
+  targets: {
+    // @ts-expect-error a card holds at most three details
+    portal: { pages: { list: { path: '/cards', page: { shell: 'shell', main: [
+      { layout: 'page', main: [{ list: { columns: ['title', 'fee', 'id', 'createdAt', 'updatedAt'], card: ['fee', 'id', 'createdAt', 'updatedAt'] } }] },
+    ] } } } },
+  },
+})
+withScreen.defineKayan({
+  name: 'cardNamedTitleProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
+  targets: { portal: { useAsTitle: 'title', pages: { list: { path: '/cards', page: { shell: 'shell', main: [
+    { layout: 'page', main: [{ list: { columns: [{ field: 'fee' }, 'title', 'createdAt'], card: ['createdAt', 'fee'] } }] },
+  ] } } } } },
+})
+withScreen.defineKayan({
+  name: 'cardNamedTitleRepeatProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
+  targets: { portal: { useAsTitle: 'title', pages: { list: { path: '/cards', page: { shell: 'shell', main: [
+    { layout: 'page', main: [{ list: { columns: ['fee', 'title'],
+      // @ts-expect-error a named title is excluded even when it is not the first declared column
+      card: ['title'],
+    } }] },
+  ] } } } } },
+})
+withScreen.defineKayan({
+  name: 'phoneTableCardProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
+  targets: {
+    // @ts-expect-error a phone table cannot declare card fields
+    portal: { pages: { list: { path: '/cards', page: { shell: 'shell', main: [{ list: { columns: ['title', 'fee'], phone: 'table', card: ['fee'] } }] } } } },
+  },
+})
+withScreen.defineKayan({
+  name: 'phoneLayoutProbe',
+  fields: { ...defaultFields, title: { kind: 'text' } },
+  targets: {
+    // @ts-expect-error phone names cards or table
+    portal: { pages: { list: { path: '/cards', page: { shell: 'shell', main: [{ list: { columns: ['title'], phone: 'tiles' } }] } } } },
+  },
+})

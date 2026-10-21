@@ -1,18 +1,20 @@
 /* There is no min-width form that undoes the card layout without copying every table style.
    Containing phone styles here preserves each host's native table cascade from sm upwards. */
 @media (width < 640px) {
+  /* A table opts out of cards but its rows still need room for phone targets. */
+  [data-list-frame][data-list-phone=table] :is(thead, tbody) > tr { height: 2.75rem; }
   /* One cell tree keeps custom cells, selection and row menus alive across a resize. */
-  [data-list-frame] {
+  [data-list-frame]:where(:not([data-list-phone=table])) {
     border-width: 0;
     border-radius: 0;
     background: transparent;
     overflow: visible;
   }
-  [data-list-frame] > div:first-child { max-height: none; overflow: visible; }
-  [data-list-frame] table { display: block; }
+  [data-list-frame]:where(:not([data-list-phone=table])) > div:first-child { max-height: none; overflow: visible; }
+  [data-list-frame]:where(:not([data-list-phone=table])) table { display: block; }
   /* Chromium assigns column headers by cell position, so clipped columns must stay in its table. */
-  [data-list-frame] thead,
-  [data-list-card] > [data-list-extra] {
+  [data-list-frame]:where(:not([data-list-phone=table])) thead,
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-extra] {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -24,10 +26,10 @@
     border-width: 0;
   }
   /* The phone controls above the frame replace these hidden header buttons in the tab order. */
-  [data-list-frame] thead button,
-  [data-list-frame] thead [role=checkbox] { display: none; }
-  [data-list-frame] tbody { display: grid; gap: 0.5rem; }
-  [data-list-card] {
+  [data-list-frame]:where(:not([data-list-phone=table])) thead button,
+  [data-list-frame]:where(:not([data-list-phone=table])) thead [role=checkbox] { display: none; }
+  [data-list-frame]:where(:not([data-list-phone=table])) tbody { display: grid; gap: 0.5rem; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.375rem 0.5rem;
@@ -37,9 +39,9 @@
     border-radius: var(--radius);
     background: var(--card);
   }
-  [data-list-card][data-list-picks] { grid-template-columns: 2.75rem minmax(0, 1fr) auto; }
-  [data-list-frame] tbody [data-list-card]:last-child { border-width: 1px; }
-  [data-list-card] > td {
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card][data-list-picks] { grid-template-columns: 2.75rem minmax(0, 1fr) auto; }
+  [data-list-frame]:where(:not([data-list-phone=table])) tbody [data-list-card]:last-child { border-width: 1px; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > td {
     position: static;
     inset: auto;
     z-index: auto;
@@ -51,17 +53,21 @@
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  [data-list-card] > [data-list-title] { display: block; grid-row: 1; grid-column: 1; align-content: center; min-height: 2.75rem; font-size: 1.125rem; }
-  [data-list-card][data-list-picks] > [data-list-title] { grid-column: 2; }
-  [data-list-card] > [data-list-select-row] { display: flex; grid-row: 1; grid-column: 1; align-items: center; justify-content: center; }
-  [data-list-card] > [data-list-actions] { display: flex; grid-row: 1; grid-column: -2 / -1; align-items: center; justify-content: end; }
-  [data-list-card] > [data-list-detail] { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr); gap: 0.5rem; align-items: baseline; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-title] { display: block; grid-row: 1; grid-column: 1; align-content: center; min-height: 2.75rem; font-size: 1.125rem; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card][data-list-picks] > [data-list-title] { grid-column: 2; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-select-row] { display: flex; grid-row: 1; grid-column: 1; align-items: center; justify-content: center; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-actions] { display: flex; grid-row: 1; grid-column: -2 / -1; align-items: center; justify-content: end; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-detail] { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr); gap: 0.5rem; align-items: baseline; }
+  /* Fixed rows avoid Chromium desktop paint changes from an inactive variable grid row. */
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="0"] { grid-row: 2; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="1"] { grid-row: 3; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="2"] { grid-row: 4; }
   /* Clipped cells keep their column positions, but their controls must never become invisible tab stops. */
-  [data-list-extra] :is(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]) { display: none; }
-  [data-list-label] { color: var(--muted-foreground); font-size: 0.75rem; }
-  [data-list-value] { min-width: 0; }
-  [data-list-value] [data-slot=badge] { max-width: 100%; height: auto; white-space: normal; overflow-wrap: anywhere; }
-  [data-list-value]:empty::after { content: '—'; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-extra] :is(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]) { display: none; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-label] { color: var(--muted-foreground); font-size: 0.75rem; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-value] { min-width: 0; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-value] [data-slot=badge] { max-width: 100%; height: auto; white-space: normal; overflow-wrap: anywhere; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-value]:empty::after { content: '—'; }
 
-  [data-list-stretched-link]::after { content: ''; position: absolute; inset: 0; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-stretched-link]::after { content: ''; position: absolute; inset: 0; }
 }
