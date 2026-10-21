@@ -52,7 +52,7 @@ type KayanTargetsOf<
 type CheckedScreenCards<L extends Language, Targets> = {
   [Name in keyof Targets]: Name extends keyof L['targets']
     ? L['targets'][Name] extends { capability: 'screen' }
-      ? Targets[Name] & CheckedCardNodes<Targets[Name], never, LocalesOf<L>>
+      ? Targets[Name] & CheckedCardNodes<Targets[Name], LocalesOf<L>>
       : unknown
     : Name extends 'service' ? unknown : never
 }

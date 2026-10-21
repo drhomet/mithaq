@@ -3372,7 +3372,7 @@ withScreen.defineKayan({
   fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
   targets: { portal: { pages: { list: { path: '/cards', page: { shell: 'shell', main: [
     { layout: 'page', main: [{ list: { columns: ['title', 'fee'],
-      // @ts-expect-error the title column is not repeated on a card
+      // The build checks the title; types cannot recover kayan field order.
       card: ['title'],
     } }] },
   ] } } } } },
@@ -3399,10 +3399,22 @@ withScreen.defineKayan({
   fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
   targets: { portal: { useAsTitle: 'title', pages: { list: { path: '/cards', page: { shell: 'shell', main: [
     { layout: 'page', main: [{ list: { columns: ['fee', 'title'],
-      // @ts-expect-error a named title is excluded even when it is not the first declared column
+      // The same build check owns named and fallback titles.
       card: ['title'],
     } }] },
   ] } } } } },
+})
+// Column order cannot guess the title, nor can the enclosing kayan's title decide an `of` list's.
+for (const useAsTitle of [undefined, 'title'] as const) for (const list of [
+  { columns: ['fee', 'title'], card: ['fee'] },
+  { columns: ['fee', 'title'], card: ['title'] },
+  { of: 'relatedCourses', where: 'parent', columns: ['fee', 'title'], card: ['fee'] },
+  { of: 'relatedCourses', where: 'parent', columns: ['fee', 'title'], card: ['title'] },
+  { of: 'sessions', where: 'course', columns: ['capacity', 'startsAt'], card: ['capacity'] },
+] as const) withScreen.defineKayan({
+  name: 'cardTitleResolutionProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, fee: { kind: 'number' } },
+  targets: { portal: { useAsTitle, pages: { edit: { path: '/cards/:id', page: { shell: 'shell', main: [{ list }] } } } } },
 })
 withScreen.defineKayan({
   name: 'phoneTableCardProbe',

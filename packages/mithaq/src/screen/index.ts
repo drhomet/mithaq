@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { builtInScreenKinds, choiceControls, packageName, registryCells, registryControls } from './client.ts'
+import { builtInScreenKinds, choiceControls, listTitle, packageName, registryCells, registryControls } from './client.ts'
 import { unsortable, type Localized, type LocalesOf, type ResolvedField, type ResolvedKayan, type RuntimeField } from '../mithaq/types.ts'
 import { defaultKinds } from '../base/kinds.ts'
 import { assertFieldWhere, assertWhere } from '../asas/runner/write.ts'
@@ -215,31 +215,27 @@ export type ScreenList<Locale extends string = string, Ref extends string | Ui =
 )
 
 type ColumnName<Column> = Column extends string ? Column : Column extends { readonly field: infer Name } ? Name : never
-type CardTitle<Columns extends readonly unknown[], Title> = [Title] extends [never]
-  ? ColumnName<Columns[0]>
-  : Title extends ColumnName<Columns[number]> ? Title : ColumnName<Columns[0]>
-
-type CheckedCard<List, Title> = List extends {
+type CheckedCard<List> = List extends {
   readonly columns: infer Columns extends readonly unknown[]
   readonly card: infer Card extends readonly string[]
 } ? { readonly card: {
-    readonly [At in keyof Card]: Card[At] extends Exclude<ColumnName<Columns[number]>, CardTitle<Columns, Title>> ? Card[At] : never
+    readonly [At in keyof Card]: Card[At] extends ColumnName<Columns[number]> ? Card[At] : never
   } }
   : unknown
 
-// Field names alone cannot reject a card field that this particular list leaves out.
-export type CheckedCardNodes<Node, Title = never, Locale extends string = string> = Node extends readonly unknown[]
-  ? { [At in keyof Node]: CheckedCardNodes<Node[At], Title, Locale> }
+// Types cannot recover field order or resolve `of`; the build checks the rendered title.
+export type CheckedCardNodes<Node, Locale extends string = string> = Node extends readonly unknown[]
+  ? { [At in keyof Node]: CheckedCardNodes<Node[At], Locale> }
   : Node extends object
     ? { [Key in keyof Node]: Key extends 'list'
         ? Node[Key] extends { readonly columns: readonly unknown[] }
-          ? CheckedCardNodes<Node[Key], Title, Locale> & CheckedCard<Node[Key], Node[Key] extends { readonly of: string } ? never : Title>
-          : CheckedCardNodes<Node[Key], Title, Locale>
+          ? CheckedCardNodes<Node[Key], Locale> & CheckedCard<Node[Key]>
+          : CheckedCardNodes<Node[Key], Locale>
         : Key extends 'label' | 'description'
           ? Node[Key] extends Readonly<Record<string, string>>
             ? Node[Key] & { [Stray in Exclude<keyof Node[Key], Locale>]: never }
-            : CheckedCardNodes<Node[Key], Title, Locale>
-          : CheckedCardNodes<Node[Key], Node extends { readonly useAsTitle: infer Name } ? Name : Title, Locale> }
+            : CheckedCardNodes<Node[Key], Locale>
+          : CheckedCardNodes<Node[Key], Locale> }
     : Node
 
 /** A declared node of one kind; a leaf may be written as its bare field name. */
@@ -848,10 +844,13 @@ export const screensOf = (
             if (!Array.isArray(card)) throw new Error(`${node} list card must be an ordered list of column names.`)
             if (card.length > 3) throw new Error(`${node} list card takes at most 3 details after the title.`)
             const names = columns.map((column) => typeof column === 'string' ? column : column.field)
+            const title = listTitle({
+              columns: Object.keys(kayan.fields).filter((name) => names.includes(name)).map((name) => ({ name })),
+              useAsTitle: (kayan.targets?.[key] as ScreenKayan | undefined)?.useAsTitle,
+            })?.name
             for (const [at, name] of card.entries()) {
               if (!names.includes(name)) throw new Error(`${node} list card names "${name}", which is not a column of this list.`)
-              const title = (kayan.targets?.[key] as ScreenKayan | undefined)?.useAsTitle
-              if (name === (title && names.includes(title) ? title : names[0])) throw new Error(`${node} list card repeats "${name}", the title column.`)
+              if (name === title) throw new Error(`${node} list card repeats "${name}", the title column.`)
               if (card.indexOf(name) !== at) throw new Error(`${node} list card names "${name}" more than once.`)
             }
           }

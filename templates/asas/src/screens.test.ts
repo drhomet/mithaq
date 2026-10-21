@@ -628,7 +628,7 @@ test('a list holds toolbar, bulk and row regions of buttons and a default sort a
 test('a list with of and where lists another kayan of the screen scoped to the record, and an unknown of, a where that is no relationship back and a join leaf are refused', () => {
   // `of` names a kayan the screen draws, `where` that kayan's relationship back at
   // this page's own, and every column, filter, sort and button is read off `of`.
-  const related = (list: Record<string, unknown>, where: 'create' | 'edit' = 'edit', leaf?: string | Record<string, unknown>) => {
+  const related = (list: Record<string, unknown>, where: 'create' | 'edit' = 'edit', leaf?: string | Record<string, unknown>, useAsTitle?: string) => {
     const language = screens({ dashboard: screenTarget({ ...dashboardBase, kayan: ['courses', 'sessions'] }) })
     const tabs = { tabs: [
       { tab: 'details', label, fields: [{ form: ['title', ...(leaf ? [leaf] : [])] }] },
@@ -658,8 +658,10 @@ test('a list with of and where lists another kayan of the screen scoped to the r
             tags: { kind: 'relationship', relationTo: 'courses', hasMany: true },
             venue: { kind: 'text' },
             seats: { kind: 'number' },
+            startsAt: { kind: 'date' },
+            capacity: { kind: 'number' },
           },
-          targets: { service: { operations: { ...defaultOperations, close: defaultOperations.update } } },
+          targets: { service: { operations: { ...defaultOperations, close: defaultOperations.update } }, dashboard: { useAsTitle } },
         } as never),
       ] as never,
     })
@@ -688,6 +690,9 @@ test('a list with of and where lists another kayan of the screen scoped to the r
     },
   }, 'the columns, filters, sort and buttons are the sessions kayan\'s own')
   assert.match(studioText(studioTree('dashboard', asas.targets.dashboard.client)), /\n\s+list of sessions where course\n/, 'mithaq screens names what the list lists')
+  assert.doesNotThrow(() => related({ of: 'sessions', where: 'course', columns: ['seats', 'venue'], card: ['seats'] }, 'edit', undefined, 'venue'))
+  assert.throws(() => related({ of: 'sessions', where: 'course', columns: ['seats', 'venue'], card: ['venue'] }, 'edit', undefined, 'venue'), /card.*venue.*title/)
+  assert.doesNotThrow(() => related({ of: 'sessions', where: 'course', columns: ['capacity', 'startsAt'], card: ['capacity'] }, 'edit', undefined, 'startsAt'))
 
   const at = 'Screen "dashboard" kayan "courses" page "edit" region "main" layout region "main" tab "sessions" list'
   const refused = (list: Record<string, unknown>, message: string, page?: 'create') =>
@@ -1310,7 +1315,7 @@ test('a list preserves its declared phone card order and refuses fields outside 
   const built = build(list(['summary', 'fee', 'currency']))
   assert.deepEqual(treeOf(built.targets.dashboard.client.kayan.courses!.pages.list).main[0]!.main[0]!.list.card, ['summary', 'fee', 'currency'])
   assert.throws(() => build(list(['updatedAt'])), /card.*updatedAt.*not.*column/)
-  assert.throws(() => build(list(['title'])), /card.*title.*title/)
+  assert.throws(() => build(list(['createdAt'])), /card.*createdAt.*title/)
   assert.throws(() => build(list(['fee', 'summary', 'currency', 'createdAt'])), /card.*at most 3/)
   assert.throws(() => build(list(['fee', 'fee'])), /card.*fee.*more than once/)
   assert.throws(() => build(list('fee')), /card.*ordered list/)
@@ -1320,6 +1325,12 @@ test('a list preserves its declared phone card order and refuses fields outside 
 test('a phone card excludes the named title even when its column is not first', () => {
   const list = (card: string[]) => ({ useAsTitle: 'title', pages: { ...pages, list: { ...pages.list, page: table([{ list: { columns: ['fee', 'title', 'summary'], card } }]) } } })
   assert.doesNotThrow(() => build(list(['summary', 'fee'])))
+  assert.throws(() => build(list(['title'])), /card.*title.*title/)
+})
+
+test('a phone card without useAsTitle uses kayan field order rather than declared column order', () => {
+  const list = (card: string[]) => ({ pages: { ...pages, list: { ...pages.list, page: table([{ list: { columns: ['fee', 'title'], card } }]) } } })
+  assert.doesNotThrow(() => build(list(['fee'])))
   assert.throws(() => build(list(['title'])), /card.*title.*title/)
 })
 

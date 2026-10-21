@@ -235,7 +235,7 @@ export function ListTable({
                     ) : (
                       Ref && <Ref field={field} value={row[field.name]} row={row} />
                     )
-                    // Grid rows order phone details without moving cells out of Chromium's table column order.
+                    // CSS orders phone details without moving cells out of Chromium's table column order.
                     return (
                       <TableCell key={field.name} data-list-title={field === linked ? '' : undefined} data-list-detail={field !== linked ? '' : undefined} data-list-extra={field !== linked && !details.includes(field.name) || undefined} data-list-card-order={card && field !== linked && details.includes(field.name) ? details.indexOf(field.name) : undefined} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : hovered}>
                         {field !== linked ? <span aria-hidden="true" data-list-label="" className={phone === 'table' ? 'hidden' : 'sm:hidden'}>{labelFor({ kayan, field, copy })}:</span> : null}

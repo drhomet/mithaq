@@ -23,6 +23,12 @@ export type {
 } from './index.ts'
 import type { ClientField, NavEntry, PageClient, ScreenClient } from './index.ts'
 
+/** The active columns keep their existing order; a listed useAsTitle alone takes precedence. */
+export const listTitle = <Column extends { readonly name: string }>({ columns, useAsTitle }: {
+  columns: readonly Column[]
+  useAsTitle?: string
+}): Column | undefined => columns.find((column) => column.name === useAsTitle) ?? columns[0]
+
 export { compareValues, matchesWhere, same } from '../mithaq/where.ts'
 
 // What each place a screen names a component receives. No framework: `Node` is

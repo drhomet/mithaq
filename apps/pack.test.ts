@@ -40,7 +40,11 @@ test('the skills and the license notices staged are exactly the files git tracks
 })
 
 test('the staged mithaq package ships the release changelog and includes it in the npm file list', () => {
-  assert.equal(readFileSync(join(staged, 'CHANGELOG.md'), 'utf8'), readFileSync(join(root, 'CHANGELOG.md'), 'utf8'))
+  const changelog = readFileSync(join(staged, 'CHANGELOG.md'), 'utf8')
+  assert.equal(changelog.replaceAll('](docs/', ']('), readFileSync(join(root, 'CHANGELOG.md'), 'utf8'))
+  for (const [, link] of changelog.matchAll(/\]\((?![a-z]+:|#)([^)#\s]+)/gi)) {
+    assert.ok(existsSync(join(staged, link!)), `CHANGELOG.md links ${link}`)
+  }
   const manifest = JSON.parse(readFileSync(join(staged, 'package.json'), 'utf8')) as { files: string[] }
   assert.ok(manifest.files.includes('CHANGELOG.md'))
 })

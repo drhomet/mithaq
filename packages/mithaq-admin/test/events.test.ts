@@ -8792,3 +8792,19 @@ for (const phone of [undefined, 'cards', 'table'] as const) test(`a list declare
   assert.ok(host.querySelector('table thead th button'), 'both layouts keep the real header controls')
   assert.equal(host.querySelectorAll('[data-list-layout-switch]').length, 0)
 })
+
+for (const related of [false, true]) test(`declared card fields render after the ${related ? 'related kayan title' : 'field-order title'}`, async () => {
+  const { listOf } = await import('../registry/node-tree.ts')
+  const node = { ...listOf(listScreen())!, columns: ['fee', 'title'].map((field) => ({ field })), card: ['fee'], ...(related && { of: 'sessions', where: 'course' }) }
+  const host = await render(createElement(List, {
+    kayan: { ...courses, useAsTitle: related ? 'title' : undefined, fields: [fieldOf({ name: 'title', kind: 'text' }), fieldOf({ name: 'fee', kind: 'number' })] },
+    node, page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300 }]),
+    query: {}, t: english, locale: 'en', onQuery: () => {}, href: (id: string) => `/courses/${id}`, newHref: '/courses/new',
+  }))
+  const row = host.querySelector('tr[data-row="c1"]')!
+  assert.equal(row.querySelector('[data-list-title]')?.textContent?.includes('Tajweed'), true)
+  const details = [...row.querySelectorAll('[data-list-detail]:not([data-list-extra])')]
+  assert.equal(details.length, 1)
+  assert.equal(details[0]!.querySelector('[data-list-label]')?.textContent, 'Fee:')
+  assert.equal(details[0]!.querySelector('[data-list-value]')?.textContent?.includes('300'), true)
+})

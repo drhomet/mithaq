@@ -58,10 +58,10 @@
   :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-select-row] { display: flex; grid-row: 1; grid-column: 1; align-items: center; justify-content: center; }
   :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-actions] { display: flex; grid-row: 1; grid-column: -2 / -1; align-items: center; justify-content: end; }
   :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-detail] { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr); gap: 0.5rem; align-items: baseline; }
-  /* Fixed rows avoid Chromium desktop paint changes from an inactive variable grid row. */
-  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="0"] { grid-row: 2; }
-  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="1"] { grid-row: 3; }
-  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="2"] { grid-row: 4; }
+  /* Ordering leaves no empty grid row when a declared detail is hidden, without moving cells off their headers. */
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="0"] { order: 1; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="1"] { order: 2; }
+  :where([data-list-frame]:not([data-list-phone=table])) [data-list-card] > [data-list-card-order="2"] { order: 3; }
   /* Clipped cells keep their column positions, but their controls must never become invisible tab stops. */
   :where([data-list-frame]:not([data-list-phone=table])) [data-list-extra] :is(a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]) { display: none; }
   :where([data-list-frame]:not([data-list-phone=table])) [data-list-label] { color: var(--muted-foreground); font-size: 0.75rem; }

@@ -1474,6 +1474,11 @@
                               "decided": "table"
                             }
                           ],
+                          "card": [
+                            "capacity",
+                            "archived",
+                            "venue"
+                          ],
                           "filters": [
                             "venue",
                             "archived"

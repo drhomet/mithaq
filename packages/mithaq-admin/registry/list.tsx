@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
 import type { ButtonClient, Row } from 'mithaq/admin'
+import { listTitle } from 'mithaq/admin'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsTrigger } from '@/components/ui/tabs'
 import { TabStrip } from 'mithaq-admin/tab-strip.tsx'
@@ -46,7 +47,7 @@ export function List(props: ListProps): ReactElement {
   const [over, setOver] = useState<ReactNode>(null)
   const columns = columnsOf({ kayan, cols: query.cols, reads, opens: node?.columns.map((column) => column.field) })
   const active = columns.flatMap((column) => kayan.fields.find((field) => field.name === column.name && column.active) ?? [])
-  const titled = active.find((field) => field.name === kayan.useAsTitle)
+  const titled = listTitle({ columns: active, useAsTitle: kayan.useAsTitle })
   const shown = titled ? [titled, ...active.filter((field) => field !== titled)] : active
   // One read per target for the whole page, so a relationship column is not one read per cell. Over the shown columns
   // alone, so a relationship the viewer has switched off costs no read.
@@ -80,7 +81,7 @@ export function List(props: ListProps): ReactElement {
    * The name of a row's menu button, naming the row by its title so a reader going down the column hears each row's own; a row with no title, or with the title column hidden, keeps the shared name.
    */
   const rowActionsLabel = (row: Row) => {
-    const name = titled && rowTitle({ kayan, row, locale })
+    const name = titled?.name === kayan.useAsTitle && rowTitle({ kayan, row, locale })
     // Bidi-isolated, so a name in the other direction does not reorder the sentence.
     return name ? (t('admin.rowActionsFor', 'Actions for {name}') ?? 'Actions for {name}').replace('{name}', () => `\u2068${name}\u2069`) : (t('admin.rowActions', 'Row actions') ?? 'Row actions')
   }

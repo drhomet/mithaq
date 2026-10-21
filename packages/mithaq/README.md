@@ -855,7 +855,7 @@ screens after changing navigation metadata.
 ### Lists
 
 A list node declares `columns`, `filters`, `search`, `sort`, `limit`, `tabs`,
-`toolbar`, `bulk` and `row`. Its `phone` layout is `'cards'` by default.
+`empty`, `menu`, `toolbar`, `bulk`, `row`, `of` and `where`. Its `phone` layout is `'cards'` by default.
 `phone: 'table'` keeps a visible header and scrolls the table inside its frame
 below 640px, with 44px targets and no page-level sideways scroll. This is a
 declaration, with no runtime layout switch. A phone table cannot declare `card`.
@@ -867,9 +867,11 @@ A card list may declare `card` for phone details:
 ```
 
 `card` orders up to three of this list's column names after its title. The
-screen's `useAsTitle` column is the title when listed; otherwise the first
-column is. Repeating the title, naming another field or listing more than three
-details fails typecheck and `mithaq generate --check`. A hidden or unreadable
+listed kayan's `useAsTitle` column is the title when active; otherwise the first
+active column is, initially in kayan field order. For `of` lists this is the related kayan.
+Types check column membership, at most three details and the phone layout;
+the build refuses a repeated title when booting or running `mithaq generate --check`.
+A hidden or unreadable
 column stays absent, with no replacement from outside `card`. Without `card`,
 the first three visible non-title columns remain the details. An empty `card`
 shows the title alone. This applies to tenant and backoffice lists, including
