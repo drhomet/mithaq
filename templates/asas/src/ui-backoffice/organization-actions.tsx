@@ -57,9 +57,9 @@ export function OrganizationActions({ value, row }: CellProps) {
     setOpen(false)
   }
   return (
-    <div data-organization={id} className="flex items-center gap-2 whitespace-nowrap">
+    <div data-organization={id} className="flex flex-wrap items-center gap-2 whitespace-normal sm:flex-nowrap sm:whitespace-nowrap">
       {/* An identifier, read left to right in either locale. */}
-      <span dir="ltr">{String(value ?? '')}</span>
+      <span dir="ltr" className="min-w-0 wrap-anywhere sm:min-w-[revert-layer] sm:wrap-normal">{String(value ?? '')}</span>
       {renames ? (
         <Button size="sm" variant="outline" className="min-h-11 sm:min-h-0" data-action="rename" onClick={() => setOpen(true)}>
           {t('backoffice.rename', 'Rename')}

@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactEle
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import type { ClientField, ClientKayan, Row } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
 import type { RelationshipTitles } from 'mithaq-admin/control-props.ts'
@@ -84,6 +85,10 @@ export function ListTable({
   const picks = picked !== undefined
   // The first shown cell carries the row's link, so a hidden or unreadable title leaves a row reachable.
   const linked = shown[0]
+  const sortable = shown.filter(canSort)
+  const sort = urlSort ?? defaultSort
+  const sorted = sortable.find((field) => field.name === sort?.replace(/^-/, ''))
+  const order = sort?.startsWith('-') ? (t('admin.descending', 'Descending') ?? 'Descending') : (t('admin.ascending', 'Ascending') ?? 'Ascending')
   // Whether the table runs past its frame's end, so the frame fades there. The value is the width of the row menu's pinned
   // column, which the fade sits before, and `false` where nothing runs past. `scrollLeft` is negative on a right-to-left page.
   const [more, setMore] = useState<number | false>(false)
@@ -105,15 +110,31 @@ export function ListTable({
   return (
     // Held to the screen below the page's header so it scrolls both ways and the head row can stay (a printed page
     // holds every row). It isolates, so pinned cells never paint over the page's sticky header or take its clicks.
-    <div className="bg-card relative isolate min-w-0 max-w-full overflow-hidden rounded-lg border [&>div:first-child]:max-h-[calc(100dvh-var(--header-height,0px))] print:[&>div:first-child]:max-h-none">
+    <div data-list-frame="" className="bg-card relative isolate min-w-0 max-w-full overflow-hidden rounded-lg border [&>div:first-child]:max-h-[calc(100dvh-var(--header-height,0px))] print:[&>div:first-child]:max-h-none">
       {unreadable ? null : (
         <Table ref={table}>
           {/* The head rule is each head cell's own inset shadow, since a collapsed border scrolls away from a sticky
               head; the row's own `border-b` is dropped so both do not draw. */}
-          <TableHeader className={`sticky top-0 z-20 ${headFill} [&_tr]:border-b-0 [&_th]:shadow-[inset_0_-1px_0_var(--border)]`}>
+          <TableHeader data-list-controls={sortable.length || picks ? 'true' : 'false'} className={`sticky top-0 z-20 ${headFill} [&_tr]:border-b-0 [&_th]:shadow-[inset_0_-1px_0_var(--border)]`}>
             <TableRow>
+              {sortable.length ? (
+                <TableHead data-list-sort-cell="" className="sm:hidden">
+                  <Select value={sort ?? null} onValueChange={(value) => onSort(value ?? undefined)}>
+                    <SelectTrigger aria-label={t('admin.sortBy', 'Sort by') ?? 'Sort by'} className="w-full">
+                      <SelectValue>{sorted ? `${labelFor({ kayan, field: sorted, copy })}: ${order}` : (t('admin.defaultOrder', 'Default order') ?? 'Default order')}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={null}>{t('admin.defaultOrder', 'Default order') ?? 'Default order'}</SelectItem>
+                      {sortable.flatMap((field) => [
+                        <SelectItem key={field.name} value={field.name}>{labelFor({ kayan, field, copy })}: {t('admin.ascending', 'Ascending') ?? 'Ascending'}</SelectItem>,
+                        <SelectItem key={`-${field.name}`} value={`-${field.name}`}>{labelFor({ kayan, field, copy })}: {t('admin.descending', 'Descending') ?? 'Descending'}</SelectItem>,
+                      ])}
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+              ) : null}
               {picked ? (
-                <TableHead scope="col" className={`${pinnedHead} start-0 ${selection}`}>
+                <TableHead data-list-select-all="" scope="col" className={`${pinnedHead} start-0 ${selection}`}>
                   <SelectAll ids={picked.ids} selected={picked.selected} onSelect={picked.onSelect} t={t} />
                 </TableHead>
               ) : null}
@@ -125,7 +146,7 @@ export function ListTable({
                 const sort = urlSort ?? defaultSort
                 const direction = sort === field.name ? 'ascending' : sort === `-${field.name}` ? 'descending' : 'none'
                 return (
-                  <TableHead key={field.name} scope="col" aria-sort={sortable ? direction : undefined} className={field === linked ? `${pinnedHead} ${picks ? 'start-11' : 'start-0'}` : undefined}>
+                  <TableHead data-list-column-head="" key={field.name} scope="col" aria-sort={sortable ? direction : undefined} className={field === linked ? `${pinnedHead} ${picks ? 'start-11' : 'start-0'}` : undefined}>
                     {sortable ? (
                       // One arrow, on the sorted column only. `aria-hidden` on the glyph and `aria-sort` on the
                       // cell keep the answer readable without it.
@@ -149,7 +170,7 @@ export function ListTable({
                   </TableHead>
                 )
               })}
-              <TableHead scope="col" className={`${pinnedHead} end-0 w-0 ${more === false ? '' : edgeHead}`}>
+              <TableHead data-list-actions-head="" scope="col" className={`${pinnedHead} end-0 w-0 ${more === false ? '' : edgeHead}`}>
                 <span className="sr-only">{t('admin.actions', 'Actions')}</span>
               </TableHead>
             </TableRow>
@@ -168,6 +189,8 @@ export function ListTable({
                   key={String(row.id ?? index)}
                   tabIndex={opens ? 0 : undefined}
                   data-row={id}
+                  data-list-card=""
+                  data-list-picks={picks || undefined}
                   aria-describedby={opens ? openHint : undefined}
                   // The ring every focusable control draws, inset so the table's frame does not clip it.
                   className={opens ? 'group/row cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset' : 'group/row'}
@@ -183,11 +206,11 @@ export function ListTable({
                   }}
                 >
                   {picked ? (
-                    <TableCell className={`${pinned} start-0 ${selection}`}>
+                    <TableCell data-list-select-row="" className={`${pinned} start-0 ${selection}`}>
                       <SelectRow id={id} selected={picked.selected} onSelect={picked.onSelect} t={t} />
                     </TableCell>
                   ) : null}
-                  {shown.map((field) => {
+                  {shown.map((field, column) => {
                     const Ref = refOf({ screen, place: 'cell', path: cellOf.get(field.name) ?? field.cell })
                     // An email cell is a mail link, and a link cannot sit in the row's link (`<a>` in `<a>` is a
                     // hydration error), so the linked column draws its text. Upload draws no anchor.
@@ -203,7 +226,8 @@ export function ListTable({
                       Ref && <Ref field={field} value={row[field.name]} row={row} />
                     )
                     return (
-                      <TableCell key={field.name} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : hovered}>
+                      <TableCell key={field.name} data-list-title={field === linked ? '' : undefined} data-list-detail={field !== linked ? '' : undefined} data-list-extra={column > 3 || undefined} className={field === linked ? `${pinned} ${picks ? 'start-11' : 'start-0'}` : hovered}>
+                        {field !== linked ? <span data-list-label="" className="sm:hidden">{labelFor({ kayan, field, copy })}:</span> : null}
                         {field === linked && opens ? (
                           // A real link, so it opens in a new tab and lists for a reader, but out of the tab
                           // order since the row is the stop. An untitled row's name holds the visible text.
@@ -211,12 +235,12 @@ export function ListTable({
                             {cell}
                           </a>
                         ) : (
-                          cell
+                          field === linked ? cell : <div data-list-value="" className="sm:contents">{cell}</div>
                         )}
                       </TableCell>
                     )
                   })}
-                  <TableCell className={`${pinned} end-0 w-0 ${more === false ? '' : edge}`}>
+                  <TableCell data-list-actions="" className={`${pinned} end-0 w-0 ${more === false ? '' : edge}`}>
                     <div className="flex items-center justify-end gap-2">{actions(row)}</div>
                   </TableCell>
                 </TableRow>
@@ -226,7 +250,7 @@ export function ListTable({
         </Table>
       )}
       {children}
-      {more === false ? null : <div data-scroll-cue="" aria-hidden className="from-card pointer-events-none absolute inset-y-0 w-10 bg-linear-to-l to-transparent rtl:bg-linear-to-r" style={{ insetInlineEnd: more }} />}
+      {more === false ? null : <div data-scroll-cue="" aria-hidden className="hidden sm:block from-card pointer-events-none absolute inset-y-0 w-10 bg-linear-to-l to-transparent rtl:bg-linear-to-r" style={{ insetInlineEnd: more }} />}
     </div>
   )
 }

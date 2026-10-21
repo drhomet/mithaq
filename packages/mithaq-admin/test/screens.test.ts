@@ -182,7 +182,7 @@ test('a list node draws its columns, filters and search, and its empty component
     href: (id: string) => `/dashboard/courses/${id}`,
     newHref: '/dashboard/courses/new',
   } as never))
-  const heads = [...host.querySelectorAll('th')].filter((one) => !one.querySelector('.sr-only')).map((one) => one.textContent!.trim())
+  const heads = [...host.querySelectorAll('th:not([data-list-sort-cell])')].filter((one) => !one.querySelector('.sr-only')).map((one) => one.textContent!.trim())
   assert.deepEqual(heads, ['Title', 'Fee', 'Opens on', 'Status', 'Details', 'Cover image'], `the node's columns, in its order: ${heads.join(', ')}`)
   assert.ok(host.querySelector('[data-empty="courses/courses"]'), 'the empty component is drawn with the kayan and the page')
   assert.equal(host.querySelector('input[type="search"]')!.getAttribute('placeholder'), 'Title, Summary, or Details', 'the search runs over the node\'s fields')
@@ -294,8 +294,8 @@ test('215c. a list of a kayan that keeps drafts reads with draft for an actor ho
     href: (id: string) => `/dashboard/courses/${id}`,
     newHref: '/dashboard/courses/new',
   } as never))
-  const column = [...host.querySelectorAll('th')].findIndex((one) => one.textContent?.trim() === 'Status')
-  assert.deepEqual([...host.querySelectorAll('tbody tr')].map((row) => row.querySelectorAll('td')[column]?.textContent?.trim()), ['Draft', 'Published'], 'the Status column says draft or published')
+  const column = [...host.querySelectorAll('th:not([data-list-sort-cell])')].findIndex((one) => one.textContent?.trim() === 'Status')
+  assert.deepEqual([...host.querySelectorAll('tbody tr')].map((row) => row.querySelectorAll('td')[column]?.querySelector('[data-list-value]')?.textContent?.trim()), ['Draft', 'Published'], 'the Status column says draft or published')
   await act(async () => {
     mounted!.unmount()
     mounted = undefined

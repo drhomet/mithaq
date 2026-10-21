@@ -378,10 +378,11 @@
       "name": "mithaq-list-table",
       "type": "registry:component",
       "title": "Mithaq list table",
-      "description": "The list's table: sortable headings, the selection column, each row's cells drawn from the components map with the first linking the row, and the pinned columns and the fade where it runs past its frame.",
+      "description": "The list's phone cards and desktop table: sort and selection controls, declared cells with the first linking the row, and pinned desktop columns with a scroll cue.",
       "registryDependencies": [
         "button",
-        "table"
+        "table",
+        "select"
       ],
       "files": [
         {

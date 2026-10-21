@@ -1453,7 +1453,7 @@ test('50b. the backoffice app: support lists people and organizations, opens eac
     const row = [...courses.matchAll(/<tr[^>]*data-row="[^"]+"[^>]*>[\s\S]*?<\/tr>/g)].map((hit) => hit[0]).find((one) => one.includes(`data-row="${course}"`)) ?? ''
     assert.ok(row.includes(title), 'the course is a row of the table')
     assert.ok(row.includes(`href="/backoffice/courses/${course}"`) && row.includes('tabindex="0"') && row.includes('data-row-menu='), `and opens the course's record: ${row.slice(0, 300)}`)
-    const heads = [...courses.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
+    const heads = [...courses.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].filter((hit) => !hit[0].includes('data-list-sort-cell')).map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
     assert.equal(heads[0], 'Title', `the title column first: ${heads.join(', ')}`)
     await opensRecords(['users', 'organizations', 'members', 'courses', 'sessions', 'enrollments', 'tags', 'roles', 'member-roles'])
     const record = await backofficePage(`/backoffice/courses/${course}`)
@@ -1477,7 +1477,7 @@ test('50b. the backoffice app: support lists people and organizations, opens eac
     const rowLink = new RegExp(`<a href="/backoffice/local-users/${String(signUp.body.id)}" data-row-link="[^"]*"[^>]*>([^<]*)</a>`).exec(accounts)?.[1]
     assert.equal(rowLink, localEmail, 'the row link holds the plain address')
     assert.ok(!accounts.includes('href="mailto:'), 'and the list draws no mail link inside it')
-    const localHeads = [...accounts.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
+    const localHeads = [...accounts.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].filter((hit) => !hit[0].includes('data-list-sort-cell')).map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
     assert.deepEqual(localHeads.filter((head) => head !== 'Actions').sort(), ['Created at', 'Email', 'Verified'], `by its email, its verified state and its date: ${localHeads.join(', ')}`)
     const account = await backofficePage(`/backoffice/local-users/${String(signUp.body.id)}`)
     assert.ok(account.includes('<form') && account.includes(localEmail), 'the edit page is a form titled by the email')
@@ -1990,7 +1990,7 @@ test('60. the dashboard is one look: affixes are addons, every checkbox and sele
     assert.ok(!session.includes('data-slot="native-select"'), 'and none is the native box')
 
     const list = await as('/dashboard/courses', locale)
-    const heads = [...list.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
+    const heads = [...list.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].filter((hit) => !hit[0].includes('data-list-sort-cell')).map((hit) => hit[1]!.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
     assert.equal(heads[0], locale === 'ar' ? 'العنوان' : 'Title', `the title column comes first in ${locale}: ${heads.join(', ')}`)
     const row = new RegExp(`<tr[^>]*data-row="${course.id}"[^>]*>[\\s\\S]*?</tr>`).exec(list)?.[0] ?? ''
     assert.match(row, /tabindex="0"/, 'the row is a stop of the tab order')

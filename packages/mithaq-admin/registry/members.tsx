@@ -624,7 +624,8 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
                       <Search value={search} fields={[t('dashboard.membersName', 'Name') ?? 'Name', t('dashboard.membersEmail', 'Email') ?? 'Email']} locale={locale} t={t} onSearch={(value) => { setSearch(value); setPage(1) }} />
                       <label htmlFor={roleFilter} className="sr-only">{t('dashboard.membersRoleFilter', 'Role')}</label>
-                      <select id={roleFilter} data-role-filter="" value={roleShown} className="border-input bg-background h-9 rounded-md border px-3 text-sm min-h-11 sm:min-h-0 lg:w-56" onChange={(event) => { setRoleShown(event.target.value); setPage(1) }}>
+                      {/* Native options otherwise set the phone grid's minimum width; sm restores the host's desktop sizing. */}
+                      <select id={roleFilter} data-role-filter="" value={roleShown} className="w-full min-w-0 sm:w-auto sm:min-w-[revert-layer] border-input bg-background h-9 rounded-md border px-3 text-sm min-h-11 sm:min-h-0 lg:w-56" onChange={(event) => { setRoleShown(event.target.value); setPage(1) }}>
                         <option value="">{t('dashboard.membersEveryRole', 'Every role')}</option>
                         {roles.map((one) => <option key={one.name} value={one.name}>{one.label?.[locale] ?? one.name}</option>)}
                       </select>

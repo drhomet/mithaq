@@ -182,6 +182,7 @@
 /* An empty field reads as a dash, in a list's cell and on a record page, as the
    checkbox cell already draws a question never answered. */
 td[data-slot='table-cell']:empty::before,
+td[data-slot='table-cell'] > [data-list-value]:empty::after,
 a[data-row-link]:empty::before,
 [data-field-value] > span:empty::before {
   content: '—';

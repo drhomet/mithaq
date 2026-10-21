@@ -1,0 +1,81 @@
+/* One cell tree keeps custom cells, selection and row menus alive across a resize. */
+[data-list-frame] {
+  border-width: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+[data-list-frame] > div:first-child { max-height: none; overflow: visible; }
+[data-list-frame] table { display: block; }
+[data-list-frame] thead { display: block; position: static; background: transparent; }
+[data-list-frame] thead[data-list-controls='false'] { display: none; }
+[data-list-frame] thead tr { display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.5rem; }
+[data-list-frame] [data-list-column-head],
+[data-list-frame] [data-list-actions-head] { display: none; }
+[data-list-frame] [data-list-sort-cell] { display: block; order: 1; flex: 1; min-width: 0; height: auto; padding: 0; box-shadow: none; }
+[data-list-frame] [data-list-select-all] { display: flex; position: static; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; background: transparent; box-shadow: none; }
+[data-list-frame] tbody { display: grid; gap: 0.5rem; }
+[data-list-card] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.375rem 0.5rem;
+  position: relative;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+[data-list-card][data-list-picks] { grid-template-columns: 2.75rem minmax(0, 1fr) auto; }
+[data-list-frame] tbody [data-list-card]:last-child { border-width: 1px; }
+[data-list-card] > td {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  min-width: 0;
+  width: auto;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+[data-list-card] > [data-list-title] { display: block; grid-row: 1; grid-column: 1; align-content: center; min-height: 2.75rem; font-size: 1.125rem; }
+[data-list-card][data-list-picks] > [data-list-title] { grid-column: 2; }
+[data-list-card] > [data-list-select-row] { display: flex; grid-row: 1; grid-column: 1; align-items: center; justify-content: center; }
+[data-list-card] > [data-list-actions] { display: flex; grid-row: 1; grid-column: -2 / -1; align-items: center; justify-content: end; }
+[data-list-card] > [data-list-detail] { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr); gap: 0.5rem; align-items: baseline; }
+[data-list-card] > [data-list-extra] { display: none; }
+[data-list-label] { color: var(--muted-foreground); font-size: 0.75rem; }
+[data-list-value] { min-width: 0; }
+[data-list-value] [data-slot=badge] { max-width: 100%; height: auto; white-space: normal; overflow-wrap: anywhere; }
+[data-list-value]:empty::after { content: '—'; }
+
+[data-list-stretched-link]::after { content: ''; position: absolute; inset: 0; }
+
+/* Revert only the phone layout so each host's table primitives keep their exact desktop styles. */
+@media (min-width: 640px) {
+  [data-list-stretched-link]::after { content: none; position: revert-layer; inset: revert-layer; }
+  [data-list-frame] { border-width: revert-layer; border-radius: revert-layer; background: revert-layer; overflow: revert-layer; }
+  [data-list-frame] > div:first-child { max-height: revert-layer; overflow: revert-layer; }
+  [data-list-frame] table { display: revert-layer; }
+  [data-list-frame] thead { display: revert-layer; position: revert-layer; background: revert-layer; }
+  [data-list-frame] thead[data-list-controls='false'] { display: revert-layer; }
+  [data-list-frame] thead tr { display: revert-layer; align-items: revert-layer; gap: revert-layer; padding-bottom: revert-layer; }
+  [data-list-frame] [data-list-column-head], [data-list-frame] [data-list-actions-head] { display: revert-layer; }
+  [data-list-frame] [data-list-sort-cell] { display: none; }
+  [data-list-frame] [data-list-select-all] { display: revert-layer; position: revert-layer; width: revert-layer; height: revert-layer; align-items: revert-layer; justify-content: revert-layer; background: revert-layer; box-shadow: revert-layer; }
+  [data-list-frame] tbody { display: revert-layer; gap: revert-layer; }
+  [data-list-card] { display: revert-layer; grid-template-columns: revert-layer; gap: revert-layer; position: revert-layer; padding: revert-layer; border: revert-layer; border-radius: revert-layer; background: revert-layer; }
+  [data-list-card][data-list-picks] { grid-template-columns: revert-layer; }
+  [data-list-frame] tbody [data-list-card]:last-child { border-width: revert-layer; }
+  [data-list-card] > td { position: revert-layer; inset: revert-layer; z-index: revert-layer; min-width: revert-layer; width: revert-layer; padding: revert-layer; box-shadow: revert-layer; background: revert-layer; white-space: revert-layer; overflow-wrap: revert-layer; }
+  [data-list-card] > [data-list-title] { display: revert-layer; grid-row: revert-layer; grid-column: revert-layer; align-content: revert-layer; min-height: revert-layer; font-size: revert-layer; }
+  [data-list-card][data-list-picks] > [data-list-title] { grid-column: revert-layer; }
+  [data-list-card] > [data-list-select-row], [data-list-card] > [data-list-actions] { display: revert-layer; grid-row: revert-layer; grid-column: revert-layer; align-items: revert-layer; justify-content: revert-layer; }
+  [data-list-card] > [data-list-detail] { display: revert-layer; grid-column: revert-layer; grid-template-columns: revert-layer; gap: revert-layer; align-items: revert-layer; }
+  [data-list-card] > [data-list-extra] { display: revert-layer; }
+  [data-list-label] { color: revert-layer; font-size: revert-layer; }
+  [data-list-value] { min-width: revert-layer; }
+  [data-list-value] [data-slot=badge] { max-width: revert-layer; height: revert-layer; white-space: revert-layer; overflow-wrap: revert-layer; }
+  [data-list-value]:empty::after { content: none; }
+}

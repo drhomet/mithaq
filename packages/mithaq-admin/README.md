@@ -134,6 +134,15 @@ colors, fonts, radii and `components.json` while merging these changes:
   complete title; option labels wrap in a popup bounded by the viewport. Select,
   combobox and dropdown menu items own the 44px phone minimum and its desktop
   reset. Merge `dropdown-menu.tsx` too before removing item sizing from callers.
+- Merge ejected `list-table.tsx`, `members.tsx` and `roles.tsx` for phone cards. They show the
+  first visible column as the title and the next three as labelled details;
+  the column picker's order chooses those details. Keep the host's
+  `mithaq-admin/source.css` import for the card layout. Sorting and select-all
+  replace column headings below `sm`; the table remains from `sm` upward.
+  Add translations for `admin.sortBy`, `admin.defaultOrder`, `admin.ascending`
+  and `admin.descending` to the host's copy. If a host styles `td:empty`, extend
+  that rule to `[data-list-value]:empty::after` too, as the backoffice starter
+  does, so empty desktop cells keep their appearance.
 - Replace unedited copies of `src/auth-frame.tsx`, `src/locale-switch.tsx` and
   `src/routes/unauthorized.tsx` with the installed `screens-host` item's files.
   Merge edited copies by hand. Delete only a file you have checked is unedited

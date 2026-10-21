@@ -90,6 +90,10 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
   },
   // end add-on: courses
   admin: {
+    sortBy: { en: 'Sort by', ar: 'الترتيب حسب' },
+    ascending: { en: 'Ascending', ar: 'تصاعدي' },
+    descending: { en: 'Descending', ar: 'تنازلي' },
+    defaultOrder: { en: 'Default order', ar: 'الترتيب الافتراضي' },
     nav: { en: 'Admin', ar: 'الإدارة' },
     yes: { en: 'Yes', ar: 'نعم' },
     no: { en: 'No', ar: 'لا' },

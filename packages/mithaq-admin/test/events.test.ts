@@ -1178,7 +1178,7 @@ test('218d. the members page is the list table: Members · N, a person with thei
   const { host, rows } = await membersPage({ loaderData, permissions: ['member.find', 'memberRoles.find', 'member.fields.lastSeenAt'] })
   assert.equal(host.querySelector('h1')?.textContent, 'Members · 2', 'the heading counts the members')
   assert.ok(host.querySelector('[data-members] [data-slot="card"] table'), 'drawn on the list table, inside the list\'s card')
-  assert.deepEqual([...host.querySelectorAll('[data-members] thead th')].map((one) => one.textContent), ['Name', 'Roles', 'Joined', 'Last seen', 'Actions'])
+  assert.deepEqual([...host.querySelectorAll('[data-members] thead th:not([data-list-sort-cell])')].map((one) => one.textContent), ['Name', 'Roles', 'Joined', 'Last seen', 'Actions'])
   const first = host.querySelector('tbody tr[data-row="u1"]')!
   assert.equal(first.querySelector('td')!.textContent, 'Laylalayla@example.com', 'the first column is the name with the address under it')
   assert.ok(first.textContent!.includes('Teacher'), 'a role by its label')
@@ -1200,7 +1200,7 @@ test('218d. the members page is the list table: Members · N, a person with thei
   assert.equal(host.querySelector('[data-list-message]')?.textContent?.includes('No rows match this filter.'), true, 'a filter matching nobody says so, with a way to clear it')
 
   const hidden = await membersPage({ loaderData, permissions: ['member.find', 'memberRoles.find'] })
-  assert.ok(![...hidden.host.querySelectorAll('thead th')].some((one) => one.textContent === 'Last seen'), 'without member.fields.lastSeenAt there is no Last seen column')
+  assert.ok(![...hidden.host.querySelectorAll('thead th:not([data-list-sort-cell])')].some((one) => one.textContent === 'Last seen'), 'without member.fields.lastSeenAt there is no Last seen column')
   assert.equal(hidden.host.querySelector('[data-members-tab]'), null, 'and to a viewer who may not invite, no Invitations tab')
   assert.equal(hidden.host.querySelector('[data-invite]'), null, 'nor Invite')
   assert.equal(hidden.host.querySelector('[data-row-menu]'), null, 'and a viewer who may change nothing gets no row menu')
@@ -1218,12 +1218,12 @@ test('229c. invitations: a tab counting them, Email, Role, Sent by and Expires, 
   Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void copied.push(text) } })
   const { host, rows, menu, item } = await membersPage({ loaderData: { members: [layla], roles: [teacher], invites: [pendingInvite, lapsedInvite] }, permissions: ['member.find', 'invitation.create', 'invitation.cancel'] })
   assert.deepEqual([...host.querySelectorAll('[data-members-tab]')].map((one) => one.textContent), ['Members', 'Invitations (2)'])
-  assert.deepEqual([...host.querySelectorAll('[data-members] table')[1]!.querySelectorAll('thead th')].map((one) => one.textContent), ['Email', 'Role', 'Sent by', 'Expires', 'Actions'])
+  assert.deepEqual([...host.querySelectorAll('[data-members] table')[1]!.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent), ['Email', 'Role', 'Sent by', 'Expires', 'Actions'])
   assert.deepEqual(rows(1), ['i1', 'i2'])
   const lapsed = host.querySelector('tr[data-row="i2"]')!
   assert.ok(lapsed.querySelector('[data-expired]')?.textContent?.startsWith('Expired'), 'one run out says so')
-  assert.ok([...lapsed.querySelectorAll('td')].slice(0, 4).every((one) => one.firstElementChild?.className.includes('text-muted-foreground')), 'and is greyed')
-  assert.equal(host.querySelector('tr[data-row="i1"]')!.textContent!.includes('MemberLayla'), true, 'the role by its word and who sent it')
+  assert.ok([...lapsed.querySelectorAll('td')].slice(0, 4).every((one) => (one.querySelector('[data-list-value]') ?? one).firstElementChild?.className.includes('text-muted-foreground')), 'and is greyed')
+  assert.deepEqual([...host.querySelectorAll('tr[data-row="i1"] [data-list-value]')].slice(0, 2).map((one) => one.textContent), ['Member', 'Layla'], 'the role by its word and who sent it')
   assert.equal(host.querySelector('[data-row-menu="i1"]')?.getAttribute('aria-label'), 'Actions for ⁨old@example.com⁩', 'each menu names its invitation')
   assert.deepEqual(await menu('i2'), ['resend', 'cancel'], 'a link run out is sent again, never copied')
   await act(async () => press(window.document.activeElement as unknown as Element, 'Escape'))
@@ -1400,7 +1400,7 @@ test('240z. the members page reads in Arabic: its heading, tabs, columns, filter
   })
   assert.equal(host.querySelector('h1')?.textContent, `الأعضاء · ${new Intl.NumberFormat('ar').format(1)}`)
   assert.deepEqual([...host.querySelectorAll('[data-members-tab]')].map((one) => one.textContent), ['الأعضاء', `الدعوات (${new Intl.NumberFormat('ar').format(1)})`])
-  assert.deepEqual([...host.querySelectorAll('[data-members] table')[0]!.querySelectorAll('thead th')].map((one) => one.textContent), ['الاسم', 'الأدوار', 'تاريخ الانضمام', 'الإجراءات'])
+  assert.deepEqual([...host.querySelectorAll('[data-members] table')[0]!.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent), ['الاسم', 'الأدوار', 'تاريخ الانضمام', 'الإجراءات'])
   assert.equal(host.querySelector('[data-role-filter] option')?.textContent, 'كل الأدوار')
   assert.ok(!host.querySelector('[data-row-menu="u1"]'), 'the row link already opens roles')
 })
@@ -2321,11 +2321,11 @@ test('61. a relationship column naming many rows counts the ones it has no room 
   assert.ok(!host.textContent?.includes('t1'), 'and no cell shows the id it holds, because the read answered for every one')
 
   // A row holding no ids renders nothing rather than the word for an empty array. Read off that row's own tags cell: a column the URL does not name keeps the declaration's answer.
-  const heads = [...host.querySelectorAll('thead th')].map((one) => one.textContent)
+  const heads = [...host.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent)
   const at = heads.findIndex((one) => one?.includes('Tags'))
   assert.ok(at >= 0, `the tags column is in the table: ${heads.join(', ')}`)
   const row = [...host.querySelectorAll('tbody tr')].find((one) => one.textContent?.includes('Sarf'))!
-  assert.equal([...row.querySelectorAll('td')][at]!.textContent, '', 'a row that points at nothing has an empty cell')
+  assert.equal([...row.querySelectorAll('td')][at]!.querySelector('[data-list-value]')!.textContent, '', 'a row that points at nothing has an empty cell')
 })
 
 test('a hasMany holding 101 ids is read in pieces the HTTP read cap admits, so the cell and the picker still name every row', async () => {
@@ -4084,7 +4084,7 @@ test('150a. a row opens its record from a click anywhere on it and from Enter, l
       },
     }),
   )
-  const heads = [...host.querySelectorAll('thead th')].map((one) => one.textContent?.trim())
+  const heads = [...host.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent?.trim())
   assert.equal(heads[0], 'Title', `the title column comes first: ${heads.join(', ')}`)
   const row = (id: string) => host.querySelector(`tr[data-row="${id}"]`)!
   const { followed, stop } = following()
@@ -7583,7 +7583,7 @@ test('233s. a student reads its own seats as cards, upcoming first, each giving 
   assert.match(cards[1]!, /^Python/)
   assert.equal(mine.querySelector('table'), null, 'no table for a student')
   const every = await drawPortal(createElement(Enrollments), { access: instructor, client: portalClient(rows), kayan: portalScreen.kayan.enrollments })
-  const heads = [...every.querySelectorAll('th')].map((one) => one.textContent)
+  const heads = [...every.querySelectorAll('th:not([data-list-sort-cell])')].map((one) => one.textContent)
   assert.deepEqual(heads, ['Course', 'Session', 'Venue and format', 'Student'])
   const students = [...every.querySelectorAll('tbody tr')].map((one) => one.lastElementChild?.textContent)
   assert.deepEqual(students, ['Sara', 'Not available'], 'a student the server lets it read by name, and one it does not left unnamed')
@@ -8450,11 +8450,11 @@ test('B2 the roles list counts assigned members and links fixed roles to read-on
   const list = { page: { docs: [{ id: 'r1', name: 'teacher', label: { en: 'Teacher' }, permissions: ['courses.find'] }, { id: 'r2', label: { en: 'Unread name' } }, { id: 'r3', name: 'constructor', label: { en: 'No assignments' } }] }, creates: false, href: (id: string) => `/dashboard/roles/${id}` }
   const host = await render(createElement(ListContext, { value: list as never }, createElement(RolesTable, { roles: [administrator], counts: { administrator: 1, teacher: 2 } })), { t: english })
   assert.equal(host.querySelector('[data-row="administrator"] a')?.getAttribute('href'), '/dashboard/roles/fixed/administrator')
-  assert.equal(host.querySelector('[data-row="administrator"] [data-member-count]')?.textContent, '1')
-  assert.equal(host.querySelector('[data-row="r1"] [data-member-count]')?.textContent, '2')
+  assert.equal(host.querySelector('[data-row="administrator"] [data-member-count] [data-list-value]')?.textContent, '1')
+  assert.equal(host.querySelector('[data-row="r1"] [data-member-count] [data-list-value]')?.textContent, '2')
   assert.equal(host.querySelector('[data-row="r1"] a')?.getAttribute('href'), '/dashboard/roles/r1')
-  assert.equal(host.querySelector('[data-row="r2"] [data-member-count]')?.textContent, '—', 'a masked role name cannot be joined to its assignment count')
-  assert.equal(host.querySelector('[data-row="r3"] [data-member-count]')?.textContent, '0', 'role names do not read inherited object properties as counts')
+  assert.equal(host.querySelector('[data-row="r2"] [data-member-count] [data-list-value]')?.textContent, '—', 'a masked role name cannot be joined to its assignment count')
+  assert.equal(host.querySelector('[data-row="r3"] [data-member-count] [data-list-value]')?.textContent, '0', 'role names do not read inherited object properties as counts')
 })
 
 
@@ -8520,7 +8520,7 @@ test('B2 role counts survive host renders with a rebuilt client and access repor
     assert.equal(fetched.mock.callCount(), 1)
     assert.deepEqual(reads, ['assignments'])
     await act(async () => mounted!.render(createElement(ScreenContext, { value: { ...state, t: english } }, withComponents(tree(['member.find'])))))
-    assert.equal(host.querySelector('[data-member-count]')?.textContent, '—')
+    assert.equal(host.querySelector('[data-member-count] [data-list-value]')?.textContent, '—')
   } finally { fetched.mock.restore() }
 })
 
@@ -8686,4 +8686,69 @@ test('a long Arabic combobox exposes the complete input value', async () => {
   const input = host.querySelector('[role=combobox]') as HTMLInputElement
   assert.equal(input.value, long)
   assert.equal(input.title, long)
+})
+
+test('phone list sorting offers readable sortable columns, both directions and the declared order without losing the query', async () => {
+  const shown = { ...courses, fields: [
+    fieldOf({ name: 'title', kind: 'text', label: { en: 'Title', ar: 'العنوان' } }),
+    fieldOf({ name: 'fee', kind: 'number', label: { en: 'Fee', ar: 'الرسوم' } }),
+    fieldOf({ name: 'details', kind: 'text', label: { en: 'Details', ar: 'التفاصيل' }, sortable: false }),
+    fieldOf({ name: 'private', kind: 'text', label: { en: 'Private', ar: 'خاص' }, rules: { localized: true } }),
+  ] }
+  const queries: import('../registry/list-query.ts').ListQuery[] = []
+  const host = await render(createElement(List, {
+    kayan: shown, page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300, details: 'A long description' }]),
+    query: { page: 3, search: 'taj', sort: '-fee', cols: ['title', 'fee', 'details'] }, t, locale: 'en',
+    onQuery: (query) => queries.push(query), href: (id: string) => `/courses/${id}`, newHref: '/courses/new',
+  }))
+  const trigger = host.querySelector('[aria-label="Sort by"]')!
+  assert.ok(trigger, 'the phone has a named sort control instead of cut-off column headings')
+  assert.equal(host.querySelectorAll('tbody [data-row-link]').length, 1, 'one cell tree per row, shared by the phone and desktop layouts')
+  await act(async () => click(trigger as unknown as Element))
+  const options = [...window.document.querySelectorAll('[role="option"]')]
+  assert.deepEqual(options.map((option) => option.textContent), ['Default order', 'Title: Ascending', 'Title: Descending', 'Fee: Ascending', 'Fee: Descending'])
+  await act(async () => click(options.find((one) => one.textContent === 'Fee: Ascending')! as unknown as Element))
+  assert.deepEqual(queries.at(-1), { page: 1, search: 'taj', sort: 'fee', cols: ['title', 'fee', 'details'] })
+  await act(async () => click(trigger as unknown as Element))
+  await act(async () => click([...window.document.querySelectorAll('[role="option"]')].find((one) => one.textContent === 'Title: Descending')! as unknown as Element))
+  assert.equal(queries.at(-1)?.sort, '-title')
+  await act(async () => click(trigger as unknown as Element))
+  await act(async () => click([...window.document.querySelectorAll('[role="option"]')].find((one) => one.textContent === 'Default order')! as unknown as Element))
+  assert.deepEqual(queries.at(-1), { page: 1, search: 'taj', sort: undefined, cols: ['title', 'fee', 'details'] }, 'the reset lets the declared list sort apply again')
+})
+
+test('phone cards keep one row link and checkbox, labelled details, and independent row actions', async () => {
+  const host = await render(createElement(List, {
+    kayan: courses, screen: listScreen(), page: pageOf([{ id: 'c1', title: 'Tajweed', fee: 300, currency: 'SAR', delivery: 'live' }]),
+    query: { cols: ['title', 'fee', 'currency', 'delivery', 'createdAt'] }, t: english, locale: 'en', onQuery: () => {},
+    href: (id: string) => `/courses/${id}`, newHref: '/courses/new', operations: { deleteMany: true, delete: true }, run: async () => ({}),
+  }))
+  const row = host.querySelector('tr[data-row="c1"]')!
+  assert.equal(row.querySelectorAll('[data-list-title]').length, 1)
+  assert.deepEqual([...row.querySelectorAll('[data-list-detail]:not([data-list-extra]) [data-list-label]')].map((one) => one.textContent), ['Fee:', 'Currency:', 'Delivery:'])
+  assert.ok(row.querySelector('[data-list-extra]'), 'further columns stay available to the desktop table')
+  assert.equal(row.querySelectorAll('[role="checkbox"]').length, 1)
+  assert.equal(host.querySelectorAll('thead [role="checkbox"]').length, 1, 'select-all is shared by both layouts, rather than duplicated')
+  let opened = 0
+  row.querySelector('a[data-row-link]')!.addEventListener('click', (event) => { event.preventDefault(); opened++ })
+  await act(async () => click(row.querySelector('[data-list-label]')! as unknown as Element))
+  assert.equal(opened, 1, 'tapping a detail opens the row through its host-routed link')
+  await act(async () => press(row as unknown as Element, 'Enter'))
+  assert.equal(opened, 2)
+  await act(async () => click(row.querySelector('[role="checkbox"]')! as unknown as Element))
+  assert.equal(opened, 2, 'selection never opens the row')
+  await act(async () => click(row.querySelector('[data-row-menu]')! as unknown as Element))
+  assert.equal(opened, 2, 'the actions menu never opens the row')
+  assert.ok(window.document.querySelector('[data-row-action="delete"]'))
+})
+
+test('the dedicated roles list uses the same labelled phone card layout without replacing its desktop table', async () => {
+  const { RolesTable } = await import('../registry/roles.tsx')
+  const list = { page: pageOf([{ id: 'r1', name: 'reviewer', label: { en: 'Reviewer' } }]), creates: false, href: (id: string) => `/roles/${id}` }
+  const host = await render(createElement(ListContext, { value: list as never }, createElement(RolesTable, { roles: [], counts: { reviewer: 2 } })), { t: english })
+  const card = host.querySelector('[data-roles] [data-list-card]')
+  assert.ok(card)
+  assert.equal(card.closest('table') !== null, true)
+  assert.equal(card.querySelector('[data-list-title] a')?.getAttribute('href'), '/roles/r1')
+  assert.deepEqual([...card.querySelectorAll('[data-list-label]')].map((one) => one.textContent), ['Kind:', 'Members:'])
 })

@@ -4,6 +4,8 @@
 
 ### Upgrade notes
 
+- Lists use stacked cards below `sm`, with declared detail labels, sorting, selection and row menus. Desktop and tablet tables keep their existing layout.
+
 - Admin screens now start with phone layouts, and long select and combobox values stay readable. Existing 0.3.0 projects need manual merges; follow the [mithaq-admin upgrade guide](packages/mithaq-admin/README.md#upgrading-030-projects-to-031).
 
 ## 0.3.0
