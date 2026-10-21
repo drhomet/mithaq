@@ -138,7 +138,9 @@ colors, fonts, radii and `components.json` while merging these changes:
   first visible column as the title and the next three as labelled details;
   the column picker's order chooses those details. Keep the host's
   `mithaq-admin/source.css` import for the card layout. Sorting and select-all
-  replace column headings below `sm`; the table remains from `sm` upward.
+  sit before the list frame below `sm`. Keep the real column headers visually
+  hidden there, with each cell linked by `headers`; hide repeated card labels
+  from screen readers. The table keeps its original layout from `sm` upward.
   Add translations for `admin.sortBy`, `admin.defaultOrder`, `admin.ascending`
   and `admin.descending` to the host's copy. If a host styles `td:empty`, extend
   that rule to `[data-list-value]:empty::after` too, as the backoffice starter

@@ -196,6 +196,7 @@ a[data-row-link]:empty::before,
    own, the frame a list's table sits in, the filter panel above it and the
    danger region of a record page. */
 [data-slot='card'],
+[data-list-card],
 :has(> [data-slot='table-container']),
 [data-mithaq-filters],
 [data-region='danger'] {

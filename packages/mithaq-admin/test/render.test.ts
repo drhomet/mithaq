@@ -1257,7 +1257,7 @@ test('47. the search, the columns button, the filter panel\'s button and the tab
 
 test('48. one arrow is drawn, on the sorted column and nowhere else, and every sortable head still reports aria-sort', () => {
   // Every head but the last, the row menu's, which heads no field.
-  const headsOf = (markup: string) => [...markup.matchAll(/<th[\s\S]*?<\/th>/g)].map((hit) => hit[0]).filter((head) => !head.includes('sr-only') && !head.includes('data-list-sort-cell'))
+  const headsOf = (markup: string) => [...markup.matchAll(/<th[\s\S]*?<\/th>/g)].map((hit) => hit[0]).filter((head) => !head.includes('sr-only'))
   const plain = headsOf(listMarkup())
   assert.ok(plain.length >= 3, `the table heads its columns: ${plain.length}`)
   for (const head of plain) assert.equal(/lucide-arrow-(up|down)/.test(head), false, `an unsorted head draws no arrow:\n${head}`)

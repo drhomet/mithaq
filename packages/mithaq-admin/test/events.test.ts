@@ -1178,7 +1178,7 @@ test('218d. the members page is the list table: Members · N, a person with thei
   const { host, rows } = await membersPage({ loaderData, permissions: ['member.find', 'memberRoles.find', 'member.fields.lastSeenAt'] })
   assert.equal(host.querySelector('h1')?.textContent, 'Members · 2', 'the heading counts the members')
   assert.ok(host.querySelector('[data-members] [data-slot="card"] table'), 'drawn on the list table, inside the list\'s card')
-  assert.deepEqual([...host.querySelectorAll('[data-members] thead th:not([data-list-sort-cell])')].map((one) => one.textContent), ['Name', 'Roles', 'Joined', 'Last seen', 'Actions'])
+  assert.deepEqual([...host.querySelectorAll('[data-members] thead th')].map((one) => one.textContent), ['Name', 'Roles', 'Joined', 'Last seen', 'Actions'])
   const first = host.querySelector('tbody tr[data-row="u1"]')!
   assert.equal(first.querySelector('td')!.textContent, 'Laylalayla@example.com', 'the first column is the name with the address under it')
   assert.ok(first.textContent!.includes('Teacher'), 'a role by its label')
@@ -1200,7 +1200,7 @@ test('218d. the members page is the list table: Members · N, a person with thei
   assert.equal(host.querySelector('[data-list-message]')?.textContent?.includes('No rows match this filter.'), true, 'a filter matching nobody says so, with a way to clear it')
 
   const hidden = await membersPage({ loaderData, permissions: ['member.find', 'memberRoles.find'] })
-  assert.ok(![...hidden.host.querySelectorAll('thead th:not([data-list-sort-cell])')].some((one) => one.textContent === 'Last seen'), 'without member.fields.lastSeenAt there is no Last seen column')
+  assert.ok(![...hidden.host.querySelectorAll('thead th')].some((one) => one.textContent === 'Last seen'), 'without member.fields.lastSeenAt there is no Last seen column')
   assert.equal(hidden.host.querySelector('[data-members-tab]'), null, 'and to a viewer who may not invite, no Invitations tab')
   assert.equal(hidden.host.querySelector('[data-invite]'), null, 'nor Invite')
   assert.equal(hidden.host.querySelector('[data-row-menu]'), null, 'and a viewer who may change nothing gets no row menu')
@@ -1218,7 +1218,7 @@ test('229c. invitations: a tab counting them, Email, Role, Sent by and Expires, 
   Object.defineProperty(globalThis.navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void copied.push(text) } })
   const { host, rows, menu, item } = await membersPage({ loaderData: { members: [layla], roles: [teacher], invites: [pendingInvite, lapsedInvite] }, permissions: ['member.find', 'invitation.create', 'invitation.cancel'] })
   assert.deepEqual([...host.querySelectorAll('[data-members-tab]')].map((one) => one.textContent), ['Members', 'Invitations (2)'])
-  assert.deepEqual([...host.querySelectorAll('[data-members] table')[1]!.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent), ['Email', 'Role', 'Sent by', 'Expires', 'Actions'])
+  assert.deepEqual([...host.querySelectorAll('[data-members] table')[1]!.querySelectorAll('thead th')].map((one) => one.textContent), ['Email', 'Role', 'Sent by', 'Expires', 'Actions'])
   assert.deepEqual(rows(1), ['i1', 'i2'])
   const lapsed = host.querySelector('tr[data-row="i2"]')!
   assert.ok(lapsed.querySelector('[data-expired]')?.textContent?.startsWith('Expired'), 'one run out says so')
@@ -1400,7 +1400,7 @@ test('240z. the members page reads in Arabic: its heading, tabs, columns, filter
   })
   assert.equal(host.querySelector('h1')?.textContent, `الأعضاء · ${new Intl.NumberFormat('ar').format(1)}`)
   assert.deepEqual([...host.querySelectorAll('[data-members-tab]')].map((one) => one.textContent), ['الأعضاء', `الدعوات (${new Intl.NumberFormat('ar').format(1)})`])
-  assert.deepEqual([...host.querySelectorAll('[data-members] table')[0]!.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent), ['الاسم', 'الأدوار', 'تاريخ الانضمام', 'الإجراءات'])
+  assert.deepEqual([...host.querySelectorAll('[data-members] table')[0]!.querySelectorAll('thead th')].map((one) => one.textContent), ['الاسم', 'الأدوار', 'تاريخ الانضمام', 'الإجراءات'])
   assert.equal(host.querySelector('[data-role-filter] option')?.textContent, 'كل الأدوار')
   assert.ok(!host.querySelector('[data-row-menu="u1"]'), 'the row link already opens roles')
 })
@@ -2321,7 +2321,7 @@ test('61. a relationship column naming many rows counts the ones it has no room 
   assert.ok(!host.textContent?.includes('t1'), 'and no cell shows the id it holds, because the read answered for every one')
 
   // A row holding no ids renders nothing rather than the word for an empty array. Read off that row's own tags cell: a column the URL does not name keeps the declaration's answer.
-  const heads = [...host.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent)
+  const heads = [...host.querySelectorAll('thead th')].map((one) => one.textContent)
   const at = heads.findIndex((one) => one?.includes('Tags'))
   assert.ok(at >= 0, `the tags column is in the table: ${heads.join(', ')}`)
   const row = [...host.querySelectorAll('tbody tr')].find((one) => one.textContent?.includes('Sarf'))!
@@ -2492,9 +2492,9 @@ test('64. ticking rows and running a bulk button sends one call naming exactly t
       },
     }),
   )
-  const boxes = () => [...host.querySelectorAll('[role="checkbox"]')]
+  const boxes = () => [...host.querySelectorAll('table [role="checkbox"]')]
   const count = () => host.querySelector('[data-mithaq-selected]')?.getAttribute('data-mithaq-selected')
-  assert.equal(boxes().length, docs.length + 1, 'the page is one checkbox per row under one at the head of the column')
+  assert.equal(boxes().length, docs.length + 1, 'the table is one checkbox per row under one at the head of the column')
   assert.equal(count(), undefined, 'nothing is ticked to begin with, so nothing is counted')
   const button = (text: string) => [...host.querySelectorAll('button')].find((one) => one.textContent?.trim() === text)!
   assert.equal(button('Delete').closest('[hidden]') !== null, true, 'and no bulk button is offered over no ticked row')
@@ -2896,7 +2896,7 @@ test('71. a refused bulk says so and leaves the rows ticked, so a denied row nev
       },
     })),
   )
-  const boxes = () => [...host.querySelectorAll('[role="checkbox"]')]
+  const boxes = () => [...host.querySelectorAll('table [role="checkbox"]')]
   const count = () => host.querySelector('[data-mithaq-selected]')?.getAttribute('data-mithaq-selected')
   await act(async () => {
     click(boxes()[1]! as unknown as Element)
@@ -4084,7 +4084,7 @@ test('150a. a row opens its record from a click anywhere on it and from Enter, l
       },
     }),
   )
-  const heads = [...host.querySelectorAll('thead th:not([data-list-sort-cell])')].map((one) => one.textContent?.trim())
+  const heads = [...host.querySelectorAll('thead th')].map((one) => one.textContent?.trim())
   assert.equal(heads[0], 'Title', `the title column comes first: ${heads.join(', ')}`)
   const row = (id: string) => host.querySelector(`tr[data-row="${id}"]`)!
   const { followed, stop } = following()
@@ -7583,7 +7583,7 @@ test('233s. a student reads its own seats as cards, upcoming first, each giving 
   assert.match(cards[1]!, /^Python/)
   assert.equal(mine.querySelector('table'), null, 'no table for a student')
   const every = await drawPortal(createElement(Enrollments), { access: instructor, client: portalClient(rows), kayan: portalScreen.kayan.enrollments })
-  const heads = [...every.querySelectorAll('th:not([data-list-sort-cell])')].map((one) => one.textContent)
+  const heads = [...every.querySelectorAll('th')].map((one) => one.textContent)
   assert.deepEqual(heads, ['Course', 'Session', 'Venue and format', 'Student'])
   const students = [...every.querySelectorAll('tbody tr')].map((one) => one.lastElementChild?.textContent)
   assert.deepEqual(students, ['Sara', 'Not available'], 'a student the server lets it read by name, and one it does not left unnamed')
@@ -8703,6 +8703,8 @@ test('phone list sorting offers readable sortable columns, both directions and t
   }))
   const trigger = host.querySelector('[aria-label="Sort by"]')!
   assert.ok(trigger, 'the phone has a named sort control instead of cut-off column headings')
+  assert.equal(trigger.closest('table') === null, true, 'sorting is a list control, never a column header')
+  assert.equal(host.querySelector('table')?.parentElement === host.querySelector('[data-list-frame]')?.firstElementChild, true)
   assert.equal(host.querySelectorAll('tbody [data-row-link]').length, 1, 'one cell tree per row, shared by the phone and desktop layouts')
   await act(async () => click(trigger as unknown as Element))
   const options = [...window.document.querySelectorAll('[role="option"]')]
@@ -8728,7 +8730,13 @@ test('phone cards keep one row link and checkbox, labelled details, and independ
   assert.deepEqual([...row.querySelectorAll('[data-list-detail]:not([data-list-extra]) [data-list-label]')].map((one) => one.textContent), ['Fee:', 'Currency:', 'Delivery:'])
   assert.ok(row.querySelector('[data-list-extra]'), 'further columns stay available to the desktop table')
   assert.equal(row.querySelectorAll('[role="checkbox"]').length, 1)
-  assert.equal(host.querySelectorAll('thead [role="checkbox"]').length, 1, 'select-all is shared by both layouts, rather than duplicated')
+  assert.equal(host.querySelectorAll('thead [role="checkbox"]').length, 1)
+  for (const cell of row.querySelectorAll('td')) {
+    const header = host.querySelector(`[id="${cell.getAttribute('headers')}"]`)
+    assert.equal(header?.tagName, 'TH', 'each card cell keeps its own real column header')
+    assert.equal(header?.getAttribute('scope'), 'col')
+  }
+  assert.ok([...row.querySelectorAll('[data-list-label]')].every((label) => label.getAttribute('aria-hidden') === 'true'), 'visible labels do not repeat the accessible column header')
   let opened = 0
   row.querySelector('a[data-row-link]')!.addEventListener('click', (event) => { event.preventDefault(); opened++ })
   await act(async () => click(row.querySelector('[data-list-label]')! as unknown as Element))
@@ -8749,6 +8757,8 @@ test('the dedicated roles list uses the same labelled phone card layout without 
   const card = host.querySelector('[data-roles] [data-list-card]')
   assert.ok(card)
   assert.equal(card.closest('table') !== null, true)
+  for (const cell of card.querySelectorAll('td')) assert.equal(host.querySelector(`[id="${cell.getAttribute('headers')}"]`)?.getAttribute('scope'), 'col')
+  assert.ok([...card.querySelectorAll('[data-list-label]')].every((label) => label.getAttribute('aria-hidden') === 'true'))
   assert.equal(card.querySelector('[data-list-title] a')?.getAttribute('href'), '/roles/r1')
   assert.deepEqual([...card.querySelectorAll('[data-list-label]')].map((one) => one.textContent), ['Kind:', 'Members:'])
 })
