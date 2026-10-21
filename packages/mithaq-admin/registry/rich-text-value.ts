@@ -1,3 +1,4 @@
+// Theme adapted from shadcn-editor, MIT. See LICENSES/shadcn-editor.txt.
 import { createEditor, type Klass, type LexicalNode } from 'lexical'
 import { typesOf, unknownType } from 'mithaq/rich-text'
 
@@ -29,14 +30,27 @@ export const blank = (value: RichTextValue) => value.root.children.every((node) 
 
 const theme = {
   paragraph: 'mb-2',
+  table: 'w-full table-fixed border-collapse',
+  tableScrollableWrapper: 'max-w-full overflow-x-auto',
+  tableRow: 'border-b',
+  tableCell: 'min-w-24 border border-border px-3 py-2 align-top',
+  tableCellHeader: 'bg-muted font-semibold',
+  tableSelection: 'bg-primary/10',
+  code: 'my-3 block max-w-full overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm whitespace-pre',
+  codeHighlight: { keyword: 'text-primary', string: 'text-green-700 dark:text-green-300', comment: 'text-muted-foreground', number: 'text-orange-700 dark:text-orange-300', function: 'text-blue-700 dark:text-blue-300', punctuation: 'text-muted-foreground' },
   heading: {
     h1: 'mb-3 text-2xl font-semibold',
     h2: 'mb-3 text-xl font-semibold',
     h3: 'mb-2 text-lg font-semibold',
+    h4: 'mb-2 text-base font-semibold',
+    h5: 'mb-2 text-sm font-semibold',
+    h6: 'mb-2 text-sm font-medium',
   },
   list: {
     nested: { listitem: 'list-none before:hidden after:hidden' },
     ol: 'ms-6 list-decimal',
+    olDepth: ['list-decimal', 'list-[lower-alpha]', 'list-[lower-roman]'],
+    ulDepth: ['list-disc', 'list-[circle]', 'list-[square]'],
     ul: 'ms-6 list-disc',
     checklist: 'ms-2 list-none',
     listitem: 'mb-1',
@@ -45,7 +59,7 @@ const theme = {
     listitemUnchecked:
       'relative mb-1 list-none px-7 before:absolute before:start-1 before:top-1 before:size-4 before:rounded before:border before:border-primary before:content-[""]',
   },
-  quote: 'mb-2 border-s-2 ps-3 text-muted-foreground',
+  quote: 'my-3 border-s-4 ps-4 italic text-muted-foreground',
   link: 'text-primary underline underline-offset-4',
   hr: 'my-3 border-t',
   text: {

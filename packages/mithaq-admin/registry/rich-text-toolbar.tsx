@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+// Adapted from shadcn-editor and Lexical's playground, MIT. See LICENSES/shadcn-editor.txt and LICENSES/lexical.txt.
+import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $isLinkNode, $toggleLink, TOGGLE_LINK_COMMAND } from '@lexical/link'
 import { $findMatchingParent } from '@lexical/utils'
 import {
   $isElementNode,
+  $getSelection,
+  $getState,
+  $setState,
   $isRangeSelection,
   COMMAND_PRIORITY_CRITICAL,
   FORMAT_ELEMENT_COMMAND,
@@ -17,12 +21,15 @@ import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { Toggle } from '@/components/ui/toggle'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { BlockDropdown, ClearFormatting, FormatButtons, HistoryButtons } from 'mithaq-admin/rich-text-format-buttons.tsx'
+import { BlockDropdown, ClearFormatting, FormatButtons, HistoryButtons, ToolbarTip } from 'mithaq-admin/rich-text-format-buttons.tsx'
 import type { RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { getSelectedNode, newLink, useSelectionChange } from 'mithaq-admin/rich-text-selection.ts'
+import type { RichTextPolicy } from 'mithaq/rich-text'
+import { directionChoice } from 'mithaq-admin/rich-text-choices.ts'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import type { RichTextDirection } from 'mithaq-admin/rich-text-value.ts'
 
-function LinkButton({ t, setLinkEditMode }: { t: Translate; setLinkEditMode: (editing: boolean) => void }) {
+export function LinkButton({ t, setLinkEditMode }: { t: Translate; setLinkEditMode: (editing: boolean) => void }) {
   const [editor] = useLexicalComposerContext()
   const [isLink, setIsLink] = useState(false)
   useSelectionChange(editor, (selection) => {
@@ -49,7 +56,7 @@ const alignments = [
   { format: 'right', Icon: AlignRightIcon, label: (t: Translate) => t('admin.richText.alignRight', 'Align right') },
   { format: 'justify', Icon: AlignJustifyIcon, label: (t: Translate) => t('admin.richText.justify', 'Justify') },
 ] as const
-function AlignButtons({ t }: { t: Translate }) {
+function AlignButtons({ t, policy }: { t: Translate; policy: RichTextPolicy }) {
   const [editor] = useLexicalComposerContext()
   const [current, setCurrent] = useState<ElementFormatType>('')
   useSelectionChange(editor, (selection) => {
@@ -64,7 +71,7 @@ function AlignButtons({ t }: { t: Translate }) {
   const indent = t('admin.richText.indent', 'Indent') ?? 'Indent'
   return (
     <>
-      <ButtonGroup>
+      {policy.features.includes('alignment') && <ButtonGroup>
         {alignments.map(({ format, Icon, label }) => {
           const name = label(t) ?? format
           return (
@@ -73,20 +80,20 @@ function AlignButtons({ t }: { t: Translate }) {
             </Toggle>
           )
         })}
-      </ButtonGroup>
-      <ButtonGroup>
+      </ButtonGroup>}
+      {policy.features.includes('indent') && <ButtonGroup>
         <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" title={outdent} aria-label={outdent} onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND, undefined)}>
           <IndentDecreaseIcon className="size-4 rtl:-scale-x-100" />
         </Button>
         <Button type="button" variant="outline" size="icon-sm" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" title={indent} aria-label={indent} onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND, undefined)}>
           <IndentIncreaseIcon className="size-4 rtl:-scale-x-100" />
         </Button>
-      </ButtonGroup>
+      </ButtonGroup>}
     </>
   )
 }
 
-export function ToolbarRow({ t, locale, picks, setLinkEditMode, direction }: { t: Translate; locale: string; picks: readonly RichTextPick[]; setLinkEditMode: (editing: boolean) => void; direction: RichTextDirection }) {
+export function ToolbarRow({ t, locale, picks, setLinkEditMode, direction, policy, extras }: { t: Translate; locale: string; picks: readonly RichTextPick[]; setLinkEditMode: (editing: boolean) => void; direction: RichTextDirection; policy: RichTextPolicy; extras?: ReactNode }) {
   const [editor] = useLexicalComposerContext()
   const bar = useRef<HTMLDivElement>(null)
   const [blockType, setBlockType] = useState('paragraph')
@@ -138,13 +145,35 @@ export function ToolbarRow({ t, locale, picks, setLinkEditMode, direction }: { t
   return (
     // Sticky under the page's header, so no ancestor may scroll or clip (the editor box uses overflow-clip). The tint is opaque so scrolling text never shows through.
     // On a phone it is one sideways-scrolling line, with contained width so it does not widen the page.
-    <div ref={bar} role="toolbar" aria-label={t('admin.richText.toolbar', 'Formatting')} aria-orientation="horizontal" onKeyDown={move} className="border-border bg-[color-mix(in_oklab,var(--muted)_20%,var(--background))] sticky top-[var(--header-bar-height,var(--header-height,0px))] z-9 flex flex-nowrap items-center gap-1.5 overflow-x-auto contain-inline-size border-b px-2 py-2 [&>*]:shrink-0 sm:flex-wrap sm:overflow-x-visible sm:contain-none sm:[&>*]:shrink">
+    <div ref={bar} role="toolbar" aria-label={t('admin.richText.toolbar', 'Formatting')} aria-orientation="horizontal" onKeyDown={move} className="border-border bg-[color-mix(in_oklab,var(--muted)_30%,var(--background))] sticky top-[var(--header-bar-height,var(--header-height,0px))] z-9 flex flex-nowrap items-center gap-1.5 [scrollbar-width:none] hover:[scrollbar-width:thin] overflow-x-auto contain-inline-size border-b px-2 py-2 [&>*]:shrink-0 sm:flex-wrap sm:overflow-x-visible sm:contain-none sm:[&>*]:shrink">
       <HistoryButtons activeEditor={activeEditor} t={t} />
       <BlockDropdown toolbar={{ activeEditor, blockType, setBlockType }} t={t} locale={locale} picks={picks} />
-      <FormatButtons t={t} />
-      <LinkButton t={t} setLinkEditMode={setLinkEditMode} />
+      <FormatButtons t={t} policy={policy} />
+      {policy.features.includes('link') && <LinkButton t={t} setLinkEditMode={setLinkEditMode} />}
       <ClearFormatting t={t} />
-      <AlignButtons t={t} />
+      <AlignButtons t={t} policy={policy} />
+      {policy.features.includes('direction') && <DirectionButton t={t} />}
+      {extras}
     </div>
   )
+}
+
+function DirectionButton({ t }: { t: Translate }) {
+  const [editor] = useLexicalComposerContext()
+  const [current, setCurrent] = useState('auto')
+  useSelectionChange(editor, (selection) => {
+    if (!$isRangeSelection(selection)) return
+    const node = selection.anchor.getNode()
+    const block = $isElementNode(node) && !node.isInline() ? node : $findMatchingParent(node, (one) => $isElementNode(one) && !one.isInline())
+    if (block) setCurrent($getState(block, directionChoice))
+  })
+  return <DropdownMenu>
+    <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-0" />} aria-label={`${t('admin.richText.direction', 'Block direction')}: ${t(`admin.richText.${current}`, current)}`}>{t('admin.richText.direction', 'Block direction')}: {t(`admin.richText.${current}`, current)}</DropdownMenuTrigger>
+    <DropdownMenuContent>{['auto', 'rtl', 'ltr'].map((value) => <DropdownMenuItem key={value} onClick={() => editor.update(() => {
+      const selection = $getSelection()
+      if (!$isRangeSelection(selection)) return
+      const blocks = new Set(selection.getNodes().map((node) => $isElementNode(node) && !node.isInline() ? node : $findMatchingParent(node, (one) => $isElementNode(one) && !one.isInline())))
+      for (const block of blocks) if ($isElementNode(block) && block.getType() !== 'root') { $setState(block, directionChoice, value === 'rtl' || value === 'ltr' ? value : 'auto'); block.setDirection(value === 'rtl' || value === 'ltr' ? value : null) }
+    })}>{t(`admin.richText.${value}`, value)}</DropdownMenuItem>)}</DropdownMenuContent>
+  </DropdownMenu>
 }

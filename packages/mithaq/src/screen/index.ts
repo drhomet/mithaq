@@ -294,6 +294,7 @@ export type RefOf<Target, Kinds = {}> = Target extends { layouts: infer Layouts;
 type IconOf<Target> = Target extends { icons?: readonly (infer Name extends string)[] } ? Name : never
 
 type FieldData = {
+  richTextPolicy?: import('../rich-text/features.ts').RichTextPolicy
   name: string
   kind: string
   // The label function is left off: the projection is built once per boot, so calling
@@ -436,6 +437,7 @@ export type ScreenClient<Pages extends Record<string, string> = Record<string, s
 export const clientFieldOf = (name: string, field: RuntimeField & { target?: { name: string } }): FieldData => ({
   name,
   kind: field.kind,
+  ...(field.richTextPolicy && { richTextPolicy: { ...field.richTextPolicy, features: field.features ?? field.richTextPolicy.features } }),
   ...(typeof field.label === 'object' && { label: field.label }),
   rules: Object.fromEntries(
     Object.entries(field.rules ?? {}).filter(

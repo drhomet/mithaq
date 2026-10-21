@@ -1,0 +1,83 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { defaultNodes, richText } from './index.ts'
+
+const document = (node: object) => ({ root: { type: 'root', children: [{ type: 'paragraph', children: [node] }] } })
+const text = (format = 0) => ({ type: 'text', text: 'مرحبا Hello', format })
+const schema = () => richText({ nodes: defaultNodes, features: ['bold', 'italic', 'link'] }).kinds.richText.targets.zod({ kind: 'richText', name: 'body', column: 'body', features: ['bold'] })
+
+test('a field accepts only formats its project installed and the field selected', () => {
+  assert.equal(schema().safeParse(document(text(1))).success, true)
+  assert.equal(schema().safeParse(document(text(2))).success, false)
+  assert.equal(schema().safeParse(document({ type: 'link', url: 'https://example.com', children: [text()] })).success, false)
+  assert.throws(() => richText({ nodes: defaultNodes, features: ['bold'] }).kinds.richText.targets.zod({ kind: 'richText', name: 'body', column: 'body', features: ['tables'] }), /not installed/)
+})
+
+test('styles are fixed node choices, never CSS, and block overrides never belong on the root', () => {
+  const kind = richText({ nodes: defaultNodes, features: ['styling', 'direction'], fonts: ['serif'] }).kinds.richText
+  const check = kind.targets.zod()
+  assert.equal(check.safeParse(document({ ...text(), $: { color: 'primary', size: 'large', font: 'serif' } })).success, true)
+  for (const node of [
+    { ...text(), style: 'color:red' }, { ...text(), textStyle: 'font-size:99px' },
+    { ...text(), $: { color: 'red' } }, { ...text(), $: { font: 'sans' } },
+    { ...text(), $: { size: '100px' } }, { ...text(), $: { css: 'background:url(https://example.com)' } },
+  ]) assert.equal(check.safeParse(document(node)).success, false)
+  const block = document(text())
+  Object.assign(block.root.children[0]!, { $: { direction: 'rtl' } })
+  assert.equal(check.safeParse(block).success, true)
+  assert.equal(check.safeParse({ root: { ...block.root, $: { direction: 'rtl' } } }).success, false)
+  assert.equal(check.safeParse(document({ ...text(), $: { direction: 'rtl' } })).success, false)
+})
+
+test('tables and code are installed per project and refused outside the selected field', () => {
+  const table = { type: 'table', children: [{ type: 'tablerow', children: [{ type: 'tablecell', headerState: 1, children: [{ type: 'paragraph', children: [text()] }] }] }] }
+  const code = { type: 'code', language: 'javascript', children: [text()] }
+  const all = richText({ nodes: defaultNodes, features: ['tables', 'code'] }).kinds.richText.targets.zod()
+  for (const node of [table, code]) {
+    assert.equal(all.safeParse({ root: { type: 'root', children: [node] } }).success, true)
+    assert.equal(schema().safeParse({ root: { type: 'root', children: [node] } }).success, false)
+  }
+})
+
+test('0.3.4 serialized documents and converted Payload documents retain every byte when read', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { convertPayloadToLexical } = await import('./index.ts')
+  const old = JSON.parse(readFileSync(new URL('./__fixtures__/payload-product-description.json', import.meta.url), 'utf8'))
+  const converted = convertPayloadToLexical({ data: old, nodes: defaultNodes })
+  assert.ok('value' in converted)
+  for (const value of [old, converted.value]) {
+    const before = JSON.stringify(value)
+    assert.equal(richText({ nodes: defaultNodes }).kinds.richText.targets.zod().safeParse(value).success, true)
+    assert.equal(JSON.stringify(value), before)
+  }
+})
+
+const installed = richText({ nodes: defaultNodes, features: ['bold', 'italic'] })
+type LimitedField = import('../mithaq/types.ts').FieldOf<{ kinds: typeof installed.kinds; rules: {}; targets: {} }>
+const valid: LimitedField = { kind: 'richText', features: ['bold'] }
+// @ts-expect-error a field cannot enable an uninstalled project feature
+const invalid: LimitedField = { kind: 'richText', features: ['tables'] }
+void [valid, invalid]
+
+test('new table and code values refuse CSS channels, unapproved languages and invalid structure', () => {
+  const schema = richText({ nodes: defaultNodes, features: ['tables', 'code'] }).kinds.richText.targets.zod()
+  const wrap = (node: object) => ({ root: { type: 'root', children: [node] } })
+  const cell = { type: 'tablecell', children: [{ type: 'paragraph', children: [text()] }] }
+  for (const node of [
+    { type: 'table', children: [{ type: 'paragraph', children: [] }] },
+    { type: 'table', colWidths: [300], children: [{ type: 'tablerow', children: [cell] }] },
+    { type: 'table', children: [{ type: 'tablerow', children: [{ ...cell, backgroundColor: 'red' }] }] },
+    { type: 'table', children: [{ type: 'tablerow', children: [{ ...cell, colSpan: 1000000 }] }] },
+    { type: 'code', language: 'javascript:url(x)', children: [text()] },
+  ]) assert.equal(schema.safeParse(wrap(node)).success, false)
+})
+
+test('a checklist is independently selectable and format numbers cannot wrap around the allowed bits', () => {
+  const check = richText({ nodes: defaultNodes, features: ['checklist'] }).kinds.richText.targets.zod()
+  const checklist = { root: { type: 'root', children: [{ type: 'list', listType: 'check', tag: 'ul', children: [{ type: 'listitem', checked: false, children: [text()] }] }] } }
+  assert.equal(check.safeParse(checklist).success, true)
+  assert.equal(schema().safeParse(document(text(4294967297))).success, false)
+  const bad = document(text())
+  Object.assign(bad.root.children[0]!, { textFormat: 1.5 })
+  assert.equal(schema().safeParse(bad).success, false)
+})

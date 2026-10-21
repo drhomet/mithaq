@@ -1096,3 +1096,14 @@ server {
 ### The test database
 
 Never point tests at a database you want to keep. A project made by `bun create mithaq` ships without the template's own tests, but its `packages/mithaq/src/mithaq.ts` keeps one guard: under `node --test`, the build refuses to load without `DATABASE_URL`, so a test you write never falls back to the dev database. The mithaq repository's own tests need a throwaway Postgres set up as [CONTRIBUTING.md](https://github.com/drhomet/mithaq/blob/main/CONTRIBUTING.md#set-up) describes.
+
+## Selecting rich text tools
+
+`bun create mithaq my-app --rich-text=tables,code,styling,markdown,counter`
+installs the rich-text add-on with those optional tools. `--with rich-text`
+keeps the existing tool set and refreshed toolbar. The generated
+`packages/mithaq/src/mithaq/rich-text-features.ts` names the installed features
+and the allowed fonts. Edit it for an existing project, then pass its config
+to `richText` alongside the project's nodes. A field can narrow the selection
+with `features: ['bold', 'italic', 'link']`; it cannot add an uninstalled tool.
+The repository's worked example enables the optional tools on course details.

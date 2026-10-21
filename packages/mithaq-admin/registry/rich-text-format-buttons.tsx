@@ -1,3 +1,4 @@
+// Adapted from shadcn-editor and Lexical's playground, MIT. See LICENSES/shadcn-editor.txt and LICENSES/lexical.txt.
 import { useCallback, useEffect, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $isListNode, ListNode } from '@lexical/list'
@@ -9,6 +10,7 @@ import {
   $isElementNode,
   $isRangeSelection,
   $isTextNode,
+  $setState,
   CAN_REDO_COMMAND,
   CAN_UNDO_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
@@ -24,9 +26,17 @@ import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Toggle } from '@/components/ui/toggle'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import type { ReactElement } from 'react'
+import type { RichTextPolicy } from 'mithaq/rich-text'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { pickLabel, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
+import { colorChoice, sizeChoice, fontChoice } from 'mithaq-admin/rich-text-choices.ts'
 import { useSelectionChange } from 'mithaq-admin/rich-text-selection.ts'
+
+export function ToolbarTip({ name, children }: { name: string; children: ReactElement }) {
+  return <Tooltip><TooltipTrigger render={children} /><TooltipContent>{name}</TooltipContent></Tooltip>
+}
 
 export type Toolbar = { activeEditor: LexicalEditor; blockType: string; setBlockType: (blockType: string) => void }
 
@@ -105,7 +115,7 @@ const formats = [
   { format: 'strikethrough', Icon: StrikethroughIcon, label: (t: Translate) => t('admin.richText.strikethrough', 'Strikethrough') },
   { format: 'code', Icon: CodeIcon, label: (t: Translate) => t('admin.richText.code', 'Code') },
 ] as const
-export function FormatButtons({ t }: { t: Translate }) {
+export function FormatButtons({ t, policy }: { t: Translate; policy: RichTextPolicy }) {
   const [editor] = useLexicalComposerContext()
   const [active, setActive] = useState<readonly string[]>([])
   useSelectionChange(editor, (selection) => {
@@ -113,12 +123,12 @@ export function FormatButtons({ t }: { t: Translate }) {
   })
   return (
     <ButtonGroup>
-      {formats.map(({ format, Icon, label }) => {
+      {formats.filter(({ format }) => policy.features.includes(format === 'code' ? 'inlineCode' : format)).map(({ format, Icon, label }) => {
         const name = label(t) ?? format
         return (
-          <Toggle key={format} variant="outline" size="sm" className="min-h-11 sm:min-h-0 min-w-11 sm:min-w-0" title={name} aria-label={name} pressed={active.includes(format)} onPressedChange={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, format as TextFormatType)}>
+          <ToolbarTip key={format} name={name}><Toggle variant="outline" size="sm" className="min-h-11 sm:min-h-0 min-w-11 sm:min-w-0" title={name} aria-label={name} pressed={active.includes(format)} onPressedChange={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, format as TextFormatType)}>
             <Icon className="size-4" />
-          </Toggle>
+          </Toggle></ToolbarTip>
         )
       })}
     </ButtonGroup>
@@ -144,6 +154,9 @@ export function ClearFormatting({ t }: { t: Translate }) {
           if (idx === nodes.length - 1) textNode = textNode.splitText(focus.offset)[0] || textNode
           const extractedTextNode = extractedNodes[0]
           if (nodes.length === 1 && $isTextNode(extractedTextNode)) textNode = extractedTextNode
+          $setState(textNode, colorChoice, 'default')
+          $setState(textNode, sizeChoice, 'normal')
+          $setState(textNode, fontChoice, 'sans')
           if (textNode.__style !== '') textNode.setStyle('')
           if (textNode.__format !== 0) {
             textNode.setFormat(0)

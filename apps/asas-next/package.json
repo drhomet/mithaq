@@ -7,7 +7,11 @@
     "asas": "*",
     "next": "^16.3.5",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0",
+    "@lexical/markdown": "0.52.0",
+    "@lexical/code-prism": "0.52.0"
   },
   "devDependencies": {
     "@types/react": "^19.3.0"

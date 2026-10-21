@@ -1110,7 +1110,8 @@
           "type": "registry:lib",
           "target": "@components/mithaq/rich-text-nodes.ts"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text-value",
@@ -1126,7 +1127,8 @@
           "type": "registry:lib",
           "target": "@components/mithaq/rich-text-value.ts"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text-line",
@@ -1139,7 +1141,8 @@
           "type": "registry:lib",
           "target": "@components/mithaq/rich-text-line.ts"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text-picks",
@@ -1159,7 +1162,8 @@
           "type": "registry:component",
           "target": "@components/mithaq/rich-text-picks.tsx"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text-selection",
@@ -1178,7 +1182,8 @@
           "type": "registry:lib",
           "target": "@components/mithaq/rich-text-selection.ts"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text-format-buttons",
@@ -1203,7 +1208,8 @@
         "button",
         "button-group",
         "dropdown-menu",
-        "toggle"
+        "toggle",
+        "tooltip"
       ]
     },
     {
@@ -1227,6 +1233,7 @@
       "registryDependencies": [
         "button",
         "button-group",
+        "dropdown-menu",
         "toggle"
       ]
     },
@@ -1249,7 +1256,8 @@
       ],
       "registryDependencies": [
         "button",
-        "input"
+        "input",
+        "popover"
       ]
     },
     {
@@ -1269,7 +1277,8 @@
           "type": "registry:component",
           "target": "@components/mithaq/rich-text-link-plugin.tsx"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text-slash-menu",
@@ -1286,7 +1295,8 @@
           "type": "registry:component",
           "target": "@components/mithaq/rich-text-slash-menu.tsx"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text-viewer",
@@ -1323,7 +1333,8 @@
           "type": "registry:component",
           "target": "@components/mithaq/rich-text-editor.tsx"
         }
-      ]
+      ],
+      "registryDependencies": []
     },
     {
       "name": "mithaq-rich-text",
@@ -1717,6 +1728,128 @@
           "path": "registry/page-header.tsx",
           "type": "registry:component",
           "target": "@components/mithaq/page-header.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-features",
+      "type": "registry:component",
+      "registryDependencies": [],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/rich-text-features.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-features.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-choices",
+      "type": "registry:component",
+      "registryDependencies": [],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/rich-text-choices.ts",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-choices.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-counter",
+      "type": "registry:component",
+      "registryDependencies": [],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/rich-text-counter.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-counter.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-markdown",
+      "type": "registry:component",
+      "registryDependencies": [],
+      "dependencies": [
+        "@lexical/markdown@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-markdown.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-markdown.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-styling",
+      "type": "registry:component",
+      "registryDependencies": [
+        "button",
+        "dropdown-menu"
+      ],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/rich-text-styling.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-styling.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-code",
+      "type": "registry:component",
+      "registryDependencies": [
+        "button",
+        "dropdown-menu"
+      ],
+      "dependencies": [
+        "@lexical/code-core@0.52.0",
+        "@lexical/code-prism@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-code.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-code.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-tables",
+      "type": "registry:component",
+      "registryDependencies": [
+        "button",
+        "dropdown-menu"
+      ],
+      "dependencies": [
+        "@lexical/table@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-tables.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-tables.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-floating-toolbar",
+      "type": "registry:component",
+      "registryDependencies": [
+        "popover"
+      ],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/rich-text-floating-toolbar.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-floating-toolbar.tsx"
         }
       ]
     }

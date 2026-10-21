@@ -22,7 +22,11 @@
     "image-dimensions": "2.5.1",
     "lexical": "0.52.0",
     "mithaq": "*",
-    "mithaq-admin": "*"
+    "mithaq-admin": "*",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0",
+    "@lexical/markdown": "0.52.0",
+    "@lexical/code-prism": "0.52.0"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

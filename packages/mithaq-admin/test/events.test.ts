@@ -8809,3 +8809,62 @@ for (const related of [false, true]) test(`declared card fields render after the
   assert.equal(details[0]!.querySelector('[data-list-label]')?.textContent, 'Fee:')
   assert.equal(details[0]!.querySelector('[data-list-value]')?.textContent?.includes('300'), true)
 })
+
+test('rich text fields expose only their selected formatting tools and counters never enter stored JSON', async () => {
+  const { RichTextEditor } = await import('../registry/rich-text-editor.tsx')
+  const changes: unknown[] = []
+  const host = await render(createElement(RichTextEditor, { value: richOf(blockOf('paragraph', [textOf('مرحبا Hello')])), onChange: (value) => changes.push(value), direction: 'ltr', t, locale: 'ar', policy: { features: ['bold', 'counter'], fonts: ['sans'] } }))
+  await act(async () => sleep(100))
+  assert.ok(host.querySelector('button[aria-label="Bold"]'))
+  assert.equal(host.querySelector('button[aria-label="Italic"]'), null)
+  assert.equal(host.querySelector('button[aria-label="Add link"]'), null)
+  assert.ok(host.querySelector('[data-rich-text-counter]')?.textContent?.includes('٢'))
+  assert.equal(JSON.stringify(changes).includes('characters'), false)
+})
+
+test('safe markdown shortcuts omit link transforms and follow field formatting choices', async () => {
+  const { markdownTransformers } = await import('../registry/rich-text-markdown.tsx')
+  const { LINK, BOLD_STAR, ITALIC_STAR } = await import('@lexical/markdown')
+  const chosen = markdownTransformers({ features: ['bold', 'markdown'], fonts: ['sans'] })
+  assert.ok(chosen.includes(BOLD_STAR))
+  assert.equal(chosen.includes(ITALIC_STAR), false)
+  assert.equal(chosen.includes(LINK), false)
+})
+
+test('block direction and fixed styling survive serialization without setting root direction or CSS', async () => {
+  const { RichTextEditor, RichTextViewer } = await import('../registry/rich-text.tsx')
+  const { $getRoot, $setState } = await import('lexical')
+  const { directionChoice, colorChoice, sizeChoice, fontChoice } = await import('../registry/rich-text-choices.ts')
+  const host = await render(createElement(RichTextEditor, { value: richOf(blockOf('paragraph', [textOf('مرحبا Hello')]), blockOf('paragraph', [textOf('English أولا')])), onChange: () => {}, direction: 'ltr', t, locale: 'en', policy: { features: ['direction', 'styling'], fonts: ['serif'] }, id: 'choices' }))
+  await act(async () => sleep(100))
+  const editor = (host.querySelector('#choices') as unknown as { __lexicalEditor: import('lexical').LexicalEditor }).__lexicalEditor
+  await act(async () => editor.update(() => {
+    const root = $getRoot()
+    $setState(root.getFirstChild()!, directionChoice, 'rtl')
+    const text = root.getAllTextNodes()[0]!
+    $setState(text, colorChoice, 'primary')
+    $setState(text, sizeChoice, 'large')
+    $setState(text, fontChoice, 'serif')
+  }))
+  const saved = editor.getEditorState().toJSON()
+  assert.equal(saved.root.direction, null)
+  assert.equal((saved.root.children[0] as unknown as { $: { direction: string } }).$.direction, 'rtl')
+  assert.equal(JSON.stringify(saved).includes('color:'), false)
+  assert.equal(JSON.stringify(saved).includes('font-family:'), false)
+  const viewer = await render(createElement(RichTextViewer, { value: saved, direction: 'ltr', t }))
+  await act(async () => sleep(100))
+  assert.equal(viewer.querySelector('p')?.getAttribute('dir'), 'rtl')
+  assert.equal(viewer.querySelector('p span')?.getAttribute('style')?.includes('var(--primary)'), true)
+})
+
+test('a table can be inserted from its toolbar before the user focuses the editor', async () => {
+  const { RichTextEditor } = await import('../registry/rich-text-editor.tsx')
+  const host = await render(createElement(RichTextEditor, { value: null, onChange: () => {}, direction: 'ltr', t, locale: 'en', policy: { features: ['tables'], fonts: ['sans'] }, id: 'insert-table' }))
+  await act(async () => sleep(100))
+  await act(async () => click(buttonNamed(host, 'Table')!))
+  const item = [...window.document.querySelectorAll('[role="menuitem"]')].find((one) => one.textContent === 'Insert table')
+  assert.ok(item)
+  await act(async () => click(item as unknown as Element))
+  assert.equal(host.querySelectorAll('table').length, 1)
+  assert.equal(host.querySelectorAll('table tr').length, 3)
+})

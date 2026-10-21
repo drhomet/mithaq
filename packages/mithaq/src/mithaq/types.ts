@@ -64,6 +64,8 @@ export type ServiceOf<L> = L extends { targets: infer Targets }
 export type JsonSchema = { schema: Record<string, unknown> | boolean; uri?: string; fileMatch?: readonly string[] }
 
 type Named<Locale extends string = string> = {
+  /** A rich-text field may narrow the features its project installed. */
+  features?: readonly import('../rich-text/features.ts').RichTextFeature[]
   access?: { create?: StoredFieldAccess; read?: StoredFieldAccess; update?: StoredFieldAccess }
   /** One string per locale the language declares, every one required. */
   label?: Localized<Locale> | LabelFunction
@@ -129,6 +131,8 @@ export type Field<KindName extends string = string, RuleValues = Rules> = KindNa
 /** A field as it is after a build, open over locales for `Field`'s reason. */
 export type RuntimeField = Named & {
   kind: string
+  features?: readonly import('../rich-text/features.ts').RichTextFeature[]
+  richTextPolicy?: import('../rich-text/features.ts').RichTextPolicy
   rules?: Record<string, unknown>
   relationTo?: string | (() => Kayan)
   hasMany?: true
@@ -167,6 +171,7 @@ type BoundField<L extends LanguageShape, K extends keyof L['kinds'] & string> = 
     rules?: BoundRules<L, K>
     targets?: Record<string, unknown> & { [Screen in ScreenKeys<L['targets']>]?: ScreenField<RefOf<L['targets'][Screen], L['kinds']>> }
   } &
+  (L['kinds'][K] extends { richTextPolicy: { features: readonly (infer Feature extends import('../rich-text/features.ts').RichTextFeature)[] } } ? { features?: readonly Feature[] } : { features?: never }) &
   (K extends 'join'
     ? { relationTo: string | (() => Kayan); on: string; defaultLimit?: number; defaultSort?: string; hasMany?: never }
     : // A kind that points at a row says so, and a field of it names the kayan it points at.

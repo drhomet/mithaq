@@ -38,6 +38,7 @@ import { auditSink } from './mithaq/audit-sink.ts'
 // end add-on: audit-log
 // add-on: rich-text
 import { richTextNodes } from './mithaq/rich-text-nodes.ts'
+import { richTextConfig } from './mithaq/rich-text-features.ts'
 // end add-on: rich-text
 import { systemRoles } from './roles/system-roles.ts'
 // add-on: uploads
@@ -288,7 +289,7 @@ export const arkan = [
   base,
   // add-on: rich-text
   // The rich text kind over this project's node list.
-  richText({ nodes: richTextNodes }),
+  richText({ nodes: richTextNodes, ...richTextConfig }),
   // end add-on: rich-text
   // add-on: uploads
   // The `upload` kind and the storage target.

@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $isLinkNode } from '@lexical/link'
@@ -16,6 +16,9 @@ export function FloatingLinkEditorPlugin({ anchorElem, isLinkEditMode, setIsLink
   t: Translate
 }): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
+  // Clicking the toolbar blurs before the popover mounts its input, so keep the placeholder until it can take focus.
+  const editing = useRef(isLinkEditMode)
+  editing.current = isLinkEditMode
   const [activeEditor, setActiveEditor] = useState(editor)
   const [isLink, setIsLink] = useState(false)
   useEffect(() => {
@@ -50,7 +53,7 @@ export function FloatingLinkEditorPlugin({ anchorElem, isLinkEditMode, setIsLink
         if (stale(editorState)) dropPlaceholders(editor, true)
       }),
       editor.registerCommand(SELECTION_CHANGE_COMMAND, (_payload, newEditor) => ($updateToolbar(), setActiveEditor(newEditor), false), COMMAND_PRIORITY_CRITICAL),
-      editor.registerCommand(BLUR_COMMAND, () => (setTimeout(() => typingLink() || dropPlaceholders(editor, false)), false), COMMAND_PRIORITY_LOW),
+      editor.registerCommand(BLUR_COMMAND, () => (setTimeout(() => editing.current || typingLink() || dropPlaceholders(editor, false)), false), COMMAND_PRIORITY_LOW),
     )
   }, [editor])
   if (!anchorElem) return null

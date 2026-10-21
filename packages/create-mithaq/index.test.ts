@@ -322,3 +322,16 @@ test('in one package an import of a feature resolves only where that feature exp
   assert.equal(exportsPath(excluding, '/ui/open.tsx'), true, 'a path under a pattern is admitted')
   assert.equal(exportsPath(excluding, '/ui/private/secret.tsx'), false, 'unless a more specific key excludes it with null, as Node does')
 })
+
+test('rich text tools are selected at creation and unknown names fail before writing a project', async () => {
+  const { resolveRichTextFeatures } = await import('./index.js')
+  assert.deepEqual(resolveRichTextFeatures(), [])
+  assert.throws(() => resolveRichTextFeatures(['table']), /distinct features/)
+  assert.throws(() => resolveRichTextFeatures(['code', 'code']), /distinct features/)
+  create({ name: 'rt-selection', cwd: scratch, template, version: '1.2.3', richText: ['tables', 'counter'] })
+  const config = read('rt-selection/packages/mithaq/src/mithaq/rich-text-features.ts')
+  assert.match(config, /features: \[\.\.\.defaultRichTextFeatures, 'tables', 'counter'\]/)
+  assert.doesNotMatch(config, /'code'|'markdown'|'styling'/)
+  create({ name: 'rt-default', cwd: scratch, template, version: '1.2.3', addOns: ['rich-text'] })
+  assert.match(read('rt-default/packages/mithaq/src/mithaq/rich-text-features.ts'), /features: \[\.\.\.defaultRichTextFeatures\]/)
+})

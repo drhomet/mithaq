@@ -1,43 +1,15 @@
+// Adapted from shadcn-editor and Lexical's playground, MIT. See LICENSES/shadcn-editor.txt and LICENSES/lexical.txt.
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import { $isLinkNode, TOGGLE_LINK_COMMAND } from '@lexical/link'
 import { $findMatchingParent, mergeRegister } from '@lexical/utils'
 import { $getSelection, $isRangeSelection, COMMAND_PRIORITY_HIGH, COMMAND_PRIORITY_LOW, KEY_ESCAPE_COMMAND, SELECTION_CHANGE_COMMAND, type BaseSelection, type LexicalEditor } from 'lexical'
 import { CheckIcon, PencilIcon, TrashIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { dropPlaceholders, getSelectedNode, newLink } from 'mithaq-admin/rich-text-selection.ts'
 import { safeUrl } from 'mithaq/rich-text'
-
-// Held apart from the JSX, so `shadcn add` in a right-to-left project does not rewrite `left-0` to `start-0`: the bubble
-// is placed by a translate measured from the physical left edge in either direction.
-const bubble = 'absolute top-0 left-0 z-20 w-full max-w-sm rounded-md opacity-0 shadow-md'
-
-const VERTICAL_GAP = 10
-const HORIZONTAL_OFFSET = 5
-
-function setFloatingElemPositionForLinkEditor(targetRect: DOMRect | null, floatingElem: HTMLElement, anchorElem: HTMLElement): void {
-  const scrollerElem = anchorElem.parentElement
-  if (targetRect === null || !scrollerElem) {
-    floatingElem.style.opacity = '0'
-    floatingElem.style.transform = 'translate(-10000px, -10000px)'
-    return
-  }
-  const floatingElemRect = floatingElem.getBoundingClientRect()
-  const anchorElementRect = anchorElem.getBoundingClientRect()
-  const editorScrollerRect = scrollerElem.getBoundingClientRect()
-  let top = targetRect.top - VERTICAL_GAP
-  let left = targetRect.left - HORIZONTAL_OFFSET
-  if (top < editorScrollerRect.top) top += floatingElemRect.height + targetRect.height + VERTICAL_GAP * 2
-  if (left + floatingElemRect.width > editorScrollerRect.right) left = editorScrollerRect.right - floatingElemRect.width - HORIZONTAL_OFFSET
-  // A right-to-left page puts the bubble's start on the right, which the
-  // physical offset above would push off the edge.
-  if (left < editorScrollerRect.left) left = editorScrollerRect.left
-  top -= anchorElementRect.top
-  left -= anchorElementRect.left
-  floatingElem.style.opacity = '1'
-  floatingElem.style.transform = `translate(${left}px, ${top}px)`
-}
 
 export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLinkEditMode, setIsLinkEditMode, t }: {
   editor: LexicalEditor
@@ -50,6 +22,7 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
 }): JSX.Element {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [rect, setRect] = useState<DOMRect>()
   const [linkUrl, setLinkUrl] = useState('')
   const [editedLinkUrl, setEditedLinkUrl] = useState(newLink)
   // False until the address is edited, so the placeholder it opens on is not flagged invalid.
@@ -69,17 +42,14 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
     const editorElem = editorRef.current
     const nativeSelection = window.getSelection()
     const activeElement = document.activeElement
-    if (editorElem === null) return
     const rootElement = editor.getRootElement()
     if (selection !== null && nativeSelection !== null && rootElement !== null && rootElement.contains(nativeSelection.anchorNode) && editor.isEditable()) {
       const domRect: DOMRect | undefined = nativeSelection.focusNode?.parentElement?.getBoundingClientRect()
       if (domRect) {
-        domRect.y += 40
-        setFloatingElemPositionForLinkEditor(domRect, editorElem, anchorElem)
+        setRect(domRect)
       }
       setLastSelection(selection)
-    } else if (!activeElement || !activeElement.classList.contains('link-input')) {
-      if (rootElement !== null) setFloatingElemPositionForLinkEditor(null, editorElem, anchorElem)
+    } else if (!isLinkEditMode && (!activeElement || !activeElement.classList.contains('link-input'))) {
       setLastSelection(null)
       setIsLinkEditMode(false)
       setLinkUrl('')
@@ -139,7 +109,9 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
   const editing = t('admin.richText.editLink', 'Edit link') ?? 'Edit link'
   const removing = t('admin.richText.removeLink', 'Remove link') ?? 'Remove link'
   return (
-    <div ref={editorRef} data-link-editor className={bubble}>
+    <Popover open={isLink && !!rect} onOpenChange={(open) => { if (!open) cancel() }}>
+      <PopoverTrigger tabIndex={-1} aria-hidden style={{ position: 'fixed', top: rect?.top ?? 0, left: rect?.left ?? 0, width: rect?.width ?? 0, height: rect?.height ?? 0, pointerEvents: 'none', opacity: 0 }} />
+      <PopoverContent ref={editorRef} data-link-editor initialFocus={false} finalFocus={false} className="w-sm max-w-[calc(100vw-2rem)] p-0" align="start">
       {!isLink ? null : isLinkEditMode ? (
         <div className="bg-popover flex items-center gap-2 rounded-md border p-1 ps-2">
           <Input
@@ -166,10 +138,10 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
             }}
             className="link-input flex-grow"
           />
-          <Button type="button" size="icon" variant="ghost" title={cancelling} aria-label={cancelling} onClick={cancel} className="shrink-0">
+          <Button type="button" size="icon" variant="ghost" title={cancelling} aria-label={cancelling} onClick={cancel} className="min-h-11 min-w-11 shrink-0 sm:min-h-0 sm:min-w-0">
             <XIcon className="size-4" />
           </Button>
-          <Button type="button" size="icon" disabled={!allowed} title={saving} aria-label={saving} onClick={handleLinkSubmission} className="shrink-0">
+          <Button type="button" size="icon" disabled={!allowed} title={saving} aria-label={saving} onClick={handleLinkSubmission} className="min-h-11 min-w-11 shrink-0 sm:min-h-0 sm:min-w-0">
             <CheckIcon className="size-4" />
           </Button>
         </div>
@@ -179,15 +151,16 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
             {linkUrl}
           </a>
           <div className="flex">
-            <Button type="button" size="icon" variant="ghost" title={editing} aria-label={editing} onClick={() => (setEditedLinkUrl(linkUrl), setIsLinkEditMode(true))}>
+            <Button type="button" size="icon" variant="ghost" title={editing} aria-label={editing} className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" onClick={() => (setEditedLinkUrl(linkUrl), setIsLinkEditMode(true))}>
               <PencilIcon className="size-4" />
             </Button>
-            <Button type="button" size="icon" variant="destructive" title={removing} aria-label={removing} onClick={() => editor.dispatchCommand(TOGGLE_LINK_COMMAND, null)}>
+            <Button type="button" size="icon" variant="destructive" title={removing} aria-label={removing} className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0" onClick={() => editor.dispatchCommand(TOGGLE_LINK_COMMAND, null)}>
               <TrashIcon className="size-4" />
             </Button>
           </div>
         </div>
       )}
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }

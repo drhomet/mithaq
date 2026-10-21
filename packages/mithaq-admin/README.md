@@ -507,3 +507,21 @@ A registry item is a piece mithaq ships for every project. Its source lives in `
 ### A registry step
 
 A step every project may want, and may want to change, ships as a registry file rather than as core code. `expectedUpdatedAt` is one: it lives in `packages/mithaq-admin/registry/steps/expected-updated-at.ts` in the mithaq repository, `mithaq eject mithaq-expected-updated-at` writes it to `src/steps/expected-updated-at.ts`, and a project edits its copy in place. Write a new one the same way, and follow [Add a registry item](#add-a-registry-item). Put the step's tests beside it so a replacement can run them.
+
+## Rich text in 0.3.5
+
+The toolbar keeps 44px phone targets and one arrow-key tab stop. It groups
+formatting tools with tooltips, opens links in a popover, and offers selection
+tools on wide screens with a fine pointer. Touch users use the sticky toolbar.
+
+The control reads the field's installed feature policy from generated screens.
+Optional tables, code highlighting, styling, markdown and counters have separate
+imports. RichTextEditor callers outside generated forms can pass `policy` with
+`features` and `fonts`. Code highlighting uses Lexical's Prism adapter. Styling
+writes fixed NodeState choices, never CSS; the viewer uses the same mapping.
+
+Projects holding ejected rich-text pieces must merge or eject the changed
+pieces and their dependencies again, including rich-text-features, choices and
+the selected optional modules. Regenerate screens after upgrading so the field
+policy reaches the browser. The serialized document remains Lexical JSON.
+See [feature configuration](../mithaq/README.md#rich-text-features).

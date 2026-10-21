@@ -44,7 +44,7 @@ export const uniqueRuleIndexes = new WeakSet<object>()
 
 export const isPlainIdentifier = (value: string) => value.length <= 63 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value)
 
-const fixed = new Set(['access', 'column', 'custom', 'dbName', 'description', 'jsonSchema', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'maxBytes', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
+const fixed = new Set(['access', 'column', 'custom', 'features', 'richTextPolicy', 'dbName', 'description', 'jsonSchema', 'kayan', 'kind', 'kindTargets', 'label', 'locales', 'maxBytes', 'name', 'now', 'operators', 'options', 'placeholder', 'prefix', 'schemaTarget', 'sortable', 'suffix', 'target', 'targets', 'rules'])
 
 // Every list holds exactly one store or managed read step, and none of the three
 // the runner owns; the effect is read off that one step, so it is never declared.
@@ -656,6 +656,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
             // Written on every field, so a `locales` a declaration wrote itself is dropped.
             locales: field.rules?.localized ? language.locales : undefined,
             now: language.kinds[field.kind]?.now,
+            richTextPolicy: language.kinds[field.kind]?.richTextPolicy,
             kindTargets: language.kinds[field.kind]?.targets,
             operators: language.kinds[field.kind]?.operators,
             sortable: language.kinds[field.kind]?.sortable,
@@ -926,6 +927,8 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
           )
         }
       }
+      if (field.features !== undefined && !language.kinds[field.kind]?.richTextPolicy) throw new Error(`${where} carries features but its kind installs no rich text features.`)
+      if (field.features !== undefined && (!Array.isArray(field.features) || field.features.some((feature) => !language.kinds[field.kind]?.richTextPolicy?.features.includes(feature)))) throw new Error(`${where} names a rich text feature not installed by its project.`)
       // A key that is neither a rule nor one of its kind's own is a typo, and says so.
       const own = field.kind === 'join' ? joinKeys : pointsAtRow(field.kind) ? relationshipKeys : undefined
       for (const key of Object.keys(field)) {

@@ -1,0 +1,77 @@
+import type { RichTextNode } from './value.ts'
+
+/** The existing editor's choices, named so a project can spread or narrow them. */
+export const defaultRichTextFeatures = ['bold', 'italic', 'underline', 'strikethrough', 'inlineCode', 'headings', 'lists', 'checklist', 'quote', 'divider', 'link', 'alignment', 'indent', 'upload', 'direction'] as const
+export const richTextFeatures = [...defaultRichTextFeatures, 'tables', 'code', 'styling', 'markdown', 'counter'] as const
+export type RichTextFeature = typeof richTextFeatures[number]
+export const richTextColors = { default: 'inherit', primary: 'var(--primary)', muted: 'var(--muted-foreground)', destructive: 'var(--destructive)' } as const
+export const richTextSizes = { small: '0.875em', normal: '1em', large: '1.25em' } as const
+export const richTextFonts = { sans: 'var(--font-sans, sans-serif)', serif: 'var(--font-serif, serif)', mono: 'var(--font-mono, monospace)' } as const
+export type RichTextFont = keyof typeof richTextFonts
+export const defaultRichTextFonts = ['sans', 'serif', 'mono'] as const
+export type RichTextPolicy = { features: readonly RichTextFeature[]; fonts: readonly RichTextFont[] }
+
+/** Reject policy typos before generation or a first write, even in untyped config. */
+export const checkRichTextPolicy = ({ features, fonts }: RichTextPolicy) => {
+  if (!Array.isArray(features) || features.some((one) => !richTextFeatures.includes(one)) || new Set(features).size !== features.length) throw new Error('Rich text features must be distinct installed feature names.')
+  if (!Array.isArray(fonts) || !fonts.length || fonts.some((one) => !Object.hasOwn(richTextFonts, one)) || new Set(fonts).size !== fonts.length) throw new Error('Rich text fonts must be distinct names from sans, serif and mono.')
+}
+
+const formatBits = { bold: 1, italic: 2, strikethrough: 4, underline: 8, inlineCode: 16 } as const
+const nodeFeatures: Record<string, RichTextFeature> = { heading: 'headings', list: 'lists', listitem: 'lists', quote: 'quote', horizontalrule: 'divider', link: 'link', autolink: 'link', upload: 'upload', table: 'tables', tablerow: 'tables', tablecell: 'tables', code: 'code', 'code-highlight': 'code' }
+
+/** Policy runs over the original JSON so Lexical cannot silently drop an unsupported value. */
+export const richTextFeatureGuard = ({ node, policy }: { node: RichTextNode; policy: RichTextPolicy }): string | undefined => {
+  const { features, fonts } = policy
+  const has = (feature: RichTextFeature) => features.includes(feature)
+  const needed = node.type === 'list' && node.listType === 'check' ? 'checklist' : nodeFeatures[node.type]
+  if (needed && !has(needed) && !(node.type === 'listitem' && has('checklist'))) return `The field does not allow the ${needed} feature.`
+  if (node.type === 'heading' && !['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(String(node.tag))) return 'A heading must be h1 through h6.'
+  if (node.type === 'list' && (!['number', 'bullet', 'check'].includes(String(node.listType)) || (node.listType === 'check' && !has('checklist')))) return 'The field does not allow this list type.'
+  if (typeof node.text === 'string') {
+    const allowed = Object.entries(formatBits).reduce((bits, [name, bit]) => bits | (has(name as RichTextFeature) ? bit : 0), 0)
+    if (typeof node.format === 'number' && (node.format < 0 || node.format > allowed || (node.format & ~allowed) !== 0)) return 'The field does not allow this text format.'
+    if (node.mode !== undefined && !['normal', 'token', 'segmented'].includes(String(node.mode))) return 'The field does not allow this text mode.'
+  } else if (node.format) {
+    if (!['left', 'start', 'center', 'right', 'end', 'justify'].includes(String(node.format))) return 'This block alignment is not allowed.'
+    if (!has('alignment')) return 'The field does not allow alignment.'
+  }
+  if (node.textFormat !== undefined && !Number.isInteger(node.textFormat)) return 'A block text format must be a whole number.'
+  if (typeof node.textFormat === 'number') {
+    const refused = richTextFeatureGuard({ node: { type: 'text', text: '', format: node.textFormat }, policy })
+    if (refused) return refused
+  }
+  if (node.type === 'code' && node.language != null && !['javascript', 'typescript', 'json', 'css', 'markup', 'python'].includes(String(node.language))) return 'This code language is not allowed.'
+  if (node.indent && !has('indent')) return 'The field does not allow indentation.'
+  if (node.direction !== undefined && node.direction !== null && !['rtl', 'ltr'].includes(String(node.direction))) return 'A block direction must be rtl, ltr or null.'
+  // Older Lexical documents carry root.direction. Keep that metadata on round trips; the renderer clears it.
+  // New overrides are NodeState choices and never belong to the root.
+  if (node.type === 'root' && node.$ != null) return 'Direction and styling belong to blocks, never the root.'
+  const state = node.$
+  if (state !== undefined) {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) return 'Node choices must be an object.'
+    const choices = state as Record<string, unknown>
+    for (const [key, value] of Object.entries(choices)) {
+      if (typeof value !== 'string') return 'Rich text choices are names, never CSS or objects.'
+      if (key === 'direction') {
+        if (!has('direction') || typeof node.text === 'string' || !Array.isArray(node.children) || !['rtl', 'ltr', 'auto'].includes(String(value))) return 'The field does not allow this block direction.'
+      } else {
+        if (!has('styling') || typeof node.text !== 'string') return 'The field does not allow styling here.'
+        if (key === 'color' ? !Object.hasOwn(richTextColors, String(value)) : key === 'size' ? !Object.hasOwn(richTextSizes, String(value)) : key === 'font' ? !fonts.includes(value as RichTextFont) : true) return 'Styling must use the project\'s fixed choices.'
+      }
+    }
+  }
+  if (node.type === 'table' && (!node.children?.length || node.children.length > 100 || node.children.some((one) => one.type !== 'tablerow'))) return 'A table holds 1 to 100 rows.'
+  if (node.type === 'tablerow' && (!node.children?.length || node.children.length > 100 || node.children.some((one) => one.type !== 'tablecell'))) return 'A table row holds 1 to 100 cells.'
+  if (node.type === 'tablecell') {
+    for (const key of ['colSpan', 'rowSpan']) if (node[key] !== undefined && (!Number.isInteger(node[key]) || Number(node[key]) < 1 || Number(node[key]) > 100)) return 'A table span is 1 to 100.'
+    if (node.headerState !== undefined && (!Number.isInteger(node.headerState) || ![0, 1, 2, 3].includes(node.headerState as number))) return 'A table header state is 0 to 3.'
+  }
+  // Tables have structural CSS fields in Lexical. None is an author-supplied style channel.
+  for (const key of ['backgroundColor', 'width', 'height', 'colWidths']) if (node[key] != null && node[key] !== '') return `Rich text stores no ${key}.`
+  for (const child of node.children ?? []) {
+    const refused = richTextFeatureGuard({ node: child, policy })
+    if (refused) return refused
+  }
+  return undefined
+}

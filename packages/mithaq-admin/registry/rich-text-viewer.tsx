@@ -7,11 +7,14 @@ import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin'
 import { ListPlugin } from '@lexical/react/LexicalListPlugin'
 import { CheckListPlugin } from '@lexical/react/LexicalCheckListPlugin'
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
-import { $getRoot, $isElementNode, HISTORY_MERGE_TAG, type Klass, type LexicalNode } from 'lexical'
+import { $getRoot, $isElementNode, $getState, RootNode, HISTORY_MERGE_TAG, type Klass, type LexicalNode } from 'lexical'
 import { useDirection } from '@/components/ui/direction'
 import { cn } from '@/lib/utils'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { richTextBounds, safeUrl, typesOf } from 'mithaq/rich-text'
+import { richTextBounds, defaultRichTextFonts, safeUrl, typesOf, type RichTextPolicy } from 'mithaq/rich-text'
+import { $dfs } from '@lexical/utils'
+import { directionChoice } from 'mithaq-admin/rich-text-choices.ts'
+import { FeatureNodes, useFeatureNodes, type RichTextFeatureModule } from 'mithaq-admin/rich-text-features.tsx'
 import { RichTextContext } from 'mithaq-admin/rich-text-picks.tsx'
 import { configOf, unreadable, valueOf, type RichTextDirection, type RichTextNode, type RichTextValue } from 'mithaq-admin/rich-text-value.ts'
 
@@ -22,11 +25,17 @@ import { configOf, unreadable, valueOf, type RichTextDirection, type RichTextNod
 export function DirectionPlugin() {
   const [editor] = useLexicalComposerContext()
   useEffect(() => {
-    editor.update(() => {
+    const update = () => {
       const root = $getRoot()
-      root.setDirection(null)
-      for (const block of root.getChildren()) if ($isElementNode(block) && block.getDirection() !== null) block.setDirection(null)
-    }, { tag: HISTORY_MERGE_TAG })
+      if (root.getDirection() !== null) root.setDirection(null)
+      for (const { node: block } of $dfs()) if ($isElementNode(block) && block !== root) {
+        const choice = $getState(block, directionChoice)
+        const next = choice === 'auto' ? null : choice
+        if (block.getDirection() !== next) block.setDirection(next)
+      }
+    }
+    editor.update(update, { tag: HISTORY_MERGE_TAG })
+    return editor.registerNodeTransform(RootNode, update)
   }, [editor])
   return null
 }
@@ -81,7 +90,7 @@ export function Unreadable({ value, nodes, problem, direction, t, id, describedB
  * through Lexical's `sanitizeUrl`, which answers `about:blank` for unsupported schemes, so a
  * `javascript:` or `data:` address that reached a column past the server's check is never followed.
  */
-export function RichTextViewer({ value, direction, t, className, id, describedBy, nodes }: {
+type ViewerProps = {
   value: unknown
   direction: RichTextDirection
   t: Translate
@@ -89,8 +98,23 @@ export function RichTextViewer({ value, direction, t, className, id, describedBy
   id?: string
   describedBy?: string
   nodes?: readonly Klass<LexicalNode>[]
-}): ReactElement {
-  const drawn = nodes ?? use(RichTextContext).nodes
+}
+export function RichTextViewer(props: ViewerProps): ReactElement {
+  const policy: RichTextPolicy = { features: [], fonts: defaultRichTextFonts }
+  let remaining = richTextBounds.nodes
+  const walk = (node: RichTextNode, depth = richTextBounds.depth) => {
+    if (!node || depth <= 0 || remaining-- <= 0) return
+    if (node.type === 'table' && !policy.features.includes('tables')) policy.features = [...policy.features, 'tables']
+    if (node.type === 'code' && !policy.features.includes('code')) policy.features = [...policy.features, 'code']
+    if (node.$ && typeof node.$ === 'object' && ['color', 'size', 'font'].some((key) => Object.hasOwn(node.$ as object, key)) && !policy.features.includes('styling')) policy.features = [...policy.features, 'styling']
+    for (const child of Array.isArray(node.children) ? node.children : []) walk(child, depth - 1)
+  }
+  walk(valueOf(props.value).root)
+  return <FeatureNodes policy={policy}>{(modules) => <Viewer {...props} modules={modules} policy={policy} />}</FeatureNodes>
+}
+function Viewer({ value, direction, t, className, id, describedBy, nodes , modules, policy }: ViewerProps & { modules: readonly RichTextFeatureModule[]; policy: RichTextPolicy }): ReactElement {
+  const provided = use(RichTextContext)
+  const drawn = useFeatureNodes({ nodes: nodes ?? provided.nodes, modules })
   const held = useMemo(() => valueOf(value), [value])
   // Asked before serializing, so a value nested past the bound never reaches `JSON.stringify` or Lexical.
   const problem = useMemo(() => unreadable(held, drawn), [held, drawn])
@@ -107,6 +131,7 @@ export function RichTextViewer({ value, direction, t, className, id, describedBy
         <CheckListPlugin />
         <LinkPlugin validateUrl={safeUrl} />
         <DirectionPlugin />
+        {modules.map(({ Plugin }, index) => Plugin ? <Plugin key={index} policy={policy} locale="en" t={t} /> : null)}
       </LexicalComposer>
     </div>
   )

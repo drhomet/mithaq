@@ -578,9 +578,17 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-roles',
       'mithaq-tab-strip',
       'mithaq-page-header',
+      'mithaq-rich-text-features',
+      'mithaq-rich-text-choices',
+      'mithaq-rich-text-counter',
+      'mithaq-rich-text-markdown',
+      'mithaq-rich-text-styling',
+      'mithaq-rich-text-code',
+      'mithaq-rich-text-tables',
+      'mithaq-rich-text-floating-toolbar',
 
     ],
-    'the registry declares the ninety-eight items this file knows about',
+    'the registry declares the items this file knows about',
   )
   const declaredItems = source.items as { name: string; files: { path: string; target: string }[] }[]
   const appPathOf = (target: string) => target.startsWith('~/') ? target.slice(2) : `src/${target.replace('@components/', 'components/')}`

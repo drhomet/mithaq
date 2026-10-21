@@ -1473,6 +1473,35 @@
         {
           "name": "details",
           "kind": "richText",
+          "richTextPolicy": {
+            "features": [
+              "bold",
+              "italic",
+              "underline",
+              "strikethrough",
+              "inlineCode",
+              "headings",
+              "lists",
+              "checklist",
+              "quote",
+              "divider",
+              "link",
+              "alignment",
+              "indent",
+              "upload",
+              "direction",
+              "tables",
+              "code",
+              "styling",
+              "markdown",
+              "counter"
+            ],
+            "fonts": [
+              "sans",
+              "serif",
+              "mono"
+            ]
+          },
           "label": {
             "en": "Details",
             "ar": "التفاصيل"
@@ -2089,6 +2118,35 @@
         {
           "name": "details",
           "kind": "richText",
+          "richTextPolicy": {
+            "features": [
+              "bold",
+              "italic",
+              "underline",
+              "strikethrough",
+              "inlineCode",
+              "headings",
+              "lists",
+              "checklist",
+              "quote",
+              "divider",
+              "link",
+              "alignment",
+              "indent",
+              "upload",
+              "direction",
+              "tables",
+              "code",
+              "styling",
+              "markdown",
+              "counter"
+            ],
+            "fonts": [
+              "sans",
+              "serif",
+              "mono"
+            ]
+          },
           "label": {
             "en": "Details",
             "ar": "التفاصيل"

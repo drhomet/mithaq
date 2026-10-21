@@ -138,7 +138,7 @@ Where it lives: `packages/mithaq/src/mithaq/rukn.ts` `defineRukn` and
   against the project's own node list. It can be searched and is never sorted.
   It is imported from `mithaq/rich-text`, the one entry that loads Lexical, so a
   project that uses it installs `lexical`, `@lexical/extension`, `@lexical/link`,
-  `@lexical/list` and `@lexical/rich-text` (mithaq's optional peers) and a project
+  `@lexical/list`, `@lexical/table`, `@lexical/code-core` and `@lexical/rich-text` (mithaq's optional peers) and a project
   without it installs none. `packages/mithaq/src/rich-text/index.ts` `richText`.
 - **`storage(config)`**: the `upload` kind, a relationship drawn as a file
   picker, and the `storage` target over the project's config. The config holds
@@ -960,7 +960,7 @@ A kind's `screen` control and cell each name one the registry ships, a `ui()` re
 
 A rukn's kinds, rules and target names are vocabulary, so adding a rukn, or changing what one brings, follows [Add a kind or a rule](#add-a-kind-or-a-rule). Fields a feature needs, such as `uploadFields` or `draftFields`, are not part of a rukn: they are exported beside it as named values a kayan spreads.
 
-When you write a rukn factory whose kinds depend on its argument, type that argument as `<const C>`, or the kinds widen and the type checks pass silently. A factory whose kinds do not depend on its argument, such as `richText({ nodes })` or `storage(config)`, takes no generic.
+When you write a rukn factory whose kinds depend on its argument, type that argument as `<const C>`, or the kinds widen and the type checks pass silently. A factory whose kinds do not depend on its argument, such as `storage(config)`, takes no generic. Rich text keeps its installed feature names literal so fields can narrow them.
 
 ### Add a kind or a rule
 
@@ -1040,3 +1040,47 @@ to `drizzleAdapter` instead. It is an adapter because it connects mithaq's
 store contract to Postgres through Drizzle; it still has the `store` capability.
 The [0.1.1 to 0.2.0 upgrade guide](../../templates/asas/README.md#011-to-020)
 covers the other breaking changes.
+
+## Rich text features
+
+A project installs features in its `richText` rukn. The starter writes the
+selection in `src/mithaq/rich-text-features.ts`. Existing projects can add that
+file and pass its config alongside `nodes` in their rukn. No vocabulary or
+migration changes, and existing Lexical JSON stays unchanged.
+
+```ts
+import { defaultRichTextFeatures, richText } from 'mithaq/rich-text'
+
+const text = richText({
+  nodes: richTextNodes,
+  features: [...defaultRichTextFeatures, 'tables', 'code', 'styling', 'markdown', 'counter'],
+  fonts: ['sans', 'serif', 'mono'],
+})
+```
+
+The default features are bold, italic, underline, strikethrough, inlineCode,
+headings, lists, checklist, quote, divider, link, alignment, indent, upload and
+direction. `upload` still requires the project's UploadNode and file plugin.
+A field may narrow them with `{ kind: 'richText', features: ['bold', 'italic',
+'link'] }`. Omitting `features` uses the installed list. Both TypeScript and
+`generate --check` refuse a field that enables an uninstalled feature. The
+server checks node types, format bits, block choices and style choices against
+the selected field before accepting a write.
+
+The stored value remains Lexical's editorState JSON. Styling uses NodeState
+choices under `$`: `color` is default, primary, muted or destructive; `size`
+is small, normal or large; `font` is a member of the project's fonts list,
+a subset of sans, serif and mono. The renderer maps these names to theme CSS.
+No CSS string is stored or accepted. Tables have no free colours or dimensions.
+Code languages are javascript, typescript, json, css, markup and python.
+
+Blocks follow their first strong character. A block's `$: { direction: 'rtl' }`
+or ltr overrides it, and auto clears the override. The editor writes null to the root direction. Legacy root direction metadata
+stays readable for round trips and the renderer ignores it. The editor never stores a word or character count. Markdown shortcuts
+follow the field's formatting choices and have no link transformer.
+
+Install Lexical's optional peers at 0.52.0 wherever used. The language needs
+`@lexical/table` and `@lexical/code-core`; the admin also needs
+`@lexical/code-prism` and `@lexical/markdown`. Optional editor code is imported
+only for fields that select it. A read view loads the optional nodes its stored
+document uses, so narrowing a field cannot erase its older document.

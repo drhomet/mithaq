@@ -85,7 +85,9 @@
     "better-auth": "1.7.4",
     "lexical": "0.52.0",
     "react": "^19.3.0",
-    "vite": ">=8"
+    "vite": ">=8",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0"
   },
   "peerDependenciesMeta": {
     "@lexical/extension": {
@@ -114,6 +116,12 @@
     },
     "vite": {
       "optional": true
+    },
+    "@lexical/table": {
+      "optional": true
+    },
+    "@lexical/code-core": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -128,6 +136,8 @@
     "better-auth": "1.7.4",
     "@types/react": "^19.3.0",
     "react": "^19.3.0",
-    "vite": "^8.0.13"
+    "vite": "^8.0.13",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0"
   }
 }

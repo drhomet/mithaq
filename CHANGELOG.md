@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.5
+
+- Rich-text projects select installed features, and fields may narrow them. Type checking and generation refuse uninstalled names; server validation enforces each field's nodes, formats and fixed style choices.
+- Refreshed grouped toolbar, tooltips, link popover, wide-screen selection tools and form-sized headings. Added optional tables, code blocks with lazy highlighting, safe markdown shortcuts, display-only counters, token styling and per-block direction overrides. Existing Lexical JSON and mithaq UploadNode images remain readable.
+- `create-mithaq --rich-text=tables,code,styling,markdown,counter` writes the selected tools into project config. Default rich-text projects keep their current tools and the new look. Regenerate screens on upgrade; merge any held rich-text copies and install the new optional Lexical peers. No database migration is needed. MIT notices for shadcn-editor and Lexical now ship with the packages.
+
 ## 0.3.4
 
 - Kayan and own-page navigation can declare `nav.icon`, a serializable name from `screenTarget.icons`, implemented in the app's `components.icons` map. Screen builds refuse undeclared names before generation, and the language's typed components map requires every declared icon. Named imports keep unused icons out of the bundle. `checkComponents` refuses unregistered names at boot, including hidden entries.

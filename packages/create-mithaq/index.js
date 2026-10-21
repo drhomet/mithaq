@@ -80,7 +80,7 @@ export const addOns = {
   // The `richText` kind, its Lexical nodes and editor.
   'rich-text': {
     needs: [],
-    files: ['packages/mithaq/src/mithaq/rich-text-nodes.ts', 'packages/mithaq/src/ui/rich-text-nodes.tsx'],
+    files: ['packages/mithaq/src/mithaq/rich-text-features.ts', 'packages/mithaq/src/mithaq/rich-text-nodes.ts', 'packages/mithaq/src/ui/rich-text-nodes.tsx'],
     without: [],
     packages: ['lexical', '@lexical/'],
     copy: ['kinds.richText', 'kinds.richText.invalid'],
@@ -107,6 +107,12 @@ export const addOns = {
  * The add-ons `asked` names with every one they need, in the table's order, and the ones added for that. A name the
  * table does not hold is refused with the list, so a typo never makes a smaller project than asked for.
  */
+export const optionalRichTextFeatures = ['tables', 'code', 'styling', 'markdown', 'counter']
+export function resolveRichTextFeatures(asked = []) {
+  if (asked.some((name) => !optionalRichTextFeatures.includes(name)) || new Set(asked).size !== asked.length) throw new Error(`--rich-text names distinct features: ${optionalRichTextFeatures.join(', ')}.`)
+  return asked
+}
+
 export function resolveAddOns(asked) {
   const unknown = asked.filter((name) => !Object.hasOwn(addOns, name))
   if (unknown.length) throw new Error(`No add-on is named ${unknown.map((name) => `"${name}"`).join(', ')}. The add-ons are ${Object.keys(addOns).join(', ')}.`)
@@ -335,13 +341,14 @@ const writeOrganizations = (file, settings) =>
  * backoffice console. `addOns` names the add-ons the project holds beside auth and the tags example, with
  * every one they need; none is the minimal project.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], organizations, showOrganization, signUp, organizationName }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], richText: richTextAsked, organizations, showOrganization, signUp, organizationName }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`, and a scope.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
   }
   if (!['monorepo', 'single'].includes(layout)) throw new Error(`The layout is monorepo or single, not "${layout}".`)
-  const { chosen } = resolveAddOns(asked)
+  const features = resolveRichTextFeatures(richTextAsked)
+  const { chosen } = resolveAddOns([...asked, ...(richTextAsked !== undefined ? ['rich-text'] : [])])
   const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
   const backoffice = chosen.includes('backoffice')
   if (layout === 'single' && backoffice) throw new Error('A single package serves the tenant app alone. Choose the monorepo layout to include the backoffice console.')
@@ -368,6 +375,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
     writeJson(join(project, file), file === 'package.json' ? { name, ...packageJson } : packageJson)
   }
   keepOnly({ project, chosen })
+  if (chosen.includes('rich-text')) edit(join(project, 'packages/mithaq/src/mithaq/rich-text-features.ts'), (text) => text.replace(/features: .* as const,/, `features: [...defaultRichTextFeatures${features.map((one) => `, '${one}'`).join('')}] as const,`))
   writeOrganizations(join(project, 'packages/mithaq/src/mithaq/auth/organizations.ts'), settings)
   // One `.env` for the asas's commands and one for each app's dev server,
   // the same secrets in each: the tenant app and the backoffice console sign
@@ -412,6 +420,7 @@ const help = `Usage: create-mithaq [name] [options]
   --layout monorepo   the language, each feature, the asas and each app as workspace packages (the default)
   --layout single     one package holding the language, the features, the asas and the tenant app
   --with <a,b>        the add-ons to hold beside auth and the tags example, with every one they need
+  --rich-text=tables,code,styling,markdown,counter  Install optional rich-text tools
   --full              every add-on: the whole worked example (a single package leaves out backoffice)
   --organizations one|many
                       one organization, made on /auth/first-run (the default), or many, each sign-up
@@ -446,7 +455,7 @@ const binAbove = (folder) => {
 const main = async () => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, 'organization-name': { type: 'string' }, 'organization-name-ar': { type: 'string' }, help: { type: 'boolean' } },
+    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, 'rich-text': { type: 'string' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, 'organization-name': { type: 'string' }, 'organization-name-ar': { type: 'string' }, help: { type: 'boolean' } },
   })
   if (values.help) return console.log(help)
   if (values.full && values.with !== undefined) throw new Error('Pass --full or --with, not both: --full is every add-on.')
@@ -476,11 +485,12 @@ const main = async () => {
   const showOrganization = shown !== 'no'
   // A single package cannot hold the backoffice console, so its whole example is every other add-on.
   const asked = values.full ? Object.keys(addOns).filter((one) => layout !== 'single' || one !== 'backoffice') : (picked ?? [])
+  if (values['rich-text'] !== undefined && !asked.includes('rich-text')) asked.push('rich-text')
   const { chosen, added } = resolveAddOns(asked)
   if (added.length) console.log(`Added ${added.join(', ')}, which ${asked.filter((one) => addOns[one].needs.length).join(', ')} need${added.length === 1 ? 's' : ''}.`)
   const { version } = readJson(new URL('package.json', import.meta.url))
   const organizationName = named ? { en: named, ...(namedInArabic && { ar: namedInArabic }) } : undefined
-  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, organizations, showOrganization, signUp, organizationName })
+  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, richText: values['rich-text']?.split(',').filter(Boolean), organizations, showOrganization, signUp, organizationName })
   const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
   console.log(`Created ${project}${chosen.length ? `, with ${chosen.join(', ')}` : ', minimal'}.`)
   const manager = managerOf(process.env.npm_config_user_agent)

@@ -23,6 +23,7 @@ export type Kind<Value = unknown, RuleName extends string = string> = {
   /** `false` where a value of this kind cannot order a page. */
   sortable?: false
   /** `true` where a value of this kind is the id of another row, named by `relationTo`. */
+  richTextPolicy?: import('../rich-text/features.ts').RichTextPolicy
   pointsAtRow?: true
   /** What a field of this kind does when the row it points at is deleted, unless it names its own `onDelete`. */
   onDelete?: OnDelete

@@ -40,7 +40,11 @@
     "mithaq": "*",
     "react": "^19.3.0",
     "react-day-picker": "^10.0.1",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0",
+    "@lexical/markdown": "0.52.0",
+    "@lexical/code-prism": "0.52.0"
   },
   "peerDependenciesMeta": {
     "better-auth": {
@@ -68,6 +72,18 @@
       "optional": true
     },
     "lexical": {
+      "optional": true
+    },
+    "@lexical/table": {
+      "optional": true
+    },
+    "@lexical/code-core": {
+      "optional": true
+    },
+    "@lexical/markdown": {
+      "optional": true
+    },
+    "@lexical/code-prism": {
       "optional": true
     }
   },
@@ -105,6 +121,10 @@
     "react-dom": "^19.3.0",
     "react-resizable-panels": "^4.13.3",
     "recharts": "3.8.0",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0",
+    "@lexical/markdown": "0.52.0",
+    "@lexical/code-prism": "0.52.0"
   }
 }
