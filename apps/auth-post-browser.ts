@@ -7,7 +7,10 @@ const dummyPassword = 'dummy-password-do-not-use'
 /** The browser sees real server-rendered pages; every native Document submit is stopped before the server. */
 export const authPostBrowser = async () => {
   const executablePath = process.env.AUTH_BROWSER_EXECUTABLE
-  if (!executablePath) return undefined
+  if (!executablePath) {
+    assert.ok(process.env.CI === undefined, 'CI requires AUTH_BROWSER_EXECUTABLE and an installed Chromium for native auth checks')
+    return undefined
+  }
   const browser = await chromium.launch({ executablePath, headless: true })
   return {
     close: () => browser.close(),
@@ -50,7 +53,7 @@ async function nativeChecks({ browser, url, control = false }: { browser: Browse
         const name = await input.getAttribute('name')
         await input.fill(name === 'email' ? 'dummy-auth-post@example.com' : name === 'name' ? 'Dummy auth post' : dummyPassword)
       }
-      if (control) await page.locator('form').evaluate((form) => form.setAttribute('method', 'get'))
+      if (control) await page.locator('form').evaluate((form) => form.removeAttribute('method'))
       const fields = await page.locator('form').evaluate((form) => Object.fromEntries(new FormData(form as HTMLFormElement))) as Record<string, string>
       const path = new URL(url).pathname
       const expected = path === '/auth/forgot-password' ? ['email']
@@ -70,7 +73,9 @@ async function nativeChecks({ browser, url, control = false }: { browser: Browse
       assert.equal(intercepted, 1, 'the native Document request was intercepted before any server write')
       assert.equal(request.method, control ? 'GET' : 'POST', `${mode} ${new URL(url).pathname}`)
       assert.equal(leaks({ urls, fields }), control, 'the same URL/history assertion must catch the positive GET control')
-      if (!control) {
+      if (control) {
+        assert.deepEqual(Object.fromEntries(new URL(request.url).searchParams), fields, 'the GET control must expose every form value, including the password on sign-in')
+      } else {
         assert.equal(request.url, initial, 'native POST introduces no query parameters')
         assert.deepEqual(Object.fromEntries(new URLSearchParams(request.body!)), fields, 'every successful control, including confirmation and setup code, is in the body')
         if (new URL(url).pathname !== '/auth/forgot-password') assert.ok(fields.password, 'this fixture reaches the password branch')

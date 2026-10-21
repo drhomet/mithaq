@@ -132,6 +132,15 @@ ChoosePassword serves both set-password and reset-password. Merge the
 backoffice's `src/routes/auth.sign-in.tsx` and `auth.create-first-user.tsx` too.
 The setup-code branch must submit with POST as well.
 
+ChoosePassword also calls the project's Better Auth `setPasswordState` plugin.
+A project with its own provider must copy the `setPasswordState` declaration
+from `templates/mithaq/src/mithaq/auth/index.ts` in the 0.3.3 starter to its
+auth setup, then register it in the provider's `plugins` array. This is project code, not a built-in Better Auth
+endpoint. It exposes `server.api.setPasswordState({ query: { token } })` in
+process only, validates the live reset-password token and returns its account
+email. Without the plugin, both password-link pages fail to load. Preserve its
+`SERVER_ONLY` protection; do not expose token lookup through an HTTP query.
+
 Every password, setup code and personal value must stay in a POST body when
 JavaScript is disabled or a form is submitted before hydration. Keep the
 project's existing submit handlers and its Origin, cookie and rate-limit

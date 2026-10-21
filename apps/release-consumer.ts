@@ -359,9 +359,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     const codeOf = async (response: Response) => [response.status, ((await response.json().catch(() => null)) as { code?: string } | null)?.code] as const
     const cookieOf = (response: Response) => response.headers.getSetCookie().map((part) => part.split(';')[0]).join('; ')
     if (!many) {
-      if (full && !single && authBrowser) {
+      if (full && authBrowser) {
+        console.log(`auth browser layout: ${name}`)
         await authBrowser.native({ url: `${origin}/auth/first-run` })
-        await authBrowser.native({ url: `${backofficeOrigin}/auth/create-first-user` })
+        if (backoffice) await authBrowser.native({ url: `${backofficeOrigin}/auth/create-first-user` })
       }
       // One organization: nothing signs up before its owner is made, and only the setup code makes them.
       const setUp = await (await fetch(`${origin}/auth/first-run`, { signal: AbortSignal.timeout(10_000) })).text()
@@ -374,12 +375,13 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       assert.equal(won.length, 1, `one first-run wins: ${JSON.stringify(runs)}\n${output}`)
       assert.deepEqual(runs.filter(([, [status]]) => status !== 200).map(([, answer]) => answer), [[403, 'FIRST_RUN_CLOSED'], [403, 'FIRST_RUN_CLOSED']])
       const owner = `owner-${won[0]![0]}-${stamp}@example.com`
-      if (full && !single && authBrowser) {
+      if (full && authBrowser) {
         await authBrowser.native({ url: `${origin}/auth/sign-in` })
-        await authBrowser.native({ url: `${backofficeOrigin}/auth/sign-in` })
+        if (backoffice) await authBrowser.native({ url: `${backofficeOrigin}/auth/sign-in` })
         await authBrowser.native({ url: `${origin}/auth/forgot-password`, control: true })
+        await authBrowser.native({ url: `${origin}/auth/sign-in`, control: true })
         await authBrowser.signIn({ origin, email: owner, password: 'release-test-password' })
-        await authBrowser.signIn({ origin: backofficeOrigin, email: owner, password: 'release-test-password' })
+        if (backoffice) await authBrowser.signIn({ origin: backofficeOrigin, email: owner, password: 'release-test-password' })
       }
       const signedIn = await post('sign-in/email', { email: owner, password: 'release-test-password' })
       assert.equal(signedIn.status, 200, `the owner signs in\n${output}`)
@@ -397,15 +399,18 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const addedText = await added.text()
       assert.equal(added.status, 200, `${addedText}\n${output}`)
       const addedId = (JSON.parse(addedText) as { user?: { id?: string } }).user?.id
-      if (full && !single && authBrowser) {
+      if (full && authBrowser) {
         const link = await linkMailed(person)
         await authBrowser.native({ url: link.href })
         link.pathname = '/auth/reset-password'
         await authBrowser.native({ url: link.href })
-        const invitation = await post('organization/invite-member', { email: `invited-${stamp}@example.com`, role: 'member' }, { cookie: cookieOf(signedIn) })
-        assert.equal(invitation.status, 200)
-        const { id } = await invitation.json() as { id: string }
-        await authBrowser.native({ url: `${origin}/auth/sign-up?redirect=${encodeURIComponent(`/auth/accept-invitation?id=${id}`)}` })
+        // The single-package consumer has verified open sign-up, so it has no password sign-up branch.
+        if (!open) {
+          const invitation = await post('organization/invite-member', { email: `invited-${stamp}@example.com`, role: 'member' }, { cookie: cookieOf(signedIn) })
+          assert.equal(invitation.status, 200)
+          const { id } = await invitation.json() as { id: string }
+          await authBrowser.native({ url: `${origin}/auth/sign-up?redirect=${encodeURIComponent(`/auth/accept-invitation?id=${id}`)}` })
+        }
         await authBrowser.native({ url: `${origin}/auth/forgot-password` })
       }
       const chosen = await post('reset-password', { token: (await linkMailed(person)).searchParams.get('token'), newPassword: 'release-test-password' })
