@@ -351,7 +351,7 @@ function Labelled({ id, label, children }: { id: string; label: string; children
 function Choice({ id, value, options, any, onChange }: { id: string; value: string | undefined; options: readonly { value: string; label: string }[]; any: string; onChange: (value: string | undefined) => void }) {
   return (
     <Select value={value ?? ''} onValueChange={(next: string | null) => onChange(next || undefined)}>
-      <SelectTrigger id={id} className="w-full data-[size=default]:min-h-11 sm:data-[size=default]:min-h-0">
+      <SelectTrigger id={id} className="w-full">
         <SelectValue>{options.find((one) => one.value === value)?.label ?? any}</SelectValue>
       </SelectTrigger>
       <SelectContent>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Upgrade notes
+
+- Admin screens now start with phone layouts, and long select and combobox values stay readable. Existing 0.3.0 projects need manual merges; follow the [mithaq-admin upgrade guide](packages/mithaq-admin/README.md#upgrading-030-projects-to-031).
+
 ## 0.3.0
 
 ### Upgrade notes

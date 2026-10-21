@@ -59,10 +59,9 @@ export function Pagination({ locale, onLimit, onPage, page, t }: PaginationProps
           <Label className="text-sm font-medium" htmlFor={perPageId}>
             {t('admin.perPage', 'Per page') ?? 'Per page'}
           </Label>
-          {/* Revert the phone minimum to the tenant theme's 2.25rem desktop minimum, rather than overriding it with zero. */}
           {/* The size is the trigger's own child: the item list mounts only while open, so a server render would show an empty trigger. */}
           <Select value={String(page.limit)} onValueChange={(next: string | null) => next && onLimit(Number(next))}>
-            <SelectTrigger id={perPageId} size="sm" className="h-8 w-[70px] data-[size=sm]:min-h-11 sm:data-[size=sm]:min-h-[revert-layer]">
+            <SelectTrigger id={perPageId} size="sm" className="h-8 w-[70px]">
               <SelectValue>{page.limit}</SelectValue>
             </SelectTrigger>
             <SelectContent side="top">

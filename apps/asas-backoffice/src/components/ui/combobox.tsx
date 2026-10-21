@@ -71,7 +71,7 @@ function ComboboxInput({
         render={(inputProps) => <InputGroupInput {...inputProps} className="min-w-0 min-h-11 sm:min-h-0 text-ellipsis" title={inputProps.title ?? String((inputProps as React.ComponentProps<"input">).value ?? "")} disabled={disabled} />}
         {...props}
       />
-      <InputGroupAddon align="inline-end" className="py-0 sm:py-2">
+      <InputGroupAddon align="inline-end">
         {showTrigger && (
           <InputGroupButton
             size="icon-xs"

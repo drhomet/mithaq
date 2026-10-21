@@ -147,10 +147,8 @@ colors, fonts, radii and `components.json` while merging these changes:
   navigation, regions and behavior. The backoffice link must retain its desktop
   padding and centre its phone icon, including in RTL.
 
-For TB these paths are under `apps/asas-tanstack/` and `packages/mithaq/`.
-Its edited `components/mithaq/form-actions.tsx` and custom shell pieces need a
-merge, not a replacement. Apply the equivalent changes to each other host's own
-primitives; the tenant and backoffice starter designs are different.
+Apply the equivalent changes to each other host's own primitives; the tenant
+and backoffice starter designs are different.
 
 Run the project's checks after merging. Verify short and long values in both
 text directions, open option menus on a phone, and compare desktop and tablet
