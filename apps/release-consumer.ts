@@ -402,7 +402,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
         await authBrowser.native({ url: link.href })
         link.pathname = '/auth/reset-password'
         await authBrowser.native({ url: link.href })
-        const invitation = await post('organization/create-invitation', { email: `invited-${stamp}@example.com`, role: 'member' }, { cookie: cookieOf(signedIn) })
+        const invitation = await post('organization/invite-member', { email: `invited-${stamp}@example.com`, role: 'member' }, { cookie: cookieOf(signedIn) })
         assert.equal(invitation.status, 200)
         const { id } = await invitation.json() as { id: string }
         await authBrowser.native({ url: `${origin}/auth/sign-up?redirect=${encodeURIComponent(`/auth/accept-invitation?id=${id}`)}` })
