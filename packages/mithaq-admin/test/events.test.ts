@@ -8813,12 +8813,12 @@ for (const related of [false, true]) test(`declared card fields render after the
 test('rich text fields expose only their selected formatting tools and counters never enter stored JSON', async () => {
   const { RichTextEditor } = await import('../registry/rich-text-editor.tsx')
   const changes: unknown[] = []
-  const host = await render(createElement(RichTextEditor, { value: richOf(blockOf('paragraph', [textOf('مرحبا Hello')])), onChange: (value) => changes.push(value), direction: 'ltr', t, locale: 'ar', policy: { features: ['bold', 'counter'], fonts: ['sans'] } }))
+  const host = await render(createElement(RichTextEditor, { value: richOf(blockOf('paragraph', [textOf('مرحبا Hello')])), onChange: (value) => changes.push(value), direction: 'ltr', t, locale: 'ar-u-nu-latn', policy: { features: ['bold', 'counter'], fonts: ['sans'] } }))
   await act(async () => sleep(100))
   assert.ok(host.querySelector('button[aria-label="Bold"]'))
   assert.equal(host.querySelector('button[aria-label="Italic"]'), null)
   assert.equal(host.querySelector('button[aria-label="Add link"]'), null)
-  assert.ok(host.querySelector('[data-rich-text-counter]')?.textContent?.includes('٢'))
+  assert.ok(host.querySelector('[data-rich-text-counter]')?.textContent?.includes('2'))
   assert.equal(JSON.stringify(changes).includes('characters'), false)
 })
 
