@@ -47,7 +47,7 @@ const defaultCells: Cells = {
   checkbox: ({ kayan, field, value, t, locale }) => value === true
     ? (t(`${kayan.name}.${field.name}.true`) ?? t('admin.yes', locale === 'ar' ? 'نعم' : 'Yes') ?? (locale === 'ar' ? 'نعم' : 'Yes'))
     : (t(`${kayan.name}.${field.name}.false`) ?? t('admin.no', locale === 'ar' ? 'لا' : 'No') ?? (locale === 'ar' ? 'لا' : 'No')),
-  datetime: (props) => props.field.name === 'archivedAt' && !props.whole
+  datetime: (props) => props.field.name === 'archivedAt' && !props.whole && props.value !== undefined
     ? <Badge variant="secondary" className={props.value ? 'text-muted-foreground' : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'}>{props.value
       ? (props.t('admin.archived', props.locale === 'ar' ? 'مؤرشف' : 'Archived') ?? (props.locale === 'ar' ? 'مؤرشف' : 'Archived'))
       : (props.t('admin.active', props.locale === 'ar' ? 'نشط' : 'Active') ?? (props.locale === 'ar' ? 'نشط' : 'Active'))}</Badge>
@@ -71,5 +71,5 @@ const defaultCells: Cells = {
 export const cells: Cells = Object.fromEntries(Object.entries(defaultCells).map(([name, cell]) => [name, (props: import('mithaq-admin/control-props.ts').CellProps) => {
   const value = props.field.rules.localized === true && props.value && typeof props.value === 'object'
     ? (props.value as Record<string, unknown>)[props.locale] : props.value
-  return isEmptyValue(value) && !(name === 'datetime' && props.field.name === 'archivedAt' && !props.whole) ? emptyValue(props) : cell(props)
+  return isEmptyValue(value) && !(name === 'datetime' && props.field.name === 'archivedAt' && !props.whole && props.value !== undefined) ? emptyValue(props) : cell(props)
 }])) as Cells

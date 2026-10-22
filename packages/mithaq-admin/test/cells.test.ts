@@ -112,3 +112,12 @@ test('partial and older saved column choices request every effective visible cou
     else Reflect.deleteProperty(globalThis, 'localStorage')
   }
 })
+
+test('an absent archive timestamp stays empty while null and dates show their actual status', () => {
+  const props={kayan,field:{name:'archivedAt',kind:'datetime',rules:{}} as ClientField,locale:'en',t:(_key:string,fallback?:string)=>fallback}
+  const absent=renderToStaticMarkup(createElement(()=>cells.datetime({...props,value:undefined}) as ReactElement))
+  assert.match(absent,/class="sr-only">Empty</)
+  assert.equal(absent.includes('Active'),false)
+  assert.match(renderToStaticMarkup(createElement(()=>cells.datetime({...props,value:null}) as ReactElement)),/>Active</)
+  assert.match(renderToStaticMarkup(createElement(()=>cells.datetime({...props,value:new Date('2026-10-22T01:00:00Z')}) as ReactElement)),/>Archived</)
+})
