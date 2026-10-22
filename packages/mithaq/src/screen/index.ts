@@ -124,12 +124,12 @@ export type ScreenField<Ref extends string | Ui = string | Ui, Kind extends stri
 export type When = { readonly when?: Where }
 
 /** A field on one page: its name, or its name with what this page alone draws it with. */
-export type ScreenLeaf<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string> =
+export type ScreenLeaf<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string, Cell extends string | Ui = Ref> =
   | FieldName
   | ({
       readonly field: FieldName
       readonly component?: Ref
-      readonly cell?: Ref
+      readonly cell?: Cell
       readonly placeholder?: Localized<Locale>
       readonly description?: Localized<Locale>
       readonly readOnly?: boolean
@@ -199,7 +199,7 @@ export type ScreenNode<Locale extends string = string, Ref extends string | Ui =
 
 /** A list node's own keys: its columns, what it filters, searches and opens with, and its buttons. */
 export type ScreenList<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string> = {
-  readonly columns: readonly ScreenLeaf<Locale, Ref, FieldName>[]
+  readonly columns: readonly ScreenLeaf<Locale, Ref, FieldName, Ref | 'count'>[]
   readonly filters?: readonly FieldName[]
   /** The fields a search box runs over: a field of this kayan, or one hop to a text field of a kayan it points at, `userId.email`. */
   readonly search?: readonly (FieldName | `${FieldName}.${string}`)[]
@@ -301,7 +301,7 @@ export type ScreenKeys<Targets> = {
 
 /** Every reference a declaration may write on one screen of a build. */
 export type RefOf<Target, Kinds = {}> = Target extends { layouts: infer Layouts; components: infer Components }
-  ? ScreenRef<('count' | keyof Layouts | keyof Components | keyof typeof builtInScreenKinds | keyof typeof defaultKinds | OwnScreenNames<Kinds>) & string>
+  ? ScreenRef<(keyof Layouts | keyof Components | keyof typeof builtInScreenKinds | keyof typeof defaultKinds | OwnScreenNames<Kinds>) & string>
   : string | Ui
 
 type IconOf<Target> = Target extends { icons?: readonly (infer Name extends string)[] } ? Name : never

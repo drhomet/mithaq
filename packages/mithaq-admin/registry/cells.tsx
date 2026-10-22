@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import type { ClientField } from 'mithaq/admin'
 import { booleanWord } from 'mithaq-admin/copy.ts'
 import type { Cells } from 'mithaq-admin/components.tsx'
-import { emptyValue, formatDate, isEmptyValue, listed } from 'mithaq-admin/format.tsx'
+import { emptyValue, formatDate, isArchiveStamp, isEmptyValue, listed } from 'mithaq-admin/format.tsx'
 import { RelationshipCell } from 'mithaq-admin/relationship-cell.tsx'
 
 // ponytail: what this file exported before rich text became an add-on, kept for one version so a project's own file
@@ -46,7 +46,7 @@ const defaultCells: Cells = {
   // Exact text: a JS double would lose digits.
   decimal: ({ field, value, locale }) => worded(field, value, locale),
   checkbox: ({ kayan, field, value, t }) => booleanWord({ kayan, field, value: value === true, t }),
-  datetime: (props) => props.field.name === 'archivedAt' && !props.whole && props.value !== undefined
+  datetime: (props) => isArchiveStamp(props.field) && !props.whole && props.value !== undefined
     ? <Badge variant="secondary" className={props.value ? 'text-muted-foreground' : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'}>{props.value
       ? (props.t('admin.archived', 'Archived') ?? ('Archived'))
       : (props.t('admin.active', 'Active') ?? ('Active'))}</Badge>
@@ -70,5 +70,5 @@ const defaultCells: Cells = {
 export const cells: Cells = Object.fromEntries(Object.entries(defaultCells).map(([name, cell]) => [name, (props: import('mithaq-admin/control-props.ts').CellProps) => {
   const value = props.field.rules.localized === true && props.value && typeof props.value === 'object'
     ? (props.value as Record<string, unknown>)[props.locale] : props.value
-  return isEmptyValue(value) && !(name === 'datetime' && props.field.name === 'archivedAt' && !props.whole && props.value !== undefined) ? emptyValue(props) : cell(props)
+  return isEmptyValue(value) && !(name === 'datetime' && isArchiveStamp(props.field) && !props.whole && props.value !== undefined) ? emptyValue(props) : cell(props)
 }])) as Cells

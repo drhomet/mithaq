@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs'
-import { formatDate, noValue } from 'mithaq-admin/format.tsx'
+import { emptyValue, formatDate } from 'mithaq-admin/format.tsx'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { openRow } from 'mithaq-admin/list.tsx'
 import { ListMessage } from 'mithaq-admin/list-header.tsx'
@@ -280,8 +280,8 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
           >
             <p className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
               <bdi>{member.name}</bdi><bdi dir="ltr">{member.email}</bdi>
-              <span>{t('dashboard.membersJoined', 'Joined')}: {formatDate({ value: member.joined, locale, day: true }) ?? noValue}</span>
-              {holds(access, 'member.fields.lastSeenAt') ? <span>{t('member.lastSeenAt', 'Last seen')}: {formatDate({ value: member.lastSeen, locale, day: true }) ?? noValue}</span> : null}
+              <span>{t('dashboard.membersJoined', 'Joined')}: {formatDate({ value: member.joined, locale, day: true }) ?? emptyValue({ t, locale })}</span>
+              {holds(access, 'member.fields.lastSeenAt') ? <span>{t('member.lastSeenAt', 'Last seen')}: {formatDate({ value: member.lastSeen, locale, day: true }) ?? emptyValue({ t, locale })}</span> : null}
             </p>
             {roles.length === 0 ? <p className="text-muted-foreground">{t('dashboard.membersNoRoles', 'There is no role you may read to assign.')}</p> : null}
             {group(true, t('dashboard.membersFixed', 'Fixed roles'))}
@@ -307,20 +307,22 @@ function PersonCell({ row }: CellProps) {
 
 /** A member's roles, each by its label, as badges. */
 function RolesCell({ value }: CellProps) {
+  const { t, locale } = useLocale()
   const labels = Array.isArray(value) ? (value as string[]) : []
-  return labels.length ? <div className="flex flex-wrap gap-1">{labels.map((label) => <Badge key={label} variant="secondary">{label}</Badge>)}</div> : noValue
+  return labels.length ? <div className="flex flex-wrap gap-1">{labels.map((label) => <Badge key={label} variant="secondary">{label}</Badge>)}</div> : emptyValue({ t, locale })
 }
 
 /** A day, in UTC so the server's render and the browser's agree on it, and a dash where there is none. */
 function DayCell({ value }: CellProps) {
-  const { locale } = useLocale()
-  return (typeof value === 'string' && value && formatDate({ value, locale, day: true })) || noValue
+  const { locale, t } = useLocale()
+  return (typeof value === 'string' && value && formatDate({ value, locale, day: true })) || emptyValue({ t, locale })
 }
 
 /** One column of an invitation, greyed once it has run out. */
 function InviteCell({ value, row }: CellProps) {
+  const { t, locale } = useLocale()
   const text = typeof value === 'string' && value ? value : undefined
-  return <span className={row.expired ? 'text-muted-foreground' : undefined}>{text ?? noValue}</span>
+  return <span className={row.expired ? 'text-muted-foreground' : undefined}>{text ?? emptyValue({ t, locale })}</span>
 }
 
 /** When an invitation runs out, or that it has, greyed. */
@@ -329,7 +331,7 @@ function ExpiresCell({ value, row }: CellProps) {
   const day = typeof value === 'string' && value ? formatDate({ value, locale, day: true }) : undefined
   return row.expired ? (
     <span data-expired="" className="text-muted-foreground">{t('dashboard.inviteExpired', 'Expired')}{day ? ` · ${day}` : ''}</span>
-  ) : (day ?? noValue)
+  ) : (day ?? emptyValue({ t, locale }))
 }
 
 /** A column of one of the page's tables, drawn by one of the cells above or a shipped one, named in the viewer's locale. */

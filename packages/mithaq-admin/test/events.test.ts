@@ -9061,3 +9061,12 @@ test('autosaving while a field is hidden preserves its unsaved edit until it is 
   assert.deepEqual(writes.written[1], { id: 'a-row', notifications: true, summary: 'Unsaved note' })
   assert.equal(dirty.at(-1), false, 'the note becomes clean only after it is sent')
 })
+
+test('missing member roles and dates announce the empty marker', async () => {
+  const {host}=await membersPage({loaderData:{members:[{...omar,joined:undefined,lastSeen:undefined}],roles:[]},permissions:['member.find','memberRoles.find','member.fields.lastSeenAt']})
+  const row=host.querySelector('tbody tr[data-row="u2"]')!
+  for(const cell of [...row.querySelectorAll('td')].slice(1,4)){
+    assert.equal(cell.querySelector('[data-list-value] [aria-hidden="true"]')?.textContent,'—')
+    assert.equal(cell.querySelector('.sr-only')?.textContent,'Empty')
+  }
+})

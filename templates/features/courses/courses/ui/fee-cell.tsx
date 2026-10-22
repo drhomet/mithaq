@@ -3,13 +3,13 @@
 // the dot of "ر.س." on the wrong side.
 import type { CellProps } from 'mithaq/admin'
 import { useLocale } from 'mithaq/admin/react'
-import { noValue } from 'mithaq-admin/format.tsx'
+import { emptyValue } from 'mithaq-admin/format.tsx'
 
 const amount = (text: string) => <bdi dir="ltr">{text}</bdi>
 
 export function FeeCell({ value, row }: CellProps) {
-  const { locale } = useLocale()
-  if (typeof value !== 'number') return noValue
+  const { locale, t } = useLocale()
+  if (typeof value !== 'number') return emptyValue({ t, locale })
   try {
     if (typeof row.currency === 'string' && row.currency) return amount(new Intl.NumberFormat(locale, { style: 'currency', currency: row.currency }).format(value))
   } catch {

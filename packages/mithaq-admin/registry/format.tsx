@@ -1,14 +1,10 @@
+import type { ClientField } from 'mithaq/admin'
 import type { Translate } from 'mithaq-admin/copy.ts'
 
 /**
  * Several values as one phrase in the viewer's own language, by `Intl.ListFormat`. The type is `unit`, so English joins with commas alone and Arabic with its own conjunction.
  */
 export const listed = (values: readonly string[], locale: string) => new Intl.ListFormat(locale, { type: 'unit' }).format(values)
-
-/**
- * What a cell draws for a value nobody set: a dash hidden from screen readers, since a cell read as nothing says the same.
- */
-export const noValue = <span aria-hidden="true">—</span>
 
 /**
  * A sentence that counts, in the plural form the locale takes for that count: `key` plus `_one`, `_two`, `_few`, `_many` or `_other` as `Intl.PluralRules` names it, falling back to `_other`. `{count}` is the number in the locale's digits.
@@ -44,3 +40,6 @@ export const asMoment = (value: unknown) => {
 export const emptyValue = ({ t }: { t: Translate; locale: string }) => <><span aria-hidden="true">—</span><span className="sr-only">{t('admin.emptyValue', 'Empty') ?? ('Empty')}</span></>
 
 export const isEmptyValue = (value: unknown) => value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)
+
+/** The shipped archive convention, shared by list titles and value cells. */
+export const isArchiveStamp = (field: Pick<ClientField, 'name' | 'kind'>) => field.name === 'archivedAt' && field.kind === 'datetime'

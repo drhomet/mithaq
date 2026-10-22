@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { CellProps, FetchClient, Row } from 'mithaq/admin'
 import { ListContext, useClient, useLocale, useScreen } from 'mithaq/admin/react'
 import type { FoundPage } from 'mithaq-admin/control-props.ts'
-import { formatDate, noValue } from 'mithaq-admin/format.tsx'
+import { formatDate, emptyValue } from 'mithaq-admin/format.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 import { findByIds, nameOfRow, titleFieldOf } from 'mithaq-admin/relationship-control.tsx'
 
@@ -44,7 +44,7 @@ export function SessionCell({ field, value, row }: CellProps) {
   // Sorted, so the same rows in another order are the same query.
   const ids = [...new Set((use(ListContext)?.page.docs ?? [row]).flatMap((one: Row) => (typeof one[field.name] === 'string' ? [one[field.name] as string] : [])))].sort()
   const { data: sessions, isError } = useQuery({ queryKey: ['session-cell', ids], queryFn: () => sessionsOf({ client, ids, maxLimit }), staleTime: 30_000 })
-  if (typeof value !== 'string') return noValue
+  if (typeof value !== 'string') return emptyValue({ t, locale })
   const session = sessions?.get(value)
   const when = formatDate({ value: session?.startsAt, locale })
   const course = session?.course ? nameOfRow({ row: session.course as Row, title: titleFieldOf(courses), locale }) : undefined

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
 import type { RelationshipTitles } from 'mithaq-admin/control-props.ts'
 import { labelFor, type Copy } from 'mithaq-admin/copy.ts'
-import { emptyValue } from 'mithaq-admin/format.tsx'
+import { emptyValue, isArchiveStamp } from 'mithaq-admin/format.tsx'
 import { canSort } from 'mithaq-admin/list-query.ts'
 import { SelectAll, SelectRow } from 'mithaq-admin/list-selection.tsx'
 import { isUntitled } from 'mithaq-admin/row-title.tsx'
@@ -230,7 +230,7 @@ export function ListTable({
                     // The screen's own component draws first, so the map is asked only for what it does not.
                     const drawn = Ref && screen ? undefined : cellFor({ cells, field, column: cellOf.get(field.name) })
                     const Cell = drawn === cells.email && field === linked && opens ? cells.text : drawn
-                    const untitled = cellOf.get(field.name) !== 'count' && !(field.name === 'archivedAt' && field.kind === 'datetime') && field.name === kayan.useAsTitle && isUntitled({ kayan, row, locale })
+                    const untitled = cellOf.get(field.name) !== 'count' && !isArchiveStamp(field) && field.name === kayan.useAsTitle && isUntitled({ kayan, row, locale })
                     const cell = untitled ? (
                       <span className="text-muted-foreground">{emptyValue({ t, locale })}</span>
                     ) : Cell ? (

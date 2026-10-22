@@ -3495,3 +3495,18 @@ withScreen.defineKayan({
     { list: { columns: [{ field: 'parent', cell: 'count' }] } },
   ] } } } } },
 })
+
+withScreen.defineKayan({
+  name: 'badCountComponentProbe', fields: { ...defaultFields, title: { kind: 'text' } },
+  // @ts-expect-error count is a list cell, never a control component
+  targets: { portal: { pages: { list: { path: '/counts', page: { shell: 'shell', main: [
+    { list: { columns: [{ field: 'title', component: 'count' }] } },
+  ] } } } } },
+})
+withScreen.defineKayan({
+  name: 'badCountControlProbe', fields: { ...defaultFields, peers: { kind: 'relationship', relationTo: 'countCellProbe', hasMany: true } },
+  // @ts-expect-error count belongs only to a list column
+  targets: { portal: { pages: { list: { path: '/counts', page: { shell: 'shell', main: [
+    { field: 'peers', cell: 'count' },
+  ] } } } } },
+})

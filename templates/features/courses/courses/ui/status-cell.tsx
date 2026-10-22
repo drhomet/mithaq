@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { CellProps, Row } from 'mithaq/admin'
 import { ListContext, useClient, useLocale, useScreen } from 'mithaq/admin/react'
 import { Badge } from '@/components/ui/badge'
-import { noValue } from 'mithaq-admin/format.tsx'
+import { emptyValue } from 'mithaq-admin/format.tsx'
 import { coursesOf } from '../../enrollments/ui/session-cell.tsx'
 
 const pills = {
@@ -19,12 +19,12 @@ const words = { draft: 'Draft', published: 'Published', changed: 'Changed', arch
 
 export function StatusCell({ value, row }: CellProps) {
   const client = useClient()
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
   const { maxLimit } = useScreen()
   // Sorted, so the same rows in another order are the same query.
   const ids = [...new Set((use(ListContext)?.page.docs ?? [row]).flatMap((one: Row) => (one._status === 'draft' ? [String(one.id)] : [])))].sort()
   const { data: published, isError } = useQuery({ queryKey: ['status-cell', ids], queryFn: () => coursesOf({ client, ids, maxLimit }), enabled: ids.length > 0, staleTime: 30_000 })
-  if (value !== 'draft' && value !== 'published') return noValue
+  if (value !== 'draft' && value !== 'published') return emptyValue({ t, locale })
   if (row.archived === true) return <Badge data-status="archived" className={pills.archived}>{t('version.archived', words.archived)}</Badge>
   // Loading until the read answers, and a draft where it failed, which is what the row itself holds.
   if (value === 'draft' && !published && !isError) return t('admin.loading', 'Loading…')
