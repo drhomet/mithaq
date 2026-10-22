@@ -8985,3 +8985,14 @@ test('a form never sends a filled field after its parent condition hides it', as
   assert.equal(writes.written.length, 1)
   assert.deepEqual(writes.written[0], { notifications: false })
 })
+
+test('the starter role record delete and its confirmation use the solid destructive treatment', async () => {
+  const host = await render(createElement(DeleteRole, { operation: 'delete', run: async () => {}, busy: false }), { record: { id: 'r1', name: 'reviewer' }, client: (async () => ({ docs: [] })) as never })
+  const trigger = host.querySelector('[data-button="delete"]')!
+  assert.match(trigger.className, /bg-destructive(?:\s|$)/)
+  assert.match(trigger.className, /text-white/)
+  await act(async () => click(trigger))
+  const confirm = window.document.querySelector('[data-slot="alert-dialog-action"]')!
+  assert.match(confirm.className, /bg-destructive(?:\s|$)/)
+  assert.match(confirm.className, /text-white/)
+})

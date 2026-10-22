@@ -2,7 +2,7 @@
 
 ## 0.3.5
 
-- Whole-record delete actions and confirmations use solid red with readable text in light and dark themes. Record buttons can declare `destructive: true`; inline row and chip removes retain their colours.
+- Whole-record delete actions and confirmations, including the starter's custom role delete, use solid red with readable text in light and dark themes. Record buttons can declare `destructive: true`; inline row and chip removes retain their colours.
 - Required option fields start on their default or an empty placeholder and offer no Clear. Optional selects and comboboxes keep Clear.
 - Relationships offer `+` for actors allowed to create the related kayan, with `allowCreate: false` as a field opt-out. A screen's `quickCreate: { fields: [...] }` declares its short form, typed and checked against create fields; otherwise the full create form opens. Successful creates are selected; refusals stay inside the drawer and conditionally hidden fields stay out of requests. The starter's tags declare a quick form. Regenerate screens and merge held admin pieces as described in the [admin guide](packages/mithaq-admin/README.md#relationship-quick-create-and-required-choices). No migration is needed.
 

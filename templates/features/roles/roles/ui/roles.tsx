@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { holds, type ButtonProps, type CellProps, type Row } from 'mithaq/admin'
 import { useAccess } from 'mithaq/admin/react'
 import { RolesTable as SharedRolesTable } from 'mithaq-admin/roles.tsx'
+import { solidDestructive } from 'mithaq-admin/delete-button.tsx'
 import { memberCounts } from 'mithaq-admin/member-counts.ts'
 import { useClient, useLocale, useRecord, useScreen } from 'mithaq/admin/react'
 import { OWNER_ROLE } from '@asas/mithaq/roles/grants.ts'
@@ -90,7 +91,7 @@ export function DeleteRole({ run, busy }: ButtonProps) {
   }
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <Button type="button" variant="destructive" data-button="delete" disabled={busy} onClick={() => void ask()}>
+      <Button type="button" variant="destructive" className={`min-h-11 sm:min-h-0 ${solidDestructive}`} data-button="delete" disabled={busy} onClick={() => void ask()}>
         {t('admin.delete', 'Delete')}
       </Button>
       <AlertDialogContent>
@@ -113,10 +114,10 @@ export function DeleteRole({ run, busy }: ButtonProps) {
             ))}
           </ul>
         ) : null}
-        <AlertDialogFooter>
+        <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
           <AlertDialogCancel>{t('admin.cancel', 'Cancel')}</AlertDialogCancel>
           {holders.length ? null : (
-            <AlertDialogAction variant="destructive" disabled={busy} onClick={() => void run({})}>
+            <AlertDialogAction variant="destructive" className={solidDestructive} disabled={busy} onClick={() => void run({})}>
               {t('roles.delete.confirm', 'Delete for good')}
             </AlertDialogAction>
           )}
