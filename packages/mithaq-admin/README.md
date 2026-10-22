@@ -601,7 +601,7 @@ Only visible count columns ask normal `find` for `counts: ['scheduledSessions',
 columns and split linked IDs into chunks of at most 1,000. Counts include only
 rows the actor may read, within the current tenant reach, with the related
 read's field access and soft deletes applied. A missing read permission or
-unreadable linking field gives a dash. Custom record-dependent linking-field
+unreadable linking field gives a dash. Custom linking-field
 callbacks and custom related find pipelines also leave the count unavailable,
 because aggregation cannot prove their masks without reading whole records.
 No count request makes no related read. Counts use the store's aggregate when
@@ -615,6 +615,7 @@ Existing projects merge held `cells.tsx`, `format.tsx`, `relationship-cell.tsx`,
 `list-query.ts`, `copy.ts`, `node-buttons.tsx` and `members.tsx`. Add
 `admin.emptyValue`, `admin.openEmpty`, `admin.active` and `admin.archived` to
 the host copy beside `admin.yes` and `admin.no`, with translations for each
-locale. Ejected `cells.tsx` also needs the host's shadcn Badge.
+locale. Replace imports of the removed `noValue` with `emptyValue({ t, locale })`.
+Ejected `cells.tsx` also needs the host's shadcn Badge.
 Regenerate screens after declaring count columns. No database migration or
 vocabulary signature is needed for these presentation choices.

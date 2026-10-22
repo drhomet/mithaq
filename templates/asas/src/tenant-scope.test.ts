@@ -48,6 +48,7 @@ import {
   versionsTarget,
   withUploadReference,
   type Authorize,
+  type FieldAccess,
   type StandardSchemaV1,
   type Store,
   type RuntimeField,
@@ -147,7 +148,7 @@ const stubServer = () => ({
   handler: async () => new Response(null),
 })
 
-const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { authorize = defaultAuthorize, withLocal = false, publicFiles = false }: { authorize?: Authorize; withLocal?: boolean; publicFiles?: boolean } = {}) => {
+const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { authorize = defaultAuthorize, withLocal = false, publicFiles = false, linkRead }: { authorize?: Authorize; withLocal?: boolean; publicFiles?: boolean; linkRead?: FieldAccess } = {}) => {
   /** A step that writes the row `aimed` names through the raw store, beside the operation's own. */
   const aimAt = (write: 'insert' | 'update' | 'remove') =>
     async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
@@ -274,7 +275,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       ...defaultFields,
       firmId: tenant.field,
       title: { kind: 'text' },
-      memo: { kind: 'relationship', relationTo: 'memos' },
+      memo: { kind: 'relationship', relationTo: 'memos', ...(linkRead && { access: { read: linkRead } }) },
       memoSet: { kind: 'relationship', relationTo: 'memos', hasMany: true },
       tag: { kind: 'relationship', relationTo: 'tags' },
       cover: { kind: 'upload', relationTo: 'files' },
@@ -2453,4 +2454,24 @@ test('counts never expose hidden parent ids or fields removed by the final read 
   const page = await built.kayan.parents.operations.find({ counts: ['children'] })
   assert.equal(Object.hasOwn(page.docs[0]!, 'id'), false)
   assert.deepEqual(page.counts, {})
+})
+
+
+test('default-argument linking masks cannot expose counts across records or organizations', async () => {
+  const memory=memoryStore()
+  const built=languageOf(memory as never,{linkRead:({doc}={user:null})=>doc?.title!=='hidden'})
+  const one=await actorOf({active:'org1'}),two=await actorOf({active:'org2'})
+  for(const id of ['org1','org2'])await memory.insert({tx:undefined,kayan:'firms',data:{id,name:id}})
+  const parent=await built.kayan.memos.operations.create({title:'own parent'},{actor:one})
+  const foreign=await built.kayan.memos.operations.create({title:'foreign parent'},{actor:two})
+  const data={memo:parent.id,memoSet:[],tag:null,cover:null,reply:null}
+  await built.kayan.notes.operations.create({...data,title:'hidden'},{actor:one})
+  const other=await built.kayan.notes.operations.create({...data,memo:foreign.id,title:'foreign child'},{actor:two})
+  await memory.update({tx:undefined,kayan:'notes',id:other.id,data:{memo:parent.id}})
+  const children=await built.kayan.notes.operations.find({},{actor:one})
+  assert.equal(children.docs.length,1)
+  assert.equal(Object.hasOwn(children.docs[0]!,'memo'),false)
+  const page=await built.kayan.memos.operations.find({counts:['notes']},{actor:one})
+  assert.deepEqual(page.docs.map((row:{id:string})=>row.id),[parent.id])
+  assert.deepEqual(page.counts,{})
 })

@@ -580,7 +580,7 @@ export const readers = <Actor>({
   const readCount = async ({ request, where, sort }: { request: CountRead; where: Where | undefined; sort: { field: string; direction: 'asc' | 'desc' } }) => {
     const read = declaredFieldAccess(kayan.fields[request.link]?.access?.read)
     // Arbitrary record-dependent masks cannot be proved from a link-only projection; fail closed.
-    if (typeof read === 'function' && read.length && !rowsOfField(read)) {
+    if (typeof read === 'function' && !rowsOfField(read)) {
       throw denied({ message: 'A record-dependent linking-field mask cannot supply a projected count.', key: 'error.forbidden.field_read' })
     }
     if (store.count) {
