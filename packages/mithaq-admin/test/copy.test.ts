@@ -352,8 +352,8 @@ test('232a. ticking a row on a phone draws the bulk bar fixed to the bottom, the
   const notified = () => window.document.querySelector('#courses-updateMany-notifications')!
   assert.equal(notified().textContent, 'Leave as is', 'the box starts at leaving every row as it is')
   await act(async () => click(notified() as unknown as Element))
-  await act(async () => click([...window.document.querySelectorAll('[data-slot="select-item"]')].find((one) => one.textContent === 'No')! as unknown as Element))
-  assert.equal(notified().textContent, 'No', 'and says the value it will write')
+  await act(async () => click([...window.document.querySelectorAll('[data-slot="select-item"]')].find((one) => one.textContent === 'Disabled')! as unknown as Element))
+  assert.equal(notified().textContent, 'Disabled', "and says the field's declared word for the value it will write")
   await act(async () => fire(dialog.querySelector('form')! as unknown as Element, 'submit'))
   await act(async () => sleep(20))
   assert.deepEqual(calls, [{ where: { id: { in: ['c1', 'c2'] } }, data: { notifications: false } }], 'clearing it sends false, which an untouched box never did')
