@@ -6,7 +6,7 @@ import type { Translate } from 'mithaq-admin/copy.ts'
 export type FeatureProps = { policy: RichTextPolicy; locale: string; t: Translate }
 export type RichTextFeatureModule = { nodes?: readonly Klass<LexicalNode>[]; Plugin?: ComponentType<FeatureProps>; Buttons?: ComponentType<FeatureProps> }
 
-/** Each import is a separate chunk; an installed project feature costs nothing to a field that leaves it out. */
+/** Rich-text projects install all peers; feature code loads only for fields that select it. */
 export const loadRichTextFeatures = (policy: RichTextPolicy): Promise<RichTextFeatureModule[]> => Promise.all([
   ...(policy.features.includes('tables') ? [import('mithaq-admin/rich-text-tables.tsx')] : []),
   ...(policy.features.includes('code') ? [import('mithaq-admin/rich-text-code.tsx')] : []),

@@ -2,6 +2,8 @@
 
 ## 0.3.5
 
+- Preserve every 0.3.4 text-format bit in the default policy. Clean pasted formatting against the field policy before emitting JSON, including table dimensions, links, indentation and code metadata. Unset styles inherit CSS, inline nodes cannot override direction, and link popovers follow ancestor scrolling. Rich-text projects must install the full Lexical peer set; the 0.3.4 upgrade steps now name it explicitly.
+
 - Rich-text projects select installed features, and fields may narrow them. Type checking and generation refuse uninstalled names; server validation enforces each field's nodes, formats and fixed style choices.
 - Refreshed grouped toolbar, tooltips, link popover, wide-screen selection tools and form-sized headings. Added optional tables, code blocks with lazy highlighting, safe markdown shortcuts, display-only counters, token styling and per-block direction overrides. Existing Lexical JSON and mithaq UploadNode images remain readable.
 - `create-mithaq --rich-text=tables,code,styling,markdown,counter` writes the selected tools into project config. Default rich-text projects keep their current tools and the new look. Regenerate screens on upgrade; merge any held rich-text copies and install the new optional Lexical peers. No database migration is needed. MIT notices for shadcn-editor and Lexical now ship with the packages.

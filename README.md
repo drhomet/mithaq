@@ -158,6 +158,4 @@ Each guide is the `README.md` of the folder it describes.
 
 mithaq is pre-1.0. The template that `bun create mithaq` creates is the worked example, and every file there is commented.
 
-MIT licensed; see [LICENSE](https://github.com/drhomet/mithaq/blob/main/LICENSE). mithaq includes code adapted from Payload, openstatus's time picker, shadcn-editor and Lexical, all MIT licensed; their notices are in [LICENSES/payload.txt](https://github.com/drhomet/mithaq/blob/main/LICENSES/payload.txt) and [LICENSES/openstatus-time-picker.txt](https://github.com/drhomet/mithaq/blob/main/LICENSES/openstatus-time-picker.txt).
-
-Rich-text toolbar adaptations credit [shadcn-editor](https://github.com/htmujahid/shadcn-editor) and [Lexical](https://github.com/facebook/lexical). Their MIT notices ship in [LICENSES/shadcn-editor.txt](LICENSES/shadcn-editor.txt) and [LICENSES/lexical.txt](LICENSES/lexical.txt).
+MIT licensed; see [LICENSE](https://github.com/drhomet/mithaq/blob/main/LICENSE). Adapted code comes from Payload, openstatus's time picker, [shadcn-editor](https://github.com/htmujahid/shadcn-editor) and [Lexical](https://github.com/facebook/lexical). Their MIT notices ship in [LICENSES/payload.txt](LICENSES/payload.txt), [LICENSES/openstatus-time-picker.txt](LICENSES/openstatus-time-picker.txt), [LICENSES/shadcn-editor.txt](LICENSES/shadcn-editor.txt) and [LICENSES/lexical.txt](LICENSES/lexical.txt).

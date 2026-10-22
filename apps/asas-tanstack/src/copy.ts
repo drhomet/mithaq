@@ -190,6 +190,7 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     'richText.rtl': { en: 'Right to left', ar: 'من اليمين لليسار' },
     'richText.ltr': { en: 'Left to right', ar: 'من اليسار لليمين' },
     'richText.selectionToolbar': { en: 'Selection formatting', ar: 'تنسيق التحديد' },
+    'richText.choice.inherit': { en: 'Inherit', ar: 'موروث' },
     'richText.choice.default': { en: 'Default', ar: 'افتراضي' },
     'richText.choice.primary': { en: 'Primary', ar: 'أساسي' },
     'richText.choice.muted': { en: 'Muted', ar: 'خفيف' },

@@ -1107,3 +1107,32 @@ and the allowed fonts. Edit it for an existing project, then pass its config
 to `richText` alongside the project's nodes. A field can narrow the selection
 with `features: ['bold', 'italic', 'link']`; it cannot add an uninstalled tool.
 The repository's worked example enables the optional tools on course details.
+
+### Upgrading a 0.3.4 project
+
+Upgrade `mithaq` and `mithaq-admin` together to 0.3.5. Keep every Lexical package
+at 0.52.0. The `mithaq/rich-text` entry and editor require their whole peer set,
+even when the project leaves tables, code or markdown out. Feature selection
+controls allowed content and lazy browser imports, not npm installation. Peers
+remain optional for a project that does not use rich text at all.
+
+Install `@lexical/table@0.52.0` and `@lexical/code-core@0.52.0` in the language
+workspace. Install those two plus `@lexical/code-prism@0.52.0` and
+`@lexical/markdown@0.52.0` in every host that imports the editor. Retain the
+existing Lexical peers and the project's UploadNode and upload plugin.
+
+Create `src/mithaq/rich-text-features.ts` in the language workspace, as the
+starter now does, and pass its config beside `nodes` to `richText`. Spread
+`defaultRichTextFeatures` to keep every 0.3.4 text format, including subscript,
+superscript, highlight and case bits. Add optional tools by name. A field may
+narrow that list; the worked example narrows session notes to bold, italic and
+links while course details keep the full editor.
+
+From the asas workspace run `mithaq generate screens`, then
+`mithaq generate --check`. From the language and host workspaces run
+`mithaq upgrade --check`. Merge held rich-text files, or eject their new copies,
+including the new `rich-text-policy` item. A dependency upgrade does not replace
+held files. Merge the new `admin.richText` copy entries in each host's `copy.ts`, including the Inherit label, or add them to its own translation system.
+Existing Lexical JSON and database columns need no migration.
+The editor cleans pasted content before save; direct API writes still have to
+satisfy their field's selected policy.

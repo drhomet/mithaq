@@ -1059,8 +1059,8 @@ const text = richText({
 ```
 
 The default features are bold, italic, underline, strikethrough, inlineCode,
-headings, lists, checklist, quote, divider, link, alignment, indent, upload and
-direction. `upload` still requires the project's UploadNode and file plugin.
+subscript, superscript, highlight, lowercase, uppercase, capitalize, headings,
+lists, checklist, quote, divider, link, alignment, indent, upload and direction. `upload` still requires the project's UploadNode and file plugin.
 A field may narrow them with `{ kind: 'richText', features: ['bold', 'italic',
 'link'] }`. Omitting `features` uses the installed list. Both TypeScript and
 `generate --check` refuse a field that enables an uninstalled feature. The
@@ -1079,8 +1079,15 @@ or ltr overrides it, and auto clears the override. The editor writes null to the
 stays readable for round trips and the renderer ignores it. The editor never stores a word or character count. Markdown shortcuts
 follow the field's formatting choices and have no link transformer.
 
-Install Lexical's optional peers at 0.52.0 wherever used. The language needs
+Every rich-text project must install all its Lexical peers at 0.52.0, including
+the packages for tools it leaves out. They are optional peers of the core
+package only because a project without rich text needs none. The language needs
 `@lexical/table` and `@lexical/code-core`; the admin also needs
 `@lexical/code-prism` and `@lexical/markdown`. Optional editor code is imported
-only for fields that select it. A read view loads the optional nodes its stored
+only for fields that select it. Feature selection controls content and browser
+loading, not package installation. A read view loads the optional nodes its stored
 document uses, so narrowing a field cannot erase its older document.
+
+Before emitting a write, the editor removes unsupported paste formatting, clears
+free CSS and table dimensions, unwraps disallowed links and normalizes unknown
+code languages. The same field guard checks emitted JSON before save.

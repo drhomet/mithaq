@@ -1852,6 +1852,19 @@
           "target": "@components/mithaq/rich-text-floating-toolbar.tsx"
         }
       ]
+    },
+    {
+      "name": "mithaq-rich-text-policy",
+      "type": "registry:component",
+      "registryDependencies": [],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/rich-text-policy.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-policy.tsx"
+        }
+      ]
     }
   ]
 }

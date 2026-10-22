@@ -24,9 +24,9 @@ import type { Translate } from 'mithaq-admin/copy.ts'
 import { BlockDropdown, ClearFormatting, FormatButtons, HistoryButtons, ToolbarTip } from 'mithaq-admin/rich-text-format-buttons.tsx'
 import type { RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { getSelectedNode, newLink, useSelectionChange } from 'mithaq-admin/rich-text-selection.ts'
-import type { RichTextPolicy } from 'mithaq/rich-text'
+import { richTextBlockTypes, type RichTextPolicy } from 'mithaq/rich-text'
 import { directionChoice } from 'mithaq-admin/rich-text-choices.ts'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu'
 import type { RichTextDirection } from 'mithaq-admin/rich-text-value.ts'
 
 export function LinkButton({ t, setLinkEditMode }: { t: Translate; setLinkEditMode: (editing: boolean) => void }) {
@@ -169,11 +169,11 @@ function DirectionButton({ t }: { t: Translate }) {
   })
   return <DropdownMenu>
     <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-0" />} aria-label={`${t('admin.richText.direction', 'Block direction')}: ${t(`admin.richText.${current}`, current)}`}>{t('admin.richText.direction', 'Block direction')}: {t(`admin.richText.${current}`, current)}</DropdownMenuTrigger>
-    <DropdownMenuContent>{['auto', 'rtl', 'ltr'].map((value) => <DropdownMenuItem key={value} onClick={() => editor.update(() => {
+    <DropdownMenuContent><DropdownMenuRadioGroup value={current} onValueChange={(value) => editor.update(() => {
       const selection = $getSelection()
       if (!$isRangeSelection(selection)) return
       const blocks = new Set(selection.getNodes().map((node) => $isElementNode(node) && !node.isInline() ? node : $findMatchingParent(node, (one) => $isElementNode(one) && !one.isInline())))
-      for (const block of blocks) if ($isElementNode(block) && block.getType() !== 'root') { $setState(block, directionChoice, value === 'rtl' || value === 'ltr' ? value : 'auto'); block.setDirection(value === 'rtl' || value === 'ltr' ? value : null) }
-    })}>{t(`admin.richText.${value}`, value)}</DropdownMenuItem>)}</DropdownMenuContent>
+      for (const block of blocks) if ($isElementNode(block) && !block.isInline() && richTextBlockTypes.includes(block.getType())) { $setState(block, directionChoice, value === 'rtl' || value === 'ltr' ? value : 'auto'); block.setDirection(value === 'rtl' || value === 'ltr' ? value : null) }
+    })}>{['auto', 'rtl', 'ltr'].map((value) => <DropdownMenuRadioItem key={value} value={value}>{t(`admin.richText.${value}`, value)}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent>
   </DropdownMenu>
 }

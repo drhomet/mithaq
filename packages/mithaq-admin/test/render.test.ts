@@ -586,6 +586,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-rich-text-code',
       'mithaq-rich-text-tables',
       'mithaq-rich-text-floating-toolbar',
+      'mithaq-rich-text-policy',
 
     ],
     'the registry declares the items this file knows about',

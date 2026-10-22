@@ -169,7 +169,8 @@ export const sessions = defineKayan({
     },
     // Written by `archive` and `unarchive` alone, as a course's is, and `archiveMany` runs an archive per row.
     archived: { kind: 'checkbox', label: { en: 'Archived', ar: 'مؤرشفة' }, rules: { providedBy: { create: 'never', update: 'application' } } },
-    details: { kind: 'richText', label: { en: 'Details', ar: 'التفاصيل' } },
+    // Session notes need emphasis and links; course details keep the full editor.
+    details: { kind: 'richText', features: ['bold', 'italic', 'link'], label: { en: 'Details', ar: 'التفاصيل' } },
     /**
      * The enrollments that point at this session: the one kind that builds no column. `enrollments.session`
      * holds this row's id, so a read populates the array through the enrollments kayan's own access and

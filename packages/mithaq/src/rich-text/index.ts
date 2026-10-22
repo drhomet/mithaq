@@ -33,7 +33,6 @@ const readerOf = ({ field, nodes, policy }: { field: ResolvedField | undefined; 
   const read = field?.richText ?? richTextReader(nodes, field?.filesIn)
   if (read === storedRichText) return read
   return (value: unknown): RichTextRead => {
-    if (read === storedRichText) return read(value)
     const shape = richTextGuard(value)
     if (shape) return { refused: shape }
     const refused = richTextFeatureGuard({ node: (value as RichTextValue).root, policy: selected })

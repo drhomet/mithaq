@@ -11,7 +11,7 @@ import { $getRoot, $isElementNode, $getState, RootNode, HISTORY_MERGE_TAG, type 
 import { useDirection } from '@/components/ui/direction'
 import { cn } from '@/lib/utils'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { richTextBounds, defaultRichTextFonts, safeUrl, typesOf, type RichTextPolicy } from 'mithaq/rich-text'
+import { richTextBounds, richTextBlockTypes, defaultRichTextFonts, safeUrl, typesOf, type RichTextPolicy } from 'mithaq/rich-text'
 import { $dfs } from '@lexical/utils'
 import { directionChoice } from 'mithaq-admin/rich-text-choices.ts'
 import { FeatureNodes, useFeatureNodes, type RichTextFeatureModule } from 'mithaq-admin/rich-text-features.tsx'
@@ -28,8 +28,8 @@ export function DirectionPlugin() {
     const update = () => {
       const root = $getRoot()
       if (root.getDirection() !== null) root.setDirection(null)
-      for (const { node: block } of $dfs()) if ($isElementNode(block) && block !== root) {
-        const choice = $getState(block, directionChoice)
+      for (const { node: block } of $dfs()) if ($isElementNode(block)) {
+        const choice = !block.isInline() && richTextBlockTypes.includes(block.getType()) ? $getState(block, directionChoice) : 'auto'
         const next = choice === 'auto' ? null : choice
         if (block.getDirection() !== next) block.setDirection(next)
       }

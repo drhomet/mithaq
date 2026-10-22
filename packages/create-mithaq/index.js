@@ -103,16 +103,16 @@ export const addOns = {
   backoffice: { needs: [], files: ['apps/asas-backoffice'], without: [], packages: [], copy: [], tables: false },
 }
 
-/**
- * The add-ons `asked` names with every one they need, in the table's order, and the ones added for that. A name the
- * table does not hold is refused with the list, so a typo never makes a smaller project than asked for.
- */
 export const optionalRichTextFeatures = ['tables', 'code', 'styling', 'markdown', 'counter']
 export function resolveRichTextFeatures(asked = []) {
   if (asked.some((name) => !optionalRichTextFeatures.includes(name)) || new Set(asked).size !== asked.length) throw new Error(`--rich-text names distinct features: ${optionalRichTextFeatures.join(', ')}.`)
   return asked
 }
 
+/**
+ * The add-ons `asked` names with every one they need, in the table's order, and the ones added for that. A name the
+ * table does not hold is refused with the list, so a typo never makes a smaller project than asked for.
+ */
 export function resolveAddOns(asked) {
   const unknown = asked.filter((name) => !Object.hasOwn(addOns, name))
   if (unknown.length) throw new Error(`No add-on is named ${unknown.map((name) => `"${name}"`).join(', ')}. The add-ons are ${Object.keys(addOns).join(', ')}.`)

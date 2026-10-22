@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { mergeRegister } from '@lexical/utils'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { TablePlugin } from '@lexical/react/LexicalTablePlugin'
 import { INSERT_TABLE_COMMAND, TableNode, TableRowNode, TableCellNode, $insertTableRowAtSelection, $insertTableColumnAtSelection, $deleteTableRowAtSelection, $deleteTableColumnAtSelection, $getTableCellNodeFromLexicalNode, $isTableSelection } from '@lexical/table'
@@ -7,7 +9,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { FeatureProps } from 'mithaq-admin/rich-text-features.tsx'
 
 export const nodes = [TableNode, TableRowNode, TableCellNode]
-export function Plugin() { return <TablePlugin hasCellMerge={false} hasCellBackgroundColor={false} hasHorizontalScroll /> }
+export function Plugin() {
+  const [editor] = useLexicalComposerContext()
+  useEffect(() => mergeRegister(
+    editor.registerNodeTransform(TableNode, (node) => { if (node.getColWidths() !== undefined) node.setColWidths(undefined) }),
+    editor.registerNodeTransform(TableCellNode, (node) => {
+      if (node.getWidth() !== undefined) node.setWidth(undefined)
+      if (node.getBackgroundColor() !== null) node.setBackgroundColor(null)
+    }),
+    editor.registerNodeTransform(TableRowNode, (node) => { if (node.getHeight() !== undefined) node.setHeight(undefined) }),
+  ), [editor])
+  return <TablePlugin hasCellMerge={false} hasCellBackgroundColor={false} hasHorizontalScroll />
+}
 export function Buttons({ t }: FeatureProps) {
   const [editor] = useLexicalComposerContext()
   const change = (action: () => void) => editor.update(() => {

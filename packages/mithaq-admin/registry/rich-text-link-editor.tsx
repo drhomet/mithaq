@@ -22,6 +22,7 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
 }): JSX.Element {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const linkedElement = useRef<HTMLElement | null>(null)
   const [rect, setRect] = useState<DOMRect>()
   const [linkUrl, setLinkUrl] = useState('')
   const [editedLinkUrl, setEditedLinkUrl] = useState(newLink)
@@ -34,21 +35,22 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
     if ($isRangeSelection(selection)) {
       const node = getSelectedNode(selection)
       const linkParent = $findMatchingParent(node, $isLinkNode)
-      if (linkParent) setLinkUrl(linkParent.getURL())
-      else if ($isLinkNode(node)) setLinkUrl(node.getURL())
-      else setLinkUrl('')
-      if (isLinkEditMode) setEditedLinkUrl(linkUrl)
+      const link = linkParent ?? ($isLinkNode(node) ? node : null)
+      if (link) {
+        setLinkUrl(link.getURL())
+        linkedElement.current = editor.getElementByKey(link.getKey())
+      } else if (!isLinkEditMode) {
+        setLinkUrl('')
+        linkedElement.current = null
+      }
     }
-    const editorElem = editorRef.current
-    const nativeSelection = window.getSelection()
     const activeElement = document.activeElement
-    const rootElement = editor.getRootElement()
-    if (selection !== null && nativeSelection !== null && rootElement !== null && rootElement.contains(nativeSelection.anchorNode) && editor.isEditable()) {
-      const domRect: DOMRect | undefined = nativeSelection.focusNode?.parentElement?.getBoundingClientRect()
+    if (linkedElement.current?.isConnected && editor.isEditable()) {
+      const domRect = linkedElement.current.getBoundingClientRect()
       if (domRect) {
         setRect(domRect)
       }
-      setLastSelection(selection)
+      if (selection) setLastSelection(selection)
     } else if (!isLinkEditMode && (!activeElement || !activeElement.classList.contains('link-input'))) {
       setLastSelection(null)
       setIsLinkEditMode(false)
@@ -58,15 +60,14 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
   }, [anchorElem, editor, setIsLinkEditMode, isLinkEditMode, linkUrl])
 
   useEffect(() => {
-    const scrollerElem = anchorElem.parentElement
     const update = () => editor.getEditorState().read(() => void $updateLinkEditor())
     window.addEventListener('resize', update)
-    scrollerElem?.addEventListener('scroll', update)
+    window.addEventListener('scroll', update, true)
     return () => {
       window.removeEventListener('resize', update)
-      scrollerElem?.removeEventListener('scroll', update)
+      window.removeEventListener('scroll', update, true)
     }
-  }, [anchorElem.parentElement, editor, $updateLinkEditor])
+  }, [editor, $updateLinkEditor])
 
   useEffect(
     () =>
@@ -90,6 +91,7 @@ export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLi
   }, [isLinkEditMode, isLink])
 
   useEffect(() => setEdited(false), [isLinkEditMode])
+  useEffect(() => { if (isLinkEditMode) setEditedLinkUrl(linkUrl) }, [isLinkEditMode, linkUrl])
   // Every address written passes `safeUrl`, the check the server makes of a write.
   const allowed = safeUrl(editedLinkUrl) && editedLinkUrl.trim() !== newLink
   const handleLinkSubmission = () => {

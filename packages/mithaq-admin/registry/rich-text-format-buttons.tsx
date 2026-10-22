@@ -28,7 +28,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Toggle } from '@/components/ui/toggle'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import type { ReactElement } from 'react'
-import type { RichTextPolicy } from 'mithaq/rich-text'
+import { richTextChoiceFeatures, type RichTextPolicy } from 'mithaq/rich-text'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { pickLabel, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { colorChoice, sizeChoice, fontChoice } from 'mithaq-admin/rich-text-choices.ts'
@@ -123,7 +123,7 @@ export function FormatButtons({ t, policy }: { t: Translate; policy: RichTextPol
   })
   return (
     <ButtonGroup>
-      {formats.filter(({ format }) => policy.features.includes(format === 'code' ? 'inlineCode' : format)).map(({ format, Icon, label }) => {
+      {formats.filter(({ format }) => policy.features.includes(richTextChoiceFeatures[format]!)).map(({ format, Icon, label }) => {
         const name = label(t) ?? format
         return (
           <ToolbarTip key={format} name={name}><Toggle variant="outline" size="sm" className="min-h-11 sm:min-h-0 min-w-11 sm:min-w-0" title={name} aria-label={name} pressed={active.includes(format)} onPressedChange={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, format as TextFormatType)}>
@@ -154,9 +154,9 @@ export function ClearFormatting({ t }: { t: Translate }) {
           if (idx === nodes.length - 1) textNode = textNode.splitText(focus.offset)[0] || textNode
           const extractedTextNode = extractedNodes[0]
           if (nodes.length === 1 && $isTextNode(extractedTextNode)) textNode = extractedTextNode
-          $setState(textNode, colorChoice, 'default')
-          $setState(textNode, sizeChoice, 'normal')
-          $setState(textNode, fontChoice, 'sans')
+          $setState(textNode, colorChoice, '')
+          $setState(textNode, sizeChoice, '')
+          $setState(textNode, fontChoice, '')
           if (textNode.__style !== '') textNode.setStyle('')
           if (textNode.__format !== 0) {
             textNode.setFormat(0)

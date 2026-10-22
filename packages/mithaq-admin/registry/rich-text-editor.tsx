@@ -1,4 +1,4 @@
-import { use, useEffect, useState, type ReactElement } from 'react'
+import { use, useState, type ReactElement } from 'react'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
@@ -9,10 +9,10 @@ import { CheckListPlugin } from '@lexical/react/LexicalCheckListPlugin'
 import { HorizontalRulePlugin } from '@lexical/react/LexicalHorizontalRulePlugin'
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
-import { COMMAND_PRIORITY_CRITICAL, FORMAT_TEXT_COMMAND, type Klass, type LexicalNode } from 'lexical'
+import type { Klass, LexicalNode } from 'lexical'
 import type { ControlProps } from 'mithaq-admin/control-props.ts'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, safeUrl } from 'mithaq/rich-text'
+import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, richTextChoiceFeatures, richTextGuard, richTextFeatureGuard, safeUrl } from 'mithaq/rich-text'
 import { FloatingLinkEditorPlugin } from 'mithaq-admin/rich-text-link-plugin.tsx'
 import { RichTextContext, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { holdsPlaceholder } from 'mithaq-admin/rich-text-selection.ts'
@@ -21,16 +21,10 @@ import { ToolbarRow } from 'mithaq-admin/rich-text-toolbar.tsx'
 import { configOf, unreadable, valueOf, type RichTextDirection, type RichTextValue } from 'mithaq-admin/rich-text-value.ts'
 import { FloatingToolbar } from 'mithaq-admin/rich-text-floating-toolbar.tsx'
 import { FeatureNodes, useFeatureNodes, type RichTextFeatureModule } from 'mithaq-admin/rich-text-features.tsx'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { DirectionPlugin, Unreadable } from 'mithaq-admin/rich-text-viewer.tsx'
+import { PolicyPlugin } from 'mithaq-admin/rich-text-policy.tsx'
+import { Unreadable } from 'mithaq-admin/rich-text-viewer.tsx'
 
 const defaultPolicy: RichTextPolicy = { features: defaultRichTextFeatures, fonts: defaultRichTextFonts }
-
-function AllowedFormats({ policy }: { policy: RichTextPolicy }) {
-  const [editor] = useLexicalComposerContext()
-  useEffect(() => editor.registerCommand(FORMAT_TEXT_COMMAND, (format) => !policy.features.includes(format === 'code' ? 'inlineCode' : format as typeof policy.features[number]), COMMAND_PRIORITY_CRITICAL), [editor, policy])
-  return null
-}
 
 export function RichTextEditor(props: EditorProps & { policy?: RichTextPolicy }): ReactElement {
   const policy = props.policy ?? props.control?.field.richTextPolicy ?? defaultPolicy
@@ -62,6 +56,7 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   const provided = use(RichTextContext)
   const { Plugin } = provided
   const drawn = useFeatureNodes({ nodes: nodes ?? provided.nodes, modules })
+  const allowedPicks = (picks ?? provided.picks).filter((pick) => !richTextChoiceFeatures[pick.key] || policy.features.includes(richTextChoiceFeatures[pick.key]!))
   const [held] = useState(() => valueOf(value))
   const [problem] = useState(() => unreadable(held, drawn))
   // Built only over a value these nodes read, so a value nested past the bound never reaches `JSON.stringify` or Lexical.
@@ -72,10 +67,7 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   return (
     <div className="border-input bg-background overflow-clip rounded-lg border shadow-xs" dir={direction} data-rich-text={id}>
       <LexicalComposer initialConfig={initial}>
-        <ToolbarRow t={t} locale={locale} picks={(picks ?? provided.picks).filter((pick) => {
-          const needed = ({ h1: 'headings', h2: 'headings', h3: 'headings', number: 'lists', bullet: 'lists', check: 'checklist', quote: 'quote', horizontalRule: 'divider', image: 'upload' } as Record<string, string>)[pick.key]
-          return !needed || policy.features.includes(needed as typeof policy.features[number])
-        })} setLinkEditMode={setIsLinkEditMode} direction={direction} policy={policy} extras={modules.map(({ Buttons }, index) => Buttons ? <Buttons key={index} policy={policy} locale={locale} t={t} /> : null)} />
+        <ToolbarRow t={t} locale={locale} picks={allowedPicks} setLinkEditMode={setIsLinkEditMode} direction={direction} policy={policy} extras={modules.map(({ Buttons }, index) => Buttons ? <Buttons key={index} policy={policy} locale={locale} t={t} /> : null)} />
         <div className="relative" ref={setAnchor}>
           <RichTextPlugin
             contentEditable={
@@ -95,20 +87,21 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
           />
         </div>
         {/* A value holding an unconfirmed link is never handed on, so an autosave while the link editor is open sends no placeholder the server refuses. */}
-        <OnChangePlugin ignoreSelectionChange onChange={(state) => holdsPlaceholder(state) || onChange(state.toJSON() as unknown as RichTextValue)} />
+        <OnChangePlugin ignoreSelectionChange onChange={(state) => {
+          if (holdsPlaceholder(state)) return
+          // Lexical exports optional keys as undefined; the value crossing the server boundary is JSON.
+          const next = JSON.parse(JSON.stringify(state.toJSON())) as RichTextValue
+          if (!richTextGuard(next) && !richTextFeatureGuard({ node: next.root, policy })) onChange(next)
+        }} />
         <HistoryPlugin />
         <ListPlugin />
         <CheckListPlugin />
         {policy.features.includes('link') && <LinkPlugin validateUrl={safeUrl} />}
         <FloatingLinkEditorPlugin anchorElem={anchor} isLinkEditMode={isLinkEditMode} setIsLinkEditMode={setIsLinkEditMode} t={t} />
         <HorizontalRulePlugin />
-        <SlashMenu locale={locale} picks={(picks ?? provided.picks).filter((pick) => {
-          const needed = ({ h1: 'headings', h2: 'headings', h3: 'headings', number: 'lists', bullet: 'lists', check: 'checklist', quote: 'quote', horizontalRule: 'divider', image: 'upload' } as Record<string, string>)[pick.key]
-          return !needed || policy.features.includes(needed as typeof policy.features[number])
-        })} />
+        <SlashMenu locale={locale} picks={allowedPicks} />
         <FloatingToolbar policy={policy} locale={locale} t={t} setLinkEditMode={setIsLinkEditMode} />
-        <DirectionPlugin />
-        <AllowedFormats policy={policy} />
+        <PolicyPlugin policy={policy} />
         {modules.map(({ Plugin }, index) => Plugin ? <Plugin key={index} policy={policy} locale={locale} t={t} /> : null)}
         {Plugin && control ? <Plugin {...control} /> : null}
       </LexicalComposer>

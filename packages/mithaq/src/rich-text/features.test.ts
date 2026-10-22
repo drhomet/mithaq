@@ -81,3 +81,35 @@ test('a checklist is independently selectable and format numbers cannot wrap aro
   Object.assign(bad.root.children[0]!, { textFormat: 1.5 })
   assert.equal(schema().safeParse(bad).success, false)
 })
+
+test('0.3.4 text format bits survive editing and Payload conversion under the default policy', async () => {
+  const { readFileSync } = await import('node:fs')
+  const legacy = JSON.parse(readFileSync(new URL('./__fixtures__/legacy-formatting-034.json', import.meta.url), 'utf8'))
+  const check = richText({ nodes: defaultNodes }).kinds.richText.targets.zod()
+  for (const value of [legacy.editorState, legacy.payloadConverted]) {
+    assert.deepEqual(value.root.children.map((block: any) => block.children[0].format), [32, 64, 128, 256, 512, 1024, -1, 4096, 4294967297])
+    assert.equal(check.safeParse(value).success, true)
+  }
+})
+
+test('nested list items need lists, not the separate indentation feature', () => {
+  const list = { type: 'list', listType: 'bullet', tag: 'ul', children: [{ type: 'listitem', indent: 0, children: [text(), { type: 'list', listType: 'bullet', tag: 'ul', children: [{ type: 'listitem', indent: 1, children: [text()] }] }] }] }
+  assert.equal(richText({ nodes: defaultNodes, features: ['lists'] }).kinds.richText.targets.zod().safeParse({ root: { type: 'root', children: [list] } }).success, true)
+})
+
+test('code accepts no free theme string', () => {
+  const check = richText({ nodes: defaultNodes, features: ['code'] }).kinds.richText.targets.zod()
+  for (const theme of ['arbitrary-attribute', '', false]) assert.equal(check.safeParse({ root: { type: 'root', children: [{ type: 'code', language: 'javascript', theme, children: [text()] }] } }).success, false)
+})
+
+test('direction overrides belong to real blocks and never inline links', () => {
+  const check = richText({ nodes: defaultNodes, features: ['link', 'direction'] }).kinds.richText.targets.zod()
+  for (const extra of [{ $: { direction: 'rtl' } }, { direction: 'rtl' }]) {
+    assert.equal(check.safeParse(document({ type: 'link', url: 'https://example.com', children: [text()], ...extra })).success, false)
+  }
+})
+
+test('an unrestricted default format policy retains other integers accepted by 0.3.4', () => {
+  const check = richText({ nodes: defaultNodes }).kinds.richText.targets.zod()
+  for (const format of [-1, 4096, 4294967297]) assert.equal(check.safeParse(document(text(format))).success, true)
+})

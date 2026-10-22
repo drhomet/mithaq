@@ -525,3 +525,8 @@ pieces and their dependencies again, including rich-text-features, choices and
 the selected optional modules. Regenerate screens after upgrading so the field
 policy reaches the browser. The serialized document remains Lexical JSON.
 See [feature configuration](../mithaq/README.md#rich-text-features).
+
+Rich-text projects require all Lexical peers, including table, code-core,
+code-prism and markdown, even for a narrowed field. Feature modules remain
+lazy browser imports. The core package marks these peers optional only for
+projects that do not use rich text. See the [0.3.4 upgrade steps](../../templates/asas/README.md#upgrading-a-034-project).

@@ -125,6 +125,7 @@
     "@lexical/table": "0.52.0",
     "@lexical/code-core": "0.52.0",
     "@lexical/markdown": "0.52.0",
-    "@lexical/code-prism": "0.52.0"
+    "@lexical/code-prism": "0.52.0",
+    "@lexical/html": "0.52.0"
   }
 }
