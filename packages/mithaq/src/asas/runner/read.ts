@@ -581,6 +581,7 @@ export const readers = <Actor>({
     }
     if (!store.count) throw denied({ message: 'This store cannot supply relationship counts.', key: 'error.forbidden.field_read' })
     const totals = []
+    // ponytail: one count query per parent row, count column and ID chunk; add grouped count when round trips dominate.
     for (const values of request.queries) totals.push(await store.count({ kayan: kayan.name, args: { where: combineWhere(combineWhere(where, { [request.link]: { in: values } }), shown) }, tx: currentTx() }))
     request.result = totals
   }
