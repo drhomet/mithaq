@@ -4,6 +4,7 @@ import type { ClientField } from 'mithaq/admin'
 import { booleanWord } from 'mithaq-admin/copy.ts'
 import type { Cells } from 'mithaq-admin/components.tsx'
 import { emptyValue, formatDate, isArchiveStamp, isEmptyValue, listed } from 'mithaq-admin/format.tsx'
+import { missingRow } from 'mithaq-admin/control-props.ts'
 import { RelationshipCell } from 'mithaq-admin/relationship-cell.tsx'
 
 // ponytail: what this file exported before rich text became an add-on, kept for one version so a project's own file
@@ -31,7 +32,7 @@ const worded = (field: ClientField, value: unknown, locale: string) => {
 
 /** The shipped value cells and the opt-in count cell, held by `defaultComponents.cells`. */
 const defaultCells: Cells = {
-  count: ({ value, locale }) => typeof value === 'number' ? value.toLocaleString(locale) : '',
+  count: ({ value, locale, t }) => typeof value === 'number' ? value.toLocaleString(locale) : missingRow({ t, gone: false }),
   text: ({ field, value, locale }) => worded(field, value, locale),
   email: ({ value }) =>
     value ? (
@@ -70,5 +71,5 @@ const defaultCells: Cells = {
 export const cells: Cells = Object.fromEntries(Object.entries(defaultCells).map(([name, cell]) => [name, (props: import('mithaq-admin/control-props.ts').CellProps) => {
   const value = props.field.rules.localized === true && props.value && typeof props.value === 'object'
     ? (props.value as Record<string, unknown>)[props.locale] : props.value
-  return isEmptyValue(value) && !(name === 'datetime' && isArchiveStamp(props.field) && !props.whole && props.value !== undefined) ? emptyValue(props) : cell(props)
+  return name !== 'count' && isEmptyValue(value) && !(name === 'datetime' && isArchiveStamp(props.field) && !props.whole && props.value !== undefined) ? emptyValue(props) : cell(props)
 }])) as Cells

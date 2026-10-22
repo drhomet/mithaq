@@ -17,7 +17,7 @@ const draw = (kind: keyof typeof all, value: unknown, locale: string) => renderT
 }) as ReactElement))
 
 test('empty cells of every shipped kind show one dash with localized accessible words', () => {
-  for (const locale of ['en', 'ar']) for (const kind of Object.keys(all) as (keyof typeof all)[]) {
+  for (const locale of ['en', 'ar']) for (const kind of Object.keys(all).filter((kind) => kind !== 'count') as (keyof typeof all)[]) {
     for (const value of [null, undefined, '', []]) {
       const html = draw(kind, value, locale)
       assert.match(html, /aria-hidden="true">—<\/span>/, `${kind}: ${String(value)}`)
@@ -138,4 +138,12 @@ test('bulk checkbox words follow the same host and field copy as list cells', as
     assert.ok(html.includes(word))
     assert.equal(html.includes('>Yes<'),false)
   }
+})
+
+
+test('unavailable counts use the host not-available word while zero stays a number', () => {
+  for(const [locale,word] of [['en','Not available'],['ar','غير متاح']]) {
+    for(const value of [undefined,null]) assert.equal(draw('count',value,locale),word)
+  }
+  assert.equal(draw('count',0,'en'),'0')
 })

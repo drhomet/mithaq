@@ -601,7 +601,7 @@ Only visible count columns ask normal `find` for `counts: ['scheduledSessions',
 columns and split linked IDs into chunks of at most 1,000. Counts include only
 rows the actor may read, within the current tenant reach, with the related
 read's field access and soft deletes applied. A missing read permission or
-unreadable linking field gives a dash. Custom linking-field
+unreadable linking field shows Not available. Custom linking-field
 callbacks and custom related find pipelines also leave the count unavailable,
 because aggregation cannot prove their masks without reading whole records.
 No count request makes no related read. Counts require the store's `count`
