@@ -1206,6 +1206,15 @@ test('218d. the members page is the list table: Members · N, a person with thei
   assert.equal(hidden.host.querySelector('[data-row-menu]'), null, 'and a viewer who may change nothing gets no row menu')
 })
 
+test('many-organization members keep password recovery while account creation stays absent', async () => {
+  const { host, menu } = await membersPage({ loaderData: { members: [layla], roles: [teacher], invites: [] }, permissions: ['member.find', 'member.create', 'invitation.create'] })
+  assert.equal(host.querySelector('[data-add-person]'), null, 'a founder adds people by invitation alone')
+  assert.ok(host.querySelector('[data-invite]'), 'invitations remain available')
+  assert.ok(host.querySelector('[data-row-menu="u1"]'), 'an authorized issuer retains the member action menu')
+  assert.ok((await menu('u1')).includes('password-link'), 'existing eligible accounts still have recovery')
+  assert.ok(host.querySelector('[data-password-link-sheet]'), 'the issue dialog remains available')
+})
+
 test('229c. invitations: a tab counting them, Email, Role, Sent by and Expires, one run out greyed, and a row menu that copies, sends again and cancels, each said in a green toast; the invite dialog refuses an empty or malformed address and empties on close', async (t) => {
   await toasted()
   let answer: [number, unknown] = [400, { code: 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION', message: 'User is already a member of this organization' }]

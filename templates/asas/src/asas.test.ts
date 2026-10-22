@@ -6,10 +6,11 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { tmpdir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 import crypto from 'node:crypto'
-import { syncBuiltinESMExports } from 'node:module'
+import { createRequire, syncBuiltinESMExports } from 'node:module'
 import { after, before, mock, test } from 'node:test'
 import { setTimeout } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { format } from 'node:util'
 import { ORPCError } from '@orpc/server'
 import { SignJWT, jwtVerify } from 'jose'
 import { z } from 'zod'
@@ -1222,7 +1223,7 @@ test('0m. with one organization an administrator adds a person: account, members
   assert.match(mail.linkTo('new-pupil-0m@example.com')!, /^http:\/\/localhost:5173\/auth\/set-password\?token=/, 'on the page that chooses a first password')
   assert.equal((await askedOf(school, '/reset-password', { token, newPassword: 'the-pupil-chose-this' })).status, 200, 'which chooses the password')
   assert.equal((await askedOf(school, '/sign-in/email', { email: 'new-pupil-0m@example.com', password: 'the-pupil-chose-this' })).status, 200, 'and the person signs in')
-  assert.equal((await membership('new-pupil-0m@example.com'))!.email_verified, true, 'proved by the link')
+  assert.equal((await membership('new-pupil-0m@example.com'))!.email_verified, false, 'an administrator link never proves the address')
 
   // An account written as an open sign-up with no proof would leave it, past the invitation-only gate.
   const context = await school.$context
@@ -1353,13 +1354,13 @@ test('0r. sending an invitation again asks invitation.create in the active organ
   assert.equal(await counted(), before, 'and a refused invitation spends none of the organization\'s day')
 })
 
-test('0p. with many organizations both password-link routes require a session', async () => {
+test('0p. with many organizations account creation is absent and password-link issuance requires a session', async () => {
   const many = modeServer({ ...manySettings, mailer: keptMail().mailer })
-  assert.equal((await askedOf(many, '/organization/add-person', { name: 'Nobody', email: 'nobody-0p@example.com' })).status, 401)
+  assert.equal((await askedOf(many, '/organization/add-person', { name: 'Nobody', email: 'nobody-0p@example.com' })).status, 404)
   assert.equal((await askedOf(many, '/organization/send-password-link', { userId: 'nobody' })).status, 401)
 })
 
-test('0v. organization issuers mail replaceable links with Copy fallback and refuse foreign accounts, platform staff and callers without the key', async (t) => {
+test('0v. organization issuers throttle email links with Copy fallback and refuse foreign accounts, platform staff and callers without the key', async (t) => {
   const mail = keptMail()
   const school = modeServer({ ...schoolSettings, mailer: mail.mailer })
   const gated = betterAuthStrategy({ server: school, collection: 'user', assigned: accessResolve as never, onError: console.error })
@@ -1388,8 +1389,13 @@ test('0v. organization issuers mail replaceable links with Copy fallback and ref
   assert.match(mail.linkTo('pupil-0s@example.com')!, /^http:\/\/localhost:5173\/auth\/set-password\?token=/, 'the member is mailed a link to choose their password')
   assert.equal((await askedOf(school, '/sign-in/email', { email: 'pupil-0s@example.com', password: modePassword })).status, 200, 'which changes nothing until they open it')
   const mailed = await mailCount(mail)
-  assert.equal((await send(pupil)).status, 200, 'an operator may replace a link')
-  assert.equal(await mailCount(mail), mailed + 1, 'email delivery sends the replacement')
+  const repeated = await send(pupil)
+  assert.equal(repeated.status, 200, 'repeated requests retain Copy')
+  assert.equal(await mailCount(mail), mailed, 'a member receives at most one email in five minutes')
+  assert.equal(new URL(((await repeated.json()) as { link: string }).link).searchParams.get('token'), token, 'throttling preserves the usable link')
+  await db.execute(`update verification set created_at = now() - interval '6 minutes' where value = '${pupil}' and identifier like 'reset-password:%'`)
+  assert.equal((await send(pupil)).status, 200)
+  assert.equal(await mailCount(mail), mailed + 1, 'delivery resumes after five minutes')
   assert.equal((await askedOf(school, '/reset-password', { token: (await tokenMailed(mail, 'pupil-0s@example.com'))!, newPassword: 'the-pupil-chose-this' })).status, 200, 'the current link chooses the password')
 
   const stranger = await account({ email: 'stranger-0s@example.com', member: false })
@@ -19055,15 +19061,37 @@ test('sidebar metadata survives projection and hiding a list keeps its route and
   assert.throws(() => build({ group: { name: '', label: { en: 'Settings', ar: 'الإعدادات' } } }), /group needs a name/)
 })
 
-test('password links: administrator delivery issues a 24 hour link in a many-organization project without a mailer', async (t) => {
-  const one = modeServer({ ...authSettings, passwordDelivery: 'admin', verifyEmail: false, mailer: undefined } as Partial<AuthSettings>)
-  const signed = await one.api.signUpEmail({ body: { name: 'Link owner', email: 'links-owner@example.com', password: modePassword }, returnHeaders: true })
+test('password links: a verified self-registered founder cannot create another address through an administrator link', async () => {
+  const mail = keptMail()
+  const many = modeServer({ ...manySettings, passwordDelivery: 'admin', mailer: mail.mailer })
+  const headers = await proved({ one: many, mail, email: 'links-founder@example.com' })
+  const organization = (await many.api.createOrganization({ body: { name: 'Founder', slug: 'links-founder' }, headers }))!.id
+  await many.api.setActiveOrganization({ body: { organizationId: organization }, headers })
+  const founder = betterAuthStrategy({ server: many, collection: 'user', assigned: accessResolve as never, onError: console.error })
+  const refused = await founder.handler(new Request('http://test/api/auth/user/organization/add-person', { method: 'POST', headers: { cookie: headers.get('cookie')!, 'content-type': 'application/json', origin: tenantOrigin }, body: JSON.stringify({ name: 'Victim', email: 'links-victim@example.com' }) }))
+  assert.equal(refused.status, 404, 'a self-registered founder cannot create another address through an administrator link')
+  const reclaimed = await proved({ one: many, mail, email: 'links-victim@example.com' })
+  assert.equal((await many.api.getSession({ headers: reclaimed }))?.user.emailVerified, true, 'the real owner can still prove their own address')
+})
+
+test('password links: administrator delivery issues a 24 hour link without proving a mailbox', async (t) => {
+  const many = modeServer({ ...authSettings, passwordDelivery: 'admin', verifyEmail: false, mailer: undefined })
+  const one = modeServer({ ...authSettings, organizations: 'one', passwordDelivery: 'admin', verifyEmail: false, mailer: undefined })
+  const logged: string[] = []
+  const bearers: string[] = []
+  const capture = (...args: unknown[]) => logged.push(format(...args))
+  for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) t.mock.method(console, method, capture)
+  for (const instance of [one, many]) {
+    const logger = (await instance.$context).logger
+    for (const method of ['info', 'warn', 'error', 'debug', 'success'] as const) t.mock.method(logger, method, capture)
+  }
+  const signed = await many.api.signUpEmail({ body: { name: 'Link owner', email: 'links-owner@example.com', password: modePassword }, returnHeaders: true })
   const headers = new Headers({ cookie: signed.headers.get('set-cookie') ?? '' })
-  const organization = (await one.api.createOrganization({ body: { name: 'Links', slug: 'password-links' }, headers }))!.id
+  const organization = (await many.api.createOrganization({ body: { name: 'Links', slug: 'password-links' }, headers }))!.id
   await one.api.setActiveOrganization({ body: { organizationId: organization }, headers })
   const gated = betterAuthStrategy({ server: one, collection: 'user', assigned: accessResolve as never, onError: console.error })
   const added = await gated.handler(new Request('http://test/api/auth/user/organization/add-person', { method: 'POST', headers: { cookie: headers.get('cookie')!, 'content-type': 'application/json', origin: tenantOrigin }, body: JSON.stringify({ name: 'New staff', email: 'links-staff@example.com' }) }))
-  assert.equal(added.status, 200, 'administrator delivery works with many organizations')
+  assert.equal(added.status, 200, 'administrator account creation works in one organization')
   const body = await added.json() as { link: string; expiresAt: string; user: { id: string } }
   assert.ok(typeof body.link === 'string', 'only the requesting administrator receives the bearer')
   assert.ok(Math.abs(Date.parse(body.expiresAt) - Date.now() - 86_400_000) < 10_000, 'expires in 24 hours')
@@ -19073,7 +19101,7 @@ test('password links: administrator delivery issues a 24 hour link in a many-org
     assert.equal(response.status, 200, 'authorized issuance succeeds')
     return await response.json() as { link: string; expiresAt: string }
   }
-  const tokenOf = (link: string) => new URL(link).searchParams.get('token')!
+  const tokenOf = (link: string) => { const token = new URL(link).searchParams.get('token')!; bearers.push(token); return token }
   const reset = (token: string, query = false) => post(`reset-password${query ? `?token=${encodeURIComponent(token)}` : ''}`, { token: query ? '' : token, newPassword: 'the-staff-chose-this' })
   await t.test('replacement, cancellation, single use, body and empty-body query tokens', async () => {
     let current = await issue()
@@ -19085,6 +19113,15 @@ test('password links: administrator delivery issues a 24 hour link in a many-org
     current = await issue()
     assert.equal((await post('organization/cancel-password-link', { userId: body.user.id })).status, 200)
     assert.equal((await reset(tokenOf(current.link))).status, 400, 'cancel spends the link')
+  })
+  await t.test('administrator links never prove an address, including operator recovery in many mode', async () => {
+    const signed = await one.api.signInEmail({ body: { email: 'links-staff@example.com', password: 'the-staff-chose-this' } })
+    assert.equal(signed.user.emailVerified, false, 'an organization link proves control of the link, never the mailbox')
+    const account = await many.api.signUpEmail({ body: { name: 'Unproved', email: 'links-unproved@example.com', password: modePassword } })
+    const issued = await many.api.operatorPasswordLink({ body: { email: account.user.email } as never })
+    assert.equal((await askedOf(many, '/reset-password', { token: tokenOf(issued.link), newPassword: 'the-staff-chose-this' })).status, 200)
+    const recovered = await many.api.signInEmail({ body: { email: account.user.email, password: 'the-staff-chose-this' } })
+    assert.equal(recovered.user.emailVerified, false, 'operator recovery does not prove a mailbox in many mode either')
   })
   await t.test('expired tokens and changed origin fail on the page and on redemption', async () => {
     let current = await issue()
@@ -19099,7 +19136,7 @@ test('password links: administrator delivery issues a 24 hour link in a many-org
     await (await one.$context).internalAdapter.createVerificationValue({ identifier: `password-origin:${body.user.id}`, value: organization, expiresAt: new Date('9999-12-31') })
   })
   await t.test('shared accounts and cross-organization targets fail, including sharing after issuance', async () => {
-    const other = (await one.api.createOrganization({ body: { name: 'Other links', slug: 'other-links' }, headers }))!.id
+    const other = (await many.api.createOrganization({ body: { name: 'Other links', slug: 'other-links' }, headers }))!.id
     await one.api.setActiveOrganization({ body: { organizationId: organization }, headers })
     const current = await issue()
     await one.api.addMember({ body: { userId: body.user.id, organizationId: other, role: 'member' } })
@@ -19109,6 +19146,44 @@ test('password links: administrator delivery issues a 24 hour link in a many-org
     await one.api.setActiveOrganization({ body: { organizationId: other }, headers })
     assert.equal((await post('organization/send-password-link', { userId: body.user.id })).status, 404, 'other organization sees the same refusal as an unknown member')
     await one.api.setActiveOrganization({ body: { organizationId: organization }, headers })
+  })
+  await t.test('mixed-case JSON locks redemption before a concurrent membership change', async () => {
+    const current = await issue()
+    const other = String((await modeRows("select id from organization where slug = 'other-links'"))[0]!.id)
+    let redemption: Promise<Response> | undefined
+    try {
+      await asas.targets.drizzle.transaction(async (transaction) => {
+        const tx = transaction as { execute(query: string): Promise<{ rows: Record<string, unknown>[] }> }
+        await tx.execute(`select id from "user" where id = '${body.user.id}' for update`)
+        const pid = Number((await tx.execute('select pg_backend_pid() as pid')).rows[0]!.pid)
+        redemption = gated.handler(new Request('http://test/api/auth/user/reset-password', { method: 'POST', headers: { 'content-type': 'APPLICATION/JSON', origin: tenantOrigin }, body: JSON.stringify({ token: tokenOf(current.link), newPassword: 'the-racing-password' }) }))
+        let blocked = false
+        for (let attempt = 0; attempt < 100; attempt++) {
+          blocked = (await modeRows(`select pid from pg_stat_activity where ${pid} = any(pg_blocking_pids(pid))`)).length > 0
+          if (blocked) break
+          await setTimeout(20)
+        }
+        assert.equal(blocked, true, 'redemption reached the account lock before the competing transaction commits')
+        await tx.execute(`insert into member (id, user_id, organization_id, role, created_at) values ('links-racing-membership', '${body.user.id}', '${other}', 'member', now())`)
+      })
+      assert.equal((await redemption!).status, 400, 'membership committed while redemption waited must be rechecked before writing a credential')
+      const unchanged = await one.api.signInEmail({ body: { email: 'links-staff@example.com', password: 'the-staff-chose-this' }, asResponse: true })
+      assert.equal(unchanged.status, 200, 'the refused reset keeps the original password')
+    } finally {
+      await redemption
+      await db.execute("delete from member where id = 'links-racing-membership'")
+    }
+  })
+  await t.test('a rolled-back promotion preserves its password link in the same transaction', async () => {
+    const { runWithAdapter } = await import(createRequire(new URL('../../mithaq/package.json', import.meta.url)).resolve('@better-auth/core/context'))
+    const current = await issue()
+    const member = (await modeRows(`select id from member where user_id = '${body.user.id}' and organization_id = '${organization}'`))[0]!
+    await assert.rejects(asas.targets.drizzle.transaction(async (tx) => {
+      const bound = betterAuth({ ...one.options, database: betterAuthDrizzle(tx as never, { provider: 'pg', schema: tables, transaction: false }) })
+      await runWithAdapter((await bound.$context).adapter, () => bound.api.updateMemberRole({ body: { memberId: String(member.id), role: 'admin' }, headers }))
+      throw new Error('Roll back the promotion')
+    }), /Roll back the promotion/)
+    assert.equal((await reset(tokenOf(current.link))).status, 200, 'cancelling a link rolls back with the promotion')
   })
   await t.test('only owners issue for admins; promotion cancels a delegate link even after demotion', async () => {
     await seedRoleRow(organization, 'links-delegate', ['screen.dashboard', 'member.create'])
@@ -19204,24 +19279,34 @@ test('password links: administrator delivery issues a 24 hour link in a many-org
     assert.notEqual(result.code, 0)
     assert.match(result.stderr, /No password link was issued/)
     assert.equal(result.stdout.includes('token='), false)
-    const issued = await new Promise<{ code: number; stdout: string }>((resolve) => {
-      execFile(process.execPath, [fileURLToPath(new URL('../../../packages/mithaq/src/asas/cli/mithaq.ts', import.meta.url)), 'password-link', 'links-staff@example.com'], { cwd: fileURLToPath(new URL('./', import.meta.url)).replace(/src\/$/, ''), env: process.env }, (error, stdout) => resolve({ code: Number(error?.code ?? 0), stdout }))
+    const issued = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
+      execFile(process.execPath, [fileURLToPath(new URL('../../../packages/mithaq/src/asas/cli/mithaq.ts', import.meta.url)), 'password-link', 'links-staff@example.com'], { cwd: fileURLToPath(new URL('./', import.meta.url)).replace(/src\/$/, ''), env: process.env }, (error, stdout, stderr) => resolve({ code: Number(error?.code ?? 0), stdout, stderr }))
     })
     assert.equal(issued.code, 0)
     const lines = issued.stdout.trim().split('\n')
     assert.equal(lines.length, 1, 'the operator gets the link exactly once')
-    const token = new URL(lines[0]!).searchParams.get('token')!
+    const token = tokenOf(lines[0]!)
+    assert.equal(issued.stderr.includes('token=') || issued.stderr.includes(token), false, 'CLI logs never repeat the requested output')
+    logged.push(result.stderr, issued.stderr)
     assert.equal((await one.api.setPasswordState({ query: { token }, asResponse: true })).status, 200, 'the CLI link is usable by the real password page')
 
   })
   await t.test('email failure retains the same administrator Copy fallback without logging a bearer', async () => {
-    const emailing = modeServer({ ...authSettings, passwordDelivery: 'email', verifyEmail: false, mailer: { send: async () => { throw new Error('Synthetic delivery failure') } } })
+    await post('organization/cancel-password-link', { userId: body.user.id })
+    const emailing = modeServer({ ...authSettings, passwordDelivery: 'email', verifyEmail: false, mailer: { send: async (mail) => { throw new Error(mail.text) } } })
+    for (const method of ['info', 'warn', 'error', 'debug', 'success'] as const) t.mock.method((await emailing.$context).logger, method, capture)
     const service = betterAuthStrategy({ server: emailing, collection: 'user', assigned: accessResolve as never, onError: () => {} })
     const response = await service.handler(new Request('http://test/api/auth/user/organization/send-password-link', { method: 'POST', headers: { cookie: headers.get('cookie')!, 'content-type': 'application/json', origin: tenantOrigin }, body: JSON.stringify({ userId: body.user.id }) }))
     assert.equal(response.status, 200, 'the operator retains Copy when Resend refuses')
     const fallback = await response.json() as { link: string; emailFailed: boolean }
     assert.equal(fallback.emailFailed, true)
     assert.equal((await reset(tokenOf(fallback.link))).status, 200, 'the fallback is the same usable one-time link')
+  })
+  await t.test('console and Better Auth logs contain no bearer across issue, redeem, failure and CLI', () => {
+    const output = logged.join('\n')
+    assert.ok(logged.length > 0, 'the capture observes real audit output')
+    assert.equal(/token=|reset-password:/.test(output), false, 'logs never carry a token URL or verification identifier')
+    assert.equal(bearers.some((token) => output.includes(token)), false, 'logs never carry a bare token')
   })
   await t.test('forgot-password answers identically for known and unknown accounts without tokens', async () => {
     const known = await askedOf(one, '/request-password-reset', { email: 'links-staff@example.com' })

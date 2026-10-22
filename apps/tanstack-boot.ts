@@ -1185,8 +1185,8 @@ test('49. a screen is entered only with its key: the registrar enters the dashbo
   assert.equal(await sentTo('/dashboard/members', cookie), null, 'the members page is served to the tenant administrator, who holds every key')
   assert.ok((await screenHtml('/dashboard/members')).includes('data-members'), 'and draws it')
   assert.ok(screened['/dashboard/members']!.includes('>Last seen<'), 'with when each member was last seen, to the administrator')
-  // Administrator delivery provisions new staff in the verified active organization in either mode.
-  assert.ok(screened['/dashboard/members']!.includes('data-add-person') && screened['/dashboard/members']!.includes('data-invite-menu'), 'many organizations offer Add person and keep invitations for existing accounts')
+  // A self-registered founder must never create another address through an administrator link.
+  assert.ok(!screened['/dashboard/members']!.includes('data-add-person') && screened['/dashboard/members']!.includes('data-invite='), 'many organizations add people through invitations alone')
   const members = (await (await fetch(`${origin}/api/auth/user/organization/list-members`, { headers: { cookie } })).json()) as { members: { userId: string; user: { email: string } }[] }
   const drawn = screened['/dashboard/members']!
   /** The members' table alone, the first of the page's two. */

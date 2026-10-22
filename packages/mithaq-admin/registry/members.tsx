@@ -399,7 +399,8 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
   const cancels = holds(access, 'invitation.cancel')
   const invites = loaderData?.invites !== undefined
   // With one organization an administrator adds people directly, and sends one a new password link the same way.
-  const adds = holds(access, 'member.create')
+  const links = holds(access, 'member.create')
+  const adds = organizations === 'one' && links
   const seesLastSeen = holds(access, 'member.fields.lastSeenAt')
   const [inviting, setInviting] = useState(false)
   const [email, setEmail] = useState('')
@@ -637,7 +638,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                       actions={(row) => {
                         const member = members.find((one) => one.userId === row.id)
                         if (!member) return null
-                        const linkable = adds && member.email !== me
+                        const linkable = links && member.email !== me
                         const takes = removable(member)
                         return linkable || takes ? (
                           <RowActions id={member.userId} label={rowActionsLabel(member.name)}>
@@ -755,7 +756,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                 </form>
               </dialog>
             ) : null}
-            {adds ? (
+            {links ? (
               <dialog
                 ref={handedSheet}
                 data-password-link-sheet=""

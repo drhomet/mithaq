@@ -4,7 +4,7 @@ import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import { logMailer } from '../../mail/index.ts'
 import { organizationName } from './organizations.ts'
-import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, organizationNameProblem, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
+import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, organizationNameProblem, settingsProblems, serverFor, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
 test('trustedIpHeaders splits TRUSTED_IP_HEADER into a header list, and is undefined when unset', () => {
   assert.deepEqual(trustedIpHeaders('cf-connecting-ip'), ['cf-connecting-ip'])
@@ -150,7 +150,8 @@ test('off a local host, or in production, the auth setup refuses to start withou
     'production on localhost': { NODE_ENV: 'production', BETTER_AUTH_URL: 'http://localhost:5173', BACKOFFICE_URL: 'http://localhost:5174', BETTER_AUTH_SECRET: 'a-deploy-secret' },
   }
   for (const [deploy, env] of Object.entries(deploys)) {
-    await assert.rejects(importedUnder(env), /needs a mailer in production[\s\S]*RESEND_API_KEY/, `${deploy}: refused without a mailer`)
+    const bare = await importedUnder(env)
+    assert.throws(() => bare.serverFor(bare.authSettings)({} as never, { referenced: async () => 0 }), /needs a mailer in production[\s\S]*RESEND_API_KEY/, `${deploy}: boot refuses without a mailer`)
     const imported = await importedUnder({ ...env, RESEND_API_KEY: 're_never_sent', MAIL_FROM: 'mail@example.com' })
     assert.equal(imported.options.rateLimit.enabled, true, `${deploy}: and with one the provider rate limits`)
   }
@@ -401,14 +402,16 @@ test('a mailer is never waited on: a reset is answered as fast for an address wi
 })
 
 test('email password delivery refuses boot without its configured Resend mailer', () => {
-  assert.throws(() => authOptions({}, { ...authSettings, passwordDelivery: 'email', mailer: undefined }), /RESEND_API_KEY.*MAIL_FROM/)
+  const settings = { ...authSettings, passwordDelivery: 'email' as const, mailer: undefined }
+  assert.doesNotThrow(() => authOptions({}, settings), 'declarations and generation need no delivery credentials')
+  assert.throws(() => serverFor(settings)({} as never, { referenced: async () => 0 }), /RESEND_API_KEY.*MAIL_FROM/)
 })
 
 
-test('the project configured for email refuses import when RESEND_API_KEY is missing', async () => {
+test('the project configured for email imports without delivery credentials', async () => {
   const { spawnSync } = await import('node:child_process')
   const loader = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'; registerHooks({ load(url, context, next) { const loaded = next(url, context); return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace("passwordDelivery: 'admin' | 'email' = 'admin'", "passwordDelivery: 'admin' | 'email' = 'email'") } : loaded } })`)}`
   const result = spawnSync(process.execPath, ['--import', loader, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./index.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, RESEND_API_KEY: '', MAIL_FROM: '' } })
-  assert.notEqual(result.status, 0)
-  assert.match(result.stderr, /passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM/)
+  assert.equal(result.status, 0, 'loading declarations for generation does not boot delivery')
+  assert.equal(result.stderr.includes('RESEND_API_KEY'), false)
 })
