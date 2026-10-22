@@ -1,5 +1,5 @@
 import { rowsOf } from '../mithaq/rows.ts'
-import { accessReport, actor, actorPermissions, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
+import { accessReport, actor, actorPermissions, authActor, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
 import { betterAuthStrategy } from '../auth/better-auth/index.ts'
 import { holdsVerificationSteps, isLocalAuthTarget, localAuthStrategy, type LocalAuthActor, type LocalAuthOptions, type ProtectedLocalField } from '../auth/local/index.ts'
 import { bulkSeals, outputOf, sealOf, storeSeals, type AuditHandler, type DerivedShapes, type OperationEffect, type OperationScreen, type WriteStep, type RuntimeWriteTools as WriteTools } from './runner/steps.ts'
@@ -19,7 +19,7 @@ import type { BuiltTables } from '../drizzle/index.ts'
 import { screensOf, type ScreenClient } from '../screen/index.ts'
 import { messagesOf, type MessageRegistry, type MessagesResolver } from '../mithaq/messages.ts'
 import { resolve } from '../mithaq/resolve.ts'
-import { defaultMentionSources } from '../rich-text/features.ts'
+import { defaultMentionSources } from '../rich-text/policy.ts'
 import { commentService } from '../rich-text/comments-server.ts'
 import { recordStorage, resolveStorage, storageRoutes } from '../storage/storage.ts'
 
@@ -703,16 +703,24 @@ export const buildAsas = <
   }
   const registered = new Map(declared.map((one) => [one.name, one]))
   const resolvedByName = new Map(resolved.map((one) => [one.name, one]))
-  for (const one of resolved) for (const field of Object.values(one.fields)) {
-    const policy = field.richTextPolicy
-    if (policy && (field.features ?? policy.features).includes('mentions')) for (const source of policy.mentionSources ?? defaultMentionSources) if (!resolvedByName.has(source.kayan)) throw new Error(`Mention source "${source.kayan}" names no kayan of this build.`)
-    if (!policy || !(field.features ?? policy.features).includes('comments')) continue
-    if (!one.tenant) throw new Error('Comments require a tenant-owned record.')
-    if (service.context !== undefined && !language.kinds[field.kind]?.richTextComments?.context) throw new Error('Comments require their request context function when the service declares context.')
-    const threads = policy.comments && resolvedByName.get(policy.comments.threads)
-    if (!threads?.tenant || threads.store !== one.store || Object.keys(threads.operations).length || !service.audit) throw new Error('Comments require a private tenant threads kayan in the record store and an audit sink.')
-    for (const key of ['recordKayan', 'recordId', 'field', 'quote', 'resolved', 'comments', 'createdAt', 'updatedAt']) if (!threads.fields[key]) throw new Error(`Comment threads declare no "${key}" field.`)
-    field.commentThreads = threads
+  for (const one of resolved) {
+    for (const field of Object.values(one.fields)) {
+      const policy = field.richTextPolicy
+      if (policy && (field.features ?? policy.features).includes('mentions')) {
+        for (const source of policy.mentionSources ?? defaultMentionSources) {
+          if (!resolvedByName.has(source.kayan)) throw new Error(`Mention source "${source.kayan}" names no kayan of this build.`)
+        }
+      }
+      if (!policy || !(field.features ?? policy.features).includes('comments')) continue
+      if (!one.tenant) throw new Error('Comments require a tenant-owned record.')
+      if (service.context !== undefined && !language.kinds[field.kind]?.richTextComments?.context) throw new Error('Comments require their request context function when the service declares context.')
+      const threads = policy.comments && resolvedByName.get(policy.comments.threads)
+      if (!threads?.tenant || threads.store !== one.store || Object.keys(threads.operations).length || !service.audit) throw new Error('Comments require a private tenant threads kayan in the record store and an audit sink.')
+      for (const key of ['recordKayan', 'recordId', 'field', 'quote', 'resolved', 'comments', 'createdAt', 'updatedAt']) {
+        if (!threads.fields[key]) throw new Error(`Comment threads declare no "${key}" field.`)
+      }
+      field.commentThreads = threads
+    }
   }
   // Wired here, not inside one provider, so no provider is a second source of keys for
   // another. A target that throws takes the whole answer: half an answer is an unresolved grant.
@@ -1087,6 +1095,16 @@ export const buildAsas = <
   const comments = resolved.some((one) => Object.values(one.fields).some((field) => field.commentThreads)) ? commentService({
     kayans: resolvedByName,
     context: language.kinds.richText?.richTextComments?.context,
+    trustedOrigin: async ({ request, actor }) => {
+      const origin = request.headers.get('origin')
+      if (!origin || origin === 'null') return false
+      try { if (new URL(origin).origin !== origin) return false } catch { return false }
+      const strategy = strategies.find((one) => one.name === authActor(actor)?.collection) ?? strategies[0]
+      const provider = strategy as AuthStrategy & { server?: { $context?: Promise<{ isTrustedOrigin: (origin: string) => boolean }> } }
+      const context = await provider?.server?.$context
+      // Better Auth knows the public URL behind a TLS proxy; local strategies use the served origin.
+      return context ? context.isTrustedOrigin(origin) : origin === new URL(request.url).origin
+    },
     storeOf: (one) => buildTargets[one.store] as Store,
     read: async ({ kayan, id, actor }) => {
       const read = (built[kayan]?.operations as Record<string, ((input: unknown, options: unknown) => Promise<unknown>) | undefined>)?.findByID

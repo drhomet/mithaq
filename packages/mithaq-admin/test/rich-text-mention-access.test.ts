@@ -17,19 +17,24 @@ test('a numeric record id is read in the source kayan id kind', async () => {
   assert.equal(await mentionHref({ mention: { kayan: 'tags', id: '12', name: 'Twelve' }, screen, client: client as any }), '/dashboard/tags/12')
 })
 
-test('organization members link through their permitted member page and a fresh scoped provider read', async () => {
+test('organization member links require a fresh managed read and their member page permission', async () => {
   const screen = { path: '/dashboard', kayan: {}, pages: { member: { path: '/members/:id', permission: 'member.find' } } } as any
   const mention = { kayan: 'member', id: 'dummy-member', name: 'Original name' }
   const sources = [{ kayan: 'member', title: 'userId.name', members: 'user', page: 'member' }]
-  const request = async (url: string) => {
-    const query = new URL(url, 'http://fixture.test').searchParams
-    assert.equal(query.get('filterField'), 'id')
-    assert.equal(query.get('filterValue'), 'dummy-member')
-    assert.equal(query.has('organizationId'), false)
-    return Response.json({ members: [{ id: 'dummy-member', userId: 'dummy/user' }] })
+  let managed = 0
+  const client = async (args: unknown) => {
+    managed++
+    assert.deepEqual(args, { kayan: 'member', operation: 'findByID', input: { id: 'dummy-member', depth: 1 } })
+    return { id: 'dummy-member', userId: { id: 'dummy/user', name: 'Readable name' } }
   }
-  const options = { mention, screen, sources, request, client: (async () => { throw new Error('Provider-owned member') }) as any }
-  assert.equal(await mentionHref({ ...options, access: { permissions: ['member.find'] } }), '/dashboard/members/dummy%2Fuser')
-  assert.equal(await mentionHref({ ...options, access: { permissions: [] } }), undefined)
-  assert.equal(await mentionHref({ ...options, access: { permissions: ['member.find'] }, request: async () => new Response(null, { status: 403 }) }), undefined)
+  const fetchBefore = globalThis.fetch
+  globalThis.fetch = (async () => Response.json({ members: [{ id: 'dummy-member', userId: 'dummy/user' }] })) as typeof fetch
+  const options = { mention, screen, sources, client: client as any, access: { permissions: ['member.find'] } }
+  try {
+    assert.equal(await mentionHref(options), '/dashboard/members/dummy%2Fuser')
+    assert.equal(managed, 1)
+    assert.equal(await mentionHref({ ...options, access: { permissions: [] } }), undefined)
+    assert.equal(await mentionHref({ ...options, client: (async () => { throw new Error('Managed row denied') }) as any }), undefined)
+    assert.equal(await mentionHref({ ...options, client: (async () => ({ id: 'dummy-member' })) as any }), undefined)
+  } finally { globalThis.fetch = fetchBefore }
 })

@@ -569,20 +569,15 @@ const validateTenantRelationships = async <Actor>(
 const keyIn = (kayan: ResolvedKayan) => (value: unknown) =>
   kayan.fields.id?.kind === 'uuid' && typeof value === 'string' ? value.toLowerCase() : value
 
-export const assertReferences = async ({ kayan, store, data, tenant, access, offered, tx, id = data.id }: {
+/** The sealed store checks the final value once, including values a step writes outside its own record. */
+export const assertCommentMarks = async ({ kayan, store, data, tenant, tx, id = data.id }: {
   kayan: ResolvedKayan
   store: Pick<Store, 'find'>
   data: Record<string, unknown>
-  id?: unknown
-  /** The organization the written row belongs to, or the active one where the row belongs to none. */
   tenant: unknown
-  /** What else the target's row must meet: its read access for this actor. */
-  access?: (target: ResolvedKayan) => Promise<Where | undefined>
-  /** What one field's `filterOptions` offers this actor, which a managed write is held to. */
-  offered?: (field: ResolvedField) => Promise<Where | undefined>
   tx?: unknown
+  id?: unknown
 }) => {
-  const own = kayan.tenant
   for (const field of Object.values(kayan.fields)) {
     const value = data[field.name]
     if (value == null || !field.richTextPolicy) continue
@@ -596,6 +591,21 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
     ] } } })
     if (found.docs.length !== ids.length) throw invalid({ message: 'A comment mark must name a thread of this tenant, record and field.', key: 'error.invalid.comment_thread' })
   }
+}
+
+export const assertReferences = async ({ kayan, store, data, tenant, access, offered, tx }: {
+  kayan: ResolvedKayan
+  store: Pick<Store, 'find'>
+  data: Record<string, unknown>
+  /** The organization the written row belongs to, or the active one where the row belongs to none. */
+  tenant: unknown
+  /** What else the target's row must meet: its read access for this actor. */
+  access?: (target: ResolvedKayan) => Promise<Where | undefined>
+  /** What one field's `filterOptions` offers this actor, which a managed write is held to. */
+  offered?: (field: ResolvedField) => Promise<Where | undefined>
+  tx?: unknown
+}) => {
+  const own = kayan.tenant
   // Gathered per target, so two fields at one kayan and a whole `hasMany` set are one read; a
   // field whose options are its own is read apart.
   const targets = new Map<ResolvedKayan | ResolvedField, { target: ResolvedKayan; sets: { field: string; value: unknown }[] }>()
@@ -1082,6 +1092,8 @@ export const write = <Actor = unknown>({
             if (drafting && kept && incremented.length) throw invalid({ message: 'An increment writes a stored integer field, not a draft snapshot.', key: 'error.invalid.value', params: { kayan: name } })
             if (drafting && kept) {
               const draft = { ...base, ...values, id: targetId }
+              // Draft snapshots bypass the sealed row store, so check their final annotations here.
+              await assertCommentMarks({ kayan: kept, store, data: draft, tenant: tenantOf(actor), tx: heldTx, id: targetId })
               await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: draft, autosave: autosaving })
               return draft
             }

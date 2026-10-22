@@ -916,7 +916,8 @@ const storeOf = <
           }
           built[field.name] = column
         }
-        const indexed = columns.filter((field) => field.rules?.index)
+        // A plain compound index serves reads of its leading column too.
+        const indexed = columns.filter((field) => field.rules?.index && !kayan.indexes.some((index) => !index.unique && index.fields[0] === field.name))
         // A unique rule's own index over one column is that column's UNIQUE, the constraint a unique
         // field has always built, so a shared kayan's table is the one it was.
         const ownUnique = (index: CompoundIndex) => uniqueRuleIndexes.has(index) && index.fields.length === 1
@@ -927,7 +928,7 @@ const storeOf = <
         const compound = kayan.indexes.flatMap((index, at) => {
           if (ownUnique(index)) return []
           const { fields, unique, nullsNotDistinct } = index
-          const name = `${kayan.table}_${fields.map((field) => kayan.fields[field]!.column).join('_')}_${nullsNotDistinct ? 'unique' : 'idx'}`
+          const name = index.name ?? `${kayan.table}_${fields.map((field) => kayan.fields[field]!.column).join('_')}_${nullsNotDistinct ? 'unique' : 'idx'}`
           if (!isPlainIdentifier(name)) {
             throw new Error(
               `Kayan "${kayan.name}" indexes[${at}] is named ${JSON.stringify(name)}, which is longer than the 63 bytes Postgres keeps of a name, or holds a character other than a letter, a digit or an underscore. Give the kayan or its fields a shorter dbName.`,

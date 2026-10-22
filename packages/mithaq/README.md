@@ -421,7 +421,10 @@ indexes: ({ defaults }) => [
 ],
 ```
 
-An entry is `{ fields, unique?, nullsNotDistinct? }`. On a per-organization
+An entry is `{ fields, name?, unique?, nullsNotDistinct? }`. A plain SQL `name`
+of at most 63 bytes can shorten an index whose generated table-and-column name
+would be too long. A plain index over several columns also serves its leading
+column, so the store omits that column's redundant plain index. On a per-organization
 kayan a group `{ within: 'organization', unique: [...], index: [...] }` builds
 indexes led by the organization field. A `unique` field that no unique index
 covers is refused. The group, and what `unique` means per organization, are
@@ -1106,7 +1109,7 @@ follow the field's formatting choices and have no link transformer.
 Every rich-text project must install all its Lexical peers at 0.52.0, including
 the packages for tools it leaves out. They are optional peers of the core
 package only because a project without rich text needs none. The language needs
-`@lexical/table` and `@lexical/code-core`; the admin also needs
+`@lexical/table`, `@lexical/code-core`, `@lexical/mark` and `@lexical/hashtag`; the admin also needs
 `@lexical/code-prism` and `@lexical/markdown`. Optional editor code is imported
 only for fields that select it. Feature selection controls content and browser
 loading, not package installation. A read view loads the optional nodes its stored
@@ -1131,12 +1134,13 @@ and `comments` only when installed, with dynamic imports of their matching
 the browser graph entirely; a field can still narrow the project's selection.
 
 `mentionSources` declares the sources. Its default is `defaultMentionSources`,
-the organization's members through the project's Better Auth `user` provider.
-That provider's normal member-list permissions apply. The default member
-source names the screen's `member` page, checks its permission, and resolves
-the membership to its user through a fresh scoped provider read before linking. A different provider
-name can be passed as `members`. Other sources use their normal managed
-`find` operation with the reader's permissions, tenant and field masking.
+the organization's users through the managed `user` directory and its `name` title. Every
+source uses its normal managed `find`, filtered on the server to at most 20
+rows, with the reader's row and field permissions and tenant scope. A project
+must grant access to that source and its title; an unreadable source offers no
+entries. The default source names the screen's `member` page, checks its
+permission, and performs a fresh managed user read before linking. `members` identifies a membership source whose page uses its
+related user's id.
 
 ```ts
 richText({

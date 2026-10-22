@@ -2673,6 +2673,8 @@ test('10c. a kayan\'s indexes are built on its own table in its own schema, name
     [{ name: 'playbooks_is_archived_idx', unique: true }],
     'and an entry with nullsNotDistinct false stays a unique index',
   )
+  assert.equal(getTableConfig(indexed([{ fields: ['code', 'isArchived'], name: 'playbook_lookup' }]).playbooks as never).indexes[0]!.config.name, 'playbook_lookup')
+  for (const name of ['', 1, null, 'bad-name', 'x'.repeat(64)]) assert.throws(() => indexed([{ fields: ['code'], name }]), /plain SQL identifier/)
   assert.deepEqual(getTableConfig(indexed(undefined).playbooks as never).indexes, [], 'no key builds no index')
   assert.deepEqual(getTableConfig(indexed([]).playbooks as never).indexes, [], 'and nor does an empty list')
   // A unique field is a default index: on a shared kayan, the column's own UNIQUE it always was.
@@ -2746,7 +2748,7 @@ test('10c. a kayan\'s indexes are built on its own table in its own schema, name
     { dbName: long },
   )
   // A misspelt key would otherwise build an index that is not unique.
-  refused([{ fields: ['code'], uniqe: true }], 'Kayan "playbooks" indexes[0] writes "uniqe", and an index takes fields, unique and nullsNotDistinct alone.')
+  refused([{ fields: ['code'], uniqe: true }], 'Kayan "playbooks" indexes[0] writes "uniqe", and an index takes fields, name, unique and nullsNotDistinct alone.')
   // NULLS NOT DISTINCT only means something on a unique index.
   for (const entry of [{ fields: ['code'], nullsNotDistinct: true }, { fields: ['code'], unique: false, nullsNotDistinct: true }]) {
     refused([entry], 'Kayan "playbooks" indexes[0] writes nullsNotDistinct without unique: true, and only a unique index treats nulls as equal or distinct. Add unique: true, or drop nullsNotDistinct.')
@@ -19359,4 +19361,44 @@ test('password links: administrator delivery issues a 24 hour link without provi
     assert.equal(known.status, 200)
     assert.deepEqual([unknown.status, await unknown.json()], [known.status, await known.json()])
   })
+})
+
+
+test('the default mention directory filters and limits managed tenant reads without exposing masked names or email', async () => {
+  const { defaultMentionSources } = await import('../../../packages/mithaq/src/rich-text/index.ts')
+  const source = defaultMentionSources[0]!
+  const tenant = await roleTenant('rt2-directory-main')
+  const elsewhere = await roleTenant('rt2-directory-other')
+  const roleName = 'rt2-directory-reader'
+  const keys = ['member.find', 'member.fields.id', 'user.find', 'user.fields.id', 'user.fields.name']
+  await seedRoleRow(tenant.organization, roleName, keys)
+  await db.execute(`update member_roles set role = '${roleName}' where organization_id = '${tenant.organization}' and user_id = '${tenant.people.registrar.id}'`)
+  const store = asas.targets.drizzle as unknown as import('../../../packages/mithaq/src/mithaq/language.ts').Store
+  await store.transaction(async (tx) => {
+    for (let index = 0; index < 24; index++) {
+      const id = crypto.randomUUID(), now = new Date()
+      await store.insert({ tx, kayan: 'user', data: { id, name: `rt2-directory-main-member-${index}`, email: `${id}@example.test`, emailVerified: true, createdAt: now, updatedAt: now } })
+      await store.insert({ tx, kayan: 'member', data: { id: crypto.randomUUID(), userId: id, organizationId: tenant.organization, role: 'member', createdAt: now } })
+    }
+  })
+  const search = (query: string) => tenant.as('registrar', `${source.kayan}/find`, { limit: 20, depth: 1, where: { [source.title]: { like: query } } })
+  const found = await search('rt2-directory')
+  assert.equal(found.status, 200, JSON.stringify(found.body))
+  const docs = found.body.docs as Record<string, unknown>[]
+  assert.equal(docs.length, 20)
+  for (const row of docs) {
+    assert.deepEqual(Object.keys(row).sort(), ['id', 'name'], 'email and every unreadable field are masked')
+    assert.ok(String(row.name).startsWith('rt2-directory-main'))
+    assert.notEqual(row.id, elsewhere.people.student.id)
+  }
+  assert.equal(((await search('rt2-directory-main-member-7')).body.docs as unknown[]).length, 1, 'the server filters the name')
+  assert.deepEqual((await search('rt2-directory-other')).body.docs, [], 'another tenant never appears, even when searched by name')
+  const role = (await asas.kayan.roles.operations.find({ where: { name: { equals: roleName } } }, tenant.options)).docs[0]!
+  await asas.kayan.roles.operations.update({ id: role.id, permissions: keys.filter((key) => key !== 'user.fields.name') }, tenant.options)
+  assert.equal((await search('rt2-directory')).status, 403, 'member.find alone cannot expose a masked name through search')
+  const masked = await tenant.as('registrar', `${source.kayan}/find`, { limit: 20, depth: 1 })
+  assert.equal(masked.status, 200)
+  for (const row of masked.body.docs as Record<string, unknown>[]) assert.deepEqual(Object.keys(row), ['id'])
+  await asas.kayan.roles.operations.update({ id: role.id, permissions: keys.filter((key) => key !== 'user.find') }, tenant.options)
+  assert.equal((await search('rt2-directory')).status, 403, 'directory access itself is required')
 })

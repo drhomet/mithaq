@@ -21,5 +21,6 @@
   { "type": "rename", "kind": "foreign key", "from": ["public", "roles", "roles_tenant_id_organization_id_fkey"], "to": ["public", "roles", "roles_organization_id_organization_id_fkey"] },
   { "type": "rename", "kind": "foreign key", "from": ["public", "course_sessions", "course_sessions_tenant_id_organization_id_fkey"], "to": ["public", "course_sessions", "course_sessions_organization_id_organization_id_fkey"] },
   { "type": "rename", "kind": "foreign key", "from": ["public", "settings", "settings_tenant_id_organization_id_fkey"], "to": ["public", "settings", "settings_organization_id_organization_id_fkey"] },
-  { "type": "rename", "kind": "foreign key", "from": ["public", "tags", "tags_tenant_id_organization_id_fkey"], "to": ["public", "tags", "tags_organization_id_organization_id_fkey"] }
+  { "type": "rename", "kind": "foreign key", "from": ["public", "tags", "tags_tenant_id_organization_id_fkey"], "to": ["public", "tags", "tags_organization_id_organization_id_fkey"] },
+  { "type": "create", "kind": "index", "entity": ["public", "rich_text_threads", "rich_text_threads_record_field_created_idx"] }
 ]

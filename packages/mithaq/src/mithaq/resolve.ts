@@ -493,8 +493,10 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
         throw new Error(`${where} names no field, and an index is built over at least one. Write it as { fields: ['a', 'b'] }.`)
       }
       // A misspelt `unique` would otherwise build an index that is not.
-      const stray = Object.keys(index as object).find((key) => key !== 'fields' && key !== 'unique' && key !== 'nullsNotDistinct')
-      if (stray !== undefined) throw new Error(`${where} writes "${stray}", and an index takes fields, unique and nullsNotDistinct alone.`)
+      const stray = Object.keys(index as object).find((key) => key !== 'fields' && key !== 'unique' && key !== 'nullsNotDistinct' && key !== 'name')
+      if (stray !== undefined) throw new Error(`${where} writes "${stray}", and an index takes fields, name, unique and nullsNotDistinct alone.`)
+      const name = (index as { name?: unknown }).name
+      if (name !== undefined && (typeof name !== 'string' || !isPlainIdentifier(name))) throw new Error(`${where} needs a plain SQL identifier for its name, at most 63 bytes.`)
       if (unique !== undefined && typeof unique !== 'boolean') {
         throw new Error(`${where} writes unique as ${JSON.stringify(unique)}, and unique is true or false.`)
       }

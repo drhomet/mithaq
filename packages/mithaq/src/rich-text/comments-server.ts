@@ -4,7 +4,7 @@ import type { Store } from '../mithaq/language.ts'
 import type { FieldAccess, ResolvedKayan } from '../mithaq/types.ts'
 import { combineWhere, type Where } from '../mithaq/where.ts'
 import type { Authorize, ManagedAdmin } from '../asas/runner/write.ts'
-import type { RichTextCommentOptions } from './features.ts'
+import type { RichTextCommentOptions } from './policy.ts'
 import type { AuditHandler, Context } from '../asas/runner/steps.ts'
 import { running } from '../asas/runner/runtime.ts'
 import { AsasError, codes, denied, invalid, missing } from '../asas/runner/errors.ts'
@@ -62,6 +62,7 @@ export type CommentRuntime = {
   audit: AuditHandler
   maxBodyBytes: number
   onError: (error: unknown) => void
+  trustedOrigin: (args: { request: Request; actor: unknown }) => Promise<boolean>
   context?: RichTextCommentOptions['context']
 }
 
@@ -127,17 +128,17 @@ export const commentService = (runtime: CommentRuntime) => {
         const parts = url.pathname.slice('/api/rich-text/comments/'.length).split('/').map(decodeURIComponent)
         if (parts.length !== 3 || parts.some((part) => !part || part.length > 255)) throw bad('A comment names a record and field.')
         if (!['GET', 'POST'].includes(request.method)) return new Response(null, { status: 405 })
+        const actor = await who()
         let input: CommentInput | undefined
         if (request.method === 'POST') {
-          if (request.headers.get('origin') !== url.origin) throw denied({ message: 'The request origin is not this host.', key: 'error.forbidden.origin' })
+          if (!await runtime.trustedOrigin({ request, actor })) throw denied({ message: 'The request origin is not this host.', key: 'error.forbidden.origin' })
           const body = await boundedBody(request, runtime.maxBodyBytes)
           if (body instanceof Response) return body
           const value: unknown = JSON.parse(await body.text())
           if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some((key) => !['action', 'thread', 'comment', 'text', 'quote'].includes(key))) throw bad('Invalid comment input.')
           input = value as CommentInput
-          if (!['create', 'reply', 'edit', 'delete', 'resolve', 'reopen'].includes(input.action) || [input.thread, input.comment].some((id) => id !== undefined && (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))) throw bad('Invalid comment action or id.')
+          if (!['create', 'reply', 'edit', 'delete', 'resolve', 'reopen'].includes(input.action) || input.action !== 'create' && input.thread === undefined || [input.thread, input.comment].some((id) => id !== undefined && (typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))) throw bad('Invalid comment action or id.')
         }
-        const actor = await who()
         const extra = await runtime.context?.({ request, actor })
         const answer = await running.run({ user: actor, context: { source: 'local', ...extra, depth: 0, chain: [] } }, () => call({ kayan: parts[0]!, id: parts[1]!, field: parts[2]!, actor, input, page: Number(url.searchParams.get('page') ?? 1) }))
         return Response.json(answer, { headers: { 'Cache-Control': 'private, no-store' } })

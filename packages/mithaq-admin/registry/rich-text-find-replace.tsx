@@ -46,7 +46,7 @@ export function Plugin({ t, locale }: FeatureProps) {
   const close = () => { setOpen(false); editor.focus() }
   const label = (key: string, fallback: string) => t(`admin.richText.${key}`, fallback)
   return <section role="region" aria-label={label('findReplace', 'Find and replace')} className="grid gap-2 border-t p-3" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); close() }
-      if (event.key === 'Enter') { event.preventDefault(); move(event.shiftKey ? -1 : 1) } }}>
+      if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type === 'text') { event.preventDefault(); move(event.shiftKey ? -1 : 1) } }}>
     <label className="grid gap-1 text-sm">{label('find', 'Find')}<Input ref={input} value={query} onChange={(event) => setQuery(event.target.value)} dir="auto" className="min-h-11" /></label>
     <label className="grid gap-1 text-sm">{label('replaceWith', 'Replace with')}<Input value={replacement} onChange={(event) => setReplacement(event.target.value)} dir="auto" className="min-h-11" /></label>
     <div className="flex flex-wrap gap-2 text-sm">

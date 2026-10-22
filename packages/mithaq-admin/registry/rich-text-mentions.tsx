@@ -5,11 +5,11 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { LexicalTypeaheadMenuPlugin, MenuOption, useBasicTypeaheadTriggerMatch } from '@lexical/react/LexicalTypeaheadMenuPlugin'
 import { HashtagPlugin } from '@lexical/react/LexicalHashtagPlugin'
 import { HashtagNode } from '@lexical/hashtag'
-import { $applyNodeReplacement, $getRoot, $getSelection, $isRangeSelection, $setSelection, TextNode, type EditorConfig } from 'lexical'
+import { $applyNodeReplacement, $createTextNode, $getRoot, $getSelection, $isRangeSelection, $setSelection, TextNode, type EditorConfig } from 'lexical'
 import { ScreenContext } from 'mithaq/admin/react'
 import { defaultMentionSources } from 'mithaq/rich-text/client'
 import { MentionNode, type Mention } from 'mithaq/rich-text/mention'
-import { defaultMentionRequest, mentionHref } from 'mithaq-admin/rich-text-mention-access.ts'
+import { mentionHref } from 'mithaq-admin/rich-text-mention-access.ts'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import type { FeatureProps } from 'mithaq-admin/rich-text-features.tsx'
@@ -44,17 +44,9 @@ export function Plugin({ policy, locale, t }: FeatureProps) {
     setOptions([]); setFailed(false)
     const timer = setTimeout(async () => {
       const found = await Promise.allSettled(sources.map(async (source): Promise<Mention[]> => {
-        if (source.members) {
-          const rows: Mention[] = []
-          for (let offset = 0; ; offset += 100) {
-            const response = await fetch(`/api/auth/${encodeURIComponent(source.members)}/organization/list-members?limit=100&offset=${offset}&sortBy=id`)
-            if (!response.ok) throw new Error('Members unavailable')
-            const page = await response.json() as { members: { id: string; user: { name: string } }[]; total: number }
-            rows.push(...page.members.filter((one) => one.user.name.toLocaleLowerCase(locale).includes(query.toLocaleLowerCase(locale))).map((one) => ({ kayan: source.kayan, id: one.id, name: one.user.name })))
-            if (!page.members.length || offset + page.members.length >= page.total) return rows.slice(0, 20)
-          }
-        }
-        const page = await screen.client({ kayan: source.kayan, operation: 'find', input: { limit: 20, depth: 1, ...(query && { where: { [source.title]: { like: query } } }) } }) as { docs: Record<string, unknown>[] }
+        const titleField = screen.screen.kayan[source.kayan]?.fields.find((field) => field.name === source.title)
+        const searchField = titleField?.rules.localized ? `${source.title}.${locale}` : source.title
+        const page = await screen.client({ kayan: source.kayan, operation: 'find', input: { limit: 20, depth: 1, ...(query && { where: { [searchField]: { like: query } } }) } }) as { docs: Record<string, unknown>[] }
         return page.docs.flatMap((row) => {
           const title = source.title.split('.').reduce<unknown>((value, key) => value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, row)
           const name = title && typeof title === 'object' ? (title as Record<string, unknown>)[locale] : title
@@ -67,6 +59,9 @@ export function Plugin({ policy, locale, t }: FeatureProps) {
     }, 150)
     return () => { current = false; clearTimeout(timer) }
   }, [query, screen, sources, locale, editor])
+  useEffect(() => editor.registerNodeTransform(MentionView, (node) => {
+    if (editor.isEditable() && !sources.some((source) => source.kayan === node.getMention().kayan)) node.replace($createTextNode(node.getTextContent()).setFormat(node.getFormat()))
+  }), [editor, sources])
   useEffect(() => editor.registerNodeTransform(TextNode, (node) => {
     if (!editor.isEditable() || !node.isSimpleText() || node.hasFormat('code') || node.getParents().some((parent) => parent.getType() === 'code')) return
     const match = /:([a-z]+):/.exec(node.getTextContent())
@@ -83,7 +78,7 @@ export function Plugin({ policy, locale, t }: FeatureProps) {
       for (const node of $getRoot().getAllTextNodes()) if (node instanceof MentionNode && !seen.has(node.getKey())) {
         seen.add(node.getKey())
         const key = node.getKey()
-        mentionHref({ mention: node.getMention(), client: screen.client, screen: screen.screen, sources, access: screen.access, request: defaultMentionRequest }).then((href) => {
+        mentionHref({ mention: node.getMention(), client: screen.client, screen: screen.screen, sources, access: screen.access }).then((href) => {
           if (!current || editor.isEditable()) return
           const element = editor.getElementByKey(key)
           if (href) element?.setAttribute('href', href)
@@ -109,8 +104,8 @@ export function Plugin({ policy, locale, t }: FeatureProps) {
       if (!anchor.current) return null
       // DOMRect coordinates are physical even when the document is RTL.
       const rect = anchor.current.getBoundingClientRect()
-      return createPortal(<div role="listbox" aria-label={t('admin.richText.mentions', 'Mention a record')} className="bg-popover text-popover-foreground fixed z-[1000] max-h-64 w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border p-1 shadow-lg" style={{ left: Math.max(8, Math.min(rect.left, window.innerWidth - 296)), top: Math.min(rect.bottom + 4, window.innerHeight - 260) }} dir={screen?.dir ?? (locale.startsWith('ar') ? 'rtl' : 'ltr')}>
-        {options.map((option, index) => <button key={option.key} ref={option.setRefElement} type="button" role="option" tabIndex={-1} aria-selected={selectedIndex === index} className={`min-h-11 w-full rounded px-3 py-2 text-start text-sm break-words ${selectedIndex === index ? 'bg-accent' : ''}`} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOptionAndCleanUp(option)}>{option.mention.name}</button>)}
+      return createPortal(<div id="typeahead-menu" role="listbox" aria-label={t('admin.richText.mentions', 'Mention a record')} className="bg-popover text-popover-foreground fixed z-[1000] max-h-64 w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border p-1 shadow-lg" style={{ left: Math.max(8, Math.min(rect.left, window.innerWidth - 296)), top: Math.min(rect.bottom + 4, window.innerHeight - 260) }} dir={screen?.dir ?? (locale.startsWith('ar') ? 'rtl' : 'ltr')}>
+        {options.map((option, index) => <button id={`typeahead-item-${index}`} key={option.key} ref={option.setRefElement} type="button" role="option" tabIndex={-1} aria-selected={selectedIndex === index} className={`min-h-11 w-full rounded px-3 py-2 text-start text-sm break-words ${selectedIndex === index ? 'bg-accent' : ''}`} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setHighlightedIndex(index)} onClick={() => selectOptionAndCleanUp(option)}>{option.mention.name}</button>)}
         {!options.length && <p role="status" className="p-3 text-sm">{failed ? t('admin.richText.mentionsUnavailable', 'Some sources could not be read.') : t('admin.richText.noMentions', 'No matching records.')}</p>}
       </div>, document.body)
     }}

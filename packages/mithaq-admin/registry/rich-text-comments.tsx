@@ -2,7 +2,7 @@
 import { use, useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { MarkNode, $wrapSelectionInMarkNode } from '@lexical/mark'
-import { $getNodeByKey, $getRoot, $getSelection, $isRangeSelection, $setSelection, COMMAND_PRIORITY_EDITOR, createCommand, type RangeSelection } from 'lexical'
+import { $getNodeByKey, $getRoot, $isElementNode, $getSelection, $isRangeSelection, $setSelection, COMMAND_PRIORITY_EDITOR, COMMAND_PRIORITY_HIGH, SELECTION_INSERT_CLIPBOARD_NODES_COMMAND, createCommand, type LexicalNode, type RangeSelection } from 'lexical'
 import { ScreenContext } from 'mithaq/admin/react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -49,6 +49,21 @@ export function Plugin({ t, control, field: fieldName }: FeatureProps) {
     if (selection.current) { setTarget(undefined); setText(''); setError('') }
     setQuote(words)
   }
+  useEffect(() => editor.registerCommand(SELECTION_INSERT_CLIPBOARD_NODES_COMMAND, ({ nodes }) => {
+    const own = new Set<string>()
+    const collect = (node: LexicalNode) => {
+      if (node instanceof MarkNode) for (const id of node.getIDs()) own.add(id.toLowerCase())
+      if ($isElementNode(node)) node.getChildren().forEach(collect)
+    }
+    collect($getRoot())
+    // Clipboard annotations are untrusted; only threads already belonging to this field survive.
+    const clean = (nodes: LexicalNode[]): LexicalNode[] => nodes.flatMap((node) => {
+      if ($isElementNode(node)) { const children = clean(node.getChildren()); node.clear().append(...children) }
+      return node instanceof MarkNode && node.getIDs().some((id) => !own.has(id.toLowerCase())) ? node.getChildren() : [node]
+    })
+    nodes.splice(0, nodes.length, ...clean(nodes))
+    return false
+  }, COMMAND_PRIORITY_HIGH), [editor])
   useEffect(() => editor.registerCommand(OPEN_COMMENTS, () => { capture(); setOpen(true); return true }, COMMAND_PRIORITY_EDITOR), [editor, t])
   useEffect(() => {
     const refresh = () => editor.getEditorState().read(() => {

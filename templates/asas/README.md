@@ -1123,10 +1123,10 @@ even when the project leaves tables, code or markdown out. Feature selection
 controls allowed content and lazy browser imports, not npm installation. Peers
 remain optional for a project that does not use rich text at all.
 
-Install `@lexical/table@0.52.0` and `@lexical/code-core@0.52.0` in the language
-workspace. Install those two plus `@lexical/code-prism@0.52.0` and
-`@lexical/markdown@0.52.0`, `@lexical/mark@0.52.0` and
-`@lexical/hashtag@0.52.0` in every host that imports the editor. Retain the
+Install `@lexical/table@0.52.0`, `@lexical/code-core@0.52.0`,
+`@lexical/mark@0.52.0` and `@lexical/hashtag@0.52.0` in the language
+workspace. Install those four plus `@lexical/code-prism@0.52.0` and
+`@lexical/markdown@0.52.0` in every host that imports the editor. Retain the
 existing Lexical peers and the project's UploadNode and upload plugin.
 
 Create `src/mithaq/rich-text-features.ts` in the language workspace, as the

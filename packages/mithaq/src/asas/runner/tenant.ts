@@ -7,7 +7,7 @@ import { combineWhere, compareValues, same, type Scalar, type Where } from '../.
 import { AsasError, denied, invalid, missing } from './errors.ts'
 import { running } from './runtime.ts'
 import type { OperationEffect, RuntimeWriteTools as WriteTools } from './steps.ts'
-import { assertStoreWhere, assertReferences, type Authorize } from './write.ts'
+import { assertStoreWhere, assertReferences, assertCommentMarks, type Authorize } from './write.ts'
 
 /** How far a read reaches past the active organization: every verified membership, or every tenant. */
 export type TenantReach = 'mine' | 'all'
@@ -200,7 +200,9 @@ export const tenancy = ({ language, assigned, onError, collection }: {
     }
     const references = async ({ name, data, tx, id }: { name: string; data: Record<string, unknown>; tx: unknown; id?: unknown }) => {
       for (const key of Object.keys(data)) declaredField(name, key)
-      return assertReferences({ kayan: named(name), store: { find }, data, tenant: active(running.getStore()?.user), tx, id })
+      const args = { kayan: named(name), store: { find }, data, tenant: active(running.getStore()?.user), tx, id }
+      await assertReferences(args)
+      await assertCommentMarks(args)
     }
     const sealed = (name: string, data?: Record<string, unknown>) => {
       const field = named(name).tenant

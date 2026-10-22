@@ -38,3 +38,13 @@ test('a legacy custom mention without record identity stays unreadable instead o
   const { MentionNode, richTextReader } = await import('./index.ts')
   assert.ok('refused' in richTextReader([...defaultNodes, MentionNode])(document({ type: 'mention', name: 'Huda', text: 'Huda' })))
 })
+
+
+test('hashtags round trip the full-width hash, ZWNJ and Japanese iteration mark emitted by Lexical', () => {
+  const schema = richText({ nodes: defaultNodes, features: ['mentions'] }).kinds.richText.targets.zod()
+  for (const text of ['＃مرحبا', '#می\u200cخواهم', '#〃', '#۞', '＃日本語_123']) {
+    const value = document({ type: 'hashtag', text, version: 1 })
+    assert.deepEqual(schema.parse(value), value)
+  }
+  for (const text of ['#', '＃', '#two words', '#bad!', '#😀']) assert.equal(schema.safeParse(document({ type: 'hashtag', text })).success, false, text)
+})

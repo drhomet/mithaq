@@ -6,24 +6,25 @@ import { test } from 'node:test'
 import { act, createElement } from 'react'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { createRoot } from 'react-dom/client'
-import { mount, window, click, press } from './dom.ts'
+import { mount, window, click, press, type } from './dom.ts'
 import type { RichTextPolicy, RichTextValue } from 'mithaq/rich-text'
 
 const { RichTextEditor } = await import('../registry/rich-text-editor.tsx')
 const { defaultNodes, richText, richTextFeatureGuard } = await import('mithaq/rich-text')
 const { RichTextContext, viewsOf, defaultPicks } = await import('../registry/rich-text-picks.tsx')
 const installed = { nodes: viewsOf(defaultNodes), picks: defaultPicks, featureModules: { mentions: () => import('../registry/rich-text-mentions.tsx'), comments: () => import('../registry/rich-text-comments.tsx'), findReplace: () => import('../registry/rich-text-find-replace.tsx') } }
+const { ScreenContext } = await import('mithaq/admin/react')
 const { $getRoot, $createTextNode } = await import('lexical')
 const { $generateNodesFromDOM } = await import('@lexical/html')
 const t = (_key: string, fallback?: string) => fallback
 const legacy = JSON.parse(readFileSync(new URL('../../mithaq/src/rich-text/__fixtures__/legacy-formatting-034.json', import.meta.url), 'utf8'))
 
-async function withEditor({ value, policy, run }: { value?: unknown; policy?: RichTextPolicy; run: (args: { editor: import('lexical').LexicalEditor; host: HTMLElement; changes: RichTextValue[] }) => Promise<void> }) {
+async function withEditor({ value, policy, screen, locale = 'en', run }: { value?: unknown; policy?: RichTextPolicy; screen?: any; locale?: string; run: (args: { editor: import('lexical').LexicalEditor; host: HTMLElement; changes: RichTextValue[] }) => Promise<void> }) {
   const host = mount()
   const root = createRoot(host)
   const changes: RichTextValue[] = []
   try {
-    await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(RichTextEditor, { value, policy, onChange: (value) => changes.push(value), direction: 'ltr', t, locale: 'en', id: 'policy-editor' }))))
+    await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(ScreenContext, { value: screen }, createElement(RichTextEditor, { value, policy, onChange: (value) => changes.push(value), direction: 'ltr', t, locale, id: 'policy-editor' })))))
     await act(async () => sleep(100))
     const editor = (host.querySelector('#policy-editor') as unknown as { __lexicalEditor: import('lexical').LexicalEditor }).__lexicalEditor
     assert.ok(editor, 'the editor loaded')
@@ -197,5 +198,99 @@ test('find and replace updates hashtag words and unwraps a tag replaced with ord
     await act(async () => editor.update(() => { assert.equal($replaceMatches({ query: '#new', replacement: 'plain', all: true, index: 0, locale: 'en', matchCase: false, wholeWord: false }), 2) }))
     assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), 'plain plain')
     assert.ok(!JSON.stringify(changes.at(-1)).includes('"type":"hashtag"'))
+  } })
+})
+
+
+test('the default member picker searches managed reads and never reveals a masked name', async () => {
+  const calls: any[] = []
+  let providerCalls = 0
+  const fetchBefore = globalThis.fetch
+  globalThis.fetch = (async () => { providerCalls++; return Response.json({ members: [{ id: 'hidden', user: { name: 'Masked name', email: 'private@example.test' } }], total: 1 }) }) as typeof fetch
+  const screen = { dir: 'ltr', screen: { kayan: { user: { fields: [] } } }, client: async (call: any) => { calls.push(call); return { docs: [{ id: 'hidden' }, { id: 'visible', name: 'Allowed name' }] } } }
+  try {
+    await withEditor({ policy: { features: ['mentions'], fonts: ['sans'] }, screen, run: async ({ editor }) => {
+      await act(async () => editor.update(() => { $getRoot().selectEnd().insertText('@name') }))
+      await act(async () => sleep(250))
+      await act(async () => sleep(20))
+      assert.equal(providerCalls, 0, 'the provider roster bypasses managed row and field gates')
+      assert.deepEqual(calls, [{ kayan: 'user', operation: 'find', input: { limit: 20, depth: 1, where: { name: { like: 'name' } } } }])
+      const menu = window.document.querySelector('[role="listbox"][aria-label="Mention a record"]')!
+      assert.ok(menu.textContent?.includes('Allowed name'), menu.outerHTML)
+      assert.equal(menu.id, 'typeahead-menu')
+      assert.equal(menu.querySelector('[role="option"]')?.id, 'typeahead-item-0')
+      assert.equal(window.document.getElementById('policy-editor')?.getAttribute('aria-controls'), menu.id)
+      assert.ok(!menu.textContent?.includes('Masked name'))
+    } })
+  } finally { globalThis.fetch = fetchBefore }
+})
+
+
+test('mention searches use the current locale column of a localized title', async () => {
+  const calls: any[] = []
+  const screen = { dir: 'rtl', screen: { kayan: { tags: { fields: [{ name: 'name', kind: 'text', rules: { localized: true } }] } } }, client: async (call: any) => { calls.push(call); return { docs: [{ id: 'tag', name: { ar: 'وسم', en: 'Tag' } }] } } }
+  await withEditor({ policy: { features: ['mentions'], fonts: ['sans'], mentionSources: [{ kayan: 'tags', title: 'name' }] }, screen, locale: 'ar', run: async ({ editor }) => {
+    await act(async () => editor.update(() => { $getRoot().selectEnd().insertText('@وسم') }))
+    await act(async () => sleep(250))
+      await act(async () => sleep(20))
+    assert.deepEqual(calls, [{ kayan: 'tags', operation: 'find', input: { limit: 20, depth: 1, where: { 'name.ar': { like: 'وسم' } } } }])
+    assert.ok(window.document.querySelector('[role="listbox"][aria-label="Mention a record"]')?.textContent?.includes('وسم'))
+  } })
+})
+
+
+test('find action buttons keep native Enter activation while inputs navigate matches', async () => {
+  const value = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', text: 'old old' }] }] } }
+  await withEditor({ value, policy: { features: ['findReplace'], fonts: ['sans'] }, run: async ({ editor, host }) => {
+    await act(async () => click([...host.querySelectorAll('button')].find((button) => button.textContent === 'Find and replace')!))
+    const panel = host.querySelector('[role="region"]')!
+    const [find, replace] = panel.querySelectorAll('input')
+    await act(async () => { type(find!, 'old'); type(replace!, 'new') })
+    for (const label of ['Replace', 'Replace all', 'Close']) {
+      const button = [...panel.querySelectorAll('button')].find((one) => one.textContent === label)!
+      const key = new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      await act(async () => button.dispatchEvent(key as unknown as Event))
+      assert.equal(key.defaultPrevented, false, `${label} can activate from Enter`)
+    }
+    const navigate = new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    await act(async () => find!.dispatchEvent(navigate as unknown as Event))
+    assert.equal(navigate.defaultPrevented, true)
+    await act(async () => click([...panel.querySelectorAll('button')].find((one) => one.textContent === 'Replace all')!))
+    assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), 'new new')
+  } })
+})
+
+
+test('pasting strips foreign comment marks and disallowed mentions while retaining their words', async () => {
+  const { PASTE_COMMAND } = await import('lexical')
+  const own = '11111111-1111-4111-8111-111111111111'
+  const foreign = '22222222-2222-4222-8222-222222222222'
+  const text = (text: string) => ({ type: 'text', version: 1, text, format: 0, detail: 0, mode: 'normal', style: '' })
+  const mark = (id: string, words: string) => ({ type: 'mark', version: 1, ids: [id], children: [text(words)], format: '', indent: 0, direction: null })
+  const value = { root: { type: 'root', children: [{ type: 'paragraph', children: [mark(own, 'Existing')] }] } }
+  const policy: RichTextPolicy = { features: ['comments', 'mentions'], fonts: ['sans'], comments: { threads: 'threads' }, mentionSources: [{ kayan: 'tags', title: 'name' }] }
+  await withEditor({ value, policy, run: async ({ editor, changes }) => {
+    const transfer = new window.DataTransfer()
+    transfer.setData('application/x-lexical-editor', JSON.stringify({ namespace: 'MithaqRichText', nodes: [{ type: 'paragraph', version: 1, format: '', indent: 0, direction: null, children: [mark(foreign, 'Foreign words'), mark(own, 'Own words'), { ...text('@Person'), type: 'mention', kayan: 'user', id: 'person', name: 'Person' }, { ...text('@Tag'), type: 'mention', kayan: 'tags', id: 'tag', name: 'Tag' }] }] }))
+    await act(async () => editor.update(() => { $getRoot().selectEnd(); editor.dispatchCommand(PASTE_COMMAND, new window.ClipboardEvent('paste', { clipboardData: transfer }) as unknown as ClipboardEvent) }))
+    const saved = changes.at(-1)!
+    const json = JSON.stringify(saved)
+    assert.ok(!json.includes(foreign), 'a foreign record or field thread cannot enter this document')
+    assert.ok(json.includes(own), 'pasting within this field keeps its existing thread')
+    assert.ok(!json.includes('"kayan":"user"'), 'a mention outside this field sources becomes text')
+    assert.ok(json.includes('"kayan":"tags"'))
+    assert.equal(richTextFeatureGuard({ node: saved.root, policy }), undefined)
+    assert.match(editor.getEditorState().read(() => $getRoot().getTextContent()), /Foreign wordsOwn words@Person@Tag/)
+  } })
+})
+
+
+test('Lexical full-width, Persian and Japanese hashtags satisfy the server policy', async () => {
+  const policy: RichTextPolicy = { features: ['mentions'], fonts: ['sans'] }
+  await withEditor({ policy, run: async ({ editor, changes }) => {
+    await act(async () => editor.update(() => { $getRoot().selectEnd().insertText('＃مرحبا #می\u200cخواهم #〃 #۞') }))
+    const saved = changes.at(-1)!
+    assert.deepEqual(saved.root.children[0]!.children!.filter((node) => node.type === 'hashtag').map((node) => node.text), ['＃مرحبا', '#می\u200cخواهم', '#〃', '#۞'])
+    assert.equal(richTextFeatureGuard({ node: saved.root, policy }), undefined)
   } })
 })
