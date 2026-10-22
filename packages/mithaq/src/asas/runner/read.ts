@@ -1,6 +1,8 @@
-import { aliveWhere, assertSingleConstrained, assertWhere, assertWhereGrammar, publicResult, publishedWhere, type Authorize, type ManagedAdmin, type ReadOptions, type Row } from './write.ts'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { declaredFieldAccess, rowsOfField } from '../../mithaq/rows.ts'
+import { aliveWhere, assertSingleConstrained, assertWhere, assertWhereGrammar, publicResult, publishedWhere, whereLimits, type Authorize, type ManagedAdmin, type ReadOptions, type Row } from './write.ts'
 import { combineWhere, type Scalar, type Where } from '../../mithaq/where.ts'
-import { atEffect, issueRefusal, parse, type AuditHandler, type Ctx, type ReadStep, type ReadTools, type ResolvedOperation } from './steps.ts'
+import { atEffect, issueRefusal, parse, sealOf, type AuditHandler, type Ctx, type ReadStep, type ReadTools, type ResolvedOperation } from './steps.ts'
 import type { StandardSchemaIssue, StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
 import { sortableFields, unsortable, type FieldAccess, type ResolvedField, type ResolvedKayan } from '../../mithaq/types.ts'
 import { defaultKinds } from '../../base/kinds.ts'
@@ -9,6 +11,18 @@ import { AsasError, denied, invalid, localizedQuery, missing } from './errors.ts
 import { running } from './runtime.ts'
 import { membersAdmitted, type TenantScope } from './tenant.ts'
 import { revived } from '../../versions/versions.ts'
+
+type CountRead = {
+  kayan: string
+  link: string
+  queries: Scalar[][]
+  budget: { left: number }
+  result?: number[]
+}
+// Server-only context, never an HTTP input or a caller-supplied read option.
+const countReads = new AsyncLocalStorage<CountRead>()
+const countPageSize = 100
+const countRowLimit = 10_000
 
 /** What a `find` list takes where it declares no input of its own. */
 export type FindInput = {
@@ -511,46 +525,85 @@ export const readers = <Actor>({
   }
   const countsOf = async ({ fields, rows, actor, accessWhere }: { fields: ResolvedField[]; rows: Record<string, unknown>[]; actor: Actor | null; accessWhere: Where | undefined }): Promise<RelationshipCounts> => {
     const counts: RelationshipCounts = {}
-    const reads = kayans('read') as Record<string, { find?: (input: FindInput) => Promise<{ docs: Record<string, unknown>[] }> }>
-    const groups = new Map<string, { field: ResolvedField; rows: Record<string, unknown>[]; where: Where }[]>()
+    const unavailable = new Set<string>()
+    const reads = kayans('read') as Record<string, { find?: (input: FindInput) => Promise<unknown> }>
+    type Job = { field: string; parent: string; values: Scalar[] }
+    const groups = new Map<ResolvedKayan, Map<string, Job[]>>()
     const tenant = running.getStore()?.tenant
     const admitted = membersAdmitted(tenant, accessWhere)
-    for (const field of fields) {
-      const visible = []
-      for (const row of rows) {
-        const user = admitted && kayan.tenant
-          ? ((tenant as Extract<TenantScope, { reach: 'mine' }>).members.get(String(row[kayan.tenant])) ?? null) : actor
-        if (!field.access?.read || await (field.access.read as FieldAccess)({ user, data: row, doc: row, siblingData: row, id: row.id })) visible.push(row)
+    const budget = { left: countRowLimit }
+    for (const field of fields) for (const row of rows) {
+      const user = admitted && kayan.tenant
+        ? ((tenant as Extract<TenantScope, { reach: 'mine' }>).members.get(String(row[kayan.tenant])) ?? null) : actor
+      if (field.access?.read && !await (field.access.read as FieldAccess)({ user, data: row, doc: row, siblingData: row, id: row.id })) continue
+      const target = field.target!, link = field.kind === 'join' ? field.on! : 'id'
+      const values = field.kind === 'join' ? [row.id as Scalar] : [...new Set(Array.isArray(row[field.name]) ? row[field.name] as Scalar[] : [])]
+      const byLink = groups.get(target) ?? new Map<string, Job[]>()
+      const jobs = byLink.get(link) ?? []
+      for (let offset = 0; offset < Math.max(1, values.length); offset += whereLimits.values) {
+        jobs.push({ field: field.name, parent: String(row.id), values: values.slice(offset, offset + whereLimits.values) })
       }
-      if (!visible.length) continue
-      const where: Where = field.kind === 'join'
-        ? { [field.on!]: { in: visible.map((row) => row.id as Scalar) } }
-        : { id: { in: [...new Set(visible.flatMap((row) => Array.isArray(row[field.name]) ? row[field.name] as Scalar[] : []))] } }
-      const group = groups.get(field.target!.name) ?? []
-      group.push({ field, rows: visible, where })
-      groups.set(field.target!.name, group)
+      byLink.set(link, jobs)
+      groups.set(target, byLink)
+      ;(counts[field.name] ??= {})[String(row.id)] = 0
     }
-    for (const [target, group] of groups) {
-      const find = reads[target]?.find
-      if (!find) continue
-      // A normal nested find retains the actor, tenant, row policy, field masks and soft deletes.
-      // One read per target for the whole page, including multiple columns pointing there.
-      let found: { docs: Record<string, unknown>[] }
-      try { found = await find({ limit: 0, where: { or: group.map((one) => one.where) } }) }
-      catch (error) {
-        if (error instanceof AsasError && error.status === 403) continue
-        throw error
-      }
-      for (const { field, rows } of group) {
-        const link = field.kind === 'join' ? field.on! : 'id'
-        if (found.docs.some((row) => !Object.hasOwn(row, link))) continue
-        const ids = new Set(found.docs.map((row) => row.id))
-        counts[field.name] = Object.fromEntries(rows.map((row) => [String(row.id), field.kind === 'join'
-          ? found.docs.filter((child) => child[link] === row.id).length
-          : (Array.isArray(row[field.name]) ? row[field.name] as unknown[] : []).filter((id) => ids.has(id)).length]))
+    for (const [target, byLink] of groups) for (const [link, jobs] of byLink) {
+      const find = reads[target.name]?.find
+      if (!find) { for (const job of jobs) unavailable.add(job.field); continue }
+      // Each union and each IN stays inside the normal find grammar's node/value bounds.
+      for (let offset = 0; offset < jobs.length;) {
+        const batch: Job[] = []
+        let values = 0
+        while (offset < jobs.length && batch.length < 100) {
+          const job = jobs[offset]!
+          if (unavailable.has(job.field)) { offset++; continue }
+          if (batch.length && values + job.values.length > whereLimits.values) break
+          batch.push(job)
+          values += job.values.length
+          offset++
+        }
+        if (!batch.length) continue
+        const request: CountRead = { kayan: target.name, link, queries: batch.map((job) => job.values), budget }
+        try {
+          await countReads.run(request, () => find({ limit: countPageSize, where: { or: request.queries.map((values) => ({ [link]: { in: values } })) } }))
+          if (!request.result) throw denied({ message: 'This read cannot supply a safe count.', key: 'error.forbidden.field_read' })
+          batch.forEach((job, index) => { counts[job.field]![job.parent]! += request.result![index]! })
+        } catch (error) {
+          if (!(error instanceof AsasError) || error.status !== 403) throw error
+          for (const job of batch) unavailable.add(job.field)
+        }
       }
     }
+    for (const field of unavailable) delete counts[field]
     return counts
+  }
+  const readCount = async ({ request, where, sort }: { request: CountRead; where: Where | undefined; sort: { field: string; direction: 'asc' | 'desc' } }) => {
+    const read = declaredFieldAccess(kayan.fields[request.link]?.access?.read)
+    // Arbitrary record-dependent masks cannot be proved from a link-only projection; fail closed.
+    if (typeof read === 'function' && read.length && !rowsOfField(read)) {
+      throw denied({ message: 'A record-dependent linking-field mask cannot supply a projected count.', key: 'error.forbidden.field_read' })
+    }
+    if (store.count) {
+      const totals = []
+      for (const values of request.queries) totals.push(await store.count({ kayan: kayan.name, args: { where: combineWhere(combineWhere(where, { [request.link]: { in: values } }), shown) }, tx: currentTx() }))
+      request.result = totals
+      return
+    }
+    if (!store.projectedReads || request.budget.left < 1) throw denied({ message: 'This store cannot supply a bounded projected count.', key: 'error.forbidden.field_read' })
+    const totals = request.queries.map(() => 0), sets = request.queries.map((values) => new Set(values))
+    const available = request.budget.left, pageSize = Math.min(countPageSize, available)
+    // ponytail: without aggregation, scan only links in 100-row pages, at most 10,000 per parent page; add grouped count for larger sets.
+    for (let page = 1; ; page++) {
+      const found = await findStore(kayan.name, { limit: pageSize, page, sort, where, select: [request.link] }, currentTx())
+      if (found.totalDocs > available) {
+        request.budget.left = 0
+        throw denied({ message: 'This count exceeds the projected-read bound.', key: 'error.forbidden.field_read' })
+      }
+      request.budget.left -= found.docs.length
+      for (const row of found.docs) sets.forEach((values, index) => { if (values.has(row[request.link] as Scalar)) totals[index]!++ })
+      if (page * pageSize >= found.totalDocs) break
+    }
+    request.result = totals
   }
   const fetchList = async (input: Record<string, unknown>, actor: Actor | null, granted?: Granted, drafts?: Granted) => {
     const accessWhere = granted ? granted.where : await readAccess(kayan, actor, authorize, admin)
@@ -561,6 +614,11 @@ export const readers = <Actor>({
     const [first, ...rest] = judges(actor, accessWhere)
     const sort = await sortOf(kayan, input.sort, first!, authorize, admin)
     for (const judge of rest) if (sort.field !== 'id') await protectedField(kayan, sort.field, judge, authorize, admin, 'sort')
+    const request = countReads.getStore()
+    if (request?.kayan === kayan.name) {
+      await readCount({ request, where, sort })
+      return pageOf([], 0, limit, page)
+    }
     const result = await findStore(kayan.name, { limit, page, sort, where }, currentTx(), drafts)
     const rows = drafts ? await latestOf(result.docs, drafts) : result.docs
     return pageOf(await populateJoins(rows, integerOption('depth', input.depth, 0, 0, cap - 1)), result.totalDocs, limit, page)
@@ -654,6 +712,10 @@ export const readers = <Actor>({
     const granted: Granted = await running.run(around, async () => ({
       where: await readAccess(kayan, actor, authorize, admin, mode === 'one' ? data.id : undefined, name),
     }))
+    const request = countReads.getStore()
+    if (request?.kayan === kayan.name && (name !== 'find' || declaration.steps.length !== 1 || sealOf(declaration.steps[0]!) !== 'find' || declaration.afterSteps.length || declaration.output)) {
+      throw denied({ message: 'A custom read pipeline cannot supply a projected count.', key: 'error.forbidden.field_read' })
+    }
     // A draft read answers each row's latest version, so it asks `findVersions` too.
     const drafts: Granted | undefined = !!options.draft && !!kayan.versions?.drafts && (mode === 'many' || mode === 'one')
       ? await running.run(around, async () => ({ where: await authorize({ admin, actor, data: {}, effect: 'read', kayan, operation: 'findVersions' }) }))

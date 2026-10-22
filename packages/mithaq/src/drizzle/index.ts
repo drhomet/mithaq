@@ -824,6 +824,7 @@ const storeOf = <
 
   return {
     capability: 'store',
+    projectedReads: true as const,
     type: 'drizzle',
     sql: 'drizzle',
     idKinds,
@@ -1228,7 +1229,7 @@ const storeOf = <
       return { ...sets, ...expand(name, row as Record<string, unknown>) }
     },
 
-    async find({ kayan: name, args: { limit, lock, page, sort, where }, tx }) {
+    async find({ kayan: name, args: { limit, lock, page, sort, where, select }, tx }) {
       if (lock && !tx) throw new Error('A locked find requires a transaction.')
       const client = (tx ?? db) as Database
       const table = tables[name]!
@@ -1248,11 +1249,13 @@ const storeOf = <
       ]
       const offset = limit > 0 ? (page - 1) * limit : 0
       // `$dynamic()` keeps each branch one type, so drizzle checks `orderBy` against the table.
-      const query = client.select().from(table).$dynamic().where(condition)
+      if (select && (!select.length || select.some((field) => !Object.hasOwn(table, field)))) throw invalid({ message: 'A projection names an unknown column.', key: 'error.invalid.unknown_field' })
+      const query = (select ? client.select(Object.fromEntries(select.map((field) => [field, table[field]!]))) : client.select()).from(table).$dynamic().where(condition)
       const locked = tx && lock ? query.for(({ update: 'update', noKeyUpdate: 'no key update', share: 'share', keyShare: 'key share' } as const)[lock]) : query
       const ordered = locked.orderBy(...orderBy).offset(offset)
       const docs = limit > 0 ? await ordered.limit(limit) : await ordered
       const rows = await client.select({ totalDocs: sqlCount() }).from(table).where(condition)
+      if (select) return { docs: docs as Record<string, unknown>[], totalDocs: Number(rows[0]?.totalDocs ?? 0) }
       const held = (docs as Record<string, unknown>[]).map((row) => expand(name, row))
       const sets = await readSets(client, name, held.map((row) => row.id))
       return {

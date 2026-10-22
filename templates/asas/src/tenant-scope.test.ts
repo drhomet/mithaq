@@ -653,8 +653,24 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     try {
       const result = await memos().find({ counts: ['notes'], where: { id: { in: [first.id, second.id] } } }, { actor: one })
       assert.deepEqual(result.counts, { notes: { [first.id]: 1, [second.id]: 0 } })
-      assert.deepEqual(reads, ['memos', 'notes'])
+      assert.deepEqual(reads, ['memos'], 'aggregates never load child rows')
     } finally { store.find = find }
+  })
+
+  test('count fallback projects the linking field under the same tenant scope', async () => {
+    const first = await memos().create({ title: 'projected count' }, { actor: one })
+    await built.kayan.notes.operations.create({ title: 'own projected child', memo: first.id, memoSet: [], tag: null, cover: null, reply: null }, { actor: one })
+    const other = await built.kayan.notes.operations.create({ title: 'foreign projected child', memo: ids.org2, memoSet: [], tag: null, cover: null, reply: null }, { actor: two })
+    await store.transaction((tx) => store.update({ tx, kayan: 'notes', id: other.id, data: { memo: first.id } }))
+    const count = store.count, find = store.find
+    const projections: (readonly string[] | undefined)[] = []
+    store.count = undefined
+    store.find = async (args) => { if (args.kayan === 'notes') projections.push(args.args.select); return find.call(store, args) }
+    try {
+      const result = await memos().find({ counts: ['notes'], where: { id: { equals: first.id } } }, { actor: one })
+      assert.deepEqual(result.counts, { notes: { [first.id]: 1 } })
+      assert.deepEqual(projections, [['memo']])
+    } finally { store.count = count; store.find = find }
   })
 
   test('a create is filled with the active organization, and a caller naming the field is refused before any step runs', async () => {
@@ -2397,7 +2413,7 @@ test('list counts batch the page through related find and retain tenant and read
   queries.length = 0
   const page = await built.kayan.memos.operations.find({ counts: ['notes'], limit: 0 }, { actor: one })
   assert.deepEqual(page.counts, { notes: { [first.id]: 12, [second.id]: 1 } })
-  assert.deepEqual(queries, ['memos', 'notes'], 'one related read for both parents')
+  assert.deepEqual(queries, ['memos'], 'related find counts both parents without loading child rows')
   assert.equal(page.docs.some((row: { id: string }) => row.id === other.id), false)
   queries.length = 0
   await built.kayan.memos.operations.find({}, { actor: one })

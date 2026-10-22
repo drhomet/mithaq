@@ -143,6 +143,8 @@ export type Store<
   readonly capability: 'store'
   /** `'drizzle'` where this store's `db` and `tables` are drizzle's, which local auth reads its kayan through. */
   readonly sql?: 'drizzle'
+  /** Declares that find honors select without loading the other columns or relationship sets. */
+  readonly projectedReads?: true
   /** Builds what this store needs for one build, answering the store that build uses from then on. */
   init(kayan: ResolvedKayan[]): void | Store<Kinds, Rules, Built, Tx, Row>
   /** Reaches the database and, unless `readOnly`, prepares it. `readOnly` writes nothing. */
@@ -160,6 +162,7 @@ export type Store<
     kayan: string
     args: {
       limit: number
+      select?: readonly string[]
       /**
        * Hold returned rows until this transaction ends. `update` excludes every competing lock;
        * `noKeyUpdate` keeps their values unchanged by others while allowing `keyShare` readers;
