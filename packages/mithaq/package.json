@@ -18,7 +18,9 @@
     "./targets": "./src/targets.ts",
     "./drizzle": "./src/drizzle/proxy/index.ts",
     "./drizzle/pg-core": "./src/drizzle/proxy/pg-core.ts",
-    "./drizzle/node-postgres": "./src/drizzle/proxy/node-postgres.ts"
+    "./drizzle/node-postgres": "./src/drizzle/proxy/node-postgres.ts",
+    "./rich-text/mention": "./src/rich-text/mention-node.ts",
+    "./rich-text/client": "./src/rich-text/client.ts"
   },
   "bin": {
     "mithaq": "./src/asas/cli/mithaq.ts"
@@ -59,7 +61,9 @@
       "./targets": "./dist/targets.js",
       "./drizzle": "./dist/drizzle/proxy/index.js",
       "./drizzle/pg-core": "./dist/drizzle/proxy/pg-core.js",
-      "./drizzle/node-postgres": "./dist/drizzle/proxy/node-postgres.js"
+      "./drizzle/node-postgres": "./dist/drizzle/proxy/node-postgres.js",
+      "./rich-text/mention": "./dist/rich-text/mention-node.js",
+      "./rich-text/client": "./dist/rich-text/client.js"
     },
     "bin": {
       "mithaq": "dist/asas/cli/mithaq.js"

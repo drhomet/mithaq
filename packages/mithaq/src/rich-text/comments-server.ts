@@ -55,7 +55,7 @@ export const commentMarks = (value: unknown): Set<string> => {
 export type CommentRuntime = {
   kayans: ReadonlyMap<string, ResolvedKayan>
   storeOf: (kayan: ResolvedKayan) => Store
-  read: (args: { kayan: string; id: string; actor: unknown }) => Promise<Record<string, unknown> | null>
+  read: (args: { kayan: string; id: string | number; actor: unknown }) => Promise<Record<string, unknown> | null>
   authorize: Authorize
   admin?: ManagedAdmin
   tenantOf: (actor: unknown) => string | undefined
@@ -76,7 +76,8 @@ export const commentService = (runtime: CommentRuntime) => {
     if (!kayan || !field || !policy?.comments || !(field.features ?? policy.features).includes('comments') || !tenant) throw absent()
     const threads = runtime.kayans.get(policy.comments.threads)
     if (!threads?.tenant || threads.store !== kayan.store) throw new Error('Comment threads need the record store and a tenant field.')
-    const visible = await runtime.read({ kayan: name, id, actor })
+    const recordId = kayan.fields.id?.kind === 'number' ? Number(id) : id
+    const visible = await runtime.read({ kayan: name, id: recordId, actor })
     if (!visible || !Object.hasOwn(visible, fieldName)) throw absent()
     const store = runtime.storeOf(kayan)
     const where: Where = { and: [{ [threads.tenant]: { equals: tenant } }, { recordKayan: { equals: name } }, { recordId: { equals: String(visible.id) } }, { field: { equals: fieldName } }] }
@@ -93,7 +94,7 @@ export const commentService = (runtime: CommentRuntime) => {
       // The record lock serializes comments with record deletion and access-changing updates.
       const record = (await store.find({ tx, kayan: name, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock: 'share', where: combineWhere({ id: { equals: visible.id as string } }, access) } })).docs[0]
       if (!record) throw absent()
-      const fresh = await running.run({ user: actor, context, transactions: new Map([[store, { tx, operation: 'comments' }]]) }, () => runtime.read({ kayan: name, id, actor }))
+      const fresh = await running.run({ user: actor, context, transactions: new Map([[store, { tx, operation: 'comments' }]]) }, () => runtime.read({ kayan: name, id: recordId, actor }))
       if (!fresh || !Object.hasOwn(fresh, fieldName)) throw absent()
       const writeField = field.access?.update
       if (writeField && !await (writeField as FieldAccess)({ user: actor, id: record.id, doc: record, data: { [fieldName]: record[fieldName] }, siblingData: record })) throw denied({ message: 'This field cannot be commented on.', key: 'error.forbidden.field_write' })

@@ -189,6 +189,11 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
     'richText.mentionsUnavailable': { en: "Some sources could not be read.", ar: "تعذرت قراءة بعض المصادر." },
     'richText.noMentions': { en: "No matching records.", ar: "لا توجد سجلات مطابقة." },
     'richText.emoji': { en: "Emoji", ar: "رموز تعبيرية" },
+    'richText.emoji.smile': { en: 'Smile', ar: 'وجه مبتسم' },
+    'richText.emoji.heart': { en: 'Heart', ar: 'قلب' },
+    'richText.emoji.thumbsup': { en: 'Thumbs up', ar: 'إعجاب' },
+    'richText.emoji.check': { en: 'Check', ar: 'علامة صح' },
+    'richText.emoji.tada': { en: 'Celebrate', ar: 'احتفال' },
     // end add-on: rich-text-mentions
     // add-on: rich-text-comments
     'richText.comments': { en: "Comments", ar: "التعليقات" },

@@ -9,7 +9,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Input } from '@/components/ui/input'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { dropPlaceholders, getSelectedNode, newLink } from 'mithaq-admin/rich-text-selection.ts'
-import { safeUrl } from 'mithaq/rich-text'
+import { safeUrl } from 'mithaq/rich-text/client'
 
 export function FloatingLinkEditor({ editor, isLink, setIsLink, anchorElem, isLinkEditMode, setIsLinkEditMode, t }: {
   editor: LexicalEditor

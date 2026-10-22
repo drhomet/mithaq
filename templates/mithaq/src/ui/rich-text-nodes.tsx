@@ -12,6 +12,17 @@ import { UploadPlugin, UploadView, imagePick } from 'mithaq-admin/upload-node.ts
 import { richTextNodes } from '../mithaq/rich-text-nodes.ts'
 
 const value = {
+  featureModules: {
+    // add-on: rich-text-mentions
+    mentions: () => import('mithaq-admin/rich-text-mentions.tsx'),
+    // end add-on: rich-text-mentions
+    // add-on: rich-text-find-replace
+    findReplace: () => import('mithaq-admin/rich-text-find-replace.tsx'),
+    // end add-on: rich-text-find-replace
+    // add-on: rich-text-comments
+    comments: () => import('mithaq-admin/rich-text-comments.tsx'),
+    // end add-on: rich-text-comments
+  },
   nodes: viewsOf(richTextNodes, [
     ...defaultViews,
     // add-on: uploads

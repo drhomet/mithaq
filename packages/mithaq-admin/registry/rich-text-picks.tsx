@@ -75,6 +75,7 @@ export const viewsOf = (nodes: readonly Klass<LexicalNode>[], views: readonly Kl
  * the project's own list so the editor, viewer and server read the same nodes. The registry's own where none is provided.
  */
 export const RichTextContext = createContext<{
+  featureModules?: import('mithaq-admin/rich-text-features.tsx').RichTextClientModules
   nodes: readonly Klass<LexicalNode>[]
   picks: readonly RichTextPick[]
   /** What a project's own node mounts inside every editor beside its nodes, handed the field's control props (for example the upload node's dialog). */

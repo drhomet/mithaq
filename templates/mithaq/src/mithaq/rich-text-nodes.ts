@@ -4,9 +4,9 @@
 // project's own is spread after the defaults, `[...defaultNodes, CalloutNode]`,
 // and a node that draws React keeps its DOM-free class here and its React
 // subclass in the client file.
-import { defaultNodes } from 'mithaq/rich-text'
+import { defaultNodes } from 'mithaq/rich-text/client'
 // add-on: uploads
-import { UploadNode } from 'mithaq/rich-text'
+import { UploadNode } from 'mithaq/rich-text/client'
 // end add-on: uploads
 
 export const richTextNodes = [

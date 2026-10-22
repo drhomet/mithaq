@@ -589,7 +589,7 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
     const ids = [...commentMarks(value)]
     if (!ids.length) continue
     const target = field.commentThreads
-    if (!target?.tenant || !tenant || !id) throw invalid({ message: 'Comment marks require a saved record and its declared threads.', key: 'error.invalid.comment_thread' })
+    if (!target?.tenant || !tenant || id === undefined || id === null || id === '') throw invalid({ message: 'Comment marks require a saved record and its declared threads.', key: 'error.invalid.comment_thread' })
     const found = await store.find({ tx, kayan: target.name, args: { limit: ids.length, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { and: [
       { id: { in: ids } }, { [target.tenant]: { equals: tenant as Scalar } },
       { recordKayan: { equals: kayan.name } }, { recordId: { equals: String(id) } }, { field: { equals: field.name } },

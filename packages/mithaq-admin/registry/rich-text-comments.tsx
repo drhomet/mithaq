@@ -24,7 +24,7 @@ export function Plugin({ t, control, field: fieldName }: FeatureProps) {
   const recordId = control?.values.id ?? screen?.record?.id
   const kayan = control?.kayan.name ?? screen?.kayan?.name
   const field = control?.field.name ?? fieldName
-  const endpoint = recordId && kayan && field ? `/api/rich-text/comments/${[kayan, String(recordId), field].map(encodeURIComponent).join('/')}` : undefined
+  const endpoint = recordId != null && recordId !== '' && kayan && field ? `/api/rich-text/comments/${[kayan, String(recordId), field].map(encodeURIComponent).join('/')}` : undefined
   const [open, setOpen] = useState(false)
   const [threads, setThreads] = useState<Thread[]>([])
   const [marks, setMarks] = useState<Set<string>>(new Set())
@@ -54,7 +54,7 @@ export function Plugin({ t, control, field: fieldName }: FeatureProps) {
     const refresh = () => editor.getEditorState().read(() => {
       const next = new Set<string>()
       const walk = (node: import('lexical').LexicalNode) => {
-        if (node instanceof MarkNode) for (const id of node.getIDs()) next.add(id)
+        if (node instanceof MarkNode) for (const id of node.getIDs()) if (typeof id === 'string') next.add(id.toLowerCase())
         if ('getChildren' in node) for (const child of (node as import('lexical').ElementNode).getChildren()) walk(child)
       }
       walk($getRoot()); setMarks(next)

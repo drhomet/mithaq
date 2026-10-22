@@ -36,8 +36,8 @@ const reach = (roots: string[]) => {
   return named
 }
 
-test('no entry point but mithaq/rich-text reaches Lexical, followed through every file it imports', () => {
-  const core = Object.entries(manifest.exports).filter(([entry]) => entry !== './rich-text').map(([, file]) => file)
+test('no entry point outside mithaq/rich-text reaches Lexical, followed through every file it imports', () => {
+  const core = Object.entries(manifest.exports).filter(([entry]) => entry !== './rich-text' && !entry.startsWith('./rich-text/')).map(([, file]) => file)
   const reached = reach([...core, ...Object.values(manifest.bin)])
   assert.deepEqual([...reached].filter(([name]) => lexical(name) || name === 'mithaq/rich-text').map(([name, by]) => `${by} imports ${name}`), [])
   assert.ok([...reach([manifest.exports['./rich-text']!]).keys()].some(lexical), 'and the walk does find it through mithaq/rich-text')

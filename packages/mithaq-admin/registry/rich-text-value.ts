@@ -1,6 +1,6 @@
 // Theme adapted from shadcn-editor, MIT. See LICENSES/shadcn-editor.txt.
 import { createEditor, type Klass, type LexicalNode } from 'lexical'
-import { typesOf, unknownType } from 'mithaq/rich-text'
+import { typesOf, unknownType } from 'mithaq/rich-text/client'
 
 /** One node of Lexical's serialized editor state. */
 export type RichTextNode = { type: string; children?: RichTextNode[]; text?: string; [key: string]: unknown }
@@ -29,7 +29,7 @@ export const valueOf = (value: unknown): RichTextValue => {
 export const blank = (value: RichTextValue) => value.root.children.every((node) => node.type === 'paragraph' && !node.children?.length)
 
 const theme = {
-  mark: 'bg-amber-200/40 dark:bg-amber-400/20',
+  mark: 'bg-amber-200/40 text-inherit dark:bg-amber-400/20',
   paragraph: 'mb-2',
   table: 'w-full table-fixed border-collapse',
   tableScrollableWrapper: 'max-w-full overflow-x-auto',

@@ -34,8 +34,9 @@ for (const postgres of [false, true]) test(`comments use the record and field ga
   const body = { kind: 'richText' as const, access: { read: ({ user }: { user: unknown }) => (user as { id: string }).id !== 'fieldHidden', update: ({ user }: { user: unknown }) => (user as { id: string }).id !== 'fieldReader' } }
   const records = language.defineKayan({ ...common, name: 'records', access: { ...gates, read: ({ user }) => (user as { id: string }).id !== 'hidden', update: ({ user }) => (user as { id: string }).id !== 'reader' }, fields: { ...defaultFields, organization: language.targets.tenant.field, body, second: body } })
   const threads = language.defineKayan({ ...common, name: 'threads', targets: { service: { operations: {} } }, fields: { ...defaultFields, organization: language.targets.tenant.field, recordKayan: { kind: 'text' }, recordId: { kind: 'text' }, field: { kind: 'text' }, quote: { kind: 'text' }, resolved: { kind: 'checkbox' }, comments: { kind: 'json', maxBytes: defaultJsonMaxBytes } } })
+  const numbered = language.defineKayan({ ...common, name: 'numbered', fields: { ...defaultFields, id: { kind: 'number' }, organization: language.targets.tenant.field, body } })
   const events = language.defineKayan({ ...common, name: 'events', fields: { id: { kind: 'uuid' }, operation: { kind: 'text' }, snapshot: { kind: 'json', maxBytes: defaultJsonMaxBytes } } })
-  const built = language.buildAsas({ kayan: [organizations, user, records, threads, events], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: () => {} } })
+  const built = language.buildAsas({ kayan: [organizations, user, records, numbered, threads, events], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: () => {} } })
   const actual = built.targets.store as unknown as Store
   try {
     await built.connect()
@@ -81,6 +82,12 @@ for (const postgres of [false, true]) test(`comments use the record and field ga
     assert.equal((await request('writer', { action: 'delete', thread: thread.id, comment: thread.comments[0]!.id })).status, 200)
     const found = await actual.find({ kayan: 'events', args: { limit: 100, page: 1, sort: { field: 'id', direction: 'asc' } } })
     assert.equal(found.totalDocs, 6)
+    await built.kayan.numbered.operations.create({ id: 0, body: value }, { actor: writer })
+    const numeric = await built.handler(new Request('http://fixture.test/api/rich-text/comments/numbered/0/body', { method: 'POST', headers: { 'x-person': 'writer', Origin: 'http://fixture.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', text: 'Numeric record', quote: 'Selected' }) }))
+    assert.equal(numeric.status, 200, await numeric.clone().text())
+    const numericThread = await numeric.json() as { id: string }
+    const numericMark = { root: { type: 'root' as const, children: [{ type: 'paragraph', children: [{ type: 'mark', ids: [numericThread.id], children: [{ type: 'text', text: 'Selected' }] }] }] } }
+    await built.kayan.numbered.operations.update({ id: 0, body: numericMark }, { actor: writer })
     if (postgres) {
       auditFailure = true
       assert.equal((await request('writer', { action: 'reply', thread: thread.id, text: 'Rolled back' })).status, 500)

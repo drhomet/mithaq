@@ -1,4 +1,4 @@
-export { defaultNodes } from 'mithaq/rich-text'
+export { defaultNodes } from 'mithaq/rich-text/client'
 
 // A project's own list spreads this, in a file both the editor and the server import:
 //

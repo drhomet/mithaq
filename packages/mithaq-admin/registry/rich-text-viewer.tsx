@@ -11,7 +11,7 @@ import { $getRoot, $isElementNode, $getState, RootNode, HISTORY_MERGE_TAG, type 
 import { useDirection } from '@/components/ui/direction'
 import { cn } from '@/lib/utils'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { richTextBounds, richTextBlockTypes, defaultRichTextFonts, safeUrl, typesOf, type RichTextPolicy } from 'mithaq/rich-text'
+import { richTextBounds, richTextBlockTypes, defaultRichTextFonts, safeUrl, typesOf, type RichTextPolicy } from 'mithaq/rich-text/client'
 import { $dfs } from '@lexical/utils'
 import { directionChoice } from 'mithaq-admin/rich-text-choices.ts'
 import { FeatureNodes, useFeatureNodes, type RichTextFeatureModule } from 'mithaq-admin/rich-text-features.tsx'

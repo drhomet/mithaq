@@ -5,7 +5,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $insertNodeToNearestRoot } from '@lexical/utils'
 import type { ClientField } from 'mithaq/admin'
 import { ScreenContext } from 'mithaq/admin/react'
-import { UploadNode } from 'mithaq/rich-text'
+import { UploadNode } from 'mithaq/rich-text/client'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ControlProps, FindApi, FoundPage } from 'mithaq-admin/control-props.ts'

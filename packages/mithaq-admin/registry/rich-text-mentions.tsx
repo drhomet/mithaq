@@ -7,7 +7,8 @@ import { HashtagPlugin } from '@lexical/react/LexicalHashtagPlugin'
 import { HashtagNode } from '@lexical/hashtag'
 import { $applyNodeReplacement, $getRoot, $getSelection, $isRangeSelection, $setSelection, TextNode, type EditorConfig } from 'lexical'
 import { ScreenContext } from 'mithaq/admin/react'
-import { MentionNode, defaultMentionSources, type Mention } from 'mithaq/rich-text'
+import { defaultMentionSources } from 'mithaq/rich-text/client'
+import { MentionNode, type Mention } from 'mithaq/rich-text/mention'
 import { defaultMentionRequest, mentionHref } from 'mithaq-admin/rich-text-mention-access.ts'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
@@ -17,7 +18,7 @@ export class MentionView extends MentionNode {
   createDOM(config: EditorConfig): HTMLElement {
     const text = super.createDOM(config)
     const anchor = document.createElement('a')
-    anchor.className = 'break-words rounded bg-primary/10 px-1 text-primary'
+    anchor.className = `${text.className} break-words rounded bg-primary/10 px-1 text-primary`
     anchor.append(...text.childNodes)
     return anchor
   }
@@ -123,7 +124,7 @@ export function Buttons({ t }: FeatureProps) {
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger render={<Button type="button" variant="outline" size="sm" className="min-h-11 sm:min-h-0" onMouseDown={() => editor.getEditorState().read(() => { const selection = $getSelection(); held.current = $isRangeSelection(selection) ? selection.clone() : null })} />}>{t('admin.richText.emoji', 'Emoji')}</PopoverTrigger>
     <PopoverContent align="end" className="flex w-auto p-1" aria-label={t('admin.richText.emoji', 'Emoji')}>
-      {emoji.map(([name, value]) => <Button key={name} type="button" variant="ghost" className="min-h-11 min-w-11" aria-label={name} onMouseDown={(event) => event.preventDefault()} onClick={() => {
+      {emoji.map(([name, value]) => <Button key={name} type="button" variant="ghost" className="min-h-11 min-w-11" aria-label={t(`admin.richText.emoji.${name}`, name)} onMouseDown={(event) => event.preventDefault()} onClick={() => {
         editor.update(() => { if (held.current) $setSelection(held.current); const selection = $getSelection(); if ($isRangeSelection(selection)) selection.insertText(value) }); setOpen(false)
       }}>{value}</Button>)}
     </PopoverContent>

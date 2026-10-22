@@ -1123,7 +1123,12 @@ Install `mentions` in the project's feature list, or use
 `features`. The add-on provides an `@` picker, a small emoji palette and
 `:smile:`, `:heart:`, `:thumbsup:`, `:check:` and `:tada:` shortcodes. Emoji
 remain ordinary text. Hashtags use Lexical hashtag nodes and accept Arabic.
-No emoji database is bundled.
+No emoji database is bundled. The starter registers each installed phase-2
+module in `RichTextContext.featureModules`. Existing projects must merge
+`templates/mithaq/src/ui/rich-text-nodes.tsx`: register `mentions`, `findReplace`
+and `comments` only when installed, with dynamic imports of their matching
+`mithaq-admin/rich-text-*.tsx` pieces. This keeps omitted tool imports out of
+the browser graph entirely; a field can still narrow the project's selection.
 
 `mentionSources` declares the sources. Its default is `defaultMentionSources`,
 the organization's members through the project's Better Auth `user` provider.
@@ -1143,6 +1148,12 @@ richText({
   ],
 })
 ```
+
+Browser pieces import shared readers and nodes from `mithaq/rich-text/client`,
+which leaves the server factory and its optional imports out of their bundles.
+Browser extensions import the DOM-free `MentionNode` from
+`mithaq/rich-text/mention`; the server rukn registers it automatically. This
+separate import keeps the node class out of clients that omit mentions.
 
 A mention stores `type: 'mention'`, `kayan`, `id`, `name` and `text: '@' + name`,
 alongside Lexical's text metadata. The name is the snapshot at insertion.

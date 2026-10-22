@@ -11,6 +11,8 @@ import type { RichTextPolicy, RichTextValue } from 'mithaq/rich-text'
 
 const { RichTextEditor } = await import('../registry/rich-text-editor.tsx')
 const { defaultNodes, richText, richTextFeatureGuard } = await import('mithaq/rich-text')
+const { RichTextContext, viewsOf, defaultPicks } = await import('../registry/rich-text-picks.tsx')
+const installed = { nodes: viewsOf(defaultNodes), picks: defaultPicks, featureModules: { mentions: () => import('../registry/rich-text-mentions.tsx'), comments: () => import('../registry/rich-text-comments.tsx'), findReplace: () => import('../registry/rich-text-find-replace.tsx') } }
 const { $getRoot, $createTextNode } = await import('lexical')
 const { $generateNodesFromDOM } = await import('@lexical/html')
 const t = (_key: string, fallback?: string) => fallback
@@ -21,7 +23,7 @@ async function withEditor({ value, policy, run }: { value?: unknown; policy?: Ri
   const root = createRoot(host)
   const changes: RichTextValue[] = []
   try {
-    await act(async () => root.render(createElement(RichTextEditor, { value, policy, onChange: (value) => changes.push(value), direction: 'ltr', t, locale: 'en', id: 'policy-editor' })))
+    await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(RichTextEditor, { value, policy, onChange: (value) => changes.push(value), direction: 'ltr', t, locale: 'en', id: 'policy-editor' }))))
     await act(async () => sleep(100))
     const editor = (host.querySelector('#policy-editor') as unknown as { __lexicalEditor: import('lexical').LexicalEditor }).__lexicalEditor
     assert.ok(editor, 'the editor loaded')
@@ -175,7 +177,7 @@ test('a mention viewer removes its link when a fresh record read is refused', as
   const host = mount(), root = createRoot(host)
   const value = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'mention', kayan: 'tags', id: 'dummy-tag', name: 'Snapshot', text: '@Snapshot', version: 1 }] }] } }
   const state = (allowed: boolean) => ({ dir: 'ltr', screen: { path: '/dashboard', kayan: { tags: { fields: [], pages: { edit: { path: '/tags/:id' } } } } }, client: async () => { if (!allowed) throw new Error('Forbidden'); return { id: 'dummy-tag' } } }) as any
-  const render = (allowed: boolean) => root.render(createElement(ScreenContext, { value: state(allowed) }, createElement(RichTextViewer, { value, direction: 'ltr', t })))
+  const render = (allowed: boolean) => root.render(createElement(RichTextContext, { value: installed }, createElement(ScreenContext, { value: state(allowed) }, createElement(RichTextViewer, { value, direction: 'ltr', t }))))
   try {
     await act(async () => { render(true); await sleep(100) })
     await act(async () => sleep(100))

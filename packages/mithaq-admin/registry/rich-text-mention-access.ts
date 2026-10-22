@@ -1,5 +1,5 @@
 import { holds, type AccessReport, type FetchClient, type ScreenClient } from 'mithaq/admin'
-import { defaultMentionSources, type Mention, type MentionSource } from 'mithaq/rich-text'
+import { defaultMentionSources, type Mention, type MentionSource } from 'mithaq/rich-text/client'
 
 /** A cached mention name is public document text; only a fresh authorized read may add a link. */
 export const defaultMentionRequest = (url: string) => fetch(url)

@@ -28,7 +28,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Toggle } from '@/components/ui/toggle'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import type { ReactElement } from 'react'
-import { richTextChoiceFeatures, type RichTextPolicy } from 'mithaq/rich-text'
+import { richTextChoiceFeatures, type RichTextPolicy } from 'mithaq/rich-text/client'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { pickLabel, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { colorChoice, sizeChoice, fontChoice } from 'mithaq-admin/rich-text-choices.ts'

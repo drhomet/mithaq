@@ -1,9 +1,10 @@
 // Adapted from shadcn-editor's MentionNode and Lexical's playground, MIT; see LICENSES/.
 import { $getState, $setState, createState, TextNode, type LexicalUpdateJSON, type SerializedTextNode } from 'lexical'
 
-const kayan = createState('kayan', { parse: (value) => typeof value === 'string' ? value : '' })
-const id = createState('id', { parse: (value) => typeof value === 'string' ? value : '' })
-const name = createState('name', { parse: (value) => typeof value === 'string' ? value : '' })
+// State configs are local allocations, so an uninstalled mention feature can be dropped from clients.
+const kayan = /* @__PURE__ */ createState('kayan', { parse: (value) => typeof value === 'string' ? value : '' })
+const id = /* @__PURE__ */ createState('id', { parse: (value) => typeof value === 'string' ? value : '' })
+const name = /* @__PURE__ */ createState('name', { parse: (value) => typeof value === 'string' ? value : '' })
 export type Mention = { kayan: string; id: string; name: string }
 
 /** DOM-free record identity; the browser resolves permission before drawing any link. */
