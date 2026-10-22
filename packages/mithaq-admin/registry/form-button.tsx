@@ -45,13 +45,13 @@ export function FormButton({ api, busy, copy, id, kayan, kayans, onDelete, opera
   }
   // A delete is the one write nothing brings back, so its button is always the two-step dialog, whatever the node carries.
   if (operation.effect === 'delete') {
-    return <DeleteButton busy={busy} copy={copy} kayan={kayan} label={operationLabelFor({ kayan, operation, copy })} row={value ?? undefined} onDelete={onDelete} />
+    return <DeleteButton wholeRecord busy={busy} copy={copy} kayan={kayan} label={operationLabelFor({ kayan, operation, copy })} row={value ?? undefined} onDelete={onDelete} />
   }
   // A button that asks for no values and carries a confirm asks it in the app's own dialog; any other opens the
   // registry's dialog, which asks the confirm in its heading. Each names the row it runs on.
   const description = value ? rowWarning({ kayan, row: value, operation: operation.name, copy }) : undefined
   if (operation.confirm && !operation.fields?.length) {
-    return <NodeButton node={operation} copy={copy} busy={busy} description={description} run={() => void run({ id }, refuse)} />
+    return <NodeButton destructive={operation.destructive} node={operation} copy={copy} busy={busy} description={description} run={() => void run({ id }, refuse)} />
   }
   return (
     <OperationButton
@@ -63,6 +63,7 @@ export function FormButton({ api, busy, copy, id, kayan, kayans, onDelete, opera
       kayan={kayan}
       kayans={kayans}
       operation={operation}
+      destructive={operation.destructive}
       run={run}
     />
   )

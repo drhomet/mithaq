@@ -119,7 +119,7 @@ export function RelationshipControl(props: ControlProps & { drawRow?: (row: Reco
   // report lets create a row of the target. The server still decides the create.
   const add = use(KayanForm)?.add
   // An upload's picker has its own Upload new, so only a relationship draws the +.
-  const adds = field.kind === 'relationship' && !!add && !!target && !readOnly && props.form !== undefined && createsIn({ kayan: target, report: screenState?.access.collections?.[target.name] })
+  const adds = field.kind === 'relationship' && field.allowCreate !== false && !!add && !!target && !readOnly && props.form !== undefined && createsIn({ kayan: target, report: screenState?.access.collections?.[target.name] })
   /** Every id this field is holding, which is at most one unless the field said otherwise. */
   const held = idsOf(value)
   const many = field.hasMany === true

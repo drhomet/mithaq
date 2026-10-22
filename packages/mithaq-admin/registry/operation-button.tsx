@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { besideLabel, controlFor, useComponents } from 'mithaq-admin/components.tsx'
 import type { FindApi } from 'mithaq-admin/control-props.ts'
 import { operationFieldLabelFor, operationLabelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { solidDestructive } from 'mithaq-admin/delete-button.tsx'
 import { seedOf } from 'mithaq-admin/field-values.ts'
 import { FieldShell, describedBy } from 'mithaq-admin/field-shell.tsx'
 import { issuesOf, refusalWords } from 'mithaq-admin/form-rules.tsx'
@@ -31,6 +32,7 @@ export function OperationButton({
   busy,
   copy,
   description,
+  destructive = false,
   inputOf,
   kayan,
   kayans,
@@ -46,6 +48,7 @@ export function OperationButton({
   onOpenChange?: (open: boolean) => void
   /** What the dialog says it runs on, the row being edited unless the caller says otherwise. */
   description?: string
+  destructive?: boolean
   /** The call's input from what the boxes hold: the row's id beside them on a form or list row, the ticked rows' `where` around them on a bulk. */
   inputOf: (values: Record<string, unknown>) => Record<string, unknown>
   kayan: ClientKayan
@@ -104,7 +107,7 @@ export function OperationButton({
       {controlled.open === undefined ? (
         <AlertDialogTrigger
           render={
-            <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" disabled={busy}>
+            <Button type="button" variant={destructive ? "destructive" : "outline"} className={`min-h-11 sm:min-h-0 ${destructive ? solidDestructive : ""}`} disabled={busy}>
               {label}
             </Button>
           }
@@ -173,7 +176,7 @@ export function OperationButton({
           </div>
           <AlertDialogFooter className="shrink-0 [&_button]:min-h-11 sm:[&_button]:min-h-0">
             <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
-            <AlertDialogAction type="submit" disabled={busy}>
+            <AlertDialogAction variant={destructive ? "destructive" : "default"} className={destructive ? solidDestructive : undefined} type="submit" disabled={busy}>
               {label}
             </AlertDialogAction>
           </AlertDialogFooter>

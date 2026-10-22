@@ -35,6 +35,7 @@ export const tags = defineKayan({
     // as a label, so it is one string per locale, and every screen reads it in
     // the viewer's.
     dashboard: {
+      quickCreate: { fields: ['name'] },
       nav: { icon: 'tags', group: navGroups.library },
       useAsTitle: 'name',
       description: {

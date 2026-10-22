@@ -2794,6 +2794,15 @@
           "cell": "text"
         }
       ],
+      "quickCreate": {
+        "fields": [
+          {
+            "field": "name",
+            "component": "text",
+            "decided": "table"
+          }
+        ]
+      },
       "operations": [
         {
           "name": "create",

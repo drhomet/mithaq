@@ -17,12 +17,16 @@ import { formatDate, listed } from 'mithaq-admin/format.tsx'
 import { rowWarning } from 'mithaq-admin/row-title.tsx'
 import { refusalKeyOf } from 'mithaq-admin/refusal.ts'
 
+// Dark destructive tokens are too light for white text on a solid button.
+export const solidDestructive = 'bg-destructive text-white hover:bg-destructive/90 dark:bg-red-700 dark:text-white dark:hover:bg-red-800'
+
 /**
  * The delete, in two clicks. The dialog stays open until the delete lands, so a refusal is said inside it.
  * With `open` handed in, the dialog is controlled and draws no trigger, so a menu can open it.
  */
 export function DeleteButton({
   busy,
+  wholeRecord = false,
   copy,
   kayan,
   label,
@@ -32,6 +36,8 @@ export function DeleteButton({
   row,
 }: {
   busy: boolean
+  /** Record-page actions are solid; row and inline removes retain their lighter treatment. */
+  wholeRecord?: boolean
   copy: Copy
   kayan: ClientKayan
   label: string
@@ -54,7 +60,7 @@ export function DeleteButton({
       {given === undefined ? (
         <AlertDialogTrigger
           render={
-            <Button type="button" variant="destructive" className="min-h-11 sm:min-h-0" data-button="delete" disabled={busy}>
+            <Button type="button" variant="destructive" className={`min-h-11 sm:min-h-0 ${wholeRecord ? solidDestructive : ""}`} data-button="delete" disabled={busy}>
               {label}
             </Button>
           }
@@ -76,6 +82,7 @@ export function DeleteButton({
           <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
+            className={wholeRecord ? solidDestructive : undefined}
             disabled={busy}
             onClick={async () => {
               setRefused(undefined)

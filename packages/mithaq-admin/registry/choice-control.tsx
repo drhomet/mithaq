@@ -20,7 +20,7 @@ export function ComboboxControl(props: ControlProps): ReactElement {
   const options = props.field.options ?? []
   const label = (value: string) => options.find((one) => one.value === value)?.label[props.locale ?? ''] ?? value
   return <Combobox items={options.map((one) => one.value)} value={typeof props.value === 'string' ? props.value : null} onValueChange={changeOf(props)} itemToStringLabel={label} disabled={props.readOnly}>
-    <ComboboxInput id={props.id} placeholder={props.placeholder} clearLabel={props.t('admin.clear', 'Clear')} triggerLabel={props.t('admin.open', 'Open')} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} />
+    <ComboboxInput showClear={props.field.rules.required !== true && props.value !== null && props.value !== undefined && !props.readOnly} id={props.id} placeholder={props.placeholder} clearLabel={props.t('admin.clear', 'Clear')} triggerLabel={props.t('admin.open', 'Open')} aria-describedby={props.describedBy} aria-required={ariaRequired(props.field)} />
     <ComboboxContent><ComboboxList>{options.map((one) => <ComboboxItem key={one.value} value={one.value}>{label(one.value)}</ComboboxItem>)}</ComboboxList></ComboboxContent>
   </Combobox>
 }

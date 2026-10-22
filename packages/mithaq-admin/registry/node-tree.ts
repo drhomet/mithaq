@@ -139,6 +139,7 @@ export const listOf = (screen: { page: TreePage } | undefined): ListNode | undef
 /** Every field name a tree mentions, at any depth, of the leaves `keep` keeps. */
 export const leavesOf = (nodes: readonly Node[], keep: (leaf: LeafClient) => boolean = () => true): readonly string[] =>
   nodes.flatMap((node): readonly string[] => {
+    if (typeof node === 'string') return keep({ field: node }) ? [node] : []
     const leaf = ofKind(node, 'field')
     return leaf ? (keep(leaf) ? [leaf.field] : []) : leavesOf(inside(node), keep)
   })

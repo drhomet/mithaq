@@ -52,7 +52,7 @@ export function DrawerForm({ edit, onClose, title, ...props }: Omit<FormProps, '
   const [closing, setClosing] = useState(false)
   return (
     <DocumentDrawer title={title} edit={edit} closeLabel={props.t('admin.close', 'Close') ?? 'Close'} onClose={() => (dirty ? setClosing(true) : onClose())}>
-      <Form {...props} onDirty={setDirty} onCancel={onClose} blocked={closing ? { proceed: onClose, reset: () => setClosing(false) } : undefined} />
+      <Form {...props} inlineRefusal onDirty={setDirty} onCancel={onClose} blocked={closing ? { proceed: onClose, reset: () => setClosing(false) } : undefined} />
     </DocumentDrawer>
   )
 }
@@ -81,8 +81,8 @@ function AddDrawer({ api, copy, kayans, made, onClose, target }: Pick<FormProps,
     <DrawerForm
       kayan={target}
       title={newTitleOf({ kayan: target, copy })}
-      // The fields its create page asks for, without the page's shell; every field where it has none.
-      nodes={page && 'page' in page ? formIn(nodesOf(page)) : undefined}
+      // The quick form takes precedence; otherwise reuse the create form without its page shell.
+      nodes={target.quickCreate?.fields ?? (page && 'page' in page ? formIn(nodesOf(page)) : undefined)}
       client={{ create: write('create'), update: write('update'), delete: write('delete') }}
       drafts={target.drafts && report?.operations?.findVersions === true ? {} : undefined}
       operations={report?.operations}
@@ -157,7 +157,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const tree = nodes ?? (screen && nodesOf(screen.page))
   // The fields this form draws a box for, which its summary lists.
   const drawn = new Set(tree ? leavesOf(tree) : kayan.fields.map((field) => field.name))
-  const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse, seed, seeded, setSeed, status, tree, values, onWritten: forgetPublished, done: (landed) => doneWords({ kayan, copy, ...landed }) })
+  const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse, seed, seeded, setSeed, status, tree, values, scope: scopeOf({ values, record: value, access, kayan }), onWritten: forgetPublished, done: (landed) => doneWords({ kayan, copy, ...landed }) })
   const { busy, run, save, readAt, asking, setAsking, leaving } = saving
   // Never while a discard question is open, which says the change is unsaved, nor once a write was refused because
   // the row changed since this form read it: every autosave after it would be refused the same way.
@@ -265,22 +265,29 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // On a screen's page the title is the page's own `title` node, and a form handed its nodes sits in a drawer or a list
   // that titles it, so the form keeps only the sentence under it.
   const chrome = (
-    <FormChrome
-      headed={headed}
-      title={screen || nodes ? undefined : titleOf({ kayan, copy })}
-      about={about}
-      problems={Object.entries(sentences).filter(([name]) => drawn.has(name)).map(([name, sentence]) => ({ id: `${kayan.name}-${name}`, label: labelOf(name), sentence }))}
-      refused={refusals}
-      stale={staleIn(held) ? failedWords({ kayan: kayan.name, copy, thrown: held }) : undefined}
-      views={controlled ? views : undefined}
-      t={t}
-      draft={status === 'changed' ? {
-        busy: busy || autosaved === 'saving',
-        onRestore: operations?.restoreVersion === true && client.run ? () => void run({ write: () => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), effect: 'update', operation: { name: 'restoreVersion' }, next: 'published' }) : undefined,
-        onViewPublished: client.findByID ? () => void choose('published') : undefined,
-        viewing,
-      } : undefined}
-    />
+    <>
+      {props.inlineRefusal && held && !staleIn(held) && !Object.keys(issues).length ? (
+        <p role="alert" className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive">
+          {failedWords({ kayan: kayan.name, copy, thrown: held })}
+        </p>
+      ) : null}
+      <FormChrome
+        headed={headed}
+        title={screen || nodes ? undefined : titleOf({ kayan, copy })}
+        about={about}
+        problems={Object.entries(sentences).filter(([name]) => drawn.has(name)).map(([name, sentence]) => ({ id: `${kayan.name}-${name}`, label: labelOf(name), sentence }))}
+        refused={refusals}
+        stale={staleIn(held) ? failedWords({ kayan: kayan.name, copy, thrown: held }) : undefined}
+        views={controlled ? views : undefined}
+        t={t}
+        draft={status === 'changed' ? {
+          busy: busy || autosaved === 'saving',
+          onRestore: operations?.restoreVersion === true && client.run ? () => void run({ write: () => client.run!('restoreVersion', { id, ...readAt(props.expectedUpdatedAtOn?.includes('restoreVersion')) }), effect: 'update', operation: { name: 'restoreVersion' }, next: 'published' }) : undefined,
+          onViewPublished: client.findByID ? () => void choose('published') : undefined,
+          viewing,
+        } : undefined}
+      />
+    </>
   )
   const unnamed = tree ? [] : kayan.fields.filter((field) => field.kind !== 'join')
   return (

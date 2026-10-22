@@ -115,6 +115,8 @@ export type ScreenField<Ref extends string | Ui = string | Ui> = {
   readonly filter?: true
   readonly searchable?: true
   readonly sortable?: false
+  /** Relationship pickers offer create unless this field opts out. */
+  readonly allowCreate?: boolean
 }
 
 /** When a node is drawn: a `Where` over the form's values, the loaded row under `record.` and the access report under `$user.`. */
@@ -253,6 +255,8 @@ export type ScreenButton<Locale extends string = string, Ref extends string | Ui
   readonly label: Localized<Locale>
   readonly fields?: readonly string[]
   readonly reload?: boolean
+  /** A whole-record destructive action, drawn solid red on a record form. */
+  readonly destructive?: boolean
   readonly component?: Ref
   /** What the button asks before it runs. */
   readonly confirm?: { readonly title: Localized<Locale>; readonly body: Localized<Locale> }
@@ -271,7 +275,9 @@ export type ScreenPage<Locale extends string = string, Ref extends string | Ui =
   | { readonly path: string; readonly component: Ref; readonly page?: never; readonly mode?: never }
 
 /** What `targets.<screen>` on a kayan says, complete for that screen. */
-export type ScreenKayan<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string, Icon extends string = string> = {
+export type ScreenKayan<Locale extends string = string, Ref extends string | Ui = string | Ui, FieldName extends string = string, Icon extends string = string, CreateFieldName extends string = FieldName> = {
+  /** Fields of the same create operation, without a page shell. */
+  readonly quickCreate?: { readonly fields: readonly ScreenNode<Locale, Ref, CreateFieldName>[] }
   readonly nav?: ScreenNav<Locale, Icon>
   readonly useAsTitle?: FieldName
   readonly description?: Localized<Locale>
@@ -347,6 +353,7 @@ export type ButtonClient = {
   label: Localized
   fields?: string[]
   reload?: boolean
+  destructive?: boolean
   component?: string
   confirm?: { title: Localized; body: Localized }
   when?: Where
@@ -409,6 +416,7 @@ export type ClientKayan<Pages extends string = string> = {
   fields: ClientField[]
   operations: { name: string; effect: string; fields?: ClientField[]; updatesMany?: true }[]
   useAsTitle?: string
+  quickCreate?: { fields: NodeClient[] }
   description?: Localized
   /** The rows every list of this kayan on the screen is held to (`ScreenKayan` `baseFilter`). */
   baseFilter?: Where
@@ -462,7 +470,7 @@ export const clientFieldOf = (name: string, field: RuntimeField & { target?: { n
 const word = /^[\p{ID_Start}$_][\p{ID_Continue}$]*$/u
 const targetKeys = ['capability', 'type', 'path', 'kayan', 'controls', 'icons', 'providers', 'pages', 'layouts', 'components']
 const leafKeys = ['field', 'component', 'cell', 'placeholder', 'description', 'readOnly', 'width', 'when']
-const buttonKeys = ['button', 'label', 'fields', 'reload', 'component', 'confirm', 'when']
+const buttonKeys = ['button', 'label', 'fields', 'reload', 'destructive', 'component', 'confirm', 'when']
 const listKeys = ['columns', 'phone', 'card', 'filters', 'search', 'empty', 'menu', 'toolbar', 'bulk', 'row', 'sort', 'limit', 'tabs', 'of', 'where']
 const modes = ['dialog', 'sheet', 'drawer']
 /** Every key of `value` is one `known` names, so nothing reaches `screen.json` unnamed. */
@@ -640,6 +648,7 @@ export const screensOf = (
         cell: own.cell ? ref(`${where} targets.${key}.cell`, 'cell', own.cell, field.kind) : controls[field.kind]!.cell,
         ...(typeof own.width === 'string' && { width: own.width }),
         ...(own.filter === true && { filter: true as const }),
+        ...(typeof own.allowCreate === 'boolean' && { allowCreate: own.allowCreate }),
         ...(own.searchable === true && { searchable: true as const }),
         // So no list offers a sort the server refuses.
         ...((own.sortable === false || field.sortable === false) && { sortable: false as const }),
@@ -951,6 +960,7 @@ export const screensOf = (
             label: copy(`${at} label`, one.label),
             ...(one.fields !== undefined && { fields: [...one.fields] }),
             ...(typeof one.reload === 'boolean' && { reload: one.reload }),
+            ...(typeof one.destructive === 'boolean' && { destructive: one.destructive }),
             ...drawnBy(node, one),
             ...(one.confirm !== undefined && { confirm: { title: copy(`${at} confirm title`, one.confirm.title), body: copy(`${at} confirm body`, one.confirm.body) } }),
           }
@@ -1000,6 +1010,23 @@ export const screensOf = (
       const where = `${screen} kayan "${name}"`
       if (block.useAsTitle !== undefined) fieldNamed(`${where} useAsTitle`, block.useAsTitle)
       const baseFilter = block.baseFilter === undefined ? undefined : scope.whenOf(`${where} baseFilter`, block.baseFilter, true)
+      let quickCreate: ClientKayan['quickCreate']
+      if (block.quickCreate !== undefined) {
+        const at = `${where} quickCreate`
+        named(at, block.quickCreate, ['fields'], 'quick-create form')
+        if (!Array.isArray(block.quickCreate.fields)) throw new Error(`${at} fields is no list of form nodes.`)
+        const quickScope = { ...scope, fieldNamed: (path: string, name: unknown) => {
+          const field = fieldNamed(path, name)
+          const provider = (field.rules.providedBy as { create?: string } | undefined)?.create
+          if (['uuid', 'join'].includes(field.kind) || (provider !== undefined && provider !== 'client')) {
+            throw new Error(`${at} names "${String(name)}", which is not a client-provided create field.`)
+          }
+          return field
+        } }
+        const { nodeOf } = treeOf(quickScope, 'create', false, { form: 0, list: 0 })
+        const form = nodeOf(at, { form: block.quickCreate.fields }) as { form: NodeClient[] }
+        quickCreate = { fields: form.form }
+      }
       const kayanPages: Record<string, PageClient> = {}
       for (const [page, declared] of Object.entries(block.pages ?? {})) {
         const at = `${where} page "${page}"`
@@ -1036,6 +1063,7 @@ export const screensOf = (
         name,
         single: kayan.single === true,
         fields: Object.values(fields),
+        ...(quickCreate && { quickCreate }),
         operations: Object.entries(kayan.operations).map(([operation, declared]) => {
           const input = ((declared.targets as Record<string, { fields?: Record<string, RuntimeField> }> | undefined)?.[key])?.fields
           return {
@@ -1065,8 +1093,15 @@ export const screensOf = (
   return screens
 }
 
+type CreateFieldNames<Fields> = {
+  [Name in keyof Fields & string]: Fields[Name] extends { kind: 'uuid' | 'join' } ? never
+    : Fields[Name] extends { rules: { providedBy: { create: infer Provider } } }
+      ? Provider extends 'client' ? Name : never
+      : Name
+}[keyof Fields & string]
+
 declare module '../mithaq/rukn.ts' {
   interface KayanConfigs<L, F, T> {
-    screen: ScreenKayan<LocalesOf<L>, RefOf<T, L extends { kinds: infer Kinds } ? Kinds : {}>, keyof F & string, IconOf<T>>
+    screen: ScreenKayan<LocalesOf<L>, RefOf<T, L extends { kinds: infer Kinds } ? Kinds : {}>, keyof F & string, IconOf<T>, CreateFieldNames<NoInfer<F>>>
   }
 }

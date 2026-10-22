@@ -3225,15 +3225,15 @@ withScreen.defineKayan({
 type ScreenTargetKeys = Expect<
   Equal<keyof import('mithaq').ScreenTarget, 'capability' | 'type' | 'path' | 'kayan' | 'controls' | 'icons' | 'providers' | 'pages' | 'layouts' | 'components'>
 >
-type ScreenKayanKeys = Expect<Equal<keyof import('mithaq').ScreenKayan, 'nav' | 'useAsTitle' | 'description' | 'baseFilter' | 'pages'>>
+type ScreenKayanKeys = Expect<Equal<keyof import('mithaq').ScreenKayan, 'nav' | 'useAsTitle' | 'description' | 'baseFilter' | 'pages' | 'quickCreate'>>
 type ScreenPageKeys = Expect<Equal<keyof import('mithaq').ScreenPage, 'path' | 'page' | 'mode' | 'component'>>
 type ScreenOwnPageKeys = Expect<Equal<keyof import('mithaq').ScreenOwnPage, 'path' | 'component' | 'nav' | 'permission'>>
 type ScreenLeafKeys = Expect<
   Equal<keyof Exclude<import('mithaq').ScreenLeaf, string>, 'field' | 'component' | 'cell' | 'placeholder' | 'description' | 'readOnly' | 'width' | 'when'>
 >
-type ScreenButtonKeys = Expect<Equal<keyof import('mithaq').ScreenButton, 'button' | 'label' | 'fields' | 'reload' | 'component' | 'confirm' | 'when'>>
+type ScreenButtonKeys = Expect<Equal<keyof import('mithaq').ScreenButton, 'button' | 'label' | 'fields' | 'reload' | 'destructive' | 'component' | 'confirm' | 'when'>>
 type ScreenFieldKeys = Expect<
-  Equal<keyof import('mithaq').ScreenField, 'component' | 'cell' | 'width' | 'filter' | 'searchable' | 'sortable'>
+  Equal<keyof import('mithaq').ScreenField, 'component' | 'cell' | 'width' | 'filter' | 'searchable' | 'sortable' | 'allowCreate'>
 >
 
 // The tenant target: `tenant.field` is the one ownership field, typed exactly, on a language that
@@ -3445,4 +3445,21 @@ withScreen.defineKayan({
     // @ts-expect-error phone names cards or table
     portal: { pages: { list: { path: '/cards', page: { shell: 'shell', main: [{ list: { columns: ['title'], phone: 'tiles' } }] } } } },
   },
+})
+
+withScreen.defineKayan({
+  name: 'quickCreateProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, generated: { kind: 'text', rules: { providedBy: { create: 'application' } } } },
+  targets: { portal: { quickCreate: { fields: ['title', { field: 'title', when: { title: { exists: true } } }] } } },
+})
+withScreen.defineKayan({
+  name: 'quickCreateUnknownProbe', fields: { ...defaultFields, title: { kind: 'text' } },
+  // @ts-expect-error a quick form names create fields of this kayan
+  targets: { portal: { quickCreate: { fields: ['titel'] } } },
+})
+withScreen.defineKayan({
+  name: 'quickCreateProvidedProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, generated: { kind: 'text', rules: { providedBy: { create: 'application' } } } },
+  // @ts-expect-error a quick form cannot ask for an application-provided create field
+  targets: { portal: { quickCreate: { fields: ['generated'] } } },
 })

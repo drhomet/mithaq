@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Copy } from 'mithaq-admin/copy.ts'
 import type { Places } from 'mithaq-admin/screen-refs.ts'
+import { solidDestructive } from 'mithaq-admin/delete-button.tsx'
 import { useConfirm } from 'mithaq-admin/use-confirm.tsx'
 
 /** One button a page draws where its node sits: the operation, and what the node says about it. */
-export type PageButton = ClientKayan['operations'][number] & Pick<ButtonClient, 'label' | 'component' | 'confirm'>
+export type PageButton = ClientKayan['operations'][number] & Pick<ButtonClient, 'label' | 'component' | 'confirm' | 'destructive'>
 
 /**
  * The button a node draws for this actor, when the kayan declares its
@@ -26,7 +27,7 @@ export const pageButtonOf = ({
   const operation = kayan.operations.find((one) => one.name === node.button)
   if (!operation || allowed?.[operation.name] !== true) return undefined
   const fields = operation.fields?.filter((one) => !node.fields || node.fields.includes(one.name))
-  return { ...operation, ...(fields && { fields }), label: node.label, ...(node.component && { component: node.component }), ...(node.confirm && { confirm: node.confirm }) }
+  return { ...operation, ...(fields && { fields }), label: node.label, ...(node.destructive !== undefined && { destructive: node.destructive }), ...(node.component && { component: node.component }), ...(node.confirm && { confirm: node.confirm }) }
 }
 
 /**
@@ -60,12 +61,12 @@ export function OwnButton({
  * It is what a node draws when it asks for no values: a form draws a dialog
  * for an operation that does.
  */
-export function NodeButton({ node, copy, busy, run, description }: { node: Pick<ButtonClient, 'label' | 'confirm'>; copy: Copy; busy: boolean; run: () => void; description?: string }): ReactElement {
+export function NodeButton({ node, copy, busy, run, description, destructive = false }: { destructive?: boolean; node: Pick<ButtonClient, 'label' | 'confirm'>; copy: Copy; busy: boolean; run: () => void; description?: string }): ReactElement {
   const label = node.label[copy.locale]
-  const { ask, dialog } = useConfirm({ confirm: node.confirm, confirmLabel: label ?? '', description, copy })
+  const { ask, dialog } = useConfirm({ confirm: node.confirm, confirmLabel: label ?? '', description, copy, destructive })
   return (
     <>
-      <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" disabled={busy} onClick={() => void ask().then((yes) => yes && run())}>
+      <Button type="button" variant={destructive ? "destructive" : "outline"} className={`min-h-11 sm:min-h-0 ${destructive ? solidDestructive : ""}`} disabled={busy} onClick={() => void ask().then((yes) => yes && run())}>
         {label}
       </Button>
       {dialog}

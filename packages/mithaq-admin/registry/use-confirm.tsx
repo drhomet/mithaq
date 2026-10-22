@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ButtonClient } from 'mithaq/admin'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { solidDestructive } from 'mithaq-admin/delete-button.tsx'
 import type { Copy } from 'mithaq-admin/copy.ts'
 
 /**
@@ -12,12 +13,14 @@ export const useConfirm = ({
   confirm,
   confirmLabel,
   description,
+  destructive = false,
   copy: { t, locale },
 }: {
   confirm: ButtonClient['confirm']
   confirmLabel: string
   /** What the caller says the button runs on, such as a bulk's count of ticked rows, before the confirm's own body. */
   description?: string
+  destructive?: boolean
   copy: Copy
 }) => {
   const [answer, setAnswer] = useState<(yes: boolean) => void>()
@@ -39,7 +42,7 @@ export const useConfirm = ({
         </AlertDialogHeader>
         <AlertDialogFooter className="[&_button]:min-h-11 sm:[&_button]:min-h-0">
           <AlertDialogCancel>{t('admin.cancel', 'Cancel') ?? 'Cancel'}</AlertDialogCancel>
-          <AlertDialogAction data-button="confirm-operation" onClick={onConfirm}>
+          <AlertDialogAction variant={destructive ? "destructive" : "default"} className={destructive ? solidDestructive : undefined} data-button="confirm-operation" onClick={onConfirm}>
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

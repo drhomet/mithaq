@@ -8868,3 +8868,120 @@ test('a table can be inserted from its toolbar before the user focuses the edito
   assert.equal(host.querySelectorAll('table').length, 1)
   assert.equal(host.querySelectorAll('table tr').length, 3)
 })
+
+test('whole-record delete uses solid destructive colours on its trigger and confirm', async () => {
+  const { DeleteButton } = await import('../registry/delete-button.tsx')
+  const host = await render(createElement(DeleteButton, { wholeRecord: true, busy: false, copy: { t, locale: 'en' }, kayan: courses, label: 'Delete course', onDelete: async () => true }))
+  const trigger = host.querySelector('[data-button="delete"]')!
+  assert.match(trigger.className, /bg-destructive(?:\s|$)/)
+  assert.match(trigger.className, /text-white/)
+  await act(async () => click(trigger))
+  const confirm = window.document.querySelector('[data-slot="alert-dialog-action"]')!
+  assert.match(confirm.className, /bg-destructive(?:\s|$)/)
+  assert.match(confirm.className, /text-white/)
+})
+
+test('only whole-record destructive operations receive solid red, including their confirmation', async () => {
+  const { FormButton } = await import('../registry/form-button.tsx')
+  for (const fields of [undefined, [fieldOf({ name: 'reason', kind: 'text' })]]) {
+    const operation = { name: 'archive', effect: 'update', label: { en: 'Archive' }, destructive: true, confirm: { title: { en: 'Archive?' }, body: { en: 'The record will be archived.' } }, fields }
+    const host = await render(createElement(FormButton, { operation, kayan: courses, copy: { t, locale: 'en' }, busy: false, id: 'c1', run: async () => true, refuse: () => {}, onDelete: async () => true }))
+    const trigger = host.querySelector('button')!
+    assert.match(trigger.className, /bg-destructive(?:\s|$)/)
+    await act(async () => click(trigger))
+    assert.match(window.document.querySelector('[data-slot="alert-dialog-action"]')!.className, /bg-destructive(?:\s|$)/)
+  }
+  const { NodeButton } = await import('../registry/node-buttons.tsx')
+  const ordinary = await render(createElement(NodeButton, { node: { label: { en: 'Archive' } }, copy: { t, locale: 'en' }, busy: false, run: () => {} }))
+  assert.doesNotMatch(ordinary.querySelector('button')!.className, /bg-destructive(?:\s|$)/)
+  const rows = await render(createElement(List, { kayan: courses, page: pageOf([{ id: 'c1', title: 'Tajweed' }]), query: {}, t, locale: 'en', onQuery: () => {}, href: (id: string) => `/courses/${id}`, newHref: '/courses/new', operations: { delete: true }, run: async () => ({}) }))
+  await act(async () => click(rows.querySelector('[data-row="c1"] [data-slot="dropdown-menu-trigger"]')!))
+  const remove = window.document.querySelector('[data-row-action="delete"]')!
+  assert.ok(remove)
+  assert.doesNotMatch(remove.className, /bg-destructive(?:\s|$)/)
+  await act(async () => click(remove as unknown as Element))
+  assert.doesNotMatch(window.document.querySelector('[data-slot="alert-dialog-action"]')!.className, /bg-destructive(?:\s|$)/)
+})
+
+test('choice forms seed required defaults, leave unseeded required choices empty, and keep Clear only for optional choices', async () => {
+  for (const component of ['select', 'combobox']) {
+    for (const rules of [{ required: true, defaultValue: 'SAR' }, { required: true }, { required: false }]) {
+      const field = fieldOf({ name: 'currency', kind: 'text', component, rules, placeholder: { en: 'Choose currency' }, options: [{ value: 'SAR', label: { en: 'Riyal' } }, { value: 'USD', label: { en: 'Dollar' } }] })
+      const kayan = { ...courses, fields: [field] }
+      const host = await render(createElement(Form, { kayan, client: recording().client, value: null, t, locale: 'en', onDone: () => {} }))
+      const input = host.querySelector('input[role="combobox"]') as HTMLInputElement | null
+      const trigger = host.querySelector('[data-slot="select-trigger"]')
+      assert.equal(input ? input.value : trigger?.textContent, rules.defaultValue ? 'Riyal' : component === 'select' ? 'Choose currency' : '')
+      if (input) assert.equal(input.placeholder, 'Choose currency')
+      await act(async () => click(input ?? trigger!))
+      const items = [...window.document.querySelectorAll('[role="option"]')]
+      assert.equal(items.some((one) => one.textContent === 'Clear'), component === 'select' && !rules.required)
+      await act(async () => click(items.find((one) => one.textContent === 'Dollar')! as unknown as Element))
+      if (component === 'combobox') {
+        assert.equal(host.querySelector('[data-slot="combobox-clear"]') !== null, !rules.required)
+      } else {
+        await act(async () => click(trigger!))
+        assert.equal([...window.document.querySelectorAll('[role="option"]')].some((one) => one.textContent === 'Clear'), !rules.required)
+      }
+    }
+  }
+})
+
+test('relationship quick create uses its declared form, keeps refusals inside, then selects the new row', async () => {
+  const name = fieldOf({ name: 'name', kind: 'text', rules: { required: true } })
+  const hidden = fieldOf({ name: 'privateNote', kind: 'text', rules: { defaultValue: 'never send this' } })
+  const target: ClientKayan = { ...screen.kayan.tags!, pages: { ...screen.kayan.tags!.pages, create: recordPage([{ form: ['name', 'details'] }], '/tags/new') }, fields: [name, hidden, fieldOf({ name: 'details', kind: 'text' })], quickCreate: { fields: [{ field: 'name' }, { field: 'privateNote', when: { name: { equals: 'secret' } } }] } }
+  const made: Record<string, unknown>[] = []
+  let refuse = true
+  const host = await render(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: ['title', 'tags'] }])), client: recording().client, value: draftRow, t: (key: string, fallback?: string) => key === 'error.quickRefused' ? 'Not allowed here' : fallback, locale: 'en', onDone: () => {}, kayans: [courses, target], api: fakeApi({ tags: [] }).api }), {
+    access: { collections: { tags: { operations: { create: true }, fields: { name: { create: true }, privateNote: { create: true }, details: { create: true } } } } },
+    client: (async ({ input, operation, kayan }: { input: Record<string, unknown>; operation: string; kayan: string }) => {
+      made.push({ input, operation, kayan })
+      if (refuse) throw { data: { key: 'error.quickRefused' } }
+      return { id: 'new-tag', ...input }
+    }) as never,
+  })
+  await act(async () => click(host.querySelector('[data-add-new]')!))
+  let drawer = documentDrawer()!
+  assert.ok(drawer.querySelector('#tags-name'))
+  assert.equal(drawer.querySelector('#tags-details'), null, 'quick form leaves full-create details out')
+  assert.equal(drawer.querySelector('#tags-privateNote'), null, 'conditions hide the seeded note')
+  await act(async () => typeInto(drawer.querySelector('#tags-name')!, 'New tag'))
+  await act(async () => fire(drawer.querySelector('form')!, 'submit'))
+  drawer = documentDrawer()!
+  assert.ok(drawer, 'refusal keeps the drawer open')
+  assert.match(drawer.querySelector('[role="alert"]')?.textContent ?? '', /Not allowed here/)
+  refuse = false
+  await act(async () => fire(drawer.querySelector('form')!, 'submit'))
+  assert.deepEqual(made, [0, 1].map(() => ({ kayan: 'tags', operation: 'create', input: { name: 'New tag' } })))
+  assert.equal(documentDrawer(), null)
+  assert.match(host.querySelector('[data-control="relationship"]')!.textContent!, /New tag/)
+})
+
+test('a relationship field can opt out of create even when the actor may create its target', async () => {
+  const kayan = { ...courses, fields: courses.fields.map((field) => field.name === 'tags' ? { ...field, allowCreate: false } : field) }
+  const host = await render(createElement(Form, { kayan, screen: screenOf(recordPage([{ form: ['tags'] }]), kayan), client: recording().client, value: draftRow, t, locale: 'en', onDone: () => {}, kayans, api: fakeApi({ tags: [] }).api }), {
+    access: { collections: { tags: { operations: { create: true }, fields: { name: { create: true } } } } },
+  })
+  assert.equal(host.querySelector('[data-add-new]') === null, true)
+})
+
+test('a relationship without quickCreate opens the complete create form', async () => {
+  const target: ClientKayan = { ...screen.kayan.tags!, quickCreate: undefined, fields: [fieldOf({ name: 'name', kind: 'text' }), fieldOf({ name: 'details', kind: 'text' })], pages: { ...screen.kayan.tags!.pages, create: recordPage([{ form: ['name', 'details'] }], '/tags/new') } }
+  const host = await render(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: ['tags'] }])), client: recording().client, value: draftRow, t, locale: 'en', onDone: () => {}, kayans: [courses, target], api: fakeApi({ tags: [] }).api }), { access: { collections: { tags: { operations: { create: true }, fields: { name: { create: true }, details: { create: true } } } } } })
+  await act(async () => click(host.querySelector('[data-add-new]')!))
+  assert.ok(documentDrawer()?.querySelector('#tags-name'))
+  assert.ok(documentDrawer()?.querySelector('#tags-details'))
+})
+
+test('a form never sends a filled field after its parent condition hides it', async () => {
+  const kayan = { ...courses, fields: [fieldOf({ name: 'notifications', kind: 'checkbox', rules: { defaultValue: true } }), fieldOf({ name: 'summary', kind: 'text', rules: { defaultValue: 'seed' } })] }
+  const writes = recording()
+  const host = await render(createElement(Form, { kayan, client: writes.client, value: null, screen: screenOf(recordPage([{ form: ['notifications', { section: 'notes', label: { en: 'Notes' }, when: { notifications: { equals: true } }, fields: ['summary'] }] }]), kayan), t, locale: 'en', onDone: () => {} }))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'filled while visible'))
+  await act(async () => click(host.querySelector('#courses-notifications')!))
+  assert.equal(host.querySelector('#courses-summary') === null, true)
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.equal(writes.written.length, 1)
+  assert.deepEqual(writes.written[0], { notifications: false })
+})

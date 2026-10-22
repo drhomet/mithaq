@@ -38,6 +38,41 @@ policy: the screen host (`mithaq-screens-host`), the storage adapters and defaul
 `expectedUpdatedAt` step (`mithaq-expected-updated-at`) and `ui/directional-icon.tsx`. They are the project's
 to edit.
 
+## Relationship quick create and required choices
+
+A relationship in a record form offers `+` when the access report allows the
+actor to create the related kayan and set a client-provided field. The server
+still authorizes the same `create` operation. To hide this action for one field,
+write `targets.dashboard: { allowCreate: false }` on that relationship.
+
+A related kayan can declare its short form on each screen:
+
+<!-- from: templates/features/tags/tags/tags.ts -->
+```ts
+quickCreate: { fields: ['name'] },
+```
+
+The drawer draws these form nodes, including their `when` conditions. Fields
+hidden by conditions stay out of the request, even when they have defaults or
+were filled before being hidden. Without `quickCreate`, it draws the declared
+create page's form, or all fields when there is no create page form. On success,
+the new row is selected and the drawer closes. Refusals remain inside the drawer.
+Required fields omitted from a quick form still need a server default or a value
+provided by the server; quick create does not relax the schema or permissions.
+
+Required option fields start on their declared default, or on their placeholder
+when none exists. They offer no Clear. Optional selects and comboboxes retain
+Clear after selection. A whole-record delete and its confirmation use solid red
+with readable text in both themes. A record-page button can mark another action
+`destructive: true`; its trigger and confirmation receive the same treatment.
+Inline row actions and chip removes keep their existing colours.
+
+After upgrading, regenerate screens. Projects holding these pieces should merge
+`form`, `form-types`, `use-form-save`, `node-tree`, `relationship-control`, `choice-control`,
+`delete-button`, `form-button`, `node-buttons`, `operation-button` and `use-confirm`.
+If you hold `delete-button`, merge its new `solidDestructive` export before
+adopting the other changed buttons. No database migration is needed.
+
 ## Page headers and tabs
 
 `mithaq-admin/page-header.tsx` exports `PageHeader` with optional `breadcrumb`

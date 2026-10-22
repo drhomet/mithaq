@@ -881,6 +881,30 @@ and resolve it with `navIconFor` from `mithaq-admin/components.tsx` to adopt it.
 The starter's named imports live in `ui/nav-icons.ts`; no icon-library lookup
 or dynamic import pulls the whole library into the bundle.
 
+### Quick-create forms
+
+A kayan's `targets.<screen>.quickCreate` declares the form opened by a
+relationship picker's `+`. It uses the same create operation and access report:
+
+<!-- from: templates/features/tags/tags/tags.ts -->
+```ts
+quickCreate: { fields: ['name'] },
+```
+
+`fields` takes form nodes with leaves typed against the kayan's client-provided
+create fields. Groups and `when` conditions work as on a create page. Screen
+construction and `mithaq generate --check` refuse unknown and server-provided
+field names. Omitted required fields still require server defaults or providers.
+Without this declaration, the picker opens the related kayan's full create form.
+A relationship may opt out with `targets.<screen>: { allowCreate: false }`.
+The action is otherwise visible when the actor may create the related kayan.
+The drawer selects the new row and closes only after a successful create; it
+shows refusals inside and never sends fields hidden by its form conditions.
+
+A button node on a record form may declare `destructive: true` to use solid red
+on its trigger and confirmation. Deletes receive that treatment automatically.
+Inline row actions retain their existing treatment.
+
 ### Lists
 
 A list node declares `columns`, `filters`, `search`, `sort`, `limit`, `tabs`,

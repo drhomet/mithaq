@@ -4,7 +4,7 @@ import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { valuesOf } from 'mithaq-admin/field-values.ts'
 import { refusalOf } from 'mithaq-admin/form-rules.tsx'
 import { afterDraft, type DraftOptions, type DraftStatus, type FormProps } from 'mithaq-admin/form-types.tsx'
-import { leavesOf, type Node } from 'mithaq-admin/node-tree.ts'
+import { inside, leavesOf, shown, type Node } from 'mithaq-admin/node-tree.ts'
 import type { Seed, Seeding } from 'mithaq-admin/use-form-seed.tsx'
 import { toast } from 'mithaq-admin/toast.tsx'
 
@@ -21,6 +21,7 @@ export type FormSaveInput = Pick<FormProps, 'client' | 'expectedUpdatedAt' | 'ex
   seeded: (seeding: Seeding) => Seed
   /** The page's nodes, whose leaves are what the form writes; none for a form handed no page. */
   tree?: readonly Node[]
+  scope?: Record<string, unknown>
   /** Whether the server owns a field on this operation, which leaves it out of every write. */
   owned: (field: ClientField) => boolean
   /** Whether the kayan keeps drafts. */
@@ -61,6 +62,7 @@ export const useFormSave = ({
   setSeed,
   status,
   tree,
+  scope,
   values,
 }: FormSaveInput) => {
   const [busy, setBusy] = useState(false)
@@ -115,7 +117,15 @@ export const useFormSave = ({
   const writable = () => {
     // A page's form writes only what the page names and draws writable: sending a field it leaves out would
     // overwrite whatever was saved since. A field a control or panel set through `setValue` counts as named.
-    const names = tree && new Set([...leavesOf(tree, (leaf) => !leaf.readOnly), ...named.current])
+    const visible = (nodes: readonly Node[]): readonly Node[] => nodes.flatMap((node) => {
+      if (scope && !shown(node, scope)) return []
+      return typeof node === 'string' ? [{ field: node }] : 'field' in node ? [node] : visible(inside(node))
+    })
+    const declared = tree && new Set(leavesOf(tree))
+    const visibleTree = tree && visible(tree)
+    const drawn = visibleTree && new Set(leavesOf(visibleTree))
+    // A value set before its condition hid the field must stay out of the request too.
+    const names = tree && new Set([...leavesOf(visibleTree!, (leaf) => !leaf.readOnly), ...[...named.current].filter((name) => !declared!.has(name) || drawn!.has(name))])
     return (names ? kayan.fields.filter((field) => names.has(field.name)) : kayan.fields).filter((field) => !owned(field))
   }
 

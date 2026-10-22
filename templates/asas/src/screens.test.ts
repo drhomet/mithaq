@@ -567,7 +567,7 @@ test('a button sits in any region with its confirm, the title and nav nodes proj
   )
   assert.throws(
     () => build({ pages: { ...pages, create: create(['title', { button: 'archive', label, position: 'header' }]) } }),
-    /form button "archive" carries "position", which a button does not take\. A button takes button, label, fields, reload, component, confirm, when\./,
+    /form button "archive" carries "position", which a button does not take\. A button takes button, label, fields, reload, destructive, component, confirm, when\./,
     'where it sits is its position',
   )
 })
@@ -1366,4 +1366,23 @@ test('a list defaults to phone cards, may declare a phone table and refuses card
   assert.throws(() => node({ phone: 'table', card: ['fee'] }), /card.*phone.*table/)
   assert.throws(() => node({ phone: 'table', card: [] }), /card.*phone.*table/)
   assert.throws(() => node({ phone: 'tiles' }), /phone.*cards.*table/)
+})
+
+test('quick-create forms project their create fields and refuse unknown or server-provided fields before generation', () => {
+  const quickCreate = { fields: ['title', { field: 'summary', when: { currency: { equals: 'SAR' } } }] }
+  const client = build({ pages, quickCreate }).targets.dashboard.client.kayan.courses!
+  assert.deepEqual(client.quickCreate?.fields.map((one) => 'field' in one ? one.field : undefined), ['title', 'summary'])
+  for (const field of ['titel', 'id', 'createdAt']) {
+    assert.throws(() => build({ pages, quickCreate: { fields: [field] } }), /quickCreate.*(not a field|not a client-provided create field)/)
+  }
+  const destructive = build({ pages: { ...pages, edit: { ...pages.edit, page: record({ main: [{ form: ['title'] }], danger: [{ button: 'archive', label: archive, destructive: true, confirm: { title: archive, body: label } }] }) } } }).targets.dashboard.client.kayan.courses!
+  assert.equal(treeOf(destructive.pages.edit).main[0]!.danger![0]!.destructive, true)
+})
+
+test('relationship create opt-out survives the browser projection', () => {
+  const language = screens()
+  const suppliers = language.defineKayan({ name: 'suppliers', fields: { ...defaultFields, name: { kind: 'text' } } })
+  const courses = language.defineKayan({ name: 'courses', fields: { ...defaultFields, supplier: { kind: 'relationship', relationTo: () => suppliers, targets: { dashboard: { allowCreate: false } } } } })
+  const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [courses, suppliers] })
+  assert.equal(asas.targets.dashboard.client.kayan.courses!.fields.find((field) => field.name === 'supplier')!.allowCreate, false)
 })

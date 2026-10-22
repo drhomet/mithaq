@@ -74,6 +74,8 @@ export type FormProps = {
   screen?: ScreenPage
   /** What the host draws a list node on this page with. A host that hands none draws no list. */
   related?: Draw['list']
+  /** Keeps a drawer's general refusal beside its fields rather than only in a toast. */
+  inlineRefusal?: boolean
   /** The nodes this form draws in place of a page, as one form node and no shell. They win over `screen`'s page. */
   nodes?: readonly Node[]
   /**
