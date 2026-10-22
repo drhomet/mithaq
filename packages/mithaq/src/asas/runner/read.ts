@@ -19,6 +19,7 @@ type CountRead = {
   result?: number[]
 }
 // Server-only context, never an HTTP input or a caller-supplied read option.
+// The kayan-name match also makes an access callback's find of that kayan return an empty page during a count.
 const countReads = new AsyncLocalStorage<CountRead>()
 
 /** What a `find` list takes where it declares no input of its own. */
