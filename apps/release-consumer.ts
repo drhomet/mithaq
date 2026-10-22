@@ -312,7 +312,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     }
     {
       const { RESEND_API_KEY: _key, MAIL_FROM: _from, ...unmailed } = production
-      const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./src/mithaq/auth/index.ts')"], { cwd: language, encoding: 'utf8', env: { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' } })
+      const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./src/asas.ts')"], { cwd: template, encoding: 'utf8', env: { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' } })
       assert.notEqual(refused.status, 0, `${name}: a production start with no mailer is refused`)
       assert.match(refused.stderr, /passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM/, refused.stderr)
     }
