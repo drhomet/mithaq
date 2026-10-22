@@ -43,7 +43,8 @@ export const joinRole: string | null = null
 /**
  * Whether a new account proves its address by a mailed link before it signs in, read with an open
  * sign-up: in `'one'`, before it joins too. `'many'` takes `true`: anyone founds an organization
- * there, so a sign-up must tell nobody which addresses have an account.
+ * there, so a sign-up must tell nobody which addresses have an account. Administrator delivery
+ * requires `false`; choose email delivery to require verification.
  */
 export const verifyEmail: boolean = true
 
@@ -80,4 +81,4 @@ export const nameIn = ({ name, names }: { name: string; names?: unknown }, local
 }
 
 /** Password links are copied or shared by an administrator, or mailed through Resend. Change this per project. */
-export const passwordDelivery: 'admin' | 'email' = 'admin'
+export const passwordDelivery: 'admin' | 'email' = 'email'

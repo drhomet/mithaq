@@ -114,6 +114,7 @@ test('an expired reset link is refused and changes nothing', async () => {
  * own URL, because every guard of the module is read once, at import.
  */
 const importedUnder = async (env: Record<string, string>) => {
+  env = { RESEND_API_KEY: '', MAIL_FROM: '', ...env }
   // `NODE_ENV` is typed read-only, and written here through a plain record.
   const vars: Record<string, string | undefined> = process.env
   const was = Object.fromEntries(Object.keys(env).map((key) => [key, vars[key]]))
@@ -131,7 +132,7 @@ const importedUnder = async (env: Record<string, string>) => {
 test('password reset is off without an email delivery mailer, and explicit test mailers can deliver links', async () => {
   // A deploy run with plain node and BETTER_AUTH_URL unset falls back to localhost.
   assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
-  const server = betterAuthServer({ ...authOptions().options, database: memoryAdapter(tables()), secret: 'test-secret' })
+  const server = betterAuthServer({ ...authOptions({}, { ...authSettings, mailer: undefined }).options, database: memoryAdapter(tables()), secret: 'test-secret' })
   await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
   let held = new Response()
   const log = await printed(async () => (held = await server.api.requestPasswordReset({ body: { email: 'held@example.com' }, asResponse: true })))
@@ -151,7 +152,7 @@ test('off a local host, or in production, the auth setup refuses to start withou
   }
   for (const [deploy, env] of Object.entries(deploys)) {
     const bare = await importedUnder(env)
-    assert.throws(() => bare.serverFor(bare.authSettings)({} as never, { referenced: async () => 0 }), /needs a mailer in production[\s\S]*RESEND_API_KEY/, `${deploy}: boot refuses without a mailer`)
+    assert.throws(() => bare.serverFor(bare.authSettings)({} as never, { referenced: async () => 0 }), /(?:needs a mailer in production|passwordDelivery is email)[\s\S]*RESEND_API_KEY/, `${deploy}: boot refuses without a mailer`)
     const imported = await importedUnder({ ...env, RESEND_API_KEY: 're_never_sent', MAIL_FROM: 'mail@example.com' })
     assert.equal(imported.options.rateLimit.enabled, true, `${deploy}: and with one the provider rate limits`)
   }
@@ -307,7 +308,7 @@ registerHooks({ load: (url, context, next) => {
 
 test('production requires mail for open sign-up and email password delivery; invitation-only administrator delivery needs none', () => {
   const open = { ...school, signUp: 'open' as const }
-  for (const [name, settings] of [['one, open', open], ['one, by invitation', school], ['many', authSettings]] as const) {
+  for (const [name, settings] of [['one, open', open], ['one, by invitation', { ...school, passwordDelivery: 'admin', verifyEmail: false }], ['many', authSettings]] as const) {
     if (settings.signUp === 'open') assert.match(problems({ ...settings, mailer: undefined }, true).join('\n'), /needs a mailer in production[\s\S]*RESEND_API_KEY/, name)
     else assert.deepEqual(problems({ ...settings, mailer: undefined }, true), [], name)
     assert.deepEqual(problems({ ...settings, mailer }, true), [], `${name}, with a mailer`)
@@ -414,4 +415,22 @@ test('the project configured for email imports without delivery credentials', as
   const result = spawnSync(process.execPath, ['--import', loader, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./index.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, RESEND_API_KEY: '', MAIL_FROM: '' } })
   assert.equal(result.status, 0, 'loading declarations for generation does not boot delivery')
   assert.equal(result.stderr.includes('RESEND_API_KEY'), false)
+})
+
+
+test('administrator delivery refuses required mailbox verification and names both fixes', () => {
+  const refused = { ...school, passwordDelivery: 'admin' as const, verifyEmail: true }
+  assert.match(problems(refused).join(' '), /passwordDelivery.*admin.*verifyEmail.*true.*email.*false/)
+  assert.throws(() => serverFor(refused)({} as never, { referenced: async () => 0 }), /passwordDelivery.*admin.*verifyEmail.*true.*email.*false/)
+  assert.deepEqual(problems({ ...refused, verifyEmail: false }), [])
+  assert.deepEqual(problems({ ...refused, passwordDelivery: 'email' }), [])
+})
+
+test('generate --check refuses administrator delivery with verification before reading the database', async () => {
+  const { spawnSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const loader = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'; registerHooks({ load(url, context, next) { const loaded = next(url, context); return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace(/(export const passwordDelivery:.* = )'(?:admin|email)'/, "$1'admin'") } : loaded } })`)}`
+  const result = spawnSync(process.execPath, ['--import', loader, '../../packages/mithaq/src/asas/cli/mithaq.ts', 'generate', '--check'], { cwd: fileURLToPath(new URL('../../../../asas/', import.meta.url)), encoding: 'utf8', env: process.env })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /passwordDelivery.*admin.*verifyEmail.*true.*email.*false/)
 })

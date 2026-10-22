@@ -301,13 +301,14 @@ const keepOnly = ({ project, chosen }) => {
  * the courses example are students; without the roles add-on nobody is given a role on joining. Every
  * open sign-up proves its address.
  */
-export function organizationSettings({ organizations = 'one', showOrganization = true, signUp, chosen, organizationName }) {
+export function organizationSettings({ organizations = 'one', showOrganization = true, signUp, chosen, organizationName, passwordDelivery = 'admin' }) {
   if (organizations === 'none') throw new Error('--organizations is one or many, not "none": one organization never shown is --organizations one --show-organization no.')
   if (!['one', 'many'].includes(organizations)) throw new Error(`--organizations is one or many, not "${organizations}".`)
   if (signUp !== undefined && !['invite', 'open'].includes(signUp)) throw new Error(`--sign-up is invite or open, not "${signUp}".`)
   const many = organizations === 'many'
   if (many && signUp === 'invite') throw new Error('many organizations take --sign-up open: each sign-up founds its own.')
   if (many && !showOrganization) throw new Error('many organizations are shown by name: a person who belongs to several switches between them.')
+  if (many && passwordDelivery === 'admin') throw new Error('many organizations require mailbox verification: choose --password-delivery email.')
   // One line of 1 to 100 characters, as the auth setup keeps an organization's name, so the project loads.
   for (const one of Object.values(organizationName ?? {})) {
     if (typeof one !== 'string' || !one.trim() || one.length > 100 || /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]/u.test(one)) throw new Error('--organization-name is one line of 1 to 100 characters.')
@@ -317,7 +318,7 @@ export function organizationSettings({ organizations = 'one', showOrganization =
     showOrganization,
     signUp: signUp ?? (many ? 'open' : 'invite'),
     joinRole: !many && chosen.includes('courses') ? 'student' : null,
-    verifyEmail: true,
+    verifyEmail: passwordDelivery === 'email',
     allowedDomains: [],
     // The Arabic falls back to the English, so the language never reads an organization with no name.
     ...(organizationName?.en && { organizationName: { en: organizationName.en.trim(), ar: organizationName.ar?.trim() || organizationName.en.trim() } }),
@@ -350,7 +351,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   if (!['admin', 'email'].includes(passwordDelivery)) throw new Error('--password-delivery is admin or email.')
   const features = resolveRichTextFeatures(richTextAsked)
   const { chosen } = resolveAddOns([...asked, ...(richTextAsked !== undefined ? ['rich-text'] : [])])
-  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
+  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName, passwordDelivery })
   const backoffice = chosen.includes('backoffice')
   if (layout === 'single' && backoffice) throw new Error('A single package serves the tenant app alone. Choose the monorepo layout to include the backoffice console.')
   const project = join(cwd, name)
@@ -378,7 +379,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   keepOnly({ project, chosen })
   if (chosen.includes('rich-text')) edit(join(project, 'packages/mithaq/src/mithaq/rich-text-features.ts'), (text) => text.replace(/features: .* as const,/, `features: [...defaultRichTextFeatures${features.map((one) => `, '${one}'`).join('')}] as const,`))
   writeOrganizations(join(project, 'packages/mithaq/src/mithaq/auth/organizations.ts'), settings)
-  edit(join(project, 'packages/mithaq/src/mithaq/auth/organizations.ts'), (text) => text.replace(/(export const passwordDelivery: 'admin' \| 'email' = )'admin'/, `$1'${passwordDelivery}'`))
+  edit(join(project, 'packages/mithaq/src/mithaq/auth/organizations.ts'), (text) => text.replace(/(export const passwordDelivery: 'admin' \| 'email' = )'(?:admin|email)'/, `$1'${passwordDelivery}'`))
   // One `.env` for the asas's commands and one for each app's dev server,
   // the same secrets in each: the tenant app and the backoffice console sign
   // and read each other's sessions under one `BETTER_AUTH_SECRET`.
@@ -496,7 +497,7 @@ const main = async () => {
   const { version } = readJson(new URL('package.json', import.meta.url))
   const organizationName = named ? { en: named, ...(namedInArabic && { ar: namedInArabic }) } : undefined
   const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, richText: values['rich-text']?.split(',').filter(Boolean), passwordDelivery, organizations, showOrganization, signUp, organizationName })
-  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
+  const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName, passwordDelivery })
   console.log(`Created ${project}${chosen.length ? `, with ${chosen.join(', ')}` : ', minimal'}.`)
   const manager = managerOf(process.env.npm_config_user_agent)
   const installed = manager !== undefined && spawnSync(manager, ['install'], { cwd: project, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0

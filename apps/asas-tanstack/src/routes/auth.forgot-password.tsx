@@ -18,12 +18,15 @@ export const Route = createFileRoute('/auth/forgot-password')({
 })
 
 function ForgotPassword() {
+  return passwordDelivery === 'admin' ? <AdminForgotPassword /> : <EmailForgotPassword />
+}
+
+export function AdminForgotPassword() {
   const { t } = useCopy()
   const search = Route.useSearch()
   const { signedIn, home, screens } = Route.useRouteContext()
   if (signedIn) return <AlreadySignedIn redirect={search.redirect} home={home} screens={screens} />
-  if (passwordDelivery === 'admin') return <AuthFrame title={t('auth.forgotPassword', 'Forgot password')} description={t('auth.askAdministrator', 'Ask your administrator for a password link.')}><p className="text-center"><Link className="text-primary inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4 sm:inline sm:min-h-0 sm:min-w-0" to="/auth/sign-in" search={{ redirect: search.redirect }}>{t('auth.backToSignIn', 'Back to login')}</Link></p></AuthFrame>
-  return <EmailForgotPassword />
+  return <AuthFrame title={t('auth.forgotPassword', 'Forgot password')} description={t('auth.askAdministrator', 'Ask your administrator for a password link.')}><p className="text-center"><Link className="text-primary inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4 sm:inline sm:min-h-0 sm:min-w-0" to="/auth/sign-in" search={{ redirect: search.redirect }}>{t('auth.backToSignIn', 'Back to login')}</Link></p></AuthFrame>
 }
 
 export function EmailForgotPassword() {

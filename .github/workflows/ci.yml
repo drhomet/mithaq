@@ -17,6 +17,10 @@ concurrency:
 env:
   # Not 5432 or 55439, which testDatabase refuses as dev databases; the tests drop and rebuild it.
   DATABASE_URL: postgres://postgres:postgres@localhost:55432/mithaq
+  # The repository's many-organization example requires email delivery; tests never send externally.
+  RESEND_API_KEY: re_ci_never_sent
+  MAIL_FROM: Tests <mail@example.com>
+  RESEND_BASE_URL: http://127.0.0.1:9
 
 jobs:
   test:

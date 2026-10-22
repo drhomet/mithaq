@@ -412,7 +412,7 @@ test('a signed-in person reads the invitation and accepts it with one press, and
 
 
 test('administrator forgot-password asks for a link without an email form or an account lookup', async () => {
-  const adminForgot = (await import('./routes/auth.forgot-password.tsx')).Route.options.component!
+  const adminForgot = (await import('./routes/auth.forgot-password.tsx')).AdminForgotPassword
   const { host, unmount } = await start('/auth/forgot-password', adminForgot)
   try {
     assert.equal(host.querySelector('form'), null)
