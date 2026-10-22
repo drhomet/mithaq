@@ -15,7 +15,7 @@ assert.equal(packed.status, 0, `apps/pack.ts failed:\n${packed.stdout}\n${packed
 
 const tracked = (path: string) => execFileSync('git', ['ls-files', path], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean).map((file) => file.slice(path.length + 1)).sort()
 const filesUnder = (folder: string) => readdirSync(join(staged, folder), { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name).slice(join(staged, folder).length + 1)).sort()
-const guides = ['packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']
+const guides = ['packages/mithaq/README.md', 'packages/mithaq/src/auth/better-auth/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']
 
 test('the mithaq package ships each user guide as the repository holds it, and every link between them resolves inside the package', () => {
   assert.deepEqual(filesUnder('docs'), execFileSync('git', ['ls-files', ...guides], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean).sort(), 'the tracked guides alone, no contributor AGENTS.md')

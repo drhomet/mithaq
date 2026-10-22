@@ -23,6 +23,7 @@ import { toast } from 'mithaq-admin/toast.tsx'
 import type { ComponentType } from 'react'
 import { Pagination } from 'mithaq-admin/list-pagination.tsx'
 import { useScreen } from 'mithaq/admin/react'
+import { IssuePasswordLink, PasswordLink } from 'mithaq-admin/password-link.tsx'
 import type { Member, Role } from 'mithaq-admin/member-types.ts'
 
 export type MembersOptions = {
@@ -75,7 +76,7 @@ export function AddPerson({ sheet, roles, onInvited, options }: { options: Membe
   const [busy, setBusy] = useState(false)
   const [refusal, setRefusal] = useState<string>()
   // Answered only where no mailer is configured: the administrator hands it over.
-  const [link, setLink] = useState<string>()
+  const [link, setLink] = useState<{ link: string; expiresAt: string; emailFailed?: boolean; user: { id: string } }>()
   const add = async () => {
     if (!name.trim() || !email.trim()) return setRefusal(t('auth.required', 'This field is required.'))
     setBusy(true)
@@ -85,15 +86,15 @@ export function AddPerson({ sheet, roles, onInvited, options }: { options: Membe
       const key = refusedKey(refusalKey, answered)
       return setRefusal((key && t(key)) || t('dashboard.addPersonRefused', 'The server refused to add that person.'))
     }
-    const body = answered.body as { added?: boolean; link?: string; invited?: boolean; invitation?: { id: string; email: string; role?: string; expiresAt: string } }
+    const body = answered.body as { added?: boolean; link?: string; expiresAt?: string; emailFailed?: boolean; user?: { id: string }; invited?: boolean; invitation?: { id: string; email: string; role?: string; expiresAt: string } }
     if (body.invited && body.invitation) {
       onInvited(inviteOf(body.invitation))
       toast.success((t('dashboard.inviteSent', 'Invitation sent to {email}') ?? 'Invitation sent to {email}').replace('{email}', () => body.invitation!.email))
       return sheet.current?.close()
     }
-    if (body.link) {
+    if (body.link && body.expiresAt && body.user) {
       toast.success((t('dashboard.personAddedLink', '{name} added. Hand them the link below.') ?? '{name} added. Hand them the link below.').replace('{name}', () => name.trim()))
-      return setLink(body.link)
+      return setLink({ link: body.link, expiresAt: body.expiresAt, emailFailed: body.emailFailed, user: body.user })
     }
     toast.success((t('dashboard.personAdded', '{name} added. A link to choose a password was sent to {email}.') ?? '{name} added. A link to choose a password was sent to {email}.').replace('{name}', () => name.trim()).replace('{email}', () => email.trim()))
     sheet.current?.close()
@@ -121,7 +122,7 @@ export function AddPerson({ sheet, roles, onInvited, options }: { options: Membe
           <p className="text-muted-foreground">{t('dashboard.addPersonAbout', 'They get an account here and a link by email to choose their password. Someone who already has an account is sent an invitation instead.')}</p>
         </header>
         {link ? (
-          <HandedLink link={link} said={t('dashboard.addPersonLink', 'No mailer is configured. Hand this link to them alone: it chooses their password and lasts 48 hours.')} />
+          <PasswordLink key={link.link} link={link.link} expiresAt={link.expiresAt} emailFailed={link.emailFailed} cancel={async () => { const response = await authArm('organization/cancel-password-link', { userId: link.user.id }); if (!response.ok) throw new Error('Cancellation refused') }} />
         ) : (
           <>
             <FieldShell id={nameId} label={t('dashboard.membersName', 'Name') ?? 'Name'}>
@@ -145,20 +146,6 @@ export function AddPerson({ sheet, roles, onInvited, options }: { options: Membe
         </footer>
       </form>
     </dialog>
-  )
-}
-
-/** A link answered where no mailer is configured, for the administrator to hand over, in a box that selects itself. */
-function HandedLink({ link, said }: { link: string; said: ReactNode }) {
-  const { t } = useLocale()
-  return (
-    <div data-handed-link="" className="grid gap-2">
-      <p>{said}</p>
-      <Input readOnly dir="ltr" value={link} aria-label={t('dashboard.link', 'Link')} onFocus={(event) => event.currentTarget.select()} />
-      <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => void navigator.clipboard.writeText(link).then(() => toast.success(t('dashboard.inviteCopied', 'Link copied') ?? 'Link copied'))}>
-        {t('dashboard.inviteCopy', 'Copy link')}
-      </Button>
-    </div>
   )
 }
 
@@ -280,6 +267,7 @@ export function MemberRoles({ member, roles, onHeld, options, children }: { opti
       </div> : null,
       more: null,
       main: <div className={`mx-auto grid w-full max-w-3xl gap-4${edits ? ' pb-20 sm:pb-0' : ''}`}>
+        {holds(access, 'member.create') && member.email !== me ? <IssuePasswordLink userId={member.userId} phone={member.phone} authArm={options.authArm} /> : null}
         <section data-member-page={member.userId}>
           <form
             id={formId} method="post"
@@ -398,7 +386,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
   const [roleShown, setRoleShown] = useState('')
   const [removing, setRemoving] = useState<Member>()
   const [busy, setBusy] = useState(false)
-  const [handed, setHanded] = useState<{ name: string; link: string }>()
+  const [handed, setHanded] = useState<{ name: string; link: string; userId: string; expiresAt: string; phone?: string; emailFailed?: boolean }>()
   const handedSheet = useRef<HTMLDialogElement>(null)
   const addSheet = useRef<HTMLDialogElement>(null)
   const table = useRef<HTMLTableElement>(null)
@@ -411,7 +399,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
   const cancels = holds(access, 'invitation.cancel')
   const invites = loaderData?.invites !== undefined
   // With one organization an administrator adds people directly, and sends one a new password link the same way.
-  const adds = organizations === 'one' && holds(access, 'member.create')
+  const adds = holds(access, 'member.create')
   const seesLastSeen = holds(access, 'member.fields.lastSeenAt')
   const [inviting, setInviting] = useState(false)
   const [email, setEmail] = useState('')
@@ -485,8 +473,9 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
     const answered = await authArm('organization/send-password-link', { userId: member.userId })
     if (!answered.ok) return void toast.error(refused(answered, t('dashboard.passwordLinkRefused', 'The server refused to send that link.')))
     const link = (answered.body as { link?: unknown } | null)?.link
-    if (typeof link === 'string') {
-      setHanded({ name: member.name, link })
+    const expiresAt = (answered.body as { expiresAt?: string } | null)?.expiresAt
+    if (typeof link === 'string' && expiresAt) {
+      setHanded({ name: member.name, link, userId: member.userId, expiresAt, phone: member.phone, emailFailed: answered.body?.emailFailed === true })
       return handedSheet.current?.showModal()
     }
     toast.success((t('dashboard.passwordLinkSent', 'A link to choose a password was sent to {email}') ?? 'A link to choose a password was sent to {email}').replace('{email}', () => member.email))
@@ -564,7 +553,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
   // Development has no mailer, so the page says how an invitation or a password link reaches anyone there.
   const noMailer = development && (invites || adds) ? (
     <p data-no-mailer="" role="note" className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
-      {t('dashboard.inviteNoMailer', 'No mailer is configured, so no email is sent. In development the link is written to the server log, and each pending invitation has a link to copy.')}
+      {t('dashboard.inviteNoMailer', 'Each pending invitation has a link to copy and share privately.')}
     </p>
   ) : null
   const inviteButton = (primary: boolean) => (
@@ -777,7 +766,7 @@ export function Members({ loaderData, options }: { loaderData?: MembersData; opt
                 <div className="grid gap-4 p-6 text-sm">
                   <h2 className="text-base font-medium">{t('dashboard.passwordLink', 'Send a new password link')}</h2>
                   {handed ? (
-                    <HandedLink link={handed.link} said={(t('dashboard.passwordLinkHanded', 'No mailer is configured. Hand this link to {name} alone: it chooses their password and lasts 48 hours.') ?? '').replace('{name}', () => handed.name)} />
+                    <PasswordLink key={handed.link} link={handed.link} expiresAt={handed.expiresAt} emailFailed={handed.emailFailed} phone={handed.phone} cancel={async () => { const response = await authArm('organization/cancel-password-link', { userId: handed.userId }); if (!response.ok) throw new Error('Cancellation refused') }} />
                   ) : null}
                   <footer className="flex justify-end">
                     <Button type="button" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => handedSheet.current?.close()}>{t('admin.close', 'Close')}</Button>

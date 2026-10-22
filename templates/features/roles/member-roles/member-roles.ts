@@ -128,6 +128,21 @@ const keepsAManager = async (ctx: Ctx, tools: WriteTools): Promise<Ctx> => {
   return ctx
 }
 
+/** Promotion spends older links in the same transaction, so demotion never revives them. */
+const cancelsPasswordLinks = async (ctx: Ctx): Promise<Ctx> => {
+  const data = { ...ctx.dataBefore, ...(ctx.data as Record<string, unknown>) }
+  const role = String(data.role)
+  const keys = Object.hasOwn(tenantRoles, role)
+    ? tenantRoles[role as keyof typeof tenantRoles].permissions
+    : (await txOf(ctx).execute<{ permissions: string[] }>(sql`select permissions from roles where organization_id = ${ctx.tenant} and name = ${role}`)).rows[0]?.permissions ?? []
+  if (!managesRoles(keys)) return ctx
+  // Issuance and redemption take this lock too. The member predicate keeps a shared account's
+  // other organizations out of this role write's authority.
+  await txOf(ctx).execute(sql`select id from "user" where id = ${String(data.user)} and exists (select 1 from member where user_id = ${String(data.user)} and organization_id = ${ctx.tenant}) for update`)
+  await txOf(ctx).execute(sql`delete from verification where value = ${String(data.user)} and identifier like 'reset-password:%' and exists (select 1 from member where user_id = ${String(data.user)} and organization_id = ${ctx.tenant})`)
+  return ctx
+}
+
 /**
  * Who holds which of this project's roles, per tenant: one row per member per
  * role. It exists so that Better Auth's own `member.role` never carries a
@@ -167,8 +182,8 @@ export const memberRoles = defineKayan({
         // tenant roles alone, so a backoffice role such as `support` reads as an
         // unknown custom role and is refused 400. `'roles'` is the kayan it reads
         // the tenant's custom roles from.
-        create: { steps: ({ steps }) => [assignableRole(tenantRoles, 'roles'), steps.insert] },
-        update: { steps: ({ steps }) => [assignableRole(tenantRoles, 'roles'), keepsOwnManager, keepsAManager, steps.update] },
+        create: { steps: ({ steps }) => [assignableRole(tenantRoles, 'roles'), cancelsPasswordLinks, steps.insert] },
+        update: { steps: ({ steps }) => [assignableRole(tenantRoles, 'roles'), keepsOwnManager, keepsAManager, cancelsPasswordLinks, steps.update] },
         // Removing an assignment is measured the way handing it out is. Without it
         // an actor delegated `memberRoles.delete` removes the tenant's only
         // administrator row. The guard reads the row the store holds, because a

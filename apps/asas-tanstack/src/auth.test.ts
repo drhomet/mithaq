@@ -17,7 +17,7 @@ const { createRoot } = await import('react-dom/client')
 const { Outlet, RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } = await import('@tanstack/react-router')
 const signUp = (await import('./routes/auth.sign-up.tsx')).Route.options.component!
 const signIn = (await import('./routes/auth.sign-in.tsx')).Route.options.component!
-const forgot = (await import('./routes/auth.forgot-password.tsx')).Route.options.component!
+const forgot = (await import('./routes/auth.forgot-password.tsx')).EmailForgotPassword
 const reset = (await import('./routes/auth.reset-password.tsx')).Route.options.component!
 const setPassword = (await import('./routes/auth.set-password.tsx')).Route.options.component!
 const accept = (await import('./routes/auth.accept-invitation.tsx')).Route.options.component!
@@ -408,4 +408,14 @@ test('a signed-in person reads the invitation and accepts it with one press, and
     ['/api/auth/user/organization/accept-invitation', JSON.stringify({ invitationId: 'inv-1' })],
   ], 'and one press posts the accept, which is the only write')
   assert.equal(pressed.alert, copy.invitationGone!.en, 'a refusal of the accept is worded too')
+})
+
+
+test('administrator forgot-password asks for a link without an email form or an account lookup', async () => {
+  const adminForgot = (await import('./routes/auth.forgot-password.tsx')).Route.options.component!
+  const { host, unmount } = await start('/auth/forgot-password', adminForgot)
+  try {
+    assert.equal(host.querySelector('form'), null)
+    assert.match(host.textContent ?? '', /Ask your administrator/)
+  } finally { await unmount() }
 })

@@ -174,7 +174,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
   try {
     // The project as `<manager> create mithaq` makes it, with `mithaq` and `mithaq-admin` pointed at the tarballs through flags
     // only this check passes, so neither is fetched from npm.
-    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, ...addOns, ...modes, '--mithaq', tarball, '--mithaq-admin', adminTarball], {
+    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, ...addOns, ...modes, '--password-delivery', 'email', '--mithaq', tarball, '--mithaq-admin', adminTarball], {
       cwd: scratch,
       encoding: 'utf8',
       timeout: 600_000,
@@ -314,7 +314,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const { RESEND_API_KEY: _key, MAIL_FROM: _from, ...unmailed } = production
       const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./src/mithaq/auth/index.ts')"], { cwd: language, encoding: 'utf8', env: { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' } })
       assert.notEqual(refused.status, 0, `${name}: a production start with no mailer is refused`)
-      assert.match(refused.stderr, /needs a mailer in production/, refused.stderr)
+      assert.match(refused.stderr, /passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM/, refused.stderr)
     }
     const start = (cwd: string, at: number) => {
       const child = spawn(process.execPath, [join(installed(cwd, 'vite'), 'bin/vite.js'), 'preview', '--port', String(at), '--host', '127.0.0.1', '--strictPort'], {
@@ -392,7 +392,8 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const named = modes.includes('--organization-name') ? { en: "Noor's School", ar: 'مدرسة النور' } : { en: 'My organization', ar: 'مؤسستي' }
       assert.deepEqual([held.name, JSON.parse(held.names ?? 'null')], [named.en, named], `the organization is named from code: ${JSON.stringify(held).slice(0, 300)}`)
       if (!open) assert.deepEqual(await codeOf(await post('sign-up/email', { name: 'Stranger', email: `stranger-${stamp}@example.com`, password: 'release-test-password' })), [403, 'SIGN_UP_INVITE_ONLY'], 'by invitation, a sign-up with none is refused')
-      // The owner adds a person in one request, and the link that chooses the password goes to that person's mailbox.
+      // This consumer explicitly chooses email delivery; starter tests and visual checks cover the administrator default.
+      // The owner adds a person and receives Copy fallback while the same link goes to the person's mailbox.
       const person = `added-${stamp}@example.com`
       const added = await post('organization/add-person', { name: 'Added', email: person }, { cookie: cookieOf(signedIn) })
       // Read once: the assertion's message is built before it is judged, so it reads the body even when it passes.

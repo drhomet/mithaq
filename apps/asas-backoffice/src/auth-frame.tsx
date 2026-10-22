@@ -93,10 +93,10 @@ export function AuthFrame({ title, description, children }: { title: string | un
   const { t, locale } = useCopy()
   const { app } = useRouteContext({ from: '__root__' })
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col [&_button]:min-h-11 [&_button]:min-w-11 [&_input]:min-h-11 sm:[&_button]:min-h-0 sm:[&_button]:min-w-0 sm:[&_input]:min-h-0">
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
         {/* An anchor: `/` is not a router route in an app whose start entry answers its home. */}
-        <a className="text-lg inline-flex min-h-11 items-center font-semibold sm:min-h-0" href="/">
+        <a className="text-lg inline-flex min-h-11 min-w-11 items-center font-semibold sm:min-h-0 sm:min-w-0" href="/">
           {t(app, 'Asas')}
         </a>
         <LocaleSwitch locale={locale} />
@@ -125,9 +125,9 @@ function PasswordInput(props: ComponentProps<'input'>) {
   const [shown, setShown] = useState(false)
   return (
     // Focus moving to the box's own toggle has not left the box.
-    <InputGroup onBlur={(event) => event.currentTarget.contains(event.relatedTarget) && event.stopPropagation()}>
+    <InputGroup className="min-h-11 sm:min-h-0" onBlur={(event) => event.currentTarget.contains(event.relatedTarget) && event.stopPropagation()}>
       <InputGroupInput {...props} dir="ltr" type={shown ? 'text' : 'password'} />
-      <InputGroupAddon align="inline-end">
+      <InputGroupAddon align="inline-end" className="py-0 sm:py-2">
         <InputGroupButton aria-label={t('auth.showPassword', 'Show password')} aria-pressed={shown} size="icon-xs" onClick={() => setShown((was) => !was)}>
           {shown ? <EyeOff /> : <Eye />}
         </InputGroupButton>
@@ -152,4 +152,4 @@ export function AuthBox({
     </FieldShell>
   )
 }
-// mithaq-admin 0.0.0 e664138e6363af559b8c005896c7894c08d2c04f14e062bad71df2f0e1b6027c
+// mithaq-admin 0.0.0 3841a00e65cae91458965663749ee7475ce384abd51183f7a2867b37f3fdab42

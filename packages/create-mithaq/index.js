@@ -341,12 +341,13 @@ const writeOrganizations = (file, settings) =>
  * backoffice console. `addOns` names the add-ons the project holds beside auth and the tags example, with
  * every one they need; none is the minimal project.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], richText: richTextAsked, organizations, showOrganization, signUp, organizationName }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], richText: richTextAsked, passwordDelivery = 'admin', organizations, showOrganization, signUp, organizationName }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`, and a scope.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
   }
   if (!['monorepo', 'single'].includes(layout)) throw new Error(`The layout is monorepo or single, not "${layout}".`)
+  if (!['admin', 'email'].includes(passwordDelivery)) throw new Error('--password-delivery is admin or email.')
   const features = resolveRichTextFeatures(richTextAsked)
   const { chosen } = resolveAddOns([...asked, ...(richTextAsked !== undefined ? ['rich-text'] : [])])
   const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
@@ -377,6 +378,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   keepOnly({ project, chosen })
   if (chosen.includes('rich-text')) edit(join(project, 'packages/mithaq/src/mithaq/rich-text-features.ts'), (text) => text.replace(/features: .* as const,/, `features: [...defaultRichTextFeatures${features.map((one) => `, '${one}'`).join('')}] as const,`))
   writeOrganizations(join(project, 'packages/mithaq/src/mithaq/auth/organizations.ts'), settings)
+  edit(join(project, 'packages/mithaq/src/mithaq/auth/organizations.ts'), (text) => text.replace(/(export const passwordDelivery: 'admin' \| 'email' = )'admin'/, `$1'${passwordDelivery}'`))
   // One `.env` for the asas's commands and one for each app's dev server,
   // the same secrets in each: the tenant app and the backoffice console sign
   // and read each other's sessions under one `BETTER_AUTH_SECRET`.
@@ -422,6 +424,8 @@ const help = `Usage: create-mithaq [name] [options]
   --with <a,b>        the add-ons to hold beside auth and the tags example, with every one they need
   --rich-text=tables,code,styling,markdown,counter  Install optional rich-text tools
   --full              every add-on: the whole worked example (a single package leaves out backoffice)
+  --password-delivery admin|email
+                      admin copies or shares password links (default); email sends through Resend
   --organizations one|many
                       one organization, made on /auth/first-run (the default), or many, each sign-up
                       founding its own
@@ -455,12 +459,12 @@ const binAbove = (folder) => {
 const main = async () => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, 'rich-text': { type: 'string' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, 'organization-name': { type: 'string' }, 'organization-name-ar': { type: 'string' }, help: { type: 'boolean' } },
+    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, 'rich-text': { type: 'string' }, 'password-delivery': { type: 'string' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, 'organization-name': { type: 'string' }, 'organization-name-ar': { type: 'string' }, help: { type: 'boolean' } },
   })
   if (values.help) return console.log(help)
   if (values.full && values.with !== undefined) throw new Error('Pass --full or --with, not both: --full is every add-on.')
   let [name] = positionals
-  let { layout } = values
+  let { layout, 'password-delivery': passwordDelivery } = values
   let picked = values.with?.split(',').map((one) => one.trim()).filter(Boolean)
   let { organizations, 'show-organization': shown, 'sign-up': signUp, 'organization-name': named, 'organization-name-ar': namedInArabic } = values
   const prompt = process.stdin.isTTY ? createInterface({ input: process.stdin, output: process.stdout }) : undefined
@@ -473,6 +477,7 @@ const main = async () => {
       else if (answer === 'pick') picked = (await prompt.question(`Add-ons, comma-separated (${Object.keys(addOns).join(', ')}): `)).split(',').map((one) => one.trim()).filter(Boolean)
       else if (answer !== 'minimal') throw new Error(`The answer is minimal, full or pick, not "${answer}".`)
     }
+    if (!passwordDelivery && prompt) passwordDelivery = (await prompt.question('Password links: administrator copies or shares, or Resend email? (admin/email) [admin]: ')).trim().toLowerCase() || 'admin'
     if (!organizations && prompt) organizations = (await prompt.question('One organization, or many? (one/many) [one]: ')).trim().toLowerCase() || 'one'
     if (!shown && prompt && organizations !== 'many') shown = (await prompt.question('Show the organization\'s name on its pages? (yes/no) [yes]: ')).trim().toLowerCase() || 'yes'
     if (!signUp && prompt && organizations !== 'many') signUp = (await prompt.question('Who signs up: the invited, or anyone? (invite/open) [invite]: ')).trim().toLowerCase() || 'invite'
@@ -490,7 +495,7 @@ const main = async () => {
   if (added.length) console.log(`Added ${added.join(', ')}, which ${asked.filter((one) => addOns[one].needs.length).join(', ')} need${added.length === 1 ? 's' : ''}.`)
   const { version } = readJson(new URL('package.json', import.meta.url))
   const organizationName = named ? { en: named, ...(namedInArabic && { ar: namedInArabic }) } : undefined
-  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, richText: values['rich-text']?.split(',').filter(Boolean), organizations, showOrganization, signUp, organizationName })
+  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, richText: values['rich-text']?.split(',').filter(Boolean), passwordDelivery, organizations, showOrganization, signUp, organizationName })
   const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName })
   console.log(`Created ${project}${chosen.length ? `, with ${chosen.join(', ')}` : ', minimal'}.`)
   const manager = managerOf(process.env.npm_config_user_agent)
@@ -519,7 +524,7 @@ Next, with PostgreSQL 15 or later serving the database DATABASE_URL names in ${l
   ${run} run dev:setup${run === 'npm' ? ' --' : ''} --seed${single ? '' : '\n  cd ../../apps/asas-tanstack'}
   ${run} run dev   # the tenant app, http://localhost:5173${backoffice ? `\n  # in a second terminal, from apps/asas-backoffice: ${run} run dev   # the backoffice console, http://localhost:5174` : ''}
 
-Sign in${backoffice ? ' to both apps' : ''} with DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD from ${language}.env. A deploy is set up by hand instead: ${settings.organizations === 'many' ? 'sign up in the tenant app, prove your address by the link it mails, sign in and create an organization.' : `open /auth/first-run and make the app's owner${settings.showOrganization ? ' and its organization' : ''} with the SETUP_CODE it was started with.`} A production start needs a mailer: RESEND_API_KEY and MAIL_FROM. ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills an organization with sample rows again: the first user's first, or the ones SEED_EMAIL and SEED_ORGANIZATION name.${short ? `
+Sign in${backoffice ? ' to both apps' : ''} with DEV_ADMIN_EMAIL and DEV_ADMIN_PASSWORD from ${language}.env. A deploy is set up by hand instead: ${settings.organizations === 'many' ? 'sign up in the tenant app, prove your address by the link it mails, sign in and create an organization.' : `open /auth/first-run and make the app's owner${settings.showOrganization ? ' and its organization' : ''} with the SETUP_CODE it was started with.`} Email password delivery and open sign-up need RESEND_API_KEY and MAIL_FROM. ${run} run seed in ${single ? 'the project' : 'packages/asas'} fills an organization with sample rows again: the first user's first, or the ones SEED_EMAIL and SEED_ORGANIZATION name.${short ? `
 
 The project holds no migration yet. Before it runs in production, write its first against an empty database with mithaq migrate --name init in ${single ? 'the project' : 'packages/asas'} (README.md, "Running in production").` : ''}`)
 }

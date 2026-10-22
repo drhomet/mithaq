@@ -16,7 +16,7 @@ const { publishConfig, private: _private, devDependencies: _dev, scripts: _scrip
 
 // Committed files only, as the template is staged, so nothing left in the working tree ships.
 const tracked = (...paths: string[]) => execFileSync('git', ['ls-files', '-z', ...paths], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
-const guides = ['packages/mithaq/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']
+const guides = ['packages/mithaq/README.md', 'packages/mithaq/src/auth/better-auth/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']
 const skills = 'templates/asas/.claude/skills'
 // The build compiles every `src/**/*.ts` it finds, so a file git does not track there would ship in `dist/`. Release CI
 // checks out clean; this guards a publish from a working tree, over every path staged from the tree.

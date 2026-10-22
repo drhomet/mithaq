@@ -282,3 +282,7 @@ It needs `DATABASE_URL`, and exits 0 unless it refuses or fails.
 ```sh
 bunx mithaq storage sweep --check
 ```
+
+## password-link
+
+Run `mithaq password-link <email>` from the project's asas package with `DATABASE_URL` explicitly set. The starter's server-only provider endpoint issues a replacement one-time link valid for 24 hours and prints it once. Unknown emails are refused. This is the recovery path for a first super admin or a locked-out administrator, including shared accounts. Keep the output private; do not redirect it to application logs. The command never reads an environment file. Projects with a custom provider must supply `operatorPasswordLink` in that provider's server API. See [Password links](../../auth/better-auth/README.md) for delivery and organization authority.

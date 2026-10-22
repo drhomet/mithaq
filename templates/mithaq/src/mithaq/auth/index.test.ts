@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth as betterAuthServer } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
+import { logMailer } from '../../mail/index.ts'
 import { organizationName } from './organizations.ts'
 import { authOptions, authSettings, backgroundSettled, domainAllowed, options, organizationLimitsFor, organizationNameProblem, settingsProblems, subjectLine, trustedIpHeaders, type AuthSettings } from './index.ts'
 
@@ -54,7 +55,7 @@ test('with TRUSTED_IP_HEADER unset, a forged cf-connecting-ip header is ignored 
 // only under `NODE_ENV=development`.
 const tables = () => ({ user: [], session: [], account: [], verification: [], organization: [], member: [], invitation: [] })
 const serverWith = async (emailAndPassword = {}) => {
-  const developed = (await importedUnder({ NODE_ENV: 'development' })).authOptions().options
+  const developed = (await importedUnder({ NODE_ENV: 'development' })).authOptions({}, { ...authSettings, passwordDelivery: 'email', mailer: logMailer }).options
   return betterAuthServer({ ...developed, emailAndPassword: { ...developed.emailAndPassword, ...emailAndPassword }, database: memoryAdapter(tables()), secret: 'test-secret' })
 }
 
@@ -127,7 +128,7 @@ const importedUnder = async (env: Record<string, string>) => {
   }
 }
 
-test('on a local host with NODE_ENV unset, password reset is off and prints nothing: only NODE_ENV=development, set explicitly, logs a link', async () => {
+test('password reset is off without an email delivery mailer, and explicit test mailers can deliver links', async () => {
   // A deploy run with plain node and BETTER_AUTH_URL unset falls back to localhost.
   assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
   const server = betterAuthServer({ ...authOptions().options, database: memoryAdapter(tables()), secret: 'test-secret' })
@@ -155,11 +156,11 @@ test('off a local host, or in production, the auth setup refuses to start withou
   }
 })
 
-test('an invitation writes its accept link to the log under NODE_ENV=development on a local host, and anywhere else prints neither the link nor the address', async () => {
+test('an invitation without a mailer never logs its link or address, including in development', async () => {
   // As the reset link above.
   assert.equal(process.env.NODE_ENV, undefined, 'a deploy run with plain node, which sets no NODE_ENV')
   const deploys: [string, Record<string, string>, boolean][] = [
-    ['development on localhost', { NODE_ENV: 'development' }, true],
+    ['development on localhost', { NODE_ENV: 'development' }, false],
     // A real host starts only with a mailer, which the link goes to instead.
     ['a local host with no NODE_ENV', {}, false],
   ]
@@ -182,7 +183,7 @@ test('an invitation writes its accept link to the log under NODE_ENV=development
 const mailingOwner = async (settings: AuthSettings, organizationName = 'Org') => {
   const sent: { to: string; subject: string; text: string; html: string }[] = []
   const mailer = { send: async (mail: (typeof sent)[number]) => void sent.push(mail) }
-  const server = betterAuthServer({ ...authOptions({}, { ...settings, mailer }).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
+  const server = betterAuthServer({ ...authOptions({}, { ...settings, passwordDelivery: 'email', mailer }).options, database: memoryAdapter({ ...tables(), organizationRole: [] }), secret: 'test-secret' })
   const { user } = await server.api.signUpEmail({ body: { name: 'Owner', email: 'owner@example.com', password: 'the-old-password' } })
   await server.api.createOrganization({ body: { name: organizationName, slug: 'org', userId: user.id } })
   const headers = new Headers({ cookie: (await server.api.signInEmail({ body: { email: 'owner@example.com', password: 'the-old-password' }, returnHeaders: true })).headers.get('set-cookie') ?? '' })
@@ -303,10 +304,11 @@ registerHooks({ load: (url, context, next) => {
   assert.equal(loaded.status, 0, loaded.stderr)
 })
 
-test('in production every mode needs a mailer: an open sign-up proves addresses by mail, invitations and resets are mailed, and many proves every address', () => {
+test('production requires mail for open sign-up and email password delivery; invitation-only administrator delivery needs none', () => {
   const open = { ...school, signUp: 'open' as const }
   for (const [name, settings] of [['one, open', open], ['one, by invitation', school], ['many', authSettings]] as const) {
-    assert.match(problems({ ...settings, mailer: undefined }, true).join('\n'), /needs a mailer in production[\s\S]*RESEND_API_KEY/, name)
+    if (settings.signUp === 'open') assert.match(problems({ ...settings, mailer: undefined }, true).join('\n'), /needs a mailer in production[\s\S]*RESEND_API_KEY/, name)
+    else assert.deepEqual(problems({ ...settings, mailer: undefined }, true), [], name)
     assert.deepEqual(problems({ ...settings, mailer }, true), [], `${name}, with a mailer`)
     assert.deepEqual(problems({ ...settings, mailer: undefined }, false), [], `${name}: development logs its mail instead`)
   }
@@ -385,7 +387,7 @@ test('an organization\'s name, which founders write and mail bodies carry, is on
 test('a mailer is never waited on: a reset is answered as fast for an address with an account as for one without, and the mail follows', async () => {
   const sent: string[] = []
   const slow = { send: async ({ to }: { to: string }) => { await new Promise((done) => setTimeout(done, 1000)); sent.push(to) } }
-  const server = betterAuthServer({ ...authOptions({}, { ...authSettings, mailer: slow }).options, database: memoryAdapter(tables()), secret: 'test-secret' })
+  const server = betterAuthServer({ ...authOptions({}, { ...authSettings, passwordDelivery: 'email', mailer: slow }).options, database: memoryAdapter(tables()), secret: 'test-secret' })
   await server.api.signUpEmail({ body: { name: 'Held', email: 'held@example.com', password: 'the-old-password' } })
   const timed = async (email: string) => {
     const started = performance.now()
@@ -396,4 +398,17 @@ test('a mailer is never waited on: a reset is answered as fast for an address wi
   assert.ok(held < 500 && missing < 500, `neither answer waits on the mailer: ${Math.round(held)}ms and ${Math.round(missing)}ms`)
   await backgroundSettled()
   assert.deepEqual(sent, ['held@example.com'], 'and the mail is sent after')
+})
+
+test('email password delivery refuses boot without its configured Resend mailer', () => {
+  assert.throws(() => authOptions({}, { ...authSettings, passwordDelivery: 'email', mailer: undefined }), /RESEND_API_KEY.*MAIL_FROM/)
+})
+
+
+test('the project configured for email refuses import when RESEND_API_KEY is missing', async () => {
+  const { spawnSync } = await import('node:child_process')
+  const loader = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'; registerHooks({ load(url, context, next) { const loaded = next(url, context); return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace("passwordDelivery: 'admin' | 'email' = 'admin'", "passwordDelivery: 'admin' | 'email' = 'email'") } : loaded } })`)}`
+  const result = spawnSync(process.execPath, ['--import', loader, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./index.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, RESEND_API_KEY: '', MAIL_FROM: '' } })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM/)
 })

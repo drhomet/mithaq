@@ -1659,6 +1659,11 @@
           "path": "registry/member-counts.ts",
           "type": "registry:lib",
           "target": "@components/mithaq/member-counts.ts"
+        },
+        {
+          "path": "registry/password-link.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/password-link.tsx"
         }
       ]
     },

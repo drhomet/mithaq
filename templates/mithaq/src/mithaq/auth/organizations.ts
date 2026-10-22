@@ -78,3 +78,6 @@ export const nameIn = ({ name, names }: { name: string; names?: unknown }, local
     return name
   }
 }
+
+/** Password links are copied or shared by an administrator, or mailed through Resend. Change this per project. */
+export const passwordDelivery: 'admin' | 'email' = 'admin'

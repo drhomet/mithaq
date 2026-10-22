@@ -1,3 +1,5 @@
+import { sql } from 'mithaq/drizzle'
+import type { NodePgDatabase } from 'mithaq/drizzle/node-postgres'
 import { actorRoles, conflict, defaultFields, denied, folderOf, grantedPermissions, writableRoleName, defaultOperations, type Ctx, type WriteTools } from 'mithaq'
 import { user as users } from '@asas/auth'
 import { assignedCount, managerRemains, memberRoles } from '../member-roles/member-roles.ts'
@@ -86,6 +88,17 @@ const keepsOwnRole = (ctx: Ctx): Ctx => {
 }
 
 /** A role that lets its holders manage roles loses that only while another member still may, whether its keys change or it is deleted. */
+/** Giving a held custom role administrative keys invalidates links issued before that promotion. */
+const cancelsPromotedLinks = async (ctx: Ctx): Promise<Ctx> => {
+  const keys = (ctx.data as { permissions?: unknown }).permissions
+  if (!Array.isArray(keys) || !managesRoles(keys)) return ctx
+  const tx = ctx.tx as NodePgDatabase
+  const role = String(ctx.dataBefore?.name)
+  await tx.execute(sql`select id from "user" where id in (select user_id from member_roles where organization_id = ${ctx.tenant} and role = ${role}) order by id for update`)
+  await tx.execute(sql`delete from verification where identifier like 'reset-password:%' and value in (select user_id from member_roles where organization_id = ${ctx.tenant} and role = ${role})`)
+  return ctx
+}
+
 const keepsManagers = async (ctx: Ctx, tools: WriteTools): Promise<Ctx> => {
   const before = ctx.dataBefore
   if (!before || !managesRoles(keysOf(before.permissions))) return ctx
@@ -129,7 +142,7 @@ export const roles = defineKayan({
         // has parsed by then, so the column is already a list of strings, and the
         // write has not happened, so a refused grant leaves no row behind.
         create: { steps: ({ steps }) => [tenantKeysOnly, grantedPermissions, writableRoleName(systemRoles), unheld, steps.insert] },
-        update: { steps: ({ steps }) => [tenantKeysOnly, grantedPermissions, writableRoleName(systemRoles), unheld, keepsOwnRole, keepsManagers, steps.update] },
+        update: { steps: ({ steps }) => [tenantKeysOnly, grantedPermissions, writableRoleName(systemRoles), unheld, keepsOwnRole, keepsManagers, cancelsPromotedLinks, steps.update] },
         delete: { steps: ({ steps }) => [grantedPermissions, unheld, keepsManagers, steps.remove] },
       },
     },

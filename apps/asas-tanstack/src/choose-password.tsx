@@ -74,7 +74,7 @@ export function ChoosePassword({ first, token, redirect, signedIn, home, screens
   )
   const signIn = (
     <p className="mt-4 text-center text-sm">
-      <Link className="text-primary underline underline-offset-4" to="/auth/sign-in">
+      <Link className="text-primary inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4 sm:inline sm:min-h-0 sm:min-w-0" to="/auth/sign-in">
         {t('auth.signIn', 'Sign in')}
       </Link>
     </p>
@@ -103,7 +103,7 @@ export function ChoosePassword({ first, token, redirect, signedIn, home, screens
     return (
       <AuthFrame title={title} description={t('auth.tokenInvalid', 'Token is either invalid or has expired.')}>
         <p className="text-center text-sm">
-          <Link className="text-primary underline underline-offset-4" to="/auth/forgot-password">
+          <Link className="text-primary inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4 sm:inline sm:min-h-0 sm:min-w-0" to="/auth/forgot-password">
             {t('auth.forgotPassword', 'Forgot password')}
           </Link>
         </p>

@@ -8,10 +8,10 @@ import type { Command } from '../../mithaq/language.ts'
 import { Refusal } from '../../mithaq/refusal.ts'
 import type { ScreenClient } from '../../screen/index.ts'
 
-const verbs = ['eject', 'generate', 'lock', 'migrate', 'screens', 'upgrade']
+const verbs = ['eject', 'generate', 'lock', 'migrate', 'password-link', 'screens', 'upgrade']
 const nouns = ['auth', 'messages', 'screens']
 const usage =
-  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq screens | mithaq upgrade --check | mithaq eject <item> | mithaq eject --prune | mithaq <target> <command> [--check]'
+  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq password-link <email> | mithaq screens | mithaq upgrade --check | mithaq eject <item> | mithaq eject --prune | mithaq <target> <command> [--check]'
 
 type Built = {
   targets: Record<string, { commands?: Record<string, Command> } | undefined>
@@ -60,6 +60,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
       console.error(usage)
       process.exit(1)
     }
+    if (verb === 'password-link' && !process.env.DATABASE_URL) throw new Refusal('Set DATABASE_URL explicitly before issuing a password link.')
+    if (verb === 'password-link' && (!noun || noun.startsWith('--') || rest.length)) throw new Refusal('Usage: mithaq password-link <email>')
     const project = pathToFileURL(`${process.cwd()}/`)
     const check = flags.includes('--check')
     // The project saying it has no database to scan, which a check otherwise refuses to pass without.
@@ -121,6 +123,16 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
     } else if (verb === 'generate') {
       const code = await (noun === 'messages' ? messages() : noun === 'screens' ? screens() : auth(check))
       if (code) process.exit(code)
+    } else if (verb === 'password-link') {
+      const asas = await asasOf()
+      try {
+        const provider = (asas as unknown as { auth: { strategies: { server?: { api: { operatorPasswordLink?: (args: { body: { email: string } }) => Promise<{ link: string }> } } }[] } }).auth.strategies.find((one) => one.server?.api.operatorPasswordLink)
+        if (!provider?.server?.api.operatorPasswordLink) throw new Refusal('This project has no provider with operator password links. Upgrade its auth setup.')
+        try {
+          const { link } = await provider.server.api.operatorPasswordLink({ body: { email: noun! } })
+          console.log(link)
+        } catch { throw new Refusal('No password link was issued. Check that the email names an existing account and the database is available.') }
+      } finally { await asas.destroy() }
     } else if (verb === 'screens') {
       const { studioText, studioTree } = await import('../../screen/studio.ts')
       const targets = (await asasOf()).targets as Record<string, { capability?: unknown; client?: ScreenClient } | undefined>

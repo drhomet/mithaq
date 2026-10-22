@@ -43,7 +43,7 @@ export const readMembers = async ({ access, client, request, maxLimit }: LoaderT
         // In id order, which no change to a member's other columns reorders.
         const response = await request(`/api/auth/user/organization/list-members?limit=${maxLimit}&offset=${offset}&sortBy=id`)
         if (!response.ok) throw new Error(`list-members answered ${response.status}`)
-        const page = (await response.json()) as { members: { userId: string; role: string; createdAt: string; lastSeenAt?: string | null; user: { name: string; email: string } }[]; total: number }
+        const page = (await response.json()) as { members: { userId: string; role: string; createdAt: string; lastSeenAt?: string | null; user: { name: string; email: string; phone?: string } }[]; total: number }
         return { rows: page.members, total: page.total }
       },
     }),
@@ -75,6 +75,7 @@ export const readMembers = async ({ access, client, request, maxLimit }: LoaderT
       userId: member.userId,
       name: member.user.name,
       email: member.user.email,
+      ...(member.user.phone && { phone: member.user.phone }),
       joined: isoOf(member.createdAt),
       // Answered only to a viewer holding the column's key; the server leaves it out for anyone else.
       ...(member.lastSeenAt && { lastSeen: isoOf(member.lastSeenAt) }),

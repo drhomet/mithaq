@@ -335,3 +335,12 @@ test('rich text tools are selected at creation and unknown names fail before wri
   create({ name: 'rt-default', cwd: scratch, template, version: '1.2.3', addOns: ['rich-text'] })
   assert.match(read('rt-default/packages/mithaq/src/mithaq/rich-text-features.ts'), /features: \[\.\.\.defaultRichTextFeatures\]/)
 })
+
+test('password links default to administrator delivery and email is an explicit project setting', () => {
+  for (const delivery of [undefined, 'admin', 'email']) {
+    const name = `links-${delivery ?? 'default'}`
+    create({ name, cwd: scratch, template, version: '1.2.3', passwordDelivery: delivery })
+    assert.match(read(name, 'packages/mithaq/src/mithaq/auth/organizations.ts'), new RegExp(`export const passwordDelivery: 'admin' \\| 'email' = '${delivery ?? 'admin'}'`))
+  }
+  assert.throws(() => create({ name: 'links-invalid', cwd: scratch, template, version: '1.2.3', passwordDelivery: 'sms' }), /password-delivery/)
+})

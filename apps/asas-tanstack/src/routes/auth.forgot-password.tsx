@@ -1,3 +1,4 @@
+import { passwordDelivery } from 'asas/organizations'
 import { useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,15 @@ function ForgotPassword() {
   const { t } = useCopy()
   const search = Route.useSearch()
   const { signedIn, home, screens } = Route.useRouteContext()
+  if (signedIn) return <AlreadySignedIn redirect={search.redirect} home={home} screens={screens} />
+  if (passwordDelivery === 'admin') return <AuthFrame title={t('auth.forgotPassword', 'Forgot password')} description={t('auth.askAdministrator', 'Ask your administrator for a password link.')}><p className="text-center"><Link className="text-primary inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4 sm:inline sm:min-h-0 sm:min-w-0" to="/auth/sign-in" search={{ redirect: search.redirect }}>{t('auth.backToSignIn', 'Back to login')}</Link></p></AuthFrame>
+  return <EmailForgotPassword />
+}
+
+export function EmailForgotPassword() {
+  const { t } = useCopy()
+  const search = Route.useSearch()
+  const { signedIn, home, screens } = Route.useRouteContext()
   const refused = useRefusal()
   const [email, setEmail] = useState('')
   const [left, setLeft] = useState(false)
@@ -29,7 +39,7 @@ function ForgotPassword() {
   const wrong = () => (!email ? t('auth.required', 'This field is required.') : notAnEmail(email) ? t('auth.invalidEmail', 'Invalid email') : undefined)
   const back = (
     <p className="mt-4 text-center text-sm">
-      <Link className="text-primary underline underline-offset-4" to="/auth/sign-in" search={{ redirect: search.redirect }}>
+      <Link className="text-primary inline-flex min-h-11 min-w-11 items-center justify-center underline underline-offset-4 sm:inline sm:min-h-0 sm:min-w-0" to="/auth/sign-in" search={{ redirect: search.redirect }}>
         {t('auth.backToSignIn', 'Back to login')}
       </Link>
     </p>
@@ -54,11 +64,6 @@ function ForgotPassword() {
         title={t('auth.emailSent', 'Email sent')}
         description={t('auth.checkYourEmail', "If the email address is associated with an account, you will receive instructions to reset your password shortly. Please check your spam or junk mail folder if you don't see the email in your inbox.")}
       >
-        {import.meta.env?.DEV ? (
-          <p data-no-mailer="" className="text-muted-foreground rounded-md border px-3 py-2 text-sm">
-            {t('auth.noMailer', 'No mailer is configured, so no email was sent. In development the reset link is written to the server log.')}
-          </p>
-        ) : null}
         {back}
       </AuthFrame>
     )

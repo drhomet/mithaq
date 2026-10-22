@@ -26,7 +26,7 @@ export const mailerFromEnv = (env: Record<string, string | undefined>): Mailer |
 }
 
 /**
- * The mailer this deploy configured, or none; the auth setup logs mail in development without one.
+ * The mailer this deploy configured, or none. Password delivery is selected in the auth config.
  * The auth setup asks it as it loads, so every load reads the environment it is started with.
  */
 export const configuredMailer = (): Mailer | undefined => mailerFromEnv(process.env)

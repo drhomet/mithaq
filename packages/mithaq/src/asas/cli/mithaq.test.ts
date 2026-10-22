@@ -60,3 +60,12 @@ test('the bin loads a project whose sources import each other without an extensi
     rmSync(project, { recursive: true, force: true })
   }
 })
+
+test('password-link needs an explicit database before importing the project', async () => {
+  const outside = mkdtempSync(join(tmpdir(), 'mithaq-link-'))
+  try {
+    const env = { ...process.env }
+    delete env.DATABASE_URL
+    await assert.rejects(run(process.execPath, [bin, 'password-link', 'dummy@example.com'], { cwd: outside, env }), /Set DATABASE_URL explicitly/)
+  } finally { rmSync(outside, { recursive: true, force: true }) }
+})

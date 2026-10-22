@@ -15,7 +15,7 @@ import { sql } from 'mithaq/drizzle'
 import { configuredMailer, logMailer, type Mail, type Mailer } from '../../mail/index.ts'
 // A module of its own so a screen can list the roles without loading the provider.
 import { backofficeRoles } from './backoffice-roles.ts'
-import { allowedDomains, defaultLocale, joinRole, nameIn, organizationName, organizations, showOrganization, signUp, verifyEmail } from './organizations.ts'
+import { allowedDomains, defaultLocale, joinRole, nameIn, organizationName, organizations, passwordDelivery, showOrganization, signUp, verifyEmail } from './organizations.ts'
 // add-on: roles
 import { tenantRoles } from '../../roles/tenant-roles.ts'
 // end add-on: roles
@@ -202,19 +202,15 @@ const exactRoles = (role: unknown) => {
   })
 }
 
-// Both conditions are asked because either alone fails open: a deploy run with plain `node` never
-// sets `NODE_ENV`, and an unset `BETTER_AUTH_URL` falls back to `localhost`.
-const logsLinks = process.env.NODE_ENV === 'development' && isLocalHost(tenantURL)
-
 /**
  * What the auth setup reads beyond the provider's own options: the organization mode and who may
  * join (`organizations.ts`), and the mailer that sends the password reset, the invitation and the
- * verification. The mailer is the deploy's configured one (`src/mail/index.ts`), else in
- * development on this machine the log, else none, and then no reset is offered and the inviter
- * hands the link over.
+ * verification. The deploy names its mailer in `src/mail/index.ts`. Administrator password
+ * delivery needs none; open sign-up still needs one for address proof.
  */
 export type AuthSettings = {
   mailer: Mailer | undefined
+  passwordDelivery: 'admin' | 'email'
   organizations: typeof organizations
   showOrganization: boolean
   signUp: typeof signUp
@@ -224,7 +220,8 @@ export type AuthSettings = {
   /** In `'one'`, the organization's name in each locale, which lives in code. */
   organizationName: Readonly<Record<string, string>>
 }
-export const authSettings: AuthSettings = { mailer: configuredMailer() ?? (logsLinks ? logMailer : undefined), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains, organizationName }
+if (passwordDelivery === 'email' && !process.env.RESEND_API_KEY) throw new Error('passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM before starting the app.')
+export const authSettings: AuthSettings = { mailer: configuredMailer(), organizations, showOrganization, signUp, joinRole, verifyEmail, allowedDomains, organizationName, passwordDelivery }
 
 /** An address as the provider's own sign-up takes one. */
 const anAddress = z.email()
@@ -345,12 +342,12 @@ export const settingsProblems = ({ settings, deployed, joinRoles }: { settings: 
   } else {
     problemsOfOne({ problems, signUp, verifyEmail, allowedDomains, joinRole, joinRoles })
   }
-  // Without one no reset is offered, no invitation reaches anyone and no address is proved.
-  if (deployed && !mailer) problems.push('A start needs a mailer in production, which proves each address, sends each reset and mails each invitation: set RESEND_API_KEY and MAIL_FROM.')
+  // Address proof still needs mail; invitation-only administrator delivery does not.
+  if (deployed && !mailer && (signUp === 'open' || settings.passwordDelivery === 'email')) problems.push('A start needs a mailer in production, which proves each address, sends each reset and mails each invitation: set RESEND_API_KEY and MAIL_FROM.')
   return problems
 }
 /** `settingsProblems` of one organization. */
-const problemsOfOne = ({ problems, signUp, verifyEmail, allowedDomains, joinRole, joinRoles }: Omit<AuthSettings, 'mailer' | 'organizations' | 'showOrganization' | 'organizationName'> & { problems: string[]; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
+const problemsOfOne = ({ problems, signUp, verifyEmail, allowedDomains, joinRole, joinRoles }: Omit<AuthSettings, 'passwordDelivery' | 'mailer' | 'organizations' | 'showOrganization' | 'organizationName'> & { problems: string[]; joinRoles: Readonly<Record<string, '*' | readonly string[]>> | null }) => {
   if (allowedDomains.length && signUp !== 'open') problems.push("allowedDomains is read only with signUp = 'open': empty it, or open the sign-up.")
   if (allowedDomains.length && !verifyEmail) problems.push('allowedDomains needs verifyEmail = true: an address nobody proved is any domain its writer wants.')
   for (const entry of allowedDomains) {
@@ -534,6 +531,12 @@ type Target = ({ email?: string; role?: string | null } & Record<string, unknown
 const targets = new WeakMap<object, Target>()
 /** The role a call writes, on `set-role` and `create-user` as `role` and on `update-user` and `create-user` as `data.role`. */
 const roleOf = (body: { role?: unknown; data?: { role?: unknown } }) => body.role ?? body.data?.role
+/** A global administrator promotion also spends organization-issued links before a later demotion. */
+const cancelsStaffPasswordLinks = async (user: { id: string; role?: unknown }, context: HookContext | null) => {
+  if (!context || !holdsRole(roleOf((context.body ?? {}) as { role?: unknown; data?: { role?: unknown } }), (role) => Object.hasOwn(backofficeRoles, role))) return
+  const adapter = await getCurrentAdapter(context.context.adapter)
+  await adapter.deleteMany({ model: 'verification', where: [{ field: 'value', value: user.id }, { field: 'identifier', operator: 'starts_with', value: 'reset-password:' }] })
+}
 /** Whether a provider `member.role` names the owner, matched exactly as the provider matches it. */
 const isOwnerRole = (role: unknown) => typeof role === 'string' && role.split(',').includes('owner')
 /** Whether a `user.role` value names a role `test` admits, read as the plugin reads it, comma-separated. */
@@ -848,6 +851,7 @@ export type StoreHooks = {
   afterCreateOrganization?: AssignFirstRole
   beforeRemoveMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
   beforeAcceptInvitation?: (data: Joining & { invitation: { role: string } & Record<string, unknown>; user: { id: string } & Record<string, unknown> }) => Promise<void>
+  afterUpdateMemberRole?: (data: { member: { userId: string; role: string } }) => Promise<void>
   beforeAddMember?: (data: Joining & { member: { userId: string } & Record<string, unknown> }) => Promise<void>
   /** Writes one row of the staff history, which the audit-log add-on keeps. */
   recordBackoffice?: (entry: BackofficeEntry) => Promise<unknown>
@@ -873,9 +877,7 @@ export const trustedIpHeaders = (value: string | undefined): string[] | undefine
 
 const ipAddressHeaders = trustedIpHeaders(process.env.TRUSTED_IP_HEADER)
 
-// Where a password reset link goes: through the mailer, which in development may be the server's
-// log. With no mailer the provider refuses every address alike before it looks one up, so no token
-// or address is written anywhere.
+// Password links go only to the selected delivery. They are never automatically logged.
 //
 // The link is the tenant app's reset page, not the provider's `url`, which names
 // `/api/auth/reset-password` while this project serves the provider under `/api/auth/user`.
@@ -907,20 +909,8 @@ const addedMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganizat
   await mailer.send(letter({
     to: email,
     subject: 'Your account · حسابك',
-    en: `An administrator added you to ${en}. Open the link below to choose your password; it lasts 48 hours.`,
-    ar: `أضافك أحد المسؤولين إلى ${ar}. افتح الرابط أدناه لاختيار كلمة المرور؛ وهو صالح 48 ساعة.`,
-    link: setPasswordLink(token),
-  }))
-}
-
-// A new set-password link an administrator sent a member, which changes nothing until it is opened.
-const newLinkMail = ({ mailer, showOrganization }: { mailer: Mailer; showOrganization: boolean }) => async ({ email, organization, token }: { email: string; organization: { name: string; names?: unknown }; token: string }) => {
-  const [en, ar] = showOrganization ? [nameIn(organization, 'en'), nameIn(organization, 'ar')] : ['this app', 'هذا التطبيق']
-  await mailer.send(letter({
-    to: email,
-    subject: 'Choose your password · اختر كلمة المرور',
-    en: `An administrator of ${en} sent you a link to choose your password. Open it within 48 hours. Until you do, nothing changes.`,
-    ar: `أرسل إليك أحد مسؤولي ${ar} رابطا لاختيار كلمة المرور. افتحه خلال 48 ساعة. لن يتغير شيء حتى تفعل.`,
+    en: `An administrator added you to ${en}. Open the link below to choose your password; it lasts 24 hours.`,
+    ar: `أضافك أحد المسؤولين إلى ${ar}. افتح الرابط أدناه لاختيار كلمة المرور؛ وهو صالح 24 ساعة.`,
     link: setPasswordLink(token),
   }))
 }
@@ -940,8 +930,8 @@ const resetMail = (mailer: Mailer) => async ({ user, token }: { user: { email: s
   mailer.send(letter({
     to: user.email,
     subject: 'Reset your password · إعادة تعيين كلمة المرور',
-    en: 'Someone asked to reset the password of the account at this address. If it was you, open the link below within an hour. If not, ignore this message: nothing changes.',
-    ar: 'طلب أحدهم إعادة تعيين كلمة مرور الحساب بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال ساعة. وإلا فتجاهل هذه الرسالة: لن يتغير شيء.',
+    en: 'Someone asked to reset the password of the account at this address. If it was you, open the link below within 24 hours. If not, ignore this message: nothing changes.',
+    ar: 'طلب أحدهم إعادة تعيين كلمة مرور الحساب بهذا العنوان. إن كنت أنت، فافتح الرابط أدناه خلال 24 ساعة. وإلا فتجاهل هذه الرسالة: لن يتغير شيء.',
     link: new URL(`/auth/reset-password?token=${encodeURIComponent(token)}`, tenantURL).href,
   }))
 
@@ -965,16 +955,19 @@ export const backgroundSettled = async () => {
   while (background.size) await Promise.allSettled([...background])
 }
 
-export const optionsFor = (settings: AuthSettings) => ({
+export const optionsFor = (settings: AuthSettings) => {
+  if (settings.passwordDelivery === 'email' && !settings.mailer) throw new Error('passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM before starting the app.')
+  return ({
   // A reset ends every session of the account, in both apps, since they share one session table.
   emailAndPassword: {
     enabled: true as const,
     revokeSessionsOnPasswordReset: true,
+    resetPasswordTokenExpiresIn: 86_400,
     // Where a sign-up proves its address, an address with an account is answered with a made-up
     // user. The admin plugin gives a real one its role as it is written, not as a default the
     // made-up one reads, so without this the answer's `role` would say which addresses exist.
     customSyntheticUser: ({ coreFields, additionalFields, id }: { coreFields: Record<string, unknown>; additionalFields: Record<string, unknown>; id: string }) => ({ ...coreFields, ...additionalFields, role: 'user', id }),
-    ...(settings.mailer ? { sendResetPassword: resetMail(settings.mailer) } : {}),
+    ...(settings.passwordDelivery === 'email' && settings.mailer ? { sendResetPassword: resetMail(settings.mailer) } : {}),
   },
   // The provider rate limits only when `NODE_ENV` is `production`, so a deploy that sets none would
   // answer every sign-in and reset request unlimited. Off a local host it limits whatever
@@ -1009,6 +1002,7 @@ export const optionsFor = (settings: AuthSettings) => ({
   // one: the base adapter would take a second pool client while the transaction holds the first,
   // and a full pool would wait on itself.
   databaseHooks: {
+    user: { update: { after: cancelsStaffPasswordLinks } },
     session: {
       create: {
         before: async (
@@ -1023,6 +1017,7 @@ export const optionsFor = (settings: AuthSettings) => ({
     },
   },
 })
+}
 /** This project's options, which `mithaq generate auth` reads. */
 export const options = optionsFor(authSettings)
 
@@ -1118,9 +1113,9 @@ type ServerTargets = {
     tables: Record<string, unknown>
     insert(args: { tx: unknown; kayan: string; data: Record<string, unknown> }): Promise<unknown>
     remove(args: { tx: unknown; kayan: string; id: unknown }): Promise<unknown>
-    find(args: { tx?: unknown; kayan: string; args: { limit: number; page: number; sort: { field: string; direction: 'asc' | 'desc' }; where?: Where } }): Promise<{ docs: Record<string, unknown>[] }>
+    find(args: { tx?: unknown; kayan: string; args: { limit: number; page: number; sort: { field: string; direction: 'asc' | 'desc' }; where?: Where; lock?: 'update' | 'share' } }): Promise<{ docs: Record<string, unknown>[] }>
     transaction<Result>(run: (tx: unknown) => Promise<Result>): Promise<Result>
-    count?(args: { kayan: string; args: { where?: Where } }): Promise<number>
+    count?(args: { kayan: string; args: { where?: Where; lock?: 'update' | 'share' } }): Promise<number>
   }
 }
 
@@ -1165,6 +1160,11 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   // that holds one makes the organization: a second client would wait on the rows it has not
   // committed.
   const storeHooks = (tx?: unknown): StoreHooks => ({
+    afterUpdateMemberRole: async ({ member }) => {
+      if (member.role.split(',').some((role) => role === 'admin' || role === 'owner')) {
+        await (await tenant.$context).adapter.deleteMany({ model: 'verification', where: [{ field: 'value', value: member.userId }, { field: 'identifier', operator: 'starts_with', value: 'reset-password:' }] })
+      }
+    },
     // add-on: roles
     // The tenant's first assignment: a role holding `memberRoles.create` has to be assigned before
     // it can assign anything, and the caller of `createOrganization` is in no organization until
@@ -1368,10 +1368,11 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     if (!oneOrganization || settings.signUp !== 'open' || firstRegistering.getStore()) return
     if (holdsRole(user.role, (one) => Object.hasOwn(backofficeRoles, one))) return
     if (settings.allowedDomains.length && !domainAllowed(user.email, settings.allowedDomains)) return
+    const { internalAdapter } = await tenant.$context
+    // Staff links already name a member. Use the active adapter's marker before taking another pool client.
+    if (await internalAdapter.findVerificationValue(joinedOnce(user.id))) return
     const [organization] = (await store.find({ kayan: 'organization', args: { limit: 1, page: 1, sort: { field: 'createdAt', direction: 'asc' } } })).docs
     if (!organization) return
-    const { internalAdapter } = await tenant.$context
-    if (await internalAdapter.findVerificationValue(joinedOnce(user.id))) return
     if (await store.count!({ kayan: 'member', args: { where: { userId: { equals: user.id } } } })) return
     // An invitation still to answer, or one accepted, is how this address joins; one cancelled,
     // declined or expired is none.
@@ -1428,7 +1429,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     authAudit({ action: 'accept', user: user.id, organization: accepted.organizationId, invitation: id })
   }
   const bindings = (user: string) => [{ field: 'identifier', operator: 'starts_with' as const, value: 'invited:' }, { field: 'value', operator: 'starts_with' as const, value: `${user} ` }]
-  const unbind = async (user: string) => (await tenant.$context).adapter.deleteMany({ model: 'verification', where: bindings(user) })
+  const unbind = async (user: string) => (await getCurrentAdapter((await tenant.$context).adapter)).deleteMany({ model: 'verification', where: bindings(user) })
   // `token` is the link the address was proved with: only its own binding is accepted.
   const acceptBound = async ({ user, token }: { user: { id: string; email: string }; token: unknown }) => {
     const { internalAdapter } = await tenant.$context
@@ -1445,7 +1446,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     return rows.some((row) => row.identifier !== `reset-password:${except}` && Date.now() - new Date(row.createdAt).getTime() < 5 * 60 * 1000)
   }
   // The set-password link that proves an address, stored as the provider stores a reset's, so the
-  // reset page and route answer it. It lasts an hour, as a reset link does.
+  // reset page and route answer it. Address confirmation lasts an hour; password resets last 24.
   const confirmLink = async (user: { id: string; email: string }) => {
     if (!settings.mailer || (await mailedLately(user.id))) return
     const { adapter, internalAdapter } = await tenant.$context
@@ -1561,12 +1562,8 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
   //   throw new APIError('BAD_REQUEST', { message: 'A role is given on adding a person with the roles add-on alone.' })
   // }
   // end without add-on: roles
-  // Adds a person to the one organization in one request: their account, their membership, a role
-  // the caller may hand over, and a link to choose their password, mailed, or with no mailer answered
-  // for the caller to hand over. Never a password anyone knows. An account nobody proved, which may
-  // be a squat, is handed to the mailbox: its password and sessions end before it is added. A proved
-  // account is never added without its word: it is invited instead. The organization is the caller's
-  // verified active one; a body naming another is not read.
+  // An existing account is invited and keeps its credential. New staff, their origin and their
+  // first link commit together, so a refused grant cannot leave a later-adoptable account behind.
   // The tenant instance's own routes, typed here so the route below, which the instance holds, does
   // not make the instance's type depend on itself.
   type Invites = { createInvitation(args: { body: Record<string, unknown>; headers: Headers }): Promise<unknown>; addMember(args: { body: { userId: string; organizationId: string; role: 'member' } }): Promise<unknown> }
@@ -1579,80 +1576,173 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         // Outside `asas.handler` no key is resolved, so the route answers nothing there.
         if (typeof organization !== 'string' || !holdsPermission('member.create')) throw new APIError('FORBIDDEN', { message: 'Adding a person needs the permission "member.create" in your active organization.' })
         const { name, email: written, role } = (ctx.body ?? {}) as Record<string, unknown>
-        if (typeof name !== 'string' || !name.trim() || name.length > 100 || typeof written !== 'string' || !anAddress.safeParse(written).success || (role !== undefined && (typeof role !== 'string' || !role))) {
+        if (typeof name !== 'string' || !name.trim() || name.length > 100 || typeof written !== 'string' || !anAddress.safeParse(written.trim()).success || (role !== undefined && (typeof role !== 'string' || !role))) {
           throw new APIError('BAD_REQUEST', { message: 'A name of 1 to 100 characters and an email are required, and a role, where given, is a role\'s name.' })
         }
         if (typeof role === 'string') await assignable({ organization, role })
-        const email = written.toLowerCase()
+        const email = written.trim().toLowerCase()
         const { adapter, internalAdapter } = ctx.context
         const found = (await internalAdapter.findUserByEmail(email))?.user as ({ id: string; emailVerified: boolean; role?: unknown } | undefined)
         if (found && (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: found.id } } } }))) {
           throw new APIError('CONFLICT', { code: 'USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION', message: 'This person is already a member.' })
         }
         // Staff hold the backoffice, so a tenant never touches their sign-in.
-        if (found && (found.emailVerified || holdsRole(found.role, (one) => Object.hasOwn(backofficeRoles, one)))) {
+        if (found) {
           const invitation = await tenantApi().createInvitation({ body: { email, role: 'member', organizationId: organization }, headers: ctx.headers! })
           return ctx.json({ invited: true, invitation })
         }
-        // With no mailer the link is answered to the caller, which only this machine's own app may ask.
-        if (!settings.mailer && !isLocalHost(ctx.headers?.get('origin') ?? '')) throw new APIError('FORBIDDEN', { message: 'Adding a person mails them a link, and no mailer is configured.' })
-        if (settings.mailer) await withinLimits(organization)
-        // ponytail: the steps below are not one transaction. A failure part-way leaves an account with
-        // no password nobody can sign in to, which the next Add of that address takes up as any
-        // account nobody proved; one transaction over the provider's writes if that is ever seen.
-        const user = found ?? (await firstRegistering.run(true, () => internalAdapter.createUser({ name: name.trim(), email, emailVerified: false }, { method: 'admin' })))
-        if (found) {
-          await internalAdapter.deleteUserSessions(found.id)
-          await adapter.deleteMany({ model: 'account', where: [{ field: 'userId', value: found.id }, { field: 'providerId', value: 'credential' }] })
-        }
-        await tenantApi().addMember({ body: { userId: user.id, organizationId: organization, role: 'member' } })
-        // Joined once, as an open sign-up records it, so removed they never join again by one.
-        if (!(await internalAdapter.findVerificationValue(joinedOnce(user.id)))) await internalAdapter.createVerificationValue({ identifier: joinedOnce(user.id), value: organization, expiresAt: new Date('9999-12-31T00:00:00Z') })
-        // add-on: roles
-        if (typeof role === 'string') await store.transaction((tx) => grantRole({ tx, organization, user: user.id, role }))
-        // end add-on: roles
-        const token = randomBytes(24).toString('base64url')
-        await internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) })
+        if (settings.passwordDelivery === 'email' && settings.mailer) await withinLimits(organization)
+        const authority = await passwordAuthority(ctx)
+        const { user, issued } = await store.transaction(async (tx) => {
+          const bound = betterAuthServer({ ...built, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables, transaction: false }) })
+          const { adapter, internalAdapter } = await bound.$context
+          return runWithAdapter(adapter, () => firstRegistering.run(true, async () => {
+            const user = await internalAdapter.createUser({ name: name.trim(), email, emailVerified: false }, { method: 'admin' })
+            await (bound.api as unknown as Invites).addMember({ body: { userId: user.id, organizationId: organization, role: 'member' } })
+            // A removal must not let an open sign-up join again later.
+            await internalAdapter.createVerificationValue({ identifier: joinedOnce(user.id), value: organization, expiresAt: new Date('9999-12-31T00:00:00Z') })
+            // add-on: roles
+            if (typeof role === 'string') await grantRole({ tx, organization, user: user.id, role })
+            // end add-on: roles
+            await internalAdapter.createVerificationValue({ identifier: `password-origin:${user.id}`, value: organization, expiresAt: new Date('9999-12-31T00:00:00Z') })
+            if (!authority.superAdmin && !(await passwordAccount({ tx, user: user.id, organization, privileged: authority.privileged }))) throw new APIError('FORBIDDEN', { message: 'Only owners and super admins issue links for administrators.' })
+            const issued = await issuePassword({ user: user.id, ...(authority.superAdmin ? {} : { organization, privileged: authority.privileged }) })
+            return { user, issued }
+          }))
+        })
         authAudit({ action: 'add-person', actor: ctx.context.session?.user.id ?? null, user: user.id, organization, role: role ?? null })
-        if (!settings.mailer) return ctx.json({ added: true, user: { id: user.id }, link: setPasswordLink(token) })
-        const held = (await adapter.findOne<{ name: string; names?: unknown }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
-        await ctx.context.runInBackgroundOrAwait(addedMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email, organization: held, token }))
-        await mailedFor(organization)
-        return ctx.json({ added: true, user: { id: user.id } })
+        let emailFailed = false
+        if (settings.passwordDelivery === 'email' && settings.mailer) {
+          const held = (await adapter.findOne<{ name: string; names?: unknown }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
+          try {
+            await addedMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email, organization: held, token: issued.token })
+            await mailedFor(organization)
+          } catch { emailFailed = true }
+        }
+        ctx.setHeader('cache-control', 'no-store')
+        ctx.setHeader('referrer-policy', 'no-referrer')
+        return ctx.json({ added: true, user: { id: user.id }, emailFailed, link: setPasswordLink(issued.token), expiresAt: issued.expiresAt })
       }),
     },
   }
-  // A new link to choose a password, for a member of the one organization who lost theirs or never opened Add person's,
-  // asked by whoever may add a person. It is mailed to the member. With no mailer it is answered to the caller, on this
-  // machine alone, and only for an account that holds no password yet: any other's link would hand it to whoever asked,
-  // an administrator's to a delegate holding member.create, whether or not its address is proved, since an invited
-  // account keeps an unproved address beside the password it chose. Anyone outside the organization answers
-  // as nobody, and staff hold the backoffice, whose sign-in a tenant never touches. The member's password and sessions
-  // stand until they choose.
+  // The origin survives ordinary verification cleanup. Only creation of a new account writes it;
+  // membership alone never gives an organization authority over a global credential.
+  const passwordRows = (user: string) => [{ field: 'value', value: user }, ...resetLinks]
+  const passwordTx = new AsyncLocalStorage<unknown>()
+  const passwordAccount = async ({ tx, user, organization, privileged }: { tx?: unknown; user: string; organization: string; privileged: boolean }) => {
+    const readTx = tx ?? passwordTx.getStore()
+    const { adapter: fallback, internalAdapter } = await tenant.$context
+    const adapter = await getCurrentAdapter(fallback)
+    const account = await internalAdapter.findUserById(user)
+    const members = await adapter.findMany<{ organizationId: string; role: string }>({ model: 'member', where: [{ field: 'userId', value: user }] })
+    const origin = await internalAdapter.findVerificationValue(`password-origin:${user}`)
+    if (!account || members.length !== 1 || members[0]?.organizationId !== organization || (!origin || origin.value !== organization || !(new Date(origin.expiresAt).getTime() > Date.now())) || holdsRole((account as { role?: unknown }).role, (role) => Object.hasOwn(backofficeRoles, role))) return false
+    if (privileged) return true
+    if (members[0].role.split(',').some((role) => role === 'owner' || role === 'admin')) return false
+    // add-on: roles
+    const assignments = await store.find({ tx: readTx, kayan: 'memberRoles', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: organization }, user: { equals: user } } } })
+    for (const assignment of assignments.docs) {
+      const role = String(assignment.role)
+      const keys = Object.hasOwn(tenantRoles, role) ? tenantRoles[role as keyof typeof tenantRoles].permissions : (await store.find({ tx: readTx, kayan: 'roles', args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { organization: { equals: organization }, name: { equals: role } } } })).docs[0]?.permissions
+      if (keys === '*' || (Array.isArray(keys) && keys.some((key) => ['*', 'roles.create', 'roles.update', 'roles.delete', 'memberRoles.create', 'memberRoles.update', 'memberRoles.delete'].includes(key)))) return false
+    }
+    // end add-on: roles
+    return true
+  }
+  const issuePassword = async ({ user, organization, privileged = true }: { user: string; organization?: string; privileged?: boolean }) => {
+    const token = organization ? `org.${Buffer.from(organization).toString('base64url')}.${privileged ? 'owner' : 'member'}.${randomBytes(32).toString('base64url')}` : randomBytes(32).toString('base64url')
+    const expiresAt = new Date(Date.now() + 86_400_000)
+    const { adapter: fallback, internalAdapter } = await tenant.$context
+    const adapter = await getCurrentAdapter(fallback)
+    try {
+      await adapter.deleteMany({ model: 'verification', where: passwordRows(user) })
+      await internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user, expiresAt })
+    } catch {
+      // Adapter errors can carry bound token values. Hand the provider a safe refusal to log.
+      throw new APIError('INTERNAL_SERVER_ERROR', { message: 'No password link was issued.' })
+    }
+    return { token, expiresAt }
+  }
+  const passwordLock = async <Result,>({ user, run }: { user: string; run: (tx: unknown) => Promise<Result> }) => store.transaction(async (tx) => {
+    // An inserted membership takes a user FK key-share lock. Holding this row for the whole
+    // credential write closes the gap between the origin check and token consumption.
+    await store.find({ tx, kayan: 'user', args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { id: { equals: user } }, lock: 'update' } })
+    await store.find({ tx, kayan: 'member', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { userId: { equals: user } }, lock: 'share' } })
+    return passwordTx.run(tx, () => runWithAdapter(drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables })(built), () => run(tx)))
+  })
+  const passwordAuthority = async (ctx: HookContext) => {
+    const organization = requestOrganization()
+    const caller = await getSessionFromCtx(ctx)
+    const superAdmin = holdsRole((caller?.user as { role?: unknown } | undefined)?.role, (role) => role === 'super_admin')
+    if (!caller || (!superAdmin && (typeof organization !== 'string' || !holdsPermission('member.create')))) throw new APIError('FORBIDDEN', { message: 'Issuing a password link needs member.create in your active organization.' })
+    const owner = typeof organization === 'string' && await ctx.context.adapter.findOne<{ role: string }>({ model: 'member', where: [{ field: 'userId', value: caller.user.id }, { field: 'organizationId', value: organization }] })
+    return { organization, superAdmin, issuer: caller.user.id, privileged: superAdmin || isOwnerRole(owner && owner.role) }
+  }
   const sendPasswordLink = {
     id: 'send-password-link',
     endpoints: {
       sendPasswordLink: createAuthEndpoint('/organization/send-password-link', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
-        const organization = requestOrganization()
-        if (typeof organization !== 'string' || !holdsPermission('member.create')) throw new APIError('FORBIDDEN', { message: 'Sending a password link needs the permission "member.create" in your active organization.' })
+        const authority = await passwordAuthority(ctx)
         const { userId } = (ctx.body ?? {}) as Record<string, unknown>
-        const member = typeof userId === 'string' && (await store.count!({ kayan: 'member', args: { where: { organizationId: { equals: organization }, userId: { equals: userId } } } }))
-        const user = member ? ((await ctx.context.internalAdapter.findUserById(userId as string)) as ({ id: string; email: string; role?: unknown } | null)) : null
-        if (!user) throw new APIError('NOT_FOUND', { code: 'error.missing.member', message: 'No member of this organization has that id.' })
-        if (holdsRole(user.role, (one) => Object.hasOwn(backofficeRoles, one))) throw new APIError('FORBIDDEN', { message: 'A staff member\'s sign-in is the backoffice\'s, never a tenant\'s.' })
-        if (!settings.mailer && (!isLocalHost(ctx.headers?.get('origin') ?? '') || (await ctx.context.internalAdapter.findAccounts(user.id)).some((one) => one.providerId === 'credential'))) throw new APIError('FORBIDDEN', { message: 'A password link is mailed, and no mailer is configured.' })
-        if (settings.mailer && (await mailedLately(user.id))) return ctx.json({ sent: true })
-        if (settings.mailer) await withinLimits(organization)
-        const token = randomBytes(24).toString('base64url')
-        await ctx.context.internalAdapter.createVerificationValue({ identifier: `reset-password:${token}`, value: user.id, expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) })
-        authAudit({ action: 'send-password-link', actor: ctx.context.session?.user.id ?? null, user: user.id, organization })
-        if (!settings.mailer) return ctx.json({ sent: true, link: setPasswordLink(token) })
-        const held = (await ctx.context.adapter.findOne<{ name: string; names?: unknown }>({ model: 'organization', where: [{ field: 'id', value: organization }] }))!
-        await ctx.context.runInBackgroundOrAwait(newLinkMail({ mailer: settings.mailer, showOrganization: settings.showOrganization })({ email: user.email, organization: held, token }))
-        await mailedFor(organization)
-        return ctx.json({ sent: true })
+        if (typeof userId !== 'string') throw new APIError('BAD_REQUEST', { message: 'Name the member by userId.' })
+        if (userId === authority.issuer) throw new APIError('FORBIDDEN', { message: 'Ask another administrator to issue your link.' })
+        if (settings.passwordDelivery === 'email' && settings.mailer && typeof authority.organization === 'string') await withinLimits(authority.organization)
+        const issued = await passwordLock({ user: userId, run: async (tx) => {
+            const user = await ctx.context.internalAdapter.findUserById(userId)
+            const member = authority.superAdmin || await (await getCurrentAdapter(ctx.context.adapter)).findOne({ model: 'member', where: [{ field: 'userId', value: userId }, { field: 'organizationId', value: authority.organization! }] })
+            if (!user || !member) throw new APIError('NOT_FOUND', { message: 'No member has that id.' })
+            if (!authority.superAdmin && !(await passwordAccount({ tx, user: userId, organization: authority.organization!, privileged: authority.privileged }))) throw new APIError('FORBIDDEN', { code: 'PASSWORD_LINK_PLATFORM_REQUIRED', message: 'Ask an owner or a super admin. Organization links require an account created here, belonging to this organization alone; only owners and super admins issue for administrators.' })
+            const value = await issuePassword({ user: userId, ...(authority.superAdmin ? {} : { organization: authority.organization!, privileged: authority.privileged }) })
+            return { ...value, email: user.email }
+        } })
+        let emailed = false
+        let emailFailed = false
+        if (settings.passwordDelivery === 'email' && settings.mailer) {
+          try {
+            await settings.mailer.send(letter({ to: issued.email, subject: 'Choose your password · اختر كلمة المرور', en: 'Open this one-time link within 24 hours to choose your password.', ar: 'افتح هذا الرابط خلال 24 ساعة لاختيار كلمة المرور. يستخدم مرة واحدة.', link: setPasswordLink(issued.token) }))
+          emailed = true
+          if (typeof authority.organization === 'string') await mailedFor(authority.organization)
+          } catch {
+            // Delivery can fail after issuance. Keep Copy available without logging the mail body.
+            emailFailed = true
+          }
+        }
+        authAudit({ action: 'send-password-link', actor: ctx.context.session?.user.id ?? null, user: userId, organization: authority.organization })
+        ctx.setHeader('cache-control', 'no-store')
+        ctx.setHeader('referrer-policy', 'no-referrer')
+        return ctx.json({ sent: true, emailed, emailFailed, link: setPasswordLink(issued.token), expiresAt: issued.expiresAt })
+      }),
+      cancelPasswordLink: createAuthEndpoint('/organization/cancel-password-link', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
+        const authority = await passwordAuthority(ctx)
+        const { userId } = (ctx.body ?? {}) as Record<string, unknown>
+        if (typeof userId !== 'string' || (!authority.superAdmin && !(await passwordAccount({ user: userId, organization: authority.organization!, privileged: authority.privileged })))) throw new APIError('FORBIDDEN', { message: 'This account needs an owner or a super admin.' })
+        await ctx.context.adapter.deleteMany({ model: 'verification', where: passwordRows(userId) })
+        ctx.setHeader('cache-control', 'no-store')
+        ctx.setHeader('referrer-policy', 'no-referrer')
+        return ctx.json({ cancelled: true })
+      }),
+      operatorPasswordLink: createAuthEndpoint('/password-link/operator', { method: 'POST', metadata: { SERVER_ONLY: true } }, async (ctx) => {
+        const email = (ctx.body as { email?: unknown } | undefined)?.email
+        const user = typeof email === 'string' ? (await ctx.context.internalAdapter.findUserByEmail(email.trim().toLowerCase()))?.user : undefined
+        if (!user) throw new APIError('NOT_FOUND', { message: 'No account has that email.' })
+        const issued = await passwordLock({ user: user.id, run: () => issuePassword({ user: user.id }) })
+        return { link: setPasswordLink(issued.token), expiresAt: issued.expiresAt }
       }),
     },
+  }
+  // Match Better Auth's `body.token || query.token`, including an empty body token.
+  const checkPasswordToken = async (token: unknown) => {
+    if (typeof token !== 'string' || !token.startsWith('org.')) return
+    const [, encoded, privilege] = token.split('.')
+    const link = await (await tenant.$context).internalAdapter.findVerificationValue(`reset-password:${token}`).catch(() => { throw new APIError('INTERNAL_SERVER_ERROR', { message: 'Password link lookup failed.' }) })
+    if (!link || !(await passwordAccount({ user: link.value, organization: Buffer.from(encoded!, 'base64url').toString(), privileged: privilege === 'owner' }))) throw APIError.from('BAD_REQUEST', BASE_ERROR_CODES.INVALID_TOKEN)
+  }
+  const passwordPolicy = {
+    id: 'password-policy',
+    hooks: { before: [{ matcher: (ctx: { path?: string }) => ctx.path === '/reset-password' || (settings.passwordDelivery === 'admin' && ctx.path === '/request-password-reset'), handler: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === '/request-password-reset') return ctx.json({ status: true, message: 'Ask your administrator for a password link.' })
+      await checkPasswordToken((ctx.body as { token?: unknown } | undefined)?.token || (ctx.query as { token?: unknown } | undefined)?.token)
+    }) }] },
   }
   // Where a sign-up proves its address, the password is chosen once, from the mailed link, so the sign-up asks none:
   // whatever one carries is replaced by one nobody knows, and whoever signs up with another's address never holds a
@@ -1673,6 +1763,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       setPasswordState: createAuthEndpoint('/set-password/state', { method: 'GET', metadata: { SERVER_ONLY: true } }, async (ctx) => {
         const { token } = (ctx.query ?? {}) as { token?: unknown }
         const { internalAdapter } = ctx.context
+        await checkPasswordToken(token)
         const link = typeof token === 'string' && token ? await internalAdapter.findVerificationValue(`reset-password:${token}`) : null
         const user = link && new Date(link.expiresAt) > new Date() ? await internalAdapter.findUserById(link.value) : null
         if (!user) throw APIError.from('BAD_REQUEST', BASE_ERROR_CODES.INVALID_TOKEN)
@@ -1702,18 +1793,20 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       // A reset proves the mailbox, and an account proved so for the first time joins as a verified
       // one would. The user is read before the reset, so `emailVerified` says whether it was proved.
       onPasswordReset: async ({ user }: { user: { id: string; email: string; emailVerified?: boolean; role?: unknown } }) => {
-        const { adapter, internalAdapter } = await tenant.$context
+        const { adapter: fallback, internalAdapter } = await tenant.$context
+        const adapter = await getCurrentAdapter(fallback)
         await internalAdapter.updateUser(user.id, { emailVerified: true })
         // The password is chosen, so every other link to choose it is spent.
         await adapter.deleteMany({ model: 'verification', where: [{ field: 'value', value: user.id }, ...resetLinks] })
         if (!user.emailVerified) {
-          await acceptBound({ user, token: (tryGetCurrentAuthEndpointContext()?.body as { token?: unknown } | undefined)?.token })
+          const endpoint = tryGetCurrentAuthEndpointContext()
+          await acceptBound({ user, token: (endpoint?.body as { token?: unknown } | undefined)?.token || (endpoint?.query as { token?: unknown } | undefined)?.token })
           await joinOpen(user)
         }
       },
       // A second sign-up with the address of an account nobody proved, such as its owner's after
       // someone squatted it, is answered as any sign-up and mails the address the link that proves it.
-      ...(settings.mailer && {
+      ...(settings.passwordDelivery === 'email' && settings.mailer && {
         sendResetPassword: async (data: { user: { id: string; email: string }; token: string }) => {
           // Whoever asks for a reset proves the address afresh, carrying no invitation.
           await unbind(data.user.id)
@@ -1740,9 +1833,12 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
       keepsPerson,
       invitationLimit,
       setPasswordState,
+      passwordPolicy,
+      addPerson,
+      sendPasswordLink,
       namedInCode,
       ...(verifying ? [chosenLater] : []),
-      ...(oneOrganization ? [firstRun, signUpGate, addPerson, sendPasswordLink] : []),
+      ...(oneOrganization ? [firstRun, signUpGate] : []),
     ],
     // In one organization, nobody founds another or leaves the one: leaving would leave the
     // person in no organization at all, where every read is refused.
@@ -1759,6 +1855,7 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
         update: { after: lastSeen },
       },
       user: {
+        ...built.databaseHooks.user,
         create: {
           before: async (user: { email: string }, context: { body?: unknown; context: { adapter: unknown } } | null) => {
             await accountGate(user, context)
@@ -1851,9 +1948,24 @@ export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { 
     // Nor a password reset of its own: staff reset through the tenant app's page like anyone,
     // and the reset ends their sessions here too.
     disabledPaths: ['/one-time-token/verify', '/sign-up/email', '/request-password-reset', '/reset-password'],
-    databaseHooks: { session: { create: { before: staffSession(built.databaseHooks.session.create.before) } } },
+    databaseHooks: { ...built.databaseHooks, session: { create: { before: staffSession(built.databaseHooks.session.create.before) } } },
     database,
   })
+  const resetLocked = async <Result,>({ token, run }: { token: unknown; run: (server: Pick<typeof tenant, 'handler'> & { api: Pick<typeof tenant.api, 'resetPassword'> }) => Promise<Result> }) => {
+    const link = typeof token === 'string' && token.startsWith('org.') ? await (await tenant.$context).internalAdapter.findVerificationValue(`reset-password:${token}`).catch(() => { throw new APIError('INTERNAL_SERVER_ERROR', { message: 'Password link lookup failed.' }) }) : null
+    return link ? passwordLock({ user: link.value, run: (tx) => run(betterAuthServer({ ...tenant.options, logger: { disabled: true }, database: drizzleAdapter(tx as never, { provider: 'pg', schema: store.tables, transaction: false }) })) }) : run(tenant)
+  }
+  const api = new Proxy(tenant.api, { get: (target, key) => {
+    if (key !== 'resetPassword') return Reflect.get(target, key)
+    return (args: Parameters<typeof tenant.api.resetPassword>[0]) => resetLocked({ token: args?.body?.token || args?.query?.token, run: (server) => server.api.resetPassword(args) })
+  } })
+  const handler = async (request: Request) => {
+    if (request.method !== 'POST' || new URL(request.url).pathname !== '/api/auth/reset-password') return tenant.handler(request)
+    if (new URL(request.url).searchParams.getAll('token').length > 1) return Response.json({ code: 'INVALID_TOKEN', message: 'Invalid token.' }, { status: 400 })
+    const copy = request.clone()
+    const body = request.headers.get('content-type')?.includes('application/json') ? await copy.json().catch(() => ({})) as { token?: unknown } : Object.fromEntries(await copy.formData().catch(() => new FormData()))
+    return resetLocked({ token: body.token || new URL(request.url).searchParams.get('token'), run: (server) => server.handler(request) })
+  }
   // One object for the kayan, which answers from whichever instance serves the request.
-  return new Proxy(tenant, { get: (_target, key) => Reflect.get(onBackoffice() ? backoffice : tenant, key) })
+  return new Proxy(tenant, { get: (_target, key) => onBackoffice() ? Reflect.get(backoffice, key) : key === 'api' ? api : key === 'handler' ? handler : Reflect.get(tenant, key) })
 }
