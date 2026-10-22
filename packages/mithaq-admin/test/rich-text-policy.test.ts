@@ -187,3 +187,15 @@ test('a mention viewer removes its link when a fresh record read is refused', as
     assert.ok(host.textContent?.includes('@Snapshot'))
   } finally { await act(async () => root.unmount()); host.remove() }
 })
+
+test('find and replace updates hashtag words and unwraps a tag replaced with ordinary text', async () => {
+  const { $replaceMatches } = await import('../registry/rich-text-find.ts')
+  await withEditor({ policy: { features: ['mentions', 'findReplace'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    await act(async () => editor.update(() => { ($getRoot().getFirstChildOrThrow() as import('lexical').ParagraphNode).append($createTextNode('#old #old')) }))
+    await act(async () => editor.update(() => { assert.equal($replaceMatches({ query: 'old', replacement: 'new', all: true, index: 0, locale: 'en', matchCase: false, wholeWord: true }), 2) }))
+    assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), '#new #new')
+    await act(async () => editor.update(() => { assert.equal($replaceMatches({ query: '#new', replacement: 'plain', all: true, index: 0, locale: 'en', matchCase: false, wholeWord: false }), 2) }))
+    assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), 'plain plain')
+    assert.ok(!JSON.stringify(changes.at(-1)).includes('"type":"hashtag"'))
+  } })
+})

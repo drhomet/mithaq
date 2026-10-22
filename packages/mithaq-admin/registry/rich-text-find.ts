@@ -12,7 +12,7 @@ export const $findMatches = ({ query, matchCase, wholeWord, locale }: FindOption
     if ($isTextNode(node)) {
       const block = node.getParents().find((parent) => $isElementNode(parent) && !parent.isInline())?.getKey() ?? ''
       // Record mentions are atomic identities, and replacing a piece would corrupt their stored name.
-      if (node.isTextEntity() || node.isToken()) { groups.push({ block: '', nodes: [] }); return }
+      if (node.isTextEntity() && node.getType() !== 'hashtag' || node.isToken()) { groups.push({ block: '', nodes: [] }); return }
       let group = groups.at(-1)
       if (!group || group.block !== block) { group = { block, nodes: [] }; groups.push(group) }
       group.nodes.push(node)
