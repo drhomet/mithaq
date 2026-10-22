@@ -12,7 +12,7 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import type { Klass, LexicalNode } from 'lexical'
 import type { ControlProps } from 'mithaq-admin/control-props.ts'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, richTextChoiceFeatures, richTextGuard, richTextFeatureGuard, safeUrl } from 'mithaq/rich-text'
+import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, richTextChoiceFeatures, safeUrl } from 'mithaq/rich-text'
 import { FloatingLinkEditorPlugin } from 'mithaq-admin/rich-text-link-plugin.tsx'
 import { RichTextContext, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { holdsPlaceholder } from 'mithaq-admin/rich-text-selection.ts'
@@ -91,7 +91,8 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
           if (holdsPlaceholder(state)) return
           // Lexical exports optional keys as undefined; the value crossing the server boundary is JSON.
           const next = JSON.parse(JSON.stringify(state.toJSON())) as RichTextValue
-          if (!richTextGuard(next) && !richTextFeatureGuard({ node: next.root, policy })) onChange(next)
+          // The field must receive refused edits too, so saving reports the server's error instead of the last good value.
+          onChange(next)
         }} />
         <HistoryPlugin />
         <ListPlugin />

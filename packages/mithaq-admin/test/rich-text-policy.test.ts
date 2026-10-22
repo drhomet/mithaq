@@ -117,3 +117,36 @@ test('style and direction menus expose their current choice as checked radio ite
 test('opening an allowed 0.3.4 document does not emit a replacement value', async () => {
   await withEditor({ value: legacy.editorState, run: async ({ changes }) => { assert.equal(changes.length, 0) } })
 })
+
+test('an oversized edit reaches the field so the server can report its refusal', async () => {
+  await withEditor({ value: legacy.editorState, run: async ({ editor, changes }) => {
+    assert.equal(changes.length, 0, 'opening a stored document sends nothing')
+    const text = 'x'.repeat(600 * 1024)
+    await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[0]!.setTextContent(text) }))
+    assert.equal(changes.length, 1, 'the field receives the edit instead of keeping its last good value')
+    assert.equal(changes[0]!.root.children[0]!.children![0]!.text, text)
+    const parsed = richText({ nodes: defaultNodes }).kinds.richText.targets.zod().safeParse(changes[0])
+    assert.equal(parsed.success, false, 'the server refuses the oversized value')
+    if (!parsed.success) assert.match(parsed.error.message, /larger than 524288 bytes/)
+  } })
+})
+
+test('the mounted link popover follows a scrolling ancestor', async () => {
+  const value = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'link', url: 'https://example.com', children: [{ type: 'text', text: 'linked words' }] }] }] } }
+  await withEditor({ value, run: async ({ editor, host }) => {
+    const link = host.querySelector('a')!
+    host.style.overflow = 'auto'
+    // happy-dom has no layout; supply the link geometry a browser gives after ancestor scrolling.
+    link.getBoundingClientRect = () => new window.DOMRect(40, 200 - host.scrollTop, 90, 20) as unknown as DOMRect
+    await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[0]!.select(0, 6) }))
+    const anchor = host.querySelector<HTMLElement>('[data-slot="popover-trigger"]')!
+    assert.ok(window.document.querySelector('[data-link-editor]'), 'the link popover is mounted')
+    assert.equal(anchor.style.top, '200px')
+    await act(async () => {
+      host.scrollTop = 70
+      host.dispatchEvent(new window.Event('scroll', { bubbles: false }) as unknown as Event)
+    })
+    assert.equal(anchor.style.top, '130px', 'the popover anchor follows the link by the scroll distance')
+    assert.equal(anchor.style.left, '40px')
+  } })
+})
