@@ -580,7 +580,8 @@ viewer cannot read, or one no longer returned.
 
 A datetime field named `archivedAt` is the archive timestamp by convention.
 Lists and phone cards draw Active or Archived, نشط or مؤرشف, in a coloured badge.
-The record page keeps its date. This adds no field role or vocabulary word.
+An omitted timestamp stays empty; null means Active. The record page keeps its date.
+This adds no field role or vocabulary word.
 Other datetime fields retain their dates. Projects using another name can
 supply their own cell. Checkbox cells display the project's
 `<kayan>.<field>.true` and `.false` messages. Without those messages they show
@@ -596,16 +597,24 @@ timestamp example.
 
 Only visible count columns ask normal `find` for `counts: ['scheduledSessions',
 'tags']`. The response keeps stored fields intact and adds
-`counts: { scheduledSessions: { [rowId]: 3 } }`. One managed related read per
-target covers the whole page, including multiple columns at that target.
-Counts include only rows the actor may read, within the current tenant reach,
-with the related read's field access and soft deletes applied. A missing read
-permission or unreadable linking field gives a dash, not zero. No count request
-makes no related read. The server reads all matching related rows to count them;
-counts do not use the join's preview limit.
+`counts: { scheduledSessions: { [rowId]: 3 } }`. Related reads batch the page's
+columns and split linked IDs into chunks of at most 1,000. Counts include only
+rows the actor may read, within the current tenant reach, with the related
+read's field access and soft deletes applied. A missing read permission or
+unreadable linking field gives a dash. Custom record-dependent linking-field
+callbacks and custom related find pipelines also leave the count unavailable,
+because aggregation cannot prove their masks without reading whole records.
+No count request makes no related read. Counts use the store's aggregate when
+available; otherwise a store declaring `projectedReads: true` supplies only the
+linking column through `find`'s `select` option.
+The fallback reads at most 10,000 linking values per parent page in pages of 100; counts beyond that bound remain unavailable.
+Counts do not use the join's preview limit.
 
 Existing projects merge held `cells.tsx`, `format.tsx`, `relationship-cell.tsx`,
-`upload-cell.tsx`, `rich-text.tsx`, `list.tsx`, `list-table.tsx`, `list-types.tsx`
-and `list-query.ts`. Ejected `cells.tsx` also needs the host's shadcn Badge.
+`upload-cell.tsx`, `rich-text.tsx`, `list.tsx`, `list-table.tsx`, `list-types.tsx`,
+`list-query.ts`, `copy.ts`, `node-buttons.tsx` and `members.tsx`. Add
+`admin.emptyValue`, `admin.openEmpty`, `admin.active` and `admin.archived` to
+the host copy beside `admin.yes` and `admin.no`, with translations for each
+locale. Ejected `cells.tsx` also needs the host's shadcn Badge.
 Regenerate screens after declaring count columns. No database migration or
 vocabulary signature is needed for these presentation choices.

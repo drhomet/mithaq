@@ -4,7 +4,9 @@
 
 - Empty cells of every shipped kind show one dash with localized accessible words. Checkbox cells show declared true/false words or localized Yes/No.
 - Datetime fields named `archivedAt` draw Active/Archived badges in lists and phone cards; record pages keep the date.
-- Join and hasMany relationship columns may declare `cell: 'count'`, typed and checked by generation. Only visible columns request counts through normal find; one related managed read per target covers the page under tenant and read permissions. See [List cells](packages/mithaq-admin/README.md#list-cells) for response shape and held-file upgrades.
+- Join and hasMany relationship columns may declare `cell: 'count'`, typed and checked by generation. Only visible columns request counts through normal find; bounded related managed reads cover the page under tenant and read permissions. See [List cells](packages/mithaq-admin/README.md#list-cells) for response shape and held-file upgrades.
+
+- Count fallbacks read only linking fields, at most 10,000 values per parent page in pages of 100; larger counts remain unavailable.
 
 ## 0.3.5
 
