@@ -572,8 +572,8 @@ projects that do not use rich text. See the [0.3.4 upgrade steps](../../template
 
 ## List cells
 
-Every shipped kind shows `—` for a missing value, an empty string or an empty
-array. Screen readers hear "Empty" or "فارغ". Zero and false remain values.
+Every shipped kind except count shows `—` for a missing value, an empty string
+or an empty array; an unavailable count shows Not available. Screen readers hear "Empty" or "فارغ". Zero and false remain values.
 Relationships and uploads with no reference use the same marker. Loading,
 Not available and Deleted still describe a reference waiting to load, one the
 viewer cannot read, or one no longer returned.

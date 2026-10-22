@@ -125,7 +125,7 @@ export const memoryStore = () => {
         })
       const offset = limit > 0 ? (page - 1) * limit : 0
       const docs = limit > 0 ? sorted.slice(offset, offset + limit) : sorted
-      return { docs: docs, totalDocs: sorted.length }
+      return { docs, totalDocs: sorted.length }
     },
     sum: async ({ kayan: name, field, where }: { tx?: unknown; kayan: string; field: string; where?: Where }) => {
       if (!['integer', 'number', 'decimal'].includes(kayanByName.get(name)?.fields[field]?.kind ?? '')) throw invalid({ message: 'Only numeric fields can be summed.', key: 'error.invalid.value' })
