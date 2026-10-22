@@ -16,13 +16,10 @@ type CountRead = {
   kayan: string
   link: string
   queries: Scalar[][]
-  budget: { left: number }
   result?: number[]
 }
 // Server-only context, never an HTTP input or a caller-supplied read option.
 const countReads = new AsyncLocalStorage<CountRead>()
-const countPageSize = 100
-const countRowLimit = 10_000
 
 /** What a `find` list takes where it declares no input of its own. */
 export type FindInput = {
@@ -531,7 +528,6 @@ export const readers = <Actor>({
     const groups = new Map<ResolvedKayan, Map<string, Job[]>>()
     const tenant = running.getStore()?.tenant
     const admitted = membersAdmitted(tenant, accessWhere)
-    const budget = { left: countRowLimit }
     for (const field of fields) for (const row of rows) {
       const user = admitted && kayan.tenant
         ? ((tenant as Extract<TenantScope, { reach: 'mine' }>).members.get(String(row[kayan.tenant])) ?? null) : actor
@@ -563,9 +559,9 @@ export const readers = <Actor>({
           offset++
         }
         if (!batch.length) continue
-        const request: CountRead = { kayan: target.name, link, queries: batch.map((job) => job.values), budget }
+        const request: CountRead = { kayan: target.name, link, queries: batch.map((job) => job.values) }
         try {
-          await countReads.run(request, () => find({ limit: countPageSize, where: { or: request.queries.map((values) => ({ [link]: { in: values } })) } }))
+          await countReads.run(request, () => find({ limit: 1, where: { or: request.queries.map((values) => ({ [link]: { in: values } })) } }))
           if (!request.result) throw denied({ message: 'This read cannot supply a safe count.', key: 'error.forbidden.field_read' })
           batch.forEach((job, index) => { counts[job.field]![job.parent]! += request.result![index]! })
         } catch (error) {
@@ -577,34 +573,18 @@ export const readers = <Actor>({
     for (const field of unavailable) delete counts[field]
     return counts
   }
-  const readCount = async ({ request, where, sort }: { request: CountRead; where: Where | undefined; sort: { field: string; direction: 'asc' | 'desc' } }) => {
+  const readCount = async ({ request, where }: { request: CountRead; where: Where | undefined }) => {
     const read = declaredFieldAccess(kayan.fields[request.link]?.access?.read)
-    // Arbitrary record-dependent masks cannot be proved from a link-only projection; fail closed.
+    // Arbitrary record-dependent masks cannot be proved by an aggregate; fail closed.
     if (typeof read === 'function' && !rowsOfField(read)) {
-      throw denied({ message: 'A record-dependent linking-field mask cannot supply a projected count.', key: 'error.forbidden.field_read' })
+      throw denied({ message: 'A record-dependent linking-field mask cannot supply an aggregate count.', key: 'error.forbidden.field_read' })
     }
-    if (store.count) {
-      const totals = []
-      for (const values of request.queries) totals.push(await store.count({ kayan: kayan.name, args: { where: combineWhere(combineWhere(where, { [request.link]: { in: values } }), shown) }, tx: currentTx() }))
-      request.result = totals
-      return
-    }
-    if (!store.projectedReads || request.budget.left < 1) throw denied({ message: 'This store cannot supply a bounded projected count.', key: 'error.forbidden.field_read' })
-    const totals = request.queries.map(() => 0), sets = request.queries.map((values) => new Set(values))
-    const available = request.budget.left, pageSize = Math.min(countPageSize, available)
-    // ponytail: without aggregation, scan only links in 100-row pages, at most 10,000 per parent page; add grouped count for larger sets.
-    for (let page = 1; ; page++) {
-      const found = await findStore(kayan.name, { limit: pageSize, page, sort, where, select: [request.link] }, currentTx())
-      if (found.totalDocs > available) {
-        request.budget.left = 0
-        throw denied({ message: 'This count exceeds the projected-read bound.', key: 'error.forbidden.field_read' })
-      }
-      request.budget.left -= found.docs.length
-      for (const row of found.docs) sets.forEach((values, index) => { if (values.has(row[request.link] as Scalar)) totals[index]!++ })
-      if (page * pageSize >= found.totalDocs) break
-    }
+    if (!store.count) throw denied({ message: 'This store cannot supply relationship counts.', key: 'error.forbidden.field_read' })
+    const totals = []
+    for (const values of request.queries) totals.push(await store.count({ kayan: kayan.name, args: { where: combineWhere(combineWhere(where, { [request.link]: { in: values } }), shown) }, tx: currentTx() }))
     request.result = totals
   }
+
   const fetchList = async (input: Record<string, unknown>, actor: Actor | null, granted?: Granted, drafts?: Granted) => {
     const accessWhere = granted ? granted.where : await readAccess(kayan, actor, authorize, admin)
     const callerWhere = await judgedWhere(input.where as Where | undefined, actor, accessWhere)
@@ -616,7 +596,7 @@ export const readers = <Actor>({
     for (const judge of rest) if (sort.field !== 'id') await protectedField(kayan, sort.field, judge, authorize, admin, 'sort')
     const request = countReads.getStore()
     if (request?.kayan === kayan.name) {
-      await readCount({ request, where, sort })
+      await readCount({ request, where })
       return pageOf([], 0, limit, page)
     }
     const result = await findStore(kayan.name, { limit, page, sort, where }, currentTx(), drafts)
@@ -714,7 +694,7 @@ export const readers = <Actor>({
     }))
     const request = countReads.getStore()
     if (request?.kayan === kayan.name && (name !== 'find' || declaration.steps.length !== 1 || sealOf(declaration.steps[0]!) !== 'find' || declaration.afterSteps.length || declaration.output)) {
-      throw denied({ message: 'A custom read pipeline cannot supply a projected count.', key: 'error.forbidden.field_read' })
+      throw denied({ message: 'A custom read pipeline cannot supply an aggregate count.', key: 'error.forbidden.field_read' })
     }
     // A draft read answers each row's latest version, so it asks `findVersions` too.
     const drafts: Granted | undefined = !!options.draft && !!kayan.versions?.drafts && (mode === 'many' || mode === 'one')

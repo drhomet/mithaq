@@ -604,10 +604,8 @@ read's field access and soft deletes applied. A missing read permission or
 unreadable linking field gives a dash. Custom linking-field
 callbacks and custom related find pipelines also leave the count unavailable,
 because aggregation cannot prove their masks without reading whole records.
-No count request makes no related read. Counts use the store's aggregate when
-available; otherwise a store declaring `projectedReads: true` supplies only the
-linking column through `find`'s `select` option.
-The fallback reads at most 10,000 linking values per parent page in pages of 100; counts beyond that bound remain unavailable.
+No count request makes no related read. Counts require the store's `count`
+aggregate; a store without it leaves the count unavailable.
 Counts do not use the join's preview limit.
 
 Existing projects merge held `cells.tsx`, `format.tsx`, `relationship-cell.tsx`,

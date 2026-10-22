@@ -71,7 +71,6 @@ export const memoryStore = () => {
     return [field, row ? Number(row[field]) + Number(value.$inc) : value.$inc]
   }))
   return {
-    projectedReads: true as const,
     capability: 'store' as const,
     rows,
     calls,
@@ -116,7 +115,7 @@ export const memoryStore = () => {
     },
     remove: async ({ kayan: name, id, where }: { tx: unknown; kayan: string; id: unknown; where?: Where }) =>
       of(name).splice(constrained(name, id, where), 1)[0]!,
-    find: async ({ kayan: name, args: { limit, page, sort, where, select } }: { tx?: unknown; kayan: string; args: { limit: number; select?: readonly string[]; page: number; sort: { field: string; direction: 'asc' | 'desc' }; where?: Where } }) => {
+    find: async ({ kayan: name, args: { limit, page, sort, where } }: { tx?: unknown; kayan: string; args: { limit: number; page: number; sort: { field: string; direction: 'asc' | 'desc' }; where?: Where } }) => {
       const sorted = of(name)
         .filter((row) => !where || matches(name, row, where))
         .toSorted((left, right) => {
@@ -126,7 +125,7 @@ export const memoryStore = () => {
         })
       const offset = limit > 0 ? (page - 1) * limit : 0
       const docs = limit > 0 ? sorted.slice(offset, offset + limit) : sorted
-      return { docs: select ? docs.map((row) => Object.fromEntries(select.map((field) => [field, row[field]]))) : docs, totalDocs: sorted.length }
+      return { docs: docs, totalDocs: sorted.length }
     },
     sum: async ({ kayan: name, field, where }: { tx?: unknown; kayan: string; field: string; where?: Where }) => {
       if (!['integer', 'number', 'decimal'].includes(kayanByName.get(name)?.fields[field]?.kind ?? '')) throw invalid({ message: 'Only numeric fields can be summed.', key: 'error.invalid.value' })
