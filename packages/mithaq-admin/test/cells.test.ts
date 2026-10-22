@@ -90,3 +90,25 @@ test('count cells use page metadata even when the count is the list title', asyn
     assert.match(html, new RegExp(`data-list-title=""[^>]*>${count}</td>`))
   }
 })
+
+test('partial and older saved column choices request every effective visible count', async () => {
+  const { findOf, remembered, remember } = await import('../registry/list-query.ts')
+  const { columnsOf } = await import('../registry/list-columns.tsx')
+  const field = (name: string, kind = 'text') => ({ name, kind, rules: {}, component: kind, cell: kind }) as ClientField
+  const listed = { name: 'products', fields: [field('title'), field('fee', 'integer'), field('variants', 'join')], operations: [], pages: {}, single: false }
+  const node = { columns: [{ field: 'title' }, { field: 'fee' }, { field: 'variants', cell: 'count' }] }
+  const check = (cols: readonly string[]) => {
+    assert.deepEqual(columnsOf({ kayan: listed, cols, opens: node.columns.map((column) => column.field) }).filter((column) => column.active).map((column) => column.name), ['title', 'variants'])
+    assert.deepEqual(findOf({ kayan: listed, query: { cols }, node }), { counts: ['variants'] })
+  }
+  check(['title', '-fee'])
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage'), values = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) } })
+  try {
+    remember('products', { cols: ['title', '-fee'] })
+    check(remembered('products', 100).cols!)
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'localStorage', previous)
+    else Reflect.deleteProperty(globalThis, 'localStorage')
+  }
+})

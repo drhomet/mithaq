@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { checkboxSize } from 'mithaq-admin/control-props.ts'
 import { labelFor, type Translate } from 'mithaq-admin/copy.ts'
-import { columnsFrom, columnsTo, type ColumnChoice, type ListQuery } from 'mithaq-admin/list-query.ts'
+import { effectiveColumns, columnsTo, type ColumnChoice, type ListQuery } from 'mithaq-admin/list-query.ts'
 
 export type ColumnsProps = {
   kayan: ClientKayan
@@ -122,17 +122,7 @@ export const columnsOf = ({
   /** The columns a page's list node opens with, which is every field where there is no node. */
   opens?: readonly string[]
 }): readonly ColumnChoice[] => {
-  const isDefault = (_kayan: ClientKayan, field: ClientField) => !opens || opens.includes(field.name)
-  const candidates = columnCandidates(kayan, reads)
-  const offered = new Set(candidates.map((field) => field.name))
-  const fromUrl = columnsFrom(cols).filter((one) => offered.has(one.name))
-  const named = new Set(fromUrl.map((one) => one.name))
-  const rest = candidates.filter((field) => !named.has(field.name))
-  if (fromUrl.length) {
-    // A column the URL did not name keeps the declaration's answer, so a field added to a kayan is not hidden from old links.
-    return [...fromUrl, ...rest.map((field) => ({ name: field.name, active: isDefault(kayan, field) }))]
-  }
-  return candidates.map((field) => ({ name: field.name, active: isDefault(kayan, field) }))
+  return effectiveColumns({ fields: columnCandidates(kayan, reads), cols, opens })
 }
 
 /**

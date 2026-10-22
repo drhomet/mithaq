@@ -30,6 +30,19 @@ export type ColumnChoice = { name: string; active: boolean }
 export const columnsFrom = (cols: readonly string[] | undefined): ColumnChoice[] =>
   (cols ?? []).map((one) => (one.startsWith('-') ? { name: one.slice(1), active: false } : { name: one, active: true }))
 
+/** Partial links and saved choices keep newly declared columns at their declared visibility. */
+export const effectiveColumns = ({ fields, cols, opens }: {
+  fields: readonly { name: string }[]
+  cols?: readonly string[]
+  opens?: readonly string[]
+}): readonly ColumnChoice[] => {
+  const offered = new Set(fields.map((field) => field.name))
+  const named = columnsFrom(cols).filter((column) => offered.has(column.name))
+  const explicit = new Set(named.map((column) => column.name))
+  const defaults = fields.filter((field) => !explicit.has(field.name)).map((field) => ({ name: field.name, active: !opens || opens.includes(field.name) }))
+  return [...named, ...defaults]
+}
+
 /** The choices written back as the URL's column list. */
 export const columnsTo = (columns: readonly ColumnChoice[]): string[] =>
   columns.map((one) => (one.active ? one.name : `-${one.name}`))
@@ -422,9 +435,8 @@ export const findOf = ({
   const tab = (node?.tabs?.find((one) => one.tab === query.tab) ?? node?.tabs?.[0])?.where
   const where = tab === undefined ? searched : searched === undefined ? tab : { and: [tab, searched] }
   const sort = query.sort ?? node?.sort
-  const counts = node?.columns?.filter((column) => column.cell === 'count'
-    && kayan.fields?.some((field) => field.name === column.field)
-    && (query.cols === undefined || query.cols.includes(column.field))).map((column) => column.field)
+  const visible = new Set(effectiveColumns({ fields: kayan.fields ?? [], cols: query.cols, opens: node?.columns?.map((column) => column.field) }).filter((column) => column.active).map((column) => column.name))
+  const counts = node?.columns?.filter((column) => column.cell === 'count' && visible.has(column.field)).map((column) => column.field)
   return {
     ...(counts?.length && { counts }),
     ...(where !== undefined && { where }),
