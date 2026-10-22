@@ -59,3 +59,26 @@ test('the projected count ceiling leaves the value unavailable rather than trunc
   assert.equal(page.docs[0]?.id,parent.id)
   assert.equal(reads.filter(read=>read.kayan==='children').length,1)
 })
+
+test('a role without read access to the related kayan receives no count', async () => {
+  const {built,parent,reads,totals,seed}=await fixture({relatedRead:({user})=>(user as {role?:string}|null)?.role!=='blocked'})
+  await seed(1)
+  const page=await built.kayan.parents.operations.find({counts:['links','children']},{actor:{role:'blocked'}})
+  assert.equal(page.docs[0]?.id,parent.id)
+  assert.deepEqual(page.counts,{})
+  assert.equal(reads.filter(read=>read.kayan==='children').length,0)
+  assert.equal(totals.length,0)
+  assert.deepEqual((await built.kayan.parents.operations.find({counts:['children']},{actor:{role:'reader'}})).counts,{children:{[parent.id]:1}})
+})
+
+test('a hidden linking field leaves the join count unavailable', async () => {
+  for(const count of [true,false]){
+    const {built,parent,reads,totals,seed}=await fixture({count,linkRead:({user})=>(user as {role?:string}|null)?.role!=='blocked'})
+    await seed(1)
+    const page=await built.kayan.parents.operations.find({counts:['children']},{actor:{role:'blocked'}})
+    assert.equal(page.docs[0]?.id,parent.id)
+    assert.deepEqual(page.counts,{})
+    assert.equal(reads.filter(read=>read.kayan==='children').length,0)
+    assert.equal(totals.length,0)
+  }
+})
