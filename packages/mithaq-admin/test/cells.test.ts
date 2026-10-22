@@ -142,7 +142,7 @@ test('bulk checkbox words follow the same host and field copy as list cells', as
 
 
 test('unavailable counts use the host not-available word while zero stays a number', () => {
-  for(const [locale,word] of [['en','Not available'],['ar','غير متاح']]) {
+  for(const [locale,word] of [['en','Not available'],['ar','غير متاح']] as const) {
     for(const value of [undefined,null]) assert.equal(draw('count',value,locale),word)
   }
   assert.equal(draw('count',0,'en'),'0')
