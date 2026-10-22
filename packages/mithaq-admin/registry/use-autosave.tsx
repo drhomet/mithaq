@@ -68,8 +68,13 @@ export const useAutosave = ({ busy, changed, client, form, id, interval, noteSav
           // The instant the draft now stands at, which the next write sends.
           const updatedAt = (written as { updatedAt?: unknown } | null)?.updatedAt ?? seed.updatedAt
           if (JSON.stringify(form.state.values) === json) {
-            form.reset(values)
-            setSeed(seeded({ values, status: afterDraft(seed.status), updatedAt }))
+            // A hidden field was not autosaved; keep its old baseline and its local edit.
+            const saved = { ...seed.saved, ...sent }
+            form.reset(saved)
+            for (const [name, value] of Object.entries(values)) {
+              if (JSON.stringify(value) !== JSON.stringify(saved[name])) form.setFieldValue(name, value)
+            }
+            setSeed(seeded({ values: saved, status: afterDraft(seed.status), updatedAt }))
           } else {
             setSeed((held) => ({ ...held, saved: { ...held.saved, ...sent }, status: afterDraft(held.status), updatedAt }))
           }

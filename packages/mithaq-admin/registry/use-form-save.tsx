@@ -85,17 +85,20 @@ export const useFormSave = ({
   const kept = useRef(false)
   // `refuse` is where a refusal lands: the form's own box by default, or an operation dialog's boxes, which
   // stays open to hold them. `next` is the draft status the write leaves the row at. Answers whether the write landed.
-  const run = async ({ write, effect, operation, refuse = setRefused, next }: Landed & { write: () => Promise<unknown>; refuse?: (thrown: unknown) => void }): Promise<boolean> => {
+  const run = async ({ write, effect, operation, refuse = setRefused, next, sent = values }: Landed & { write: () => Promise<unknown>; refuse?: (thrown: unknown) => void; sent?: Record<string, unknown> }): Promise<boolean> => {
     setRefused(undefined)
     setBusy(true)
     try {
       const written = await write()
       kept.current = true
-      // What was just written is what the form now holds, so it holds no change: Save goes disabled and
-      // the unload guard comes down.
-      form.reset(values)
+      // Hidden fields were not sent, so their edits and the guard must survive this save.
+      const saved = { ...seed.saved, ...sent }
+      form.reset(saved)
+      for (const [name, value] of Object.entries(values)) {
+        if (JSON.stringify(value) !== JSON.stringify(saved[name])) form.setFieldValue(name, value)
+      }
       // The instant the row now stands at, which the next update sends.
-      setSeed(seeded({ values, status: next ?? seed.status, updatedAt: (written as { updatedAt?: unknown } | null)?.updatedAt ?? seed.updatedAt }))
+      setSeed(seeded({ values: saved, status: next ?? seed.status, updatedAt: (written as { updatedAt?: unknown } | null)?.updatedAt ?? seed.updatedAt }))
       noteSave()
       onWritten()
       toast.success(done({ effect, operation, next }))
@@ -138,7 +141,7 @@ export const useFormSave = ({
     if (refusal) return setRefused(refusal)
     const written = valuesOf({ fields, values, owned })
     const next = drafts ? (options?.draft ? afterDraft(seed.status) : 'published') : undefined
-    void run({ write: () => (id ? client.update({ ...written, ...readAt(expectedUpdatedAt), id }, options) : client.create(written, options)), effect: id ? 'update' : 'create', next })
+    void run({ write: () => (id ? client.update({ ...written, ...readAt(expectedUpdatedAt), id }, options) : client.create(written, options)), effect: id ? 'update' : 'create', next, sent: written })
   }
 
   // The discard question is open, or a Discard is on its way out, deleting a draft first where it has one to delete.

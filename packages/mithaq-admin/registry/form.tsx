@@ -112,9 +112,9 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // How many writes the person pressed were refused over fields, which moves the focus to the summary on each.
   const [refusals, setRefusals] = useState(0)
   // A refusal naming a field is drawn at that field and in the summary; a row changed elsewhere is a lasting notice on
-  // the form, since nothing saves until it is read again; any other, a request that failed, is said in a red toast.
+  // the form, since nothing saves until it is read again. Other failures stay inline in drawers, or in a red toast.
   const said = (thrown: unknown) => {
-    if (!thrown || staleIn(thrown)) return
+    if (!thrown || staleIn(thrown) || props.inlineRefusal) return
     const named = Object.entries(issuesOf(thrown))
     if (!named.length) return void toast.error(failedWords({ kayan: kayan.name, copy, thrown }))
     // A field the page does not draw has no box to mark, so what is wrong with it is said here.
@@ -157,6 +157,7 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   const tree = nodes ?? (screen && nodesOf(screen.page))
   // The fields this form draws a box for, which its summary lists.
   const drawn = new Set(tree ? leavesOf(tree) : kayan.fields.map((field) => field.name))
+  const undrawn = Object.entries(sentences).filter(([name]) => !drawn.has(name))
   const saving = useFormSave({ ...props, drafts: !!drafts, form, id, owned, refuse, seed, seeded, setSeed, status, tree, values, scope: scopeOf({ values, record: value, access, kayan }), onWritten: forgetPublished, done: (landed) => doneWords({ kayan, copy, ...landed }) })
   const { busy, run, save, readAt, asking, setAsking, leaving } = saving
   // Never while a discard question is open, which says the change is unsaved, nor once a write was refused because
@@ -266,9 +267,9 @@ function FormScreen(props: FormProps & { made?: string; onMade: (id: string) => 
   // that titles it, so the form keeps only the sentence under it.
   const chrome = (
     <>
-      {props.inlineRefusal && held && !staleIn(held) && !Object.keys(issues).length ? (
+      {props.inlineRefusal && held && !staleIn(held) && (!Object.keys(issues).length || undrawn.length > 0) ? (
         <p role="alert" className="rounded-md border border-destructive/50 px-3 py-2 text-sm text-destructive">
-          {failedWords({ kayan: kayan.name, copy, thrown: held })}
+          {undrawn.length ? undrawn.map(([name, sentence]) => `${labelOf(name)}: ${sentence}`).join(' ') : failedWords({ kayan: kayan.name, copy, thrown: held })}
         </p>
       ) : null}
       <FormChrome

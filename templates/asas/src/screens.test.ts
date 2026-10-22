@@ -1386,3 +1386,10 @@ test('relationship create opt-out survives the browser projection', () => {
   const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [courses, suppliers] })
   assert.equal(asas.targets.dashboard.client.kayan.courses!.fields.find((field) => field.name === 'supplier')!.allowCreate, false)
 })
+
+test('a relationship create opt-out refuses a non-boolean with its own message', () => {
+  const language = screens()
+  const suppliers = language.defineKayan({ name: 'suppliers', fields: { ...defaultFields, name: { kind: 'text' } } })
+  const courses = language.defineKayan({ name: 'courses', fields: { ...defaultFields, supplier: { kind: 'relationship', relationTo: () => suppliers, targets: { dashboard: { allowCreate: 'no' as never } } } } })
+  assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [courses, suppliers] }), /Kayan "courses" field "supplier" targets\.dashboard\.allowCreate must be a boolean\./)
+})

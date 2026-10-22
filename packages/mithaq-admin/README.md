@@ -65,12 +65,13 @@ when none exists. They offer no Clear. Optional selects and comboboxes retain
 Clear after selection. A whole-record delete and its confirmation use solid red
 with readable text in both themes. A record-page button can mark another action
 `destructive: true`; its trigger and confirmation receive the same treatment.
+List and bulk buttons ignore this marker and keep their existing colours.
 Custom record button components apply the exported `solidDestructive` class to
 their trigger and confirmation, as the starter's role delete does. Inline row
 actions and chip removes keep their existing colours.
 
 After upgrading, regenerate screens. Projects holding these pieces should merge
-`form`, `form-types`, `use-form-save`, `node-tree`, `relationship-control`, `choice-control`,
+`form`, `form-types`, `use-form-save`, `use-autosave`, `node-tree`, `relationship-control`, `choice-control`,
 `delete-button`, `form-button`, `node-buttons`, `operation-button` and `use-confirm`.
 If you hold `delete-button`, merge its new `solidDestructive` export before
 adopting the other changed buttons. No database migration is needed.

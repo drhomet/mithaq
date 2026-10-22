@@ -169,7 +169,7 @@ type BoundField<L extends LanguageShape, K extends keyof L['kinds'] & string> = 
   {
     kind: K
     rules?: BoundRules<L, K>
-    targets?: Record<string, unknown> & { [Screen in ScreenKeys<L['targets']>]?: ScreenField<RefOf<L['targets'][Screen], L['kinds']>> }
+    targets?: Record<string, unknown> & { [Screen in ScreenKeys<L['targets']>]?: ScreenField<RefOf<L['targets'][Screen], L['kinds']>, K> }
   } &
   (L['kinds'][K] extends { richTextPolicy: { features: readonly (infer Feature extends import('../rich-text/features.ts').RichTextFeature)[] } } ? { features?: readonly Feature[] } : { features?: never }) &
   (K extends 'join'

@@ -881,7 +881,10 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
         // List-only hints would otherwise be ignored; a relationship picker consumes allowCreate.
         for (const key of ['allowCreate', 'defaultColumns', 'inline'] as const) {
           if (Object.hasOwn(block as object, key)) {
-            if (key === 'allowCreate' && field.kind === 'relationship' && typeof drawn.allowCreate === 'boolean') continue
+            if (key === 'allowCreate' && field.kind === 'relationship') {
+              if (typeof drawn.allowCreate !== 'boolean') throw new Error(`${at}.allowCreate must be a boolean.`)
+              continue
+            }
             throw new Error(`${at}.${key} is set, and it draws nothing: a one-to-many relationship is a page's list node now, { list: { of, where } }.`)
           }
         }

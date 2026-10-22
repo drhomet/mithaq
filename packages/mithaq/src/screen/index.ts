@@ -108,16 +108,17 @@ export const screenTarget = <
 })
 
 /** What `targets.<screen>` on a field may say: how it is drawn, never what it holds. */
-export type ScreenField<Ref extends string | Ui = string | Ui> = {
+export type ScreenField<Ref extends string | Ui = string | Ui, Kind extends string = string> = {
   readonly component?: Ref
   readonly cell?: Ref
   readonly width?: string
   readonly filter?: true
   readonly searchable?: true
   readonly sortable?: false
+} & ('relationship' extends Kind ? {
   /** Relationship pickers offer create unless this field opts out. */
   readonly allowCreate?: boolean
-}
+} : {})
 
 /** When a node is drawn: a `Where` over the form's values, the loaded row under `record.` and the access report under `$user.`. */
 export type When = { readonly when?: Where }

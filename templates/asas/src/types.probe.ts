@@ -2673,6 +2673,12 @@ withComponents.defineKayan({
   targets: { service: { operations: defaultOperations } },
 })
 withComponents.defineKayan({
+  name: 'allowCreateOnTextProbe',
+  // @ts-expect-error only relationship pickers offer create
+  fields: { note: { kind: 'text', targets: { dashboard: { allowCreate: false } } } },
+  targets: { service: { operations: defaultOperations } },
+})
+withComponents.defineKayan({
   name: 'searchableFalseProbe',
   // @ts-expect-error a field is searched only when it says so, so `false` is not a value
   fields: { price: { kind: 'text', label: { ar: 'السعر', en: 'Price' }, targets: { dashboard: { searchable: false } } } },

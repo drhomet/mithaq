@@ -8928,12 +8928,13 @@ test('choice forms seed required defaults, leave unseeded required choices empty
 })
 
 test('relationship quick create uses its declared form, keeps refusals inside, then selects the new row', async () => {
+  await toasted()
   const name = fieldOf({ name: 'name', kind: 'text', rules: { required: true } })
   const hidden = fieldOf({ name: 'privateNote', kind: 'text', rules: { defaultValue: 'never send this' } })
   const target: ClientKayan = { ...screen.kayan.tags!, pages: { ...screen.kayan.tags!.pages, create: recordPage([{ form: ['name', 'details'] }], '/tags/new') }, fields: [name, hidden, fieldOf({ name: 'details', kind: 'text' })], quickCreate: { fields: [{ field: 'name' }, { field: 'privateNote', when: { name: { equals: 'secret' } } }] } }
   const made: Record<string, unknown>[] = []
   let refuse = true
-  const host = await render(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: ['title', 'tags'] }])), client: recording().client, value: draftRow, t: (key: string, fallback?: string) => key === 'error.quickRefused' ? 'Not allowed here' : fallback, locale: 'en', onDone: () => {}, kayans: [courses, target], api: fakeApi({ tags: [] }).api }), {
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: ['title', 'tags'] }])), client: recording().client, value: draftRow, t: (key: string, fallback?: string) => key === 'error.quickRefused' ? 'Not allowed here' : fallback, locale: 'en', onDone: () => {}, kayans: [courses, target], api: fakeApi({ tags: [] }).api })), {
     access: { collections: { tags: { operations: { create: true }, fields: { name: { create: true }, privateNote: { create: true }, details: { create: true } } } } },
     client: (async ({ input, operation, kayan }: { input: Record<string, unknown>; operation: string; kayan: string }) => {
       made.push({ input, operation, kayan })
@@ -8951,6 +8952,7 @@ test('relationship quick create uses its declared form, keeps refusals inside, t
   drawer = documentDrawer()!
   assert.ok(drawer, 'refusal keeps the drawer open')
   assert.match(drawer.querySelector('[role="alert"]')?.textContent ?? '', /Not allowed here/)
+  assert.deepEqual(await toasted(), [], 'the drawer says a general refusal once, inline')
   refuse = false
   await act(async () => fire(drawer.querySelector('form')!, 'submit'))
   assert.deepEqual(made, [0, 1].map(() => ({ kayan: 'tags', operation: 'create', input: { name: 'New tag' } })))
@@ -8964,6 +8966,22 @@ test('a relationship field can opt out of create even when the actor may create 
     access: { collections: { tags: { operations: { create: true }, fields: { name: { create: true } } } } },
   })
   assert.equal(host.querySelector('[data-add-new]') === null, true)
+})
+
+test('a quick-create refusal naming an omitted field stays in the drawer with its label', async () => {
+  await toasted()
+  const target: ClientKayan = { ...screen.kayan.tags!, fields: [fieldOf({ name: 'name', kind: 'text' }), fieldOf({ name: 'details', kind: 'text', label: { en: 'Private details' } })], quickCreate: { fields: [{ field: 'name' }] } }
+  const host = await render(withToaster(createElement(Form, { kayan: courses, screen: screenOf(recordPage([{ form: ['tags'] }])), client: recording().client, value: draftRow, t, locale: 'en', onDone: () => {}, kayans: [courses, target], api: fakeApi({ tags: [] }).api })), {
+    access: { collections: { tags: { operations: { create: true }, fields: { name: { create: true } } } } },
+    client: (async () => { throw { data: { key: 'refused', params: { issues: [{ path: 'details', message: 'Ask the owner.' }] } } } }) as never,
+  })
+  await act(async () => click(host.querySelector('[data-add-new]')!))
+  const drawer = documentDrawer()!
+  assert.equal(drawer.querySelector('#tags-details'), null)
+  await act(async () => typeInto(drawer.querySelector('#tags-name')!, 'New tag'))
+  await act(async () => fire(drawer.querySelector('form')!, 'submit'))
+  assert.match(drawer.querySelector('[role="alert"]')?.textContent ?? '', /Private details: Ask the owner\./)
+  assert.deepEqual(await toasted(), [], 'an omitted field is explained inside the drawer')
 })
 
 test('a relationship without quickCreate opens the complete create form', async () => {
@@ -8986,6 +9004,23 @@ test('a form never sends a filled field after its parent condition hides it', as
   assert.deepEqual(writes.written[0], { notifications: false })
 })
 
+test('saving while a field is hidden preserves its unsaved edit until it is shown and saved', async () => {
+  const kayan = { ...courses, fields: [fieldOf({ name: 'notifications', kind: 'checkbox' }), fieldOf({ name: 'summary', kind: 'text' })] }
+  const writes = recording()
+  const dirty: boolean[] = []
+  const host = await render(createElement(Form, { kayan, client: writes.client, value: { id: 'a-row', notifications: true, summary: 'Saved note' }, nodes: [{ field: 'notifications' }, { field: 'summary', when: { notifications: { equals: true } } }], t, locale: 'en', onDone: () => {}, onDirty: (value: boolean) => dirty.push(value) }))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Unsaved note'))
+  await act(async () => click(host.querySelector('#courses-notifications')!))
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(writes.written, [{ id: 'a-row', notifications: false }])
+  assert.equal(dirty.at(-1), true, 'the unsent note keeps the navigation guard up')
+  await act(async () => click(host.querySelector('#courses-notifications')!))
+  assert.equal((host.querySelector('#courses-summary') as HTMLInputElement).value, 'Unsaved note')
+  await act(async () => fire(host.querySelector('form')!, 'submit'))
+  assert.deepEqual(writes.written[1], { id: 'a-row', notifications: true, summary: 'Unsaved note' })
+  assert.equal(dirty.at(-1), false, 'the note becomes clean only after it is sent')
+})
+
 test('the starter role record delete and its confirmation use the solid destructive treatment', async () => {
   const host = await render(createElement(DeleteRole, { operation: 'delete', run: async () => {}, busy: false }), { record: { id: 'r1', name: 'reviewer' }, client: (async () => ({ docs: [] })) as never })
   const trigger = host.querySelector('[data-button="delete"]')!
@@ -8995,4 +9030,21 @@ test('the starter role record delete and its confirmation use the solid destruct
   const confirm = window.document.querySelector('[data-slot="alert-dialog-action"]')!
   assert.match(confirm.className, /bg-destructive(?:\s|$)/)
   assert.match(confirm.className, /text-white/)
+})
+
+test('autosaving while a field is hidden preserves its unsaved edit until it is shown and saved', async () => {
+  const kayan = { ...courses, fields: [fieldOf({ name: 'notifications', kind: 'checkbox' }), fieldOf({ name: 'summary', kind: 'text' })] }
+  const writes = recording()
+  const dirty: boolean[] = []
+  const host = await render(createElement(Form, { kayan, client: writes.client, value: { id: 'a-row', notifications: true, summary: 'Saved note' }, nodes: [{ field: 'notifications' }, { field: 'summary', when: { notifications: { equals: true } } }], t, locale: 'en', onDone: () => {}, onDirty: (value: boolean) => dirty.push(value), drafts: { status: 'published', autosave: 100 } }))
+  await act(async () => typeInto(host.querySelector('#courses-summary')!, 'Unsaved note'))
+  await act(async () => click(host.querySelector('#courses-notifications')!))
+  await act(async () => sleep(150))
+  assert.deepEqual(writes.written, [{ id: 'a-row', notifications: false }])
+  assert.equal(dirty.at(-1), true, 'the unsent note keeps the navigation guard up')
+  await act(async () => click(host.querySelector('#courses-notifications')!))
+  assert.equal((host.querySelector('#courses-summary') as HTMLInputElement).value, 'Unsaved note')
+  await act(async () => sleep(150))
+  assert.deepEqual(writes.written[1], { id: 'a-row', notifications: true, summary: 'Unsaved note' })
+  assert.equal(dirty.at(-1), false, 'the note becomes clean only after it is sent')
 })
