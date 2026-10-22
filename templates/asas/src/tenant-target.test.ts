@@ -315,3 +315,17 @@ test('connect() refuses a store holding more than one organization where the ten
   await connected('one', 2, true)
   await connected('many', 3)
 })
+
+
+test('a tenant field may explicitly replace its own index with a declared index led by that field', () => {
+  const field = { ...tenant.field, rules: { ...tenant.field.rules, index: false } }
+  const declaration = notes({ organization: field })
+  const built = build(tenanted, { ...declaration, indexes: [{ fields: ['organization', 'title'] }] })
+  assert.deepEqual(ownership(built, 'organization'), owned)
+  const indexes = getTableConfig(built.targets.drizzle.tables.notes!).indexes.filter(({ config }) => config.columns.some((column) => (column as { name?: string }).name === 'organization_id'))
+  assert.deepEqual(indexes.map(({ config }) => config.columns.map((column) => (column as { name?: string }).name)), [['organization_id', 'title']])
+  for (const fields of [[], ['title', 'organization']]) {
+    const indexes = fields.length ? [{ fields }] : []
+    assert.throws(() => build(tenanted, { ...declaration, indexes }), /declares index false, and a tenant field is index: true/)
+  }
+})

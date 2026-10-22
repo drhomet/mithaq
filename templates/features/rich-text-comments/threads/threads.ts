@@ -11,7 +11,7 @@ export const richTextThreads = defineKayan({
   indexes: [{ name: 'rich_text_threads_record_field_created_idx', fields: ['organization', 'recordKayan', 'recordId', 'field', 'createdAt'] }],
   fields: {
     ...defaultFields,
-    organization,
+    organization: { ...organization, rules: { ...organization.rules, index: false } },
     createdAt: { ...defaultFields.createdAt, rules: { ...defaultFields.createdAt.rules, index: false } },
     recordKayan: { kind: 'text', label: { en: 'Kayan', ar: 'الكيان' }, rules: { required: true, maxLength: 100 } },
     recordId: { kind: 'text', label: { en: 'Record', ar: 'السجل' }, rules: { required: true, maxLength: 255 } },

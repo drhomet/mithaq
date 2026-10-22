@@ -3276,8 +3276,8 @@ type ScreenFieldKeys = Expect<
   tenantLanguage.defineKayan({ name: 'tenantProbe', fields: { id: defaultFields.id, organizationId: { ...owner.field, rules: { ...owner.field.rules, onDelete: 'cascade' } } }, targets: ops })
   // @ts-expect-error a tenant field is never null
   tenantLanguage.defineKayan({ name: 'tenantProbe', fields: { id: defaultFields.id, organizationId: { kind: 'relationship', relationTo: 'organization', rules: { required: false }, targets: { tenant: true } } }, targets: ops })
-  // @ts-expect-error a tenant field is indexed
-  tenantLanguage.defineKayan({ name: 'tenantProbe', fields: { id: defaultFields.id, organizationId: { ...owner.field, rules: { ...owner.field.rules, index: false } } }, targets: ops })
+  const indexedOwner = tenantLanguage.defineKayan({ name: 'indexedOwner', indexes: [{ fields: ['organizationId', 'title'] }], fields: { id: defaultFields.id, organizationId: { ...owner.field, rules: { ...owner.field.rules, index: false } }, title: { kind: 'text' } }, targets: ops })
+  type ExplicitTenantIndexOverride = Expect<Equal<typeof indexedOwner.fields.organizationId.rules.index, false>>
   // @ts-expect-error the tenant comes from the session, never a default
   tenantLanguage.defineKayan({ name: 'tenantProbe', fields: { id: defaultFields.id, organizationId: { ...owner.field, rules: { ...owner.field.rules, defaultValue: 'org-1' } } }, targets: ops })
   // @ts-expect-error a store's own column would replace the one the tenant's rules build

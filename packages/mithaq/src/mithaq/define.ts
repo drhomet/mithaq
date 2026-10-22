@@ -60,8 +60,7 @@ type CheckedScreenCards<L extends Language, Targets> = {
 /** The language's tenant target, which is under the key `tenant` alone, or `never`. */
 type TenantOf<L extends Language> = L['targets'] extends { tenant: infer T extends { capability: 'tenant'; relationTo: string; field: { rules: object } } } ? T : never
 
-// A field bound through `targets.tenant` may change its copy and add `unique`, and nothing it
-// would loosen: one row of the tenant kayan, required, indexed, filled once by the application.
+// Ownership remains required and immutable; the build checks declared index coverage for index: false.
 type TenantBinding<L extends Language, F> = F extends { targets: { tenant: unknown } }
   ? [TenantOf<L>] extends [never]
     ? { targets: { tenant: never } }
@@ -71,7 +70,7 @@ type TenantBinding<L extends Language, F> = F extends { targets: { tenant: unkno
         hasMany?: never
         rules?: {
           required?: true
-          index?: true
+          index?: boolean
           providedBy?: { readonly create: 'application'; readonly update: 'never' }
           onDelete?: 'restrict'
           defaultValue?: never
@@ -85,7 +84,7 @@ type TenantKey<Fields> = { [N in keyof Fields]: Fields[N] extends { targets: { t
 
 // A field bound by hand carries the target's rules on its type, as `defineKayan` puts them on its value.
 type TenantDefaulted<L extends Language, Fields> = true extends { [N in keyof Fields]: Fields[N] extends { targets: { tenant: true } } ? true : never }[keyof Fields]
-  ? { [N in keyof Fields]: Fields[N] extends { targets: { tenant: true } } ? Fields[N] & { rules: TenantOf<L>['field']['rules'] } : Fields[N] }
+  ? { [N in keyof Fields]: Fields[N] extends { targets: { tenant: true } } ? Fields[N] & { rules: Omit<TenantOf<L>['field']['rules'], 'index'> & { readonly index: Fields[N] extends { rules: { index: infer Index } } ? Index : true } } : Fields[N] }
   : Fields
 
 // `never` where the build declares no service target: there is no runner to run an operation.

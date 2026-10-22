@@ -243,7 +243,7 @@ const nameOf = (relationTo: unknown) =>
 
 // A row's tenant is one row of the tenant kayan, filled from the session on create and never
 // moved, so a field that loosens any of it would let a row be made or moved outside its tenant.
-const tenantField = ({ where, field, language }: { where: string; field: RuntimeField; language: Language }): RuntimeField => {
+const tenantField = ({ where, field, language, indexed }: { where: string; field: RuntimeField; language: Language; indexed: boolean }): RuntimeField => {
   const target = language.targets.tenant
   if (!isTenant(target)) {
     throw new Error(
@@ -267,7 +267,8 @@ const tenantField = ({ where, field, language }: { where: string; field: Runtime
     )
   }
   for (const [rule, value] of [['required', true], ['index', true], ['onDelete', 'restrict']] as const) {
-    if (rules[rule] === value) continue
+    // An explicit opt-out keeps tenant lookup coverage through the kayan's declared index.
+    if (rules[rule] === value || rule === 'index' && rules.index === false && indexed) continue
     throw new Error(`${where} is bound through targets.tenant and declares ${rule} ${JSON.stringify(rules[rule])}, and a tenant field is ${rule}: ${JSON.stringify(value)}. Drop the rule, and the tenant target's own applies.`)
   }
   if (providerOf(bound, 'create') !== 'application' || providerOf(bound, 'update') !== 'never') {
@@ -572,7 +573,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
     }
     const fields = Object.fromEntries(
       Object.entries(kayan.fields).map(([name, field]) => {
-        if (field.targets?.tenant !== undefined) return [name, tenantField({ where: `Kayan "${kayan.name}" field "${name}"`, field, language })]
+        if (field.targets?.tenant !== undefined) return [name, tenantField({ where: `Kayan "${kayan.name}" field "${name}"`, field, language, indexed: resolvedIndexes.get(kayan)!.some((index) => index.fields[0] === name) })]
         // A spread that writes its own `targets` drops the binding and keeps the rest of
         // `tenant.field`, which would quietly leave the kayan shared.
         const provided = field.rules?.providedBy as Record<string, unknown> | undefined

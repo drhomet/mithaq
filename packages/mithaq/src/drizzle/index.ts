@@ -916,8 +916,7 @@ const storeOf = <
           }
           built[field.name] = column
         }
-        // A plain compound index serves reads of its leading column too.
-        const indexed = columns.filter((field) => field.rules?.index && !kayan.indexes.some((index) => !index.unique && index.fields[0] === field.name))
+        const indexed = columns.filter((field) => field.rules?.index)
         // A unique rule's own index over one column is that column's UNIQUE, the constraint a unique
         // field has always built, so a shared kayan's table is the one it was.
         const ownUnique = (index: CompoundIndex) => uniqueRuleIndexes.has(index) && index.fields.length === 1

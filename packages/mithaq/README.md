@@ -423,8 +423,10 @@ indexes: ({ defaults }) => [
 
 An entry is `{ fields, name?, unique?, nullsNotDistinct? }`. A plain SQL `name`
 of at most 63 bytes can shorten an index whose generated table-and-column name
-would be too long. A plain index over several columns also serves its leading
-column, so the store omits that column's redundant plain index. On a per-organization
+would be too long. A field's `index: true` keeps its own index even when a
+compound index starts with that field. A tenant field may set `index: false`
+when a declared index starts with it; without that coverage the build refuses
+the override. On a per-organization
 kayan a group `{ within: 'organization', unique: [...], index: [...] }` builds
 indexes led by the organization field. A `unique` field that no unique index
 covers is refused. The group, and what `unique` means per organization, are
