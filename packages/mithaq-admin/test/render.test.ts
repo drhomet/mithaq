@@ -1711,6 +1711,7 @@ test('178. a text box and a text area follow their own text\'s direction, and an
 })
 
 test('178a. a json field is a monospace text area that reads left to right in an Arabic page too, named and described by its shell, and its cell is one short line of the JSON', async () => {
+  const { translator: hostTranslator } = await import('../../../apps/asas-tanstack/src/copy.ts')
   const field = fieldOf({ name: 'meta', kind: 'json', rules: { required: true } })
   const value = { colour: 'أحمر', sizes: [1, 2], nested: { deep: true } }
   const html = renderToStaticMarkup(createElement(controls.json!, { values: {}, setValue: () => {}, value, onChange: () => {}, field, kayan: courses, readOnly: false, t: copy.t, id: 'meta', describedBy: 'meta-description', error: 'Not JSON', locale: 'ar' }))
@@ -1720,7 +1721,7 @@ test('178a. a json field is a monospace text area that reads left to right in an
   }
   assert.match(box, /font-mono/)
   assert.ok(html.includes(JSON.stringify(value, null, 2).replaceAll('"', '&quot;')), `the value written out whole, two spaces deep: ${html}`)
-  const cell = (held: unknown) => staticMarkup(createElement(() => cells.json!({ kayan: courses, field, value: held, t: translator('ar'), locale: 'ar' }) as ReactElement))
+  const cell = (held: unknown) => staticMarkup(createElement(() => cells.json!({ kayan: courses, field, value: held, t: hostTranslator('ar'), locale: 'ar' }) as ReactElement))
   const line = cell({ long: 'x'.repeat(200) })
   assert.match(line, /<code[^>]*dir="ltr"/, `a cell reads left to right too: ${line}`)
   assert.ok(line.includes('…'), `and is cut to a line: ${line}`)

@@ -7208,7 +7208,7 @@ test('233a. a fee reads in a left-to-right isolate, so Arabic never reorders its
   assert.match(await draw(900, { currency: 'USD' }, 'ar'), /^<bdi dir="ltr">.*US\$.*<\/bdi>$/, 'a priced fee in Arabic')
   assert.match(await draw(900, { currency: 'USD' }, 'en'), /^<bdi dir="ltr">/, 'and in English')
   assert.match(await draw(900, {}, 'ar'), /^<bdi dir="ltr">/, 'and a fee with no currency')
-  assert.equal(await draw(null, { currency: 'USD' }, 'en'), '<span aria-hidden="true">—</span>', 'no fee is a dash a reader of a screen is not told')
+  assert.equal(await draw(null, { currency: 'USD' }, 'en'), '<span aria-hidden="true">—</span><span class="sr-only">Empty</span>', 'an unset fee has a visible dash and a spoken word')
 })
 
 test('233b. an enrollment with no session reads as a dash, and a session\'s start never breaks across lines', async () => {
@@ -7216,7 +7216,7 @@ test('233b. an enrollment with no session reads as a dash, and a session\'s star
   const field = enrollments.fields.find((one) => one.name === 'session')!
   const queries = new QueryClient()
   const none = await render(createElement(QueryClientProvider, { client: queries }, createElement(SessionCell, { field, value: null, row: { id: 'e1' } } as never)), { client: (async () => pageOf([])) as never, kayan: enrollments })
-  assert.equal(rendered(none), '<span aria-hidden="true">—</span>')
+  assert.equal(rendered(none), '<span aria-hidden="true">—</span><span class="sr-only">Empty</span>')
   await release(queries)
 
   const held = new QueryClient()
