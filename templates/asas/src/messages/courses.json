@@ -160,6 +160,10 @@
       "ar": "الإشعارات",
       "en": "Notifications"
     },
+    "false": {
+      "ar": "معطلة",
+      "en": "Disabled"
+    },
     "invalid": {
       "ar": "يجاب على هذا بنعم أو لا.",
       "en": "This is answered yes or no."
@@ -167,6 +171,10 @@
     "required": {
       "ar": "هذا الحقل مطلوب.",
       "en": "This field is required."
+    },
+    "true": {
+      "ar": "مفعلة",
+      "en": "Enabled"
     }
   },
   "opensOn": {

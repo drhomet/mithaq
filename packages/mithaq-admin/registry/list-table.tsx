@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cellFor, useComponents } from 'mithaq-admin/components.tsx'
 import type { RelationshipTitles } from 'mithaq-admin/control-props.ts'
 import { labelFor, type Copy } from 'mithaq-admin/copy.ts'
+import { emptyValue } from 'mithaq-admin/format.tsx'
 import { canSort } from 'mithaq-admin/list-query.ts'
 import { SelectAll, SelectRow } from 'mithaq-admin/list-selection.tsx'
 import { isUntitled } from 'mithaq-admin/row-title.tsx'
@@ -39,6 +40,7 @@ export type ListTableProps = {
   /** Ordered phone details; omitted lists keep the first three visible details. */
   card?: readonly string[]
   phone?: 'cards' | 'table'
+  counts?: Record<string, Record<string, number>>
   docs: readonly Row[]
   titles: RelationshipTitles
   /** The cell each column of the list node names, by field. */
@@ -69,6 +71,7 @@ export function ListTable({
   card,
   children,
   copy,
+  counts,
   defaultSort,
   docs,
   href,
@@ -227,11 +230,11 @@ export function ListTable({
                     // The screen's own component draws first, so the map is asked only for what it does not.
                     const drawn = Ref && screen ? undefined : cellFor({ cells, field, column: cellOf.get(field.name) })
                     const Cell = drawn === cells.email && field === linked && opens ? cells.text : drawn
-                    const untitled = field.name === kayan.useAsTitle && isUntitled({ kayan, row, locale })
+                    const untitled = cellOf.get(field.name) !== 'count' && !(field.name === 'archivedAt' && field.kind === 'datetime') && field.name === kayan.useAsTitle && isUntitled({ kayan, row, locale })
                     const cell = untitled ? (
-                      <span className="text-muted-foreground">{t('admin.untitled', 'Untitled') ?? 'Untitled'}</span>
+                      <span className="text-muted-foreground">{emptyValue({ t, locale })}</span>
                     ) : Cell ? (
-                      <Cell kayan={kayan} field={field} value={row[field.name]} t={t} locale={locale} titles={titles} />
+                      <Cell kayan={kayan} field={field} value={cellOf.get(field.name) === 'count' ? counts?.[field.name]?.[id] : row[field.name]} t={t} locale={locale} titles={titles} />
                     ) : (
                       Ref && <Ref field={field} value={row[field.name]} row={row} />
                     )
@@ -242,7 +245,7 @@ export function ListTable({
                         {field === linked && opens ? (
                           // A real link, so it opens in a new tab and lists for a reader, but out of the tab
                           // order since the row is the stop. An untitled row's name holds the visible text.
-                          <a href={to} data-row-link={id} tabIndex={-1} aria-label={untitled ? (t('admin.openUntitled', 'Untitled, open') ?? 'Untitled, open') : undefined} className="font-medium hover:underline">
+                          <a href={to} data-row-link={id} tabIndex={-1} aria-label={untitled ? (t('admin.openEmpty', locale === 'ar' ? 'فارغ، فتح' : 'Empty, open') ?? 'Empty, open') : undefined} className="font-medium hover:underline">
                             {cell}
                           </a>
                         ) : (

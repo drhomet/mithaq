@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
 import { useDirection } from '@/components/ui/direction'
 import { ariaRequired, changeOf, type Cell, type CellProps, type Control, type ControlProps } from 'mithaq-admin/control-props.ts'
-import { noValue } from 'mithaq-admin/format.tsx'
+import { emptyValue } from 'mithaq-admin/format.tsx'
 import { RichTextEditor } from 'mithaq-admin/rich-text-editor.tsx'
 import { richTextLine } from 'mithaq-admin/rich-text-line.ts'
 import { blank } from 'mithaq-admin/rich-text-value.ts'
@@ -38,11 +38,11 @@ export function RichTextControl(props: ControlProps): ReactElement {
 }
 
 /** The `richText` kind's cell: its first worded block on one line in a row, and the viewer on a record page. */
-export function RichTextCell({ value, t, whole, field }: CellProps): ReactNode {
+export function RichTextCell({ value, t, whole, field, locale }: CellProps): ReactNode {
   if (whole) return <RichTextValueView value={value} t={t} field={field.name} policy={field.richTextPolicy} />
   const line = richTextLine(value)
   // min-w-48 keeps a phone-width table from squeezing the words to one per line.
-  return line ? <span dir="auto" className="line-clamp-2 min-w-48 whitespace-normal">{line}</span> : noValue
+  return line ? <span dir="auto" className="line-clamp-2 min-w-48 whitespace-normal">{line}</span> : emptyValue({ t, locale })
 }
 
 /** What a project whose language holds the `richText` kind spreads into its components map, beside `defaultComponents`. */

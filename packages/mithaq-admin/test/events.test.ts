@@ -2329,12 +2329,12 @@ test('61. a relationship column naming many rows counts the ones it has no room 
   assert.ok(!host.textContent?.includes('Tafsir'), 'so the fourth name is not in the table')
   assert.ok(!host.textContent?.includes('t1'), 'and no cell shows the id it holds, because the read answered for every one')
 
-  // A row holding no ids renders nothing rather than the word for an empty array. Read off that row's own tags cell: a column the URL does not name keeps the declaration's answer.
+  // An empty relationship uses the same visible and accessible marker as scalar cells.
   const heads = [...host.querySelectorAll('thead th')].map((one) => one.textContent)
   const at = heads.findIndex((one) => one?.includes('Tags'))
   assert.ok(at >= 0, `the tags column is in the table: ${heads.join(', ')}`)
   const row = [...host.querySelectorAll('tbody tr')].find((one) => one.textContent?.includes('Sarf'))!
-  assert.equal([...row.querySelectorAll('td')][at]!.querySelector('[data-list-value]')!.textContent, '', 'a row that points at nothing has an empty cell')
+  assert.equal([...row.querySelectorAll('td')][at]!.querySelector('[data-list-value]')!.textContent, '—Empty', 'a row that points at nothing has the empty marker')
 })
 
 test('a hasMany holding 101 ids is read in pieces the HTTP read cap admits, so the cell and the picker still name every row', async () => {
@@ -6618,10 +6618,14 @@ test('276b. Compare marks the blocks of a rich text value the other side does no
 })
 
 test('185e. a rich text cell is the words of the value\'s first block, cut where a cell runs out, and a record page reads the value whole through the viewer', async () => {
+  const { renderToStaticMarkup } = await import('react-dom/server')
   const details = courses.fields.find((one) => one.name === 'details')!
   const cell = (value: unknown) => {
     const drawn = cells.richText!({ kayan: courses, field: details, value, t, locale: 'en' })
-    return (drawn as ReactElement<{ children: string }>).props.children
+    const host = window.document.createElement('span')
+    host.innerHTML = renderToStaticMarkup(createElement('span', null, drawn))
+    host.querySelectorAll('.sr-only').forEach((word) => word.remove())
+    return host.textContent ?? ''
   }
   const value = richOf(blockOf('paragraph', [textOf('Covers '), textOf('entanglement', 1), { type: 'linebreak', version: 1 }, textOf('and more')]), blockOf('heading', [textOf('Quantum')], { tag: 'h2' }))
   assert.equal(cell(value), 'Covers entanglement and more', 'the first block alone, a line break to a space, and a bold word inside its sentence')
@@ -7248,14 +7252,14 @@ test('233c. a session in the picker holds its start together, so a narrow box br
   queries.clear()
 })
 
-test('233d. a row with no title reads as Untitled in the list and names its link by what it shows and does, and a titled row keeps its title as its name', async () => {
+test('233d. a row with no title reads as empty in the list and names its link by what it shows and does, and a titled row keeps its title as its name', async () => {
   const draw = (title: unknown) => render(listOn(courses, [{ ...draftRow, id: 'x1', title }]))
   const empty = await draw('')
   const link = empty.querySelector('a[data-row-link]')!
-  assert.equal(link.textContent, 'Untitled', 'the cell says so')
-  assert.equal(link.querySelector('.text-muted-foreground')?.textContent, 'Untitled', 'muted')
-  assert.equal(link.getAttribute('aria-label'), 'Untitled, open', 'the link\'s name holds the words it shows and says what it does')
-  assert.equal((await draw(null)).querySelector('a[data-row-link]')?.getAttribute('aria-label'), 'Untitled, open', 'a null title as well')
+  assert.equal(link.textContent, '—Empty', 'one visible dash and its accessible word')
+  assert.equal(link.querySelector('.text-muted-foreground')?.textContent, '—Empty', 'muted')
+  assert.equal(link.getAttribute('aria-label'), 'Empty, open', 'the link\'s name holds the words it shows and says what it does')
+  assert.equal((await draw(null)).querySelector('a[data-row-link]')?.getAttribute('aria-label'), 'Empty, open', 'a null title as well')
   const titled = (await draw('Tajweed')).querySelector('a[data-row-link]')!
   assert.deepEqual([titled.textContent, titled.getAttribute('aria-label')], ['Tajweed', null], 'a title names its own link')
 })
@@ -7307,9 +7311,9 @@ test('233g. a rich text cell and an upload cell with nothing in them draw a dash
   const draw = async (kind: 'richText' | 'upload', value: unknown) =>
     rendered(await render(createElement('span', null, cells[kind]!({ kayan: courses, field: courses.fields.find((one) => one.cell === kind)!, value, t, locale: 'en' }))))
   for (const kind of ['richText', 'upload'] as const) {
-    for (const value of [null, undefined, []]) assert.equal(await draw(kind, value), '<span><span aria-hidden="true">—</span></span>', `${kind} holding ${JSON.stringify(value)}`)
+    for (const value of [null, undefined, []]) assert.equal(await draw(kind, value), '<span><span aria-hidden="true">—</span><span class="sr-only">Empty</span></span>', `${kind} holding ${JSON.stringify(value)}`)
   }
-  assert.equal(await draw('richText', richOf(blockOf('paragraph', []))), '<span><span aria-hidden="true">—</span></span>', 'and a value whose every block is empty')
+  assert.equal(await draw('richText', richOf(blockOf('paragraph', []))), '<span><span aria-hidden="true">—</span><span class="sr-only">Empty</span></span>', 'and a value whose every block is empty')
 })
 
 test('233h. the compare sheet offers no restore on the version the row already holds, dates the version it compares against, and still restores the others', async () => {
@@ -7982,13 +7986,13 @@ test('audit F09: Publish on a new course sends no draft status', async () => {
   assert.equal(calls[0]!.options?.draft, undefined)
 })
 
-test('240k. a yes-or-no field on a record page reads its own word for yes or no under its label, an unset one its no, never a dash', async () => {
+test('240k. a yes-or-no field on a record page reads its own word for yes or no under its label, an unset one the empty marker', async () => {
   const { FieldValue } = await import('../registry/field-value.tsx')
   const archived = courses.fields.find((one) => one.name === 'archived')!
   const words = async (value: unknown) => (await render(createElement(FieldValue, { kayan: courses, field: archived, row: { id: 'c1', archived: value }, copy: { t: english, locale: 'en' } }))).querySelector('[data-field-value="archived"]')?.textContent
   assert.equal(await words(true), 'ArchivedArchived', 'set, in the field\'s own word')
   assert.equal(await words(false), 'ArchivedActive', 'cleared')
-  assert.equal(await words(null), 'ArchivedActive', 'and a row from before the column, which holds nothing, reads the same as cleared')
+  assert.equal(await words(null), 'Archived—Empty', 'an unset value remains distinct from false')
   const verified = fieldOf({ name: 'probe', kind: 'checkbox' })
   assert.equal((await render(createElement(FieldValue, { kayan: courses, field: verified, row: { id: 'c1', probe: true }, copy: { t: english, locale: 'en' } }))).querySelector('[data-field-value="probe"]')?.textContent, 'probeYes', 'and a field with no words of its own reads Yes or No')
 })

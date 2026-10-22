@@ -78,7 +78,7 @@ export type ListRules = { paths: readonly FilterPath[]; sortable: readonly strin
 export type ListTab = { tab: string; label: Readonly<Record<string, string>>; where?: unknown }
 
 /** What a list node says about its query: what it filters and searches by, the sort and limit it opens with, and its tabs. */
-export type ListDefaults = { filters?: readonly string[]; search?: readonly string[]; sort?: string; limit?: number; tabs?: readonly ListTab[] }
+export type ListDefaults = { columns?: readonly { field: string; cell?: string }[]; filters?: readonly string[]; search?: readonly string[]; sort?: string; limit?: number; tabs?: readonly ListTab[] }
 
 /** The rules one list node reads its URL by. */
 export const rulesOf = ({ kayan, node, maxLimit, context = {} }: { kayan: ClientKayan; node: ListDefaults | undefined; maxLimit: number; context?: FilterContext }): ListRules => ({
@@ -422,7 +422,11 @@ export const findOf = ({
   const tab = (node?.tabs?.find((one) => one.tab === query.tab) ?? node?.tabs?.[0])?.where
   const where = tab === undefined ? searched : searched === undefined ? tab : { and: [tab, searched] }
   const sort = query.sort ?? node?.sort
+  const counts = node?.columns?.filter((column) => column.cell === 'count'
+    && kayan.fields?.some((field) => field.name === column.field)
+    && (query.cols === undefined || query.cols.includes(column.field))).map((column) => column.field)
   return {
+    ...(counts?.length && { counts }),
     ...(where !== undefined && { where }),
     ...(sort && { sort }),
     ...(query.page && { page: query.page }),

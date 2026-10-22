@@ -81,7 +81,7 @@ test('the panel reads the record\'s own entries newest first, and draws each cha
   assert.ok(entries[0]!.querySelector('time')?.getAttribute('dateTime'), 'and exact')
   assert.equal(changed(entries[1], 'fee'), 'Fee: 5 → 7', 'a change is its label and both values')
   assert.equal(changed(entries[1], 'currency'), 'Currency: Saudi riyal → US dollar', 'each value drawn by the field\'s own cell')
-  assert.equal(changed(entries[0], 'archived'), 'Archived: ✗Active → ✓Archived', 'a checkbox as its glyph and its word, a no apart from an empty value')
+  assert.equal(changed(entries[0], 'archived'), 'Archived: Active → Archived', 'checkbox changes use visible words')
   assert.equal(host.querySelector('[data-change="updatedAt"]') ?? host.querySelector('[data-change="tenant"]'), null, 'and no technical column')
 
   const all = [...host.querySelectorAll('[data-entry]')]

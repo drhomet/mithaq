@@ -16,7 +16,7 @@ import { providerOf } from '../../base/rules.ts'
 import type { InferInput, InferOutput, StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
 import { atEffect, defaults, issueRefusal, parse, sealOf, storeSeals, validated, withoutPrototype, type BulkResult, type Context, type ContextOf, type Ctx, type DerivedSchemas, type OperationEffect, type ResolvedOperation, type StepsOf, type Tools, type RuntimeWriteTools as WriteTools, type WriteStep } from './steps.ts'
 import { firstRegisters, running, snapshot, type Open, type Running } from './runtime.ts'
-import type { FindInput } from './read.ts'
+import type { FindInput, Paginated } from './read.ts'
 import { changedColumns, latestVersion, restoreInput, revived, saveVersion } from '../../versions/versions.ts'
 import { fileURLs } from '../../storage/storage.ts'
 import { combineWhere, operatorList } from '../../mithaq/where.ts'
@@ -1482,7 +1482,7 @@ export type Version<Doc> = {
   version: Partial<Doc>
 }
 
-type PaginatedRows<Doc> = { docs: Doc[]; totalDocs: number; limit: number; page: number; totalPages: number; hasNextPage: boolean; hasPrevPage: boolean; nextPage: number | null; prevPage: number | null; pagingCounter: number }
+type PaginatedRows<Doc> = Paginated<Doc>
 
 // What a custom `output` promises, as a schema or a function of the derived shapes.
 type OutputRow<Operation> = Operation extends { output: infer Given }

@@ -931,6 +931,21 @@
                           "field": "cover",
                           "cell": "upload",
                           "decided": "table"
+                        },
+                        {
+                          "field": "notifications",
+                          "cell": "checkbox",
+                          "decided": "field"
+                        },
+                        {
+                          "field": "scheduledSessions",
+                          "cell": "count",
+                          "decided": "leaf"
+                        },
+                        {
+                          "field": "tags",
+                          "cell": "count",
+                          "decided": "leaf"
                         }
                       ],
                       "card": [

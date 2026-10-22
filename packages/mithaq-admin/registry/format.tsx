@@ -39,3 +39,8 @@ export const asMoment = (value: unknown) => {
   if (!date || Number.isNaN(date.getTime())) return ''
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 }
+
+/** Empty cells retain a visible marker and a word a screen reader can announce. */
+export const emptyValue = ({ t, locale }: { t: Translate; locale: string }) => <><span aria-hidden="true">—</span><span className="sr-only">{t('admin.emptyValue', locale === 'ar' ? 'فارغ' : 'Empty') ?? (locale === 'ar' ? 'فارغ' : 'Empty')}</span></>
+
+export const isEmptyValue = (value: unknown) => value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)

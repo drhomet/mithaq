@@ -2996,7 +2996,7 @@ type TagOptions = Parameters<typeof asas.kayan.tags.operations.create>[1]
 type TagReadOptions = NonNullable<TagOptions> & { tenant?: 'mine' | 'all' }
 type FindSignature = Expect<Equal<
   Parameters<typeof asas.kayan.tags.operations.find>,
-  [input?: { depth?: number; limit?: number; page?: number; sort?: string; where?: Where }, options?: TagReadOptions]
+  [input?: { depth?: number; counts?: readonly string[]; limit?: number; page?: number; sort?: string; where?: Where }, options?: TagReadOptions]
 >>
 type CountSignature = Expect<Equal<Parameters<typeof asas.kayan.tags.operations.count>, [input?: { where?: Where }, options?: TagReadOptions]>>
 type CustomSignature = Expect<Equal<
@@ -3469,4 +3469,29 @@ withScreen.defineKayan({
   fields: { ...defaultFields, title: { kind: 'text' }, generated: { kind: 'text', rules: { providedBy: { create: 'application' } } } },
   // @ts-expect-error a quick form cannot ask for an application-provided create field
   targets: { portal: { quickCreate: { fields: ['generated'] } } },
+})
+
+withScreen.defineKayan({
+  name: 'countCellProbe',
+  fields: { ...defaultFields, title: { kind: 'text' }, children: { kind: 'join', relationTo: 'countCellProbe', on: 'parent' }, parent: { kind: 'relationship', relationTo: 'countCellProbe' }, peers: { kind: 'relationship', relationTo: 'countCellProbe', hasMany: true } },
+  targets: { portal: { pages: { list: { path: '/counts', page: { shell: 'shell', main: [
+    { list: { columns: ['title', { field: 'children', cell: 'count' }, { field: 'peers', cell: 'count' }] } },
+  ] } } } } },
+})
+withScreen.defineKayan({
+  name: 'badCountCellProbe',
+  fields: { ...defaultFields, title: { kind: 'text' } },
+  targets: { portal: { pages: { list: { path: '/counts', page: { shell: 'shell', main: [
+    // @ts-expect-error counts require a join or hasMany relationship column
+    { list: { columns: [{ field: 'title', cell: 'count' }] } },
+  ] } } } } },
+})
+
+withScreen.defineKayan({
+  name: 'badSingleCountCellProbe',
+  fields: { ...defaultFields, parent: { kind: 'relationship', relationTo: 'countCellProbe' } },
+  targets: { portal: { pages: { list: { path: '/counts', page: { shell: 'shell', main: [
+    // @ts-expect-error a single relationship has no count column
+    { list: { columns: [{ field: 'parent', cell: 'count' }] } },
+  ] } } } } },
 })

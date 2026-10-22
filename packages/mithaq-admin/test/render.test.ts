@@ -430,16 +430,12 @@ test('10. delete takes two clicks, and the one that deletes is not rendered at a
 test('11. a checkbox cell says true from false in words, so the column is not a glyph a screen reader skips', () => {
   // The Status column says archived, so the checkbox column is one the URL turns on.
   const html = listMarkup('en', { cols: ['title', 'archived'] })
-  // Read as the glyph and word pair: `archived` is false here, so asserting the other glyph absent would pass on a broken cell.
-  const cell = /<span aria-hidden="true"[^>]*>([^<]*)<\/span><span class="sr-only">([^<]*)<\/span>/.exec(html)
-  assert.ok(cell, `the checkbox cell is a hidden glyph followed by the words for it:\n${html.slice(0, 600)}`)
-  assert.equal(cell[1], '✗', 'the glyph is the one this row\'s false value renders')
-  assert.equal(cell[2], 'Active', 'and the word beside it is what the project wrote for false')
-  const arabic = /<span aria-hidden="true"[^>]*>[^<]*<\/span><span class="sr-only">([^<]*)<\/span>/.exec(listMarkup('ar', { cols: ['title', 'archived'] }))
-  assert.equal(arabic?.[1], 'نشط', 'and in the other locale it is the other word')
+  assert.match(html, />Active</, 'the false word is visible')
+  assert.equal(html.includes('✗'), false)
+  assert.match(listMarkup('ar', { cols: ['title', 'archived'] }), />نشط</)
 })
 
-test('184a. a cell joins several values in its locale\'s own list format, never with an ASCII comma, and an empty box reads as an unticked one', async () => {
+test('184a. a cell joins several values in its locale\'s own list format, never with an ASCII comma, and an empty box reads as empty', async () => {
   const { RelationshipCell, titleKey } = await import('../registry/relationship-cell.tsx')
   const topics = fieldOf({ name: 'topics', kind: 'textArray' })
   const cell = (locale: string, value: unknown) => staticMarkup(createElement(() => cells.textArray!({ kayan: courses, field: topics, value, t: translator(locale), locale }) as ReactElement))
@@ -450,8 +446,9 @@ test('184a. a cell joins several values in its locale\'s own list format, never 
   const titles = new Map(ids.map((id, at) => [titleKey('tags', id), ['مكثف', 'شهادة'][at]!]))
   const related = staticMarkup(createElement(RelationshipCell, { kayan: courses, field: tags, value: ids, t: translator('ar'), locale: 'ar', titles }))
   assert.equal(related, '<span>مكثف وشهادة</span>', 'and so does a relationship cell holding several rows')
-  const box = (value: unknown) => /<span aria-hidden="true"[^>]*>([^<]*)<\/span>/.exec(staticMarkup(createElement(() => cells.checkbox!({ kayan: courses, field: fieldOf({ name: 'archived', kind: 'checkbox' }), value, t: copy.t, locale: 'en' }) as ReactElement)))?.[1]
-  assert.deepEqual([box(true), box(false), box(undefined), box(null)], ['✓', '✗', '✗', '✗'], 'an empty box, as a row from before the column holds, is a no like a false one')
+  const box = (value: unknown) => staticMarkup(createElement(() => cells.checkbox!({ kayan: courses, field: fieldOf({ name: 'archived', kind: 'checkbox' }), value, t: copy.t, locale: 'en' }) as ReactElement))
+  assert.deepEqual([box(true), box(false)], ['Archived', 'Active'])
+  for (const value of [null, undefined]) assert.match(box(value), /class="sr-only">Empty</)
 })
 
 test('184c. a search runs only over what the viewer reads, across one relationship to the kayan it points at too, and the box names a far field by the relationship and its own label', () => {
@@ -1314,9 +1311,9 @@ test('48. one arrow is drawn, on the sorted column and nowhere else, and every s
   // `details` is rich text, which cannot order a page, so its head offers no sort.
   assert.equal(courses.fields.find((field) => field.name === 'details')?.sortable, false, 'the rich text column is projected unsortable')
   const quiet = plain.filter((head) => !head.includes('aria-sort="none"'))
-  assert.equal(quiet.length, 1, `one head, the rich text column's, reports no aria-sort: ${quiet.join('\n')}`)
-  assert.ok(!quiet[0]!.includes('aria-sort'), 'and no direction either')
-  assert.ok(quiet[0]!.includes('>Details<'), `and it is the details head, by its label:\n${quiet[0]}`)
+  assert.equal(quiet.length, 3, 'rich text, hasMany and join columns cannot sort')
+  for (const head of quiet) assert.equal(head.includes('aria-sort'), false)
+  assert.ok(quiet.some((head) => head.includes('>Details<')))
   const sorted = headsOf(
     renderToStaticMarkup(
       createElement(List, {
@@ -1727,7 +1724,7 @@ test('178a. a json field is a monospace text area that reads left to right in an
   const line = cell({ long: 'x'.repeat(200) })
   assert.match(line, /<code[^>]*dir="ltr"/, `a cell reads left to right too: ${line}`)
   assert.ok(line.includes('…'), `and is cut to a line: ${line}`)
-  assert.equal(cell(null), '', 'and nothing at all is no cell')
+  assert.match(cell(null), /class="sr-only">فارغ</, 'empty JSON uses the localized marker')
   assert.match(cell('text'), /&quot;text&quot;/, 'a string reads as JSON, quoted, so it is told from a number')
   assert.equal(cell({ a: 1 }).includes('…'), false, 'a short value is drawn whole')
   const emoji = cell({ e: '😀'.repeat(100) }).replaceAll('&quot;', '"')
@@ -2194,4 +2191,12 @@ test('the staff backoffice link centres its phone icon and restores each desktop
     for (const token of ['px-0', 'has-data-[icon=inline-end]:pr-0', 'sm:px-2.5', 'sm:has-data-[icon=inline-end]:pr-2', 'xl:pl-3', 'xl:pr-2']) assert.ok(classes.includes(token), token)
     assert.ok(!classes.includes('xl:px-3'))
   } finally { state.user = before }
+})
+
+test('checkbox field messages from the template appear as visible words in both locales', () => {
+  const field = courses.fields.find((one) => one.name === 'notifications')!
+  for (const locale of ['en', 'ar']) for (const value of [true, false]) {
+    const html = staticMarkup(createElement(() => cells.checkbox!({ kayan: courses, field, value, locale, t: translator(locale) }) as ReactElement))
+    assert.equal(html, locale === 'ar' ? (value ? 'مفعلة' : 'معطلة') : (value ? 'Enabled' : 'Disabled'))
+  }
 })

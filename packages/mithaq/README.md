@@ -912,6 +912,15 @@ Inline row actions retain their existing treatment.
 
 ### Lists
 
+Shipped cells show a localized accessible empty marker, checkbox words and
+status badges for datetime fields named `archivedAt`. A join or hasMany
+relationship column can declare `{ field: 'variants', cell: 'count' }`.
+Only shown count columns ask normal `find` for counts; one managed read per
+related kayan covers the page under its tenant and read permissions. Counts
+are returned beside the page's docs, not as stored field values. The
+[admin cells guide](../mithaq-admin/README.md#list-cells) describes empty,
+unavailable and counted values and the upgrade steps.
+
 A list node declares `columns`, `filters`, `search`, `sort`, `limit`, `tabs`,
 `empty`, `menu`, `toolbar`, `bulk`, `row`, `of` and `where`. Its `phone` layout is `'cards'` by default.
 `phone: 'table'` keeps a visible header and scrolls the table inside its frame

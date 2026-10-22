@@ -2,7 +2,7 @@ import { use, useEffect, useState, type ReactNode } from 'react'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import { ScreenContext } from 'mithaq/admin/react'
 import { missingRow, type CellProps, type FindApi, type RelationshipTitles } from 'mithaq-admin/control-props.ts'
-import { listed } from 'mithaq-admin/format.tsx'
+import { emptyValue, isEmptyValue, listed } from 'mithaq-admin/format.tsx'
 import { isForbidden } from 'mithaq-admin/refusal.ts'
 import { findByIds, idsOf, nameOfRow, titleFieldOf } from 'mithaq-admin/relationship-control.tsx'
 
@@ -100,7 +100,7 @@ const totalToShow = 3
 export function RelationshipCell({ field, locale, t, titles, value }: CellProps): ReactNode {
   const target = field.relationTo ?? ''
   const ids = idsOf(value)
-  if (!ids.length) return ''
+  if (isEmptyValue(value) || !ids.length) return emptyValue({ t, locale })
   const names = ids.slice(0, totalToShow).map((id) => {
     const found = titles?.get(titleKey(target, id))
     if (found === null || found === undefined) return t('admin.loading', 'Loading…') ?? 'Loading…'

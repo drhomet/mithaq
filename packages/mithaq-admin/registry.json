@@ -231,6 +231,9 @@
           "type": "registry:component",
           "target": "@components/mithaq/cells.tsx"
         }
+      ],
+      "registryDependencies": [
+        "badge"
       ]
     },
     {

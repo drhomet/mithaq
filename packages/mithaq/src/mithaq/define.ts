@@ -49,10 +49,10 @@ type KayanTargetsOf<
   [Name in Exclude<keyof L['targets'], 'service'>]?: L['targets'][Name] extends { capability: 'tenant' } ? never : KayanConfigOf<L, Fields, L['targets'][Name]>
 } & Service
 
-type CheckedScreenCards<L extends Language, Targets> = {
+type CheckedScreenCards<L extends Language, Targets, Fields> = {
   [Name in keyof Targets]: Name extends keyof L['targets']
     ? L['targets'][Name] extends { capability: 'screen' }
-      ? Targets[Name] & CheckedCardNodes<Targets[Name], LocalesOf<L>>
+      ? Targets[Name] & CheckedCardNodes<Targets[Name], LocalesOf<L>, Fields>
       : unknown
     : Name extends 'service' ? unknown : never
 }
@@ -264,7 +264,7 @@ export const defineKayan =
       store?: StoreName
       /** The target a write is validated against. One of the language's targets. */
       schema?: SchemaName
-    } }> & { [Name in VersionsKey<L>]?: Kept } & CheckedScreenCards<L, TargetDeclarations>
+    } }> & { [Name in VersionsKey<L>]?: Kept } & CheckedScreenCards<L, TargetDeclarations, Fields>
     /** This kayan's own open bag, for the project's own code. Nothing in mithaq reads it, and it stays on the server. */
     custom?: Record<string, unknown>
     access?: AccessDef & CheckedRows<AccessDef, Fields, L>
@@ -368,7 +368,7 @@ export const defineGlobal = <const L extends Language>(language: L) => {
       store?: StoreName
       /** The target a write is validated against. One of the language's targets. */
       schema?: SchemaName
-    } }> & CheckedScreenCards<L, TargetDeclarations>
+    } }> & CheckedScreenCards<L, TargetDeclarations, Fields>
     /** This global's own open bag, for the project's own code. Nothing in mithaq reads it, and it stays on the server. */
     custom?: Record<string, unknown>
     /** Read and update only: a create or delete key is refused by the type. */

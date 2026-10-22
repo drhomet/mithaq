@@ -122,6 +122,7 @@ type ZodShapes<F extends Record<string, RuntimeField>> = {
 // Strict: a misspelled `wher` stripped would answer every row unfiltered.
 const listShape = z.strictObject({
   data: z.unknown().optional(),
+  counts: z.unknown().optional(),
   depth: z.unknown().optional(),
   for: z.unknown().optional(),
   limit: z.unknown().optional(),

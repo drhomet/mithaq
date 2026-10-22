@@ -153,6 +153,7 @@ export const courses = defineKayan({
     // joins the parts into `fee.invalid` and `fee.min`. `fee` carries its own zod
     // shape, so mithaq seeds neither key: declaring them here keeps
     // `mithaq generate messages` from pruning them.
+    notifications: { true: { en: 'Enabled', ar: 'مفعلة' }, false: { en: 'Disabled', ar: 'معطلة' } },
     fee: {
       invalid: { en: 'A fee is a number.', ar: 'الرسوم رقم.' },
       min: { en: 'A fee is never negative.', ar: 'الرسوم لا تكون سالبة أبدًا.' },
@@ -307,7 +308,7 @@ export const courses = defineKayan({
           page: appPage([{ layout: 'table', main: [{ list: {
             // `_status` says whether each row is a draft or published, since this
             // list reads every row's latest draft.
-            columns: ['title', 'fee', 'opensOn', '_status', 'details', 'cover'],
+            columns: ['title', 'fee', 'opensOn', '_status', 'details', 'cover', 'notifications', { field: 'scheduledSessions', cell: 'count' }, { field: 'tags', cell: 'count' }],
             card: ['_status', 'fee', 'opensOn'],
             filters: ['title', 'fee', 'archived'],
             // `details` is searched because this list names it: a rich text field

@@ -212,7 +212,7 @@ export const registryControls = [
   'richText',
   'upload',
 ] as const
-export const registryCells = ['text', 'email', 'number', 'integer', 'decimal', 'checkbox', 'datetime', 'date', 'textArray', 'uuid', 'json', 'relationship', 'join', 'richText', 'upload'] as const
+export const registryCells = ['text', 'email', 'number', 'integer', 'decimal', 'checkbox', 'datetime', 'date', 'textArray', 'uuid', 'json', 'relationship', 'join', 'richText', 'upload', 'count'] as const
 
 /** The built-in controls that draw a field's `options`; the build refuses one over a field that declares none. */
 export const choiceControls = ['radio', 'toggleGroup', 'select', 'nativeSelect', 'combobox', 'buttonGroup', 'checkboxGroup']

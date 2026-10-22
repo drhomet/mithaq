@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.6
+
+- Empty cells of every shipped kind show one dash with localized accessible words. Checkbox cells show declared true/false words or localized Yes/No.
+- Datetime fields named `archivedAt` draw Active/Archived badges in lists and phone cards; record pages keep the date.
+- Join and hasMany relationship columns may declare `cell: 'count'`, typed and checked by generation. Only visible columns request counts through normal find; one related managed read per target covers the page under tenant and read permissions. See [List cells](packages/mithaq-admin/README.md#list-cells) for response shape and held-file upgrades.
+
 ## 0.3.5
 
 - Whole-record delete actions and confirmations, including the starter's custom role delete, use solid red with readable text in light and dark themes. Record buttons can declare `destructive: true`; inline row and chip removes retain their colours.

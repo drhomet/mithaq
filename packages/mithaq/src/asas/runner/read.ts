@@ -14,13 +14,18 @@ import { revived } from '../../versions/versions.ts'
 export type FindInput = {
   /** How far a read populates its `join` fields: 0 populates nothing, each level through the child kayan's own managed read. */
   depth?: number
+  /** Counts of readable linked rows, batched over this page, returned separately from stored fields. */
+  counts?: readonly string[]
   limit?: number
   page?: number
   sort?: string
   where?: Where
 }
 
+export type RelationshipCounts = Record<string, Record<string, number>>
+
 export type Paginated<Row> = {
+  counts?: RelationshipCounts
   docs: Row[]
   hasNextPage: boolean
   hasPrevPage: boolean
@@ -491,6 +496,62 @@ export const readers = <Actor>({
     if (offered === undefined || offered === true) return undefined
     return offered === false ? { id: { in: [] } } : assertWhere(kayan, offered)
   }
+  const countFields = (names: unknown): ResolvedField[] => {
+    if (names === undefined) return []
+    if (!Array.isArray(names) || names.some((name) => typeof name !== 'string') || new Set(names).size !== names.length) {
+      throw invalid({ message: 'Managed read option "counts" must name each counted field once.', key: 'error.invalid.read_option', params: { option: 'counts' } })
+    }
+    return names.map((name) => {
+      const field = Object.hasOwn(kayan.fields, name) ? kayan.fields[name] : undefined
+      if (!field || !(field.kind === 'join' || (field.kind === 'relationship' && field.hasMany))) {
+        throw invalid({ message: `Managed read count "${name}" must name a join or hasMany relationship.`, key: 'error.invalid.read_option', params: { option: 'counts' } })
+      }
+      return field
+    })
+  }
+  const countsOf = async ({ fields, rows, actor, accessWhere }: { fields: ResolvedField[]; rows: Record<string, unknown>[]; actor: Actor | null; accessWhere: Where | undefined }): Promise<RelationshipCounts> => {
+    const counts: RelationshipCounts = {}
+    const reads = kayans('read') as Record<string, { find?: (input: FindInput) => Promise<{ docs: Record<string, unknown>[] }> }>
+    const groups = new Map<string, { field: ResolvedField; rows: Record<string, unknown>[]; where: Where }[]>()
+    const tenant = running.getStore()?.tenant
+    const admitted = membersAdmitted(tenant, accessWhere)
+    for (const field of fields) {
+      const visible = []
+      for (const row of rows) {
+        const user = admitted && kayan.tenant
+          ? ((tenant as Extract<TenantScope, { reach: 'mine' }>).members.get(String(row[kayan.tenant])) ?? null) : actor
+        if (!field.access?.read || await (field.access.read as FieldAccess)({ user, data: row, doc: row, siblingData: row, id: row.id })) visible.push(row)
+      }
+      if (!visible.length) continue
+      const where: Where = field.kind === 'join'
+        ? { [field.on!]: { in: visible.map((row) => row.id as Scalar) } }
+        : { id: { in: [...new Set(visible.flatMap((row) => Array.isArray(row[field.name]) ? row[field.name] as Scalar[] : []))] } }
+      const group = groups.get(field.target!.name) ?? []
+      group.push({ field, rows: visible, where })
+      groups.set(field.target!.name, group)
+    }
+    for (const [target, group] of groups) {
+      const find = reads[target]?.find
+      if (!find) continue
+      // A normal nested find retains the actor, tenant, row policy, field masks and soft deletes.
+      // One read per target for the whole page, including multiple columns pointing there.
+      let found: { docs: Record<string, unknown>[] }
+      try { found = await find({ limit: 0, where: { or: group.map((one) => one.where) } }) }
+      catch (error) {
+        if (error instanceof AsasError && error.status === 403) continue
+        throw error
+      }
+      for (const { field, rows } of group) {
+        const link = field.kind === 'join' ? field.on! : 'id'
+        if (found.docs.some((row) => !Object.hasOwn(row, link))) continue
+        const ids = new Set(found.docs.map((row) => row.id))
+        counts[field.name] = Object.fromEntries(rows.map((row) => [String(row.id), field.kind === 'join'
+          ? found.docs.filter((child) => child[link] === row.id).length
+          : (Array.isArray(row[field.name]) ? row[field.name] as unknown[] : []).filter((id) => ids.has(id)).length]))
+      }
+    }
+    return counts
+  }
   const fetchList = async (input: Record<string, unknown>, actor: Actor | null, granted?: Granted, drafts?: Granted) => {
     const accessWhere = granted ? granted.where : await readAccess(kayan, actor, authorize, admin)
     const callerWhere = await judgedWhere(input.where as Where | undefined, actor, accessWhere)
@@ -601,6 +662,7 @@ export const readers = <Actor>({
     const reached = membersAdmitted(tenant, granted.where)
     const viewer = (row: Record<string, unknown>) =>
       reached && kayan.tenant ? ((tenant as { members: ReadonlyMap<string, object> }).members.get(String(row[kayan.tenant])) ?? null) as Actor | null : actor
+    let counted: ResolvedField[] | undefined
     const tools: ReadTools<unknown, Actor> = Object.freeze({
       operation: name,
       effect: 'read',
@@ -614,6 +676,7 @@ export const readers = <Actor>({
       catalog,
       read: (values: unknown) => {
         const final = values as Record<string, unknown>
+        if (mode === 'many' && final.counts !== undefined) counted = countFields(final.counts)
         return mode === 'one'
           ? fetchOne(final, actor, final.id === data.id ? granted : undefined, drafts)
           : mode === 'count'
@@ -680,7 +743,10 @@ export const readers = <Actor>({
     }
     const docs = [] as Row<Record<string, never>, never, never>[]
     for (const row of page.docs) docs.push(await publicResult({ kayan, row, actor: viewer(row), internalOutput: rowOutput, publicOutput: tools.publicOutput }) as Row<Record<string, never>, never, never>)
-    return { ...page, docs } as Paginated<Row<Record<string, never>, never, never>>
+    // Counts follow the final rows and masks, so a hidden parent id never reappears as a metadata key.
+    const fields = counted
+    const counts = fields && await running.run(around, () => countsOf({ fields, rows: page.docs.filter((_, index) => Object.hasOwn(docs[index]!, 'id')), actor, accessWhere: granted.where }))
+    return { ...page, docs, ...(counts && { counts }) } as Paginated<Row<Record<string, never>, never, never>>
   }
   return { operation }
 }

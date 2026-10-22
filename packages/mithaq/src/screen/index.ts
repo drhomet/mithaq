@@ -233,18 +233,24 @@ type CheckedCard<List> = List extends {
   : unknown
 
 // Types cannot recover field order or resolve `of`; the build checks the rendered title.
-export type CheckedCardNodes<Node, Locale extends string = string> = Node extends readonly unknown[]
-  ? { [At in keyof Node]: CheckedCardNodes<Node[At], Locale> }
+type CheckedCount<Node, Fields> = Node extends { readonly field: infer Name; readonly cell: 'count' }
+  ? Name extends keyof Fields
+    ? Fields[Name] extends { kind: 'join' } | { kind: 'relationship'; hasMany: true } ? unknown : { readonly cell: never }
+    : unknown
+  : unknown
+
+export type CheckedCardNodes<Node, Locale extends string = string, Fields = unknown> = Node extends readonly unknown[]
+  ? { [At in keyof Node]: CheckedCardNodes<Node[At], Locale, Fields> }
   : Node extends object
-    ? { [Key in keyof Node]: Key extends 'list'
+    ? CheckedCount<Node, Fields> & { [Key in keyof Node]: Key extends 'list'
         ? Node[Key] extends { readonly columns: readonly unknown[] }
-          ? CheckedCardNodes<Node[Key], Locale> & CheckedCard<Node[Key]>
-          : CheckedCardNodes<Node[Key], Locale>
+          ? CheckedCardNodes<Node[Key], Locale, Node extends { readonly of: string } ? unknown : Fields> & CheckedCard<Node[Key]>
+          : CheckedCardNodes<Node[Key], Locale, Node extends { readonly of: string } ? unknown : Fields>
         : Key extends 'label' | 'description'
           ? Node[Key] extends Readonly<Record<string, string>>
             ? Node[Key] & { [Stray in Exclude<keyof Node[Key], Locale>]: never }
-            : CheckedCardNodes<Node[Key], Locale>
-          : CheckedCardNodes<Node[Key], Locale> }
+            : CheckedCardNodes<Node[Key], Locale, Node extends { readonly of: string } ? unknown : Fields>
+          : CheckedCardNodes<Node[Key], Locale, Node extends { readonly of: string } ? unknown : Fields> }
     : Node
 
 /** A declared node of one kind; a leaf may be written as its bare field name. */
@@ -295,7 +301,7 @@ export type ScreenKeys<Targets> = {
 
 /** Every reference a declaration may write on one screen of a build. */
 export type RefOf<Target, Kinds = {}> = Target extends { layouts: infer Layouts; components: infer Components }
-  ? ScreenRef<(keyof Layouts | keyof Components | keyof typeof builtInScreenKinds | keyof typeof defaultKinds | OwnScreenNames<Kinds>) & string>
+  ? ScreenRef<('count' | keyof Layouts | keyof Components | keyof typeof builtInScreenKinds | keyof typeof defaultKinds | OwnScreenNames<Kinds>) & string>
   : string | Ui
 
 type IconOf<Target> = Target extends { icons?: readonly (infer Name extends string)[] } ? Name : never
@@ -559,7 +565,7 @@ export const screensOf = (
   }
   // A registry name off these lists is shipped by no one, whoever names it.
   const shippedControls: Record<string, readonly string[]> = { ...builtInScreenKinds }
-  const shippedCells: string[] = Object.keys(defaultKinds)
+  const shippedCells: string[] = [...Object.keys(defaultKinds), 'count']
   const knownKinds = new Set(Object.keys(defaultKinds))
   for (const [name, one] of Object.entries(language.kinds)) {
     const own = one.targets?.screen as ScreenKind | undefined
@@ -638,6 +644,8 @@ export const screensOf = (
         : field.options?.length && field.kind === 'textArray' && controls[field.kind]!.control === field.kind ? 'checkboxGroup'
         : controls[field.kind]!.control
       needsOptions(where, component, field)
+      const cell = own.cell ? ref(`${where} targets.${key}.cell`, 'cell', own.cell, field.kind) : controls[field.kind]!.cell
+      if (cell === 'count') throw new Error(`${where} count cell must be declared on a list column.`)
       return {
         ...data,
         ...(Array.isArray(field.options) && { options: field.options as ClientField['options'] }),
@@ -646,7 +654,7 @@ export const screensOf = (
         ...(typeof field.suffix === 'object' && { suffix: field.suffix }),
         ...(typeof field.description === 'object' && { description: field.description }),
         component,
-        cell: own.cell ? ref(`${where} targets.${key}.cell`, 'cell', own.cell, field.kind) : controls[field.kind]!.cell,
+        cell,
         ...(typeof own.width === 'string' && { width: own.width }),
         ...(own.filter === true && { filter: true as const }),
         ...(typeof own.allowCreate === 'boolean' && { allowCreate: own.allowCreate }),
@@ -779,6 +787,10 @@ export const screensOf = (
         // A join's rows are drawn as a list of that kayan scoped to this row, never as nested forms.
         if (place === 'control' && field.kind === 'join') {
           throw new Error(`${node} "${name}" names a join, and a page draws a join's rows as a list: write { list: { of: '${field.relationTo}', where: '${field.on}', columns: [...] } }.`)
+        }
+        if (typeof leaf !== 'string' && leaf.cell === 'count'
+          && (place !== 'cell' || !(field.kind === 'join' || (field.kind === 'relationship' && field.hasMany)))) {
+          throw new Error(`${node} "${name}" count cell must name a join or hasMany relationship column.`)
         }
         const drawn = place === 'control' ? 'component' : 'cell'
         const decided =

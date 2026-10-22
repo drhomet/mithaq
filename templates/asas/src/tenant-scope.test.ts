@@ -638,6 +638,25 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await memos().count({ where: { id: { in: [row.id, sibling.id] } } }, { actor: two })).totalDocs, 0)
   })
 
+  test('join counts batch every parent on the page and exclude cross-tenant child references', async () => {
+    const first = await memos().create({ title: 'count first' }, { actor: one })
+    const second = await memos().create({ title: 'count second' }, { actor: one })
+    const notes = built.kayan.notes.operations
+    const values = { tag: null, cover: null, reply: null, memoSet: [] }
+    await notes.create({ ...values, title: 'count visible', memo: first.id }, { actor: one })
+    const other = await notes.create({ ...values, title: 'count other', memo: ids.org2 }, { actor: two })
+    // Old or imported data may contain a cross-tenant reference; it must not enter the count.
+    await store.transaction((tx) => store.update({ tx, kayan: 'notes', id: other.id, data: { memo: first.id } }))
+    const find = store.find
+    const reads: string[] = []
+    store.find = async (args) => { reads.push(args.kayan); return find.call(store, args) }
+    try {
+      const result = await memos().find({ counts: ['notes'], where: { id: { in: [first.id, second.id] } } }, { actor: one })
+      assert.deepEqual(result.counts, { notes: { [first.id]: 1, [second.id]: 0 } })
+      assert.deepEqual(reads, ['memos', 'notes'])
+    } finally { store.find = find }
+  })
+
   test('a create is filled with the active organization, and a caller naming the field is refused before any step runs', async () => {
     const made = await memos().create({ title: 'filled' }, { actor: one })
     assert.equal(made.firmId, 'org1')
@@ -2354,4 +2373,68 @@ test('an error wrapping an after-commit failure is not advertised as a retryable
   const plug = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: () => {} })(table as never)
   const response = await plug.handle(new Request('http://test/api/work/run', { method: 'POST', body: '{}' }), async () => null)
   assert.equal(response?.status, 500)
+})
+
+test('list counts batch the page through related find and retain tenant and read scopes', async () => {
+  const memory = memoryStore()
+  const queries: string[] = []
+  const store = { ...memory, find: async (args: Parameters<Store['find']>[0]) => { queries.push(args.kayan); return memory.find(args) } }
+  const built = languageOf(store as never, { authorize: async (args) => {
+    const where = await defaultAuthorize(args)
+    return args.kayan.name === 'notes' && args.effect === 'read'
+      ? { and: [...(where ? [where] : []), { title: { not_equals: 'hidden' } }] } : where
+  } })
+  const one = await actorOf({ active: 'org1' })
+  const two = await actorOf({ active: 'org2' })
+  for (const id of ['org1', 'org2']) await memory.insert({ tx: undefined, kayan: 'firms', data: { id, name: id } })
+  const first = await built.kayan.memos.operations.create({ title: 'first' }, { actor: one })
+  const second = await built.kayan.memos.operations.create({ title: 'second' }, { actor: one })
+  const other = await built.kayan.memos.operations.create({ title: 'other' }, { actor: two })
+  for (const [title, memo] of [...Array.from({ length: 12 }, () => ['visible', first.id]), ['hidden', first.id], ['second', second.id]]) {
+    await built.kayan.notes.operations.create({ title, memo, tag: null, cover: null, reply: null, memoSet: [first.id, second.id] }, { actor: one })
+  }
+  await built.kayan.notes.operations.create({ title: 'other', memo: other.id, tag: null, cover: null, reply: null, memoSet: [other.id] }, { actor: two })
+  queries.length = 0
+  const page = await built.kayan.memos.operations.find({ counts: ['notes'], limit: 0 }, { actor: one })
+  assert.deepEqual(page.counts, { notes: { [first.id]: 12, [second.id]: 1 } })
+  assert.deepEqual(queries, ['memos', 'notes'], 'one related read for both parents')
+  assert.equal(page.docs.some((row: { id: string }) => row.id === other.id), false)
+  queries.length = 0
+  await built.kayan.memos.operations.find({}, { actor: one })
+  assert.deepEqual(queries, ['memos'], 'no count request makes no related read')
+  const notes = await built.kayan.notes.operations.find({ counts: ['memoSet'] }, { actor: one })
+  assert.ok(notes.docs.length)
+  for (const row of notes.docs) assert.equal(notes.counts.memoSet[row.id], 2)
+  await assert.rejects(built.kayan.memos.operations.find({ counts: ['title'] }, { actor: one }), /count.*join|count.*hasMany/i)
+  const denied = await actorOf({ active: 'org1', orgs: { org1: ['reader'] } })
+  const hidden = await built.kayan.memos.operations.find({ counts: ['notes'] }, { actor: denied })
+  assert.deepEqual(hidden.counts, {}, 'an unreadable parent field gives no count')
+})
+
+test('counts never expose hidden parent ids or fields removed by the final read step', async () => {
+  const store = memoryStore()
+  let hideId = false
+  let maskAfterRead = true
+  const { defineKayan, buildAsas } = defineMithaq({
+    arkan: [base],
+    targets: { store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }) },
+  })
+  const parents = defineKayan({ name: 'parents', fields: {
+    ...defaultFields,
+    id: { ...defaultFields.id, access: { read: () => !hideId } },
+    title: { kind: 'text' },
+    children: { kind: 'join', relationTo: 'children', on: 'parent', access: { read: ({ doc }) => doc?.title !== 'masked' } },
+  }, access: { create: () => true, read: () => true }, targets: { service: { operations: { ...defaultOperations,
+    find: { ...defaultOperations.find, afterSteps: [(ctx: Ctx) => ({ ...ctx, data: { ...ctx.data, docs: (ctx.data.docs as Record<string, unknown>[]).map((row) => ({ ...row, title: maskAfterRead ? 'masked' : row.title })) } })] },
+  } } } })
+  const children = defineKayan({ name: 'children', fields: { ...defaultFields, parent: { kind: 'relationship', relationTo: 'parents' } }, access: { create: () => true, read: () => true }, targets: { service: { operations: defaultOperations } } })
+  const built = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [parents, children] })
+  const parent = await built.kayan.parents.operations.create({ title: 'visible' })
+  await built.kayan.children.operations.create({ parent: parent.id })
+  assert.deepEqual((await built.kayan.parents.operations.find({ counts: ['children'] })).counts, {})
+  hideId = true
+  maskAfterRead = false
+  const page = await built.kayan.parents.operations.find({ counts: ['children'] })
+  assert.equal(Object.hasOwn(page.docs[0]!, 'id'), false)
+  assert.deepEqual(page.counts, {})
 })

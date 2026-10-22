@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { missingRow, type CellProps, type RelationshipTitles } from 'mithaq-admin/control-props.ts'
 import type { Translate } from 'mithaq-admin/copy.ts'
 import { FileThumb, FileValue, type sizes } from 'mithaq-admin/file-thumb.tsx'
-import { noValue } from 'mithaq-admin/format.tsx'
+import { emptyValue, isEmptyValue } from 'mithaq-admin/format.tsx'
 import { idsOf } from 'mithaq-admin/relationship-control.tsx'
 import { rowKey } from 'mithaq-admin/relationship-cell.tsx'
 
@@ -32,7 +32,7 @@ export function UploadCell(props: CellProps): ReactNode {
   const { field, locale, t, titles, value, whole } = props
   if (whole) return <UploadValue {...props} />
   const ids = idsOf(value)
-  if (!ids.length) return noValue
+  if (isEmptyValue(value) || !ids.length) return emptyValue({ t, locale })
   const rest = ids.length - totalToShow
   return (
     <span className="inline-flex max-w-full items-center gap-1">

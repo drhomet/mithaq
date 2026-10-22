@@ -569,3 +569,43 @@ Rich-text projects require all Lexical peers, including table, code-core,
 code-prism and markdown, even for a narrowed field. Feature modules remain
 lazy browser imports. The core package marks these peers optional only for
 projects that do not use rich text. See the [0.3.4 upgrade steps](../../templates/asas/README.md#upgrading-a-034-project).
+
+## List cells
+
+Every shipped kind shows `—` for a missing value, an empty string or an empty
+array. Screen readers hear "Empty" or "فارغ". Zero and false remain values.
+Relationships and uploads with no reference use the same marker. Loading,
+Not available and Deleted still describe a reference waiting to load, one the
+viewer cannot read, or one no longer returned.
+
+A datetime field named `archivedAt` is the archive timestamp by convention.
+Lists and phone cards draw Active or Archived, نشط or مؤرشف, in a coloured badge.
+The record page keeps its date. This adds no field role or vocabulary word.
+Other datetime fields retain their dates. Projects using another name can
+supply their own cell. Checkbox cells display the project's
+`<kayan>.<field>.true` and `.false` messages. Without those messages they show
+Yes or No, نعم or لا. An unset checkbox shows the empty marker.
+
+A list column can declare `{ field: 'scheduledSessions', cell: 'count' }` for a
+join, or `{ field: 'tags', cell: 'count' }` for a hasMany relationship. Types
+and `mithaq generate --check` refuse other fields. Counts are list column
+choices; a count cell on a field default is refused. The courses template lists
+both counts beside its notifications checkbox. Its optional summary and cover
+show the empty marker when unset. The template guide has a complete archive
+timestamp example.
+
+Only visible count columns ask normal `find` for `counts: ['scheduledSessions',
+'tags']`. The response keeps stored fields intact and adds
+`counts: { scheduledSessions: { [rowId]: 3 } }`. One managed related read per
+target covers the whole page, including multiple columns at that target.
+Counts include only rows the actor may read, within the current tenant reach,
+with the related read's field access and soft deletes applied. A missing read
+permission or unreadable linking field gives a dash, not zero. No count request
+makes no related read. The server reads all matching related rows to count them;
+counts do not use the join's preview limit.
+
+Existing projects merge held `cells.tsx`, `format.tsx`, `relationship-cell.tsx`,
+`upload-cell.tsx`, `rich-text.tsx`, `list.tsx`, `list-table.tsx`, `list-types.tsx`
+and `list-query.ts`. Ejected `cells.tsx` also needs the host's shadcn Badge.
+Regenerate screens after declaring count columns. No database migration or
+vocabulary signature is needed for these presentation choices.

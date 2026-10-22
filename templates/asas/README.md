@@ -1144,3 +1144,38 @@ held files. Merge the new `admin.richText` copy entries in each host's `copy.ts`
 Existing Lexical JSON and database columns need no migration.
 The editor cleans pasted content before save; direct API writes still have to
 satisfy their field's selected policy.
+
+### List cell examples
+
+Optional fields show the shared empty marker; checkbox fields use their own
+true/false messages or Yes/No. The courses example declares notification words,
+a scheduledSessions join count and a tags relationship count. For a kayan
+whose archive operation writes a timestamp, name its datetime `archivedAt`:
+
+```ts
+fields: {
+  title: { kind: 'text', label: { en: 'Title', ar: 'العنوان' } },
+  summary: { kind: 'text', label: { en: 'Summary', ar: 'الملخص' } },
+  archivedAt: { kind: 'datetime', label: { en: 'Status', ar: 'الحالة' } },
+  available: { kind: 'checkbox', label: { en: 'Available', ar: 'متاح' } },
+  variants: { kind: 'join', relationTo: 'variants', on: 'product', label: { en: 'Variants', ar: 'الأصناف' } },
+  tags: { kind: 'relationship', relationTo: 'tags', hasMany: true, label: { en: 'Tags', ar: 'الوسوم' } },
+},
+messages: {
+  available: {
+    true: { en: 'In stock', ar: 'متوفر' },
+    false: { en: 'Out of stock', ar: 'نفد' },
+  },
+},
+// Inside a screen page's list node:
+list: {
+  columns: ['title', 'summary', 'archivedAt', 'available', { field: 'variants', cell: 'count' }, { field: 'tags', cell: 'count' }],
+  card: ['archivedAt', 'available', 'variants'],
+},
+```
+
+An unset summary draws `—`; archivedAt draws Active while null and Archived
+once set, with the date kept on the record. The checkbox draws In stock or
+Out of stock, and a checkbox without those messages draws Yes or No.
+See [List cells](../../packages/mithaq-admin/README.md#list-cells) for count
+permissions and upgrading held copies.

@@ -1,7 +1,8 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
 import type { ClientField } from 'mithaq/admin'
 import type { Cells } from 'mithaq-admin/components.tsx'
-import { formatDate, listed } from 'mithaq-admin/format.tsx'
+import { emptyValue, formatDate, isEmptyValue, listed } from 'mithaq-admin/format.tsx'
 import { RelationshipCell } from 'mithaq-admin/relationship-cell.tsx'
 
 // ponytail: what this file exported before rich text became an add-on, kept for one version so a project's own file
@@ -27,8 +28,9 @@ const worded = (field: ClientField, value: unknown, locale: string) => {
   return field.options?.find((one) => one.value === held)?.label[locale] ?? plain(held)
 }
 
-/** One cell per name the registry ships, keyed by the kind's own name, which `defaultComponents.cells` holds. */
-export const cells: Cells = {
+/** The shipped value cells and the opt-in count cell, held by `defaultComponents.cells`. */
+const defaultCells: Cells = {
+  count: ({ value, locale }) => typeof value === 'number' ? value.toLocaleString(locale) : '',
   text: ({ field, value, locale }) => worded(field, value, locale),
   email: ({ value }) =>
     value ? (
@@ -42,23 +44,14 @@ export const cells: Cells = {
   integer: (props) => cells.number(props),
   // Exact text: a JS double would lose digits.
   decimal: ({ field, value, locale }) => worded(field, value, locale),
-  // The glyph is aria-hidden, so the sr-only word is what a screen reader gets. The words are keyed per field because `true` means different things on `archived` and `published`.
-  // A row from before the column holds nothing, which is a no. Drawn whole under its label, it is the word itself.
-  checkbox: ({ kayan, field, value, t, whole }) => whole ? (
-    <>{value === true ? (t(`${kayan.name}.${field.name}.true`) ?? t('admin.yes', 'Yes') ?? 'Yes') : (t(`${kayan.name}.${field.name}.false`) ?? t('admin.no', 'No') ?? 'No')}</>
-  ) : (
-    <>
-      <span aria-hidden className="tabular-nums">
-        {value === true ? '✓' : '✗'}
-      </span>
-      <span className="sr-only">
-        {value === true
-          ? (t(`${kayan.name}.${field.name}.true`) ?? t('admin.yes', 'Yes') ?? 'Yes')
-          : (t(`${kayan.name}.${field.name}.false`) ?? t('admin.no', 'No') ?? 'No')}
-      </span>
-    </>
-  ),
-  datetime: ({ value, locale }) => <Moment value={value} locale={locale} />,
+  checkbox: ({ kayan, field, value, t, locale }) => value === true
+    ? (t(`${kayan.name}.${field.name}.true`) ?? t('admin.yes', locale === 'ar' ? 'نعم' : 'Yes') ?? (locale === 'ar' ? 'نعم' : 'Yes'))
+    : (t(`${kayan.name}.${field.name}.false`) ?? t('admin.no', locale === 'ar' ? 'لا' : 'No') ?? (locale === 'ar' ? 'لا' : 'No')),
+  datetime: (props) => props.field.name === 'archivedAt' && !props.whole
+    ? <Badge variant="secondary" className={props.value ? 'text-muted-foreground' : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'}>{props.value
+      ? (props.t('admin.archived', props.locale === 'ar' ? 'مؤرشف' : 'Archived') ?? (props.locale === 'ar' ? 'مؤرشف' : 'Archived'))
+      : (props.t('admin.active', props.locale === 'ar' ? 'نشط' : 'Active') ?? (props.locale === 'ar' ? 'نشط' : 'Active'))}</Badge>
+    : <Moment value={props.value} locale={props.locale} />,
   date: ({ value, locale }) => formatDate({ value, locale, day: true }) ?? plain(value),
   textArray: ({ field, value, locale }) => (Array.isArray(value) ? listed(value.map((one) => worded(field, one, locale)), locale) : plain(value)),
   uuid: ({ value }) => <span className="font-mono text-xs">{plain(value)}</span>,
@@ -71,6 +64,12 @@ export const cells: Cells = {
     return <code dir="ltr" className="font-mono text-xs">{points.length > previewLength ? `${points.slice(0, previewLength).join('')}…` : points.join('')}</code>
   },
   relationship: RelationshipCell,
-  // Nothing where the read carried no join: an absent key means the read did not ask, an empty array means no children, and a count of zero would say both.
+  // An absent join was not requested, so it must not invent a count of zero.
   join: ({ value, locale }) => (Array.isArray(value) ? value.length.toLocaleString(locale) : ''),
 }
+
+export const cells: Cells = Object.fromEntries(Object.entries(defaultCells).map(([name, cell]) => [name, (props: import('mithaq-admin/control-props.ts').CellProps) => {
+  const value = props.field.rules.localized === true && props.value && typeof props.value === 'object'
+    ? (props.value as Record<string, unknown>)[props.locale] : props.value
+  return isEmptyValue(value) && !(name === 'datetime' && props.field.name === 'archivedAt' && !props.whole) ? emptyValue(props) : cell(props)
+}])) as Cells

@@ -694,6 +694,8 @@ test('a list with of and where lists another kayan of the screen scoped to the r
   assert.throws(() => related({ of: 'sessions', where: 'course', columns: ['seats', 'venue'], card: ['venue'] }, 'edit', undefined, 'venue'), /card.*venue.*title/)
   assert.doesNotThrow(() => related({ of: 'sessions', where: 'course', columns: ['capacity', 'startsAt'], card: ['capacity'] }, 'edit', undefined, 'startsAt'))
 
+  assert.throws(() => related({ of: 'sessions', where: 'course', columns: [{ field: 'course', cell: 'count' }] }), /count cell must name a join or hasMany relationship column/)
+
   const at = 'Screen "dashboard" kayan "courses" page "edit" region "main" layout region "main" tab "sessions" list'
   const refused = (list: Record<string, unknown>, message: string, page?: 'create') =>
     assert.throws(() => related(list, page), (error: Error) => error.message === `${at.replace('"edit"', `"${page ?? 'edit'}"`)} ${message}`)
@@ -1057,13 +1059,13 @@ test('the course edit page draws its tabs at page level, Details holding the rec
   }
   walk([dashboard.kayan, asas.targets.portal.client.kayan])
   assert.ok(labels.length && !labels.includes('Status'), `no section is labelled Status: ${labels}`)
-  // A join is drawn by no page; the rows pointing at a course and at a session are
-  // a list of their own kayan in a tab of the edit page.
+  // Joined records are edited in their own lists; their parent list may request a count.
   const listed = (kayan: 'courses' | 'sessions') =>
     ((kayan === 'courses' ? treeOf(dashboard.kayan[kayan]!.pages.edit).main[0] : treeOf(dashboard.kayan[kayan]!.pages.edit).main[0]!.main[0]) as unknown as { tabs: { tab: string; fields: { list: { of: string; where: string } }[] }[] }).tabs[1]!
   assert.deepEqual([listed('courses').tab, listed('courses').fields[0]!.list.of, listed('courses').fields[0]!.list.where], ['sessions', 'sessions', 'course'])
   assert.deepEqual([listed('sessions').tab, listed('sessions').fields[0]!.list.of, listed('sessions').fields[0]!.list.where], ['enrollments', 'enrollments', 'session'])
-  assert.ok(!JSON.stringify(dashboard).includes('"field":"scheduledSessions"') && !JSON.stringify(dashboard).includes('"field":"enrollments"'), 'and no page names a join as a leaf')
+  assert.match(JSON.stringify(dashboard), /"field":"scheduledSessions","cell":"count"/)
+  assert.ok(!JSON.stringify(dashboard).includes('"field":"enrollments"'), 'enrollments remain a related list')
 })
 
 test("a field carries its label and the rules that are data, in the kayan's own field order", () => {
@@ -1392,4 +1394,18 @@ test('a relationship create opt-out refuses a non-boolean with its own message',
   const suppliers = language.defineKayan({ name: 'suppliers', fields: { ...defaultFields, name: { kind: 'text' } } })
   const courses = language.defineKayan({ name: 'courses', fields: { ...defaultFields, supplier: { kind: 'relationship', relationTo: () => suppliers, targets: { dashboard: { allowCreate: 'no' as never } } } } })
   assert.throws(() => language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [courses, suppliers] }), /Kayan "courses" field "supplier" targets\.dashboard\.allowCreate must be a boolean\./)
+})
+
+test('count cells refuse scalar and single relationship columns during screen generation builds', () => {
+  assert.throws(() => build({ pages: { list: { path: '/courses', page: table([{ list: { columns: [{ field: 'title', cell: 'count' }] } }]) } } }), /count cell must name a join or hasMany relationship column/)
+})
+
+test('counts are list column choices, so field defaults cannot silently skip the count read', () => {
+  const language = screens()
+  assert.throws(() => language.buildAsas({
+    http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+    kayan: [language.defineKayan({ name: 'courses', fields: {
+      ...defaultFields, title: { kind: 'text', targets: { dashboard: { cell: 'count' } } },
+    }, targets: { service: { operations: defaultOperations }, dashboard: { pages: { list: { path: '/courses', page: table([{ list: { columns: ['title'] } }]) } } } } } as never)],
+  }), /count cell must be declared on a list column/)
 })

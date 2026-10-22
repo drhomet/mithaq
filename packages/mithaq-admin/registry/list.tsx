@@ -51,7 +51,7 @@ export function List(props: ListProps): ReactElement {
   const shown = titled ? [titled, ...active.filter((field) => field !== titled)] : active
   // One read per target for the whole page, so a relationship column is not one read per cell. Over the shown columns
   // alone, so a relationship the viewer has switched off costs no read.
-  const titles = useRelationshipTitles({ fields: shown, docs: page.docs, context: { api, client, locale } })
+  const titles = useRelationshipTitles({ fields: shown.filter((field) => node?.columns.find((column) => column.field === field.name)?.cell !== 'count'), docs: page.docs, context: { api, client, locale } })
   /** The kayan's plural, which the bulk dialog and its result name the ticked rows by. */
   const plural = titleOf({ kayan, copy, many: true })
 
@@ -171,7 +171,7 @@ export function List(props: ListProps): ReactElement {
             <ListTable
               {...{ cellOf: new Map(node?.columns.map((column) => [column.field, column.cell])), copy, href, kayan, openHint, screen, shown, table, titles, unreadable }}
               openRow={(id) => openRow(table, id)}
-              docs={page.docs}
+              docs={page.docs} counts={page.counts}
               sort={query.sort}
               card={node?.card}
               phone={node?.phone}

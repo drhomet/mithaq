@@ -8,6 +8,7 @@ import type { ScreenPage } from 'mithaq-admin/screen-refs.ts'
 
 /** One page, as the managed reader answers it. */
 export type Page = {
+  counts?: Record<string, Record<string, number>>
   docs: readonly Record<string, unknown>[]
   hasNextPage: boolean
   hasPrevPage: boolean
