@@ -1122,6 +1122,12 @@ type ServerTargets = {
   }
 }
 
+// Generators build the provider too; only a serving host needs delivery credentials.
+export const requireMailer = (settings: AuthSettings) => {
+  if (!settings.mailer && settings.passwordDelivery === 'email') throw new Error('passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM before starting the app.')
+  if (!settings.mailer && settings.signUp === 'open' && (production || !isLocalHost(tenantURL))) throw new Error('A start needs a mailer in production: set RESEND_API_KEY and MAIL_FROM.')
+}
+
 /**
  * The provider for `settings`, which is this project's own in `providers.user.server`. A test builds
  * one for another organization mode over the same tables.
@@ -1129,8 +1135,6 @@ type ServerTargets = {
 export const serverFor = (settings: AuthSettings) => (targets: ServerTargets, { referenced }: Pick<Vocabulary, 'referenced'>) => {
   const deliveryProblem = passwordDeliveryProblem(settings)
   if (deliveryProblem) throw new Error(deliveryProblem)
-  if (!settings.mailer && settings.passwordDelivery === 'email') throw new Error('passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM before starting the app.')
-  if (!settings.mailer && settings.signUp === 'open' && (production || !isLocalHost(tenantURL))) throw new Error('A start needs a mailer in production: set RESEND_API_KEY and MAIL_FROM.')
   const store = targets.drizzle
   // add-on: roles
   // The drizzle store always counts; `Store` types it optional for stores that cannot.

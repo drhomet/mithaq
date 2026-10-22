@@ -152,7 +152,7 @@ test('off a local host, or in production, the auth setup refuses to start withou
   }
   for (const [deploy, env] of Object.entries(deploys)) {
     const bare = await importedUnder(env)
-    assert.throws(() => bare.serverFor(bare.authSettings)({} as never, { referenced: async () => 0 }), /(?:needs a mailer in production|passwordDelivery is email)[\s\S]*RESEND_API_KEY/, `${deploy}: boot refuses without a mailer`)
+    assert.throws(() => bare.requireMailer(bare.authSettings), /(?:needs a mailer in production|passwordDelivery is email)[\s\S]*RESEND_API_KEY/, `${deploy}: boot refuses without a mailer`)
     const imported = await importedUnder({ ...env, RESEND_API_KEY: 're_never_sent', MAIL_FROM: 'mail@example.com' })
     assert.equal(imported.options.rateLimit.enabled, true, `${deploy}: and with one the provider rate limits`)
   }
@@ -402,21 +402,28 @@ test('a mailer is never waited on: a reset is answered as fast for an address wi
   assert.deepEqual(sent, ['held@example.com'], 'and the mail is sent after')
 })
 
-test('email password delivery refuses boot without its configured Resend mailer', () => {
-  const settings = { ...authSettings, passwordDelivery: 'email' as const, mailer: undefined }
-  assert.doesNotThrow(() => authOptions({}, settings), 'declarations and generation need no delivery credentials')
-  assert.throws(() => serverFor(settings)({} as never, { referenced: async () => 0 }), /RESEND_API_KEY.*MAIL_FROM/)
-})
-
-
-test('the project configured for email imports without delivery credentials', async () => {
+test('an email project generates screens without mail credentials and refuses production connect until delivery is configured', async () => {
   const { spawnSync } = await import('node:child_process')
-  const loader = `data:text/javascript,${encodeURIComponent(`import { registerHooks } from 'node:module'; registerHooks({ load(url, context, next) { const loaded = next(url, context); return url.endsWith('/mithaq/auth/organizations.ts') ? { ...loaded, source: String(loaded.source).replace("passwordDelivery: 'admin' | 'email' = 'admin'", "passwordDelivery: 'admin' | 'email' = 'email'") } : loaded } })`)}`
-  const result = spawnSync(process.execPath, ['--import', loader, '--input-type=module', '-e', `await import(${JSON.stringify(new URL('./index.ts', import.meta.url).href)})`], { encoding: 'utf8', env: { ...process.env, RESEND_API_KEY: '', MAIL_FROM: '' } })
-  assert.equal(result.status, 0, 'loading declarations for generation does not boot delivery')
-  assert.equal(result.stderr.includes('RESEND_API_KEY'), false)
+  const { fileURLToPath } = await import('node:url')
+  const cwd = fileURLToPath(new URL('../../../../asas/', import.meta.url))
+  const env = {
+    ...process.env, RESEND_API_KEY: '', MAIL_FROM: '',
+    BETTER_AUTH_URL: 'http://127.0.0.1:4010', BACKOFFICE_URL: 'http://127.0.0.1:4011',
+    BETTER_AUTH_SECRET: 'email-project-start-test-secret-of-32-characters',
+    STORAGE_SECRET: 'email-project-test-storage-secret-of-32-characters', STORAGE_PREFIX: 'mithaq/asas', STORAGE_ADAPTER: 'local',
+  }
+  for (const NODE_ENV of ['development', 'production'] as const) {
+    const generated = spawnSync(process.execPath, ['../../packages/mithaq/src/asas/cli/mithaq.ts', 'generate', 'screens', '--check'], {
+      cwd, encoding: 'utf8', env: { ...env, NODE_ENV },
+    })
+    assert.equal(generated.status, 0, `${NODE_ENV}: screen generation needs no mail credentials\n${generated.stdout}\n${generated.stderr}`)
+  }
+  const started = spawnSync(process.execPath, ['--input-type=module', '-e', "const { asas } = await import('./src/asas.ts'); try { await asas.connect() } finally { await asas.destroy() }"], {
+    cwd, encoding: 'utf8', env: { ...env, NODE_ENV: 'production' },
+  })
+  assert.notEqual(started.status, 0, 'production connect refuses before serving requests')
+  assert.match(started.stderr, /passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM before starting the app\./)
 })
-
 
 test('administrator delivery refuses required mailbox verification and names both fixes', () => {
   const refused = { ...school, passwordDelivery: 'admin' as const, verifyEmail: true }

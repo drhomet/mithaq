@@ -44,7 +44,7 @@ import { systemRoles } from './roles/system-roles.ts'
 // add-on: uploads
 import { storageConfig } from './storage/index.ts'
 // end add-on: uploads
-import { onBackoffice, organizationNameProblem } from './mithaq/auth/index.ts'
+import { authSettings, onBackoffice, organizationNameProblem, requireMailer } from './mithaq/auth/index.ts'
 import { organizationName, organizations, showOrganization } from './mithaq/auth/organizations.ts'
 import { assignedRoles, backofficeRolesOf, tenantAccess } from './roles/tenant-access.ts'
 // without add-on: roles
@@ -122,6 +122,7 @@ const guarded = (store: typeof drizzleStore): typeof drizzleStore => ({
   init: (kayan) => guarded((store.init(kayan) ?? store) as typeof drizzleStore) as never,
   connect: async (args?: { readOnly?: boolean }) => {
     requireDatabaseUrl()
+    if (process.env.NODE_ENV === 'production' && !args?.readOnly) requireMailer(authSettings)
     await store.connect(args)
   },
   commands: {

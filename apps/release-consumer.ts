@@ -37,8 +37,10 @@ assert.equal(databaseUrl.pathname, '/mithaq', 'the release database must be name
 // The check empties this database, so it refuses the dev database and the study container like every test step that drops a schema.
 testDatabase()
 
+// CI's test mailer must not hide a generation or build that requires delivery credentials.
+const { RESEND_API_KEY: _mailKey, MAIL_FROM: _mailFrom, ...buildEnv } = process.env
 const command = (program: string, args: string[], cwd: string) => {
-  const result = spawnSync(program, args, { cwd, encoding: 'utf8', timeout: 600_000 })
+  const result = spawnSync(program, args, { cwd, env: buildEnv, encoding: 'utf8', timeout: 600_000 })
   assert.equal(result.status, 0, `${program} ${args.join(' ')}\n${result.stdout}\n${result.stderr}`)
 }
 
@@ -178,7 +180,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       cwd: scratch,
       encoding: 'utf8',
       timeout: 600_000,
-      env: { ...process.env, npm_config_user_agent: `${manager}/0 npm/? node/v24` },
+      env: { ...buildEnv, npm_config_user_agent: `${manager}/0 npm/? node/v24` },
     })
     assert.equal(created.status, 0, `${created.stdout}\n${created.stderr}`)
     assert.ok(!created.stderr.includes('Not installed'), created.stderr)
@@ -223,6 +225,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     // The asas, where every mithaq command runs, and the language, which holds the files a project keeps from mithaq-admin.
     const template = single ? consumer : join(consumer, 'packages/asas')
     const language = single ? consumer : join(consumer, 'packages/mithaq')
+    command(installed(template, '.bin/mithaq'), ['generate', 'screens', '--check'], template)
     // The files each workspace always holds (the host, the icon, the storage adapters and the step) are read against the
     // installed mithaq-admin and must be up to date; with no package there the check answers undefined and this fails.
     // The storage adapters and their defaults come with uploads; the step and the mailers are every project's.
@@ -312,7 +315,10 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     }
     {
       const { RESEND_API_KEY: _key, MAIL_FROM: _from, ...unmailed } = production
-      const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./src/asas.ts')"], { cwd: template, encoding: 'utf8', env: { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' } })
+      const env = { ...unmailed, BETTER_AUTH_SECRET: 'a-release-consumer-secret' }
+      const generated = spawnSync(process.execPath, [installed(template, '.bin/mithaq'), 'generate', 'messages', '--check'], { cwd: template, encoding: 'utf8', env })
+      assert.equal(generated.status, 0, `${name}: production message validation needs no mailer\n${generated.stdout}\n${generated.stderr}`)
+      const refused = spawnSync(process.execPath, ['--input-type=module', '-e', "const { asas } = await import('./src/asas.ts'); try { await asas.connect() } finally { await asas.destroy() }"], { cwd: template, encoding: 'utf8', env })
       assert.notEqual(refused.status, 0, `${name}: a production start with no mailer is refused`)
       assert.match(refused.stderr, /passwordDelivery is email: set RESEND_API_KEY and MAIL_FROM/, refused.stderr)
     }
