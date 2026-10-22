@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { ClientField, ClientKayan } from 'mithaq/admin'
 import './tsx.ts'
 
+const { translator } = await import('../../../apps/asas-tanstack/src/copy.ts')
 const { cells } = await import('../registry/cells.tsx')
 const { UploadCell } = await import('../registry/upload-cell.tsx')
 const { RichTextCell } = await import('../registry/rich-text.tsx')
@@ -12,7 +13,7 @@ const all = { ...cells, upload: UploadCell, richText: RichTextCell }
 const kayan = { name: 'things' } as ClientKayan
 const draw = (kind: keyof typeof all, value: unknown, locale: string) => renderToStaticMarkup(createElement(() => all[kind]({
   kayan, field: { name: 'value', kind, rules: {}, component: kind, cell: kind } as ClientField,
-  value, locale, t: (_key, fallback) => fallback,
+  value, locale, t: translator(locale),
 }) as ReactElement))
 
 test('empty cells of every shipped kind show one dash with localized accessible words', () => {
@@ -30,7 +31,7 @@ test('empty cells of every shipped kind show one dash with localized accessible 
 
 test('archive timestamps show status words in lists and keep their date on records', () => {
   for (const locale of ['en', 'ar']) for (const value of [null, new Date('2026-10-22T01:00:00Z')]) {
-    const props = { kayan, field: { name: 'archivedAt', kind: 'datetime', rules: {} } as ClientField, value, locale, t: (_key: string, fallback?: string) => fallback }
+    const props = { kayan, field: { name: 'archivedAt', kind: 'datetime', rules: {} } as ClientField, value, locale, t: translator(locale) }
     const html = renderToStaticMarkup(createElement(() => cells.datetime(props) as ReactElement))
     assert.match(html, /data-slot="badge"/)
     assert.ok(html.includes(value ? (locale === 'ar' ? 'مؤرشف' : 'Archived') : (locale === 'ar' ? 'نشط' : 'Active')))
@@ -43,7 +44,7 @@ test('checkbox cells show declared true and false words, else localized yes and 
   for (const locale of ['en', 'ar']) for (const value of [true, false]) for (const declared of [true, false]) {
     const word = value ? (locale === 'ar' ? 'متاح' : 'Available') : (locale === 'ar' ? 'غير متاح' : 'Unavailable')
     const props = { kayan, field: { name: 'available', kind: 'checkbox', rules: {} } as ClientField, value, locale,
-      t: (key: string, fallback?: string) => declared && key === `things.available.${String(value)}` ? word : fallback }
+      t: (key: string, fallback?: string) => declared && key === `things.available.${String(value)}` ? word : translator(locale)(key, fallback) }
     assert.equal(renderToStaticMarkup(createElement(() => cells.checkbox(props) as ReactElement)), declared ? word : value ? (locale === 'ar' ? 'نعم' : 'Yes') : (locale === 'ar' ? 'لا' : 'No'))
   }
 })
@@ -120,4 +121,21 @@ test('an absent archive timestamp stays empty while null and dates show their ac
   assert.equal(absent.includes('Active'),false)
   assert.match(renderToStaticMarkup(createElement(()=>cells.datetime({...props,value:null}) as ReactElement)),/>Active</)
   assert.match(renderToStaticMarkup(createElement(()=>cells.datetime({...props,value:new Date('2026-10-22T01:00:00Z')}) as ReactElement)),/>Archived</)
+})
+
+
+test('the host supplies all default cell words and empty link names', () => {
+  const ar=translator('ar')
+  for(const [key,word] of Object.entries({emptyValue:'فارغ',archived:'مؤرشف',active:'نشط',openEmpty:'فارغ، فتح',yes:'نعم',no:'لا'})) assert.equal(ar(`admin.${key}`),word)
+})
+
+test('bulk checkbox words follow the same host and field copy as list cells', async () => {
+  const {BulkChoice}=await import('../registry/node-buttons.tsx')
+  for(const value of [true,false]){
+    const props={kayan,field:{name:'available',kind:'checkbox',rules:{}} as ClientField,value,locale:'ar',t:translator('ar')}
+    const word=renderToStaticMarkup(createElement(()=>cells.checkbox(props) as ReactElement))
+    const html=renderToStaticMarkup(createElement(BulkChoice,{...props,copy:{t:props.t,locale:'ar'},id:'bulk-available',readOnly:false,onChange:()=>{}}))
+    assert.ok(html.includes(word))
+    assert.equal(html.includes('>Yes<'),false)
+  }
 })

@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import type { ButtonClient, ClientField, ClientKayan, Row } from 'mithaq/admin'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { booleanWord } from 'mithaq-admin/copy.ts'
 import type { Copy } from 'mithaq-admin/copy.ts'
 import type { Places } from 'mithaq-admin/screen-refs.ts'
 import { solidDestructive } from 'mithaq-admin/delete-button.tsx'
@@ -101,7 +102,7 @@ export function BulkChoice({
   readOnly: boolean
   value: unknown
 }): ReactElement {
-  const word = (held: boolean) => t(`${kayan.name}.${field.name}.${held}`) ?? (held ? t('admin.yes', 'Yes') : t('admin.no', 'No')) ?? String(held)
+  const word = (held: boolean) => booleanWord({ kayan, field, value: held, t })
   const keep = t('admin.leaveAsIs', 'Leave as is') ?? 'Leave as is'
   const current = typeof value === 'boolean' ? String(value) : 'keep'
   return (

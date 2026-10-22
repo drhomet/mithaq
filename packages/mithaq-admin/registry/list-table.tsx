@@ -245,7 +245,7 @@ export function ListTable({
                         {field === linked && opens ? (
                           // A real link, so it opens in a new tab and lists for a reader, but out of the tab
                           // order since the row is the stop. An untitled row's name holds the visible text.
-                          <a href={to} data-row-link={id} tabIndex={-1} aria-label={untitled ? (t('admin.openEmpty', locale === 'ar' ? 'فارغ، فتح' : 'Empty, open') ?? 'Empty, open') : undefined} className="font-medium hover:underline">
+                          <a href={to} data-row-link={id} tabIndex={-1} aria-label={untitled ? (t('admin.openEmpty', 'Empty, open') ?? 'Empty, open') : undefined} className="font-medium hover:underline">
                             {cell}
                           </a>
                         ) : (

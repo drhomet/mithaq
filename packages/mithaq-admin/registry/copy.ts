@@ -82,3 +82,7 @@ export const titleOf = ({ kayan, copy: { t }, many = false }: { kayan: Pick<Clie
  */
 export const newTitleOf = ({ kayan, copy }: { kayan: Pick<ClientKayan, 'name'>; copy: Copy }): string =>
   copy.t(`${kayan.name}.new`) ?? (copy.t('admin.createTitle', 'Create {kind}') ?? 'Create {kind}').replace('{kind}', () => titleOf({ kayan, copy }))
+
+/** The declared checkbox words, then the host's yes or no. */
+export const booleanWord = ({ kayan, field, value, t }: { kayan: ClientKayan; field: ClientField; value: boolean; t: Translate }): string =>
+  t(`${kayan.name}.${field.name}.${value}`) ?? t(value ? 'admin.yes' : 'admin.no', value ? 'Yes' : 'No') ?? (value ? 'Yes' : 'No')
