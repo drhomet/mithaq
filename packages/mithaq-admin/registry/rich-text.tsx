@@ -19,7 +19,7 @@ export function RichTextControl(props: ControlProps): ReactElement {
   const { describedBy, error, id, locale, placeholder, readOnly, t, value } = props
   const direction = useDirection() === 'rtl' ? 'rtl' : 'ltr'
   const change = changeOf(props)
-  if (readOnly) return <RichTextViewer value={value} direction={direction} t={t} id={id} describedBy={describedBy} />
+  if (readOnly) return <RichTextViewer value={value} direction={direction} t={t} id={id} describedBy={describedBy} field={props.field.name} policy={props.field.richTextPolicy} />
   return (
     <RichTextEditor
       value={value}
@@ -38,8 +38,8 @@ export function RichTextControl(props: ControlProps): ReactElement {
 }
 
 /** The `richText` kind's cell: its first worded block on one line in a row, and the viewer on a record page. */
-export function RichTextCell({ value, t, whole }: CellProps): ReactNode {
-  if (whole) return <RichTextValueView value={value} t={t} />
+export function RichTextCell({ value, t, whole, field }: CellProps): ReactNode {
+  if (whole) return <RichTextValueView value={value} t={t} field={field.name} policy={field.richTextPolicy} />
   const line = richTextLine(value)
   // min-w-48 keeps a phone-width table from squeezing the words to one per line.
   return line ? <span dir="auto" className="line-clamp-2 min-w-48 whitespace-normal">{line}</span> : noValue

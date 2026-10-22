@@ -23,6 +23,7 @@ export type Kind<Value = unknown, RuleName extends string = string> = {
   /** `false` where a value of this kind cannot order a page. */
   sortable?: false
   /** The installed tools a rich-text field may narrow. */
+  richTextComments?: import('../rich-text/features.ts').RichTextCommentOptions
   richTextPolicy?: import('../rich-text/features.ts').RichTextPolicy
   /** `true` where a value of this kind is the id of another row, named by `relationTo`. */
   pointsAtRow?: true

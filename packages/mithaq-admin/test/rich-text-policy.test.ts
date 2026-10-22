@@ -11,7 +11,7 @@ import type { RichTextPolicy, RichTextValue } from 'mithaq/rich-text'
 
 const { RichTextEditor } = await import('../registry/rich-text-editor.tsx')
 const { defaultNodes, richText, richTextFeatureGuard } = await import('mithaq/rich-text')
-const { $getRoot } = await import('lexical')
+const { $getRoot, $createTextNode } = await import('lexical')
 const { $generateNodesFromDOM } = await import('@lexical/html')
 const t = (_key: string, fallback?: string) => fallback
 const legacy = JSON.parse(readFileSync(new URL('../../mithaq/src/rich-text/__fixtures__/legacy-formatting-034.json', import.meta.url), 'utf8'))
@@ -149,4 +149,39 @@ test('the mounted link popover follows a scrolling ancestor', async () => {
     assert.equal(anchor.style.top, '130px', 'the popover anchor follows the link by the scroll distance')
     assert.equal(anchor.style.left, '40px')
   } })
+})
+
+test('the mentions add-on writes emoji as text and Arabic hashtags as hashtag nodes', async () => {
+  await withEditor({ policy: { features: ['mentions'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    await act(async () => editor.update(() => {
+      const paragraph = $getRoot().getFirstChildOrThrow() as import('lexical').ParagraphNode
+      paragraph.append($createTextNode('مرحبا :smile: بكم').setFormat('bold'))
+      paragraph.selectEnd()
+    }))
+    const saved = JSON.stringify(changes.at(-1))
+    assert.ok(saved.includes('😀'))
+    assert.ok(!saved.includes('"type":"emoji"'))
+    await act(async () => editor.update(() => {
+      const text = $getRoot().getAllTextNodes().at(-1)!
+      text.spliceText(text.getTextContentSize(), 0, ' #العربية')
+    }))
+    assert.ok(JSON.stringify(changes.at(-1)).includes('"type":"hashtag"'))
+  } })
+})
+
+test('a mention viewer removes its link when a fresh record read is refused', async () => {
+  const { ScreenContext } = await import('mithaq/admin/react')
+  const { RichTextViewer } = await import('../registry/rich-text-viewer.tsx')
+  const host = mount(), root = createRoot(host)
+  const value = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'mention', kayan: 'tags', id: 'dummy-tag', name: 'Snapshot', text: '@Snapshot', version: 1 }] }] } }
+  const state = (allowed: boolean) => ({ dir: 'ltr', screen: { path: '/dashboard', kayan: { tags: { fields: [], pages: { edit: { path: '/tags/:id' } } } } }, client: async () => { if (!allowed) throw new Error('Forbidden'); return { id: 'dummy-tag' } } }) as any
+  const render = (allowed: boolean) => root.render(createElement(ScreenContext, { value: state(allowed) }, createElement(RichTextViewer, { value, direction: 'ltr', t })))
+  try {
+    await act(async () => { render(true); await sleep(100) })
+    await act(async () => sleep(100))
+    assert.equal(host.querySelector('a')?.getAttribute('href'), '/dashboard/tags/dummy-tag')
+    await act(async () => { render(false); await sleep(100) })
+    assert.equal(host.querySelector('a')?.getAttribute('href'), null)
+    assert.ok(host.textContent?.includes('@Snapshot'))
+  } finally { await act(async () => root.unmount()); host.remove() }
 })

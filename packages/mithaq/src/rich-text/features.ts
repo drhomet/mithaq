@@ -2,17 +2,22 @@ import type { RichTextNode } from './value.ts'
 
 /** The existing editor's choices, named so a project can spread or narrow them. */
 export const defaultRichTextFeatures = ['bold', 'italic', 'underline', 'strikethrough', 'inlineCode', 'subscript', 'superscript', 'highlight', 'lowercase', 'uppercase', 'capitalize', 'headings', 'lists', 'checklist', 'quote', 'divider', 'link', 'alignment', 'indent', 'upload', 'direction'] as const
-export const richTextFeatures = [...defaultRichTextFeatures, 'tables', 'code', 'styling', 'markdown', 'counter'] as const
+export const richTextFeatures = [...defaultRichTextFeatures, 'tables', 'code', 'styling', 'markdown', 'counter', 'mentions', 'findReplace', 'comments'] as const
 export type RichTextFeature = typeof richTextFeatures[number]
 export const richTextColors = { default: 'inherit', primary: 'var(--primary)', muted: 'var(--muted-foreground)', destructive: 'var(--destructive)' } as const
 export const richTextSizes = { small: '0.875em', normal: '1em', large: '1.25em' } as const
 export const richTextFonts = { sans: 'var(--font-sans, sans-serif)', serif: 'var(--font-serif, serif)', mono: 'var(--font-mono, monospace)' } as const
 export type RichTextFont = keyof typeof richTextFonts
 export const defaultRichTextFonts = ['sans', 'serif', 'mono'] as const
-export type RichTextPolicy = { features: readonly RichTextFeature[]; fonts: readonly RichTextFont[] }
+export type MentionSource = { readonly kayan: string; readonly title: string; readonly members?: string; readonly page?: string }
+export const defaultMentionSources = [{ kayan: 'member', title: 'userId.name', members: 'user', page: 'member' }] as const
+export type RichTextCommentOptions = { readonly threads: string; readonly context?: (args: { request: Request; actor: unknown }) => Record<string, unknown> | Promise<Record<string, unknown>> }
+export type RichTextPolicy = { features: readonly RichTextFeature[]; fonts: readonly RichTextFont[]; mentionSources?: readonly MentionSource[]; comments?: { readonly threads: string } }
 
 /** Reject policy typos before generation or a first write, even in untyped config. */
-export const checkRichTextPolicy = ({ features, fonts }: RichTextPolicy) => {
+export const checkRichTextPolicy = ({ features, fonts, mentionSources, comments }: RichTextPolicy) => {
+  if (mentionSources && (!Array.isArray(mentionSources) || !mentionSources.length || mentionSources.some((source) => !source || typeof source.kayan !== 'string' || !source.kayan || source.kayan.length > 100 || typeof source.title !== 'string' || !source.title || source.title.length > 255) || new Set(mentionSources.map((source) => source.kayan)).size !== mentionSources.length)) throw new Error('Mention sources name distinct kayan and their title fields.')
+  if (features.includes('comments') && (!comments || typeof comments.threads !== 'string' || !comments.threads)) throw new Error('Comments require a declared threads kayan.')
   if (!Array.isArray(features) || features.some((one) => !richTextFeatures.includes(one)) || new Set(features).size !== features.length) throw new Error('Rich text features must be distinct installed feature names.')
   if (!Array.isArray(fonts) || !fonts.length || fonts.some((one) => !Object.hasOwn(richTextFonts, one)) || new Set(fonts).size !== fonts.length) throw new Error('Rich text fonts must be distinct names from sans, serif and mono.')
 }
@@ -21,7 +26,7 @@ export const richTextFormatBits = { bold: 1, italic: 2, strikethrough: 4, underl
 export const allRichTextFormats = Object.values(richTextFormatBits).reduce((mask, bit) => mask | bit, 0)
 export const richTextFormatMask = (policy: RichTextPolicy) => Object.entries(richTextFormatBits).reduce((bits, [name, bit]) => bits | (policy.features.includes(name as RichTextFeature) ? bit : 0), 0)
 export const richTextChoiceFeatures: Readonly<Record<string, RichTextFeature | undefined>> = { bold: 'bold', italic: 'italic', underline: 'underline', strikethrough: 'strikethrough', code: 'inlineCode', subscript: 'subscript', superscript: 'superscript', highlight: 'highlight', lowercase: 'lowercase', uppercase: 'uppercase', capitalize: 'capitalize', h1: 'headings', h2: 'headings', h3: 'headings', number: 'lists', bullet: 'lists', check: 'checklist', quote: 'quote', horizontalRule: 'divider', image: 'upload', upload: 'upload' }
-const nodeFeatures: Record<string, RichTextFeature> = { heading: 'headings', list: 'lists', listitem: 'lists', quote: 'quote', horizontalrule: 'divider', link: 'link', autolink: 'link', upload: 'upload', table: 'tables', tablerow: 'tables', tablecell: 'tables', code: 'code', 'code-highlight': 'code' }
+const nodeFeatures: Record<string, RichTextFeature> = { heading: 'headings', list: 'lists', listitem: 'lists', quote: 'quote', horizontalrule: 'divider', link: 'link', autolink: 'link', upload: 'upload', table: 'tables', tablerow: 'tables', tablecell: 'tables', code: 'code', 'code-highlight': 'code', mention: 'mentions', hashtag: 'mentions', mark: 'comments' }
 
 export const richTextCodeLanguages = ['javascript', 'typescript', 'json', 'css', 'markup', 'python'] as const
 export const richTextBlockTypes: readonly string[] = ['paragraph', 'heading', 'quote', 'list', 'listitem', 'table', 'tablerow', 'tablecell', 'code']
@@ -33,6 +38,15 @@ export const richTextFeatureGuard = ({ node, policy }: { node: RichTextNode; pol
   const has = (feature: RichTextFeature) => features.includes(feature)
   const needed = richTextNodeFeature(node)
   if (needed && !has(needed) && !(node.type === 'listitem' && has('checklist'))) return `The field does not allow the ${needed} feature.`
+  if (node.type === 'mention') {
+    const sources = policy.mentionSources ?? defaultMentionSources
+    if (!sources.some((source) => source.kayan === node.kayan)) return 'A mention must name a declared source.'
+    if (typeof node.id !== 'string' || !node.id || node.id.length > 255 || typeof node.name !== 'string' || !node.name || node.text !== `@${node.name}`) return 'A mention carries its record id and its original name.'
+    if (Object.keys(node).some((key) => !['type', 'version', 'text', 'format', 'style', 'mode', 'detail', '$', 'kayan', 'id', 'name'].includes(key))) return 'A mention stores no link or other metadata.'
+  }
+  if (node.type === 'hashtag' && (typeof node.text !== 'string' || !/^#[\p{L}\p{M}\p{N}_]+$/u.test(node.text))) return 'A hashtag holds its text beginning with #.'
+  if (node.type === 'mark' && Object.keys(node).some((key) => !['type', 'version', 'ids', 'children', 'format', 'direction', 'indent', 'textFormat', 'textStyle'].includes(key))) return 'A comment mark stores only a thread id and its marked text.'
+  if (node.type === 'mark' && (!Array.isArray(node.ids) || node.ids.length !== 1 || typeof node.ids[0] !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(node.ids[0]))) return 'A comment mark carries exactly one thread id.'
   if (node.type === 'heading' && !['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(String(node.tag))) return 'A heading must be h1 through h6.'
   if (node.type === 'list' && (!['number', 'bullet', 'check'].includes(String(node.listType)) || (node.listType === 'check' && !has('checklist')))) return 'The field does not allow this list type.'
   if (typeof node.text === 'string') {

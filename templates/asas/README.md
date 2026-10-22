@@ -1106,7 +1106,7 @@ Never point tests at a database you want to keep. A project made by `bun create 
 
 ## Selecting rich text tools
 
-`bun create mithaq my-app --rich-text=tables,code,styling,markdown,counter`
+`bun create mithaq my-app --rich-text=tables,code,styling,markdown,counter,mentions,findReplace,comments`
 installs the rich-text add-on with those optional tools. `--with rich-text`
 keeps the existing tool set and refreshed toolbar. The generated
 `packages/mithaq/src/mithaq/rich-text-features.ts` names the installed features
@@ -1125,7 +1125,8 @@ remain optional for a project that does not use rich text at all.
 
 Install `@lexical/table@0.52.0` and `@lexical/code-core@0.52.0` in the language
 workspace. Install those two plus `@lexical/code-prism@0.52.0` and
-`@lexical/markdown@0.52.0` in every host that imports the editor. Retain the
+`@lexical/markdown@0.52.0`, `@lexical/mark@0.52.0` and
+`@lexical/hashtag@0.52.0` in every host that imports the editor. Retain the
 existing Lexical peers and the project's UploadNode and upload plugin.
 
 Create `src/mithaq/rich-text-features.ts` in the language workspace, as the

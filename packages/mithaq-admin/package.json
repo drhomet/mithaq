@@ -44,7 +44,9 @@
     "@lexical/table": "0.52.0",
     "@lexical/code-core": "0.52.0",
     "@lexical/markdown": "0.52.0",
-    "@lexical/code-prism": "0.52.0"
+    "@lexical/code-prism": "0.52.0",
+    "@lexical/mark": "0.52.0",
+    "@lexical/hashtag": "0.52.0"
   },
   "peerDependenciesMeta": {
     "better-auth": {
@@ -84,6 +86,12 @@
       "optional": true
     },
     "@lexical/code-prism": {
+      "optional": true
+    },
+    "@lexical/mark": {
+      "optional": true
+    },
+    "@lexical/hashtag": {
       "optional": true
     }
   },
@@ -126,6 +134,8 @@
     "@lexical/code-core": "0.52.0",
     "@lexical/markdown": "0.52.0",
     "@lexical/code-prism": "0.52.0",
-    "@lexical/html": "0.52.0"
+    "@lexical/html": "0.52.0",
+    "@lexical/mark": "0.52.0",
+    "@lexical/hashtag": "0.52.0"
   }
 }

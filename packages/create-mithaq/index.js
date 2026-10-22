@@ -86,6 +86,9 @@ export const addOns = {
     copy: ['kinds.richText', 'kinds.richText.invalid'],
     tables: false,
   },
+  'rich-text-mentions': { needs: ['rich-text'], files: [], without: [], packages: [], copy: [], tables: false },
+  'rich-text-find-replace': { needs: ['rich-text'], files: [], without: [], packages: [], copy: [], tables: false },
+  'rich-text-comments': { needs: ['rich-text', 'audit-log'], files: ['packages/features/rich-text-comments', 'packages/asas/src/messages/richTextThreads.json'], without: [], packages: [], copy: [], tables: true },
   // The `upload` kind, the storage target and its adapters.
   uploads: { needs: [], files: ['packages/mithaq/src/storage'], without: [], packages: ['aws4fetch', 'file-type', 'image-dimensions'], copy: ['kinds.upload', 'kinds.upload.invalid'], tables: false },
   // The organization's images, which an upload field points at.
@@ -103,7 +106,8 @@ export const addOns = {
   backoffice: { needs: [], files: ['apps/asas-backoffice'], without: [], packages: [], copy: [], tables: false },
 }
 
-export const optionalRichTextFeatures = ['tables', 'code', 'styling', 'markdown', 'counter']
+export const richTextFeatureAddOns = { mentions: 'rich-text-mentions', findReplace: 'rich-text-find-replace', comments: 'rich-text-comments' }
+export const optionalRichTextFeatures = ['tables', 'code', 'styling', 'markdown', 'counter', 'mentions', 'findReplace', 'comments']
 export function resolveRichTextFeatures(asked = []) {
   if (asked.some((name) => !optionalRichTextFeatures.includes(name)) || new Set(asked).size !== asked.length) throw new Error(`--rich-text names distinct features: ${optionalRichTextFeatures.join(', ')}.`)
   return asked
@@ -350,7 +354,8 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   if (!['monorepo', 'single'].includes(layout)) throw new Error(`The layout is monorepo or single, not "${layout}".`)
   if (!['admin', 'email'].includes(passwordDelivery)) throw new Error('--password-delivery is admin or email.')
   const features = resolveRichTextFeatures(richTextAsked)
-  const { chosen } = resolveAddOns([...asked, ...(richTextAsked !== undefined ? ['rich-text'] : [])])
+  for (const [feature, addOn] of Object.entries(richTextFeatureAddOns)) if (asked.includes(addOn) && !features.includes(feature)) features.push(feature)
+  const { chosen } = resolveAddOns([...asked, ...(richTextAsked !== undefined ? ['rich-text'] : []), ...features.flatMap((feature) => richTextFeatureAddOns[feature] ? [richTextFeatureAddOns[feature]] : [])])
   const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName, passwordDelivery })
   const backoffice = chosen.includes('backoffice')
   if (layout === 'single' && backoffice) throw new Error('A single package serves the tenant app alone. Choose the monorepo layout to include the backoffice console.')
@@ -423,7 +428,7 @@ const help = `Usage: create-mithaq [name] [options]
   --layout monorepo   the language, each feature, the asas and each app as workspace packages (the default)
   --layout single     one package holding the language, the features, the asas and the tenant app
   --with <a,b>        the add-ons to hold beside auth and the tags example, with every one they need
-  --rich-text=tables,code,styling,markdown,counter  Install optional rich-text tools
+  --rich-text=tables,code,styling,markdown,counter,mentions,findReplace,comments  Install optional rich-text tools
   --full              every add-on: the whole worked example (a single package leaves out backoffice)
   --password-delivery admin|email
                       admin copies or shares password links (default); email sends through Resend

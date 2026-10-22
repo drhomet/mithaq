@@ -45,7 +45,9 @@
     "@lexical/table": "0.52.0",
     "@lexical/code-core": "0.52.0",
     "@lexical/markdown": "0.52.0",
-    "@lexical/code-prism": "0.52.0"
+    "@lexical/code-prism": "0.52.0",
+    "@lexical/mark": "0.52.0",
+    "@lexical/hashtag": "0.52.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",

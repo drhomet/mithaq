@@ -133,6 +133,8 @@ export type RuntimeField = Named & {
   kind: string
   features?: readonly import('../rich-text/features.ts').RichTextFeature[]
   richTextPolicy?: import('../rich-text/features.ts').RichTextPolicy
+  /** Internal thread declaration, resolved by the build before any write. */
+  commentThreads?: ResolvedKayan
   rules?: Record<string, unknown>
   relationTo?: string | (() => Kayan)
   hasMany?: true

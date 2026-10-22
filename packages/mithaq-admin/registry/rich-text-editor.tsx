@@ -67,7 +67,7 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   return (
     <div className="border-input bg-background overflow-clip rounded-lg border shadow-xs" dir={direction} data-rich-text={id}>
       <LexicalComposer initialConfig={initial}>
-        <ToolbarRow t={t} locale={locale} picks={allowedPicks} setLinkEditMode={setIsLinkEditMode} direction={direction} policy={policy} extras={modules.map(({ Buttons }, index) => Buttons ? <Buttons key={index} policy={policy} locale={locale} t={t} /> : null)} />
+        <ToolbarRow t={t} locale={locale} picks={allowedPicks} setLinkEditMode={setIsLinkEditMode} direction={direction} policy={policy} extras={modules.map(({ Buttons }, index) => Buttons ? <Buttons key={index} policy={policy} locale={locale} t={t} control={control} /> : null)} />
         <div className="relative" ref={setAnchor}>
           <RichTextPlugin
             contentEditable={
@@ -101,9 +101,9 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
         <FloatingLinkEditorPlugin anchorElem={anchor} isLinkEditMode={isLinkEditMode} setIsLinkEditMode={setIsLinkEditMode} t={t} />
         <HorizontalRulePlugin />
         <SlashMenu locale={locale} picks={allowedPicks} />
-        <FloatingToolbar policy={policy} locale={locale} t={t} setLinkEditMode={setIsLinkEditMode} />
+        <FloatingToolbar extras={modules.map(({ SelectionButtons }, index) => SelectionButtons ? <SelectionButtons key={index} policy={policy} locale={locale} t={t} control={control} /> : null)} policy={policy} locale={locale} t={t} control={control} setLinkEditMode={setIsLinkEditMode} />
         <PolicyPlugin policy={policy} />
-        {modules.map(({ Plugin }, index) => Plugin ? <Plugin key={index} policy={policy} locale={locale} t={t} /> : null)}
+        {modules.map(({ Plugin }, index) => Plugin ? <Plugin key={index} policy={policy} locale={locale} t={t} control={control} /> : null)}
         {Plugin && control ? <Plugin {...control} /> : null}
       </LexicalComposer>
     </div>

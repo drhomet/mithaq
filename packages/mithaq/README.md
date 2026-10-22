@@ -1115,3 +1115,94 @@ document uses, so narrowing a field cannot erase its older document.
 Before emitting a write, the editor removes unsupported paste formatting, clears
 free CSS and table dimensions, unwraps disallowed links and normalizes unknown
 code languages. The same field guard checks emitted JSON before save.
+
+### Mentions, emoji and hashtags
+
+Install `mentions` in the project's feature list, or use
+`create-mithaq --rich-text=mentions`. A field may leave it out of its own
+`features`. The add-on provides an `@` picker, a small emoji palette and
+`:smile:`, `:heart:`, `:thumbsup:`, `:check:` and `:tada:` shortcodes. Emoji
+remain ordinary text. Hashtags use Lexical hashtag nodes and accept Arabic.
+No emoji database is bundled.
+
+`mentionSources` declares the sources. Its default is `defaultMentionSources`,
+the organization's members through the project's Better Auth `user` provider.
+That provider's normal member-list permissions apply. The default member
+source names the screen's `member` page, checks its permission, and resolves
+the membership to its user through a fresh scoped provider read before linking. A different provider
+name can be passed as `members`. Other sources use their normal managed
+`find` operation with the reader's permissions, tenant and field masking.
+
+```ts
+richText({
+  nodes: richTextNodes,
+  features: [...defaultRichTextFeatures, 'mentions'],
+  mentionSources: [
+    ...defaultMentionSources,
+    { kayan: 'tags', title: 'name' },
+  ],
+})
+```
+
+A mention stores `type: 'mention'`, `kayan`, `id`, `name` and `text: '@' + name`,
+alongside Lexical's text metadata. The name is the snapshot at insertion.
+The server refuses sources outside the declaration. A viewer adds a link only
+after `findByID` admits that record and the current screen declares an edit
+page. Otherwise it keeps the snapshot as plain text. Read failures never
+expose another record's title.
+
+### Find and replace
+
+Install `findReplace`, or pass `--rich-text=findReplace`. The toolbar button
+and Ctrl/Cmd+F inside an editable editor open a panel with case matching,
+whole words, previous/next, replace and replace all. Unicode word segmentation
+handles Arabic. Matches can cross formatting runs but stop at blocks, line
+breaks and atomic record mentions. Replacements are literal. The search state
+is never stored in the document.
+
+### Comments
+
+Use `create-mithaq --rich-text=comments`, or add the `rich-text-comments`
+add-on. This also installs rich text and the audit log. It declares a private
+`richTextThreads` kayan in the same store as the tenant-owned records it
+annotates. Shared records cannot carry tenant-owned thread marks. Its
+migration is generated and applied through the normal `mithaq migrate` flow.
+The worked example's course details use the project's installed tools, so
+selecting comments enables them there too.
+
+Existing projects declare the table from the starter's
+`templates/features/rich-text-comments/threads/threads.ts`, include it in
+`buildAsas`, and name it in their rich-text config:
+
+```ts
+richText({
+  nodes: richTextNodes,
+  features: [...defaultRichTextFeatures, 'comments'],
+  comments: { threads: 'richTextThreads' },
+})
+```
+
+The table declares no public operations. Core serves
+`/api/rich-text/comments/<kayan>/<record>/<field>`. GET lists a page of 100
+threads; `page` selects the next page. POST takes `action` and the relevant
+`thread`, `comment`, `text` or `quote`. Actions are create, reply, edit, delete,
+resolve and reopen. POST requires this host's Origin header. The record's
+managed read must expose the field. Every write also checks the record's
+update operation and field access. Only the comment's author may edit or
+delete it. Every write and its configured audit sink share one transaction.
+A project without an audit sink cannot enable comments. If the service
+declares request context, pass `comments.context: ({ request, actor }) =>
+requestContext(request)` alongside `threads`; the audit sink and nested record
+reads receive that context. This function stays on the server.
+
+Select unmarked text, open Comments and add a comment. Save the record to
+persist the mark. Marks store only a thread id and the marked text. Server
+writes reject a thread from another tenant, record or field. A new record must
+be saved before it can have threads. Overlapping selections use the existing
+thread's replies. Open and resolved threads remain in the panel when their
+marked text is deleted; such threads are shown as orphaned. A read-only
+viewer also offers the panel, including orphaned threads.
+
+Comments store plain text, at most 4000 characters per comment and 1000
+comments per thread. Projects with rich text also install `@lexical/mark` and
+`@lexical/hashtag` at the same 0.52.0 version as the other Lexical peers.

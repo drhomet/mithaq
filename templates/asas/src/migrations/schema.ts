@@ -18,6 +18,7 @@ export const {
   roles,
   memberRoles,
   tags,
+  richTextThreads,
   media,
   courses,
   sessions,

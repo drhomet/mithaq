@@ -2,6 +2,7 @@
 // whatever the project's access, authorizer or steps answer. Run on the memory store and on Postgres.
 // First, so the template's storage reads its folder from it.
 import './test-storage-dir.ts'
+import './tenant-comments.support.ts'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, before, describe, test } from 'node:test'

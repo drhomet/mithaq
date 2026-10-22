@@ -19,6 +19,8 @@ import type { BuiltTables } from '../drizzle/index.ts'
 import { screensOf, type ScreenClient } from '../screen/index.ts'
 import { messagesOf, type MessageRegistry, type MessagesResolver } from '../mithaq/messages.ts'
 import { resolve } from '../mithaq/resolve.ts'
+import { defaultMentionSources } from '../rich-text/features.ts'
+import { commentService } from '../rich-text/comments-server.ts'
 import { recordStorage, resolveStorage, storageRoutes } from '../storage/storage.ts'
 
 type UniqueNames<List extends readonly Kayan[], Seen = never> = List extends readonly [
@@ -701,6 +703,17 @@ export const buildAsas = <
   }
   const registered = new Map(declared.map((one) => [one.name, one]))
   const resolvedByName = new Map(resolved.map((one) => [one.name, one]))
+  for (const one of resolved) for (const field of Object.values(one.fields)) {
+    const policy = field.richTextPolicy
+    if (policy && (field.features ?? policy.features).includes('mentions')) for (const source of policy.mentionSources ?? defaultMentionSources) if (!resolvedByName.has(source.kayan)) throw new Error(`Mention source "${source.kayan}" names no kayan of this build.`)
+    if (!policy || !(field.features ?? policy.features).includes('comments')) continue
+    if (!one.tenant) throw new Error('Comments require a tenant-owned record.')
+    if (service.context !== undefined && !language.kinds[field.kind]?.richTextComments?.context) throw new Error('Comments require their request context function when the service declares context.')
+    const threads = policy.comments && resolvedByName.get(policy.comments.threads)
+    if (!threads?.tenant || threads.store !== one.store || Object.keys(threads.operations).length || !service.audit) throw new Error('Comments require a private tenant threads kayan in the record store and an audit sink.')
+    for (const key of ['recordKayan', 'recordId', 'field', 'quote', 'resolved', 'comments', 'createdAt', 'updatedAt']) if (!threads.fields[key]) throw new Error(`Comment threads declare no "${key}" field.`)
+    field.commentThreads = threads
+  }
   // Wired here, not inside one provider, so no provider is a second source of keys for
   // another. A target that throws takes the whole answer: half an answer is an unresolved grant.
   const buildTargets: Record<string, unknown> = { ...language.targets }
@@ -1071,6 +1084,20 @@ export const buildAsas = <
       })
     : undefined
 
+  const comments = resolved.some((one) => Object.values(one.fields).some((field) => field.commentThreads)) ? commentService({
+    kayans: resolvedByName,
+    context: language.kinds.richText?.richTextComments?.context,
+    storeOf: (one) => buildTargets[one.store] as Store,
+    read: async ({ kayan, id, actor }) => {
+      const read = (built[kayan]?.operations as Record<string, ((input: unknown, options: unknown) => Promise<unknown>) | undefined>)?.findByID
+      return read ? await read({ id, depth: 0 }, { actor }) as Record<string, unknown> | null : null
+    },
+    authorize, admin: admin as ManagedAdmin, tenantOf: tenant.active,
+    audit: service.audit as AuditHandler,
+    maxBodyBytes: 32 * 1024,
+    onError,
+  }) : undefined
+
   const asas = {
     /** Every permission key this project has: one `<kayan>.<operation>` per operation, one `<kayan>.fields.<field>` per field, one `screen.<screen>` per screen. */
     catalog: catalog as readonly string[],
@@ -1134,6 +1161,8 @@ export const buildAsas = <
         })
       }
       // The handler's own for the reason the report is.
+      const commented = await comments?.handle(request, who)
+      if (commented) return commented
       const filed = await storageServe?.(request, who)
       if (filed) return filed
       // The auth arm first, since `resolve` reserves `auth` under the same `/api`. A plug that

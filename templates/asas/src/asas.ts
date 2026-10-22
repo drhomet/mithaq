@@ -17,6 +17,9 @@ import * as roles from '@asas/roles'
 // add-on: settings
 import * as settings from '@asas/settings'
 // end add-on: settings
+// add-on: rich-text-comments
+import * as richTextComments from '@asas/rich-text-comments'
+// end add-on: rich-text-comments
 import * as tags from '@asas/tags'
 import { defaultMaxBodyBytes, fetchHttp, Notice } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
@@ -40,6 +43,9 @@ export const asas = buildAsas({
     ...roles.kayan,
     // end add-on: roles
     ...tags.kayan,
+    // add-on: rich-text-comments
+    ...richTextComments.kayan,
+    // end add-on: rich-text-comments
     // add-on: media
     // An image is read by a holder of `media.create`, and otherwise through
     // what the features pointing at images say of it.

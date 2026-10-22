@@ -321,6 +321,7 @@ type Names = Expect<
     | 'memberRoles'
     | 'organization'
     | 'organizationRole'
+    | 'richTextThreads'
     | 'roles'
     | 'session'
     | 'sessions'

@@ -1,4 +1,5 @@
 // One list in one place, so drizzle's callback transaction is kept as it is.
+import { commentMarks } from '../../rich-text/comments-server.ts'
 import { stepTools } from './store.ts'
 import { rowsOfField, type Rows } from '../../mithaq/rows.ts'
 import { heldPermissions } from '../../rbac/index.ts'
@@ -568,10 +569,11 @@ const validateTenantRelationships = async <Actor>(
 const keyIn = (kayan: ResolvedKayan) => (value: unknown) =>
   kayan.fields.id?.kind === 'uuid' && typeof value === 'string' ? value.toLowerCase() : value
 
-export const assertReferences = async ({ kayan, store, data, tenant, access, offered, tx }: {
+export const assertReferences = async ({ kayan, store, data, tenant, access, offered, tx, id = data.id }: {
   kayan: ResolvedKayan
   store: Pick<Store, 'find'>
   data: Record<string, unknown>
+  id?: unknown
   /** The organization the written row belongs to, or the active one where the row belongs to none. */
   tenant: unknown
   /** What else the target's row must meet: its read access for this actor. */
@@ -581,6 +583,19 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
   tx?: unknown
 }) => {
   const own = kayan.tenant
+  for (const field of Object.values(kayan.fields)) {
+    const value = data[field.name]
+    if (value == null || !field.richTextPolicy) continue
+    const ids = [...commentMarks(value)]
+    if (!ids.length) continue
+    const target = field.commentThreads
+    if (!target?.tenant || !tenant || !id) throw invalid({ message: 'Comment marks require a saved record and its declared threads.', key: 'error.invalid.comment_thread' })
+    const found = await store.find({ tx, kayan: target.name, args: { limit: ids.length, page: 1, lock: 'keyShare', sort: { field: 'id', direction: 'asc' }, where: { and: [
+      { id: { in: ids } }, { [target.tenant]: { equals: tenant as Scalar } },
+      { recordKayan: { equals: kayan.name } }, { recordId: { equals: String(id) } }, { field: { equals: field.name } },
+    ] } } })
+    if (found.docs.length !== ids.length) throw invalid({ message: 'A comment mark must name a thread of this tenant, record and field.', key: 'error.invalid.comment_thread' })
+  }
   // Gathered per target, so two fields at one kayan and a whole `hasMany` set are one read; a
   // field whose options are its own is read apart.
   const targets = new Map<ResolvedKayan | ResolvedField, { target: ResolvedKayan; sets: { field: string; value: unknown }[] }>()

@@ -1,3 +1,7 @@
+import { MarkNode } from '@lexical/mark'
+import { HashtagNode } from '@lexical/hashtag'
+import { MentionNode } from './mention-node.ts'
+export { MentionNode, type Mention } from './mention-node.ts'
 import { TableNode, TableRowNode, TableCellNode } from '@lexical/table'
 import { CodeNode, CodeHighlightNode } from '@lexical/code-core'
 import { jsonb } from 'drizzle-orm/pg-core'
@@ -11,7 +15,7 @@ import { isRichText, richTextGuard, richTextReader, storedRichText, type RichTex
 
 export * from './rich-text.ts'
 export * from './features.ts'
-import { checkRichTextPolicy, defaultRichTextFeatures, defaultRichTextFonts, richTextFeatureGuard, type RichTextFeature, type RichTextFont, type RichTextPolicy } from './features.ts'
+import { checkRichTextPolicy, defaultRichTextFeatures, defaultRichTextFonts, richTextFeatureGuard, type RichTextFeature, type RichTextFont, type RichTextPolicy, defaultMentionSources, type MentionSource, type RichTextCommentOptions } from './features.ts'
 
 // An emptied editor still sends a root and one empty paragraph, so a blank text
 // with no decorator is missing for `required`.
@@ -78,8 +82,9 @@ const richTextKind = ({ nodes, policy }: { nodes: readonly Klass<LexicalNode>[];
  * The rukn a project lays down for rich text, over its own node list:
  * `arkan: [base, richText({ nodes: richTextNodes })]`.
  */
-export const richText = <const Features extends readonly RichTextFeature[] = typeof defaultRichTextFeatures>({ nodes, features = defaultRichTextFeatures as unknown as Features, fonts = defaultRichTextFonts }: { nodes: readonly Klass<LexicalNode>[]; features?: Features; fonts?: readonly RichTextFont[] }) => {
-  const policy = { features, fonts }
+export const richText = <const Features extends readonly RichTextFeature[] = typeof defaultRichTextFeatures>({ nodes, features = defaultRichTextFeatures as unknown as Features, fonts = defaultRichTextFonts, mentionSources = defaultMentionSources, comments }: { nodes: readonly Klass<LexicalNode>[]; features?: Features; fonts?: readonly RichTextFont[]; mentionSources?: readonly MentionSource[]; comments?: RichTextCommentOptions }) => {
+  const policy = { features, fonts, ...(features.includes('mentions') && { mentionSources }), ...(features.includes('comments') && comments && { comments: { threads: comments.threads } }) }
   checkRichTextPolicy(policy)
-  return defineRukn({ name: 'richText', kinds: { richText: { ...richTextKind({ nodes: [...nodes, ...(features.includes('tables') ? [TableNode, TableRowNode, TableCellNode] : []), ...(features.includes('code') ? [CodeNode, CodeHighlightNode] : [])], policy }), richTextPolicy: policy } } })
+  if (comments?.context !== undefined && typeof comments.context !== 'function') throw new Error('Comments context must be a function.')
+  return defineRukn({ name: 'richText', kinds: { richText: { ...richTextKind({ nodes: [...nodes, ...(features.includes('mentions') ? [MentionNode, HashtagNode] : []), ...(features.includes('comments') ? [MarkNode] : []), ...(features.includes('tables') ? [TableNode, TableRowNode, TableCellNode] : []), ...(features.includes('code') ? [CodeNode, CodeHighlightNode] : [])], policy }), richTextPolicy: policy, ...(comments && { richTextComments: comments }) } } })
 }

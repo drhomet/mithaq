@@ -1,0 +1,124 @@
+{
+  "comments": {
+    "$value": {
+      "ar": "التعليقات",
+      "en": "Comments"
+    },
+    "invalid": {
+      "ar": "هذه ليست بيانات JSON يقبلها هذا الحقل.",
+      "en": "This is not JSON this field takes."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
+  },
+  "field": {
+    "$value": {
+      "ar": "الحقل",
+      "en": "Field"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
+  },
+  "id": {
+    "invalid": {
+      "ar": "هذا ليس معرفا فريدا.",
+      "en": "This is not a unique identifier."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
+  },
+  "organization": {
+    "ar": "المؤسسة",
+    "en": "Organization"
+  },
+  "plural": {
+    "ar": "سلاسل التعليقات",
+    "en": "Comment threads"
+  },
+  "quote": {
+    "$value": {
+      "ar": "النص المحدد",
+      "en": "Selected text"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
+  },
+  "recordId": {
+    "$value": {
+      "ar": "السجل",
+      "en": "Record"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
+  },
+  "recordKayan": {
+    "$value": {
+      "ar": "الكيان",
+      "en": "Kayan"
+    },
+    "invalid": {
+      "ar": "هذا ليس نصا.",
+      "en": "This is not text."
+    },
+    "maxLength": {
+      "ar": "القيمة طويلة جدًا.",
+      "en": "The value is too long."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
+  },
+  "resolved": {
+    "$value": {
+      "ar": "محسوم",
+      "en": "Resolved"
+    },
+    "invalid": {
+      "ar": "يجاب على هذا بنعم أو لا.",
+      "en": "This is answered yes or no."
+    },
+    "required": {
+      "ar": "هذا الحقل مطلوب.",
+      "en": "This field is required."
+    }
+  },
+  "singular": {
+    "ar": "سلسلة تعليقات",
+    "en": "Comment thread"
+  }
+}

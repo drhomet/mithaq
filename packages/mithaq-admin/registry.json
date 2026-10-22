@@ -1870,6 +1870,68 @@
           "target": "@components/mithaq/rich-text-policy.tsx"
         }
       ]
+    },
+    {
+      "name": "mithaq-rich-text-mentions",
+      "type": "registry:component",
+      "registryDependencies": [
+        "button",
+        "popover"
+      ],
+      "dependencies": [
+        "@lexical/hashtag@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-mentions.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-mentions.tsx"
+        },
+        {
+          "path": "registry/rich-text-mention-access.ts",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-mention-access.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-find-replace",
+      "type": "registry:component",
+      "registryDependencies": [
+        "button",
+        "input"
+      ],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/rich-text-find-replace.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-find-replace.tsx"
+        },
+        {
+          "path": "registry/rich-text-find.ts",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-find.ts"
+        }
+      ]
+    },
+    {
+      "name": "mithaq-rich-text-comments",
+      "type": "registry:component",
+      "registryDependencies": [
+        "button",
+        "textarea"
+      ],
+      "dependencies": [
+        "@lexical/mark@0.52.0"
+      ],
+      "files": [
+        {
+          "path": "registry/rich-text-comments.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/rich-text-comments.tsx"
+        }
+      ]
     }
   ]
 }

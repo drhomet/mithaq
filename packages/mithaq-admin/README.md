@@ -553,7 +553,8 @@ formatting tools with tooltips, opens links in a popover, and offers selection
 tools on wide screens with a fine pointer. Touch users use the sticky toolbar.
 
 The control reads the field's installed feature policy from generated screens.
-Optional tables, code highlighting, styling, markdown and counters have separate
+Optional tables, code highlighting, styling, markdown, counters, mentions,
+find/replace and comments have separate
 imports. RichTextEditor callers outside generated forms can pass `policy` with
 `features` and `fonts`. Code highlighting uses Lexical's Prism adapter. Styling
 writes fixed NodeState choices, never CSS; the viewer uses the same mapping.

@@ -29,6 +29,7 @@ export const valueOf = (value: unknown): RichTextValue => {
 export const blank = (value: RichTextValue) => value.root.children.every((node) => node.type === 'paragraph' && !node.children?.length)
 
 const theme = {
+  mark: 'bg-amber-200/40 dark:bg-amber-400/20',
   paragraph: 'mb-2',
   table: 'w-full table-fixed border-collapse',
   tableScrollableWrapper: 'max-w-full overflow-x-auto',

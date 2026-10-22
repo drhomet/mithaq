@@ -6539,19 +6539,19 @@ test('185c. the viewer draws a stored value\'s heading, list and bold text over 
 test('185g. a stored node no class of the screen registers is said in the viewer\'s language, drawn read-only as its words with the node marked, and its field is left out of every save', async () => {
   const { RichTextViewer, RichTextEditor } = await import('../registry/rich-text.tsx')
   const arabic: typeof t = (key, fallback) => (key === 'admin.richText.unknownNode' ? 'يحتوي هذا النص على عقدة "{type}" لا يستطيع هذا المحرر رسمها.' : t(key, fallback))
-  const stored = richOf(blockOf('paragraph', [{ type: 'mention', version: 1, name: 'Huda', text: 'Huda' }, textOf(' joins')]), blockOf('heading', [textOf('Plan')], { tag: 'h2' }))
-  for (const [translate, locale, words] of [[t, 'en', 'a "mention" node'], [arabic, 'ar', 'عقدة "mention"']] as const) {
+  const stored = richOf(blockOf('paragraph', [{ type: 'uninstalled', version: 1, name: 'Huda', text: 'Huda' }, textOf(' joins')]), blockOf('heading', [textOf('Plan')], { tag: 'h2' }))
+  for (const [translate, locale, words] of [[t, 'en', 'a "uninstalled" node'], [arabic, 'ar', 'عقدة "uninstalled"']] as const) {
     const viewed = await render(createElement(RichTextViewer, { value: stored, direction: locale === 'ar' ? 'rtl' : 'ltr', t: translate }))
     await act(async () => sleep(20))
     assert.equal(viewed.querySelector('[role="alert"]')?.textContent?.includes(words), true, `the viewer names the type in ${locale}: ${viewed.querySelector('[role="alert"]')?.textContent}`)
-    assert.equal(viewed.querySelector('[data-unknown-node="mention"]')?.textContent, 'mention: Huda', 'the node is marked where it stands')
+    assert.equal(viewed.querySelector('[data-unknown-node="uninstalled"]')?.textContent, 'uninstalled: Huda', 'the node is marked where it stands')
     assert.equal(viewed.textContent?.includes(' joins') && viewed.textContent.includes('Plan'), true, 'and every word around it is drawn')
     assert.equal(viewed.querySelectorAll('[contenteditable]').length, 0, 'with no editor mounted')
   }
   const changes: unknown[] = []
   const edited = await render(createElement(RichTextEditor, { value: stored, onChange: (next: unknown) => void changes.push(next), direction: 'ltr', t, locale: 'en', id: 'courses-details' }))
   await act(async () => sleep(20))
-  assert.equal(edited.querySelector('[role="alert"]')?.textContent?.includes('a "mention" node'), true, 'the editor says the same')
+  assert.equal(edited.querySelector('[role="alert"]')?.textContent?.includes('a "uninstalled" node'), true, 'the editor says the same')
   assert.equal(edited.querySelectorAll('[contenteditable]').length + edited.querySelectorAll('[aria-label="Bold"]').length, 0, 'and draws no editor and no toolbar')
 
   // A page save writes the fields that changed and never this one.
@@ -6563,7 +6563,7 @@ test('185g. a stored node no class of the screen registers is said in the viewer
     value: { id: 's1', course: 'c1', capacity: 5, startsAt: new Date(2026, 0, 2, 3, 4).toISOString(), details: stored }, t, locale: 'en', onDone: () => {},
   }))
   await act(async () => sleep(20))
-  assert.equal(host.querySelector('[data-unknown-node="mention"]') !== null, true, 'the form draws the stored value read-only')
+  assert.equal(host.querySelector('[data-unknown-node="uninstalled"]') !== null, true, 'the form draws the stored value read-only')
   await act(async () => typeInto(host.querySelector('#sessions-capacity')!, '7'))
   await act(async () => fire(host.querySelector('form')!, 'submit'))
   assert.equal(saved.length, 1, 'the page still saves')

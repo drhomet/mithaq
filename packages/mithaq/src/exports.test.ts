@@ -46,7 +46,7 @@ test('no entry point but mithaq/rich-text reaches Lexical, followed through ever
 test('Lexical is an optional peer at the version the tests run, so a project without rich text installs none', () => {
   assert.deepEqual(Object.keys(manifest.dependencies).filter(lexical), [])
   const peers = Object.keys(manifest.peerDependencies).filter(lexical).sort()
-  assert.deepEqual(peers, ['@lexical/code-core', '@lexical/extension', '@lexical/link', '@lexical/list', '@lexical/rich-text', '@lexical/table', 'lexical'])
+  assert.deepEqual(peers, ['@lexical/code-core', '@lexical/extension', '@lexical/hashtag', '@lexical/link', '@lexical/list', '@lexical/mark', '@lexical/rich-text', '@lexical/table', 'lexical'])
   for (const name of peers) {
     assert.equal(manifest.peerDependencies[name], manifest.devDependencies[name], `${name} is tested at the version it asks for`)
     assert.equal(manifest.peerDependenciesMeta[name]?.optional, true, `${name} is optional`)

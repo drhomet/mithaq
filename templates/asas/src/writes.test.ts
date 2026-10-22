@@ -4392,7 +4392,7 @@ test('185. a richText value is Lexical\'s editor state, walked and then parsed w
     ['a value nested past the bound', { root: { type: 'root', children: [deep] } }],
     ['a value past the size bound', richText('x'.repeat(600_000))],
     ['a value past the node bound', { root: { type: 'root', children: Array.from({ length: 10_001 }, () => ({ type: 'paragraph', children: [] })) } }],
-    ['a node no class of the list registers', { root: { type: 'root', children: [{ type: 'mention', name: 'Huda' }] } }],
+    ['a node no class of the list registers', { root: { type: 'root', children: [{ type: 'uninstalled', name: 'Huda' }] } }],
     ['a callout whose state its own parse refuses', callout('loud', 'Careful')],
   ]
   for (const name of ['zodNotes', 'plainNotes'] as const) {
@@ -4408,7 +4408,7 @@ test('185. a richText value is Lexical\'s editor state, walked and then parsed w
       assert.deepEqual(pathsOf(thrown), ['details'], `${name}: ${what} is refused by name`)
     }
     const unknown = await operations.create!({ id: 2, details: refused.find(([what]) => what.startsWith('a node no class'))![1], lead: richText('Lead') }).catch((error: unknown) => error) as AsasError
-    assert.deepEqual((unknown.params as { issues: { params?: unknown }[] }).issues[0]!.params, { type: 'mention' }, `${name}: naming the node type`)
+    assert.deepEqual((unknown.params as { issues: { params?: unknown }[] }).issues[0]!.params, { type: 'uninstalled' }, `${name}: naming the node type`)
     // Required means some text a reader can see, so an empty editor and one
     // holding only spaces are both refused under the field's required key.
     for (const value of [{ root: { type: 'root', children: [] } }, richText('   ')]) {
@@ -4419,7 +4419,7 @@ test('185. a richText value is Lexical\'s editor state, walked and then parsed w
     assert.deepEqual(store.rows.get(name)!.map((one) => one.id), [1], `${name}: and nothing refused was stored`)
     // A value saved before a node left the list, written past the runner the
     // way old data reaches a table, still reads, so the page can show it.
-    const old = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'mention', name: 'Huda' }, { type: 'text', text: 'joins', style: 'color: red' }] }] } }
+    const old = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'uninstalled', name: 'Huda' }, { type: 'text', text: 'joins', style: 'color: red' }] }] } }
     store.rows.get(name)!.push({ id: 9, details: old, lead: { root: { type: 'root', children: [] } } })
     assert.deepEqual((await operations.findByID!({ id: 9 })).details, old, `${name}: a stored node the list no longer holds reads back as it was stored`)
     store.rows.set(name, store.rows.get(name)!.filter((one) => one.id !== 9))

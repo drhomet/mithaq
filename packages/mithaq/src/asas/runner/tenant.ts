@@ -198,9 +198,9 @@ export const tenancy = ({ language, assigned, onError, collection }: {
         throw invalid({ message: cause instanceof Error ? cause.message : 'Invalid store filter.', key: 'error.invalid.value', params: { kayan: name }, cause })
       }
     }
-    const references = async ({ name, data, tx }: { name: string; data: Record<string, unknown>; tx: unknown }) => {
+    const references = async ({ name, data, tx, id }: { name: string; data: Record<string, unknown>; tx: unknown; id?: unknown }) => {
       for (const key of Object.keys(data)) declaredField(name, key)
-      return assertReferences({ kayan: named(name), store: { find }, data, tenant: active(running.getStore()?.user), tx })
+      return assertReferences({ kayan: named(name), store: { find }, data, tenant: active(running.getStore()?.user), tx, id })
     }
     const sealed = (name: string, data?: Record<string, unknown>) => {
       const field = named(name).tenant
@@ -260,7 +260,7 @@ export const tenancy = ({ language, assigned, onError, collection }: {
       },
       update: async (args) => {
         const where = combineWhere(checked(args.kayan, args.where), sealed(args.kayan, args.data))
-        await references({ name: args.kayan, data: args.data, tx: args.tx })
+        await references({ name: args.kayan, data: args.data, tx: args.tx, id: args.id })
         return writes.update({ ...args, where })
       },
       remove: async (args) => writes.remove({ ...args, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) }),

@@ -97,13 +97,18 @@ type ViewerProps = {
   className?: string
   id?: string
   describedBy?: string
+  field?: string
+  policy?: RichTextPolicy
   nodes?: readonly Klass<LexicalNode>[]
 }
 export function RichTextViewer(props: ViewerProps): ReactElement {
-  const policy: RichTextPolicy = { features: [], fonts: defaultRichTextFonts }
+  const policy: RichTextPolicy = { ...props.policy, features: (props.policy?.features ?? []).filter((one) => one === 'comments'), fonts: props.policy?.fonts ?? defaultRichTextFonts }
   let remaining = richTextBounds.nodes
   const walk = (node: RichTextNode, depth = richTextBounds.depth) => {
     if (!node || depth <= 0 || remaining-- <= 0) return
+    if (node.type === 'mention' && !policy.features.includes('mentions')) policy.features = [...policy.features, 'mentions']
+    if (node.type === 'hashtag' && !policy.features.includes('mentions')) policy.features = [...policy.features, 'mentions']
+    if (node.type === 'mark' && !policy.features.includes('comments')) policy.features = [...policy.features, 'comments']
     if (node.type === 'table' && !policy.features.includes('tables')) policy.features = [...policy.features, 'tables']
     if (node.type === 'code' && !policy.features.includes('code')) policy.features = [...policy.features, 'code']
     if (node.$ && typeof node.$ === 'object' && ['color', 'size', 'font'].some((key) => Object.hasOwn(node.$ as object, key)) && !policy.features.includes('styling')) policy.features = [...policy.features, 'styling']
@@ -112,7 +117,7 @@ export function RichTextViewer(props: ViewerProps): ReactElement {
   walk(valueOf(props.value).root)
   return <FeatureNodes policy={policy}>{(modules) => <Viewer {...props} modules={modules} policy={policy} />}</FeatureNodes>
 }
-function Viewer({ value, direction, t, className, id, describedBy, nodes , modules, policy }: ViewerProps & { modules: readonly RichTextFeatureModule[]; policy: RichTextPolicy }): ReactElement {
+function Viewer({ value, direction, t, className, id, describedBy, nodes, field, modules, policy }: ViewerProps & { modules: readonly RichTextFeatureModule[]; policy: RichTextPolicy }): ReactElement {
   const provided = use(RichTextContext)
   const drawn = useFeatureNodes({ nodes: nodes ?? provided.nodes, modules })
   const held = useMemo(() => valueOf(value), [value])
@@ -131,14 +136,15 @@ function Viewer({ value, direction, t, className, id, describedBy, nodes , modul
         <CheckListPlugin />
         <LinkPlugin validateUrl={safeUrl} />
         <DirectionPlugin />
-        {modules.map(({ Plugin }, index) => Plugin ? <Plugin key={index} policy={policy} locale="en" t={t} /> : null)}
+        {modules.map(({ ReadButtons }, index) => ReadButtons ? <ReadButtons key={`button-${index}`} policy={policy} locale="en" t={t} field={field} /> : null)}
+        {modules.map(({ Plugin }, index) => Plugin ? <Plugin key={index} policy={policy} locale="en" t={t} field={field} /> : null)}
       </LexicalComposer>
     </div>
   )
 }
 
 /** A rich text value as a record page reads it: the viewer, over the page's direction, and nothing where it holds none. */
-export function RichTextValueView({ value, t }: { value: unknown; t: Translate }): ReactNode {
+export function RichTextValueView({ value, t, field, policy }: { value: unknown; t: Translate; field?: string; policy?: RichTextPolicy }): ReactNode {
   const direction = useDirection() === 'rtl' ? 'rtl' : 'ltr'
-  return value ? <RichTextViewer value={value} direction={direction} t={t} /> : null
+  return value || policy?.features.includes('comments') ? <RichTextViewer value={value} direction={direction} t={t} field={field} policy={policy} /> : null
 }

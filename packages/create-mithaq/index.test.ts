@@ -30,7 +30,7 @@ const json = (...path: string[]) => JSON.parse(read(...path))
 test('a project takes the published mithaq and mithaq-admin under the names its imports use, at exactly one version', () => {
   create({ name: 'my-app', cwd: scratch, template, version: '1.2.3', addOns: every })
   const features = readdirSync(join(scratch, 'my-app/packages/features')).map((one) => `packages/features/${one}`)
-  assert.deepEqual(features, ['audit-log', 'auth', 'courses', 'media', 'roles', 'settings', 'tags'].map((one) => `packages/features/${one}`))
+  assert.deepEqual(features, ['audit-log', 'auth', 'courses', 'media', 'rich-text-comments', 'roles', 'settings', 'tags'].map((one) => `packages/features/${one}`))
   for (const workspace of ['packages/mithaq', 'packages/asas', ...features, 'apps/asas-tanstack', 'apps/asas-backoffice']) {
     const { dependencies, devDependencies = {} } = json('my-app', workspace, 'package.json')
     assert.equal(dependencies.mithaq, 'npm:@drhomet/mithaq@1.2.3', workspace)
@@ -194,7 +194,7 @@ test('an add-on brings every one it needs, said so, and a name the table does no
   assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'rich-text', 'uploads', 'media', 'courses'], added: ['roles', 'audit-log', 'rich-text', 'uploads', 'media'] })
   assert.deepEqual(resolveAddOns(['media']), { chosen: ['uploads', 'media'], added: ['uploads'] }, 'and what an add-on it needs needs')
   assert.deepEqual(resolveAddOns(['backoffice', 'roles', 'roles']).chosen, ['roles', 'backoffice'], 'in the table\'s order, once each')
-  assert.throws(() => resolveAddOns(['roles', 'images', 'rich']), /^Error: No add-on is named "images", "rich"\. The add-ons are roles, audit-log, settings, rich-text, uploads, media, courses, backoffice\.$/)
+  assert.throws(() => resolveAddOns(['roles', 'images', 'rich']), /^Error: No add-on is named "images", "rich"\. The add-ons are roles, audit-log, settings, rich-text, rich-text-mentions, rich-text-find-replace, rich-text-comments, uploads, media, courses, backoffice\.$/)
 })
 
 test('a region keeps its lines only where its add-ons are chosen, a without region is uncommented only where they are not, and the markers go either way', () => {
@@ -346,4 +346,19 @@ test('password links default to administrator delivery and email is an explicit 
   assert.match(read('links-email', 'packages/mithaq/src/mithaq/auth/organizations.ts'), /export const verifyEmail: boolean = true/)
   assert.throws(() => create({ name: 'links-many-admin', cwd: scratch, template, version: '1.2.3', organizations: 'many', passwordDelivery: 'admin' }), /many.*verification.*password-delivery email/)
   assert.throws(() => create({ name: 'links-invalid', cwd: scratch, template, version: '1.2.3', passwordDelivery: 'sms' }), /password-delivery/)
+})
+
+test('the comments tool installs its private table and audit sink, while other projects carry neither', () => {
+  create({ name: 'rt-comments', cwd: scratch, template, version: '1.2.3', richText: ['mentions', 'findReplace', 'comments'] })
+  assert.ok(existsSync(join(scratch, 'rt-comments/packages/features/rich-text-comments/threads/threads.ts')))
+  assert.ok(existsSync(join(scratch, 'rt-comments/packages/features/audit-log')))
+  const config = read('rt-comments/packages/mithaq/src/mithaq/rich-text-features.ts')
+  assert.match(config, /'mentions', 'findReplace', 'comments'/)
+  assert.match(config, /comments: \{ threads: 'richTextThreads' \}/)
+  create({ name: 'rt-no-comments', cwd: scratch, template, version: '1.2.3', richText: ['findReplace'] })
+  assert.ok(!existsSync(join(scratch, 'rt-no-comments/packages/features/rich-text-comments')))
+  assert.doesNotMatch(read('rt-no-comments/packages/mithaq/src/mithaq/rich-text-features.ts'), /comments:/)
+  assert.doesNotMatch(read('rt-no-comments/packages/asas/src/asas.ts'), /richTextComments/)
+  assert.doesNotMatch(read('rt-no-comments/apps/asas-tanstack/src/copy.ts'), /'richText\.mentions'|'richText\.comments'/)
+  assert.match(read('rt-no-comments/apps/asas-tanstack/src/copy.ts'), /'richText\.findReplace'/)
 })
