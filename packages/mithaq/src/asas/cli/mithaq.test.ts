@@ -88,7 +88,7 @@ test('jobs run accepts positional queues, defaults to all task queues and refuse
       targets: {}, connect: async () => {}, destroy: async () => {},
       jobs: { queues: ['maintenance', 'mail'], run: async ({ queue }) => (console.log(queue), { failures: 0 }) }
     }`)
-    const runJobs = (...queues: string[]) => run(process.execPath, [bin, 'jobs', 'run', ...queues], { cwd: project, env: { ...process.env, DATABASE_URL: 'postgres://postgres:postgres@127.0.0.1:55791/mithaq' } })
+    const runJobs = (...queues: string[]) => run(process.execPath, [bin, 'jobs', 'run', ...queues], { cwd: project, env: { ...process.env, DATABASE_URL: 'postgres://unused@127.0.0.1:9/mithaq' } })
     assert.equal((await runJobs('mail')).stdout.trim(), 'mail')
     assert.equal((await runJobs()).stdout.trim(), 'maintenance\nmail')
     await assert.rejects(runJobs('mail', 'typo'), (error: any) => /typo/.test(error.stderr) && error.stdout === '')
