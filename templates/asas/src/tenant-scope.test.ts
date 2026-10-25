@@ -58,6 +58,7 @@ import {
   type WriteTools,
 } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
+import { defaultNodes, richText, UploadNode } from 'mithaq/rich-text'
 import { storageRoutes } from '../../../packages/mithaq/src/storage/storage.ts'
 import { memoryStore } from './memory-store.ts'
 import { expectedUpdatedAt } from '../../mithaq/src/steps/expected-updated-at.ts'
@@ -156,7 +157,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
       (await tools.store[write]({ tx: ctx.tx, kayan: declaration(built, aimed.kayan ?? ''), id: aimed.id, data: aimed.data }), ctx)
   const language = defineMithaq({
-    arkan: [base, storage(storageConfig)],
+    arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storage(storageConfig)],
     targets: {
       store,
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
@@ -339,6 +340,13 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       versions: { drafts: { autosave: true } },
     },
   }
+  const draftOwners = {
+    ...papers, name: 'draftOwners', fields: { ...papers.fields, body: { kind: 'richText' } },
+    targets: {
+      ...papers.targets,
+      service: { operations: { ...defaultOperations, ...versionOperations, stepDraft: { ...defaultOperations.update, afterSteps: [probeStore] } } },
+    },
+  }
   const fileOwners = {
     name: 'fileOwners', dbName: 'file_owners', schemaName,
     fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, cover: { kind: 'upload', relationTo: 'files' }, deletedAt: { kind: 'datetime', rules: { providedBy: { create: 'never', update: 'never' } } } },
@@ -474,12 +482,12 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, context: (request) => localProbe(request), secret: 'tenant-scope-a-local-auth-test-secret' }),
     targets: { service: { operations: { ...defaultOperations, ...localAuthOperations } } },
   }
-  const built: Built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, fileOwners, tags, pins, badges, serials, stamps, terms, shelves, numbered, uuidData, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  const built: Built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, draftOwners, fileOwners, tags, pins, badges, serials, stamps, terms, shelves, numbered, uuidData, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
   return built
 }
 
-type Ops = Record<'heldAttach' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
-type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData' | 'fileOwners', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
+type Ops = Record<'stepDraft' | 'heldAttach' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
+type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData' | 'fileOwners' | 'draftOwners', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 // Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
 const declaration = (built: Built, name: string) => (built.kayan as unknown as Record<string, { name: string; fields: Record<string, RuntimeField> }>)[name]
@@ -1275,6 +1283,60 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await files.findByID({ id: kept.id }, { actor: one })).id, kept.id)
     assert.equal((await files.findByID({ id: foreign.id }, { actor: two })).id, foreign.id)
     assert.equal((await refusal(files.update({ id: kept.id, uploadedBy: 'somebody' }, { actor: one }))).status, 400)
+  })
+
+  test('a draft step refuses an upload deleted by cleanup before saving its rich-text snapshot', async () => {
+    const files = built.kayan.files.operations
+    const papers = built.kayan.draftOwners.operations
+    const file = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const paper = await papers.create({ title: 'draft after cleanup', memo: null, body: null }, { actor: one })
+    await cleanupUploads({ asas: built, tenant: 'org1', now: new Date(Date.now() + 60000) })
+    assert.equal((await refusal(files.findByID({ id: file.id }, { actor: one }))).status, 404)
+    const body = { root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'upload', version: 3, format: '', id: 'node', relationTo: 'files', value: file.id, fields: null }] } }
+    storeProbe = async (ctx, tools) => { await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'draftOwners'), id: paper.id, data: { body } }) }
+    try {
+      assert.equal((await refusal(papers.stepDraft({ id: paper.id, title: 'refused snapshot' }, { actor: one, draft: true }))).key, 'error.invalid.tenant_reference')
+    } finally { storeProbe = async () => {} }
+    assert.equal((await papers.findByID({ id: paper.id }, { actor: one, draft: true })).body, null)
+  })
+
+  test('a draft step holds its own rich-text upload against cleanup and refuses another organization', { timeout: 10000 }, async () => {
+    const files = built.kayan.files.operations
+    const papers = built.kayan.draftOwners.operations
+    const own = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const foreign = await files.create({ uploadReference: await uploaded(two, 'files') }, { actor: two })
+    const paper = await papers.create({ title: 'step upload draft', memo: null, body: null }, { actor: one })
+    const body = (id: string) => ({ root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'upload', version: 3, format: '', id: 'node', relationTo: 'files', value: id, fields: null }] } })
+    storeProbe = async (ctx, tools) => { await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'draftOwners'), id: paper.id, data: { body: body(foreign.id) } }) }
+    try {
+      assert.equal((await refusal(papers.stepDraft({ id: paper.id, title: 'foreign upload' }, { actor: one, draft: true }))).key, 'error.invalid.tenant_reference')
+    } finally { storeProbe = async () => {} }
+    const held = postgres ? hold() : undefined
+    storeProbe = async (ctx, tools) => {
+      await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'draftOwners'), id: paper.id, data: { body: body(own.id) } })
+      if (held) await pause(ctx)
+    }
+    const drafting = papers.stepDraft({ id: paper.id, title: 'own upload' }, { actor: one, draft: true })
+    let cleaning: ReturnType<typeof cleanupUploads> | undefined
+    try {
+      if (held) {
+        await within(held.reached.promise)
+        let answered = false
+        cleaning = cleanupUploads({ asas: built, tenant: 'org1', now: new Date(Date.now() + 60000) }).then((result) => { answered = true; return result })
+        await setTimeout(50)
+        assert.equal(answered, false, 'cleanup waits for the draft step holding the referenced upload')
+      }
+    } finally {
+      held?.release.resolve()
+      await within(Promise.allSettled([drafting, ...(cleaning ? [cleaning] : [])]), 5000)
+      storeProbe = async () => {}
+    }
+    await drafting
+    if (cleaning) assert.equal((await cleaning).failures, 0)
+    assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one, draft: true })).body, body(own.id))
+    assert.equal((await papers.findByID({ id: paper.id }, { actor: one })).body, null)
+    assert.equal((await files.findByID({ id: own.id }, { actor: one })).id, own.id)
+    assert.equal((await files.findByID({ id: foreign.id }, { actor: two })).id, foreign.id)
   })
 
   test('cleanup retains historical and soft-deleted owners in Postgres as well as memory', async () => {

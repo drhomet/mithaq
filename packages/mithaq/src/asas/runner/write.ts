@@ -1110,7 +1110,8 @@ export const write = <Actor = unknown>({
             if (drafting && kept && incremented.length) throw invalid({ message: 'An increment writes a stored integer field, not a draft snapshot.', key: 'error.invalid.value', params: { kayan: name } })
             if (drafting && kept) {
               const draft = { ...base, ...values, id: targetId }
-              // Draft snapshots bypass the sealed row store, so check their final annotations here.
+              // Draft snapshots bypass the sealed row store, so hold their final references and annotations here.
+              await assertReferences({ kayan: kept, store, data: draft, tenant: tenantOf(actor), tx: heldTx })
               await assertCommentMarks({ kayan: kept, store, data: draft, tenant: tenantOf(actor), tx: heldTx, id: targetId })
               await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: draft, autosave: autosaving })
               return draft
