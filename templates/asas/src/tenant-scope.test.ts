@@ -1285,6 +1285,22 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await refusal(files.update({ id: kept.id, uploadedBy: 'somebody' }, { actor: one }))).status, 400)
   })
 
+  test('title-only drafts and autosaves keep an existing rich-text snapshot after its upload is deleted', async () => {
+    const files = built.kayan.files.operations
+    const papers = built.kayan.draftOwners.operations
+    const file = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const body = { root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'upload', version: 3, format: '', id: 'node', relationTo: 'files', value: file.id, fields: null }] } }
+    const paper = await papers.create({ title: 'published upload', memo: null, body, _status: 'published' }, { actor: one })
+    await files.delete({ id: file.id }, { actor: one })
+    for (const autosave of [false, true]) {
+      assert.equal((await refusal(papers.update({ id: paper.id, title: 'foreign edit' }, { actor: two, draft: true, autosave }))).status, 404)
+      await papers.update({ id: paper.id, title: `saved ${autosave}` }, { actor: one, draft: true, autosave })
+      const saved = await papers.findByID({ id: paper.id }, { actor: one, draft: true })
+      assert.equal(saved.title, `saved ${autosave}`)
+      assert.deepEqual(saved.body, body)
+    }
+  })
+
   test('a draft step refuses an upload deleted by cleanup before saving its rich-text snapshot', async () => {
     const files = built.kayan.files.operations
     const papers = built.kayan.draftOwners.operations
