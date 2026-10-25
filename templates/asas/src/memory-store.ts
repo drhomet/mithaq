@@ -1,9 +1,8 @@
-import { memoryTransactions } from 'mithaq'
 // A store that keeps its rows in memory, so a test can watch what a write did without a database.
 // Every kind builds the column name and every rule is an identity. Transaction hooks stage jobs
 // until the callback succeeds; test rows remain available for assertions even after a failed write.
 import { randomUUID } from 'node:crypto'
-import { conflict, invalid, missing, defaultKinds, defaultRules, type ResolvedField, type ResolvedKayan, type Where } from 'mithaq'
+import { memoryTransactions, conflict, invalid, missing, defaultKinds, defaultRules, type ResolvedField, type ResolvedKayan, type Where } from 'mithaq'
 import { compareValues as compare, matchesWhere } from 'mithaq/admin'
 
 const each = <Value>(names: string[], value: Value): Record<string, Value> =>

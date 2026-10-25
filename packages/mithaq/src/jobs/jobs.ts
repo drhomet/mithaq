@@ -34,13 +34,13 @@ export const buildJobs = ({ target, tasks, asas }: { target: JobsTarget; tasks: 
       let passFailed = false
       try {
         await schedule({ queue })
-        const expired = await driver.expire({ now: new Date() })
+        const expired = await driver.expire()
         failures += expired
         if (expired) console.error({ failures: expired })
         const token = randomUUID()
         // One job at a time keeps every claimed lease under its heartbeat, even in a large backlog.
         for (;;) {
-          const [job] = await driver.claim({ queue, limit: 1, lease: target.lease, token, now: new Date() })
+          const [job] = await driver.claim({ queue, tasks: entries.filter(([, task]) => task.queue === queue).map(([name]) => name), limit: 1, lease: target.lease, token })
           if (!job) break
           const controller = new AbortController()
           let heartbeat: Promise<void> | undefined

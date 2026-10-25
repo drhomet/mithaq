@@ -36,7 +36,7 @@ test('two schedulers enqueue the latest occurrence once and never backfill misse
   const first = build(config)
   const second = build(config)
   await first.connect()
-  await first.targets.drizzle.db.execute('truncate mithaq_jobs, mithaq_job_occurrences')
+  await first.targets.drizzle.db.execute('truncate mithaq_jobs')
   const now = new Date('2026-10-25T12:34:56Z')
   await Promise.all([first.jobs!.schedule({ queue: 'storage', now }), second.jobs!.schedule({ queue: 'storage', now })])
   const { rows } = await first.targets.drizzle.db.execute('select task, scheduled_for, tenant from mithaq_jobs')

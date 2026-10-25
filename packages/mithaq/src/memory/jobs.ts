@@ -27,11 +27,10 @@ export const memoryTransactions = () => {
 type MemoryStore = JobStore & ReturnType<typeof memoryTransactions>
 type HeldJob = Job & { scheduledFor: Date | null; runAt: Date; token: string | null; until: number; attempts: number; completed: number | null; failed: number | null; output?: Record<string, number>; error?: { message: string } }
 
-const storage = new WeakMap<MemoryStore['afterCommit'], { rows: HeldJob[]; occurrences: Set<string> }>()
+const storage = new WeakMap<MemoryStore['afterCommit'], HeldJob[]>()
 const driver = (store?: MemoryStore): JobsDriver => {
-  const state = (store && storage.get(store.afterCommit)) || { rows: [], occurrences: new Set<string>() }
-  if (store) storage.set(store.afterCommit, state)
-  const { rows, occurrences } = state
+  const rows = (store && storage.get(store.afterCommit)) || []
+  if (store) storage.set(store.afterCommit, rows)
   const add = (args: { task: string; input: unknown; queue: string; tenant: string | null; runAt: Date; scheduledFor: Date | null }) => {
     rows.push({ ...structuredClone(args), id: randomUUID(), token: null, until: 0, attempts: 0, completed: null, failed: null })
   }
@@ -40,15 +39,14 @@ const driver = (store?: MemoryStore): JobsDriver => {
     fits: (store) => store.type === 'memory' && 'afterCommit' in store && typeof store.afterCommit === 'function',
     init: (store) => driver(store as MemoryStore),
     record: async (args) => {
-      const key = JSON.stringify([args.task, args.scheduledFor.getTime()])
-      if (occurrences.has(key)) return false
-      occurrences.add(key)
+      if (rows.some((row) => row.task === args.task && row.scheduledFor !== null && row.scheduledFor >= args.scheduledFor)) return false
       add({ ...args, input: {}, runAt: args.scheduledFor })
       return true
     },
-    claim: async ({ queue, limit, lease, token, now }) => {
-      const due = rows.filter((row) => row.queue === queue && row.tenant === null && row.completed === null && row.failed === null && row.attempts === 0 && row.token === null && row.runAt <= now).slice(0, limit)
-      for (const row of due) { row.token = token; row.until = now.getTime() + lease; row.attempts++ }
+    claim: async ({ queue, tasks, limit, lease, token }) => {
+      const now = Date.now()
+      const due = rows.filter((row) => row.queue === queue && tasks.includes(row.task) && row.tenant === null && row.completed === null && row.failed === null && row.attempts === 0 && row.token === null && row.runAt.getTime() <= now).slice(0, limit)
+      for (const row of due) { row.token = token; row.until = now + lease; row.attempts++ }
       return due.map(({ id, task, input, queue, tenant }) => ({ id, task, input: structuredClone(input), queue, tenant }))
     },
     enqueue: async ({ tx, ...args }) => {
@@ -69,13 +67,16 @@ const driver = (store?: MemoryStore): JobsDriver => {
       row.token = null
       row.until = 0
     },
-    expire: async ({ now }) => {
-      const expired = rows.filter((row) => row.token !== null && row.until <= now.getTime())
-      for (const row of expired) { row.failed = now.getTime(); row.error = { message: 'Job interrupted after its lease expired.' }; row.token = null; row.until = 0 }
+    expire: async () => {
+      const now = Date.now()
+      const expired = rows.filter((row) => row.token !== null && row.until <= now)
+      for (const row of expired) { row.failed = now; row.error = { message: 'Job interrupted after its lease expired.' }; row.token = null; row.until = 0 }
       return expired.length
     },
     prune: async ({ completedBefore, failedBefore }) => {
-      const old = rows.filter((row) => (row.completed !== null && row.completed < completedBefore.getTime()) || (row.failed !== null && row.failed < failedBefore.getTime()))
+      // ponytail: pruning scans memory history quadratically; index per-task watermarks if large queues need it.
+      const old = rows.filter((row) => ((row.completed !== null && row.completed < completedBefore.getTime()) || (row.failed !== null && row.failed < failedBefore.getTime()))
+        && (row.scheduledFor === null || rows.some((newer) => newer.task === row.task && newer.scheduledFor !== null && newer.scheduledFor > row.scheduledFor!)))
       for (const row of old) rows.splice(rows.indexOf(row), 1)
       return old.length
     },

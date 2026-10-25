@@ -1,4 +1,3 @@
-import { drizzleJobs, memoryJobs } from 'mithaq'
 // Imported first, so the template's storage reads its folder from it.
 import './test-storage-dir.ts'
 import assert from 'node:assert/strict'
@@ -48,6 +47,8 @@ import {
   versionOperations,
   versions as versionsRukn,
   drizzleAdapter,
+  drizzleJobs,
+  memoryJobs,
   fetchHttp,
   drizzleIdKinds, drizzleKinds,
   drizzleRules,

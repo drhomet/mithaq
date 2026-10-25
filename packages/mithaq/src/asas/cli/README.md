@@ -198,6 +198,8 @@ Schedules the latest due occurrence and runs due jobs once, then exits. It requi
 bunx mithaq jobs run maintenance
 ```
 
+A long-running server passes `connect({ work })` to run timers. A serverless host leaves `work` out because timers can freeze between requests, and calls `mithaq jobs run` from the platform’s cron.
+
 `mithaq jobs run [queue ...]` selects queues by positional name. With none, it runs all queues the build’s tasks use. Unknown queues are refused before running any work. The command connects with `readOnly: true` to start no timers, performs a pass, destroys the build and exits. A build with no jobs target is refused. See [Jobs](../../../README.md#jobs) for the capability, drivers and phase one limits.
 
 ## `screens`
