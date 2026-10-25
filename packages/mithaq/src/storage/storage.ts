@@ -375,7 +375,7 @@ export const resolveStorage = ({ language, resolved, storeOf, active }: {
       for (const owner of resolved) for (const field of Object.values(owner.fields)) {
         if (field.kind === 'join' || (field.target?.name !== kayan.name && field.kind !== 'richText')) continue
         if (field.rules?.onDelete === 'cascade' || field.rules?.onDelete === 'set null') throw new Error(`${where}.orphanAfter is unsafe because ${owner.name}.${field.name} uses onDelete: ${field.rules.onDelete}.`)
-        if (owner.store !== kayan.store) throw new Error(`${where}.orphanAfter requires ${owner.name}.${field.name} to use the same store.`)
+        if (owner.store !== kayan.store) throw new Error(`${where}.orphanAfter cannot check ${owner.name}.${field.name} in store "${owner.store}" within the upload's transaction in store "${kayan.store}". Use the same store.`)
       }
     }
     const fileSize = kept.fileSize ?? config.fileSize
@@ -534,7 +534,8 @@ export const storageRoutes = <Actor>({
           const count = await one.storage.unattached(actor)
           if (count === undefined) throw denied({ message: 'An upload cap requires an authenticated uploader.', key: 'error.forbidden.create', params: { kayan: one.name } })
           // ponytail: each instructions request scans every referencing table and version per candidate upload;
-          // use indexed reference queries if measured slow. Signed instructions can pass the cap; a strict cap needs reservations.
+          // use indexed reference queries if measured slow. Reads across stores are advisory, and signed instructions
+          // can pass the cap; a strict cap needs reservations.
           if (count >= one.storage.maxUnattached) throw invalid({ message: `Attach or remove an upload before uploading another. The limit is ${one.storage.maxUnattached}.`, key: 'error.invalid.upload_limit', params: { limit: one.storage.maxUnattached } })
         }
         return Response.json(await config.instructions({ kayan: one, input, actor }))

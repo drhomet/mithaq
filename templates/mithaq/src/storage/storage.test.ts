@@ -113,6 +113,7 @@ const languageOf = ({ softDelete, config = unused(), authorize = defaultAuthoriz
     arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storageRukn(config)],
     targets: {
       memory: softDelete ? memoryOf() : memoryStore(),
+      otherMemory: memoryStore(),
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
       plain: plainTarget,
       service: { capability: 'service', store: 'memory', schema: 'zod', authorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, ...(softDelete && { softDelete: 'deletedAt' }) },
@@ -139,7 +140,7 @@ type Built = Awaited<ReturnType<typeof project>>
  * shipped columns, a `notes` kayan whose cover is one of them, and the local
  * adapter with the defaults the template copies.
  */
-const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, softDelete, authorize, history, storageName = 'storage' }: { storage?: Partial<StorageConfig>; files?: Record<string, unknown>; wrap?: (adapter: StorageAdapter) => StorageAdapter; hidden?: keyof typeof uploadFields; softDelete?: boolean; authorize?: Authorize; history?: boolean; storageName?: string } = {}) => {
+const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, softDelete, authorize, history, storageName = 'storage', ownerStore = 'memory' }: { storage?: Partial<StorageConfig>; files?: Record<string, unknown>; wrap?: (adapter: StorageAdapter) => StorageAdapter; hidden?: keyof typeof uploadFields; softDelete?: boolean; authorize?: Authorize; history?: boolean; storageName?: string; ownerStore?: string } = {}) => {
   const dir = await mkdtemp(join(tmpdir(), 'mithaq-storage-'))
   const adapter = wrap(local({ dir, secret, prefix: 'app' }))
   const config: StorageConfig = { secret, adapters: { local: adapter }, adapter: 'local', ...functions, ...storage }
@@ -166,8 +167,8 @@ const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, 
   const noteOf = (name: string, schema: string) => language.defineKayan({
     name,
     access,
-    targets: { service: { schema, operations: defaultOperations }, ...(history && { versions: {} }) },
-    fields: { ...defaultFields, tenant: { kind: 'text', rules: { defaultValue: tenanted.activeOrganizationId } }, cover: { kind: 'upload', relationTo: () => fileKayan }, body: { kind: 'richText', rules: { required: true } } },
+    targets: { service: { store: ownerStore, schema, operations: defaultOperations }, ...(history && { versions: {} }) },
+    fields: { ...defaultFields, tenant: { kind: 'text', rules: { defaultValue: tenanted.activeOrganizationId } }, ...(ownerStore === 'memory' && { cover: { kind: 'upload', relationTo: () => fileKayan } }), body: { kind: 'richText', rules: { required: true } } },
   } as never)
   // The same kayan on both schema targets, the zod one and the template's own.
   const notes = noteOf('notes', 'zod')
@@ -1076,6 +1077,20 @@ test('upload instructions refuse an uploader at the unattached cap and allow ano
     assert.equal(row.uploadedBy, 'one')
     built.asas.targets.memory.rows.set('notes', [{ id: 'owner', cover: row.id }])
     assert.equal((await send(built, 'POST', '/api/files/uploadInstructions', { org: 'one', json: { filename: 'attached.png', filesize: png.length, mimeType: 'image/png' } })).status, 200)
+  } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
+})
+
+test('the upload cap counts references across stores without failing instructions', async () => {
+  const built = await project({ ownerStore: 'otherMemory', files: { storage: { mimeTypes: ['image/png'], maxUnattached: 1 } } })
+  try {
+    const { file } = await upload(built, 'one')
+    assert.equal((await create(built, 'one', file.uploadReference)).status, 200)
+    const ask = () => send(built, 'POST', '/api/files/uploadInstructions', { org: 'one', json: { filename: 'next.png', filesize: png.length, mimeType: 'image/png' } })
+    assert.equal((await ask()).status, 400, 'an unattached upload consumes a slot even with owners in another store')
+    const body = { root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'upload', version: 3, format: '', id: 'node', relationTo: 'files', value: file.uploadReference.id, fields: null }] } }
+    const attached = await send(built, 'POST', '/api/notes/create', { org: 'one', json: { body } })
+    assert.equal(attached.status, 200, await attached.clone().text())
+    assert.equal((await ask()).status, 200, 'rich text in another store frees the slot')
   } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
 })
 

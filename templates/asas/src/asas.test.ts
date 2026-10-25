@@ -82,6 +82,7 @@ import {
   type AuditHandler,
   type DerivedShapes,
   serviceTarget,
+  storage,
   uploadFields,
   withUploadReference,
 } from 'mithaq'
@@ -93,6 +94,7 @@ import { navOf, type AccessReport } from 'mithaq/admin'
 import { resolvedKayans } from '../../../packages/mithaq/src/mithaq/types.ts'
 import { rowsOf } from '../../../packages/mithaq/src/mithaq/rows.ts'
 import { orpcHttp } from 'mithaq/orpc'
+import { defaultNodes, richText, UploadNode } from 'mithaq/rich-text'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter as betterAuthDrizzle } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins'
@@ -19401,6 +19403,27 @@ test('the default mention directory filters and limits managed tenant reads with
   for (const row of masked.body.docs as Record<string, unknown>[]) assert.deepEqual(Object.keys(row), ['id'])
   await asas.kayan.roles.operations.update({ id: role.id, permissions: keys.filter((key) => key !== 'user.find') }, tenant.options)
   assert.equal((await search('rt2-directory')).status, 403, 'directory access itself is required')
+})
+
+test('orphan cleanup refuses a rich-text owner in another store and names its field and store', () => {
+  const language = defineMithaq({
+    arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storage(templateStorage)],
+    targets: {
+      memory: memoryStore(),
+      otherMemory: memoryStore(),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  const files = language.defineKayan({
+    name: 'files', access: allowAccess, fields: { ...defaultFields, ...uploadFields },
+    targets: {
+      storage: { mimeTypes: ['image/png'], orphanAfter: 1 },
+      service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, input: ({ create }) => withUploadReference(create), beforeTransaction: [templateStorage.uploaded] } } },
+    },
+  })
+  const owner = language.defineKayan({ name: 'owners', fields: { ...defaultFields, body: { kind: 'richText' } }, targets: { service: { store: 'otherMemory', operations: defaultOperations } } })
+  assert.throws(() => language.buildAsas({ kayan: [files, owner], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] }), /orphanAfter.*owners.body.*otherMemory.*memory/)
 })
 
 test('jobs configuration refuses missing explicit policy and unsupported phase one behavior', () => {

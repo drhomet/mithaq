@@ -42,7 +42,6 @@ export const uploadReferenced = async ({ kayan, id, resolved, storeOf, tenant, t
     const fields = Object.values(owner.fields).filter((field) => field.kind !== 'join' && (field.target?.name === kayan.name || field.kind === 'richText'))
     if (!fields.length) continue
     const store = storeOf(owner)
-    if (store !== storeOf(kayan)) throw new Error('Upload references must use the upload kayan\'s store.')
     // A restore takes its organization from the parent, even when an old snapshot carries none or a stale one.
     const scope = (snapshot: boolean): Where | undefined => owner.tenant && tenant !== null ? { [snapshot ? `parent.${owner.tenant}` : owner.tenant]: { equals: tenant } } : undefined
     const args = { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' as const } }
