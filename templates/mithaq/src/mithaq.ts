@@ -9,9 +9,11 @@ import {
   defaultBulkLimit,
   defaultDepth,
   defaultJoinLimit,
+  // add-on: jobs
   defaultJobLease,
   defaultJobRetention,
   drizzleJobs,
+  // end add-on: jobs
   defaultLimit,
   defaultMaxLimit,
   screenKinds,
@@ -546,7 +548,9 @@ const language = defineMithaq({
   // checked exactly like them.
   targets: {
     ...serverTargets,
+    // add-on: jobs
     jobs: drizzleJobs({ lease: defaultJobLease, retain: defaultJobRetention }),
+    // end add-on: jobs
     // The three screens, each a target of capability `screen` under its own key.
     // A kayan says what each screen draws of it under `targets.<screen>`, and
     // `mithaq generate screens` writes each screen's `screen.json`, `types.ts`,

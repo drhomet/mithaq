@@ -459,7 +459,7 @@ the kayan's own `findByID`. A global holds no files, and a kayan that holds
 files keeps no versions. Where it lives:
 `packages/mithaq/src/storage/storage.ts` `resolveStorage`.
 
-The uploads template names `defaultStorageSweepTask` from its ejected `storage/defaults.ts` in `buildAsas.tasks` as `storageSweep`. It runs hourly in production hosts that call `connect({ work: ['maintenance'] })`. Run `storage sweep --check` first to inspect the existing object policy. The scheduled task first removes abandoned upload rows, then calls the same `config.sweep` object policy as the CLI. The CLI remains an object-only sweep and still prints keys; background logs contain task names and counts alone: rows checked, deleted and kept, objects listed and deleted, and failures.
+The uploads template names `defaultStorageSweepTask` from its ejected `storage/defaults.ts` in `buildAsas.tasks` as `storageSweep`. A long-running server passes `connect({ work: ['maintenance'] })` to run it hourly; a serverless host leaves `work` out and calls `mithaq jobs run maintenance` from the platform’s cron. Run `storage sweep --check` first to inspect the existing object policy. The scheduled task first removes abandoned upload rows, then calls the same `config.sweep` object policy as the CLI. The CLI remains an object-only sweep and still prints keys; background logs contain task names and counts alone: rows checked, deleted and kept, objects listed and deleted, and failures.
 
 Set `targets.storage.orphanAfter` to a positive grace period in milliseconds only on an upload kayan where an unattached row means an abandoned upload. A cleanup takes one organization at a time, locks each candidate and checks its references again in the delete transaction. Soft-deleted owners and every retained version snapshot keep the file, including rich-text upload nodes and relationship sets. Cleanup permanently deletes eligible rows even when the upload kayan normally soft-deletes, and calls `removed` after commit. Foreign-key refusals keep the row. A pointer using `onDelete: 'cascade'` or `'set null'` makes this policy unsafe and is refused with its field name. Owners and their upload must use the same store. An internal, row-specific maintenance actor authorizes only that selected delete; the ordinary tenant scope and sealed step store still apply, independently of project access rules.
 
@@ -579,7 +579,7 @@ is `templates/asas/src/asas.ts`.
 
 ### Jobs
 
-Jobs are a capability of the language. The template names its target explicitly:
+Jobs are a capability of the language. The template’s `jobs` add-on (`--with jobs`, also pulled in by `uploads`) names its target explicitly:
 
 <!-- from: templates/mithaq/src/mithaq.ts -->
 ```ts
