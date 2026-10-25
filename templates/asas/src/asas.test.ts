@@ -19402,3 +19402,26 @@ test('the default mention directory filters and limits managed tenant reads with
   await asas.kayan.roles.operations.update({ id: role.id, permissions: keys.filter((key) => key !== 'user.find') }, tenant.options)
   assert.equal((await search('rt2-directory')).status, 403, 'directory access itself is required')
 })
+
+test('jobs configuration refuses missing explicit policy and unsupported phase one behavior', () => {
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      memory: memoryStore(),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  const task = { slug: 'sweep', handler: async () => ({}), schedule: [{ cron: '@daily', queue: 'storage' }], retries: 0 }
+  const valid = { tasks: [task], autoRun: [{ cron: '@daily', queue: 'storage', limit: 1 }], lease: 30000 }
+  for (const [jobs, message] of [
+    [{ ...valid, lease: undefined }, /lease/],
+    [{ ...valid, tasks: [task, task] }, /duplicate.*sweep/i],
+    [{ ...valid, tasks: [{ ...task, retries: 1 }] }, /phase 1/],
+    [{ ...valid, tasks: [{ ...task, schedule: [{ cron: 'bad', queue: 'storage' }] }] }, /cron/i],
+    [{ ...valid, tasks: [{ ...task, schedule: [{ cron: '@daily' }] }] }, /queue/],
+    [{ ...valid, autoRun: [{ cron: '@daily', limit: 1 }] }, /queue/],
+  ] as const) {
+    assert.throws(() => language.buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], jobs } as never), message)
+  }
+})

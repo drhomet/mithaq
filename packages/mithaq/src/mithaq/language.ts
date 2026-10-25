@@ -144,7 +144,7 @@ export type Store<
   /** `'drizzle'` where this store's `db` and `tables` are drizzle's, which local auth reads its kayan through. */
   readonly sql?: 'drizzle'
   /** Builds what this store needs for one build, answering the store that build uses from then on. */
-  init(kayan: ResolvedKayan[]): void | Store<Kinds, Rules, Built, Tx, Row>
+  init(kayan: ResolvedKayan[], options?: { jobs: boolean }): void | Store<Kinds, Rules, Built, Tx, Row>
   /** Reaches the database and, unless `readOnly`, prepares it. `readOnly` writes nothing. */
   connect(args?: { readOnly?: boolean }): Promise<void>
   /** Run `fn` in one transaction. What it returns is what the write returns. */

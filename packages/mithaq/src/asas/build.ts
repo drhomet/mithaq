@@ -1,3 +1,5 @@
+import { buildJobs } from '../jobs/jobs.ts'
+import { checkJobs, type JobsConfig } from '../jobs/config.ts'
 import { rowsOf } from '../mithaq/rows.ts'
 import { accessReport, actor, actorPermissions, authActor, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
 import { betterAuthStrategy } from '../auth/better-auth/index.ts'
@@ -503,6 +505,7 @@ export const buildAsas = <
     http,
     messages,
     statements: declaredStatements,
+    jobs,
   }: {
     kayan: KayanList &
       (UniqueNames<KayanList> extends true ? unknown : { duplicateKayanNames: never }) &
@@ -510,6 +513,7 @@ export const buildAsas = <
         ? unknown
         : { authAccessActorMismatch: AccessActorMismatch<KayanList, L, ActorFor<L, KayanList>> | AdminAccessMismatch<Auth, ActorFor<L, KayanList>> | AdminAccessShapeMismatch<Auth> })
     /** The globals, each a kayan of one row. They share the kayan namespace. */
+    jobs?: JobsConfig
     global?: GlobalList
     auth?: Auth
     /**
@@ -538,6 +542,7 @@ export const buildAsas = <
       'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], or orpcHttp with the same options first for the typed client.',
     )
   }
+  if (jobs !== undefined) checkJobs(jobs)
   const globals = (global ?? []) as readonly Kayan[]
   const globalNames = new Set(globals.map((one) => one.name))
   // One list, so a name declared twice is refused whichever list it is in.
@@ -751,10 +756,11 @@ export const buildAsas = <
   ][]
   // Every store's `init` runs in registration order, which holds while no `init` consumes another's output.
   for (const [at, [name, store]] of stores.entries()) {
-    const own = store.init(resolved.filter((one) => one.store === name)) ?? store
+    const own = store.init(resolved.filter((one) => one.store === name), { jobs: jobs !== undefined && name === service.store }) ?? store
     stores[at] = [name, own]
     buildTargets[name] = own
   }
+  const jobRunner = jobs === undefined ? undefined : buildJobs({ config: jobs, store: buildTargets[service.store] as Store, asas: (): object => asas })
   const cap = service.depth
   if (!Number.isInteger(cap) || cap < 1) throw new Error('service.depth must be a positive integer.')
 
@@ -1117,6 +1123,7 @@ export const buildAsas = <
   }) : undefined
 
   const asas = {
+    jobs: jobRunner?.api,
     /** Every permission key this project has: one `<kayan>.<operation>` per operation, one `<kayan>.fields.<field>` per field, one `screen.<screen>` per screen. */
     catalog: catalog as readonly string[],
     /** Every scope of copy this project has. A getter: only the CLI reads it, and it calls the project's own resolver. */
@@ -1194,9 +1201,13 @@ export const buildAsas = <
     connect: async ({ readOnly }: { readOnly?: boolean } = {}) => {
       // `readOnly` writes nothing: no push.
       for (const [, store] of stores) await store.connect({ readOnly })
-      if (!readOnly) await refuseExtraTenants()
+      if (!readOnly) {
+        await refuseExtraTenants()
+        jobRunner?.start()
+      }
     },
     destroy: async () => {
+      await jobRunner?.stop()
       for (const [, store] of stores) await store.destroy()
     },
   }

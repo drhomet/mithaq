@@ -120,3 +120,5 @@ export {
   type ScreenRef,
 } from './screen/index.ts'
 export type { InferInput, InferOutput, StandardSchemaV1 } from './mithaq/standard-schema.ts'
+
+export { defaultJobLease, type JobTask, type JobRunner, type JobsConfig } from './jobs/config.ts'
