@@ -1,3 +1,5 @@
+import './test-storage-dir.ts'
+import { asas as template } from './asas.ts'
 import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
 import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultJoinLimit, defaultJobLease, defaultLimit, defaultMaxBodyBytes, defaultMaxLimit, defineMithaq, drizzleAdapter, drizzleIdKinds, drizzleKinds, drizzleRules, fetchHttp, serviceTarget, zodIdKinds, zodKinds, zodRules, zodTarget, type JobsConfig } from 'mithaq'
@@ -123,4 +125,21 @@ test('readOnly starts no timers and destroy waits for an in-flight timer tick', 
   await destroying
   builds.splice(builds.indexOf(writer), 1)
   assert.equal(calls, 1)
+})
+
+test('a database blip is caught and the next tick can run', async () => {
+  let calls = 0
+  const asas = build({ tasks: [{ slug: 'blip', handler: async () => { calls++; return {} }, schedule: [{ cron: '@daily', queue: 'blip' }], retries: 0 }], autoRun: [], lease: defaultJobLease })
+  const { db } = asas.targets.drizzle
+  await db.execute('alter table mithaq_jobs rename to mithaq_jobs_unavailable')
+  try { assert.deepEqual(await asas.jobs!.run({ queue: 'blip', limit: 1 }), { completed: 0, failures: 1 }) }
+  finally { await db.execute('alter table mithaq_jobs_unavailable rename to mithaq_jobs') }
+  assert.deepEqual(await asas.jobs!.run({ queue: 'blip', limit: 1 }), { completed: 1, failures: 0 })
+  assert.equal(calls, 1)
+})
+
+
+test('the template forwards jobs through its guarded store into the generated schema', () => {
+  assert.ok(template.jobs)
+  assert.equal(Object.hasOwn(template.targets.drizzle.tables, 'mithaq_jobs'), true)
 })

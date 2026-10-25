@@ -7,6 +7,7 @@ import type { JobsConfig } from './config.ts'
 
 export const buildJobs = ({ config, store, asas }: { config: JobsConfig; store: Store; asas: () => object }) => {
   if (store.sql !== 'drizzle' || !('db' in store)) throw new Error('Jobs phase 1 requires a Postgres drizzle service store.')
+  if (!('tables' in store) || !store.tables || typeof store.tables !== 'object' || !Object.hasOwn(store.tables, 'mithaq_jobs')) throw new Error('The jobs store must forward init options to build mithaq_jobs.')
   const db = store.db as NodePgDatabase
   const handleSchedules = async ({ queue, now = new Date() }: { queue: string; now?: Date }) => {
     let scheduled = 0
@@ -63,7 +64,7 @@ export const buildJobs = ({ config, store, asas }: { config: JobsConfig; store: 
       try {
         const output = await task.handler({ asas: asas(), input: row.input, signal: controller.signal })
         if (lost) throw new Error('Job lease could not be renewed.')
-        if (!output || Object.values(output).some((value) => typeof value !== 'number' || !Number.isFinite(value))) throw new Error('Job output must contain counts alone.')
+        if (!output || typeof output !== 'object' || Array.isArray(output) || Object.values(output).some((value) => typeof value !== 'number' || !Number.isFinite(value))) throw new Error('Job output must contain counts alone.')
         const result = await db.execute(sql`update mithaq_jobs set completed_at = clock_timestamp(), output = ${JSON.stringify(output)}::jsonb,
           processing_token = null, processing_until = null, updated_at = clock_timestamp()
           where id = ${row.id}::uuid and processing_token = ${token}::uuid and not has_error returning id`)

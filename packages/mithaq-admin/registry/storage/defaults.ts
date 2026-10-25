@@ -10,6 +10,8 @@ import {
   readForFile,
   sanitizeFilename,
   signReference,
+  sweepStorage,
+  type JobTask,
   type StorageConfig,
   type StorageKayan,
 } from 'mithaq'
@@ -152,4 +154,17 @@ export const defaultServeFile: StorageConfig['serve'] = async ({ request, kayan,
     disposition: kayan.storage.config.disposition({ filename: doc.filename, mimeType: doc.mimeType }),
     answer: ({ disposition }) => adapter.staticHandler(request, { doc, disposition }),
   })
+}
+
+
+/** The scheduled object and row cleanup policy a project names in jobs.tasks. */
+export const defaultStorageSweepTask: JobTask = {
+  slug: 'storage-sweep',
+  schedule: [{ cron: '@hourly', queue: 'storage' }],
+  retries: 0,
+  handler: async ({ asas }) => {
+    const counts = await sweepStorage({ asas })
+    console.info(counts)
+    return counts
+  },
 }

@@ -378,3 +378,9 @@ test('217o. the upload dialog draws its own file button, refuses an empty altern
   assert.equal(dialog.querySelector('#upload-media-alt')?.getAttribute('aria-invalid'), null, 'and the filled English box is not')
   assert.equal(dialog.querySelector('[data-upload-refused]'), null, 'with no banner above the form')
 })
+
+test('the unattached upload cap is translated with its limit and cannot be retried unchanged', async () => {
+  const { refusalOf } = await import('../registry/upload-api.ts')
+  const error = Object.assign(new Error('Attach a file first.'), { data: { key: 'error.invalid.upload_limit', params: { limit: 5 } } })
+  assert.deepEqual(refusalOf(error, () => 'أرفق ملفا أو احذفه أولا. الحد {limit}.'), { words: 'أرفق ملفا أو احذفه أولا. الحد 5.', retry: false })
+})

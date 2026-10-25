@@ -1,6 +1,6 @@
 import { defaultFields, globalTypeLabel } from '../base/fields.ts'
 import { sortableFields, type LabelFunction, type Localized, type ResolvedKayan } from './types.ts'
-import type { Language } from './language.ts'
+import { isStorage, type Language } from './language.ts'
 import { providerOf } from '../base/rules.ts'
 
 /** What one key resolves to: a record per locale, which is checked, or a function or string, which nothing can verify. */
@@ -52,6 +52,10 @@ const floorKeys = (language: Language): Record<string, Copy> => ({
       .map(([name, field]) => [`fields.${name}`, field.label as Copy]),
   ),
   globalType: globalTypeLabel,
+  ...(Object.values(language.targets).some(isStorage) && { 'error.invalid.upload_limit': {
+    en: 'Attach or remove an upload before uploading another. The limit is {limit}.',
+    ar: 'أرفق ملفا مرفوعا أو احذفه قبل رفع ملف آخر. الحد هو {limit}.',
+  } }),
   ...Object.fromEntries(
     Object.entries(language.rules)
       .filter(([, rule]) => rule.message)

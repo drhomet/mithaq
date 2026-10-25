@@ -1,3 +1,5 @@
+import { cleanupUploadedRows } from './cleanup.ts'
+import { countUnattached } from './references.ts'
 // The object key is decided before the upload and the row that names it is made
 // in one insert after the upload is verified, so no stored file goes unnamed by a failed second write.
 import { createHmac, timingSafeEqual } from 'node:crypto'
@@ -29,6 +31,11 @@ export const uploadFields = {
   storage: { kind: 'text', label: { en: 'Storage', ar: 'التخزين' }, rules: { providedBy: fileColumn, required: true } },
 } as const satisfies Record<string, Field>
 
+/** Optional ownership without a foreign key, so deleting a user never holds their files. */
+export const uploadedByField = {
+  uploadedBy: { kind: 'text', label: { en: 'Uploaded by', ar: 'رفع بواسطة' }, rules: { providedBy: fileColumn, index: true } },
+} as const satisfies Record<string, Field>
+
 /** The storage target as the language holds it: a capability, the project's config, and the `sweep` command. */
 export type StorageTarget = {
   readonly capability: 'storage'
@@ -42,6 +49,8 @@ export type KayanStorage = {
   readonly mimeTypes: readonly string[]
   readonly fileSize?: number
   readonly public?: true
+  readonly orphanAfter?: number
+  readonly maxUnattached?: number
 }
 
 /** The request the browser sends the file with. */
@@ -134,6 +143,8 @@ export type ResolvedStorage = {
   config: StorageConfig
   // Found by its `insert` step whatever the project named it.
   operation: string
+  maxUnattached?: number
+  unattached: (actor: unknown) => Promise<number | undefined>
   exists: (id: string) => Promise<boolean>
   /** The organization this actor's files of the kayan are kept under: null for a shared kayan, nothing where a tenant-owned one has no active organization. */
   tenant: (actor: unknown) => string | null | undefined
@@ -285,7 +296,7 @@ const readsOpen = (kayan: ResolvedKayan) => {
 export const resolveStorage = ({ language, resolved, storeOf, active }: {
   language: Language
   resolved: ResolvedKayan[]
-  storeOf: Swept['storeOf']
+  storeOf: StorageBuild['storeOf']
   /** The organization the actor's verified session has active, the one a tenant-owned kayan's files are kept under. */
   active: (actor: unknown) => string | undefined
 }) => {
@@ -346,6 +357,22 @@ export const resolveStorage = ({ language, resolved, storeOf, active }: {
     if (!Array.isArray(kept.mimeTypes) || !kept.mimeTypes.length || kept.mimeTypes.some((one) => typeof one !== 'string' || !/^[\w.+-]+\/(?:[\w.+-]+|\*)$/.test(one))) {
       throw new Error(`${where} with mimeTypes ${JSON.stringify(kept.mimeTypes)}, and mimeTypes is a list of the types it holds, such as ["image/png"] or ["image/*"].`)
     }
+    for (const key of ['orphanAfter', 'maxUnattached'] as const) {
+      if (kept[key] !== undefined && (!Number.isSafeInteger(kept[key]) || kept[key]! < 1)) throw new Error(`${where}.${key} must be a positive integer.`)
+    }
+    if (kept.maxUnattached !== undefined) {
+      const field = kayan.fields.uploadedBy
+      if (!field || field.kind !== 'text' || providerOf(field, 'create') !== 'application' || providerOf(field, 'update') !== 'never' || field.relationTo) throw new Error(`${where}.maxUnattached requires the shipped uploadedByField spread.`)
+    }
+    if (kept.orphanAfter !== undefined) {
+      if (!Object.values(kayan.operations).some((one) => one.steps.some((step) => sealOf(step) === 'remove'))) throw new Error(`${where}.orphanAfter requires a managed delete operation.`)
+      if (!kayan.fields.createdAt) throw new Error(`${where}.orphanAfter requires createdAt.`)
+      for (const owner of resolved) for (const field of Object.values(owner.fields)) {
+        if (field.kind === 'join' || (field.target?.name !== kayan.name && field.kind !== 'richText')) continue
+        if (field.rules?.onDelete === 'cascade' || field.rules?.onDelete === 'set null') throw new Error(`${where}.orphanAfter is unsafe because ${owner.name}.${field.name} uses onDelete: ${field.rules.onDelete}.`)
+        if (owner.store !== kayan.store) throw new Error(`${where}.orphanAfter requires ${owner.name}.${field.name} to use the same store.`)
+      }
+    }
     const fileSize = kept.fileSize ?? config.fileSize
     if (!Number.isSafeInteger(fileSize) || fileSize < 1) throw new Error(`${where} with fileSize ${String(kept.fileSize)}, and fileSize is a whole number of bytes above 0.`)
     if (kept.public !== undefined && kept.public !== true) throw new Error(`${where} with public ${String(kept.public)}, and public is true or left out.`)
@@ -388,7 +415,7 @@ export const resolveStorage = ({ language, resolved, storeOf, active }: {
     }
     // A shared kayan's files belong to no organization, whichever session uploads them.
     const tenant = kayan.tenant ? active : () => null
-    kayan.storage = { mimeTypes: kept.mimeTypes, fileSize, public: !!kept.public, config, operation, exists: existsIn(kayan), tenant }
+    kayan.storage = { maxUnattached: kept.maxUnattached, unattached: (actor) => countUnattached({ kayan, actor, tenant: tenant(actor), resolved, storeOf }), mimeTypes: kept.mimeTypes, fileSize, public: !!kept.public, config, operation, exists: existsIn(kayan), tenant }
   }
   return holding as StorageKayan[]
 }
@@ -498,6 +525,12 @@ export const storageRoutes = <Actor>({
         const actor = await who()
         // Asked by core, so no project's instructions sign an upload for someone who may not make the row.
         await authorize({ admin, actor, data: {}, effect: 'create', kayan: one, kind: 'insert', operation: one.storage.operation })
+        if (one.storage.maxUnattached !== undefined) {
+          const count = await one.storage.unattached(actor)
+          if (count === undefined) throw denied({ message: 'An upload cap requires an authenticated uploader.', key: 'error.forbidden.create', params: { kayan: one.name } })
+          // ponytail: instructions already signed can pass the cap; a strict cap needs reservations.
+          if (count >= one.storage.maxUnattached) throw invalid({ message: `Attach or remove an upload before uploading another. The limit is ${one.storage.maxUnattached}.`, key: 'error.invalid.upload_limit', params: { limit: one.storage.maxUnattached } })
+        }
         return Response.json(await config.instructions({ kayan: one, input, actor }))
       }
       if (verb !== 'file' || !id || rest.length || request.method !== 'GET') return null
@@ -517,27 +550,40 @@ export const storageRoutes = <Actor>({
   }
 }
 
-type Swept = { config: StorageConfig; kayan: readonly ResolvedKayan[]; storeOf: (kayan: ResolvedKayan) => Store }
-const built = new WeakMap<object, Swept>()
-export const recordStorage = (asas: object, swept: Swept) => void built.set(asas, swept)
+export type StorageBuild = {
+  config: StorageConfig
+  kayan: readonly ResolvedKayan[]
+  resolved: readonly ResolvedKayan[]
+  storeOf: (kayan: ResolvedKayan) => Store
+  collection: string | undefined
+  tenants: () => Promise<string[]>
+  remove: (args: { kayan: string; id: unknown; actor: unknown }) => Promise<unknown>
+}
+const built = new WeakMap<object, StorageBuild>()
+export const recordStorage = (asas: object, swept: StorageBuild) => void built.set(asas, swept)
+
+/** Removes only eligible rows, scoped to one organization at a time. */
+export const cleanupUploads = async ({ asas, tenant, now = new Date() }: { asas: object; tenant?: string; now?: Date }) => {
+  const build = built.get(asas)
+  if (!build) return { rowsChecked: 0, rowsDeleted: 0, rowsKept: 0, failures: 0 }
+  return cleanupUploadedRows({ build, tenant, now })
+}
+
+type SweepReport = (args: { name: string; orphans?: string[] }) => void
 
 // A row marked deleted still names its key, so its object stays.
-const sweep: Command = async ({ asas, flags }: CommandInput) => {
+const sweepObjects = async ({ asas, check, report }: { asas: object; check: boolean; report?: SweepReport }) => {
   const swept = built.get(asas)
-  if (!swept) {
-    console.log('This build names no storage, so there is nothing to sweep.')
-    return 0
-  }
-  const check = flags.includes('--check')
-  // A pool of its own wherever the store was made from a string: `mithaq generate
-  // --check` runs every command after a generator has destroyed the build.
+  const counts = { objectsListed: 0, objectsDeleted: 0, failures: 0 }
+  if (!swept) return counts
+  // A pool of its own for the CLI: generate --check may already have closed the build.
   const pools: { $client: { end(): Promise<void> } }[] = []
   try {
     const named = new Map<string, Set<string>>()
     for (const one of swept.kayan) {
       const store = swept.storeOf(one)
       const string = (store as { connectionString?: unknown }).connectionString
-      const own = store.sql === 'drizzle' && typeof string === 'string' && string ? drizzle(string) : undefined
+      const own = report && store.sql === 'drizzle' && typeof string === 'string' && string ? drizzle(string) : undefined
       if (own) pools.push(own)
       const { docs } = await store.find({ kayan: one.name, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } }, tx: own })
       for (const row of docs) {
@@ -547,19 +593,47 @@ const sweep: Command = async ({ asas, flags }: CommandInput) => {
       }
     }
     for (const [name, adapter] of Object.entries(swept.config.adapters)) {
-      if (!adapter.list) {
-        console.log(`Adapter "${name}" lists no objects, so it is not swept.`)
-        continue
+      if (!adapter.list) { report?.({ name }); continue }
+      const counted: StorageAdapter = {
+        ...adapter,
+        list: async function* () { for await (const object of adapter.list!()) { counts.objectsListed++; yield object } },
+        handleDelete: async (args) => { await adapter.handleDelete(args); counts.objectsDeleted++ },
       }
-      const orphans = await swept.config.sweep({ adapter, named: named.get(name) ?? new Set(), check, now: new Date() })
-      for (const key of orphans) console.log(`${check ? 'Orphan' : 'Removed'} in "${name}": ${key}`)
-      if (!orphans.length) console.log(`Adapter "${name}" holds no orphan old enough to sweep.`)
+      try {
+        const orphans = await swept.config.sweep({ adapter: counted, named: named.get(name) ?? new Set(), check, now: new Date() })
+        report?.({ name, orphans })
+      } catch (error) {
+        if (report) throw error
+        counts.failures++
+      }
     }
-    return 0
+    return counts
   } finally {
     for (const pool of pools) await pool.$client.end().catch(() => {})
-    await asas.destroy().catch(() => {})
   }
+}
+
+/** The scheduled task's counts-only flow: remove abandoned rows, then sweep unnamed objects. */
+export const sweepStorage = async ({ asas }: { asas: object }) => {
+  const rows = await cleanupUploads({ asas })
+  const objects = await sweepObjects({ asas, check: false })
+  return { ...rows, ...objects, failures: rows.failures + objects.failures }
+}
+
+const sweep: Command = async ({ asas, flags }: CommandInput) => {
+  if (!built.has(asas)) {
+    console.log('This build names no storage, so there is nothing to sweep.')
+    return 0
+  }
+  const check = flags.includes('--check')
+  try {
+    await sweepObjects({ asas, check, report: ({ name, orphans }) => {
+      if (!orphans) { console.log(`Adapter "${name}" lists no objects, so it is not swept.`); return }
+      for (const key of orphans) console.log(`${check ? 'Orphan' : 'Removed'} in "${name}": ${key}`)
+      if (!orphans.length) console.log(`Adapter "${name}" holds no orphan old enough to sweep.`)
+    } })
+    return 0
+  } finally { await asas.destroy().catch(() => {}) }
 }
 
 /** The storage target over the project's config. The storage rukn builds it. */

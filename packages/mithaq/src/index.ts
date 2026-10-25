@@ -66,7 +66,7 @@ export {
 export type { Authorize, BoundKayans, ByID, CreateOf, Globals, IdOf, Options, Procedures, ReadOptions, Row, RowOf, UpdateOf, Version, Writes } from './asas/runner/write.ts'
 export type { Where } from './mithaq/where.ts'
 export { defaultFields, defaultGlobalFields, defaultIdField, defaultTimestampFields } from './base/fields.ts'
-export { uploadFields } from './storage/storage.ts'
+export { uploadFields, uploadedByField } from './storage/storage.ts'
 export { accessFor, fieldAccessFor } from './mithaq/types.ts'
 export type { Access, AccessArgs, AccessResult, AdminAccess, AdminAccessArgs, CompoundIndex, FieldAccess, FieldAccessArgs, Field, FilterOptions, JsonSchema, Kayan, KayanService, LabelFunction, Localized, LocalesOf, MessageMap, MessageTree, ResolvedField, ResolvedKayan, RuntimeField } from './mithaq/types.ts'
 export type { Copy, MessageRegistry, MessageScope, MessagesResolver, ProjectMessages } from './mithaq/messages.ts'
@@ -82,6 +82,8 @@ export { Refusal } from './mithaq/refusal.ts'
 export { defaultRules, providerOf, rule, type ProvidedBy, type Provider, type Rule, type Rules, type RuleValue } from './base/rules.ts'
 export { draftFields, versionOperations } from './versions/versions.ts'
 export {
+  cleanupUploads,
+  sweepStorage,
   adapterOf,
   allowedType,
   checkReference,

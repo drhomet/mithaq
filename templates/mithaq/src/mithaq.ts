@@ -119,7 +119,7 @@ const drizzleStore = drizzleAdapter({
  */
 const guarded = (store: typeof drizzleStore): typeof drizzleStore => ({
   ...store,
-  init: (kayan) => guarded((store.init(kayan) ?? store) as typeof drizzleStore) as never,
+  init: (kayan, options) => guarded((store.init(kayan, options) ?? store) as typeof drizzleStore) as never,
   connect: async (args?: { readOnly?: boolean }) => {
     requireDatabaseUrl()
     if (process.env.NODE_ENV === 'production' && !args?.readOnly) requireMailer(authSettings)

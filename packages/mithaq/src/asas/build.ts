@@ -1,3 +1,6 @@
+import { cleanupUploadTargets } from '../storage/references.ts'
+import type { KayanStorage } from '../storage/storage.ts'
+import { storageMaintenanceAccess } from './runner/storage-maintenance.ts'
 import { buildJobs } from '../jobs/jobs.ts'
 import { checkJobs, type JobsConfig } from '../jobs/config.ts'
 import { rowsOf } from '../mithaq/rows.ts'
@@ -512,8 +515,9 @@ export const buildAsas = <
       (AccessActorMismatch<KayanList, L, ActorFor<L, KayanList>> | AdminAccessMismatch<Auth, ActorFor<L, KayanList>> | AdminAccessShapeMismatch<Auth> extends never
         ? unknown
         : { authAccessActorMismatch: AccessActorMismatch<KayanList, L, ActorFor<L, KayanList>> | AdminAccessMismatch<Auth, ActorFor<L, KayanList>> | AdminAccessShapeMismatch<Auth> })
-    /** The globals, each a kayan of one row. They share the kayan namespace. */
+    /** Opt-in scheduled Postgres work; absent builds gain no table or timers. */
     jobs?: JobsConfig
+    /** The globals, each a kayan of one row. They share the kayan namespace. */
     global?: GlobalList
     auth?: Auth
     /**
@@ -611,7 +615,11 @@ export const buildAsas = <
   const storage = stored[0]?.storage.config
   // Set on every field before any schema is derived, for a value that points at a file from inside it.
   const filesIn = stored.map((one) => one.name)
-  for (const field of resolved.flatMap((one) => Object.values(one.fields))) field.filesIn = filesIn
+  const cleanedUploads = stored.filter((one) => (one.targets?.storage as KayanStorage).orphanAfter !== undefined)
+  for (const field of resolved.flatMap((one) => Object.values(one.fields))) {
+    field.filesIn = filesIn
+    if (field.kind === 'richText') cleanupUploadTargets.set(field, cleanedUploads)
+  }
   // Checked once, so a bad screen is refused here rather than at the first page drawn.
   const screens = screensOf(language, resolved)
   const hasAudit = (list: readonly unknown[] | undefined) => list?.some((step) => sealOf(step as WriteStep) === 'audit') ?? false
@@ -815,12 +823,12 @@ export const buildAsas = <
     )
   }
   // The tenant scope goes under both authorizers, so replacing either cannot leave it out.
-  const authorize: Authorize = tenant.scoped(service.authorize === defaultAuthorize
+  const authorize: Authorize = tenant.scoped(storageMaintenanceAccess(service.authorize === defaultAuthorize
     ? defaultAuthorize
     : async (args) => {
         const own = await service.authorize(args)
         return combineWhere(await defaultAuthorize(args), own === undefined ? undefined : assertWhere(args.kayan, own))
-      })
+      }))
 
   let built!: Record<string, Record<string, unknown>>
   const assertNoOptions = (value: unknown) => {
@@ -1240,7 +1248,22 @@ export const buildAsas = <
   for (const record of [declared, resolved, built, asas.kayan, asas.global, operationTable, screens]) freeze(record)
   // Keyed by the build, off its public shape.
   resolvedKayans.set(asas, Object.freeze(Object.fromEntries(resolved.map((one) => [one.name, one]))))
-  if (storage && stored.length) recordStorage(asas, { config: storage, kayan: stored, storeOf: (one) => buildTargets[one.store] as Store })
+  if (storage && stored.length) recordStorage(asas, {
+    config: storage, kayan: stored, resolved, collection: betterAuthKayan[0],
+    storeOf: (one) => buildTargets[one.store] as Store,
+    tenants: async () => {
+      const target = language.targets.tenant
+      if (!isTenant(target)) return []
+      const one = resolvedByName.get(target.relationTo)!
+      const { docs } = await (buildTargets[one.store] as Store).find({ kayan: one.name, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } } })
+      return docs.map((row) => String(row.id))
+    },
+    remove: ({ kayan, id, actor }) => {
+      const one = resolvedByName.get(kayan)!
+      const name = Object.entries(one.operations).find(([, operation]) => operation.steps.some((step) => sealOf(step) === 'remove'))![0]
+      return ((built[kayan]!.operations as Record<string, Called>)[name]!)({ id }, { actor })
+    },
+  })
   // A strategy pushed onto the list, or a handler or target swapped in, would answer every later request.
   for (const record of [strategies, asas.auth, asas.targets, asas]) Object.freeze(record)
   return asas

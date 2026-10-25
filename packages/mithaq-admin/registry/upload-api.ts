@@ -16,7 +16,7 @@ export const refusedFile = (file: { type: string; size: number }, storage?: { mi
 }
 
 /** The refusals about the file itself, which sending it again meets again, so no retry is offered. A failed send, a 412 or a 5xx may pass a second time. */
-const final = new Set(['error.invalid.upload_type', 'error.invalid.upload_size', 'error.invalid.upload_verify'])
+const final = new Set(['error.invalid.upload_type', 'error.invalid.upload_size', 'error.invalid.upload_verify', 'error.invalid.upload_limit'])
 
 const vendorNames: Readonly<Record<string, string>> = {
   'vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
@@ -51,7 +51,9 @@ export const sizeOf = (bytes: number, locale: string): string => {
 export const refusalOf = (thrown: unknown, t: Translate) => {
   const message = thrown instanceof Error ? thrown.message : String(thrown)
   const key = refusalKeyOf(thrown)
-  return { words: (key && t(key, message)) || message, retry: !final.has(key ?? '') }
+  const limit = (thrown as { data?: { params?: { limit?: unknown } } } | null)?.data?.params?.limit
+  const words = (key && t(key, message)) || message
+  return { words: key === 'error.invalid.upload_limit' && typeof limit === 'number' ? words.replaceAll('{limit}', String(limit)) : words, retry: !final.has(key ?? '') }
 }
 
 /** Headers a browser sets itself and refuses from a script, which the S3 adapter signs and the browser sends anyway. */

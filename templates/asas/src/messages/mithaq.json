@@ -1,4 +1,12 @@
 {
+  "error": {
+    "invalid": {
+      "upload_limit": {
+        "ar": "أرفق ملفا مرفوعا أو احذفه قبل رفع ملف آخر. الحد هو {limit}.",
+        "en": "Attach or remove an upload before uploading another. The limit is {limit}."
+      }
+    }
+  },
   "fields": {
     "createdAt": {
       "ar": "تاريخ الإنشاء",
