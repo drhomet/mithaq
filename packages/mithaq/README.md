@@ -450,7 +450,7 @@ fields: { ...defaultFields, ...draftFields, /* ... */ },
 Where it lives: `packages/mithaq/src/versions/versions.ts` `versionsOf`.
 
 **Storage.** A kayan holds files by writing `targets.storage` (`mimeTypes`,
-optional `fileSize`, optional `public: true`) and spreading `uploadFields`.
+optional `fileSize`, optional `public: true`, `orphanAfter` and `maxUnattached`) and spreading `uploadFields`.
 Exactly one of its operations makes rows, and that operation runs the config's
 `uploaded` step in `beforeTransaction`. The browser asks `POST
 /api/<kayan>/uploadInstructions`, uploads the file, and sends the signed
@@ -458,6 +458,12 @@ reference back in the create; `GET /api/<kayan>/file/<id>` serves it through
 the kayan's own `findByID`. A global holds no files, and a kayan that holds
 files keeps no versions. Where it lives:
 `packages/mithaq/src/storage/storage.ts` `resolveStorage`.
+
+The uploads template names `defaultStorageSweepTask` from its ejected `storage/defaults.ts` in `buildAsas.jobs.tasks`. It runs hourly; production checks for due work every five minutes. Run `storage sweep --check` first to inspect the existing object policy. The scheduled task first removes abandoned upload rows, then calls the same `config.sweep` object policy as the CLI. The CLI remains an object-only sweep and still prints keys; background logs contain task slugs and counts alone: rows checked, deleted and kept, objects listed and deleted, and failures.
+
+Set `targets.storage.orphanAfter` to a positive grace period in milliseconds only on an upload kayan where an unattached row means an abandoned upload. A cleanup takes one organization at a time, locks each candidate and checks its references again in the delete transaction. Soft-deleted owners and every retained version snapshot keep the file, including rich-text upload nodes and relationship sets. Cleanup permanently deletes eligible rows even when the upload kayan normally soft-deletes, and calls `removed` after commit. Foreign-key refusals keep the row. A pointer using `onDelete: 'cascade'` or `'set null'` makes this policy unsafe and is refused with its field name. Owners and their upload must use the same store. An internal, row-specific maintenance actor authorizes only that selected delete; the ordinary tenant scope and sealed step store still apply, independently of project access rules.
+
+Set `targets.storage.maxUnattached` to a positive per-user cap and spread `uploadedByField` beside `uploadFields`. The runner writes the actor's id to the optional `uploadedBy` text column on create and refuses managed updates to it. It has no foreign key, so deleting a user never blocks on their uploads. Instructions are refused with the translated `error.invalid.upload_limit` and a `limit` parameter while that user already holds the cap of unattached rows in the active organization. Attaching or permanently removing a file frees a slot; trashed, unattached uploads still count. Previously signed instructions can exceed the cap; a strict cap needs reservations. Add the field with a migration before enabling the cap. The template's `media` is a library, so it enables neither policy: an unreferenced image there is normal.
 
 **Screens.** A kayan says what each screen draws of it under
 `targets.<screen>`: its title field, its pages, and per-field drawing hints. See
@@ -569,6 +575,33 @@ export const asas = buildAsas({
 
 Where it lives: `packages/mithaq/src/asas/build.ts` `buildAsas`; the template's
 is `templates/asas/src/asas.ts`.
+
+### Jobs
+
+Jobs are opt-in on `buildAsas`, independently of the language vocabulary. Existing projects with no `jobs` key gain no table, timer or migration. Adding `jobs` requires `mithaq migrate` and applying that migration before starting a runner.
+
+```ts
+jobs: {
+  tasks: [{
+    slug: 'storage-sweep',
+    handler: async ({ asas, input, signal }) => sweepStorage({ asas }),
+    schedule: [{ cron: '@hourly', queue: 'storage' }],
+    retries: 0,
+  }],
+  autoRun: [{ cron: '*/5 * * * *', queue: 'storage', limit: 1 }],
+  lease: defaultJobLease,
+},
+```
+
+Import `sweepStorage` and `defaultJobLease` from `mithaq`, or name the project's `defaultStorageSweepTask` in `tasks`. Every task names a unique `slug`, a handler, `schedule` and `retries: 0`. A handler receives `{ asas, input, signal? }` and returns a record of finite numeric counts. Every schedule and `autoRun` entry names its queue; each runner also names a positive limit. A drizzle wrapper must forward both `init(kayan, options)` arguments so the jobs table reaches the generated schema. The lease is explicit milliseconds; `defaultJobLease` is thirty seconds. Invalid cron expressions, duplicate slugs, missing queues or lease, and retries other than zero are refused at build time. Cron expressions use UTC.
+
+Core's `mithaq_jobs` Postgres table is generated and migrated with the schema, never declared as a kayan or exposed over HTTP or the step store. It holds the task, input, queue, nullable tenant, schedule and wait times, lease token and expiry, attempts, completion, error, output and timestamps. Phase 1 writes a null tenant and only claims null-tenant jobs. `asas.jobs.handleSchedules({ queue, now? })` inserts the latest fire at or before now; older missed fires are not backfilled. A partial unique index on `(task, scheduled_for)` makes each occurrence one job across instances, even with simultaneous scheduler ticks. Two schedules of one task firing at the same moment share that occurrence, including when they name different queues.
+
+`asas.jobs.runJobs({ queue, limit })` claims due work with `FOR UPDATE SKIP LOCKED`, increments attempts and renews the lease while handlers run. Successful jobs keep their counts; throws fail the job with `{ message }` in the table, while logs omit the message. An expired, already-attempted job fails as interrupted and is never blindly rerun. Completed and failed rows remain as history; phase 1 has no retention task.
+
+`asas.jobs.run({ queue, limit })` schedules and runs once, catching database failures and logging failure counts. A normal `connect()` starts one protected, unreferenced croner timer per `autoRun` entry. `connect({ readOnly: true })` starts none, and `destroy()` stops timers and waits for their current ticks before closing stores. The template supplies `autoRun` only in production outside tests. For a host without a lasting process, an external scheduler runs [`mithaq jobs run`](src/asas/cli/README.md#jobs-run); explicit `--queue` and `--limit` also work when the template disables automatic runners in development.
+
+Phase 1 has no operation-side `jobs.queue`, tenant execution, retries or backoff, HTTP job endpoint, backoffice screen, concurrency keys or workflows. The nullable tenant and other state columns reserve that future contract; none is an escape from managed tenant enforcement.
 
 ### Defaults are explicit
 

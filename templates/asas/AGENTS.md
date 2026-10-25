@@ -25,6 +25,12 @@ A feature reaches another feature's kayan by its name (`relationTo: 'user'`) or 
 
 The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `rich-text`, `uploads`, `media`, `courses`, `backoffice`); `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
 
+## Storage jobs
+
+With uploads, `src/asas.ts` names `jobs`, `defaultJobLease` and the ejected `defaultStorageSweepTask` from `packages/mithaq/src/storage/defaults.ts`. Only production outside tests starts automatic runners. Use `mithaq jobs run --queue storage --limit 1` with an explicit `DATABASE_URL` for one pass. Adding `jobs` to an existing project needs a migration; leaving it absent changes nothing. Run `storage sweep --check` first to inspect the object policy, whose CLI still prints keys. Background logs hold counts and task slugs alone.
+
+`targets.storage.orphanAfter` opts an upload kayan into permanently deleting abandoned rows after its grace in milliseconds. Cleanup uses its managed delete within one organization's normal tenant scope, locks and rechecks every row, keeps soft-deleted owners and every version snapshot, and removes objects after commit. Never bypass that scope or use cascade/set-null pointers to a cleaned kayan. For `maxUnattached`, spread `uploadedByField` beside `uploadFields` and migrate before enabling it. Core writes its text uploader id on create, never updates it and adds no user foreign key. The cap counts only that user's unattached rows in their organization; already signed instructions can exceed it. Leave both options off a media library where an unreferenced file is normal. Read [Storage adapters](README.md#storage-adapters) before changing the policy.
+
 ## Adding a kayan
 
 Copy `packages/features/tags/`; with the courses add-on, `packages/features/courses/courses/courses.ts` shows custom operations and steps.

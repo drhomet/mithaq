@@ -973,6 +973,15 @@ Each upload row stores the name of the adapter that holds its file. `STORAGE_ADA
 
 `mithaq storage sweep` deletes objects that no row names and that are more than a day old. Run it with `--check` first to see the list (see [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#storage-sweep)).
 
+With the uploads add-on, `src/asas.ts` names `jobs` and the ejected `defaultStorageSweepTask`. Production checks due work every five minutes; the default task schedules an hourly sweep. Development and tests start no timers. Multiple instances insert each scheduled occurrence once through a Postgres unique index and claim work with `FOR UPDATE SKIP LOCKED`. Logs contain only task slugs and numeric counts. Throws fail that job; expired leases are marked interrupted without a retry, and the next occurrence can still run. Shutdown waits for active timer ticks. Apply the generated `mithaq_jobs` migration before enabling jobs in an existing project; without a `jobs` key existing projects see no change.
+
+For an external cron or a manual development run, use `bunx mithaq jobs run --queue storage --limit 1` with `DATABASE_URL` exported. It schedules and runs once without starting timers. The scheduled task first cleans eligible upload rows, then reuses the CLI's object policy. The CLI's `storage sweep --check` remains the preview for object cleanup; it does not remove upload rows.
+
+On an upload kayan, optional `targets.storage.orphanAfter` is a positive grace period in milliseconds for abandoned rows. Cleanup permanently deletes an eligible row through its managed delete, scoped to one organization, after locking it and checking again for references. Soft-deleted owners, relationship sets, rich-text uploads and every retained version keep a file. `cascade` and `set null` pointers targeting that kayan are refused; its owners must share its store. The `removed` step deletes the object after commit. Keep the grace longer than the form's expected lifetime.
+
+Optional `targets.storage.maxUnattached` caps unattached rows per user in their organization. Spread `uploadedByField` from `mithaq` beside `uploadFields`, then migrate: core fills its optional text column from the actor's id on create, and never updates it. It has no user foreign key. The refusal is translated with its limit; attaching or removing a file frees room. Signed instructions can still race past this soft cap; strict caps need reservations. The `media` kayan enables neither option because it is a library where unattached files are normal. See the [language's jobs guide](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/README.md#jobs).
+
+
 ### Building and starting both apps
 
 Each app's `build` script runs `mithaq lock --check` in `packages/asas`, then `vite build`, which writes `dist/`:
