@@ -27,6 +27,13 @@ const every = Object.keys(addOns)
 const read = (...path: string[]) => readFileSync(join(scratch, ...path), 'utf8')
 const json = (...path: string[]) => JSON.parse(read(...path))
 
+test('each add-on removes only copy keys that the template holds', () => {
+  const copy = JSON.parse(readFileSync(join(template, 'templates/asas/src/messages/mithaq.json'), 'utf8'))
+  for (const [name, { copy: keys }] of Object.entries(addOns)) for (const key of keys) {
+    assert.notEqual(key.split('.').reduce((branch, part) => branch?.[part], copy), undefined, `${name}: ${key}`)
+  }
+})
+
 test('a project takes the published mithaq and mithaq-admin under the names its imports use, at exactly one version', () => {
   create({ name: 'my-app', cwd: scratch, template, version: '1.2.3', addOns: every })
   const features = readdirSync(join(scratch, 'my-app/packages/features')).map((one) => `packages/features/${one}`)

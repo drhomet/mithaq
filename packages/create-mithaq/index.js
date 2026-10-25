@@ -90,7 +90,7 @@ export const addOns = {
   'rich-text-find-replace': { needs: ['rich-text'], files: [], without: [], packages: [], copy: [], tables: false },
   'rich-text-comments': { needs: ['rich-text', 'audit-log'], files: ['packages/features/rich-text-comments', 'packages/asas/src/messages/richTextThreads.json'], without: [], packages: [], copy: [], tables: true },
   // The `upload` kind, the storage target and its adapters.
-  uploads: { needs: [], files: ['packages/mithaq/src/storage'], without: [], packages: ['aws4fetch', 'file-type', 'image-dimensions'], copy: ['kinds.upload', 'kinds.upload.invalid', 'error.invalid.upload_limit'], tables: true },
+  uploads: { needs: [], files: ['packages/mithaq/src/storage'], without: [], packages: ['aws4fetch', 'file-type', 'image-dimensions'], copy: ['kinds.upload', 'kinds.upload.invalid'], tables: true },
   // The organization's images, which an upload field points at.
   media: { needs: ['uploads'], files: ['packages/features/media', 'packages/asas/src/messages/media.json'], without: [], packages: [], copy: [], tables: true },
   // The worked example: its business roles are the roles add-on's, its edit pages draw the audit log's activity, its
