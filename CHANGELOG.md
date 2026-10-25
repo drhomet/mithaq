@@ -1,9 +1,11 @@
 # Changelog
 
-## 0.3.6
+## 0.3.7
 
 - Opt-in Postgres jobs on `buildAsas` schedule each occurrence once across instances, claim due work with leases and heartbeats, and run through timers or `mithaq jobs run`. Existing projects see no change until they add `jobs`; adding it needs a migration for `mithaq_jobs`. Phase 1 has no retries, operation queueing or tenant job execution.
 - The uploads template schedules `defaultStorageSweepTask` in production with counts-only logs. Upload kayan may opt into `orphanAfter` cleanup through scoped managed deletes, retaining soft-deleted owners and every version, or `maxUnattached` per-user caps with the optional `uploadedByField` and a translated refusal. The media library enables neither policy. The object-only `storage sweep --check` command and its output stay unchanged.
+
+## 0.3.6
 
 - Empty cells of every shipped kind show one dash with localized accessible words. Checkbox cells show declared true/false words or localized Yes/No.
 - Datetime fields named `archivedAt` draw Active/Archived badges in lists and phone cards; record pages keep the date.

@@ -156,7 +156,6 @@ export const defaultServeFile: StorageConfig['serve'] = async ({ request, kayan,
   })
 }
 
-
 /** The scheduled object and row cleanup policy a project names in jobs.tasks. */
 export const defaultStorageSweepTask: JobTask = {
   slug: 'storage-sweep',

@@ -1253,9 +1253,9 @@ const refusalKeys = new Map([
 export const refusalKey = (status: number, code: unknown): string | undefined =>
   status === 429 ? 'auth.tooManyRequests' : typeof code === 'string' ? refusalKeys.get(code) : undefined
 
-/** The `t` a screen is handed, for one locale. A key splits at its first dot into scope and key; an unanswered key returns the caller's fallback. */
 const generatedCopy = copyFile(mithaq)
 
+/** The `t` a screen is handed, for one locale. A key splits at its first dot into scope and key; an unanswered key returns the caller's fallback. */
 export const translator =
   (which: string): Translate =>
   (key, fallback) => {

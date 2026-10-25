@@ -981,7 +981,6 @@ On an upload kayan, optional `targets.storage.orphanAfter` is a positive grace p
 
 Optional `targets.storage.maxUnattached` caps unattached rows per user in their organization. Spread `uploadedByField` from `mithaq` beside `uploadFields`, then migrate: core fills its optional text column from the actor's id on create, and never updates it. It has no user foreign key. The refusal is translated with its limit; attaching or removing a file frees room. Signed instructions can still race past this soft cap; strict caps need reservations. The `media` kayan enables neither option because it is a library where unattached files are normal. See the [language's jobs guide](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/README.md#jobs).
 
-
 ### Building and starting both apps
 
 Each app's `build` script runs `mithaq lock --check` in `packages/asas`, then `vite build`, which writes `dist/`:
