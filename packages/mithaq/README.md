@@ -609,15 +609,15 @@ Core’s scheduler and worker contain no SQL. `drizzleJobs` owns `mithaq_jobs`, 
 
 Implement `JobsDriver` from `mithaq`. Its `store` names the compatible store, `fits(store)` checks compatibility, and `init(store)` binds a fresh driver to the initialized store. `buildAsas` calls these against the service store so future operation-side enqueue can share its transaction. A target is `{ capability: 'jobs', type, driver, lease, retain }`; it builds no field maps.
 
-- `record({ task, scheduledFor, queue, tenant })` records only when no row of that task has an equal or newer scheduled time; equal racers insert once. Pruning preserves the newest row as the task watermark.
+- `record({ task, scheduledFor, queue, tenant })` records only when no row of that task has an equal or newer scheduled time; equal racers insert once. A recorded occurrence is immediately due even if its scheduled time is ahead of the driver clock; only `enqueue({ runAt })` delays work. Pruning preserves the newest row as the task watermark.
 - `enqueue({ task, input, queue, tenant, runAt, tx })` joins the caller’s transaction, including rollback. This driver method is tested now; operation-side enqueue is not exposed yet.
 - `claim({ queue, tasks, limit, lease, token })` returns exclusive due jobs whose names are in `tasks`, only unclaimed and never attempted. A rolling deployment leaves unknown tasks for an instance that knows them. Phase one claims null-tenant jobs alone.
 - `renew({ ids, token, lease })` returns only ids with unexpired leases still owned by the token.
 - `finish({ id, token, output } | { id, token, error })` completes or fails only work whose unexpired lease that token owns. Stale tokens change nothing.
 - `expire()` fails expired held work without making it runnable again and returns its count.
-- `prune({ completedBefore, failedBefore })` removes terminal history by its respective age and returns its count, keeping the newest scheduled row of each task even past retention.
+- `prune({ completed, failed })` takes retention durations in milliseconds and removes terminal history older than those durations using the driver’s clock. It returns the count, keeping the newest scheduled row of each task even past retention.
 
-Run the exported `jobsContract(factory)` from `mithaq/jobs/contract` in a `node:test` file. The async factory returns `{ driver, peer, transaction, destroy }`, with both drivers sharing fresh storage and transactions for each case. The driver owns its clock for claims, renewal, completion and expiry; drizzle uses `clock_timestamp()` and memory uses its own clock. The same suite proves races across drivers, task filters, claim limits and due times, rollback and commit visibility, renewal past the original deadline, expiry, stale finishes and watermark-preserving retention for both shipped drivers.
+Run the exported `jobsContract(factory)` from `mithaq/jobs/contract` in a `node:test` file. The async factory returns `{ driver, peer, transaction, destroy }`, with both drivers sharing fresh storage and transactions for each case. The driver owns its clock for claims, renewal, completion, expiry and retention; drizzle uses `clock_timestamp()` and memory uses its own clock. The same suite proves races across drivers, task filters, claim limits and due times, rollback and commit visibility, renewal past the original deadline, expiry, stale finishes and watermark-preserving retention for both shipped drivers.
 
 Polling wakes workers only at task cron fires. Wake-ups, Convex and Prisma drivers, tasks per organization, enqueue from operations, retries, `LISTEN/NOTIFY` and an HTTP runner are later work. Tenant columns reserve that future contract; jobs provide no escape from managed tenant enforcement.
 

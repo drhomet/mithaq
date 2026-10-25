@@ -40,7 +40,7 @@ const driver = (store?: MemoryStore): JobsDriver => {
     init: (store) => driver(store as MemoryStore),
     record: async (args) => {
       if (rows.some((row) => row.task === args.task && row.scheduledFor !== null && row.scheduledFor >= args.scheduledFor)) return false
-      add({ ...args, input: {}, runAt: args.scheduledFor })
+      add({ ...args, input: {}, runAt: new Date(0) })
       return true
     },
     claim: async ({ queue, tasks, limit, lease, token }) => {
@@ -73,9 +73,10 @@ const driver = (store?: MemoryStore): JobsDriver => {
       for (const row of expired) { row.failed = now; row.error = { message: 'Job interrupted after its lease expired.' }; row.token = null; row.until = 0 }
       return expired.length
     },
-    prune: async ({ completedBefore, failedBefore }) => {
+    prune: async ({ completed, failed }) => {
+      const now = Date.now()
       // ponytail: pruning scans memory history quadratically; index per-task watermarks if large queues need it.
-      const old = rows.filter((row) => ((row.completed !== null && row.completed < completedBefore.getTime()) || (row.failed !== null && row.failed < failedBefore.getTime()))
+      const old = rows.filter((row) => ((row.completed !== null && row.completed < now - completed) || (row.failed !== null && row.failed < now - failed))
         && (row.scheduledFor === null || rows.some((newer) => newer.task === row.task && newer.scheduledFor !== null && newer.scheduledFor > row.scheduledFor!)))
       for (const row of old) rows.splice(rows.indexOf(row), 1)
       return old.length

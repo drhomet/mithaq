@@ -81,8 +81,7 @@ export const buildJobs = ({ target, tasks, asas }: { target: JobsTarget; tasks: 
         console.error({ failures: 1 })
       } finally {
         try {
-          const now = Date.now()
-          const pruned = await driver.prune({ completedBefore: new Date(now - target.retain.completed), failedBefore: new Date(now - target.retain.failed) })
+          const pruned = await driver.prune(target.retain)
           if (pruned) console.info({ pruned })
         } catch { if (!passFailed) { failures++; console.error({ failures: 1 }) } }
       }

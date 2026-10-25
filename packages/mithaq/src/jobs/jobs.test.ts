@@ -13,6 +13,6 @@ test('the generic worker runs memory jobs and prunes every pass without reschedu
     await new Promise((resolve) => setTimeout(resolve, 5))
     assert.deepEqual(await worker.api.run({ queue: 'maintenance' }), { completed: 0, failures: 0 })
     assert.equal(calls, 1)
-    assert.equal(await driver.prune({ completedBefore: new Date(Date.now() + 1000), failedBefore: new Date(Date.now() + 1000) }), 0)
+    assert.equal(await driver.prune({ completed: 0, failed: 0 }), 0)
   } finally { await worker.stop() }
 })

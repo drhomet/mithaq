@@ -14,7 +14,7 @@ export type JobsDriver = {
   fits(store: JobStore): boolean
   /** Bind a fresh driver to this build's initialized store. */
   init(store: JobStore): JobsDriver
-  /** Record only occurrences newer than the task watermark; equal racers insert at most one row, even after pruning. */
+  /** Record immediately due occurrences newer than the task watermark; equal racers insert at most one row, even after pruning. */
   record(args: { task: string; scheduledFor: Date; queue: string; tenant: string | null }): Promise<boolean>
   /** Join the caller's transaction: a rollback must leave no queued job. */
   enqueue(args: { task: string; input: unknown; queue: string; tenant: string | null; runAt: Date; tx: unknown }): Promise<void>
@@ -26,8 +26,8 @@ export type JobsDriver = {
   finish(args: JobFinish): Promise<void>
   /** Using the driver clock, fail expired held jobs without making them runnable again. Return the number expired. */
   expire(): Promise<number>
-  /** Remove terminal jobs past their cutoffs except each task’s newest scheduled row, its durable watermark. Return the count. */
-  prune(args: { completedBefore: Date; failedBefore: Date }): Promise<number>
+  /** Using the driver clock and retention durations in ms, remove old terminal jobs except each task’s newest scheduled row, its durable watermark. Return the count. */
+  prune(args: JobRetention): Promise<number>
 }
 
 export type JobsTarget = JobPolicy & { readonly capability: 'jobs'; readonly type: string; readonly driver: JobsDriver }

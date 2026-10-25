@@ -16,8 +16,8 @@ const driver = (store?: JobStore): JobsDriver => {
       return driver(store)
     },
     record: async ({ task, scheduledFor, queue, tenant }) => {
-      const result = await db().execute(sql`insert into mithaq_jobs (task, input, queue, tenant, scheduled_for, wait_until)
-        select ${task}, '{}'::jsonb, ${queue}, ${tenant}, ${scheduledFor}::timestamptz, ${scheduledFor}::timestamptz
+      const result = await db().execute(sql`insert into mithaq_jobs (task, input, queue, tenant, scheduled_for)
+        select ${task}, '{}'::jsonb, ${queue}, ${tenant}, ${scheduledFor}::timestamptz
         where not exists (select 1 from mithaq_jobs where task = ${task} and scheduled_for >= ${scheduledFor})
         on conflict (task, scheduled_for) where scheduled_for is not null do nothing returning id`)
       return result.rows.length === 1
@@ -63,9 +63,9 @@ const driver = (store?: JobStore): JobsDriver => {
           and processing_token is not null and attempts > 0 returning id`)
       return rows.length
     },
-    prune: async ({ completedBefore, failedBefore }) => {
+    prune: async ({ completed, failed }) => {
       const { rows } = await db().execute(sql`delete from mithaq_jobs as job where
-        ((completed_at < ${completedBefore}) or (has_error and updated_at < ${failedBefore}))
+        ((completed_at < clock_timestamp() - ${completed} * interval '1 millisecond') or (has_error and updated_at < clock_timestamp() - ${failed} * interval '1 millisecond'))
         and (scheduled_for is null or exists (
           select 1 from mithaq_jobs as newer where newer.task = job.task and newer.scheduled_for > job.scheduled_for
         )) returning id`)

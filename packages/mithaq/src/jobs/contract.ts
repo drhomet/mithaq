@@ -23,12 +23,20 @@ export const jobsContract = (factory: JobsDriverFactory) => {
       assert.equal(rows[0]!.task, 'sweep')
     } finally { await destroy() }
   })
+  test('a recorded occurrence is immediately claimable even ahead of the driver clock', async () => {
+    const { driver, destroy } = await factory()
+    try {
+      await driver.record({ task: 'ahead', queue: 'maintenance', scheduledFor: new Date(Date.now() + 1000), tenant: null })
+      assert.deepEqual((await driver.claim({ queue: 'maintenance', tasks: ['ahead'], limit: 1, lease: 30000, token: crypto.randomUUID() })).map((job) => job.task), ['ahead'])
+    } finally { await destroy() }
+  })
+
   test('concurrent claimers never share a job, honor the limit and skip future or foreign work', async () => {
-    const { driver, peer, destroy } = await factory()
+    const { driver, peer, transaction, destroy } = await factory()
     try {
       const now = new Date()
       for (let i = 0; i < 6; i++) await driver.record({ task: `due${i}`, queue: 'maintenance', scheduledFor: now, tenant: null })
-      await driver.record({ task: 'future', queue: 'maintenance', scheduledFor: new Date(now.getTime() + 60000), tenant: null })
+      await transaction((tx) => driver.enqueue({ task: 'future', input: {}, queue: 'maintenance', runAt: new Date(now.getTime() + 60000), tenant: null, tx }))
       await driver.record({ task: 'tenant', queue: 'maintenance', scheduledFor: now, tenant: 'org-a' })
       await driver.record({ task: 'other', queue: 'other', scheduledFor: now, tenant: null })
       const [a, b] = await Promise.all([driver, peer].map((claimer) => claimer.claim({ queue: 'maintenance', tasks: ['due0', 'due1', 'due2', 'due3', 'due4', 'due5', 'future', 'tenant', 'other'], limit: 3, lease: 30000, token: crypto.randomUUID() })))
@@ -83,7 +91,8 @@ export const jobsContract = (factory: JobsDriverFactory) => {
       await driver.finish({ id: job!.id, token, output: { deleted: 1 } })
       assert.deepEqual(await driver.renew({ ids: [job!.id], token, lease: 30000 }), [])
       assert.equal(await driver.expire(), 0)
-      assert.equal(await driver.prune({ completedBefore: new Date(Date.now() + 1000), failedBefore: new Date(0) }), 1)
+      await setTimeout(5)
+      assert.equal(await driver.prune({ completed: 0, failed: 10000 }), 1)
     } finally { await destroy() }
   })
 
@@ -97,7 +106,8 @@ export const jobsContract = (factory: JobsDriverFactory) => {
       await setTimeout(300)
       assert.equal(await driver.expire(), 0)
       await driver.finish({ id: job!.id, token, output: { completed: 1 } })
-      assert.equal(await driver.prune({ completedBefore: new Date(Date.now() + 1000), failedBefore: new Date(0) }), 1)
+      await setTimeout(5)
+      assert.equal(await driver.prune({ completed: 0, failed: 10000 }), 1)
     } finally { await destroy() }
   })
 
@@ -114,11 +124,29 @@ export const jobsContract = (factory: JobsDriverFactory) => {
       assert.equal(await driver.expire(), 1)
       assert.equal(await driver.expire(), 0)
       await driver.finish({ id: job!.id, token, output: {} })
+      await setTimeout(5)
       assert.deepEqual(await driver.claim({ queue: 'maintenance', tasks: ['interrupted'], limit: 10, lease: 30000, token: crypto.randomUUID() }), [])
-      assert.equal(await driver.prune({ completedBefore: new Date(Date.now() + 1000), failedBefore: new Date(0) }), 0)
-      assert.equal(await driver.prune({ completedBefore: new Date(0), failedBefore: new Date(Date.now() + 1000) }), 1)
+      assert.equal(await driver.prune({ completed: 0, failed: 10000 }), 0)
+      assert.equal(await driver.prune({ completed: 10000, failed: 0 }), 1)
     } finally { await destroy() }
   })
+  test('pruning measures retention on the driver clock and keeps fresh history', async (t) => {
+    const { driver, transaction, destroy } = await factory()
+    const hostNow = Date.now
+    t.mock.method(Date, 'now', () => hostNow() + 60000)
+    try {
+      const token = crypto.randomUUID()
+      for (const task of ['complete', 'failed']) await transaction((tx) => driver.enqueue({ task, queue: 'maintenance', input: {}, runAt: new Date(), tenant: null, tx }))
+      const rows = await driver.claim({ queue: 'maintenance', tasks: ['complete', 'failed'], limit: 2, lease: 30000, token })
+      await driver.finish({ id: rows[0]!.id, token, output: {} })
+      await driver.finish({ id: rows[1]!.id, token, error: { message: 'failed' } })
+      assert.equal(await driver.prune({ completed: 10000, failed: 10000 }), 0)
+      await setTimeout(5)
+      assert.equal(await driver.prune({ completed: 10000, failed: 0 }), 1)
+      assert.equal(await driver.prune({ completed: 0, failed: 10000 }), 1)
+    } finally { await destroy() }
+  })
+
   test('pruning respects separate terminal ages and keeps pending and held work', async () => {
     const { driver, transaction, destroy } = await factory()
     try {
@@ -128,9 +156,10 @@ export const jobsContract = (factory: JobsDriverFactory) => {
       const rows = await driver.claim({ queue: 'maintenance', tasks: ['complete', 'failed', 'held', 'pending'], limit: 3, lease: 30000, token })
       await driver.finish({ id: rows[0]!.id, token, output: {} })
       await driver.finish({ id: rows[1]!.id, token, error: { message: 'failed' } })
-      assert.equal(await driver.prune({ completedBefore: new Date(0), failedBefore: new Date(0) }), 0)
-      assert.equal(await driver.prune({ completedBefore: new Date(Date.now() + 1000), failedBefore: new Date(0) }), 1)
-      assert.equal(await driver.prune({ completedBefore: new Date(0), failedBefore: new Date(Date.now() + 1000) }), 1)
+      await setTimeout(5)
+      assert.equal(await driver.prune({ completed: 10000, failed: 10000 }), 0)
+      assert.equal(await driver.prune({ completed: 0, failed: 10000 }), 1)
+      assert.equal(await driver.prune({ completed: 10000, failed: 0 }), 1)
       assert.deepEqual(await driver.renew({ ids: [rows[2]!.id], token, lease: 30000 }), [rows[2]!.id])
       assert.equal((await driver.claim({ queue: 'maintenance', tasks: ['complete', 'failed', 'held', 'pending'], limit: 10, lease: 30000, token })).length, 1)
     } finally { await destroy() }
@@ -145,15 +174,16 @@ export const jobsContract = (factory: JobsDriverFactory) => {
       const token = crypto.randomUUID()
       const [job] = await driver.claim({ queue: 'maintenance', tasks: ['annual'], limit: 1, lease: 30000, token })
       await driver.finish({ id: job!.id, token, output: {} })
-      const cutoff = { completedBefore: new Date(Date.now() + 1000), failedBefore: new Date(Date.now() + 1000) }
-      assert.equal(await driver.prune(cutoff), 0)
+      const retain = { completed: 0, failed: 0 }
+      assert.equal(await driver.prune(retain), 0)
       const newer = { ...occurrence, scheduledFor: new Date(scheduledFor.getTime() + 1000) }
       const recorded = await Promise.all(Array.from({ length: 20 }, (_, index) => (index % 2 ? driver : peer).record(newer)))
       assert.equal(recorded.filter(Boolean).length, 1)
       const [next] = await driver.claim({ queue: 'maintenance', tasks: ['annual'], limit: 1, lease: 30000, token })
       await driver.finish({ id: next!.id, token, error: { message: 'failed' } })
-      assert.equal(await driver.prune(cutoff), 1)
-      assert.equal(await driver.prune(cutoff), 0)
+      await setTimeout(5)
+      assert.equal(await driver.prune(retain), 1)
+      assert.equal(await driver.prune(retain), 0)
       assert.equal(await peer.record(occurrence), false)
       assert.equal(await peer.record({ ...occurrence, scheduledFor: new Date(scheduledFor.getTime() - 1000) }), false)
       assert.equal(await peer.record(newer), false)
