@@ -150,7 +150,7 @@ const stubServer = () => ({
   handler: async () => new Response(null),
 })
 
-const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { authorize = defaultAuthorize, withLocal = false, publicFiles = false, linkRead, fileLimit }: { authorize?: Authorize; withLocal?: boolean; publicFiles?: boolean; linkRead?: FieldAccess; fileLimit?: number } = {}) => {
+const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { authorize = defaultAuthorize, withLocal = false, publicFiles = false, linkRead, fileLimit, fileUploader }: { authorize?: Authorize; withLocal?: boolean; publicFiles?: boolean; linkRead?: FieldAccess; fileLimit?: number; fileUploader?: object } = {}) => {
   /** A step that writes the row `aimed` names through the raw store, beside the operation's own. */
   const aimAt = (write: 'insert' | 'update' | 'remove') =>
     async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
@@ -315,7 +315,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const files = {
     name: 'files',
     schemaName,
-    fields: { ...defaultFields, ...uploadFields, ...uploadedByField, firmId: tenant.field },
+    fields: { ...defaultFields, ...uploadFields, ...uploadedByField, ...(fileUploader && { uploadedBy: fileUploader }), firmId: tenant.field },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
       storage: { mimeTypes: ['image/png'], orphanAfter: 1, ...(fileLimit !== undefined && { maxUnattached: fileLimit }), ...(publicFiles && { public: true }) },
@@ -2539,4 +2539,25 @@ test('the upload cap counts one user in the active organization and leaves other
   const other = await actorOf({ active: 'org1' })
   assert.equal((await ask(other)).status, 200)
   await built.destroy()
+})
+
+
+test('a custom uploadedBy keeps its caller value and stays within its organization', async () => {
+  const memory = memoryStore()
+  const built = languageOf(memory as never, { fileUploader: { kind: 'text' } })
+  try {
+    for (const id of ['org1', 'org2']) await memory.insert({ tx: undefined, kayan: 'firms', data: { id, name: id } })
+    const one = await actorOf({ active: 'org1' })
+    const two = await actorOf({ active: 'org2' })
+    const png = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'))
+    const asked = await built.handler(new Request('http://test/api/files/uploadInstructions', { method: 'POST', headers: { 'x-person': String(one.id), 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'cover.png', filesize: png.length, mimeType: 'image/png' }) }))
+    assert.equal(asked.status, 200)
+    const { request, file } = await asked.json() as { request: { url: string; headers: Record<string, string> }; file: { uploadReference: Record<string, unknown> } }
+    assert.equal((await built.handler(new Request(new URL(request.url, 'http://test'), { method: 'PUT', headers: request.headers, body: png }))).status, 204)
+    const files = built.kayan.files.operations
+    const made = await files.create({ uploadReference: file.uploadReference, uploadedBy: 'legacy-owner' }, { actor: one })
+    assert.equal(made.uploadedBy, 'legacy-owner')
+    assert.equal((await files.findByID({ id: made.id }, { actor: one })).uploadedBy, 'legacy-owner')
+    assert.equal((await refusal(files.findByID({ id: made.id }, { actor: two }))).status, 404)
+  } finally { await built.destroy() }
 })

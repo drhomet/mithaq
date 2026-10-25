@@ -1,3 +1,4 @@
+import { aliveWhere } from '../asas/runner/write.ts'
 import { authActor } from '../asas/actor.ts'
 import { combineWhere, type Where } from '../mithaq/where.ts'
 import type { ResolvedField, ResolvedKayan } from '../mithaq/types.ts'
@@ -63,7 +64,7 @@ export const countUnattached = async ({ kayan, actor, tenant, resolved, storeOf 
 }) => {
   const id = uploaderId(actor)
   if (id === undefined || (kayan.tenant && tenant === undefined)) return undefined
-  const where = combineWhere({ uploadedBy: { equals: id } }, kayan.tenant ? { [kayan.tenant]: { equals: tenant! } } : undefined)
+  const where = combineWhere(combineWhere({ uploadedBy: { equals: id } }, kayan.tenant ? { [kayan.tenant]: { equals: tenant! } } : undefined), aliveWhere(kayan))
   const { docs } = await storeOf(kayan).find({ kayan: kayan.name, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where } })
   let count = 0
   for (const row of docs) if (!await uploadReferenced({ kayan, id: row.id, resolved, storeOf, tenant: tenant ?? null })) count++

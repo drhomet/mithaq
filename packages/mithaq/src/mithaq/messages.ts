@@ -1,6 +1,6 @@
 import { defaultFields, globalTypeLabel } from '../base/fields.ts'
 import { sortableFields, type LabelFunction, type Localized, type ResolvedKayan } from './types.ts'
-import { isStorage, type Language } from './language.ts'
+import type { Language } from './language.ts'
 import { providerOf } from '../base/rules.ts'
 
 /** What one key resolves to: a record per locale, which is checked, or a function or string, which nothing can verify. */
@@ -44,7 +44,7 @@ export type MessageRegistry = {
 
 // One refusal sentence per rule and per kind, which every per-field key is seeded
 // from, so a new locale costs one sentence per rule and kind, not one per field.
-const floorKeys = (language: Language): Record<string, Copy> => ({
+const floorKeys = (language: Language, kayanList: readonly ResolvedKayan[]): Record<string, Copy> => ({
   ...Object.fromEntries(Object.entries(language.kinds).map(([name, kind]) => [`kinds.${name}`, kind.label])),
   ...Object.fromEntries(
     Object.entries(defaultFields)
@@ -52,7 +52,7 @@ const floorKeys = (language: Language): Record<string, Copy> => ({
       .map(([name, field]) => [`fields.${name}`, field.label as Copy]),
   ),
   globalType: globalTypeLabel,
-  ...(Object.values(language.targets).some(isStorage) && { 'error.invalid.upload_limit': {
+  ...(kayanList.some((kayan) => kayan.storage?.maxUnattached !== undefined) && { 'error.invalid.upload_limit': {
     en: 'Attach or remove an upload before uploading another. The limit is {limit}.',
     ar: 'أرفق ملفا مرفوعا أو احذفه قبل رفع ملف آخر. الحد هو {limit}.',
   } }),
@@ -77,7 +77,7 @@ export const messagesOf = ({
   kayanList: readonly ResolvedKayan[]
   resolver?: MessagesResolver
 }): MessageRegistry => {
-  const scopes: MessageScope[] = [{ name: 'mithaq', keys: floorKeys(language) }]
+  const scopes: MessageScope[] = [{ name: 'mithaq', keys: floorKeys(language, kayanList) }]
   const collisions: Record<string, readonly string[]> = {}
   for (const kayan of kayanList) {
     // No prototype, so no field or operation name finds an inherited answer.

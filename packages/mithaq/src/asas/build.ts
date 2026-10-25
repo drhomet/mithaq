@@ -1,5 +1,4 @@
 import { cleanupUploadTargets } from '../storage/references.ts'
-import type { KayanStorage } from '../storage/storage.ts'
 import { storageMaintenanceAccess } from './runner/storage-maintenance.ts'
 import { buildJobs } from '../jobs/jobs.ts'
 import { checkJobs, type JobsConfig } from '../jobs/config.ts'
@@ -615,7 +614,7 @@ export const buildAsas = <
   const storage = stored[0]?.storage.config
   // Set on every field before any schema is derived, for a value that points at a file from inside it.
   const filesIn = stored.map((one) => one.name)
-  const cleanedUploads = stored.filter((one) => (one.targets?.storage as KayanStorage).orphanAfter !== undefined)
+  const cleanedUploads = stored.filter((one) => one.storage.orphanAfter !== undefined)
   for (const field of resolved.flatMap((one) => Object.values(one.fields))) {
     field.filesIn = filesIn
     if (field.kind === 'richText') cleanupUploadTargets.set(field, cleanedUploads)

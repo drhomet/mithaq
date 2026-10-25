@@ -20,7 +20,7 @@ import { atEffect, defaults, issueRefusal, parse, sealOf, storeSeals, validated,
 import { firstRegisters, running, snapshot, type Open, type Running } from './runtime.ts'
 import type { FindInput, Paginated } from './read.ts'
 import { changedColumns, latestVersion, restoreInput, revived, saveVersion } from '../../versions/versions.ts'
-import { fileURLs } from '../../storage/storage.ts'
+import { fileURLs, isUploadedBy } from '../../storage/storage.ts'
 import { combineWhere, operatorList } from '../../mithaq/where.ts'
 import { refuseTenantOption, writeTenant, type TenantReach } from './tenant.ts'
 import type { FieldWhere, Operator, Scalar, Where } from '../../mithaq/where.ts'
@@ -1093,7 +1093,7 @@ export const write = <Actor = unknown>({
             return row
           },
           insert: async ({ tx: heldTx, kayan: name, data: values }) => {
-            if (name === kayan.name && kayan.fields.uploadedBy && 'storage' in kayan) {
+            if (name === kayan.name && 'storage' in kayan && isUploadedBy(kayan.fields.uploadedBy)) {
               values = { ...values, uploadedBy: uploaderId(actor) ?? null }
             }
             const row = await tools.store.insert({ tx: heldTx, kayan: name, data: values })
@@ -1246,7 +1246,7 @@ export const write = <Actor = unknown>({
     }
     // A throw here is `AfterCommitError`: the write has happened, and nothing the caller sent was wrong.
     const afterCommit = async () => {
-      if (!committed) return
+      if (!committed || (!declaration.afterCommit.length && !purge)) return
       await runOutside({
         kayan,
         tools,

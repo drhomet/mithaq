@@ -120,6 +120,18 @@ const languageOf = ({ softDelete, config = unused(), authorize = defaultAuthoriz
     },
   })
 
+const renamedLanguageOf = ({ softDelete, config = unused(), authorize = defaultAuthorize }: { softDelete?: boolean; config?: StorageConfig; authorize?: Authorize } = {}) =>
+  defineMithaq({
+    arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), { ...storageRukn(config), targets: { filesStorage: storageTarget(config) } }],
+    targets: {
+      memory: softDelete ? memoryOf() : memoryStore(),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      plain: plainTarget,
+      service: { capability: 'service', store: 'memory', schema: 'zod', authorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, ...(softDelete && { softDelete: 'deletedAt' }) },
+      versions: versionsTarget({ max: 100 }),
+    },
+  })
+
 type Built = Awaited<ReturnType<typeof project>>
 
 /**
@@ -127,11 +139,11 @@ type Built = Awaited<ReturnType<typeof project>>
  * shipped columns, a `notes` kayan whose cover is one of them, and the local
  * adapter with the defaults the template copies.
  */
-const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, softDelete, authorize, history }: { storage?: Partial<StorageConfig>; files?: Record<string, unknown>; wrap?: (adapter: StorageAdapter) => StorageAdapter; hidden?: keyof typeof uploadFields; softDelete?: boolean; authorize?: Authorize; history?: boolean } = {}) => {
+const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, softDelete, authorize, history, storageName = 'storage' }: { storage?: Partial<StorageConfig>; files?: Record<string, unknown>; wrap?: (adapter: StorageAdapter) => StorageAdapter; hidden?: keyof typeof uploadFields; softDelete?: boolean; authorize?: Authorize; history?: boolean; storageName?: string } = {}) => {
   const dir = await mkdtemp(join(tmpdir(), 'mithaq-storage-'))
   const adapter = wrap(local({ dir, secret, prefix: 'app' }))
   const config: StorageConfig = { secret, adapters: { local: adapter }, adapter: 'local', ...functions, ...storage }
-  const language = languageOf({ softDelete, config, authorize })
+  const language = (storageName === 'storage' ? languageOf : renamedLanguageOf)({ softDelete, config, authorize }) as unknown as ReturnType<typeof defineMithaq>
   const fileKayan = language.defineKayan({
     name: 'files',
     auth: {
@@ -139,7 +151,7 @@ const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, 
       authenticate: ({ headers }: { headers: Headers }) => ({ user: headers.get('x-org') ? memberOf(headers.get('x-org')!) : null }),
     },
     access,
-    targets: { storage: { mimeTypes: ['image/png', 'image/jpeg'] }, service: { operations: fileOperations(config) }, ...files },
+    targets: { [storageName]: { mimeTypes: ['image/png', 'image/jpeg'] }, service: { operations: fileOperations(config) }, ...files },
     fields: {
       ...defaultFields,
       ...uploadFields,
@@ -162,6 +174,7 @@ const project = async ({ storage = {}, files = {}, wrap = (one) => one, hidden, 
   const plainNotes = noteOf('plainNotes', 'plain')
   const asas = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [fileKayan, notes, plainNotes], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: console.error } } as never) as unknown as {
     handler(request: Request): Promise<Response>
+    messages: { scopes: readonly { name: string; keys: Record<string, unknown> }[] }
     targets: { storage: { commands: { sweep(input: { asas: unknown; flags: readonly string[] }): Promise<number> } }; memory: { rows: Map<string, Record<string, unknown>[]> } }
     destroy(): Promise<void>
   }
@@ -1045,7 +1058,6 @@ test('189d. a replaced serve that sets no headers still answers nosniff, and a p
   await rm(dir, { recursive: true, force: true })
 })
 
-
 test('upload instructions refuse an uploader at the unattached cap and allow another uploader', async () => {
   const built = await project({
     files: { storage: { mimeTypes: ['image/png'], maxUnattached: 1 } },
@@ -1066,7 +1078,6 @@ test('upload instructions refuse an uploader at the unattached cap and allow ano
     assert.equal((await send(built, 'POST', '/api/files/uploadInstructions', { org: 'one', json: { filename: 'attached.png', filesize: png.length, mimeType: 'image/png' } })).status, 200)
   } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
 })
-
 
 test('cleanup keeps soft-deleted owners and every historical snapshot and purges abandoned soft-deleted uploads', async () => {
   const built = await project({ softDelete: true, history: true, files: {
@@ -1120,7 +1131,6 @@ test('the scheduled storage sweep reuses the object policy and returns counts wi
   } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
 })
 
-
 test('rich-text references to cleaned uploads take the delete-conflicting lock and keep their file', async () => {
   const built = await project({ files: { storage: { mimeTypes: ['image/png'], orphanAfter: 1 } } })
   try {
@@ -1135,5 +1145,41 @@ test('rich-text references to cleaned uploads take the delete-conflicting lock a
     assert.equal(saved.status, 200, await saved.clone().text())
     assert.ok(locks > 0)
     assert.deepEqual(await cleanupUploads({ asas: built.asas, now: new Date(Date.now() + 60000) }), { rowsChecked: 1, rowsDeleted: 0, rowsKept: 1, failures: 0 })
+  } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
+})
+
+test('storage targets may be renamed with no cleanup policy or with cleanup and an upload cap', async () => {
+  for (const policy of [{}, { orphanAfter: 1, maxUnattached: 1 }]) {
+    const built = await project({ storageName: 'filesStorage', files: { filesStorage: { mimeTypes: ['image/png'], ...policy } } })
+    try {
+      const { file } = await upload(built, 'one')
+      assert.equal((await create(built, 'one', file.uploadReference)).status, 200)
+      const asked = await send(built, 'POST', '/api/files/uploadInstructions', { org: 'one', json: { filename: 'new.png', filesize: png.length, mimeType: 'image/png' } })
+      assert.equal(asked.status, policy.maxUnattached ? 400 : 200)
+      const counts = await cleanupUploads({ asas: built.asas, now: new Date(Date.now() + 60000) })
+      assert.equal(counts.rowsDeleted, policy.orphanAfter ? 1 : 0)
+    } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
+  }
+})
+
+test('the upload limit message is generated only for kayan with an unattached cap', async () => {
+  for (const capped of [false, true]) {
+    const built = await project({ storageName: 'filesStorage', files: { filesStorage: { mimeTypes: ['image/png'], ...(capped && { maxUnattached: 1 }) } } })
+    try {
+      const keys = built.asas.messages.scopes.find((scope) => scope.name === 'mithaq')!.keys
+      assert.equal(Object.hasOwn(keys, 'error.invalid.upload_limit'), capped)
+    } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
+  }
+})
+
+test('trashing an unattached upload frees its uploader cap', async () => {
+  const built = await project({ softDelete: true, files: { storage: { mimeTypes: ['image/png'], maxUnattached: 1 }, service: { operations: { ...fileOperations(functions), delete: defaultOperations.delete } } } })
+  try {
+    const { file } = await upload(built, 'one')
+    assert.equal((await create(built, 'one', file.uploadReference)).status, 200)
+    const ask = () => send(built, 'POST', '/api/files/uploadInstructions', { org: 'one', json: { filename: 'new.png', filesize: png.length, mimeType: 'image/png' } })
+    assert.equal((await ask()).status, 400)
+    assert.equal((await send(built, 'POST', '/api/files/delete', { org: 'one', json: { id: file.uploadReference.id } })).status, 200)
+    assert.equal((await ask()).status, 200)
   } finally { await built.asas.destroy(); await rm(built.dir, { recursive: true, force: true }) }
 })

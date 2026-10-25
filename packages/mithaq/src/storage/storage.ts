@@ -5,7 +5,7 @@ import { countUnattached } from './references.ts'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { isStorage, type Command, type CommandInput, type Language, type Store } from '../mithaq/language.ts'
-import type { Field, ResolvedKayan } from '../mithaq/types.ts'
+import type { Field, ResolvedField, ResolvedKayan } from '../mithaq/types.ts'
 import { providerOf } from '../base/rules.ts'
 import { AsasError, retryConflict, codes, denied, invalid, missing } from '../asas/runner/errors.ts'
 import { sealOf, type Ctx } from '../asas/runner/steps.ts'
@@ -35,6 +35,10 @@ export const uploadFields = {
 export const uploadedByField = {
   uploadedBy: { kind: 'text', label: { en: 'Uploaded by', ar: 'رفع بواسطة' }, rules: { providedBy: fileColumn, index: true } },
 } as const satisfies Record<string, Field>
+
+/** Match the shipped ownership policy without claiming a project's same-named field. */
+export const isUploadedBy = (field: ResolvedField | undefined): boolean =>
+  !!field && field.kind === 'text' && providerOf(field, 'create') === 'application' && providerOf(field, 'update') === 'never' && !field.relationTo
 
 /** The storage target as the language holds it: a capability, the project's config, and the `sweep` command. */
 export type StorageTarget = {
@@ -143,6 +147,7 @@ export type ResolvedStorage = {
   config: StorageConfig
   // Found by its `insert` step whatever the project named it.
   operation: string
+  orphanAfter?: number
   maxUnattached?: number
   unattached: (actor: unknown) => Promise<number | undefined>
   exists: (id: string) => Promise<boolean>
@@ -362,7 +367,7 @@ export const resolveStorage = ({ language, resolved, storeOf, active }: {
     }
     if (kept.maxUnattached !== undefined) {
       const field = kayan.fields.uploadedBy
-      if (!field || field.kind !== 'text' || providerOf(field, 'create') !== 'application' || providerOf(field, 'update') !== 'never' || field.relationTo) throw new Error(`${where}.maxUnattached requires the shipped uploadedByField spread.`)
+      if (!isUploadedBy(field)) throw new Error(`${where}.maxUnattached requires the shipped uploadedByField spread.`)
     }
     if (kept.orphanAfter !== undefined) {
       if (!Object.values(kayan.operations).some((one) => one.steps.some((step) => sealOf(step) === 'remove'))) throw new Error(`${where}.orphanAfter requires a managed delete operation.`)
@@ -415,7 +420,7 @@ export const resolveStorage = ({ language, resolved, storeOf, active }: {
     }
     // A shared kayan's files belong to no organization, whichever session uploads them.
     const tenant = kayan.tenant ? active : () => null
-    kayan.storage = { maxUnattached: kept.maxUnattached, unattached: (actor) => countUnattached({ kayan, actor, tenant: tenant(actor), resolved, storeOf }), mimeTypes: kept.mimeTypes, fileSize, public: !!kept.public, config, operation, exists: existsIn(kayan), tenant }
+    kayan.storage = { orphanAfter: kept.orphanAfter, maxUnattached: kept.maxUnattached, unattached: (actor) => countUnattached({ kayan, actor, tenant: tenant(actor), resolved, storeOf }), mimeTypes: kept.mimeTypes, fileSize, public: !!kept.public, config, operation, exists: existsIn(kayan), tenant }
   }
   return holding as StorageKayan[]
 }
@@ -528,7 +533,8 @@ export const storageRoutes = <Actor>({
         if (one.storage.maxUnattached !== undefined) {
           const count = await one.storage.unattached(actor)
           if (count === undefined) throw denied({ message: 'An upload cap requires an authenticated uploader.', key: 'error.forbidden.create', params: { kayan: one.name } })
-          // ponytail: instructions already signed can pass the cap; a strict cap needs reservations.
+          // ponytail: each instructions request scans every referencing table and version per candidate upload;
+          // use indexed reference queries if measured slow. Signed instructions can pass the cap; a strict cap needs reservations.
           if (count >= one.storage.maxUnattached) throw invalid({ message: `Attach or remove an upload before uploading another. The limit is ${one.storage.maxUnattached}.`, key: 'error.invalid.upload_limit', params: { limit: one.storage.maxUnattached } })
         }
         return Response.json(await config.instructions({ kayan: one, input, actor }))
