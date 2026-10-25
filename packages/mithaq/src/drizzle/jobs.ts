@@ -2,7 +2,8 @@ import { sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { Job, JobPolicy, JobsDriver, JobsTarget, JobStore } from '../jobs/driver.ts'
 
-type Database = Pick<NodePgDatabase, 'execute'>
+type Database = Pick<NodePgDatabase, 'execute' | 'transaction'>
+const taskLock = (task: string) => sql`select pg_advisory_xact_lock(hashtext(${`mithaq_jobs:${task}`}))`
 const driver = (store?: JobStore): JobsDriver => {
   const db = () => {
     if (!store || !('db' in store)) throw new Error('Initialize drizzleJobs with its drizzle store before running work.')
@@ -15,13 +16,15 @@ const driver = (store?: JobStore): JobsDriver => {
       if (!('tables' in store) || !store.tables || !Object.hasOwn(store.tables, 'mithaq_jobs')) throw new Error('The drizzleJobs store must forward init options to build mithaq_jobs.')
       return driver(store)
     },
-    record: async ({ task, scheduledFor, queue, tenant }) => {
-      const result = await db().execute(sql`insert into mithaq_jobs (task, input, queue, tenant, scheduled_for)
+    record: ({ task, scheduledFor, queue, tenant }) => db().transaction(async (tx) => {
+      // A separate statement after the lock sees a peer's committed watermark, including after pruning.
+      await tx.execute(taskLock(task))
+      const result = await tx.execute(sql`insert into mithaq_jobs (task, input, queue, tenant, scheduled_for)
         select ${task}, '{}'::jsonb, ${queue}, ${tenant}, ${scheduledFor}::timestamptz
         where not exists (select 1 from mithaq_jobs where task = ${task} and scheduled_for >= ${scheduledFor})
         on conflict (task, scheduled_for) where scheduled_for is not null do nothing returning id`)
       return result.rows.length === 1
-    },
+    }),
     enqueue: async ({ task, input, queue, tenant, runAt, tx }) => {
       await (tx as Database).execute(sql`insert into mithaq_jobs (task, input, queue, tenant, wait_until)
         values (${task}, ${JSON.stringify(input)}::jsonb, ${queue}, ${tenant}, ${runAt})`)
@@ -64,12 +67,20 @@ const driver = (store?: JobStore): JobsDriver => {
       return rows.length
     },
     prune: async ({ completed, failed }) => {
-      const { rows } = await db().execute(sql`delete from mithaq_jobs as job where
-        ((completed_at < clock_timestamp() - ${completed} * interval '1 millisecond') or (has_error and updated_at < clock_timestamp() - ${failed} * interval '1 millisecond'))
-        and (scheduled_for is null or exists (
-          select 1 from mithaq_jobs as newer where newer.task = job.task and newer.scheduled_for > job.scheduled_for
-        )) returning id`)
-      return rows.length
+      const expired = sql`((job.completed_at < clock_timestamp() - ${completed} * interval '1 millisecond') or (job.has_error and job.updated_at < clock_timestamp() - ${failed} * interval '1 millisecond'))`
+      const { rows: tasks } = await db().execute(sql`select distinct job.task from mithaq_jobs as job where ${expired}`)
+      let pruned = 0
+      for (const { task } of tasks) {
+        pruned += await db().transaction(async (tx) => {
+          await tx.execute(taskLock(String(task)))
+          const { rows } = await tx.execute(sql`delete from mithaq_jobs as job where job.task = ${task} and ${expired}
+            and (scheduled_for is null or exists (
+              select 1 from mithaq_jobs as newer where newer.task = job.task and newer.scheduled_for > job.scheduled_for
+            )) returning id`)
+          return rows.length
+        })
+      }
+      return pruned
     },
   }
 }

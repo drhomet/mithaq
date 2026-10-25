@@ -23,7 +23,7 @@ A feature reaches another feature's kayan by its name (`relationTo: 'user'`) or 
 
 `apps/asas-tanstack/` is the tenant app, serving `/dashboard` and `/portal`; `apps/asas-backoffice/`, with the backoffice add-on, is the backoffice console for staff across every organization. Both import the asas alone.
 
-The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `rich-text`, `jobs`, `uploads`, `media`, `courses`, `backoffice`); The language, `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
+The project holds the add-ons it was made with (`roles`, `audit-log`, `settings`, `rich-text`, `jobs`, `uploads`, `media`, `courses`, `backoffice`); the language, `packages/features/` and `apps/` show which. No command adds one yet: `README.md`, "Add an add-on", says how by hand.
 
 ## Storage jobs
 
