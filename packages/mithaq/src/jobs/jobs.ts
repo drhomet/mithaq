@@ -1,117 +1,108 @@
 import { randomUUID } from 'node:crypto'
 import { Cron } from 'croner'
-import { sql } from 'drizzle-orm'
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import type { Store } from '../mithaq/language.ts'
-import type { JobsConfig } from './config.ts'
+import type { JobTasks } from './config.ts'
+import type { JobsTarget } from './driver.ts'
 
-export const buildJobs = ({ config, store, asas }: { config: JobsConfig; store: Store; asas: () => object }) => {
-  if (store.sql !== 'drizzle' || !('db' in store)) throw new Error('Jobs phase 1 requires a Postgres drizzle service store.')
-  if (!('tables' in store) || !store.tables || typeof store.tables !== 'object' || !Object.hasOwn(store.tables, 'mithaq_jobs')) throw new Error('The jobs store must forward init options to build mithaq_jobs.')
-  const db = store.db as NodePgDatabase
-  const handleSchedules = async ({ queue, now = new Date() }: { queue: string; now?: Date }) => {
+export const buildJobs = ({ target, tasks, asas }: { target: JobsTarget; tasks: JobTasks | undefined; asas: () => object }) => {
+  const entries = Object.entries(tasks ?? {})
+  const queues = [...new Set(entries.map(([, task]) => task.queue))]
+  const driver = target.driver
+  const checkWork = (work: readonly string[]) => {
+    for (const queue of work) if (!queues.includes(queue)) throw new Error(`No task uses work queue "${queue}".`)
+  }
+  const schedule = async ({ queue, now = new Date() }: { queue: string; now?: Date }) => {
+    checkWork([queue])
     let scheduled = 0
-    for (const task of config.tasks) for (const schedule of task.schedule) {
-      if (schedule.queue !== queue) continue
-      const cron = new Cron(schedule.cron, { paused: true, timezone: 'UTC' })
+    for (const [name, task] of entries) {
+      if (task.queue !== queue) continue
+      const cron = new Cron(task.cron, { paused: true, timezone: 'UTC' })
       const fire = cron.match(now) ? new Date(Math.floor(now.getTime() / 1000) * 1000) : cron.previousRuns(1, now)[0]
       cron.stop()
-      if (!fire) continue
-      const result = await db.execute(sql`insert into mithaq_jobs (task, input, queue, tenant, scheduled_for, wait_until)
-        values (${task.slug}, '{}'::jsonb, ${queue}, null, ${fire}, ${fire})
-        on conflict (task, scheduled_for) where scheduled_for is not null do nothing returning id`)
-      scheduled += result.rows.length
+      if (fire && await driver.record({ task: name, scheduledFor: fire, queue, tenant: null })) scheduled++
     }
     return { scheduled }
-  }
-  const runJobs = async ({ queue, limit }: { queue: string; limit: number }) => {
-    if (!queue || !Number.isSafeInteger(limit) || limit < 1) throw new Error('runJobs requires queue and a positive integer limit.')
-    if (!config.tasks.length) return { completed: 0, failures: 0 }
-    const token = randomUUID()
-    const tasks = sql.join(config.tasks.map((task) => sql`${task.slug}`), sql`, `)
-    const interrupted = await db.execute(sql`update mithaq_jobs set has_error = true,
-      error = '{"message":"Job interrupted after its lease expired."}'::jsonb,
-      processing_token = null, processing_until = null, updated_at = clock_timestamp()
-      where queue = ${queue} and tenant is null and task in (${tasks}) and completed_at is null and not has_error
-        and processing_until <= clock_timestamp() and attempts > 0 returning task`)
-    for (const row of interrupted.rows) console.error({ task: row.task, failures: 1 })
-    const { rows } = await db.execute(sql`with due as (
-      select id from mithaq_jobs where queue = ${queue} and tenant is null and task in (${tasks})
-        and completed_at is null and not has_error and (wait_until is null or wait_until <= clock_timestamp())
-        and (processing_until is null or processing_until <= clock_timestamp()) and attempts = 0
-      order by created_at, id limit ${limit} for update skip locked
-    ) update mithaq_jobs as job set processing_token = ${token}::uuid,
-        processing_until = clock_timestamp() + ${config.lease} * interval '1 millisecond',
-        attempts = attempts + 1, updated_at = clock_timestamp()
-      from due where job.id = due.id returning job.id, job.task, job.input`)
-    let completed = 0
-    let failures = interrupted.rows.length
-    const settled = await Promise.allSettled(rows.map(async (row) => {
-      const controller = new AbortController()
-      let heartbeat: Promise<void> | undefined
-      let lost = false
-      const timer = setInterval(() => {
-        if (heartbeat) return
-        heartbeat = db.execute(sql`update mithaq_jobs set processing_until = clock_timestamp() + ${config.lease} * interval '1 millisecond',
-          updated_at = clock_timestamp() where id = ${row.id}::uuid and processing_token = ${token}::uuid and not has_error returning id`)
-          .then((result) => { if (!result.rows.length) { lost = true; controller.abort() } })
-          .catch(() => { lost = true; controller.abort() })
-          .finally(() => { heartbeat = undefined })
-      }, Math.max(1, Math.floor(config.lease / 3)))
-      timer.unref()
-
-      const task = config.tasks.find((task) => task.slug === row.task)!
-      try {
-        const output = await task.handler({ asas: asas(), input: row.input, signal: controller.signal })
-        if (lost) throw new Error('Job lease could not be renewed.')
-        if (!output || typeof output !== 'object' || Array.isArray(output) || Object.values(output).some((value) => typeof value !== 'number' || !Number.isFinite(value))) throw new Error('Job output must contain counts alone.')
-        const result = await db.execute(sql`update mithaq_jobs set completed_at = clock_timestamp(), output = ${JSON.stringify(output)}::jsonb,
-          processing_token = null, processing_until = null, updated_at = clock_timestamp()
-          where id = ${row.id}::uuid and processing_token = ${token}::uuid and not has_error returning id`)
-        completed += result.rows.length
-        console.info({ task: task.slug, completed: result.rows.length, failures: 0 })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Job failed.'
-        await db.execute(sql`update mithaq_jobs set has_error = true, error = ${JSON.stringify({ message })}::jsonb,
-          processing_token = null, processing_until = null, updated_at = clock_timestamp()
-          where id = ${row.id}::uuid and processing_token = ${token}::uuid`)
-        failures++
-        console.error({ task: task.slug, failures: 1 })
-      } finally {
-        clearInterval(timer)
-        await heartbeat
-      }
-    }))
-    const rejected = settled.find((result) => result.status === 'rejected')
-    if (rejected?.status === 'rejected') throw rejected.reason
-    return { completed, failures }
   }
   const timers: Cron[] = []
   const ticks = new Set<Promise<{ completed: number; failures: number }>>()
   let stopped = false
-  const run = (entry: { queue: string; limit: number }) => {
+  const run = ({ queue }: { queue: string }) => {
+    checkWork([queue])
     if (stopped) return Promise.resolve({ completed: 0, failures: 0 })
     const tick = (async () => {
+      let completed = 0
+      let failures = 0
+      let passFailed = false
       try {
-        await handleSchedules({ queue: entry.queue })
-        return await runJobs(entry)
+        await schedule({ queue })
+        const expired = await driver.expire({ now: new Date() })
+        failures += expired
+        if (expired) console.error({ failures: expired })
+        const token = randomUUID()
+        // One job at a time keeps every claimed lease under its heartbeat, even in a large backlog.
+        for (;;) {
+          const [job] = await driver.claim({ queue, limit: 1, lease: target.lease, token, now: new Date() })
+          if (!job) break
+          const controller = new AbortController()
+          let heartbeat: Promise<void> | undefined
+          let lost = false
+          const renew = async () => {
+            try {
+              if (!(await driver.renew({ ids: [job.id], token, lease: target.lease })).includes(job.id)) lost = true
+            } catch { lost = true }
+            if (lost) controller.abort()
+          }
+          const timer = setInterval(() => {
+            if (!heartbeat) heartbeat = renew().finally(() => { heartbeat = undefined })
+          }, Math.max(1, Math.floor(target.lease / 3)))
+          timer.unref()
+          try {
+            const task = entries.find(([name]) => name === job.task)?.[1]
+            if (!task || task.queue !== queue || job.tenant !== null) throw new Error('This worker cannot run the claimed task.')
+            const output = await task.run({ asas: asas(), input: job.input, signal: controller.signal })
+            if (!output || typeof output !== 'object' || Array.isArray(output) || Object.values(output).some((value) => typeof value !== 'number' || !Number.isFinite(value))) throw new Error('Job output must contain counts alone.')
+            await heartbeat
+            await renew()
+            if (lost) throw new Error('Job lease could not be renewed.')
+            await driver.finish({ id: job.id, token, output })
+            completed++
+            console.info({ task: job.task, completed: 1, failures: 0 })
+          } catch (error) {
+            await driver.finish({ id: job.id, token, error: { message: error instanceof Error ? error.message : 'Job failed.' } })
+            failures++
+            console.error({ task: job.task, failures: 1 })
+          } finally {
+            clearInterval(timer)
+            await heartbeat
+          }
+        }
       } catch {
+        passFailed = true
+        failures++
         console.error({ failures: 1 })
-        return { completed: 0, failures: 1 }
+      } finally {
+        try {
+          const now = Date.now()
+          const pruned = await driver.prune({ completedBefore: new Date(now - target.retain.completed), failedBefore: new Date(now - target.retain.failed) })
+          if (pruned) console.info({ pruned })
+        } catch { if (!passFailed) { failures++; console.error({ failures: 1 }) } }
       }
+      return { completed, failures }
     })()
     ticks.add(tick)
     void tick.finally(() => ticks.delete(tick))
     return tick
   }
   return {
-    api: { handleSchedules, runJobs, run, autoRun: config.autoRun },
-    start: () => {
+    api: { schedule, run, queues },
+    checkWork,
+    start: (work: readonly string[]) => {
       if (timers.length || stopped) return
-      for (const entry of config.autoRun) timers.push(new Cron(entry.cron, {
+      checkWork(work)
+      // ponytail: cron polling wakes work only at task fires; add driver wake-ups when queued work needs lower latency.
+      for (const [, task] of entries) if (work.includes(task.queue)) timers.push(new Cron(task.cron, {
         timezone: 'UTC', protect: true, unref: true,
         catch: () => { console.error({ failures: 1 }) },
-      }, async () => { await run(entry) }))
+      }, async () => { await run({ queue: task.queue }) }))
     },
     stop: async () => {
       stopped = true

@@ -1,3 +1,4 @@
+import { drizzleJobs, memoryJobs } from 'mithaq'
 // Imported first, so the template's storage reads its folder from it.
 import './test-storage-dir.ts'
 import assert from 'node:assert/strict'
@@ -19426,7 +19427,7 @@ test('orphan cleanup refuses a rich-text owner in another store and names its fi
   assert.throws(() => language.buildAsas({ kayan: [files, owner], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] }), /orphanAfter.*owners.body.*otherMemory.*memory/)
 })
 
-test('jobs configuration refuses missing explicit policy and unsupported phase one behavior', () => {
+test('tasks require a jobs capability beside the service store', () => {
   const language = defineMithaq({
     arkan: [base],
     targets: {
@@ -19435,16 +19436,58 @@ test('jobs configuration refuses missing explicit policy and unsupported phase o
       service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
     },
   })
-  const task = { slug: 'sweep', handler: async () => ({}), schedule: [{ cron: '@daily', queue: 'storage' }], retries: 0 }
-  const valid = { tasks: [task], autoRun: [{ cron: '@daily', queue: 'storage', limit: 1 }], lease: 30000 }
-  for (const [jobs, message] of [
-    [{ ...valid, lease: undefined }, /lease/],
-    [{ ...valid, tasks: [task, task] }, /duplicate.*sweep/i],
-    [{ ...valid, tasks: [{ ...task, retries: 1 }] }, /phase 1/],
-    [{ ...valid, tasks: [{ ...task, schedule: [{ cron: 'bad', queue: 'storage' }] }] }, /cron/i],
-    [{ ...valid, tasks: [{ ...task, schedule: [{ cron: '@daily' }] }] }, /queue/],
-    [{ ...valid, autoRun: [{ cron: '@daily', limit: 1 }] }, /queue/],
-  ] as const) {
-    assert.throws(() => language.buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], jobs } as never), message)
+  assert.throws(() => language.buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], tasks: { sweep: { cron: '@daily', queue: 'maintenance', run: async () => ({}) } } } as never), /tasks.*jobs/)
+})
+test('jobs targets refuse duplicate capabilities, incompatible transactions and missing policies', () => {
+  const targets = {
+    memory: memoryStore(),
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+    service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
   }
+  const policy = { lease: 30000, retain: { completed: 86400000, failed: 604800000 } }
+  const build = (extra: object) => defineMithaq({ arkan: [base], targets: { ...targets, ...extra } }).buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] })
+  assert.throws(() => build({ jobs: drizzleJobs(policy) }), /jobs.*drizzle.*memory/)
+  assert.throws(() => build({ jobs: memoryJobs(policy), background: memoryJobs(policy) }), /jobs.*background.*capability.*jobs/)
+  assert.throws(() => build({ jobs: memoryJobs({ ...policy, lease: undefined } as never) }), /lease/)
+  assert.throws(() => build({ jobs: memoryJobs({ ...policy, retain: undefined } as never) }), /retain/)
+})
+
+test('tasks name their cron, queue and run function explicitly', () => {
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      memory: memoryStore(),
+      jobs: memoryJobs({ lease: 30000, retain: { completed: 86400000, failed: 604800000 } }),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  const task = { cron: '@daily', queue: 'maintenance', run: async () => ({}) }
+  for (const [tasks, message] of [
+    [{ sweep: { ...task, cron: 'bad' } }, /cron/i],
+    [{ sweep: { ...task, queue: undefined } }, /queue/],
+    [{ sweep: { ...task, run: undefined } }, /run/],
+  ] as const) assert.throws(() => language.buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], tasks } as never), message)
+})
+
+test('connect refuses unknown work queues and readOnly workers before connecting a store', async () => {
+  const memory = memoryStore()
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      memory,
+      jobs: memoryJobs({ lease: 30000, retain: { completed: 86400000, failed: 604800000 } }),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  const asas = language.buildAsas({ kayan: [], tasks: { sweep: { cron: '@daily', queue: 'maintenance', run: async () => ({}) } }, http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] })
+  try {
+    await assert.rejects(asas.connect({ work: ['typo'] }), /queue "typo"/)
+    await assert.rejects(asas.connect({ readOnly: true, work: ['maintenance'] }), /readOnly/)
+    assert.equal(memory.calls.connect, 0)
+    await asas.connect()
+    assert.deepEqual(await asas.jobs!.run({ queue: 'maintenance' }), { completed: 1, failures: 0 })
+    assert.deepEqual(await asas.jobs!.run({ queue: 'maintenance' }), { completed: 0, failures: 0 })
+  } finally { await asas.destroy() }
 })

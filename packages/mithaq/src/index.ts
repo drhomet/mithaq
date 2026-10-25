@@ -77,7 +77,7 @@ export { defineRukn, type KayanConfigs, type Rukn } from './mithaq/rukn.ts'
 export { base } from './base/index.ts'
 export { storage, upload } from './storage/index.ts'
 export { versions } from './versions/index.ts'
-export { defineMithaq, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, type Command, type CommandInput, type Language, type SchemaTarget, type Store, type Target, type TenantField, type TenantTarget } from './mithaq/language.ts'
+export { defineMithaq, isJobs, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, type Command, type CommandInput, type Language, type SchemaTarget, type Store, type Target, type TenantField, type TenantTarget } from './mithaq/language.ts'
 export { Refusal } from './mithaq/refusal.ts'
 export { defaultRules, providerOf, rule, type ProvidedBy, type Provider, type Rule, type Rules, type RuleValue } from './base/rules.ts'
 export { draftFields, versionOperations } from './versions/versions.ts'
@@ -123,4 +123,8 @@ export {
 } from './screen/index.ts'
 export type { InferInput, InferOutput, StandardSchemaV1 } from './mithaq/standard-schema.ts'
 
-export { defaultJobLease, type JobTask, type JobRunner, type JobsConfig } from './jobs/config.ts'
+export { defaultJobLease, defaultJobRetention, type JobTask, type JobTasks } from './jobs/config.ts'
+
+export { drizzleJobs } from './drizzle/jobs.ts'
+export { memoryJobs, memoryTransactions } from './memory/jobs.ts'
+export type { Job, JobPolicy, JobRetention, JobFinish, JobsDriver, JobsTarget } from './jobs/driver.ts'

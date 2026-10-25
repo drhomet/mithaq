@@ -1,4 +1,4 @@
-import { jobTable } from '../jobs/table.ts'
+import { jobTable, jobOccurrencesTable } from './job-table.ts'
 import { and, asc, count as sqlCount, sum as sqlSum, desc, eq, getTableColumns, getTableName, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import {
@@ -183,7 +183,7 @@ export type BuiltTables<
 } & {
   // And one per kayan that keeps versions, for the same reason.
   [K in StoreKayan<List[number], StoreName, DefaultStore> as VersionsName<K>]?: ReturnType<typeof pgTable>
-} & { mithaq_jobs?: ReturnType<typeof jobTable> }
+} & { mithaq_jobs?: ReturnType<typeof jobTable>; mithaq_job_occurrences?: ReturnType<typeof jobOccurrencesTable> }
 
 /** Builds one field's column. `tables` is every table built so far, keyed by kayan name, which a foreign key reads lazily. */
 export type ColumnBuilder = (field: ResolvedField, tables: Tables) => AnyPgColumnBuilder
@@ -1019,8 +1019,11 @@ const storeOf = <
         )
       }
       if (options?.jobs) {
-        if (tables.mithaq_jobs || kayanList.some((one) => one.table === 'mithaq_jobs')) throw new Error('The name mithaq_jobs is reserved for the jobs table.')
+        for (const name of ['mithaq_jobs', 'mithaq_job_occurrences']) {
+          if (tables[name] || kayanList.some((one) => one.table === name)) throw new Error(`The name ${name} is reserved for jobs.`)
+        }
         tables.mithaq_jobs = jobTable()
+        tables.mithaq_job_occurrences = jobOccurrencesTable()
         schemas.public = null
       }
       // Every name the push and the pull hand drizzle-kit as a glob passes here once, built.

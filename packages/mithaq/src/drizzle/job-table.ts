@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 /** Core's table, kept out of the kayan registry and the managed store. */
 export const jobTable = () => {
@@ -26,3 +26,10 @@ export const jobTable = () => {
     index('mithaq_jobs_claim').on(table.queue, table.waitUntil, table.createdAt).where(sql`${table.completedAt} is null and not ${table.hasError}`),
   ])
 }
+
+// ponytail: identity rows grow with scheduled work; compact behind durable per-task watermarks if frequent schedules need it.
+/** Occurrence identity outlives history, so retention never makes an old cron fire runnable again. */
+export const jobOccurrencesTable = () => pgTable('mithaq_job_occurrences', {
+  task: text('task').notNull(),
+  scheduledFor: timestamp('scheduled_for', { precision: 3, withTimezone: true, mode: 'date' }).notNull(),
+}, (table) => [primaryKey({ columns: [table.task, table.scheduledFor] })])

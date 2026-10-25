@@ -14,3 +14,7 @@ export { betterAuthTenant } from './auth/better-auth/tenant.ts'
 export { screenKinds, screenTarget, type ScreenTarget } from './screen/index.ts'
 export { defaultFileSize, storageTarget, type StorageConfig, type StorageTarget } from './storage/storage.ts'
 export { versionsTarget, type KayanVersions, type VersionsTarget } from './versions/index.ts'
+
+export { drizzleJobs } from './drizzle/jobs.ts'
+export { memoryJobs } from './memory/jobs.ts'
+export { defaultJobLease, defaultJobRetention } from './jobs/config.ts'

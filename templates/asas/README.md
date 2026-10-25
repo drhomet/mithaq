@@ -899,7 +899,11 @@ Each app connects once before it serves any request. Both `apps/asas-tanstack/sr
 ```ts
 const { env } = process
 if (env.NODE_ENV === 'production') {
-  await (await import('asas')).asas.connect().catch((error: unknown) => {
+  await (await import('asas')).asas.connect({
+    // add-on: uploads
+    work: ['maintenance'],
+    // end add-on: uploads
+  }).catch((error: unknown) => {
     console.error(error)
     process.exit(1)
   })
@@ -973,9 +977,11 @@ Each upload row stores the name of the adapter that holds its file. `STORAGE_ADA
 
 `mithaq storage sweep` deletes objects that no row names and that are more than a day old. Run it with `--check` first to see the list (see [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#storage-sweep)).
 
-With the uploads add-on, `src/asas.ts` names `jobs` and the ejected `defaultStorageSweepTask`. Production checks due work every five minutes; the default task schedules an hourly sweep. Development and tests start no timers. Multiple instances insert each scheduled occurrence once through a Postgres unique index and claim work with `FOR UPDATE SKIP LOCKED`. Logs contain only task slugs and numeric counts. Throws fail that job; expired leases are marked interrupted without a retry, and the next occurrence can still run. Shutdown waits for active timer ticks. Apply the generated `mithaq_jobs` migration before enabling jobs in an existing project; without a `jobs` key existing projects see no change.
+The language names `jobs: drizzleJobs({ lease: defaultJobLease, retain: defaultJobRetention })`. With uploads, `src/asas.ts` names `tasks: { storageSweep: defaultStorageSweepTask }` from the ejected storage defaults. Production hosts call `connect({ work: ['maintenance'] })`; one timer per task fires at its own cron, hourly for the default sweep. Development and tests start no work unless explicitly requested. `connect()` alone starts no timers; `readOnly` together with `work` is refused, as is a queue no task uses.
 
-For an external cron or a manual development run, use `bunx mithaq jobs run --queue storage --limit 1` with `DATABASE_URL` exported. It schedules and runs once without starting timers. The scheduled task first cleans eligible upload rows, then reuses the CLI's object policy. The CLI's `storage sweep --check` remains the preview for object cleanup; it does not remove upload rows.
+Multiple instances record each occurrence once and claim it exclusively through the jobs driver. Drizzle uses a unique occurrence identity and `FOR UPDATE SKIP LOCKED`; core scheduling and execution are store-agnostic. Completed and failed history is pruned each pass by explicit retention, while occurrence identities remain so pruning cannot reschedule old work. Logs contain only task names and counts. Throws fail the job; expired leases end interrupted without retry. Shutdown waits for active passes. Existing projects add the owner-approved jobs target and apply its generated migration to opt in. Without a target and tasks, existing projects see no change.
+
+For an external cron or a manual development run, use `bunx mithaq jobs run maintenance` with `DATABASE_URL` exported; omit queue arguments to run all task queues. It performs one pass without timers. The scheduled task first cleans eligible upload rows, then reuses the CLI’s object policy. `storage sweep --check` remains the preview for object cleanup and does not remove upload rows.
 
 On an upload kayan, optional `targets.storage.orphanAfter` is a positive grace period in milliseconds for abandoned rows. Cleanup permanently deletes an eligible row through its managed delete, scoped to one organization, after locking it and checking again for references. Soft-deleted owners, relationship sets, rich-text uploads and every retained version keep a file. `cascade` and `set null` pointers targeting that kayan are refused; its owners must share its store. The `removed` step deletes the object after commit. Keep the grace longer than the form's expected lifetime.
 

@@ -1,3 +1,4 @@
+import type { JobsTarget } from '../jobs/driver.ts'
 import { rows, type CheckedTable, type RowTable, type Rows, type RowsOptions } from './rows.ts'
 import { actorPermissions } from '../asas/actor.ts'
 import { user, type UserRefs } from './user.ts'
@@ -85,7 +86,7 @@ type RuntimeAccess = Omit<AccessTarget, 'access' | 'roles' | 'rolesOf'> & {
 
 type RuntimeService = ServiceTarget
 
-export type RuntimeTarget = RuntimeAccess | RuntimeSchema | RuntimeScreen | RuntimeService | RuntimeStore | StorageTarget | TenantTarget | VersionsTarget
+export type RuntimeTarget = RuntimeAccess | RuntimeSchema | RuntimeScreen | RuntimeService | RuntimeStore | StorageTarget | TenantTarget | VersionsTarget | JobsTarget
 
 /** The field a tenant-owned kayan places: one row of `RelationTo`, written by the application on create and never after. */
 export type TenantField<RelationTo extends string = string> = {
@@ -209,6 +210,9 @@ export const isService = (target: RuntimeTarget | undefined): target is RuntimeS
 export const isVersions = (target: RuntimeTarget | undefined): target is VersionsTarget =>
   target?.capability === 'versions'
 
+/** A target that persists scheduled work. */
+export const isJobs = (target: RuntimeTarget | undefined): target is JobsTarget => target?.capability === 'jobs'
+
 /** The target that says which kayan a row's tenant is. */
 export const isTenant = (target: RuntimeTarget | undefined): target is TenantTarget =>
   target?.capability === 'tenant'
@@ -265,7 +269,7 @@ type StoreKeys<Targets> = {
   [Name in keyof Targets]: Targets[Name] extends { capability: 'store' } ? Name : never
 }[keyof Targets] & string
 type SchemaKeys<Targets> = {
-  [Name in keyof Targets]: Targets[Name] extends { capability: 'access' | 'screen' | 'service' | 'storage' | 'store' | 'tenant' | 'versions' } ? never : Name
+  [Name in keyof Targets]: Targets[Name] extends { capability: 'access' | 'screen' | 'service' | 'storage' | 'store' | 'tenant' | 'versions' | 'jobs' } ? never : Name
 }[keyof Targets] & string
 
 // A kind carrying its own implementation for this target's type need not be in its map.
@@ -279,7 +283,7 @@ type Owned<Kinds, Name extends keyof Kinds, K, T> = Name extends keyof K
 
 type CheckedTarget<Kinds extends Record<string, Kind>, Rules extends Record<string, Rule>, Targets, T> =
   // These build no field, so there are no maps to check.
-  T extends { capability: 'access' | 'storage' | 'tenant' | 'versions' }
+  T extends { capability: 'access' | 'storage' | 'tenant' | 'versions' | 'jobs' }
     ? T
     : // Transport is its own category, so `http` and `orpc` are refused on the runner by name.
       T extends { capability: 'service' }

@@ -10,7 +10,9 @@ This file is for an agent changing mithaq itself. An agent working inside a crea
 - **rukn**, plural **arkan**: a pillar, a pluggable part that brings kinds, rules, fields or targets (`base`, `richText`, `storage`, `versions`).
 - **asas**: the foundation, the runtime `buildAsas` returns from a list of kayan.
 - **target**: what a declaration is built into, named under `defineMithaq`'s `targets` (`drizzle`, `zod`, `service`, `tenant`, a screen).
-- **capability**: the role a target plays: `store`, `schema`, `service`, `screen`, `access`, `storage`, `tenant` or `versions`.
+- **capability**: the role a target plays: `store`, `schema`, `service`, `screen`, `access`, `storage`, `tenant`, `versions` or `jobs`.
+- **task**: named background work with `cron`, `queue` and `run`, declared in `buildAsas.tasks`; `connect({ work })` chooses which queues this process runs.
+- **jobs driver**: the persistence behind a `jobs` capability, sharing the service store’s transactions and meeting the shared contract suite.
 - **step**: one function `(ctx, tools)` in an operation's list. Each list holds exactly one store or managed read step and whatever surrounds it.
 - **tenant field**: the field `betterAuthTenant` binds. A kayan that places it belongs to one organization; a kayan without it is shared.
 

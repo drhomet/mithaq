@@ -156,15 +156,14 @@ export const defaultServeFile: StorageConfig['serve'] = async ({ request, kayan,
   })
 }
 
-/** The scheduled object and row cleanup policy a project names in jobs.tasks. */
+/** The scheduled object and row cleanup policy a project names in tasks. */
 export const defaultStorageSweepTask: JobTask = {
-  slug: 'storage-sweep',
-  schedule: [{ cron: '@hourly', queue: 'storage' }],
-  retries: 0,
-  handler: async ({ asas }) => {
+  cron: '@hourly',
+  queue: 'maintenance',
+  run: async ({ asas }) => {
     const counts = await sweepStorage({ asas })
     console.info(counts)
     return counts
   },
 }
-// mithaq-admin 0.0.0 3a2ddb724d9d90b2c63705557d0429338b5d75e725025f14784b681f3a4bdb2c
+// mithaq-admin 0.0.0 e3d18c039b6ff3364707471e96dbea269ab35b2b357b90c08faf4ff0d29b314e

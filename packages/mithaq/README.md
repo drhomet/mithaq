@@ -459,7 +459,7 @@ the kayan's own `findByID`. A global holds no files, and a kayan that holds
 files keeps no versions. Where it lives:
 `packages/mithaq/src/storage/storage.ts` `resolveStorage`.
 
-The uploads template names `defaultStorageSweepTask` from its ejected `storage/defaults.ts` in `buildAsas.jobs.tasks`. It runs hourly; production checks for due work every five minutes. Run `storage sweep --check` first to inspect the existing object policy. The scheduled task first removes abandoned upload rows, then calls the same `config.sweep` object policy as the CLI. The CLI remains an object-only sweep and still prints keys; background logs contain task slugs and counts alone: rows checked, deleted and kept, objects listed and deleted, and failures.
+The uploads template names `defaultStorageSweepTask` from its ejected `storage/defaults.ts` in `buildAsas.tasks` as `storageSweep`. It runs hourly in production hosts that call `connect({ work: ['maintenance'] })`. Run `storage sweep --check` first to inspect the existing object policy. The scheduled task first removes abandoned upload rows, then calls the same `config.sweep` object policy as the CLI. The CLI remains an object-only sweep and still prints keys; background logs contain task names and counts alone: rows checked, deleted and kept, objects listed and deleted, and failures.
 
 Set `targets.storage.orphanAfter` to a positive grace period in milliseconds only on an upload kayan where an unattached row means an abandoned upload. A cleanup takes one organization at a time, locks each candidate and checks its references again in the delete transaction. Soft-deleted owners and every retained version snapshot keep the file, including rich-text upload nodes and relationship sets. Cleanup permanently deletes eligible rows even when the upload kayan normally soft-deletes, and calls `removed` after commit. Foreign-key refusals keep the row. A pointer using `onDelete: 'cascade'` or `'set null'` makes this policy unsafe and is refused with its field name. Owners and their upload must use the same store. An internal, row-specific maintenance actor authorizes only that selected delete; the ordinary tenant scope and sealed step store still apply, independently of project access rules.
 
@@ -510,6 +510,7 @@ capability alone:
 | `tenant` | says which kayan a row's organization is | at most one, named `tenant` |
 | `storage` | where a kayan's files are kept | at most one |
 | `versions` | where a kayan's past copies are kept | at most one |
+| `jobs` | persists scheduled work through a driver sharing the service store’s transactions | at most one |
 
 A store or schema target has one entry per kind and per rule; a kind may also
 carry its own implementation for a target's `type`. A target may carry
@@ -578,30 +579,47 @@ is `templates/asas/src/asas.ts`.
 
 ### Jobs
 
-Jobs are opt-in on `buildAsas`, independently of the language vocabulary. Existing projects with no `jobs` key gain no table, timer or migration. Adding `jobs` requires `mithaq migrate` and applying that migration before starting a runner.
+Jobs are a capability of the language. The template names its target explicitly:
 
+<!-- from: templates/mithaq/src/mithaq.ts -->
 ```ts
-jobs: {
-  tasks: [{
-    slug: 'storage-sweep',
-    handler: async ({ asas, input, signal }) => sweepStorage({ asas }),
-    schedule: [{ cron: '@hourly', queue: 'storage' }],
-    retries: 0,
-  }],
-  autoRun: [{ cron: '*/5 * * * *', queue: 'storage', limit: 1 }],
-  lease: defaultJobLease,
-},
+jobs: drizzleJobs({ lease: defaultJobLease, retain: defaultJobRetention }),
 ```
 
-Import `sweepStorage` and `defaultJobLease` from `mithaq`, or name the project's `defaultStorageSweepTask` in `tasks`. Every task names a unique `slug`, a handler, `schedule` and `retries: 0`. A handler receives `{ asas, input, signal? }` and returns a record of finite numeric counts. Every schedule and `autoRun` entry names its queue; each runner also names a positive limit. A drizzle wrapper must forward both `init(kayan, options)` arguments so the jobs table reaches the generated schema. The lease is explicit milliseconds; `defaultJobLease` is thirty seconds. Invalid cron expressions, duplicate slugs, missing queues or lease, and retries other than zero are refused at build time. Cron expressions use UTC.
+Import `drizzleJobs`, `defaultJobLease` and `defaultJobRetention` from `mithaq` or `mithaq/targets`. The lease is thirty seconds, renewed while work runs; retention keeps completed history for seven days and failed history for thirty days. Each value is explicit milliseconds and replaceable. A language without a jobs target and a build without `tasks` gain no table, timer, migration or message key. Existing projects opt in by adding the owner-approved target, signing their language change and writing and applying a migration before starting workers. Two jobs targets, a driver incompatible with the service store, missing lease or retention, and tasks without a jobs target are refused.
 
-Core's `mithaq_jobs` Postgres table is generated and migrated with the schema, never declared as a kayan or exposed over HTTP or the step store. It holds the task, input, queue, nullable tenant, schedule and wait times, lease token and expiry, attempts, completion, error, output and timestamps. Phase 1 writes a null tenant and only claims null-tenant jobs. `asas.jobs.handleSchedules({ queue, now? })` inserts the latest fire at or before now; older missed fires are not backfilled. A partial unique index on `(task, scheduled_for)` makes each occurrence one job across instances, even with simultaneous scheduler ticks. Two schedules of one task firing at the same moment share that occurrence, including when they name different queues.
+Tasks are keyed by name and spread like operations. With uploads, the template names its ejected policy:
 
-`asas.jobs.runJobs({ queue, limit })` claims due work with `FOR UPDATE SKIP LOCKED`, increments attempts and renews the lease while handlers run. Successful jobs keep their counts; throws fail the job with `{ message }` in the table, while logs omit the message. An expired, already-attempted job fails as interrupted and is never blindly rerun. Completed and failed rows remain as history; phase 1 has no retention task.
+<!-- from: templates/asas/src/asas.ts -->
+```ts
+tasks: { storageSweep: defaultStorageSweepTask },
+```
 
-`asas.jobs.run({ queue, limit })` schedules and runs once, catching database failures and logging failure counts. A normal `connect()` starts one protected, unreferenced croner timer per `autoRun` entry. `connect({ readOnly: true })` starts none, and `destroy()` stops timers and waits for their current ticks before closing stores. The template supplies `autoRun` only in production outside tests. For a host without a lasting process, an external scheduler runs [`mithaq jobs run`](src/asas/cli/README.md#jobs-run); explicit `--queue` and `--limit` also work when the template disables automatic runners in development.
+A task is `{ cron, queue, run }`. `run({ asas, input, signal })` returns `Promise<Record<string, number>>`, finite numeric counts alone. Every task names a valid cron, a nonempty queue and a run function; cron uses UTC. The default storage task runs hourly on `maintenance`. Projects edit its ejected policy in `storage/defaults.ts`.
 
-Phase 1 has no operation-side `jobs.queue`, tenant execution, retries or backoff, HTTP job endpoint, backoffice screen, concurrency keys or workflows. The nullable tenant and other state columns reserve that future contract; none is an escape from managed tenant enforcement.
+`asas.connect({ work: ['maintenance'] })` starts one protected, unreferenced timer per task in those queues, at the task’s own cron. `connect()` starts no timers; development and tests run no work unless requested. A queue no task uses is refused by name before stores connect. `connect({ readOnly: true, work })` is refused. `destroy()` stops timers and waits for an in-flight pass before closing stores. Production hosts pass `work` explicitly. [`mithaq jobs run maintenance`](src/asas/cli/README.md#jobs-run) performs one pass for an outside cron; with no queue arguments it uses all task queues.
+
+`asas.jobs.schedule({ queue, now? })` records the latest occurrence at or before now; older missed fires are not backfilled. `asas.jobs.run({ queue })` schedules, expires dead leases, claims and runs due jobs, then prunes history. It catches task and database failures so a later pass can run. One claimed job at a time keeps every lease under its heartbeat. An expired job ends failed as interrupted and never reruns blindly. Logs hold task names and counts, never input, output keys, stored error text or uploaded filenames. A task’s thrown message is stored in its failed job, so restrict database access to job history.
+
+Core’s scheduler and worker contain no SQL. `drizzleJobs` owns `mithaq_jobs`, generated through the drizzle store’s normal migrations, never a kayan or a managed API. It holds task, input, queue, nullable tenant, schedule and wait times, token, lease, attempts, completion, error, output and timestamps. A partial unique index plus `ON CONFLICT DO NOTHING` makes scheduling atomic, and `FOR UPDATE SKIP LOCKED` makes claims exclusive. A separate `mithaq_job_occurrences` identity ledger outlives prunable history, so retention cannot recreate an old occurrence. The ledger grows by one small row per occurrence. A drizzle wrapper must forward both `init(kayan, options)` arguments.
+
+`memoryJobs({ lease, retain })` supplies the same guarantees in one process for tests and development. A memory store spreads `memoryTransactions()` and uses its `transaction` function and `afterCommit` hook; queued jobs become visible only after a successful transaction. Drivers initialized against the same memory transaction manager share jobs and occurrence identities. Memory state disappears when the process exits.
+
+### Writing a jobs driver
+
+Implement `JobsDriver` from `mithaq`. Its `store` names the compatible store, `fits(store)` checks compatibility, and `init(store)` binds a fresh driver to the initialized store. `buildAsas` calls these against the service store so future operation-side enqueue can share its transaction. A target is `{ capability: 'jobs', type, driver, lease, retain }`; it builds no field maps.
+
+- `record({ task, scheduledFor, queue, tenant })` returns whether it atomically recorded a new occurrence; racing callers and pruning must never create that occurrence twice.
+- `enqueue({ task, input, queue, tenant, runAt, tx })` joins the caller’s transaction, including rollback. This driver method is tested now; operation-side enqueue is not exposed yet.
+- `claim({ queue, limit, lease, token, now })` returns exclusive due jobs, only unclaimed and never attempted. Phase one claims null-tenant jobs alone.
+- `renew({ ids, token, lease })` returns only ids with unexpired leases still owned by the token.
+- `finish({ id, token, output } | { id, token, error })` completes or fails only work whose unexpired lease that token owns. Stale tokens change nothing.
+- `expire({ now })` fails expired held work without making it runnable again and returns its count.
+- `prune({ completedBefore, failedBefore })` removes terminal history by its respective age and returns its count, retaining occurrence identity.
+
+Run the exported `jobsContract(factory)` from `mithaq/jobs/contract` in a `node:test` file. The async factory returns `{ driver, peer, transaction, destroy }`, with both drivers sharing fresh storage and transactions for each case. The same suite proves races across drivers, claim limits and due times, rollback and commit visibility, renewal, expiry, stale finishes and retention for both shipped drivers.
+
+Polling wakes workers only at task cron fires. Wake-ups, Convex and Prisma drivers, tasks per organization, enqueue from operations, retries, `LISTEN/NOTIFY` and an HTTP runner are later work. Tenant columns reserve that future contract; jobs provide no escape from managed tenant enforcement.
 
 ### Defaults are explicit
 
@@ -643,7 +661,7 @@ project, which the project edits there.
 - `kayan.<name>.operations` and `global.<name>.operations`: each operation as a
   function, `(input, { actor })`, for code in the app:
   `asas.kayan.courses.operations.find({ limit: 20 }, { actor })`.
-- `connect({ readOnly? })`: reaches every store and prepares it, and with
+- `connect({ readOnly?, work? })`: reaches every store and prepares it, and with
   `readOnly` writes nothing. With the drizzle store's `prodMigrations`, it runs
   or refuses pending migrations; see [Migrations in production](src/drizzle/README.md).
 - `destroy()`: closes every store.
@@ -1046,7 +1064,7 @@ A red lock also stops both apps' `dev`, `build` and `preview` scripts. While a p
 
 ### Add a target
 
-A target is one entry in `defineMithaq`'s `targets`, under a name, with a `capability` core knows: `store`, `schema`, `access`, `service`, `screen`, `tenant`, `storage` or `versions`. A target's name and capability are vocabulary, so the owner signs every new one. A new capability is a change to mithaq itself.
+A target is one entry in `defineMithaq`'s `targets`, under a name, with a `capability` core knows: `store`, `schema`, `access`, `service`, `screen`, `tenant`, `storage`, `versions` or `jobs`. A target's name and capability are vocabulary, so the owner signs every new one. A new capability is a change to mithaq itself.
 
 A target of an existing capability can be the project's own and spreads into `targets` beside the shipped ones. A new target shipped by mithaq follows the order below. Paths from here on are in the mithaq repository.
 

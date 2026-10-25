@@ -23,7 +23,6 @@ import * as richTextComments from '@asas/rich-text-comments'
 import * as tags from '@asas/tags'
 import { defaultMaxBodyBytes, fetchHttp, Notice } from 'mithaq'
 // add-on: uploads
-import { defaultJobLease } from 'mithaq'
 import { defaultStorageSweepTask } from '@asas/mithaq/storage/defaults.ts'
 // end add-on: uploads
 import { orpcHttp } from 'mithaq/orpc'
@@ -42,11 +41,7 @@ const report = (error: unknown) => console.error(error instanceof Notice ? error
 
 export const asas = buildAsas({
   // add-on: uploads
-  jobs: {
-    tasks: [defaultStorageSweepTask],
-    autoRun: process.env.NODE_ENV === 'production' && !process.env.NODE_TEST_CONTEXT ? [{ cron: '*/5 * * * *', queue: 'storage', limit: 1 }] : [],
-    lease: defaultJobLease,
-  },
+  tasks: { storageSweep: defaultStorageSweepTask },
   // end add-on: uploads
   kayan: [
     ...auth.kayan,

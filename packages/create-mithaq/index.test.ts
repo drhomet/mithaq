@@ -242,6 +242,9 @@ test('a minimal project holds auth and the tags example alone: no other feature,
   // Its code, the comments aside, which may name what an add-on would bring.
   const code = (file: string) => read(file).replaceAll(/^\s*(\/\/|\/?\*).*$/gm, '')
   const language = code('minimal/packages/mithaq/src/mithaq.ts')
+  assert.match(language, /jobs: drizzleJobs\(\{ lease: defaultJobLease, retain: defaultJobRetention \}\)/)
+  assert.doesNotMatch(code('minimal/packages/asas/src/asas.ts'), /tasks:|defaultStorageSweepTask/)
+  assert.doesNotMatch(code('minimal/apps/asas-tanstack/src/server.ts'), /work:/)
   assert.match(language, /^import \{ accessTarget \} from '\.\/roles\/member-access\.ts'$/m)
   assert.match(language, /^export \{ accessTarget \}$/m)
   assert.doesNotMatch(language, /rbacTarget|auditSink|sessionLabels|softDelete|'courses'|'roles'|'auditLog'|'settings'|richText|storage\(/)

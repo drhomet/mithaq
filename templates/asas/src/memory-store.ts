@@ -1,6 +1,7 @@
+import { memoryTransactions } from 'mithaq'
 // A store that keeps its rows in memory, so a test can watch what a write did without a database.
-// Every kind builds the column name, every rule is an identity, and the transaction is the callback
-// run straight through, since nothing here can be rolled back.
+// Every kind builds the column name and every rule is an identity. Transaction hooks stage jobs
+// until the callback succeeds; test rows remain available for assertions even after a failed write.
 import { randomUUID } from 'node:crypto'
 import { conflict, invalid, missing, defaultKinds, defaultRules, type ResolvedField, type ResolvedKayan, type Where } from 'mithaq'
 import { compareValues as compare, matchesWhere } from 'mithaq/admin'
@@ -18,6 +19,7 @@ export const noRelationship = ({ kayan, field, path }: { kayan: string; field: s
 export const memoryStore = () => {
   const rows = new Map<string, Record<string, unknown>[]>()
   const kayanByName = new Map<string, ResolvedKayan>()
+  const transactions = memoryTransactions()
   const calls = { connect: 0, destroy: 0, transaction: 0 }
   const of = (name: string) => {
     const kept = rows.get(name) ?? []
@@ -71,6 +73,7 @@ export const memoryStore = () => {
     return [field, row ? Number(row[field]) + Number(value.$inc) : value.$inc]
   }))
   return {
+    ...transactions,
     capability: 'store' as const,
     rows,
     calls,
@@ -92,7 +95,7 @@ export const memoryStore = () => {
     },
     transaction: async <Result>(run: (tx: unknown) => Promise<Result>) => {
       calls.transaction += 1
-      return run({ memory: true })
+      return transactions.transaction(run)
     },
     insert: async ({ kayan: name, data: values }: { tx: unknown; kayan: string; data: Record<string, unknown> }) => {
       // A row that names no id gets one, as a uuid column's default gives drizzle's: a versions row is

@@ -66,7 +66,7 @@ const vocabularyIn = ({ folder, source, extension }: { folder: string; source: s
 }
 // The template's, which holds every add-on and so every word, frozen until the owner signs a change.
 const vocabulary = vocabularyIn({ folder: join(root, 'templates/asas'), source: join(root, 'packages/mithaq/src'), extension: '.ts' })
-assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), 'e4c797b0f387d25d5590a9debb12b58aec3188847d90b8b215ab85e651e0b5f4', 'the template speaks the frozen vocabulary')
+assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), '009614b5410df6fbd78fdb0cf077630036a2b5428f93e32c84f5d60e59d38900', 'the template speaks the frozen vocabulary')
 type Words = Record<'kinds' | 'rules' | 'targets', Record<string, unknown>>
 const bare = vocabularyOf({ arkan: [base] }) as Words
 /** The words each add-on that brings any adds to the language: its rukn's kinds, rules and targets beyond `base`'s. */

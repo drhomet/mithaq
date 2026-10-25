@@ -192,15 +192,13 @@ bunx mithaq migrate --name add_notes
 
 ## `jobs run`
 
-Schedules the latest due occurrence and runs due jobs once, then exits. It requires `DATABASE_URL` explicitly in the shell and an applied jobs migration. It uses the same runner as the asas timers, including unique scheduled occurrences, claims, heartbeats and counts-only logs. Handler or database failures answer a nonzero exit code; stored error messages are never logged.
-
-With no flags it runs the queues and limits in `jobs.autoRun`. When that list is empty, as in template development and tests, name both flags:
+Schedules the latest due occurrence and runs due jobs once, then exits. It requires `DATABASE_URL` explicitly and an applied jobs migration. It uses the same generic worker as the asas timers: unique occurrences, exclusive claims, renewed leases and history retention. Task or database failures answer a nonzero exit code; stored error messages are never logged.
 
 ```sh
-bunx mithaq jobs run --queue storage --limit 1
+bunx mithaq jobs run maintenance
 ```
 
-`--queue <name>` selects one queue and `--limit <number>` is its positive claim limit. There are no implicit queue or limit defaults. The command connects read-only to start no timers, runs once, destroys the build and exits. A build with no `jobs` is refused. See [Jobs](../../../README.md#jobs) for configuration and the phase 1 limits.
+`mithaq jobs run [queue ...]` selects queues by positional name. With none, it runs all queues the build’s tasks use. Unknown queues are refused before running any work. The command connects with `readOnly: true` to start no timers, performs a pass, destroys the build and exits. A build with no jobs target is refused. See [Jobs](../../../README.md#jobs) for the capability, drivers and phase one limits.
 
 ## `screens`
 
@@ -289,7 +287,7 @@ Deletes stored objects that no row names any more. It lists every object in each
 | --- | --- |
 | `--check` | List the orphans and delete nothing. |
 
-The template also names `defaultStorageSweepTask` in `jobs.tasks`: it removes eligible abandoned upload rows first, then reuses this object policy. Its background log contains only task slugs and counts. This CLI keeps its object-only behavior and key output. Run `storage sweep --check` first when changing the policy. See [Storage](../../../README.md#kayan-and-globals) and [Jobs](../../../README.md#jobs).
+The template also names `defaultStorageSweepTask` in `tasks`: it removes eligible abandoned upload rows first, then reuses this object policy. Its background log contains only task names and counts. This CLI keeps its object-only behavior and key output. Run `storage sweep --check` first when changing the policy. See [Storage](../../../README.md#kayan-and-globals) and [Jobs](../../../README.md#jobs).
 
 It needs `DATABASE_URL`, and exits 0 unless it refuses or fails.
 

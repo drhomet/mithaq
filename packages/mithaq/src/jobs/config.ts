@@ -1,34 +1,32 @@
 import { Cron } from 'croner'
+import type { JobsTarget } from './driver.ts'
 
 export type JobTask = {
-  slug: string
-  handler: (args: { asas: object; input: unknown; signal?: AbortSignal }) => Promise<Record<string, number>>
-  schedule: readonly { cron: string; queue: string }[]
-  retries: 0
+  cron: string
+  queue: string
+  run: (args: { asas: object; input: unknown; signal: AbortSignal }) => Promise<Record<string, number>>
 }
-export type JobRunner = { cron: string; queue: string; limit: number }
-export type JobsConfig = { tasks: readonly JobTask[]; autoRun: readonly JobRunner[]; lease: number }
+export type JobTasks = Readonly<Record<string, JobTask>>
 
-/** The lease the project names, renewed while a handler runs: thirty seconds. */
+/** Thirty seconds, renewed while a task runs. */
 export const defaultJobLease = 30000
+/** Keep completed work for seven days and failed work for thirty days. */
+export const defaultJobRetention = { completed: 7 * 86400000, failed: 30 * 86400000 } as const
 
-export const checkJobs = (config: JobsConfig) => {
-  if (!config || !Number.isSafeInteger(config.lease) || config.lease < 3) throw new Error('jobs.lease must name a positive integer of at least 3 ms.')
-  if (!Array.isArray(config.tasks) || !Array.isArray(config.autoRun)) throw new Error('jobs must name tasks and autoRun lists.')
-  const slugs = new Set<string>()
-  for (const task of config.tasks) {
-    if (!/^[a-zA-Z0-9_-]+$/.test(task.slug)) throw new Error('A job task slug takes letters, numbers, underscores and hyphens alone.')
-    if (slugs.has(task.slug)) throw new Error(`Duplicate jobs task "${task.slug}".`)
-    slugs.add(task.slug)
-    if (task.retries !== 0) throw new Error('Jobs phase 1 requires retries: 0 on every task.')
-    if (typeof task.handler !== 'function' || !Array.isArray(task.schedule)) throw new Error(`Job task "${task.slug}" must name handler and schedule.`)
+export const checkJobs = ({ target, tasks }: { target: JobsTarget; tasks: JobTasks | undefined }) => {
+  if (!Number.isSafeInteger(target.lease) || target.lease < 3) throw new Error('jobs.lease must name a positive integer of at least 3 ms.')
+  for (const key of ['completed', 'failed'] as const) {
+    if (!Number.isSafeInteger(target.retain?.[key]) || target.retain[key] < 1) throw new Error(`jobs.retain.${key} must name a positive integer in ms.`)
   }
-  for (const entry of [...config.tasks.flatMap((task) => task.schedule), ...config.autoRun]) {
-    if (typeof entry.queue !== 'string' || !entry.queue.trim()) throw new Error('Every jobs schedule and autoRun entry must name queue.')
+  if (tasks === undefined) return
+  if (!tasks || typeof tasks !== 'object' || Array.isArray(tasks)) throw new Error('tasks must be an object keyed by task name.')
+  for (const [name, task] of Object.entries(tasks)) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error('A task name takes letters, numbers, underscores and hyphens alone.')
+    if (typeof task?.queue !== 'string' || !task.queue.trim()) throw new Error(`Task "${name}" must name queue.`)
+    if (typeof task.run !== 'function') throw new Error(`Task "${name}" must name run.`)
     try {
-      if (typeof entry.cron !== 'string') throw new Error()
-      new Cron(entry.cron, { paused: true, timezone: 'UTC' }).stop()
-    } catch { throw new Error('Every jobs schedule and autoRun entry must name a valid cron pattern.') }
+      if (typeof task.cron !== 'string') throw new Error()
+      new Cron(task.cron, { paused: true, timezone: 'UTC' }).stop()
+    } catch { throw new Error(`Task "${name}" must name a valid cron pattern.`) }
   }
-  for (const entry of config.autoRun) if (!Number.isSafeInteger(entry.limit) || entry.limit < 1) throw new Error('jobs.autoRun.limit must be a positive integer.')
 }

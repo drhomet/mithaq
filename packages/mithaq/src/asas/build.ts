@@ -1,7 +1,7 @@
 import { cleanupUploadTargets } from '../storage/references.ts'
 import { storageMaintenanceAccess } from './runner/storage-maintenance.ts'
 import { buildJobs } from '../jobs/jobs.ts'
-import { checkJobs, type JobsConfig } from '../jobs/config.ts'
+import { checkJobs, type JobTasks } from '../jobs/config.ts'
 import { rowsOf } from '../mithaq/rows.ts'
 import { accessReport, actor, actorPermissions, authActor, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
 import { betterAuthStrategy } from '../auth/better-auth/index.ts'
@@ -17,7 +17,7 @@ import { invalid } from './runner/errors.ts'
 import { assertMaxBodyBytes, boundedBody } from './http/fetch.ts'
 import { fieldlessOperation, keepOperationKeys } from '../rbac/steps.ts'
 import { resolvedKayans, type ActorBoundAccess, type AdminAccess, type Kayan, type RuntimeField, type ResolvedKayan, type ServiceOf } from '../mithaq/types.ts'
-import { accessTargetOf, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceKeys, serviceTargetOf, type Language, type Store } from '../mithaq/language.ts'
+import { accessTargetOf, isJobs, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceKeys, serviceTargetOf, type Language, type Store } from '../mithaq/language.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
 import type { BuiltTables } from '../drizzle/index.ts'
 import { screensOf, type ScreenClient } from '../screen/index.ts'
@@ -507,15 +507,15 @@ export const buildAsas = <
     http,
     messages,
     statements: declaredStatements,
-    jobs,
+    tasks,
   }: {
     kayan: KayanList &
       (UniqueNames<KayanList> extends true ? unknown : { duplicateKayanNames: never }) &
       (AccessActorMismatch<KayanList, L, ActorFor<L, KayanList>> | AdminAccessMismatch<Auth, ActorFor<L, KayanList>> | AdminAccessShapeMismatch<Auth> extends never
         ? unknown
         : { authAccessActorMismatch: AccessActorMismatch<KayanList, L, ActorFor<L, KayanList>> | AdminAccessMismatch<Auth, ActorFor<L, KayanList>> | AdminAccessShapeMismatch<Auth> })
-    /** Opt-in scheduled Postgres work; absent builds gain no table or timers. */
-    jobs?: JobsConfig
+    /** Tasks are keyed by name; work starts only when connect names their queues. */
+    tasks?: JobTasks
     /** The globals, each a kayan of one row. They share the kayan namespace. */
     global?: GlobalList
     auth?: Auth
@@ -545,7 +545,12 @@ export const buildAsas = <
       'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], or orpcHttp with the same options first for the typed client.',
     )
   }
-  if (jobs !== undefined) checkJobs(jobs)
+  const jobsTargets = Object.entries(language.targets).filter(([, target]) => isJobs(target))
+  if (jobsTargets.length > 1) throw new Error(`Targets "${jobsTargets.map(([name]) => name).join('" and "')}" both declare capability "jobs"; a build has at most one.`)
+  const jobsTarget = jobsTargets[0]?.[1]
+  const jobs = isJobs(jobsTarget) ? jobsTarget : undefined
+  if (tasks !== undefined && !jobs) throw new Error('buildAsas tasks require a target of capability "jobs".')
+  if (jobs) checkJobs({ target: jobs, tasks })
   const globals = (global ?? []) as readonly Kayan[]
   const globalNames = new Set(globals.map((one) => one.name))
   // One list, so a name declared twice is refused whichever list it is in.
@@ -587,6 +592,9 @@ export const buildAsas = <
     )
   }
   const service = serviceTargetOf(language)!
+  if (jobs && (!isStore(language.targets[service.store]) || !jobs.driver?.fits(language.targets[service.store] as Store))) {
+    throw new Error(`Jobs target "${jobsTargets[0]![0]}" driver "${jobs.driver?.store}" cannot share transactions with service store "${service.store}" (${(language.targets[service.store] as Store)?.type ?? service.store}).`)
+  }
   // For a runner written as data, which no type reached. Core picks no cap, page size or
   // bulk ceiling of its own.
   noOperations('The service target', service)
@@ -767,7 +775,7 @@ export const buildAsas = <
     stores[at] = [name, own]
     buildTargets[name] = own
   }
-  const jobRunner = jobs === undefined ? undefined : buildJobs({ config: jobs, store: buildTargets[service.store] as Store, asas: (): object => asas })
+  const jobRunner = jobs === undefined ? undefined : buildJobs({ target: { ...jobs, driver: jobs.driver.init(buildTargets[service.store] as Store) }, tasks, asas: (): object => asas })
   const cap = service.depth
   if (!Number.isInteger(cap) || cap < 1) throw new Error('service.depth must be a positive integer.')
 
@@ -1205,12 +1213,15 @@ export const buildAsas = <
       }
       return new Response('Not found', { status: 404 })
     },
-    connect: async ({ readOnly }: { readOnly?: boolean } = {}) => {
+    connect: async ({ readOnly, work }: { readOnly?: boolean; work?: readonly string[] } = {}) => {
+      if (readOnly && work !== undefined) throw new Error('connect cannot name work with readOnly: true.')
+      if (work?.length && !jobRunner) throw new Error(`No task uses work queue "${work[0]}".`)
+      jobRunner?.checkWork(work ?? [])
       // `readOnly` writes nothing: no push.
       for (const [, store] of stores) await store.connect({ readOnly })
       if (!readOnly) {
         await refuseExtraTenants()
-        jobRunner?.start()
+        jobRunner?.start(work ?? [])
       }
     },
     destroy: async () => {
@@ -1220,7 +1231,7 @@ export const buildAsas = <
   }
   // Frozen deep once nothing of the build writes to it: the runner reads every record at call
   // time. Library objects are left alone, since freezing them breaks them.
-  const shapers = Object.entries(language.targets).filter(([, target]) => !isAccess(target) && !isScreen(target) && !isService(target) && !isVersions(target) && !isStorage(target) && !isTenant(target))
+  const shapers = Object.entries(language.targets).filter(([, target]) => !isJobs(target) && !isAccess(target) && !isScreen(target) && !isService(target) && !isVersions(target) && !isStorage(target) && !isTenant(target))
   const library = new Set<unknown>(operationTable.map((one) => one.input))
   const foreign = (one: { targets?: unknown; custom?: unknown }) => {
     library.add(one.custom)

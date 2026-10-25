@@ -29,4 +29,5 @@ export const {
   courses_tags,
   _courses_versions,
   mithaq_jobs,
+  mithaq_job_occurrences,
 } = asas.targets.drizzle.tables

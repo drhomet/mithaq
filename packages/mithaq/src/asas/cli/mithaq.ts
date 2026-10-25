@@ -11,12 +11,12 @@ import type { ScreenClient } from '../../screen/index.ts'
 const verbs = ['eject', 'jobs', 'generate', 'lock', 'migrate', 'password-link', 'screens', 'upgrade']
 const nouns = ['auth', 'messages', 'screens']
 const usage =
-  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq password-link <email> | mithaq jobs run [--queue <name> --limit <number>] | mithaq screens | mithaq upgrade --check | mithaq eject <item> | mithaq eject --prune | mithaq <target> <command> [--check]'
+  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq password-link <email> | mithaq jobs run [queue ...] | mithaq screens | mithaq upgrade --check | mithaq eject <item> | mithaq eject --prune | mithaq <target> <command> [--check]'
 
 type Built = {
   targets: Record<string, { commands?: Record<string, Command> } | undefined>
   connect(args?: { readOnly?: boolean }): Promise<void>
-  jobs?: { autoRun: readonly { queue: string; limit: number }[]; run(args: { queue: string; limit: number }): Promise<{ failures: number }> }
+  jobs?: { queues: readonly string[]; run(args: { queue: string }): Promise<{ failures: number }> }
   destroy(): Promise<void>
 }
 
@@ -127,23 +127,16 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
       const code = await (noun === 'messages' ? messages() : noun === 'screens' ? screens() : auth(check))
       if (code) process.exit(code)
     } else if (verb === 'jobs') {
-      if (noun !== 'run') throw new Refusal('Usage: mithaq jobs run [--queue <name> --limit <number>]')
+      if (noun !== 'run') throw new Refusal('Usage: mithaq jobs run [queue ...]')
       const asas = await asasOf()
       try {
         if (!asas.jobs) throw new Refusal('This build names no jobs.')
-        let entries = asas.jobs.autoRun
-        if (flags.length) {
-          const queueAt = flags.indexOf('--queue')
-          const limitAt = flags.indexOf('--limit')
-          const queue = flags[queueAt + 1]
-          const limit = Number(flags[limitAt + 1])
-          if (flags.length !== 4 || queueAt < 0 || limitAt < 0 || Math.abs(queueAt - limitAt) !== 2 || !queue || !Number.isSafeInteger(limit) || limit < 1) throw new Refusal('Name both --queue and a positive integer --limit.')
-          entries = [{ queue, limit }]
-        }
-        if (!entries.length) throw new Refusal('This build names no autoRun entries. Name --queue and --limit for this run.')
+        if (rest.some((word) => word.startsWith('-'))) throw new Refusal('Usage: mithaq jobs run [queue ...]')
+        const queues = [...new Set(rest.length ? rest : asas.jobs.queues)]
+        for (const queue of queues) if (!asas.jobs.queues.includes(queue)) throw new Refusal(`No task uses work queue "${queue}".`)
         await asas.connect({ readOnly: true })
         let failures = 0
-        for (const entry of entries) failures += (await asas.jobs.run(entry)).failures
+        for (const queue of queues) failures += (await asas.jobs.run({ queue })).failures
         if (failures) process.exitCode = 1
       } finally { await asas.destroy() }
     } else if (verb === 'password-link') {
