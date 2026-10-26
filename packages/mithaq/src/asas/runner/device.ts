@@ -7,7 +7,8 @@ import { refusePlacement } from '../placement.ts'
 import { defaults, parse, sealOf, validated, outputOf, type Context, type Ctx, type DerivedShapes, type OperationStep, type ResolvedOperation, type RuntimeWriteTools, type ReadTools } from './steps.ts'
 import { stepTools } from './store.ts'
 import { projectReadableFields } from './access.ts'
-import { assertWhere, assertWhereGrammar, assertStoreWhere } from './query.ts'
+import { assertReadableWhere, protectedField } from './query-access.ts'
+import { assertWhere, assertStoreWhere } from './query.ts'
 import { AfterCommitError, denied, invalid, missing } from './errors.ts'
 import { snapshot } from './snapshot.ts'
 import { providerOf } from '../../base/rules.ts'
@@ -149,7 +150,8 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
         const sort = typeof query.sort === 'string' ? query.sort : 'id'
         const field = sort.replace(/^-/, '')
         if (!Object.hasOwn(one.fields, field) || one.fields[field]?.sortable === false) throw invalid({ message: `Unknown or unsortable field "${field}".`, key: 'error.invalid.value' })
-        const filter = combineWhere(combineWhere(where, query.where === undefined ? undefined : assertWhereGrammar(one, query.where)), alive(one))
+        await protectedField({ kayan: one, field, actor: scope.actor, authorize: service.authorize, what: 'sort' })
+        const filter = combineWhere(combineWhere(where, await assertReadableWhere({ kayan: one, where: query.where as Where | undefined, actor: scope.actor, authorize: service.authorize })), alive(one))
         const matched = kind === 'findOne' ? constrain({ one, data: query, where }) : filter
         if (kind === 'count' && store.count) return { totalDocs: await store.count({ kayan: one.name, args: { where: matched }, tx }) }
         const found = await store.find({ kayan: one.name, args: { limit: kind === 'findOne' ? 1 : limit, page, sort: { field, direction: sort.startsWith('-') ? 'desc' : 'asc' }, where: matched }, tx })
@@ -164,7 +166,7 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
       }
       const many = async (input: Row) => {
         if (input.where === undefined) throw invalid({ message: 'A bulk operation requires a where constraint.', key: 'error.invalid.bulk_where' })
-        const matched = combineWhere(combineWhere(where, assertWhereGrammar(one, input.where)), alive(one))
+        const matched = combineWhere(combineWhere(where, await assertReadableWhere({ kayan: one, where: input.where as Where, actor: scope.actor, authorize: service.authorize })), alive(one))
         const found = await store.find({ kayan: one.name, args: { limit: service.bulkLimit + 1, page: 1, lock: 'update', sort: { field: 'id', direction: 'asc' }, where: matched }, tx })
         if (found.docs.length > service.bulkLimit) throw invalid({ message: 'The device bulk limit was exceeded.', key: 'error.invalid.value' })
         const each = operation.each!

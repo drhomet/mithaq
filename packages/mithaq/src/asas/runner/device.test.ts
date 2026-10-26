@@ -198,3 +198,30 @@ test('a write opened by beforeTransaction commits its hooks exactly once before 
   await fixture.asas.kayan.patient.operations.create({ name: 'outer' })
   assert.deepEqual(seen, ['note', 'patient'])
 })
+
+test('related-field filters refuse hidden fields and constrain readable notes by patient access', async () => {
+  const fixture = setup()
+  fixture.sqlite.exec('alter table note add column patient_id integer references patient(id)')
+  const patient = fixture.language.defineKayan({ name: 'patient', placement: 'device', access: {
+    create: () => true,
+    read: ({ user }) => user === 'denied' ? false : user === 'scoped' ? { name: { equals: 'visible' } } : true,
+  }, fields: { ...defaultFields, id: { kind: 'number' }, name: { kind: 'text', rules: { required: true }, access: { read: ({ user }: { user: unknown }) => user !== 'masked' } } }, targets: { service: { operations: defaultOperations } } })
+  const note = fixture.language.defineKayan({ name: 'note', placement: 'device', access: { create: () => true, read: () => true, update: () => true, delete: () => true }, fields: { ...defaultFields, id: { kind: 'number' }, title: { kind: 'text', rules: { required: true } }, patient: { kind: 'relationship', relationTo: 'patient' } }, targets: { service: { operations: defaultOperations } } })
+  const asas = fixture.language.buildAsas({ kayan: [patient, note], http: [] })
+  await asas.connect()
+  for (const name of ['secret', 'visible']) {
+    const made = await asas.kayan.patient.operations.create({ name })
+    await asas.kayan.note.operations.create({ title: name, patient: made.id })
+  }
+  const where = { 'patient.name': { equals: 'secret' } }
+  for (const read of [asas.kayan.note.operations.find, asas.kayan.note.operations.count]) {
+    await assert.rejects(read({ where }, { actor: 'masked' }), (error: Error & { key?: string }) => error.key === 'error.forbidden.field_read')
+    await assert.rejects(read({ where }, { actor: 'denied' }), (error: Error & { key?: string }) => error.key === 'error.forbidden.read')
+    assert.equal((await read({ where }, { actor: 'scoped' })).totalDocs, 0)
+    assert.equal((await read({ where }, { actor: 'allowed' })).totalDocs, 1)
+  }
+  const alternatives = { or: [where, { title: { equals: 'visible' } }] }
+  assert.equal((await asas.kayan.note.operations.find({ where: alternatives }, { actor: 'scoped' })).totalDocs, 1)
+  await assert.rejects(asas.kayan.note.operations.updateMany({ where, data: { title: 'leaked' } }, { actor: 'masked' }), (error: Error & { key?: string }) => error.key === 'error.forbidden.field_read')
+  assert.deepEqual((await asas.kayan.note.operations.updateMany({ where, data: { title: 'leaked' } }, { actor: 'scoped' })).docs, [])
+})

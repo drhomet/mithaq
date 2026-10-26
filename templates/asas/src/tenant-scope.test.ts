@@ -1148,6 +1148,19 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await pins.count({ where: { 'memo.secret': { equals: 's2' } } }, { actor: one })).totalDocs, 0, 'org1\'s does not reach it')
   })
 
+  test('related filters in alternative branches keep the far read scope and field denial', async () => {
+    const pins = built.kayan.pins.operations
+    await pins.create({ label: 'alternative own', memo: ids.org1 }, { actor: one })
+    await pins.create({ label: 'alternative foreign', memo: ids.org2 }, { actor: two })
+    const where = { or: [{ 'memo.title': { equals: 'two' } }, { label: { equals: 'alternative own' } }] }
+    for (const read of [pins.find, pins.count]) {
+      assert.equal((await read({ where }, { actor: one })).totalDocs, 1)
+      const reader = await actorOf({ active: 'org1', orgs: { org1: ['editor'], org2: ['reader'] } })
+      const error = await refusal(read({ where: { or: [{ 'memo.secret': { equals: 's1' } }, { label: { equals: 'absent' } }] } }, { actor: reader, tenant: 'mine' }))
+      assert.equal(error.key, 'error.forbidden.field_read')
+    }
+  })
+
   test('joins at every depth read each level through the scope, under the active organization and tenant: \'mine\'', async () => {
     await built.kayan.notes.operations.create(note({ title: 'n2', memo: ids.org2 }), { actor: two })
     const firms = built.kayan.firms.operations
