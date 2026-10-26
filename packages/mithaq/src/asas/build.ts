@@ -543,6 +543,11 @@ export const buildAsas = <
   const globalNames = new Set(globals.map((one) => one.name))
   // One list, so a name declared twice is refused whichever list it is in.
   const declared = [...(kayan as readonly Kayan[]), ...globals]
+  const storeNames = declared.length ? declared.map((one) => one.targets?.service?.store ?? serviceTargetOf(language)?.store) : [serviceTargetOf(language)?.store]
+  if (!http.length && !storeNames.every((name) => {
+    const target = name && language.targets[name]
+    return target && isStore(target) && target.placement === 'device'
+  })) throw new Error('buildAsas requires http to name at least one HTTP plug for a server store.')
   refusePlacement({ language, kayan: declared, http, runtime: 'server' })
   refuseArkan(language)
   // A kayan writing `targets.screen` would read as every screen and mean one.
