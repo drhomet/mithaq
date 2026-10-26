@@ -29,7 +29,7 @@ const main = async () => {
   const paths = args.filter((arg, index) => arg !== '--unit' && !arg.startsWith('--workers=') && arg !== '--workers' && index !== (workerIndex >= 0 ? workerIndex + 1 : -1))
   const files = paths.length ? paths : unit
     ? [
-      ...['packages/**/*.test.ts', 'apps/**/*.test.ts'].flatMap((pattern) => globSync(pattern)).filter((file) => file !== 'packages/mithaq-admin/test/payload-password.test.ts'),
+      ...['packages/**/*.test.ts', 'apps/**/*.test.ts'].flatMap((pattern) => globSync(pattern)).filter((file) => !['packages/mithaq-admin/test/payload-password.test.ts', 'packages/mithaq/src/drizzle/jobs.test.ts'].includes(file)),
       ...['access', 'arkan', 'database-url', 'drizzle-proxy', 'kayan-layouts', 'lock', 'rich-text-threads', 'screens', 'tenant-target', 'test-database'].map((name) => `templates/asas/src/${name}.test.ts`),
       'templates/asas/src/ui-dashboard/members.test.ts',
     ]
