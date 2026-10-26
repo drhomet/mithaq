@@ -1,5 +1,5 @@
 import {
-  base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields,
+  base, defaultAuthorize, defaultDepth, defaultFields,
   defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq,
   drizzleSqliteIdKinds, drizzleSqliteKinds, drizzleSqliteRules, serviceTarget,
   sqliteAdapter, zodIdKinds, zodKinds, zodRules, zodTarget, type SqliteContract,
@@ -13,7 +13,7 @@ export const deviceLanguage = ({ db, transaction }: SqliteContract) => defineMit
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({
       store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth,
-      defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit,
+      defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultMaxLimit,
     }),
   },
 })

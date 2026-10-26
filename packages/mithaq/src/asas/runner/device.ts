@@ -45,7 +45,9 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
   for (const key of ['depth', 'defaultLimit', 'maxLimit', 'joinLimit', 'bulkLimit'] as const) {
     if (!Number.isInteger(service[key]) || service[key] < 1) throw new Error(`service.${key} must be a positive integer.`)
   }
-  if (service.defaultLimit > service.maxLimit || service.joinLimit > service.maxLimit) throw new Error('Device page defaults must fit service.maxLimit.')
+  for (const key of ['defaultLimit', 'joinLimit', 'bulkLimit'] as const) {
+    if (service[key] > service.maxLimit) throw new Error(`service.${key} is ${service[key]}, past service.maxLimit ${service.maxLimit}.`)
+  }
   for (const target of Object.values(language.targets)) {
     if (isTenant(target) || isStorage(target) || isVersions(target) || isScreen(target) || isAccess(target)) throw new Error('A device asas supports store, schema and service targets only.')
   }

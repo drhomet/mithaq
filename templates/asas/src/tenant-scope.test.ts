@@ -1933,6 +1933,16 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await changing as Record<string, unknown>)[kayan === 'tags' ? 'label' : 'name'], 'changed after hold')
   })
 
+  test('a nested bulk write cannot use its filter to change another organization', async () => {
+    storeProbe = async (_ctx, tools) => {
+      const result = await (tools.kayans as Record<string, Ops>).memos!.updateMany({ where: { id: { equals: ids.org2 } }, data: { title: 'foreign bulk edit' } })
+      assert.deepEqual(result.docs, [])
+    }
+    try { await memos().probe({ title: 'nested bulk boundary' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, 'two')
+    assert.equal((await memos().count({ where: { title: { equals: 'nested bulk boundary' } } }, { actor: two })).totalDocs, 0)
+  })
+
   test('every committed nested hook runs after a failure without exposing its rows to another organization', async () => {
     const seen: unknown[] = []
     storeProbe = async (ctx, tools) => {

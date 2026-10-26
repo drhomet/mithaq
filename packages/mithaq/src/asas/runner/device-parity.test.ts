@@ -24,7 +24,7 @@ const setup = ({ device, afterCommit = [], beforeSteps = [], operations = defaul
     store,
     ...(crossStore && { other: device ? sqliteAdapter({ ...fixture.database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }) : memoryStore() }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
-    service: serviceTarget({ store: 'store', schema: 'zod', authorize: defaultAuthorize, depth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, afterCommit: afterCommit as never, beforeSteps: beforeSteps as never }),
+    service: serviceTarget({ store: 'store', schema: 'zod', authorize: defaultAuthorize, depth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: device ? defaultMaxLimit : defaultBulkLimit, afterCommit: afterCommit as never, beforeSteps: beforeSteps as never }),
   } } as never)
   const patient: Kayan = { name: 'patient', ...(device && { placement: 'device' as const }), fields: { ...defaultFields, name: { kind: 'text', rules: { required: true } } }, access: { create: () => true, read: () => true, update: () => true, delete: () => true }, targets: { service: { operations: operations as never } } }
   const note: Kayan = { ...patient, name: 'note', targets: { service: { store: 'other', operations: defaultOperations } } }

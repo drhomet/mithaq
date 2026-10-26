@@ -14,7 +14,7 @@ test('a complete two-kayan device asas bundles for a neutral runtime with no Nod
         sqlite: sqliteAdapter({ db, transaction, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }),
         zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
         service: serviceTarget({ store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth,
-          defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+          defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultMaxLimit }),
       } })
       const access = { create: () => true, read: () => true, update: () => true, delete: () => true }
       const patient = language.defineKayan({ name: 'patient', placement: 'device', access, fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } } })

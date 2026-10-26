@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { setTimeout as wait } from 'node:timers/promises'
-import { AsasError, base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, type ProjectStep, type Where, zodIdKinds, zodKinds, zodRules, zodTarget } from '../../index.ts'
+import { AsasError, base, defaultAuthorize, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, type ProjectStep, type Where, zodIdKinds, zodKinds, zodRules, zodTarget } from '../../index.ts'
 import { drizzleSqliteIdKinds, drizzleSqliteKinds, sqliteAdapter, drizzleSqliteRules } from '../../targets.ts'
 import { nodeSqlite } from './__fixtures__/node-sqlite.ts'
 
@@ -24,7 +24,7 @@ const deviceLanguage = (database: ReturnType<typeof nodeSqlite>['database'], bef
   targets: {
     sqlite: sqliteAdapter({ ...database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
-    service: serviceTarget({ beforeSteps: beforeSteps as never, store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    service: serviceTarget({ beforeSteps: beforeSteps as never, store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultMaxLimit }),
   },
 })
 
