@@ -184,3 +184,10 @@ test('core refuses a tenant field and Better Auth on the device store before tar
   assert.throws(() => language.buildAsas({ kayan: [note({ fields: { ...defaultFields, organization: { kind: 'relationship', relationTo: 'missing', targets: { tenant: true } } } })] as never, http: [] }), /note.*tenant field.*device/)
   assert.throws(() => language.buildAsas({ kayan: [note({ auth: { provider: 'better-auth', server: () => { throw new Error('must not run') } } })] as never, http: [] }), /note.*Better Auth.*device/)
 })
+
+test('the server builder refuses a device-only kayan even when a SQLite store is registered', () => {
+  const { database } = nodeSqlite()
+  const { defineKayan, buildAsas } = deviceLanguage(database)
+  const patient = defineKayan({ name: 'patient', placement: 'device', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } }, access: allowAccess })
+  assert.throws(() => buildAsas({ kayan: [patient], http: [] }), /patient.*device-only.*server/)
+})

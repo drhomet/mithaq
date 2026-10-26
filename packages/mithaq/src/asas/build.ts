@@ -544,7 +544,7 @@ export const buildAsas = <
   const globalNames = new Set(globals.map((one) => one.name))
   // One list, so a name declared twice is refused whichever list it is in.
   const declared = [...(kayan as readonly Kayan[]), ...globals]
-  refusePlacement({ language, kayan: declared, http })
+  refusePlacement({ language, kayan: declared, http, runtime: 'server' })
   refuseArkan(language)
   // A kayan writing `targets.screen` would read as every screen and mean one.
   if (Object.hasOwn(language.targets, 'screen')) {

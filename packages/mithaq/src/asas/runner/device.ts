@@ -33,7 +33,7 @@ export function buildDeviceAsas<const L extends Language, const K extends readon
 export function buildDeviceAsas(language: Language, { kayan, global = [], http }: { kayan: readonly Kayan[]; global?: readonly Kayan[]; http: readonly unknown[] }): any {
   if (!Array.isArray(http) || http.length) throw new Error('A device asas requires http: []; HTTP targets are unsupported.')
   const declared = [...kayan, ...global]
-  refusePlacement({ language, kayan: declared, http })
+  refusePlacement({ language, kayan: declared, http, runtime: 'device' })
   const services = Object.values(language.targets).filter(isService)
   if (services.length !== 1 || !isService(language.targets.service)) throw new Error('A device asas needs exactly one service target named service.')
   const service = serviceTargetOf(language)!
