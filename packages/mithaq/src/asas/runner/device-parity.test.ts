@@ -9,13 +9,14 @@ import type { RuntimeWriteTools } from './steps.ts'
 type Call = (input?: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any>
 type Built = { kayan: Record<string, { operations: Record<string, Call> }>; connect(): Promise<void> }
 
-const setup = ({ device, afterCommit = [], beforeSteps = [], operations = defaultOperations, depth = defaultDepth, crossStore = false }: {
+const setup = ({ device, afterCommit = [], beforeSteps = [], operations = defaultOperations, depth = defaultDepth, crossStore = false, limits = {} }: {
   device: boolean
   afterCommit?: readonly ((ctx: Ctx, tools: RuntimeWriteTools) => Promise<Ctx>)[]
   beforeSteps?: readonly ((ctx: Ctx, tools: RuntimeWriteTools) => Promise<Ctx>)[]
   operations?: Record<string, unknown>
   depth?: number
   crossStore?: boolean
+  limits?: Partial<Record<'defaultLimit' | 'maxLimit' | 'joinLimit' | 'bulkLimit', number>>
 }) => {
   const fixture = nodeSqlite()
   fixture.sqlite.exec('create table patient (id text primary key not null, name text not null, created_at integer not null, updated_at integer not null)')
@@ -24,7 +25,7 @@ const setup = ({ device, afterCommit = [], beforeSteps = [], operations = defaul
     store,
     ...(crossStore && { other: device ? sqliteAdapter({ ...fixture.database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }) : memoryStore() }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
-    service: serviceTarget({ store: 'store', schema: 'zod', authorize: defaultAuthorize, depth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: device ? defaultMaxLimit : defaultBulkLimit, afterCommit: afterCommit as never, beforeSteps: beforeSteps as never }),
+    service: serviceTarget({ store: 'store', schema: 'zod', authorize: defaultAuthorize, depth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, ...limits, afterCommit: afterCommit as never, beforeSteps: beforeSteps as never }),
   } } as never)
   const patient: Kayan = { name: 'patient', ...(device && { placement: 'device' as const }), fields: { ...defaultFields, name: { kind: 'text', rules: { required: true } } }, access: { create: () => true, read: () => true, update: () => true, delete: () => true }, targets: { service: { operations: operations as never } } }
   const note: Kayan = { ...patient, name: 'note', targets: { service: { store: 'other', operations: defaultOperations } } }
@@ -125,5 +126,35 @@ test('both runners validate a write id before running beforeTransaction', async 
     await asas.connect()
     await assert.rejects(operations.update!({ id: 'invalid uuid', name: 'refused' }), (error: Error & { status?: number }) => error.status === 400)
     assert.deepEqual(seen, [])
+  }
+})
+
+test('both builds accept the shipped limits and bulk ceilings above the maximum page size', () => {
+  for (const device of [false, true]) {
+    for (const limits of [{}, { bulkLimit: defaultMaxLimit + 1 }, { defaultLimit: defaultMaxLimit, joinLimit: defaultMaxLimit }]) {
+      assert.doesNotThrow(() => setup({ device, limits }))
+    }
+  }
+})
+
+test('both builds refuse the same invalid page and bulk numbers', () => {
+  const message = (device: boolean, limits: Parameters<typeof setup>[0]['limits']) => {
+    let refused: string | undefined
+    assert.throws(() => setup({ device, limits }), (error: Error) => {
+      assert.match(error.message, /service\.(defaultLimit|maxLimit|joinLimit|bulkLimit)/)
+      refused = error.message
+      return true
+    })
+    return refused
+  }
+  for (const key of ['defaultLimit', 'maxLimit', 'joinLimit', 'bulkLimit'] as const) {
+    for (const value of [0, -1, 1.5, NaN, Infinity]) {
+      const limits = { [key]: value }
+      assert.equal(message(true, limits), message(false, limits))
+    }
+  }
+  for (const key of ['defaultLimit', 'joinLimit'] as const) {
+    const limits = { [key]: defaultMaxLimit + 1 }
+    assert.equal(message(true, limits), message(false, limits))
   }
 })

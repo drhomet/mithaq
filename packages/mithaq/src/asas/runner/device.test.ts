@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { base, defaultAuthorize, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, sqliteAdapter, drizzleSqliteIdKinds, drizzleSqliteKinds, drizzleSqliteRules, zodTarget, zodKinds, zodRules, zodIdKinds, type ProjectStep, type Ctx } from '../../device.ts'
+import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, sqliteAdapter, drizzleSqliteIdKinds, drizzleSqliteKinds, drizzleSqliteRules, zodTarget, zodKinds, zodRules, zodIdKinds, type ProjectStep, type Ctx } from '../../device.ts'
 import { nodeSqlite } from '../../drizzle/sqlite/__fixtures__/node-sqlite.ts'
 
 const setup = ({ beforeTransaction = [], noteBeforeTransaction = [], beforeSteps = [], afterSteps = [], afterCommit = [] }: { beforeTransaction?: readonly ProjectStep[]; noteBeforeTransaction?: readonly ProjectStep[]; beforeSteps?: readonly ProjectStep[]; afterSteps?: readonly ProjectStep[]; afterCommit?: readonly ProjectStep[] } = {}) => {
@@ -9,7 +9,7 @@ const setup = ({ beforeTransaction = [], noteBeforeTransaction = [], beforeSteps
   const language = defineMithaq({ locales: ['en', 'ar'] as const, arkan: [base], targets: {
     sqlite: sqliteAdapter({ ...fixture.database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
-    service: serviceTarget({ beforeSteps: beforeSteps as never, afterSteps: afterSteps as never, afterCommit: afterCommit as never, store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultMaxLimit }),
+    service: serviceTarget({ beforeSteps: beforeSteps as never, afterSteps: afterSteps as never, afterCommit: afterCommit as never, store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
   } })
   const access = { create: () => true, read: () => true, update: () => true, delete: () => true }
   const patient = language.defineKayan({ name: 'patient', placement: 'device', access, fields: { ...defaultFields, id: { kind: 'number' }, name: { kind: 'text', label: { en: 'Name', ar: 'Name' }, rules: { required: true } } }, targets: { service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, beforeTransaction: beforeTransaction as never } } } } })
@@ -248,12 +248,12 @@ test('a nested beforeTransaction read is refused promptly and rolls back the out
   assert.equal((await fixture.asas.kayan.note.operations.count()).totalDocs, 0)
 })
 
-test('a device build refuses a bulk ceiling past maxLimit and accepts the boundary', () => {
+test('a device build accepts the default bulk ceiling above maxLimit', () => {
   const { language, patient } = setup()
   const build = (bulkLimit: number) => defineMithaq({ locales: ['en', 'ar'] as const, arkan: [base], targets: {
     ...language.targets,
     service: serviceTarget({ ...language.targets.service, maxLimit: defaultMaxLimit, bulkLimit }),
   } }).buildAsas({ kayan: [patient], http: [] })
-  assert.throws(() => build(defaultMaxLimit + 1), /service.bulkLimit.*past service.maxLimit/)
+  assert.doesNotThrow(() => build(defaultBulkLimit))
   assert.doesNotThrow(() => build(defaultMaxLimit))
 })

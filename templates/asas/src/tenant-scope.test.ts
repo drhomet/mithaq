@@ -1933,6 +1933,16 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await changing as Record<string, unknown>)[kayan === 'tags' ? 'label' : 'name'], 'changed after hold')
   })
 
+  test('a bulk ceiling above the maximum page size still keeps another organization out', async () => {
+    assert.ok(defaultBulkLimit > defaultMaxLimit)
+    const own = await memos().create({ title: 'bulk page limit' }, { actor: one })
+    const foreign = await memos().findByID({ id: ids.org2 }, { actor: two })
+    const result = await memos().updateMany({ where: { id: { in: [own.id, ids.org2] } }, data: { title: 'bulk page limit changed' } }, { actor: one })
+    assert.deepEqual(result.docs.map((row: { id: string }) => row.id), [own.id])
+    assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, foreign.title)
+    assert.equal((await memos().count({ where: { id: { equals: own.id } } }, { actor: two })).totalDocs, 0)
+  })
+
   test('a nested bulk write cannot use its filter to change another organization', async () => {
     storeProbe = async (_ctx, tools) => {
       const result = await (tools.kayans as Record<string, Ops>).memos!.updateMany({ where: { id: { equals: ids.org2 } }, data: { title: 'foreign bulk edit' } })

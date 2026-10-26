@@ -1,3 +1,4 @@
+import { assertPageLimits, pageKeys } from './limits.ts'
 import { assertNoOptions } from './runner/lifecycle.ts'
 import { refusePlacement } from './placement.ts'
 import { rowsOf } from '../mithaq/rows.ts'
@@ -257,9 +258,6 @@ const lowerUuids = ({ kayan, input, bulk }: { kayan: ResolvedKayan; input: unkno
 // A symbol: no schema of something a browser can send takes it, so a schema that names
 // the key answers with an issue at the key.
 const probe = Symbol('mithaq.operation.input')
-
-/** The service target's four numbers, each a positive integer the project names. */
-const pageKeys = ['defaultLimit', 'maxLimit', 'joinLimit', 'bulkLimit'] as const
 
 // An input field the schema names no key for would be dropped or refused at every click,
 // so it fails the build. Asked through Standard Schema alone: a probe value at that key.
@@ -594,13 +592,7 @@ export const buildAsas = <
     throw new Error(`The service target declares no "${absent}", and every build's runner has one. Add it to serviceTarget({ ... }).`)
   }
   // Checked before `resolve` and the screens read `maxLimit`, so a bad one is refused in its own words.
-  for (const key of pageKeys) {
-    if (!Number.isInteger(service[key]) || service[key] < 1) throw new Error(`service.${key} must be a positive integer.`)
-  }
-  // A page the runner opens on its own may not be larger than the most a caller may ask for.
-  for (const key of ['defaultLimit', 'joinLimit'] as const) {
-    if (service[key] > service.maxLimit) throw new Error(`service.${key} is ${service[key]}, past service.maxLimit ${service.maxLimit}.`)
-  }
+  assertPageLimits(service)
   const transport = (['http', 'orpc'] as const).find((key) => Object.hasOwn(service, key))
   if (transport) {
     throw new Error(

@@ -1,4 +1,5 @@
 import { assertNoOptions, assertTransaction, commitWrite, operationContext, outsideStore, runSlot } from './lifecycle.ts'
+import { assertPageLimits } from '../limits.ts'
 import { assertReferences } from './references.ts'
 import { isStore, isService, isTenant, isStorage, isVersions, isScreen, isAccess, serviceTargetOf, type Language, type Store } from '../../mithaq/language-core.ts'
 import { resolve } from '../../mithaq/resolve.ts'
@@ -42,12 +43,8 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
   for (const key of ['authorize', 'store', 'schema', 'depth', 'defaultLimit', 'maxLimit', 'joinLimit', 'bulkLimit'] as const) {
     if (service[key] === undefined) throw new Error(`The service target declares no "${key}".`)
   }
-  for (const key of ['depth', 'defaultLimit', 'maxLimit', 'joinLimit', 'bulkLimit'] as const) {
-    if (!Number.isInteger(service[key]) || service[key] < 1) throw new Error(`service.${key} must be a positive integer.`)
-  }
-  for (const key of ['defaultLimit', 'joinLimit', 'bulkLimit'] as const) {
-    if (service[key] > service.maxLimit) throw new Error(`service.${key} is ${service[key]}, past service.maxLimit ${service.maxLimit}.`)
-  }
+  if (!Number.isInteger(service.depth) || service.depth < 1) throw new Error('service.depth must be a positive integer.')
+  assertPageLimits(service)
   for (const target of Object.values(language.targets)) {
     if (isTenant(target) || isStorage(target) || isVersions(target) || isScreen(target) || isAccess(target)) throw new Error('A device asas supports store, schema and service targets only.')
   }
