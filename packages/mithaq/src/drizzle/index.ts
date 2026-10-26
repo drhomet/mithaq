@@ -382,7 +382,8 @@ const whereOf = (
   const conjunction = (where as { and?: Where[] }).and
   if (Array.isArray(conjunction)) parts.push(and(...conjunction.map((one) => whereOf(db, tables, kayanByName, name, one))))
   const disjunction = (where as { or?: Where[] }).or
-  if (Array.isArray(disjunction)) parts.push(or(...disjunction.map((one) => whereOf(db, tables, kayanByName, name, one))))
+  // Drizzle omits undefined clauses, but an empty OR is false and an unconstrained branch is true.
+  if (Array.isArray(disjunction)) parts.push(or(...disjunction.map((one) => whereOf(db, tables, kayanByName, name, one) ?? sql`true`)) ?? sql`false`)
   for (const [field, rules] of Object.entries(where)) {
     if (field === 'and' || field === 'or') continue
     const [ownField, ...path] = field.split('.')

@@ -5,7 +5,7 @@ import { nodeSqlite } from '../../drizzle/sqlite/__fixtures__/node-sqlite.ts'
 import { sqliteAdapter, drizzleSqliteKinds, drizzleSqliteRules, drizzleSqliteIdKinds } from '../../device.ts'
 import { mixedWherePrivacy } from './__fixtures__/mixed-where.ts'
 
-for (const device of [false, true]) test(`${device ? 'device' : 'server'} related queries preserve mixed access constraints and caller siblings`, async () => {
+for (const device of [false, true]) test(`${device ? 'device' : 'server'} related queries preserve mixed and empty access constraints and caller siblings`, async () => {
   const fixture = nodeSqlite()
   fixture.sqlite.exec('create table patient (id integer primary key autoincrement, name text not null, created_at integer not null, updated_at integer not null); create table note (id integer primary key autoincrement, title text, patient_id integer references patient(id), created_at integer not null, updated_at integer not null)')
   try {

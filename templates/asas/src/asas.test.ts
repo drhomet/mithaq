@@ -19403,7 +19403,7 @@ test('the default mention directory filters and limits managed tenant reads with
   assert.equal((await search('rt2-directory')).status, 403, 'directory access itself is required')
 })
 
-test('mixed logical and field constraints retain their siblings in Postgres and across related reads', async () => {
+test('mixed and empty logical constraints retain their meaning in Postgres and across related reads', async () => {
   const { mixedWherePrivacy } = await import('../../../packages/mithaq/src/asas/runner/__fixtures__/mixed-where.ts')
   const schemaName = 'mixed_where_privacy'
   await db.execute(`create schema ${schemaName};

@@ -36,4 +36,31 @@ export const mixedWherePrivacy = async ({ store, schemaName }: { store: Pick<Sto
     assert.equal((await built.kayan.note.operations.find({ where })).totalDocs, 0)
     assert.equal((await built.kayan.note.operations.count({ where })).totalDocs, 0)
   }
+  // The default authorizer already refuses empty access arrays; raw stores still need boolean identities.
+  constraint = { or: [] }
+  await assert.rejects(built.kayan.patient.operations.find(), /access constraint "or" must be a non-empty array/)
+  constraint = { and: [] }
+  await assert.rejects(built.kayan.patient.operations.find(), /access constraint "and" must be a non-empty array/)
+  const raw = built.targets.store as Store
+  const sort = { field: 'id', direction: 'asc' as const }
+  for (const [where, expected] of [
+    [{ or: [] }, 0], [{ and: [] }, 2],
+    [{ and: [{ or: [] }] }, 0], [{ or: [{ or: [] }] }, 0],
+    [{ and: [], or: [] }, 0], [{ or: [], name: { equals: 'visible' } }, 0],
+    [{ or: [{ and: [] }, { name: { equals: 'absent' } }] }, 2],
+    [{ or: [{}, { name: { equals: 'absent' } }] }, 2],
+    [{ and: [{ and: [] }, { name: { equals: 'visible' } }] }, 1],
+  ] as [Where, number][]) {
+    assert.equal((await raw.find({ kayan: 'patient', args: { where, sort, limit: 10, page: 1 } })).totalDocs, expected, JSON.stringify(where))
+    assert.equal(await raw.count!({ kayan: 'patient', args: { where } }), expected, JSON.stringify(where))
+    assert.equal(await raw.sum!({ kayan: 'patient', field: 'id', where }), expected === 2 ? '3' : String(expected))
+    if (expected === 0) {
+      await assert.rejects(raw.transaction((tx) => raw.update({ tx, kayan: 'patient', id: 1, data: { name: 'changed' }, where })))
+      await assert.rejects(raw.transaction((tx) => raw.remove({ tx, kayan: 'patient', id: 1, where })))
+      await assert.rejects(raw.transaction((tx) => raw.upsert!({ tx, kayan: 'patient', on: ['id'], data: { id: 1, name: 'changed', createdAt: new Date(), updatedAt: new Date() }, where })))
+    }
+  }
+  constraint = true
+  assert.equal((await built.kayan.patient.operations.findByID({ id: 1 }))?.name, 'visible')
+  assert.equal((await built.kayan.patient.operations.count()).totalDocs, 2)
 }
