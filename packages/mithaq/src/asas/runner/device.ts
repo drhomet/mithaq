@@ -197,7 +197,11 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
             return answer === undefined || answer === true ? undefined : answer === false ? { id: { in: [] } } : assertWhere(field.target!, answer)
           } })
         }
-        ctx = await (step as OperationStep)(ctx, tools as never)
+        if (sealOf(step) === 'remove' && one.softDelete) {
+          const data = Object.fromEntries(Object.values(one.fields).filter((field) => field.name === one.softDelete || field.rules?.nowOnUpdate === true).map((field) => [field.name, field.now!()]))
+          const row = await store.update({ tx, kayan: one.name, id: ctx.data.id, data, where })
+          ctx = { ...ctx, data: row, dataAfter: snapshot(row) }
+        } else ctx = await (step as OperationStep)(ctx, tools as never)
       }
       if (operation.effect !== 'read') {
         const final = kind === 'updateMany' || kind === 'deleteMany' ? ctx.data : await project({ one, row: ctx.data, scope, output })

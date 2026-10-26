@@ -167,3 +167,18 @@ test('a device kayan exposes its built SQLite table beside its schemas and opera
   const { asas } = setup()
   assert.equal(asas.kayan.patient.targets.sqlite.table, asas.targets.sqlite.tables.patient)
 })
+
+test('a configured soft delete marks its row and leaves its stored data intact', async () => {
+  const fixture = setup()
+  fixture.sqlite.exec('alter table patient add column deleted_at integer')
+  const language = defineMithaq({ locales: ['en', 'ar'] as const, arkan: [base], targets: { ...fixture.language.targets, service: serviceTarget({ ...fixture.language.targets.service, softDelete: 'deletedAt' }) } })
+  const patient = language.defineKayan({ name: 'patient', placement: 'device', access: { create: () => true, read: () => true, update: () => true, delete: () => true }, fields: { ...defaultFields, id: { kind: 'number' }, name: { kind: 'text', rules: { required: true } }, deletedAt: { kind: 'datetime', rules: { providedBy: { create: 'never', update: 'never' } } } }, targets: { service: { operations: defaultOperations } } })
+  const asas = language.buildAsas({ kayan: [patient], http: [] })
+  await asas.connect()
+  const made = await asas.kayan.patient.operations.create({ name: 'kept' })
+  await asas.kayan.patient.operations.delete({ id: made.id })
+  assert.equal((await asas.kayan.patient.operations.count()).totalDocs, 0)
+  const held = fixture.sqlite.prepare('select name, deleted_at from patient').get()!
+  assert.equal(held.name, 'kept')
+  assert.equal(typeof held.deleted_at, 'number')
+})
