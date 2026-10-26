@@ -186,6 +186,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           probeEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [probeStore, steps.update] },
           probeBulk: { steps: ({ steps }: { steps: { updateMany: unknown } }) => [probeStore, steps.updateMany] },
           probe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert] },
+          hookProbe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert], afterCommit: [probeStore] },
           guarded: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], beforeTransaction: [(ctx: unknown) => (outside += 1, ctx)] },
           claimed: { input: () => z.object({ title: z.string(), firmId: z.string() }).strict(), steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], beforeTransaction: [(ctx: unknown) => (outside += 1, ctx)] },
           stamp: { steps: ({ steps }: { steps: { insert: unknown } }) => [moveTo('org2'), steps.insert] },
@@ -470,7 +471,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return built
 }
 
-type Ops = Record<'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'hookProbe' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 // Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
@@ -1930,6 +1931,26 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     await holding
     await probing
     assert.equal((await changing as Record<string, unknown>)[kayan === 'tags' ? 'label' : 'name'], 'changed after hold')
+  })
+
+  test('every committed nested hook runs after a failure without exposing its rows to another organization', async () => {
+    const seen: unknown[] = []
+    storeProbe = async (ctx, tools) => {
+      if (ctx.tx !== undefined) {
+        await (tools.kayans as Record<string, Ops>).memos!.afterProbe({ title: 'first queued hook' })
+        await (tools.kayans as Record<string, Ops>).memos!.afterProbe({ title: 'second queued hook' })
+      } else {
+        seen.push([ctx.data.title, ctx.tenant])
+        if (ctx.data.title === 'first queued hook') throw new Error('first hook failed')
+      }
+    }
+    try {
+      const error = await refusal(memos().hookProbe({ title: 'outer queued hook' }, { actor: one }))
+      assert.ok(error instanceof AfterCommitError)
+    } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, [['first queued hook', 'org1'], ['second queued hook', 'org1'], ['outer queued hook', 'org1']])
+    assert.equal((await memos().count({ where: { title: { contains: 'queued hook' } } }, { actor: one })).totalDocs, 3)
+    assert.equal((await memos().count({ where: { title: { contains: 'queued hook' } } }, { actor: two })).totalDocs, 0)
   })
 
   test('a beforeTransaction write runs its committed hook once and keeps the outer organization', async () => {

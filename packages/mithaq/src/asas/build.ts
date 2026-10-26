@@ -1,3 +1,4 @@
+import { assertNoOptions } from './runner/lifecycle.ts'
 import { refusePlacement } from './placement.ts'
 import { rowsOf } from '../mithaq/rows.ts'
 import { accessReport, actor, actorPermissions, authActor, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
@@ -424,7 +425,6 @@ const operations = <Actor>(
         enumerable: true,
         get: () => kayans(declaration.effect),
       })
-      if (declaration.each && !bulkSeals.includes(kind as never)) throw new Error(`Kayan "${kayan.name}" operation "${operation}" names "each", and only a bulk operation runs another on each row.`)
       // Built in the second pass, where every single-row write it delegates to exists.
       if (bulkSeals.includes(kind as never)) {
         bulkLists.push({ operation, declaration, tools, input })
@@ -434,8 +434,7 @@ const operations = <Actor>(
       methods[operation] = publish(operation, declaration.effect, input, run)
   }
   for (const { operation, declaration, tools, input } of bulkLists) {
-    const single = declaration.each ?? (declaration.effect === 'update' ? 'update' : 'delete')
-    if (!methods[single]) throw new Error(`Kayan "${kayan.name}" operation "${operation}" runs "${single}" on each row it matches, and the kayan has no operation "${single}".`)
+    const single = declaration.each!
     const run = bulk<Actor>({
       kayan,
       declaration,
@@ -820,14 +819,6 @@ export const buildAsas = <
       })
 
   let built!: Record<string, Record<string, unknown>>
-  const assertNoOptions = (value: unknown) => {
-    if (value === undefined) return
-    // Two faults, two sentences.
-    if (value && typeof value === 'object' && ('actor' in value || 'context' in value)) {
-      throw new Error('Bound kayan tools inherit the current user and context; do not pass actor or context options.')
-    }
-    throw new Error('Bound kayan tools do not accept operation options.')
-  }
   const boundCache = new Map<'read' | 'write', unknown>()
   const boundKayans = (mode: 'read' | 'write') => {
     const cached = boundCache.get(mode)

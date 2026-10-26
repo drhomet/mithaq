@@ -1,3 +1,4 @@
+import { operationContext } from './lifecycle.ts'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { declaredFieldAccess, rowsOfField } from '../../mithaq/rows.ts'
 import { aliveWhere, assertSingleConstrained, assertWhere, assertWhereGrammar, publicResult, publishedWhere, whereLimits, type Authorize, type ManagedAdmin, type ReadOptions, type Row } from './write.ts'
@@ -484,14 +485,7 @@ export const readers = <Actor>({
     const outer = running.getStore()
     const actor = (outer?.user as Actor | null | undefined) ?? options.actor ?? null
     const list = atEffect<ReadStep>(declaration.steps)
-    const chain = [...(outer?.context.chain ?? []), `${kayan.name}.${name}`]
-    const depth = (outer?.context.depth ?? 0) + 1
-    // The cap stops a read step that calls this operation again, as it stops a write.
-    if (depth > cap) {
-      throw new Error(`Read depth ${depth} is past the cap of ${cap}: ${chain.join(' -> ')}.`)
-    }
-    // A nested read takes the outer context, never the caller's: a read under a write is that write's.
-    const context = Object.freeze({ source: 'local', ...(outer?.context ?? options.context), depth, chain })
+    const context = operationContext({ kayan: kayan.name, operation: name, cap, outer: outer?.context, given: options.context, effect: 'read' })
     const mode = declaration.mode ?? 'many'
     // Opened by the outermost read alone, so a call under it can never widen what it reaches.
     const tenant = outer ? outer.tenant : await openTenant({ actor, reach: options.tenant, kayan })

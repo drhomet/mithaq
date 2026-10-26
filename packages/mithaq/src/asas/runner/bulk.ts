@@ -1,12 +1,13 @@
+import { commitWrite } from './lifecycle.ts'
 // One transaction for every row: a row that cannot be written rolls the whole call
 // back, because a bulk that half happened is a state no client can undo.
 import { stepTools } from './store.ts'
-import { AfterCommitError, AsasError, invalid, retryConflict } from './errors.ts'
+import { AsasError, invalid } from './errors.ts'
 import { assertReadableWhere, checkedWhere } from './read.ts'
 import { running } from './runtime.ts'
 import { refuseTenantOption, writeTenant } from './tenant.ts'
 import { atEffect, parse, validated, type BulkResult, type Ctx, type ResolvedOperation, type WriteStep, type RuntimeWriteTools as WriteTools } from './steps.ts'
-import { aliveWhere, beginWrite, drain, ontoRow, projectReadableFields, publishedWhere, rowLock, runOutside, type Authorize, type ManagedAdmin, type Options } from './write.ts'
+import { aliveWhere, beginWrite, ontoRow, projectReadableFields, publishedWhere, rowLock, runOutside, type Authorize, type ManagedAdmin, type Options } from './write.ts'
 import { combineWhere, type Where } from '../../mithaq/where.ts'
 import type { ResolvedKayan } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
@@ -197,21 +198,8 @@ export const bulk = <Actor = unknown>({
       if (declaration.afterCommit.length) joined.afterCommit = [...(joined.afterCommit ?? []), afterCommit]
       return result
     }
-    let result: Record<string, unknown>
-    try {
-      result = await store.transaction(run)
-    } catch (thrown) {
-      throw retryConflict(thrown)
-    } finally {
-      entry.settled = true
-    }
-    try {
-      await drain([...(entry.afterCommit ?? []), afterCommit])
-    } catch (cause) {
-      // Only the outermost operation answers with what it committed; under an outer one
-      // the failure climbs as a plain `Error`.
-      if (running.getStore()) throw cause
-      throw new AfterCommitError(result, cause)
-    }
-    return result
+    return commitWrite({
+      transaction: (run) => store.transaction(run), run, lifetime: entry,
+      queue: () => [...(entry.afterCommit ?? []), afterCommit], nested: !!running.getStore(),
+    })
   }

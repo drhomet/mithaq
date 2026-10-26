@@ -3,6 +3,7 @@ import { isRef, refuseLiteral } from './user.ts'
 import { jsonSchemaCheck } from '../base/json-schema.ts'
 import {
   bulkSeals,
+  bulkEach,
   defaultGlobalOperations,
   holdOutput,
   readSeals,
@@ -1156,15 +1157,9 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
         )
       }
     }
-    // Refused rather than dropped: a bulk without its single-row write cannot run.
     for (const [operation, declaration] of Object.entries(kayan.operations)) {
-      const seal = declaration.steps.map(sealOf).find((held) => held && bulkSeals.includes(held))
-      if (!seal) continue
-      const single = seal === 'updateMany' ? 'update' : 'delete'
-      if (kayan.operations[single]) continue
-      throw new Error(
-        `Kayan "${kayan.name}" operation "${operation}" writes every matched row through operation "${single}", which this kayan does not have. Declare it, or leave "${operation}" out of the object.`,
-      )
+      const single = bulkEach({ kayan, operation, declaration })
+      if (single) declaration.each = single
     }
   }
   // A language that names the mark and a build where nothing takes it makes every delete

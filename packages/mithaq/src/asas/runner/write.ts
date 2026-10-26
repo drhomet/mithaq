@@ -1,3 +1,5 @@
+import { assertTransaction, commitWrite, operationContext, outsideStore, runSlot } from './lifecycle.ts'
+export { drain } from './lifecycle.ts'
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 // One list in one place, so drizzle's callback transaction is kept as it is.
 import { commentMarks } from '../../rich-text/comments-server.ts'
@@ -5,7 +7,7 @@ import { stepTools } from './store.ts'
 import { rowsOfField, type Rows } from '../../mithaq/rows.ts'
 import { heldPermissions } from '../../rbac/index.ts'
 import { authActor } from '../actor.ts'
-import { AfterCommitError, AsasError, conflict, denied, invalid, missing, retryConflict } from './errors.ts'
+import { AsasError, conflict, denied, invalid, missing } from './errors.ts'
 import type { AdminAccess, FieldAccess, LocalesOf, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
 import { defaultKinds, isStorableText, type Kind } from '../../base/kinds.ts'
@@ -433,46 +435,15 @@ export const beginWrite = <Actor = unknown>({
   options?: Options<Actor>
 }) => {
   const outer = running.getStore()
-  const chain = [...(outer?.context.chain ?? []), `${kayan.name}.${operation}`]
-  const depth = (outer?.context.depth ?? 0) + 1
-  if (depth > cap) {
-    throw new Error(`Write depth ${depth} is past the cap of ${cap}: ${chain.join(' -> ')}.`)
-  }
-  // Frozen, so a step cannot reset `depth` and hand every write under it a spent cap.
-  const context: Context = Object.freeze({
-    source: 'local',
-    ...(outer?.context ?? options?.context),
-    depth,
-    chain,
-  })
+  const context = operationContext({ kayan: kayan.name, operation, cap, outer: outer?.context, given: options?.context, effect: 'write' })
   const open = outer?.transactions ?? new Map()
   // A nested write joins the outer transaction on the same store, so both commit or roll
   // back together; another store opens its own. Outside slots carry no transactions.
   const joined = open.get(store)
-  if (outer?.transactions && !joined) {
-    throw new Error(
-      `Kayan "${kayan.name}" operation "${operation}" cannot write to another store while transaction "${outer.context.chain.at(-1)}" is open.`,
-    )
-  }
-  if (joined?.settled) {
-    throw new Error(
-      `Kayan "${kayan.name}" operation "${operation}" joined the transaction "${joined.operation}" opened, which has already settled, so the write that started this one was not awaited. Await every write a step begins.`,
-    )
-  }
+  assertTransaction({ crossStore: !!outer?.transactions && !joined, settled: joined?.settled, operation: `${kayan.name}.${operation}`, outer: joined?.operation ?? outer?.context.chain.at(-1) })
   const entry: Open = joined ?? { tx: undefined, operation: `${kayan.name}.${operation}` }
   const actor = (outer?.user as Actor | null | undefined) ?? options?.actor ?? null
   return { actor, context, entry, open }
-}
-
-// A write from outside the transaction would not roll back with it, or would land after
-// the commit; a step there calls a managed operation, which opens its own.
-const outsideStore = (kayan: ResolvedKayan, operation: string, slot: string): WriteTools['store'] => {
-  const refuse = () => {
-    throw new Error(
-      `Kayan "${kayan.name}" operation "${operation}" reached the store from "${slot}", which runs outside the operation's transaction, so the write would not be in it. Write through tools.kayans, which opens its own, or move the step into "steps".`,
-    )
-  }
-  return Object.freeze({ find: refuse, hold: refuse, upsert: refuse, sum: refuse, insert: refuse, remove: refuse, update: refuse })
 }
 
 // No transaction is carried, so a managed write here opens its own. An `afterCommit`
@@ -492,37 +463,8 @@ export const runOutside = async <Actor>({
   start: Ctx
   around: { context: Context; user: Actor | null }
 }): Promise<Ctx> => {
-  const given = stepTools({ ...tools, store: outsideStore(kayan, tools.operation, slot) } as WriteTools)
-  // Read before the first step, which is handed `start` itself and may rewrite it in place.
-  const { tenant } = start
-  return running.run(around as Running, async () => {
-    let ctx = start
-    try {
-      for (const step of list) ctx = { ...(await step(ctx, given)), tenant }
-    } catch (cause) {
-      if (slot === 'beforeTransaction') throw cause
-      throw new Error(
-        `Kayan "${kayan.name}" operation "${tools.operation}" threw in afterCommit, which runs after the commit, so the write stands.`,
-        { cause },
-      )
-    }
-    return ctx
-  })
-}
-
-// One that throws does not silence the rest, since each stands for a committed write;
-// the first error is the one reported.
-export const drain = async (queue: readonly (() => Promise<void>)[]) => {
-  // A wrapper, so a thunk that threw a falsy value is still raised.
-  let failure: { cause: unknown } | undefined
-  for (const queued of queue) {
-    try {
-      await queued()
-    } catch (cause) {
-      failure ??= { cause }
-    }
-  }
-  if (failure) throw failure.cause
+  const given = stepTools({ ...tools, store: outsideStore({ kayan: kayan.name, operation: tools.operation, slot }) } as WriteTools)
+  return running.run(around as Running, () => runSlot({ kayan: kayan.name, operation: tools.operation, slot, list, start, tools: given }))
 }
 
 // A shape that names the key answers a probe value with an issue at it. An asynchronous
@@ -907,23 +849,10 @@ export const write = <Actor = unknown>({
       if (declaration.afterCommit.length) joined.afterCommit = [...(joined.afterCommit ?? []), afterCommit]
       return result
     }
-    let result: unknown
-    try {
-      result = await store.transaction(run)
-    } catch (thrown) {
-      throw retryConflict(thrown)
-    } finally {
-      entry.settled = true
-    }
-    try {
-      await drain([...(entry.afterCommit ?? []), afterCommit])
-    } catch (cause) {
-      // Only the outermost operation answers with what it committed; under an outer one the
-      // failure climbs as a plain `Error`.
-      if (running.getStore()) throw cause
-      throw new AfterCommitError(result, cause)
-    }
-    return result as Awaited<ReturnType<typeof publicResult>>
+    return commitWrite({
+      transaction: (run) => store.transaction(run), run, lifetime: entry,
+      queue: () => [...(entry.afterCommit ?? []), afterCommit], nested: !!running.getStore(),
+    }) as Promise<Awaited<ReturnType<typeof publicResult>>>
   }
 
 type Registry = readonly { name: string; fields: Record<string, RuntimeField> }[]

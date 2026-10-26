@@ -729,3 +729,15 @@ export const resolveOperations = (
   }
   return resolved
 }
+
+/** Resolved before either runner publishes calls, so a missing row operation cannot fail halfway through a batch. */
+export const bulkEach = ({ kayan, operation, declaration }: { kayan: ResolvedKayan; operation: string; declaration: ResolvedOperation }) => {
+  const bulk = declaration.steps.some((step) => bulkSeals.includes(sealOf(step) as never))
+  if (!bulk) {
+    if (declaration.each) throw invalid({ message: `Kayan "${kayan.name}" operation "${operation}" names "each", and only a bulk operation runs another on each row.`, key: 'error.invalid.bulk_operation' })
+    return undefined
+  }
+  const single = declaration.each ?? (declaration.effect === 'update' ? 'update' : 'delete')
+  if (!kayan.operations[single]) throw invalid({ message: `Kayan "${kayan.name}" operation "${operation}" runs "${single}" on each row it matches, and the kayan has no operation "${single}".`, key: 'error.invalid.bulk_operation' })
+  return single
+}
