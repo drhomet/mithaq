@@ -15,7 +15,7 @@ export const generateSqliteMigrations = async ({ schema, out, name }: { schema: 
     const config = join(directory, 'drizzle.config.mjs')
     await writeFile(config, `export default ${JSON.stringify({ dialect: 'sqlite', schema: resolve(schema), out: resolve(out) })}`)
     await promisify(execFile)(process.execPath, ['--import', kitOrm(ownKit), binary, 'generate', '--config', config, '--name', name], { maxBuffer: 4 * 1024 * 1024 })
-    return readMigrationFiles({ migrationsFolder: resolve(out) }).map(({ name, hash, sql }) => ({ name, hash, sql }))
+    return readMigrationFiles({ migrationsFolder: resolve(out) }).map(({ name, hash, folderMillis, sql }) => ({ name, hash, folderMillis, sql }))
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

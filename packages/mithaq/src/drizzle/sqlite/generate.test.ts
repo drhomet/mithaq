@@ -18,6 +18,7 @@ test('drizzle-kit generates SQLite migrations at build time, and their bundle up
     await writeFile(schema, `import { sqliteTable, integer, text } from ${JSON.stringify(core)}\nexport const patient = sqliteTable('patient', { id: integer().primaryKey({autoIncrement:true}), name: text().notNull() })`)
     const first = await generateSqliteMigrations({ schema, out, name: 'patient' })
     assert.equal(first.length, 1)
+    assert.ok(Number.isSafeInteger(first[0]!.folderMillis))
     assert.match(first[0]!.sql.join('\n'), /AUTOINCREMENT/)
     const { database } = nodeSqlite()
     await migrateSqlite({ ...database, migrations: first })
