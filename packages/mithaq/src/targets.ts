@@ -3,6 +3,8 @@
 export { drizzleAdapter, type Adapter, type ColumnBuilder, type ColumnRule } from './drizzle/index.ts'
 export { kinds as drizzleKinds, idKinds as drizzleIdKinds } from './drizzle/kinds.ts'
 export { rules as drizzleRules } from './drizzle/rules.ts'
+export { kinds as drizzleSqliteKinds, idKinds as drizzleSqliteIdKinds, type SqliteColumnBuilder } from './drizzle/sqlite/kinds.ts'
+export { rules as drizzleSqliteRules, type SqliteColumnRule } from './drizzle/sqlite/rules.ts'
 export { zodTarget, type ZodRule, type ZodShape } from './zod/index.ts'
 export { kinds as zodKinds, idKinds as zodIdKinds } from './zod/kinds.ts'
 export { rules as zodRules } from './zod/rules.ts'

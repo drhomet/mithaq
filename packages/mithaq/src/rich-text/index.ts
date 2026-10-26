@@ -5,6 +5,7 @@ export { MentionNode, type Mention } from './mention-node.ts'
 import { TableNode, TableRowNode, TableCellNode } from '@lexical/table'
 import { CodeNode, CodeHighlightNode } from '@lexical/code-core'
 import { jsonb } from 'drizzle-orm/pg-core'
+import { text } from 'drizzle-orm/sqlite-core'
 import type { Klass, LexicalNode } from 'lexical'
 import { z } from 'zod'
 import { kind } from '../base/kinds.ts'
@@ -54,6 +55,8 @@ const richTextKind = ({ nodes, policy }: { nodes: readonly Klass<LexicalNode>[];
     sortable: false,
     targets: {
       drizzle: (field: ResolvedField) => jsonb(field.column),
+      // JSON text on the device, whose proxy carries no BLOB for SQLite's binary jsonb.
+      'drizzle-sqlite': (field: ResolvedField) => text(field.column, { mode: 'json' }),
       zod: (field?: ResolvedField) => {
         const read = readerOf({ field, nodes, policy })
         return z.custom<RichTextValue>().superRefine((value, ctx) => {
