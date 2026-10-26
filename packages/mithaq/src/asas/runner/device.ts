@@ -19,7 +19,7 @@ import type { StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
 
 type Row = Record<string, unknown>
 type Options = { actor?: unknown; context?: Record<string, unknown>; tenant?: unknown; draft?: boolean; autosave?: boolean }
-type Scope = { actor: unknown; context: Context; store?: Store; tx?: unknown; afterCommit: (() => Promise<void>)[]; lifetime?: { settled: boolean; operation: string } }
+type Scope = { blockedQuery?: boolean; actor: unknown; context: Context; store?: Store; tx?: unknown; afterCommit: (() => Promise<void>)[]; lifetime?: { settled: boolean; operation: string } }
 type Call = (data?: Row, options?: Options) => Promise<any>
 
 export type DeviceAsas<L extends Language, K extends readonly Kayan[], G extends readonly Kayan[]> = {
@@ -89,6 +89,7 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
     if (options?.tenant !== undefined) throw invalid({ message: 'A device operation accepts no tenant option.', key: 'error.invalid.value' })
     if (options?.draft || options?.autosave) throw invalid({ message: 'A device operation keeps no versions.', key: 'error.invalid.value' })
     if (outer) assertNoOptions(options)
+    if (outer?.blockedQuery) throw invalid({ message: 'A nested device beforeTransaction hook cannot query outside its open transaction. Move the query into steps or call the write before opening the transaction.', key: 'error.invalid.before_transaction' })
     if (!outer && service.context !== undefined && !options?.context) throw invalid({ message: 'The device operation requires the service context.', key: 'error.invalid.context' })
     const context = operationContext({ kayan: one.name, operation: name, cap: service.depth, outer: outer?.context, given: options?.context, effect: operation.effect === 'read' ? 'read' : 'write' })
     const scope: Scope = { actor: outer ? outer.actor : options?.actor ?? null, context, store: outer?.store, tx: outer?.tx, afterCommit: [], lifetime: outer?.lifetime }
@@ -225,8 +226,7 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
       return result
     }
     if (operation.beforeTransaction.length) {
-      if (outer?.tx !== undefined) throw invalid({ message: 'A nested device write cannot run beforeTransaction outside its open transaction. Move the hook into steps or call the write before opening the transaction.', key: 'error.invalid.before_transaction' })
-      const outside = { ...scope, store: undefined, tx: undefined, afterCommit: [], lifetime: undefined }
+      const outside = { ...scope, blockedQuery: outer?.tx !== undefined, store: undefined, tx: undefined, afterCommit: [], lifetime: undefined }
       let ctx: Ctx = { kayan: one, data: { ...data }, actor: scope.actor, user: scope.actor, context: scope.context, tx: undefined }
       const tools = stepTools({ operation: name, schema, output: shape.row, kind, effect: operation.effect, kayans: bound(outside), of: of(outside, false), catalog, store: outsideStore({ kayan: one.name, operation: name, slot: 'beforeTransaction' }) } as RuntimeWriteTools)
       ctx = await runSlot({ kayan: one.name, operation: name, slot: 'beforeTransaction', list: operation.beforeTransaction as never, start: ctx, tools: tools as never })

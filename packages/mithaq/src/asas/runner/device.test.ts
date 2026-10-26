@@ -227,18 +227,21 @@ test('related-field filters refuse hidden fields and constrain readable notes by
 })
 
 
-test('a nested beforeTransaction read is refused promptly and rolls back the outer write', async () => {
+for (const query of ['of read', 'kayans read', 'nested write'] as const) test(`a nested beforeTransaction ${query} is refused lazily and rolls back the outer write`, async () => {
   let fixture: ReturnType<typeof setup>
   fixture = setup({ beforeSteps: [async (ctx, tools) => {
     if (ctx.kayan.name === 'patient') await (tools.of(fixture.note) as { create(data: { title: string }): Promise<unknown> }).create({ title: 'inner' })
     return ctx
   }], noteBeforeTransaction: [async (ctx, tools) => {
-    await tools.of(fixture.patient).count()
+    if (query === 'of read') await tools.of(fixture.patient).count()
+    else if (query === 'kayans read') await (tools.kayans as { patient: { count(): Promise<unknown> } }).patient.count()
+    else await (tools.of(fixture.patient) as { create(data: { name: string }): Promise<unknown> }).create({ name: 'unreachable' })
     return ctx
   }] })
   await fixture.asas.connect()
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
+    assert.equal((await fixture.asas.kayan.patient.operations.count()).totalDocs, 0)
     await assert.rejects(Promise.race([
       fixture.asas.kayan.patient.operations.create({ name: 'outer' }),
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('nested write did not settle')), 1000) }),

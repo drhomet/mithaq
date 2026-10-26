@@ -2010,6 +2010,18 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await memos().count({ where: { title: { equals: 'outside nested hook' } } }, { actor: two })).totalDocs, 0)
   })
 
+  test('a nested beforeTransaction hook without queries keeps its actor and runs once without reaching another organization', async () => {
+    const seen: unknown[] = []
+    storeProbe = async (ctx, tools) => {
+      if (tools.operation === 'probe') await (tools.kayans as Record<string, Ops>).memos!.outsideProbe({ title: 'nested pure hook' })
+      else seen.push([ctx.tx, ctx.tenant])
+    }
+    try { await memos().probe({ title: 'outer pure hook' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, [[undefined, 'org1']])
+    assert.equal((await memos().count({ where: { title: { equals: 'nested pure hook' } } }, { actor: one })).totalDocs, 1)
+    assert.equal((await memos().count({ where: { title: { equals: 'nested pure hook' } } }, { actor: two })).totalDocs, 0)
+  })
+
   test('a nested beforeTransaction read on the server stays outside the write and inside the actor scope', async () => {
     const seen: unknown[] = []
     storeProbe = async (ctx, tools) => {

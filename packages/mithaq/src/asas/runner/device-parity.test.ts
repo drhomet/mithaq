@@ -216,3 +216,27 @@ for (const invariant of ['write depth', 'read depth', 'cross store', 'settled wr
     }
   })
 }
+
+test('main parity: nested beforeTransaction hooks that do not query run outside the transaction and defer their hooks once', async () => {
+  for (const device of [false, true]) {
+    const seen: unknown[] = []
+    const { asas, operations } = setup({ device, operations: { ...defaultOperations, create: { ...defaultOperations.create, beforeTransaction: [async (ctx: Ctx) => {
+      seen.push(['before', ctx.data.name, ctx.tx, ctx.actor, ctx.context.depth])
+      return ctx
+    }] } }, beforeSteps: [async (ctx, tools) => {
+      if (ctx.data.name === 'outer') await (tools.kayans as Record<string, Record<string, Call>>).patient!.create!({ name: 'inner' })
+      return ctx
+    }], afterCommit: [async (ctx) => { seen.push(['after', ctx.data.name]); return ctx }] })
+    await asas.connect()
+    const reported: unknown[] = []
+    const http = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => reported.push(error) })([
+      { kayan: 'patient', name: 'create', effect: 'create', input: { '~standard': { vendor: 'probe', version: 1, validate: (value: unknown) => ({ value }) } }, call: () => operations.create!({ name: 'outer' }, { actor: 'actor' }) },
+    ] as never)
+    const response = await http.handle(new Request('http://localhost/api/patient/create', { method: 'POST', body: '{}' }), async () => null)
+    assert.equal(response!.status, 200)
+    assert.equal((await response!.json() as { name: string }).name, 'outer')
+    assert.deepEqual(reported, [])
+    assert.deepEqual(seen, [['before', 'outer', undefined, 'actor', 1], ['before', 'inner', undefined, 'actor', 2], ['after', 'inner'], ['after', 'outer']])
+    assert.equal((await operations.count!()).totalDocs, 2)
+  }
+})
