@@ -1,33 +1,22 @@
 import { and, asc, count as sqlCount, desc, eq, getTableColumns, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql, type ColumnBuilderBase, type SQL, type SQLWrapper } from 'drizzle-orm'
-import { drizzle, type SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy'
-import { index, sqliteTable, uniqueIndex, type SQLiteTable } from 'drizzle-orm/sqlite-core'
+import { index, sqliteTable, uniqueIndex, type BaseSQLiteDatabase, type SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { uniqueRuleIndexes } from '../../mithaq/resolve.ts'
 import type { CompoundIndex, ResolvedField, ResolvedKayan } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
 import { implementationOf } from '../../mithaq/rukn.ts'
 import type { Operator, Where } from '../../mithaq/where.ts'
 import { conflict, invalid, missing } from '../../asas/runner/errors.ts'
-import { Refusal } from '../../mithaq/refusal.ts'
 import { kinds as shippedKinds, type SqliteColumnBuilder } from './kinds.ts'
 import type { SqliteColumnRule, SqliteModifiable } from './rules.ts'
 
-/** A value the proxy carries: SQLite's text, numbers, booleans and null. There is no BLOB. */
-export type SqliteValue = string | number | boolean | null
-
-/** What runs one statement, answering its rows as arrays in column order, the shape drizzle's `sqlite-proxy` reads. */
-export type SqliteRunner = { execute(sql: string, params?: SqliteValue[]): Promise<{ rows: SqliteValue[][] }> }
-
-/**
- * The database the device store runs on, as the phone's native module answers it: `execute`, an
- * atomic `batch`, and `transaction`, which hands its work a scoped executor and runs nothing
- * else on the database until it settles.
- */
-export type SqliteProxy = SqliteRunner & {
-  batch(statements: { sql: string; params?: SqliteValue[] }[]): Promise<{ results: { rows: SqliteValue[][] }[] }>
-  transaction<T>(work: (tx: SqliteRunner) => Promise<T>): Promise<T>
+/** The opened drizzle database and isolated transaction boundary supplied by the host adapter. */
+export type SqliteDatabase = BaseSQLiteDatabase<'sync' | 'async', unknown, any>
+export type SqliteContract = {
+  db: SqliteDatabase
+  transaction<T>(fn: (tx: SqliteDatabase) => Promise<T>): Promise<T>
 }
 
-type Database = SqliteRemoteDatabase
+type Database = SqliteDatabase
 type Tables = Record<string, SQLiteTable & Record<string, SQLWrapper>>
 
 /** The device store: a store, plus the drizzle instance and the tables it built, read off `asas.targets.<name>`. */
@@ -40,23 +29,8 @@ export type SqliteAdapter = Omit<Store, 'kinds' | 'rules'> & {
   tables: Tables
 }
 
-// drizzle's `get` reads one row where `all` reads the list.
-const answer = ({ rows }: { rows: SqliteValue[][] }, method: string) => ({ rows: method === 'get' ? (rows[0] as never) : rows })
-
-// A batch inside a transaction is already atomic, so its statements run in turn on the scoped executor.
-const inTurn = async (runner: SqliteRunner, queries: { sql: string; params: SqliteValue[] }[]) => {
-  const results = []
-  for (const { sql: query, params } of queries) results.push(await runner.execute(query, params))
-  return results
-}
-const drizzleOver = (runner: SqliteRunner, batch?: SqliteProxy['batch']) =>
-  drizzle(
-    async (query, params, method) => answer(await runner.execute(query, params), method),
-    async (queries) => (batch ? (await batch(queries)).results : await inTurn(runner, queries)).map((result, at) => answer(result, queries[at]!.method)),
-  )
-
 // SQLite's messages are not localized, unlike Postgres's, so the constraint is read off them;
-// a driver's extended code is not part of the proxy contract.
+// the contract does not require driver-specific error codes.
 const failed = (thrown: unknown, constraint: RegExp) => {
   for (let error = thrown as { message?: unknown; cause?: unknown } | undefined, depth = 0; error && depth < 3; error = error.cause as never, depth++) {
     if (typeof error.message === 'string' && constraint.test(error.message)) return true
@@ -123,28 +97,16 @@ const conditionsOf = (column: SQLWrapper, rules: Record<string, unknown>): SQL |
   return checks.length === 1 ? checks[0] : and(...checks)
 }
 
-/** The store a device asas keeps its kayan in: the phone's SQLite, through drizzle's `sqlite-proxy` driver. */
-export const drizzleSqliteProxyAdapter = <
+/** Payload's SQLite adapter shape, with the opened drizzle database supplied by the app. */
+export const sqliteAdapter = <
   const Kinds extends Record<string, SqliteColumnBuilder>,
   const Rules extends Record<string, SqliteColumnRule>,
->({ open, kinds, rules, idKinds }: {
-  /**
-   * Opens the database, once, on `connect()`: `() => client.open('rounds')` on the phone. A thunk, so the
-   * module declaring the language imports where no native module is, as a build that writes migrations does.
-   */
-  open: () => Promise<SqliteProxy>
+>({ db, transaction, kinds, rules, idKinds }: SqliteContract & {
   kinds: Kinds
   rules: Rules
-  /** The kinds this store builds an id of; `drizzleSqliteIdKinds`, unless you replace the kinds map and its relationship builder. */
   idKinds: readonly string[]
 }): Omit<SqliteAdapter, 'kinds' | 'rules'> & { kinds: Kinds; rules: Rules } => {
-  if (typeof open !== 'function') throw new Error('drizzleSqliteProxyAdapter needs `open`, which answers the database: open: () => client.open(name).')
-  let database: SqliteProxy | undefined
-  const opened = () => {
-    if (!database) throw new Refusal('The device store has no database yet: await asas.connect(), which opens it, before the first read or write.')
-    return database
-  }
-  const db = drizzleOver({ execute: (query, params) => opened().execute(query, params) }, (statements) => opened().batch(statements))
+  if (!db || typeof transaction !== 'function') throw new Error('sqliteAdapter needs an opened drizzle db and an isolated transaction function.')
   const store = (tables: Tables, kayanByName: Map<string, ResolvedKayan>) => {
     const declaredData = (name: string, values: Record<string, unknown>) => {
       const fields = kayanByName.get(name)?.fields ?? getTableColumns(tables[name]!)
@@ -195,7 +157,7 @@ export const drizzleSqliteProxyAdapter = <
       return result as Record<string, unknown>[]
     }
     return {
-      transaction: (run: (tx: unknown) => Promise<never>) => opened().transaction((runner) => run(drizzleOver(runner))),
+      transaction: (run: (tx: unknown) => Promise<never>) => transaction(run),
       async insert({ tx, kayan: name, data }: { tx: unknown; kayan: string; data: Record<string, unknown> }) {
         try {
           return rowsOf(await (tx as Database).insert(tables[name]!).values(increments({ name, values: data, insert: true })).returning(), 'insert')[0]!
@@ -351,16 +313,13 @@ export const drizzleSqliteProxyAdapter = <
       return adapterOf(one.tables, one.kayanByName) as unknown as Store
     },
     async connect() {
-      database ??= await open()
-      // SQLite enforces no foreign key on a connection that has not asked, and a restricted delete would pass.
-      await database.execute('pragma foreign_keys = on')
-      const { rows } = await database.execute('pragma foreign_keys')
-      if (rows[0]?.[0] !== 1) throw new Error('The device database did not turn its foreign keys on, so a restricted delete would pass. Open it outside a transaction.')
+      // A restricted delete must be enforced even when the host forgot connection setup.
+      await db.run(sql`pragma foreign_keys = on`)
+      const rows = await db.values<[number]>(sql`pragma foreign_keys`)
+      if (rows[0]?.[0] !== 1) throw new Error('The device database did not turn its foreign keys on. Connect outside a transaction.')
     },
-    // The database is the app's, which opened it through `open`; the store only lets go of it.
-    async destroy() {
-      database = undefined
-    },
+    // The app owns the connection lifecycle.
+    async destroy() {},
   })
   return adapterOf(Object.create(null), new Map()) as unknown as Omit<SqliteAdapter, 'kinds' | 'rules'> & { kinds: Kinds; rules: Rules }
 }

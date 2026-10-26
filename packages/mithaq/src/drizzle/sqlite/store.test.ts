@@ -1,10 +1,10 @@
-// The device store: a kayan's rows in the phone's SQLite, reached through the proxy the native
+// The device store: a kayan's rows in the phone's SQLite, reached through an injected drizzle database the native
 // module answers. Run over Node's own SQLite behind the same contract, so this is the phone's path.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { setTimeout as wait } from 'node:timers/promises'
 import { AsasError, base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, type ProjectStep, type Where, zodIdKinds, zodKinds, zodRules, zodTarget } from '../../index.ts'
-import { drizzleSqliteIdKinds, drizzleSqliteKinds, drizzleSqliteProxyAdapter, drizzleSqliteRules } from '../../targets.ts'
+import { drizzleSqliteIdKinds, drizzleSqliteKinds, sqliteAdapter, drizzleSqliteRules } from '../../targets.ts'
 import { nodeSqlite } from './__fixtures__/node-sqlite.ts'
 
 const label = (en: string) => ({ en, ar: en })
@@ -22,7 +22,7 @@ const deviceLanguage = (database: ReturnType<typeof nodeSqlite>['database'], bef
   locales: ['en', 'ar'] as const,
   arkan: [base],
   targets: {
-    sqlite: drizzleSqliteProxyAdapter({ open: async () => database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }),
+    sqlite: sqliteAdapter({ ...database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }),
     zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ beforeSteps: beforeSteps as never, store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
   },
@@ -62,7 +62,7 @@ const device = async (beforeSteps: readonly ProjectStep[] = []) => {
   return { asas, ...proxy }
 }
 
-test('a device kayan is created, read, updated and deleted through the proxy, each value reading back as its kind', async () => {
+test('a device kayan is created, read, updated and deleted through an injected drizzle database, each value reading back as its kind', async () => {
   const { asas } = await device()
   const made = await asas.kayan.patient.operations.create({ mrn: 'A-1', name: 'Huda', born: '1990-02-28', weight: '71.50', flags: { allergies: ['penicillin'] } })
   assert.match(made.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, 'the id is the table default SQLite made')

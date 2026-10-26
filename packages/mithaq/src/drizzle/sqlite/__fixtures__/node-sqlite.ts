@@ -1,8 +1,7 @@
-// Node's own SQLite behind the proxy contract the phone's native module answers, so a test runs
-// the code path the device runs: one operation at a time per database, a scoped executor inside
-// a transaction, an atomic batch, rows as arrays in column order, and no BLOB.
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import type { SqliteProxy, SqliteValue } from '../index.ts'
+import { drizzle } from 'drizzle-orm/sqlite-proxy'
+import type { SqliteContract } from '../index.ts'
+type SqliteValue = string | number | boolean | null
 
 export const nodeSqlite = (path = ':memory:') => {
   const sqlite = new DatabaseSync(path)
@@ -40,10 +39,13 @@ export const nodeSqlite = (path = ':memory:') => {
       throw error
     }
   }
-  const database: SqliteProxy = {
-    execute: async (sql, params) => serial(() => run(sql, params)),
-    batch: async (statements) => serial(() => atomic(() => ({ results: statements.map(({ sql, params }) => run(sql, params)) }))),
-    transaction: async (work) => serial(() => atomic(() => work({ execute: async (sql, params) => run(sql, params) }))),
+  const over = (execute: (sql: string, params: SqliteValue[]) => Promise<{ rows: SqliteValue[][] }>) => drizzle(async (query, params, method) => {
+    const { rows } = await execute(query, params)
+    return { rows: method === 'get' ? rows[0] as never : rows }
+  })
+  const database: SqliteContract = {
+    db: over(async (query, params) => serial(() => run(query, params))),
+    transaction: (work) => serial(() => atomic(() => work(over(async (query, params) => run(query, params))))),
   }
   return { database, sqlite, log }
 }

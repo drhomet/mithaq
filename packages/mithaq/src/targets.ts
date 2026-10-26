@@ -5,7 +5,7 @@ export { kinds as drizzleKinds, idKinds as drizzleIdKinds } from './drizzle/kind
 export { rules as drizzleRules } from './drizzle/rules.ts'
 export { kinds as drizzleSqliteKinds, idKinds as drizzleSqliteIdKinds, type SqliteColumnBuilder } from './drizzle/sqlite/kinds.ts'
 export { rules as drizzleSqliteRules, type SqliteColumnRule } from './drizzle/sqlite/rules.ts'
-export { drizzleSqliteProxyAdapter, type SqliteAdapter, type SqliteProxy, type SqliteRunner, type SqliteValue } from './drizzle/sqlite/index.ts'
+export { sqliteAdapter, type SqliteAdapter, type SqliteContract, type SqliteDatabase } from './drizzle/sqlite/index.ts'
 export { zodTarget, type ZodRule, type ZodShape } from './zod/index.ts'
 export { kinds as zodKinds, idKinds as zodIdKinds } from './zod/kinds.ts'
 export { rules as zodRules } from './zod/rules.ts'
