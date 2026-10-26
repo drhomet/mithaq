@@ -47,6 +47,8 @@ import {
   versionOperations,
   versions as versionsRukn,
   drizzleAdapter,
+  drizzleJobs,
+  memoryJobs,
   fetchHttp,
   drizzleIdKinds, drizzleKinds,
   drizzleRules,
@@ -82,6 +84,7 @@ import {
   type AuditHandler,
   type DerivedShapes,
   serviceTarget,
+  storage,
   uploadFields,
   withUploadReference,
 } from 'mithaq'
@@ -93,6 +96,7 @@ import { navOf, type AccessReport } from 'mithaq/admin'
 import { resolvedKayans } from '../../../packages/mithaq/src/mithaq/types.ts'
 import { rowsOf } from '../../../packages/mithaq/src/mithaq/rows.ts'
 import { orpcHttp } from 'mithaq/orpc'
+import { defaultNodes, richText, UploadNode } from 'mithaq/rich-text'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter as betterAuthDrizzle } from 'better-auth/adapters/drizzle'
 import { admin } from 'better-auth/plugins'
@@ -19401,4 +19405,90 @@ test('the default mention directory filters and limits managed tenant reads with
   for (const row of masked.body.docs as Record<string, unknown>[]) assert.deepEqual(Object.keys(row), ['id'])
   await asas.kayan.roles.operations.update({ id: role.id, permissions: keys.filter((key) => key !== 'user.find') }, tenant.options)
   assert.equal((await search('rt2-directory')).status, 403, 'directory access itself is required')
+})
+
+test('orphan cleanup refuses a rich-text owner in another store and names its field and store', () => {
+  const language = defineMithaq({
+    arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storage(templateStorage)],
+    targets: {
+      memory: memoryStore(),
+      otherMemory: memoryStore(),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  const files = language.defineKayan({
+    name: 'files', access: allowAccess, fields: { ...defaultFields, ...uploadFields },
+    targets: {
+      storage: { mimeTypes: ['image/png'], orphanAfter: 1 },
+      service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, input: ({ create }) => withUploadReference(create), beforeTransaction: [templateStorage.uploaded] } } },
+    },
+  })
+  const owner = language.defineKayan({ name: 'owners', fields: { ...defaultFields, body: { kind: 'richText' } }, targets: { service: { store: 'otherMemory', operations: defaultOperations } } })
+  assert.throws(() => language.buildAsas({ kayan: [files, owner], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] }), /orphanAfter.*owners.body.*otherMemory.*memory/)
+})
+
+test('tasks require a jobs capability beside the service store', () => {
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      memory: memoryStore(),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  assert.throws(() => language.buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], tasks: { sweep: { cron: '@daily', queue: 'maintenance', run: async () => ({}) } } } as never), /tasks.*jobs/)
+})
+test('jobs targets refuse duplicate capabilities, incompatible transactions and missing policies', () => {
+  const targets = {
+    memory: memoryStore(),
+    zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+    service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+  }
+  const policy = { lease: 30000, retain: { completed: 86400000, failed: 604800000 } }
+  const build = (extra: object) => defineMithaq({ arkan: [base], targets: { ...targets, ...extra } }).buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] })
+  assert.throws(() => build({ jobs: drizzleJobs(policy) }), /jobs.*drizzle.*memory/)
+  assert.throws(() => build({ jobs: memoryJobs(policy), background: memoryJobs(policy) }), /jobs.*background.*capability.*jobs/)
+  assert.throws(() => build({ jobs: memoryJobs({ ...policy, lease: undefined } as never) }), /lease/)
+  assert.throws(() => build({ jobs: memoryJobs({ ...policy, retain: undefined } as never) }), /retain/)
+})
+
+test('tasks name their cron, queue and run function explicitly', () => {
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      memory: memoryStore(),
+      jobs: memoryJobs({ lease: 30000, retain: { completed: 86400000, failed: 604800000 } }),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  const task = { cron: '@daily', queue: 'maintenance', run: async () => ({}) }
+  for (const [tasks, message] of [
+    [{ sweep: { ...task, cron: 'bad' } }, /cron/i],
+    [{ sweep: { ...task, queue: undefined } }, /queue/],
+    [{ sweep: { ...task, run: undefined } }, /run/],
+  ] as const) assert.throws(() => language.buildAsas({ kayan: [], http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], tasks } as never), message)
+})
+
+test('connect refuses unknown work queues and readOnly workers before connecting a store', async () => {
+  const memory = memoryStore()
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      memory,
+      jobs: memoryJobs({ lease: 30000, retain: { completed: 86400000, failed: 604800000 } }),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'memory', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    },
+  })
+  const asas = language.buildAsas({ kayan: [], tasks: { sweep: { cron: '@daily', queue: 'maintenance', run: async () => ({}) } }, http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })] })
+  try {
+    await assert.rejects(asas.connect({ work: ['typo'] }), /queue "typo"/)
+    await assert.rejects(asas.connect({ readOnly: true, work: ['maintenance'] }), /readOnly/)
+    assert.equal(memory.calls.connect, 0)
+    await asas.connect()
+    assert.deepEqual(await asas.jobs!.run({ queue: 'maintenance' }), { completed: 1, failures: 0 })
+    assert.deepEqual(await asas.jobs!.run({ queue: 'maintenance' }), { completed: 0, failures: 0 })
+  } finally { await asas.destroy() }
 })

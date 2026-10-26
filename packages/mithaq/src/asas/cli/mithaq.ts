@@ -8,13 +8,15 @@ import type { Command } from '../../mithaq/language.ts'
 import { Refusal } from '../../mithaq/refusal.ts'
 import type { ScreenClient } from '../../screen/index.ts'
 
-const verbs = ['eject', 'generate', 'lock', 'migrate', 'password-link', 'screens', 'upgrade']
+const verbs = ['eject', 'jobs', 'generate', 'lock', 'migrate', 'password-link', 'screens', 'upgrade']
 const nouns = ['auth', 'messages', 'screens']
 const usage =
-  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq password-link <email> | mithaq screens | mithaq upgrade --check | mithaq eject <item> | mithaq eject --prune | mithaq <target> <command> [--check]'
+  'Usage: mithaq generate auth [--check] | mithaq generate messages [--check] [--no-data-scan] | mithaq generate screens [--check] | mithaq generate --check | mithaq lock [--check] | mithaq migrate [--check] [--name <slug>] | mithaq password-link <email> | mithaq jobs run [queue ...] | mithaq screens | mithaq upgrade --check | mithaq eject <item> | mithaq eject --prune | mithaq <target> <command> [--check]'
 
 type Built = {
   targets: Record<string, { commands?: Record<string, Command> } | undefined>
+  connect(args?: { readOnly?: boolean }): Promise<void>
+  jobs?: { queues: readonly string[]; run(args: { queue: string }): Promise<{ failures: number }> }
   destroy(): Promise<void>
 }
 
@@ -60,6 +62,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
       console.error(usage)
       process.exit(1)
     }
+    if (verb === 'jobs' && !process.env.DATABASE_URL) throw new Refusal('Set DATABASE_URL explicitly before running jobs.')
     if (verb === 'password-link' && !process.env.DATABASE_URL) throw new Refusal('Set DATABASE_URL explicitly before issuing a password link.')
     if (verb === 'password-link' && (!noun || noun.startsWith('--') || rest.length)) throw new Refusal('Usage: mithaq password-link <email>')
     const project = pathToFileURL(`${process.cwd()}/`)
@@ -123,6 +126,19 @@ if (process.argv[1] && realpathSync(process.argv[1]) === import.meta.filename) {
     } else if (verb === 'generate') {
       const code = await (noun === 'messages' ? messages() : noun === 'screens' ? screens() : auth(check))
       if (code) process.exit(code)
+    } else if (verb === 'jobs') {
+      if (noun !== 'run') throw new Refusal('Usage: mithaq jobs run [queue ...]')
+      const asas = await asasOf()
+      try {
+        if (!asas.jobs) throw new Refusal('This build names no jobs.')
+        if (rest.some((word) => word.startsWith('-'))) throw new Refusal('Usage: mithaq jobs run [queue ...]')
+        const queues = [...new Set(rest.length ? rest : asas.jobs.queues)]
+        for (const queue of queues) if (!asas.jobs.queues.includes(queue)) throw new Refusal(`No task uses work queue "${queue}".`)
+        await asas.connect({ readOnly: true })
+        let failures = 0
+        for (const queue of queues) failures += (await asas.jobs.run({ queue })).failures
+        if (failures) process.exitCode = 1
+      } finally { await asas.destroy() }
     } else if (verb === 'password-link') {
       const asas = await asasOf()
       try {

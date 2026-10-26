@@ -1,3 +1,7 @@
+import { cleanupUploadTargets } from '../storage/references.ts'
+import { storageMaintenanceAccess } from './runner/storage-maintenance.ts'
+import { buildJobs } from '../jobs/jobs.ts'
+import { checkJobs, type JobTasks } from '../jobs/config.ts'
 import { rowsOf } from '../mithaq/rows.ts'
 import { accessReport, actor, actorPermissions, authActor, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
 import { betterAuthStrategy } from '../auth/better-auth/index.ts'
@@ -13,7 +17,7 @@ import { invalid } from './runner/errors.ts'
 import { assertMaxBodyBytes, boundedBody } from './http/fetch.ts'
 import { fieldlessOperation, keepOperationKeys } from '../rbac/steps.ts'
 import { resolvedKayans, type ActorBoundAccess, type AdminAccess, type Kayan, type RuntimeField, type ResolvedKayan, type ServiceOf } from '../mithaq/types.ts'
-import { accessTargetOf, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceKeys, serviceTargetOf, type Language, type Store } from '../mithaq/language.ts'
+import { accessTargetOf, isJobs, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceKeys, serviceTargetOf, type Language, type Store } from '../mithaq/language.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
 import type { BuiltTables } from '../drizzle/index.ts'
 import { screensOf, type ScreenClient } from '../screen/index.ts'
@@ -503,12 +507,15 @@ export const buildAsas = <
     http,
     messages,
     statements: declaredStatements,
+    tasks,
   }: {
     kayan: KayanList &
       (UniqueNames<KayanList> extends true ? unknown : { duplicateKayanNames: never }) &
       (AccessActorMismatch<KayanList, L, ActorFor<L, KayanList>> | AdminAccessMismatch<Auth, ActorFor<L, KayanList>> | AdminAccessShapeMismatch<Auth> extends never
         ? unknown
         : { authAccessActorMismatch: AccessActorMismatch<KayanList, L, ActorFor<L, KayanList>> | AdminAccessMismatch<Auth, ActorFor<L, KayanList>> | AdminAccessShapeMismatch<Auth> })
+    /** Tasks are keyed by name; work starts only when connect names their queues. */
+    tasks?: JobTasks
     /** The globals, each a kayan of one row. They share the kayan namespace. */
     global?: GlobalList
     auth?: Auth
@@ -538,6 +545,12 @@ export const buildAsas = <
       'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], or orpcHttp with the same options first for the typed client.',
     )
   }
+  const jobsTargets = Object.entries(language.targets).filter(([, target]) => isJobs(target))
+  if (jobsTargets.length > 1) throw new Error(`Targets "${jobsTargets.map(([name]) => name).join('" and "')}" both declare capability "jobs"; a build has at most one.`)
+  const jobsTarget = jobsTargets[0]?.[1]
+  const jobs = isJobs(jobsTarget) ? jobsTarget : undefined
+  if (tasks !== undefined && !jobs) throw new Error('buildAsas tasks require a target of capability "jobs".')
+  if (jobs) checkJobs({ target: jobs, tasks })
   const globals = (global ?? []) as readonly Kayan[]
   const globalNames = new Set(globals.map((one) => one.name))
   // One list, so a name declared twice is refused whichever list it is in.
@@ -579,6 +592,9 @@ export const buildAsas = <
     )
   }
   const service = serviceTargetOf(language)!
+  if (jobs && (!isStore(language.targets[service.store]) || !jobs.driver?.fits(language.targets[service.store] as Store))) {
+    throw new Error(`Jobs target "${jobsTargets[0]![0]}" driver "${jobs.driver?.store}" cannot share transactions with service store "${service.store}" (${(language.targets[service.store] as Store)?.type ?? service.store}).`)
+  }
   // For a runner written as data, which no type reached. Core picks no cap, page size or
   // bulk ceiling of its own.
   noOperations('The service target', service)
@@ -606,7 +622,11 @@ export const buildAsas = <
   const storage = stored[0]?.storage.config
   // Set on every field before any schema is derived, for a value that points at a file from inside it.
   const filesIn = stored.map((one) => one.name)
-  for (const field of resolved.flatMap((one) => Object.values(one.fields))) field.filesIn = filesIn
+  const cleanedUploads = stored.filter((one) => one.storage.orphanAfter !== undefined)
+  for (const field of resolved.flatMap((one) => Object.values(one.fields))) {
+    field.filesIn = filesIn
+    if (field.kind === 'richText') cleanupUploadTargets.set(field, cleanedUploads)
+  }
   // Checked once, so a bad screen is refused here rather than at the first page drawn.
   const screens = screensOf(language, resolved)
   const hasAudit = (list: readonly unknown[] | undefined) => list?.some((step) => sealOf(step as WriteStep) === 'audit') ?? false
@@ -751,10 +771,11 @@ export const buildAsas = <
   ][]
   // Every store's `init` runs in registration order, which holds while no `init` consumes another's output.
   for (const [at, [name, store]] of stores.entries()) {
-    const own = store.init(resolved.filter((one) => one.store === name)) ?? store
+    const own = store.init(resolved.filter((one) => one.store === name), { jobs: jobs !== undefined && name === service.store }) ?? store
     stores[at] = [name, own]
     buildTargets[name] = own
   }
+  const jobRunner = jobs === undefined ? undefined : buildJobs({ target: { ...jobs, driver: jobs.driver.init(buildTargets[service.store] as Store) }, tasks, asas: (): object => asas })
   const cap = service.depth
   if (!Number.isInteger(cap) || cap < 1) throw new Error('service.depth must be a positive integer.')
 
@@ -809,12 +830,12 @@ export const buildAsas = <
     )
   }
   // The tenant scope goes under both authorizers, so replacing either cannot leave it out.
-  const authorize: Authorize = tenant.scoped(service.authorize === defaultAuthorize
+  const authorize: Authorize = tenant.scoped(storageMaintenanceAccess(service.authorize === defaultAuthorize
     ? defaultAuthorize
     : async (args) => {
         const own = await service.authorize(args)
         return combineWhere(await defaultAuthorize(args), own === undefined ? undefined : assertWhere(args.kayan, own))
-      })
+      }))
 
   let built!: Record<string, Record<string, unknown>>
   const assertNoOptions = (value: unknown) => {
@@ -1117,6 +1138,7 @@ export const buildAsas = <
   }) : undefined
 
   const asas = {
+    jobs: jobRunner?.api,
     /** Every permission key this project has: one `<kayan>.<operation>` per operation, one `<kayan>.fields.<field>` per field, one `screen.<screen>` per screen. */
     catalog: catalog as readonly string[],
     /** Every scope of copy this project has. A getter: only the CLI reads it, and it calls the project's own resolver. */
@@ -1191,18 +1213,25 @@ export const buildAsas = <
       }
       return new Response('Not found', { status: 404 })
     },
-    connect: async ({ readOnly }: { readOnly?: boolean } = {}) => {
+    connect: async ({ readOnly, work }: { readOnly?: boolean; work?: readonly string[] } = {}) => {
+      if (readOnly && work !== undefined) throw new Error('connect cannot name work with readOnly: true.')
+      if (work?.length && !jobRunner) throw new Error(`No task uses work queue "${work[0]}".`)
+      jobRunner?.checkWork(work ?? [])
       // `readOnly` writes nothing: no push.
       for (const [, store] of stores) await store.connect({ readOnly })
-      if (!readOnly) await refuseExtraTenants()
+      if (!readOnly) {
+        await refuseExtraTenants()
+        jobRunner?.start(work ?? [])
+      }
     },
     destroy: async () => {
+      await jobRunner?.stop()
       for (const [, store] of stores) await store.destroy()
     },
   }
   // Frozen deep once nothing of the build writes to it: the runner reads every record at call
   // time. Library objects are left alone, since freezing them breaks them.
-  const shapers = Object.entries(language.targets).filter(([, target]) => !isAccess(target) && !isScreen(target) && !isService(target) && !isVersions(target) && !isStorage(target) && !isTenant(target))
+  const shapers = Object.entries(language.targets).filter(([, target]) => !isJobs(target) && !isAccess(target) && !isScreen(target) && !isService(target) && !isVersions(target) && !isStorage(target) && !isTenant(target))
   const library = new Set<unknown>(operationTable.map((one) => one.input))
   const foreign = (one: { targets?: unknown; custom?: unknown }) => {
     library.add(one.custom)
@@ -1229,7 +1258,22 @@ export const buildAsas = <
   for (const record of [declared, resolved, built, asas.kayan, asas.global, operationTable, screens]) freeze(record)
   // Keyed by the build, off its public shape.
   resolvedKayans.set(asas, Object.freeze(Object.fromEntries(resolved.map((one) => [one.name, one]))))
-  if (storage && stored.length) recordStorage(asas, { config: storage, kayan: stored, storeOf: (one) => buildTargets[one.store] as Store })
+  if (storage && stored.length) recordStorage(asas, {
+    config: storage, kayan: stored, resolved, collection: betterAuthKayan[0],
+    storeOf: (one) => buildTargets[one.store] as Store,
+    tenants: async () => {
+      const target = language.targets.tenant
+      if (!isTenant(target)) return []
+      const one = resolvedByName.get(target.relationTo)!
+      const { docs } = await (buildTargets[one.store] as Store).find({ kayan: one.name, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } } })
+      return docs.map((row) => String(row.id))
+    },
+    remove: ({ kayan, id, actor }) => {
+      const one = resolvedByName.get(kayan)!
+      const name = Object.entries(one.operations).find(([, operation]) => operation.steps.some((step) => sealOf(step) === 'remove'))![0]
+      return ((built[kayan]!.operations as Record<string, Called>)[name]!)({ id }, { actor })
+    },
+  })
   // A strategy pushed onto the list, or a handler or target swapped in, would answer every later request.
   for (const record of [strategies, asas.auth, asas.targets, asas]) Object.freeze(record)
   return asas

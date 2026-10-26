@@ -11,7 +11,7 @@ bunx mithaq --help
 
 Three things hold for every command:
 
-- **It runs under Node and does not read `.env`.** Commands that open a database (`migrate`, `rbac assign`, `storage sweep`, and the data scan of `generate messages --check`) refuse to run unless `DATABASE_URL` is set in the shell. Load the project's `.env` first:
+- **It runs under Node and does not read `.env`.** Commands that open a database (`migrate`, `rbac assign`, `storage sweep`, `jobs run`, and the data scan of `generate messages --check`) refuse to run unless `DATABASE_URL` is set in the shell. Load the project's `.env` first:
 
   ```sh
   set -a; . ./.env; set +a
@@ -190,6 +190,18 @@ set -a; . ./.env; set +a
 bunx mithaq migrate --name add_notes
 ```
 
+## `jobs run`
+
+Schedules the latest due occurrence and runs due jobs once, then exits. It requires `DATABASE_URL` explicitly and an applied jobs migration. It uses the same generic worker as the asas timers: unique occurrences, exclusive claims, renewed leases and history retention. Task or database failures answer a nonzero exit code; stored error messages are never logged.
+
+```sh
+bunx mithaq jobs run maintenance
+```
+
+A long-running server passes `connect({ work })` to run timers. A serverless host leaves `work` out because timers can freeze between requests, and calls `mithaq jobs run` from the platform’s cron.
+
+`mithaq jobs run [queue ...]` selects queues by positional name. With none, it runs all queues the build’s tasks use. Unknown queues are refused before running any work. The command connects with `readOnly: true` to start no timers, performs a pass, destroys the build and exits. A build with no jobs target is refused. See [Jobs](../../../README.md#jobs) for the capability, drivers and phase one limits.
+
 ## `screens`
 
 Prints each screen target as a tree: its path, providers, pages, the nav with the permission key each entry needs, and every kayan page with its layout. It writes nothing. Use it to see what a screen will draw without starting the app.
@@ -276,6 +288,8 @@ Deletes stored objects that no row names any more. It lists every object in each
 | Flag | Meaning |
 | --- | --- |
 | `--check` | List the orphans and delete nothing. |
+
+The template also names `defaultStorageSweepTask` in `tasks`: it removes eligible abandoned upload rows first, then reuses this object policy. Its background log contains only task names and counts. This CLI keeps its object-only behavior and key output. Run `storage sweep --check` first when changing the policy. See [Storage](../../../README.md#kayan-and-globals) and [Jobs](../../../README.md#jobs).
 
 It needs `DATABASE_URL`, and exits 0 unless it refuses or fails.
 

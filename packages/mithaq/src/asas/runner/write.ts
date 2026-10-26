@@ -1,3 +1,5 @@
+import { cleanupUploadTargets, richTextUploads, uploaderId } from '../../storage/references.ts'
+import { storagePurge } from './storage-maintenance.ts'
 // One list in one place, so drizzle's callback transaction is kept as it is.
 import { commentMarks } from '../../rich-text/comments-server.ts'
 import { stepTools } from './store.ts'
@@ -18,7 +20,7 @@ import { atEffect, defaults, issueRefusal, parse, sealOf, storeSeals, validated,
 import { firstRegisters, running, snapshot, type Open, type Running } from './runtime.ts'
 import type { FindInput, Paginated } from './read.ts'
 import { changedColumns, latestVersion, restoreInput, revived, saveVersion } from '../../versions/versions.ts'
-import { fileURLs } from '../../storage/storage.ts'
+import { fileURLs, isUploadedBy } from '../../storage/storage.ts'
 import { combineWhere, operatorList } from '../../mithaq/where.ts'
 import { refuseTenantOption, writeTenant, type TenantReach } from './tenant.ts'
 import type { FieldWhere, Operator, Scalar, Where } from '../../mithaq/where.ts'
@@ -622,10 +624,22 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
       targets.set(key, held)
     }
   }
+  const uploads = new Set<ResolvedKayan>()
+  for (const field of Object.values(kayan.fields)) {
+    if (field.kind !== 'richText') continue
+    for (const reference of richTextUploads(data[field.name])) {
+      const target = cleanupUploadTargets.get(field)?.find((one) => one.name === reference.kayan)
+      if (!target) continue
+      const held = targets.get(target) ?? { target, sets: [] }
+      held.sets.push({ field: field.name, value: reference.id })
+      targets.set(target, held)
+      uploads.add(target)
+    }
+  }
   for (const [key, { target, sets }] of targets) {
     const far = target.tenant
     // A raw write to a shared row names it as it likes; the foreign key holds it.
-    if (!access && !far) continue
+    if (!access && !far && !uploads.has(target)) continue
     // Held whatever the target's own access answers, so no access widens it.
     const tenanted = tenant !== undefined && tenant !== null && far ? { [far]: { equals: tenant as Scalar } } : undefined
     // A 400: the value is what the caller sent wrong. Absent, hidden and another tenant's
@@ -645,7 +659,7 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
           })
     }
     // With no organization and no access to ask, nothing scopes the target, so nothing is admitted.
-    if (!access && !tenanted) throw refuse(sets[0]!.field)
+    if (!access && !tenanted && (far || !uploads.has(target))) throw refuse(sets[0]!.field)
     let admits: Where | undefined
     try {
       admits = await access?.(target)
@@ -908,6 +922,7 @@ export const write = <Actor = unknown>({
     }
     refuseTenantOption({ kayan, operation: tools.operation, options })
     const owner = writeTenant({ kayan, active: tenantOf(actor), effect: tools.effect, data })
+    const purge = tools.kind === 'remove' ? storagePurge({ actor, kayan: kayan.name, id: data.id }) : undefined
     const versions = kayan.versions
     // An operation with its own `input` that changes a row, and each bulk row, lands on the
     // row as it is: it keeps `_status` and its columns also go into the pending draft.
@@ -935,7 +950,7 @@ export const write = <Actor = unknown>({
         : undefined
     // Past the rows the actor may read drafts of, a never-published row answers the 404 an
     // absent id does: a 403 would tell the actor which hidden ids exist.
-    const rowsWhere = !versions?.drafts || tools.kind === 'insert'
+    const rowsWhere = purge ? {} : !versions?.drafts || tools.kind === 'insert'
       ? aliveWhere(kayan)
       : !admits
         ? publishedWhere(kayan)
@@ -986,7 +1001,7 @@ export const write = <Actor = unknown>({
     const run = (tx: unknown) => {
       entry.tx = tx
       return running.run({ context, transactions: new Map(open).set(store, entry), user: actor }, async () => {
-        const existing = tools.kind === 'insert' ? undefined : await loadExisting({ kayan, store, id: values.id, where: accessWhere, tx, rows: rowsWhere, lock: rowLock({ kayan, kind: tools.kind, data: values }) })
+        const existing = tools.kind === 'insert' ? undefined : await loadExisting({ kayan, store, id: values.id, where: accessWhere, tx, rows: rowsWhere, lock: purge ? 'update' : rowLock({ kayan, kind: tools.kind, data: values }) })
         // An actor who may not read this row's drafts writes onto it as it is, so nothing tells
         // it a draft is pending.
         const hidesDrafts = !!versions?.drafts && !!existing && (!admits || (!draftsAsked && !!admits.where
@@ -1078,6 +1093,9 @@ export const write = <Actor = unknown>({
             return row
           },
           insert: async ({ tx: heldTx, kayan: name, data: values }) => {
+            if (name === kayan.name && 'storage' in kayan && isUploadedBy(kayan.fields.uploadedBy)) {
+              values = { ...values, uploadedBy: uploaderId(actor) ?? null }
+            }
             const row = await tools.store.insert({ tx: heldTx, kayan: name, data: values })
             const kept = own(name)
             if (kept) await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row, autosave: autosaving })
@@ -1092,7 +1110,8 @@ export const write = <Actor = unknown>({
             if (drafting && kept && incremented.length) throw invalid({ message: 'An increment writes a stored integer field, not a draft snapshot.', key: 'error.invalid.value', params: { kayan: name } })
             if (drafting && kept) {
               const draft = { ...base, ...values, id: targetId }
-              // Draft snapshots bypass the sealed row store, so check their final annotations here.
+              // Draft snapshots bypass the sealed row store, so hold new references and check annotations here.
+              await assertReferences({ kayan: kept, store, data: values, tenant: tenantOf(actor), tx: heldTx })
               await assertCommentMarks({ kayan: kept, store, data: draft, tenant: tenantOf(actor), tx: heldTx, id: targetId })
               await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: draft, autosave: autosaving })
               return draft
@@ -1112,12 +1131,13 @@ export const write = <Actor = unknown>({
           remove: async (args) => {
             const { tx: heldTx, kayan: name, id } = args
             if (!ownRow(name, id)) return tools.store.remove(elsewhere(args))
-            if (kayan.softDelete) return tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
+            if (purge && existing) await purge.check({ row: existing, tx: heldTx })
+            if (kayan.softDelete && !purge) return tools.store.update({ tx: heldTx, kayan: name, id: targetId, data: { [kayan.softDelete]: new Date() }, where: writeWhere })
             // A marked row is kept, so only a delete that removes it answers to the rows naming it.
             // An update step can remove its own row, so exclude new references before counting them.
             // This raises its lock; the upgrade path is taking `update` at load for such an operation.
             if (pointers.length && existing && kind !== 'remove') await store.find({ kayan: name, args: { limit: 1, page: 1, lock: 'update', sort: byId, where: { id: { equals: existing.id as Scalar } } }, tx: heldTx })
-            if (pointers.length && existing) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
+            if (pointers.length && existing && !purge) await refuseReferenced({ kayan, existing, pointers, store, tenant: kayan.tenant ? existing[kayan.tenant] : tenantOf(actor), tx: heldTx, authorize, admin, actor })
             return tools.store.remove({ tx: heldTx, kayan: name, id: targetId, where: writeWhere })
           },
         })
@@ -1227,7 +1247,7 @@ export const write = <Actor = unknown>({
     }
     // A throw here is `AfterCommitError`: the write has happened, and nothing the caller sent was wrong.
     const afterCommit = async () => {
-      if (!declaration.afterCommit.length || !committed) return
+      if (!committed || (!declaration.afterCommit.length && !purge)) return
       await runOutside({
         kayan,
         tools,
@@ -1236,12 +1256,13 @@ export const write = <Actor = unknown>({
         start: { ...committed, tx: undefined },
         around: { context, user: actor },
       })
+      await purge?.afterCommit({ ...committed, tx: undefined })
     }
     const joined = open.get(store)
     // Drained by the write that opened the transaction; an outer rollback throws before the drain.
     if (joined) {
       const result = await run(joined.tx)
-      if (declaration.afterCommit.length) joined.afterCommit = [...(joined.afterCommit ?? []), afterCommit]
+      if (declaration.afterCommit.length || purge) joined.afterCommit = [...(joined.afterCommit ?? []), afterCommit]
       return result
     }
     let result: unknown

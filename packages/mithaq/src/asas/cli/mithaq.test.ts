@@ -69,3 +69,29 @@ test('password-link needs an explicit database before importing the project', as
     await assert.rejects(run(process.execPath, [bin, 'password-link', 'dummy@example.com'], { cwd: outside, env }), /Set DATABASE_URL explicitly/)
   } finally { rmSync(outside, { recursive: true, force: true }) }
 })
+
+test('jobs run needs an explicit database before importing the project', async () => {
+  const outside = mkdtempSync(join(tmpdir(), 'mithaq-jobs-cli-'))
+  try {
+    const env = { ...process.env }
+    delete env.DATABASE_URL
+    await assert.rejects(run(process.execPath, [bin, 'jobs', 'run'], { cwd: outside, env }), /Set DATABASE_URL explicitly/)
+  } finally { rmSync(outside, { recursive: true, force: true }) }
+})
+
+test('jobs run accepts positional queues, defaults to all task queues and refuses typos before running', async () => {
+  const project = mkdtempSync(join(tmpdir(), 'mithaq-jobs-'))
+  try {
+    mkdirSync(join(project, 'src'))
+    writeFileSync(join(project, 'package.json'), JSON.stringify({ type: 'module' }))
+    writeFileSync(join(project, 'src/asas.ts'), `export const asas = {
+      targets: {}, connect: async () => {}, destroy: async () => {},
+      jobs: { queues: ['maintenance', 'mail'], run: async ({ queue }) => (console.log(queue), { failures: 0 }) }
+    }`)
+    const runJobs = (...queues: string[]) => run(process.execPath, [bin, 'jobs', 'run', ...queues], { cwd: project, env: { ...process.env, DATABASE_URL: 'postgres://unused@127.0.0.1:9/mithaq' } })
+    assert.equal((await runJobs('mail')).stdout.trim(), 'mail')
+    assert.equal((await runJobs()).stdout.trim(), 'maintenance\nmail')
+    await assert.rejects(runJobs('mail', 'typo'), (error: any) => /typo/.test(error.stderr) && error.stdout === '')
+    await assert.rejects(runJobs('--queue', 'mail'), /Usage: mithaq jobs run/)
+  } finally { rmSync(project, { recursive: true, force: true }) }
+})

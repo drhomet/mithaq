@@ -66,7 +66,7 @@ export {
 export type { Authorize, BoundKayans, ByID, CreateOf, Globals, IdOf, Options, Procedures, ReadOptions, Row, RowOf, UpdateOf, Version, Writes } from './asas/runner/write.ts'
 export type { Where } from './mithaq/where.ts'
 export { defaultFields, defaultGlobalFields, defaultIdField, defaultTimestampFields } from './base/fields.ts'
-export { uploadFields } from './storage/storage.ts'
+export { uploadFields, uploadedByField } from './storage/storage.ts'
 export { accessFor, fieldAccessFor } from './mithaq/types.ts'
 export type { Access, AccessArgs, AccessResult, AdminAccess, AdminAccessArgs, CompoundIndex, FieldAccess, FieldAccessArgs, Field, FilterOptions, JsonSchema, Kayan, KayanService, LabelFunction, Localized, LocalesOf, MessageMap, MessageTree, ResolvedField, ResolvedKayan, RuntimeField } from './mithaq/types.ts'
 export type { Copy, MessageRegistry, MessageScope, MessagesResolver, ProjectMessages } from './mithaq/messages.ts'
@@ -77,11 +77,13 @@ export { defineRukn, type KayanConfigs, type Rukn } from './mithaq/rukn.ts'
 export { base } from './base/index.ts'
 export { storage, upload } from './storage/index.ts'
 export { versions } from './versions/index.ts'
-export { defineMithaq, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, type Command, type CommandInput, type Language, type SchemaTarget, type Store, type Target, type TenantField, type TenantTarget } from './mithaq/language.ts'
+export { defineMithaq, isJobs, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, type Command, type CommandInput, type Language, type SchemaTarget, type Store, type Target, type TenantField, type TenantTarget } from './mithaq/language.ts'
 export { Refusal } from './mithaq/refusal.ts'
 export { defaultRules, providerOf, rule, type ProvidedBy, type Provider, type Rule, type Rules, type RuleValue } from './base/rules.ts'
 export { draftFields, versionOperations } from './versions/versions.ts'
 export {
+  cleanupUploads,
+  sweepStorage,
   adapterOf,
   allowedType,
   checkReference,
@@ -120,3 +122,9 @@ export {
   type ScreenRef,
 } from './screen/index.ts'
 export type { InferInput, InferOutput, StandardSchemaV1 } from './mithaq/standard-schema.ts'
+
+export { defaultJobLease, defaultJobRetention, type JobTask, type JobTasks } from './jobs/config.ts'
+
+export { drizzleJobs } from './drizzle/jobs.ts'
+export { memoryJobs, memoryTransactions } from './memory/jobs.ts'
+export type { Job, JobPolicy, JobRetention, JobFinish, JobsDriver, JobsTarget } from './jobs/driver.ts'

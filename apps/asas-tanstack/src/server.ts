@@ -17,7 +17,11 @@ for (const client of Object.values(import.meta.glob<ScreenClient>('./routes/(scr
 // `NODE_ENV=production` never connects, which would push into the deploy's database.
 const { env } = process
 if (env.NODE_ENV === 'production') {
-  await (await import('asas')).asas.connect().catch((error: unknown) => {
+  await (await import('asas')).asas.connect({
+    // add-on: uploads
+    work: ['maintenance'],
+    // end add-on: uploads
+  }).catch((error: unknown) => {
     console.error(error)
     process.exit(1)
   })

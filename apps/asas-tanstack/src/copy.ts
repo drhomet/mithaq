@@ -1,6 +1,7 @@
 // Imports no router, stylesheet or React, so a test can load this under plain `node`.
 import { flattenMessageFile } from 'mithaq/admin'
 import { organizations, showOrganization } from 'asas/organizations'
+import mithaq from 'asas/messages/mithaq.json' with { type: 'json' }
 import localUsers from 'asas/messages/localUsers.json' with { type: 'json' }
 import organization from 'asas/messages/organization.json' with { type: 'json' }
 import tags from 'asas/messages/tags.json' with { type: 'json' }
@@ -1252,13 +1253,15 @@ const refusalKeys = new Map([
 export const refusalKey = (status: number, code: unknown): string | undefined =>
   status === 429 ? 'auth.tooManyRequests' : typeof code === 'string' ? refusalKeys.get(code) : undefined
 
+const generatedCopy = copyFile(mithaq)
+
 /** The `t` a screen is handed, for one locale. A key splits at its first dot into scope and key; an unanswered key returns the caller's fallback. */
 export const translator =
   (which: string): Translate =>
   (key, fallback) => {
     const dot = key.indexOf('.')
     if (dot < 0) return fallback
-    return scopes[key.slice(0, dot)]?.[key.slice(dot + 1)]?.[which] ?? fallback
+    return scopes[key.slice(0, dot)]?.[key.slice(dot + 1)]?.[which] ?? generatedCopy[key]?.[which] ?? fallback
   }
 
 /**

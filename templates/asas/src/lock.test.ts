@@ -116,6 +116,7 @@ test('the lock records the vocabulary alone, as plain data, and a lock read back
   assert.deepEqual((block as any).targets, {
     dashboard: 'screen',
     drizzle: 'store',
+    jobs: 'jobs',
     backoffice: 'screen',
     portal: 'screen',
     rbac: 'access',
@@ -367,7 +368,7 @@ test('the #167 lock, kept as a fixture with `previous` and `restart` in its seal
     ...root,
     kinds: { ...defaultKinds, richText: undefined, upload: undefined, integer: undefined, decimal: undefined, json: undefined },
     rules: { ...defaultRules, precision: undefined, scale: undefined },
-    targets: { ...language.targets, backoffice: undefined, platform: language.targets.backoffice, versions: undefined, storage: undefined, tenant: undefined },
+    targets: { ...language.targets, backoffice: undefined, platform: language.targets.backoffice, versions: undefined, storage: undefined, tenant: undefined, jobs: undefined },
   })
   const { code, message } = checkLock(vocabulary, kept)
   assert.equal(code, 0, message)
