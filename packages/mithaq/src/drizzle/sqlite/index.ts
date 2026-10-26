@@ -1,5 +1,5 @@
 import { and, asc, count as sqlCount, desc, eq, getTableColumns, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql, type ColumnBuilderBase, type SQL, type SQLWrapper } from 'drizzle-orm'
-import { index, sqliteTable, uniqueIndex, type BaseSQLiteDatabase, type SQLiteTable } from 'drizzle-orm/sqlite-core'
+import { index, sqliteTable, uniqueIndex, type SQLiteAsyncDatabase as BaseSQLiteDatabase, type SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { uniqueRuleIndexes } from '../../mithaq/resolve.ts'
 import type { CompoundIndex, ResolvedField, ResolvedKayan } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
@@ -10,7 +10,7 @@ import { kinds as shippedKinds, type SqliteColumnBuilder } from './kinds.ts'
 import type { SqliteColumnRule, SqliteModifiable } from './rules.ts'
 
 /** The opened drizzle database and isolated transaction boundary supplied by the host adapter. */
-export type SqliteDatabase = BaseSQLiteDatabase<'sync' | 'async', unknown, any>
+export type SqliteDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any>
 export type SqliteContract = {
   db: SqliteDatabase
   transaction<T>(fn: (tx: SqliteDatabase) => Promise<T>): Promise<T>
