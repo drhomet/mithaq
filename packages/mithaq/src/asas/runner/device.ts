@@ -91,7 +91,7 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
     const depth = (outer?.context.depth ?? 0) + 1
     if (depth > service.depth) throw new Error(`Operation depth ${depth} is past the cap of ${service.depth}.`)
     if (!outer && service.context !== undefined && !options?.context) throw new Error('The device operation requires the service context.')
-    const scope: Scope = { actor: outer ? outer.actor : options?.actor ?? null, context: Object.freeze({ ...(outer?.context ?? options?.context), source: 'local', depth, chain: [...(outer?.context.chain ?? []), `${one.name}.${name}`] }), store: outer?.store, tx: outer?.tx, afterCommit: outer?.afterCommit ?? [], lifetime: outer?.lifetime }
+    const scope: Scope = { actor: outer ? outer.actor : options?.actor ?? null, context: Object.freeze({ ...(outer?.context ?? options?.context), source: 'local', depth, chain: [...(outer?.context.chain ?? []), `${one.name}.${name}`] }), store: outer?.store, tx: outer?.tx, afterCommit: [], lifetime: outer?.lifetime }
     const store = stores.get(one.store)!
     if (outer?.store && outer.store !== store) throw new Error('A nested device operation cannot cross stores inside a transaction.')
     const shape = shapes.get(one.name)!
@@ -219,15 +219,23 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
       const visible = kind === 'findOne' ? await mask(ctx.data) : kind === 'find' ? { ...ctx.data, docs: await Promise.all((ctx.data.docs as Row[]).map(mask)) } : ctx.data
       return output ? validated(output, visible) : visible
     }
-    if (operation.effect === 'read') return run(scope.tx)
+    if (operation.effect === 'read') {
+      const result = await run(scope.tx)
+      if (outer?.tx !== undefined) outer.afterCommit.push(...scope.afterCommit)
+      return result
+    }
     if (operation.beforeTransaction.length) {
-      const outside = { ...scope, store: undefined, tx: undefined, lifetime: undefined }
+      const outside = { ...scope, store: undefined, tx: undefined, afterCommit: [], lifetime: undefined }
       let ctx: Ctx = { kayan: one, data, actor: scope.actor, user: scope.actor, context: scope.context, tx: undefined }
       const tools = { operation: name, schema, output: shape.row, kind, effect: operation.effect, kayans: bound(outside), of: of(outside, false), catalog }
       for (const step of operation.beforeTransaction) ctx = await (step as OperationStep)(ctx, tools as never)
       data = ctx.data
     }
-    if (outer?.tx !== undefined) return run(outer.tx)
+    if (outer?.tx !== undefined) {
+      const result = await run(outer.tx)
+      outer.afterCommit.push(...scope.afterCommit)
+      return result
+    }
     let result: unknown
     try { result = await store.transaction(run) } finally { if (scope.lifetime) scope.lifetime.settled = true }
     for (const after of scope.afterCommit) {

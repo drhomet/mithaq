@@ -1919,6 +1919,17 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await changing as Record<string, unknown>)[kayan === 'tags' ? 'label' : 'name'], 'changed after hold')
   })
 
+  test('a beforeTransaction write runs its committed hook once and keeps the outer organization', async () => {
+    const seen: string[] = []
+    storeProbe = async (ctx, tools) => {
+      if (tools.operation === 'outsideProbe') await (tools.kayans as Record<string, Ops>).memos!.afterProbe({ title: 'outside nested hook' })
+      else seen.push(String(ctx.tenant))
+    }
+    try { await memos().outsideProbe({ title: 'outside outer hook' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, ['org1'])
+    assert.equal((await memos().count({ where: { title: { equals: 'outside nested hook' } } }, { actor: two })).totalDocs, 0)
+  })
+
   for (const operation of ['outsideProbe', 'afterProbe'] as const) test(`step find, hold, sum and upsert are unavailable in ${operation}`, async () => {
     storeProbe = async (ctx, tools) => {
       assert.throws(() => tools.store.find({ tx: ctx.tx, kayan: declaration(built, 'memos'), args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } } }), /outside.*transaction/)

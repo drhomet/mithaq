@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, sqliteAdapter, drizzleSqliteIdKinds, drizzleSqliteKinds, drizzleSqliteRules, zodTarget, zodKinds, zodRules, zodIdKinds, type ProjectStep, type Ctx } from '../../device.ts'
 import { nodeSqlite } from '../../drizzle/sqlite/__fixtures__/node-sqlite.ts'
 
-const setup = ({ beforeSteps = [], afterSteps = [], afterCommit = [] }: { beforeSteps?: readonly ProjectStep[]; afterSteps?: readonly ProjectStep[]; afterCommit?: readonly ProjectStep[] } = {}) => {
+const setup = ({ beforeTransaction = [], beforeSteps = [], afterSteps = [], afterCommit = [] }: { beforeTransaction?: readonly ProjectStep[]; beforeSteps?: readonly ProjectStep[]; afterSteps?: readonly ProjectStep[]; afterCommit?: readonly ProjectStep[] } = {}) => {
   const fixture = nodeSqlite()
   fixture.sqlite.exec('create table patient (id integer primary key autoincrement, name text not null, created_at integer not null, updated_at integer not null); create table note (id integer primary key autoincrement, title text not null, created_at integer not null, updated_at integer not null)')
   const language = defineMithaq({ locales: ['en', 'ar'] as const, arkan: [base], targets: {
@@ -12,7 +12,7 @@ const setup = ({ beforeSteps = [], afterSteps = [], afterCommit = [] }: { before
     service: serviceTarget({ beforeSteps: beforeSteps as never, afterSteps: afterSteps as never, afterCommit: afterCommit as never, store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
   } })
   const access = { create: () => true, read: () => true, update: () => true, delete: () => true }
-  const patient = language.defineKayan({ name: 'patient', placement: 'device', access, fields: { ...defaultFields, id: { kind: 'number' }, name: { kind: 'text', label: { en: 'Name', ar: 'Name' }, rules: { required: true } } }, targets: { service: { operations: defaultOperations } } })
+  const patient = language.defineKayan({ name: 'patient', placement: 'device', access, fields: { ...defaultFields, id: { kind: 'number' }, name: { kind: 'text', label: { en: 'Name', ar: 'Name' }, rules: { required: true } } }, targets: { service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, beforeTransaction: beforeTransaction as never } } } } })
   const note = language.defineKayan({ name: 'note', placement: 'device', access, fields: { ...defaultFields, id: { kind: 'number' }, title: { kind: 'text', label: { en: 'Title', ar: 'Title' }, rules: { required: true } } }, targets: { service: { operations: defaultOperations } } })
   return { ...fixture, language, patient, note, asas: language.buildAsas({ kayan: [patient, note], http: [] }) }
 }
@@ -181,4 +181,20 @@ test('a configured soft delete marks its row and leaves its stored data intact',
   const held = fixture.sqlite.prepare('select name, deleted_at from patient').get()!
   assert.equal(held.name, 'kept')
   assert.equal(typeof held.deleted_at, 'number')
+})
+
+
+test('a write opened by beforeTransaction commits its hooks exactly once before the outer write', async () => {
+  const seen: string[] = []
+  let fixture: ReturnType<typeof setup>
+  fixture = setup({ beforeTransaction: [async (ctx, tools) => {
+    if (ctx.kayan.name === 'patient') await (tools.of(fixture.note) as { create(data: { title: string }): Promise<unknown> }).create({ title: 'before' })
+    return ctx
+  }], afterCommit: [async (ctx) => {
+    seen.push(ctx.kayan.name)
+    return ctx
+  }] })
+  await fixture.asas.connect()
+  await fixture.asas.kayan.patient.operations.create({ name: 'outer' })
+  assert.deepEqual(seen, ['note', 'patient'])
 })
