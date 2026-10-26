@@ -242,6 +242,8 @@ export type Indexes<Field extends string = string, Within extends string = strin
   | ((args: { defaults: CompoundIndex<Field>[] }) => (CompoundIndex<Field> | IndexGroup<Field, Within>)[])
 
 export type Kayan = {
+  /** Patient data declared here can only be built into a device store. */
+  placement?: 'device'
   name: string
   fields: Record<string, RuntimeField>
   access?: StoredAccess

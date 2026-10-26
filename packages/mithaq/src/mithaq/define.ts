@@ -243,6 +243,7 @@ export const defineKayan =
     const R = Record<never, never>,
     const TargetDeclarations = Record<never, never>,
   >(kayan: {
+    placement?: 'device'
     name: Name
     /** The provider that authenticates this kayan: `betterAuth({ server })`, `local({ secret })`, or a strategy. */
     auth?: Auth
@@ -311,6 +312,7 @@ export const defineKayan =
       fields,
       targets: { ...kayan.targets, service: { ...own, operations } },
     } as unknown as {
+      placement?: 'device'
       name: Name
       auth?: Auth
       access?: AccessDef

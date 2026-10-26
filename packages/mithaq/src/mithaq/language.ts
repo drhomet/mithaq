@@ -140,6 +140,7 @@ export type Store<
   Row extends Record<string, unknown> = Record<string, unknown>,
 > = Omit<Target<Kinds, Rules, Built, 'column'>, 'capability'> & {
   /** Declared, never sniffed: a target says which of the two things it is. */
+  readonly placement?: 'device'
   readonly capability: 'store'
   /** `'drizzle'` where this store's `db` and `tables` are drizzle's, which local auth reads its kayan through. */
   readonly sql?: 'drizzle'

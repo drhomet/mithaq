@@ -329,3 +329,8 @@ test('a tenant field may explicitly replace its own index with a declared index 
     assert.throws(() => build(tenanted, { ...declaration, indexes }), /declares index false, and a tenant field is index: true/)
   }
 })
+
+test('a server build refuses device-only declarations before resolving fields or connecting', () => {
+  const patient = untenanted.defineKayan({ name: 'patient', placement: 'device', fields: { ...defaultFields }, targets: operations })
+  assert.throws(() => build(untenanted, patient), /patient.*device-only.*server/)
+})

@@ -301,6 +301,7 @@ export const sqliteAdapter = <
 
   const adapterOf = (tables: Tables, kayanByName: Map<string, ResolvedKayan>) => ({
     capability: 'store' as const,
+    placement: 'device' as const,
     type: 'drizzle-sqlite' as const,
     idKinds,
     kinds,

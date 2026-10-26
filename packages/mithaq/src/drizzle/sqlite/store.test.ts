@@ -176,3 +176,11 @@ test('a build names no http plug, and the device store refuses what it does not 
   await asas.connect()
   await assert.rejects(() => asas.targets.sqlite.find({ kayan: 'note', args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { data: { equals: 1 } } } }), /field "data" is json, and the device store filters no json field/)
 })
+
+test('core refuses a tenant field and Better Auth on the device store before target initialization', () => {
+  const { database } = nodeSqlite()
+  const language = deviceLanguage(database)
+  const note = (extra: object) => ({ name: 'note', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } }, ...extra })
+  assert.throws(() => language.buildAsas({ kayan: [note({ fields: { ...defaultFields, organization: { kind: 'relationship', relationTo: 'missing', targets: { tenant: true } } } })] as never, http: [] }), /note.*tenant field.*device/)
+  assert.throws(() => language.buildAsas({ kayan: [note({ auth: { provider: 'better-auth', server: () => { throw new Error('must not run') } } })] as never, http: [] }), /note.*Better Auth.*device/)
+})

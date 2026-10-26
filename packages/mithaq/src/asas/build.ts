@@ -1,3 +1,4 @@
+import { refusePlacement } from './placement.ts'
 import { rowsOf } from '../mithaq/rows.ts'
 import { accessReport, actor, actorPermissions, authActor, isAuthDeclaration, markAdminAnswer, type AssignedResolver, type AuthStrategy, type AuthStrategyResult, type KayanAuth, type LocalAuthPermissions } from './actor.ts'
 import { betterAuthStrategy } from '../auth/better-auth/index.ts'
@@ -543,6 +544,7 @@ export const buildAsas = <
   const globalNames = new Set(globals.map((one) => one.name))
   // One list, so a name declared twice is refused whichever list it is in.
   const declared = [...(kayan as readonly Kayan[]), ...globals]
+  refusePlacement({ language, kayan: declared, http })
   refuseArkan(language)
   // A kayan writing `targets.screen` would read as every screen and mean one.
   if (Object.hasOwn(language.targets, 'screen')) {
