@@ -47,6 +47,12 @@ const referenced = (thrown: unknown, name: string) =>
     ? conflict({ message: `A "${name}" row is still pointed at by another row, so it is not deleted.`, key: 'error.conflict.referenced', params: { kayan: name }, cause: thrown })
     : thrown
 
+// Text keeps decimal precision, but SQLite cannot order it numerically without rounding.
+const refuseDecimalOrder = (kayan: string, field: string) => invalid({
+  message: `Kayan "${kayan}" field "${field}" is a decimal stored as text, so the device store cannot order it exactly.`,
+  key: 'error.invalid.decimal_order', params: { kayan, field },
+})
+
 // Backslash-escaped, with the escape named: SQLite's LIKE has no escape character of its own.
 const like = (column: SQLWrapper, value: string) => sql`${column} like ${`%${value.replace(/[\\%_]/g, '\\$&')}%`} escape '\\'`
 
@@ -141,6 +147,7 @@ export const sqliteAdapter = <
         // A plain Error: what reaches here past the read layer is an access callback's own `where`.
         if (named?.kind === 'json' || field?.kind === 'json') throw new Error(`Kayan "${name}" field "${named?.name ?? own}" is json, and the device store filters no json field.`)
         if (rest.length || (hop && !field?.target)) throw new Error(`Kayan "${name}" path "${path}" reaches no column of the device store.`)
+        if (named?.kind === 'decimal' && Object.keys(rules).some((operator) => ['greater_than', 'greater_than_equal', 'less_than', 'less_than_equal'].includes(operator))) throw refuseDecimalOrder(name, path)
         const target = hop ? tables[field!.target!.name]! : table
         const column = target[hop ?? own!]!
         const condition = conditionsOf(named?.kind === 'richText' ? textOf(column) : column, rules as Record<string, unknown>)
@@ -216,6 +223,7 @@ export const sqliteAdapter = <
         const client = (tx ?? db) as Database
         const table = tables[name]!
         if (!Object.hasOwn(kayanByName.get(name)?.fields ?? getTableColumns(table), sort.field)) throw invalid({ message: `Kayan "${name}" declares no field "${sort.field}".`, key: 'error.invalid.value', params: { kayan: name, field: sort.field } })
+        if (kayanByName.get(name)?.fields[sort.field]?.kind === 'decimal') throw refuseDecimalOrder(name, sort.field)
         const condition = where ? whereOf(client, name, where) : undefined
         const direction = sort.direction === 'desc' ? desc : asc
         // The unique id makes page boundaries total.

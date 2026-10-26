@@ -191,3 +191,33 @@ test('the server builder refuses a device-only kayan even when a SQLite store is
   const patient = defineKayan({ name: 'patient', placement: 'device', fields: { ...defaultFields }, targets: { service: { operations: defaultOperations } }, access: allowAccess })
   assert.throws(() => buildAsas({ kayan: [patient], http: [] }), /patient.*device-only.*server/)
 })
+
+test('a device decimal refuses ordering instead of comparing its stored text lexically', async () => {
+  const { asas } = await device()
+  await asas.kayan.patient.operations.create({ mrn: 'D-10', name: 'Ten', weight: '10.00' })
+  await assert.rejects(asas.kayan.patient.operations.find({ where: { weight: { greater_than: '9.00' } } }), (error: AsasError) => error.status === 400 && error.key === 'error.invalid.decimal_order')
+})
+
+test('decimal ordering refusals cover every comparison, nested filters, related fields and raw store queries while equality stays available', async () => {
+  const { asas } = await device()
+  const ten = await asas.kayan.patient.operations.create({ mrn: 'D-10', name: 'Ten', weight: '10.00' })
+  await asas.kayan.patient.operations.create({ mrn: 'D-2', name: 'Two', weight: '2.00' })
+  await asas.kayan.admission.operations.create({ patient: ten.id, ward: 'Decimal' })
+  const refusal = (error: AsasError) => error.status === 400 && error.key === 'error.invalid.decimal_order'
+  for (const operator of ['greater_than', 'greater_than_equal', 'less_than', 'less_than_equal'] as const) {
+    const where = { weight: { [operator]: '9.00' } }
+    await assert.rejects(asas.kayan.patient.operations.find({ where }), refusal)
+    await assert.rejects(asas.kayan.patient.operations.count({ where: { or: [where] } }), refusal)
+    await assert.rejects(asas.kayan.admission.operations.count({ where: { 'patient.weight': { [operator]: '9.00' } } }), refusal)
+    await assert.rejects(asas.targets.sqlite.find({ kayan: 'patient', args: { where, sort: { field: 'id', direction: 'asc' }, limit: 10, page: 1 } }), refusal)
+  }
+  assert.deepEqual((await asas.kayan.patient.operations.find({ where: { weight: { equals: '10.00' } } })).docs.map((row) => row.id), [ten.id])
+  assert.equal((await asas.kayan.patient.operations.count({ where: { weight: { in: ['10.00', '2.00'] } } })).totalDocs, 2)
+})
+
+test('a device decimal refuses both ascending and descending sorting through managed and raw queries', async () => {
+  const { asas } = await device()
+  const refusal = (error: AsasError) => error.status === 400 && error.key === 'error.invalid.decimal_order'
+  for (const sort of ['weight', '-weight']) await assert.rejects(asas.kayan.patient.operations.find({ sort }), refusal)
+  for (const direction of ['asc', 'desc'] as const) await assert.rejects(asas.targets.sqlite.find({ kayan: 'patient', args: { sort: { field: 'weight', direction }, limit: 10, page: 1 } }), refusal)
+})
