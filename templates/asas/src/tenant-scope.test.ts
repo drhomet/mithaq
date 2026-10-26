@@ -765,6 +765,13 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.ok((await memos().mine({ limit: 0 }, { actor: one })).docs.every((row: { firmId: string }) => row.firmId === 'org1'))
   })
 
+  test('mixed caller constraints never discard a tenant boundary beside logical keys', async () => {
+    const where = { and: [{ id: { exists: true } }], or: [{ id: { exists: true } }], firmId: { equals: 'org2' } }
+    assert.equal((await memos().find({ where }, { actor: one })).totalDocs, 0)
+    assert.equal((await memos().count({ where }, { actor: one })).totalDocs, 0)
+    assert.ok((await memos().count({ where }, { actor: two })).totalDocs > 0)
+  })
+
   test('a nested managed call keeps the scope of the operation around it', async () => {
     const nested = await memos().nested({}, { actor: one })
     assert.equal(nested.totalDocs, (await memos().find({ limit: 0 }, { actor: one })).totalDocs)

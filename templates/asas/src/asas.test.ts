@@ -19402,3 +19402,14 @@ test('the default mention directory filters and limits managed tenant reads with
   await asas.kayan.roles.operations.update({ id: role.id, permissions: keys.filter((key) => key !== 'user.find') }, tenant.options)
   assert.equal((await search('rt2-directory')).status, 403, 'directory access itself is required')
 })
+
+test('mixed logical and field constraints retain their siblings in Postgres and across related reads', async () => {
+  const { mixedWherePrivacy } = await import('../../../packages/mithaq/src/asas/runner/__fixtures__/mixed-where.ts')
+  const schemaName = 'mixed_where_privacy'
+  await db.execute(`create schema ${schemaName};
+    create table ${schemaName}.patient (id serial primary key, name text not null, created_at timestamptz not null, updated_at timestamptz not null);
+    create table ${schemaName}.note (id serial primary key, title text, patient_id integer references ${schemaName}.patient(id), created_at timestamptz not null, updated_at timestamptz not null)`)
+  try {
+    await mixedWherePrivacy({ schemaName, store: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }) })
+  } finally { await db.execute(`drop schema ${schemaName} cascade`) }
+})
