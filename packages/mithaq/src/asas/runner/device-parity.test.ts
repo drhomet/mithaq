@@ -91,7 +91,7 @@ test('both runners refuse options on bound calls and a bulk whose single-row ope
     await asas.connect()
     await assert.rejects(operations.create!({ name: 'outer' }), (error: Error & { key?: string }) => error.constructor === Error && error.message === 'Bound kayan tools inherit the current user and context; do not pass actor or context options.')
     const { update: _update, ...withoutUpdate } = defaultOperations
-    assert.throws(() => setup({ device, operations: withoutUpdate }), (error: Error & { key?: string }) => error.key === 'error.invalid.bulk_operation')
+    assert.throws(() => setup({ device, operations: withoutUpdate }), (error: Error & { key?: string }) => error.constructor === Error && error.key === undefined)
   }
 })
 
@@ -239,4 +239,38 @@ test('main parity: nested beforeTransaction hooks that do not query run outside 
     assert.deepEqual(seen, [['before', 'outer', undefined, 'actor', 1], ['before', 'inner', undefined, 'actor', 2], ['after', 'inner'], ['after', 'outer']])
     assert.equal((await operations.count!()).totalDocs, 2)
   }
+})
+
+for (const kind of ['update', 'delete'] as const) test(`main parity: custom bulk each still requires the kayan's ${kind} operation`, () => {
+  const { [kind]: omitted, ...operations } = defaultOperations
+  const bulk = `${kind}Many`
+  const given = { ...operations, touch: omitted, [bulk]: { ...defaultOperations[bulk as 'updateMany' | 'deleteMany'], each: 'touch' } }
+  for (const device of [false, true]) {
+    assert.throws(() => setup({ device, operations: given }), (error: Error & { status?: number; key?: string }) => {
+      assert.equal(error.constructor, Error)
+      assert.equal(error.status, undefined)
+      assert.equal(error.key, undefined)
+      assert.equal(error.message, `Kayan "patient" operation "${bulk}" writes every matched row through operation "${kind}", which this kayan does not have. Declare it, or leave "${bulk}" out of the object.`)
+      return true
+    })
+  }
+})
+
+for (const fault of ['missing default', 'missing each', 'each on a write'] as const) test(`main parity: bulk declaration refusal for ${fault} keeps its plain error and message`, () => {
+  const { update: omitted, ...withoutUpdate } = defaultOperations
+  const given = fault === 'missing default' ? withoutUpdate
+    : fault === 'missing each' ? { ...defaultOperations, updateMany: { ...defaultOperations.updateMany, each: 'touch' } }
+    : { ...defaultOperations, touch: { ...omitted, each: 'update' } }
+  const expected = fault === 'missing default'
+    ? 'Kayan "patient" operation "updateMany" writes every matched row through operation "update", which this kayan does not have. Declare it, or leave "updateMany" out of the object.'
+    : fault === 'missing each'
+      ? 'Kayan "patient" operation "updateMany" runs "touch" on each row it matches, and the kayan has no operation "touch".'
+      : 'Kayan "patient" operation "touch" names "each", and only a bulk operation runs another on each row.'
+  for (const device of [false, true]) assert.throws(() => setup({ device, operations: given }), (error: Error & { status?: number; key?: string }) => {
+    assert.equal(error.constructor, Error)
+    assert.equal(error.message, expected)
+    assert.equal(error.status, undefined)
+    assert.equal(error.key, undefined)
+    return true
+  })
 })

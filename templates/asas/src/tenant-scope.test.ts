@@ -184,6 +184,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           afterProbe: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], afterCommit: [probeStore] },
           probeAfterEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] },
           probeEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [probeStore, steps.update] },
+          touchMany: { ...defaultOperations.updateMany, each: 'probeEdit' },
           probeBulk: { steps: ({ steps }: { steps: { updateMany: unknown } }) => [probeStore, steps.updateMany] },
           probe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert] },
           hookProbe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert], afterCommit: [probeStore] },
@@ -471,7 +472,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return built
 }
 
-type Ops = Record<'hookProbe' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'touchMany' | 'hookProbe' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 // Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
@@ -1948,6 +1949,15 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.deepEqual(result.docs.map((row: { id: string }) => row.id), [own.id])
     assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, foreign.title)
     assert.equal((await memos().count({ where: { id: { equals: own.id } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('a custom bulk each with its canonical update declared cannot update another organization', async () => {
+    const first = await memos().create({ title: 'custom each first' }, { actor: one })
+    const second = await memos().create({ title: 'custom each second' }, { actor: two })
+    const changed = await memos().touchMany({ where: { id: { in: [first.id, second.id] } }, data: { title: 'custom each changed' } }, { actor: one })
+    assert.deepEqual(changed.docs.map((row: { id: string }) => row.id), [first.id])
+    assert.equal((await memos().findByID({ id: second.id }, { actor: two })).title, 'custom each second')
+    assert.equal((await memos().count({ where: { title: { equals: 'custom each changed' } } }, { actor: two })).totalDocs, 0)
   })
 
   test('a nested bulk write cannot use its filter to change another organization', async () => {

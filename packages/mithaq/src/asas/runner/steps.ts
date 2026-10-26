@@ -656,8 +656,8 @@ export const defaultOperations = {
   // A list like any other, so a kayan overrides it or leaves it out.
   count: { steps: [count] },
   // No default is filled for a bulk: each row's single-row write fills its own.
-  updateMany: { steps: [updateMany], each: 'update' },
-  deleteMany: { steps: [deleteMany], each: 'delete' },
+  updateMany: { steps: [updateMany] },
+  deleteMany: { steps: [deleteMany] },
 } satisfies Operations
 
 // A global is found by being the only row, so its read takes a depth alone.
@@ -732,12 +732,15 @@ export const resolveOperations = (
 
 /** Resolved before either runner publishes calls, so a missing row operation cannot fail halfway through a batch. */
 export const bulkEach = ({ kayan, operation, declaration }: { kayan: ResolvedKayan; operation: string; declaration: ResolvedOperation }) => {
-  const bulk = declaration.steps.some((step) => bulkSeals.includes(sealOf(step) as never))
-  if (!bulk) {
-    if (declaration.each) throw invalid({ message: `Kayan "${kayan.name}" operation "${operation}" names "each", and only a bulk operation runs another on each row.`, key: 'error.invalid.bulk_operation' })
+  const seal = declaration.steps.map(sealOf).find((step) => step && bulkSeals.includes(step as never))
+  if (!seal) {
+    if (declaration.each) throw new Error(`Kayan "${kayan.name}" operation "${operation}" names "each", and only a bulk operation runs another on each row.`)
     return undefined
   }
-  const single = declaration.each ?? (declaration.effect === 'update' ? 'update' : 'delete')
-  if (!kayan.operations[single]) throw invalid({ message: `Kayan "${kayan.name}" operation "${operation}" runs "${single}" on each row it matches, and the kayan has no operation "${single}".`, key: 'error.invalid.bulk_operation' })
+  // Main requires the canonical write even when the batch names a custom `each`.
+  const required = seal === 'updateMany' ? 'update' : 'delete'
+  if (!kayan.operations[required]) throw new Error(`Kayan "${kayan.name}" operation "${operation}" writes every matched row through operation "${required}", which this kayan does not have. Declare it, or leave "${operation}" out of the object.`)
+  const single = declaration.each ?? required
+  if (!kayan.operations[single]) throw new Error(`Kayan "${kayan.name}" operation "${operation}" runs "${single}" on each row it matches, and the kayan has no operation "${single}".`)
   return single
 }
