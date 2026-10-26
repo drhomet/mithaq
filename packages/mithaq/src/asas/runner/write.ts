@@ -440,7 +440,7 @@ export const beginWrite = <Actor = unknown>({
   // A nested write joins the outer transaction on the same store, so both commit or roll
   // back together; another store opens its own. Outside slots carry no transactions.
   const joined = open.get(store)
-  assertTransaction({ crossStore: !!outer?.transactions && !joined, settled: joined?.settled, operation: `${kayan.name}.${operation}`, outer: joined?.operation ?? outer?.context.chain.at(-1) })
+  assertTransaction({ effect: 'write', crossStore: !!outer?.transactions && !joined, settled: joined?.settled, kayan: kayan.name, operation, outer: joined?.operation ?? outer?.context.chain.at(-1) })
   const entry: Open = joined ?? { tx: undefined, operation: `${kayan.name}.${operation}` }
   const actor = (outer?.user as Actor | null | undefined) ?? options?.actor ?? null
   return { actor, context, entry, open }

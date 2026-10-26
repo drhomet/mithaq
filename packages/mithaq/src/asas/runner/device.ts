@@ -93,7 +93,7 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
     const context = operationContext({ kayan: one.name, operation: name, cap: service.depth, outer: outer?.context, given: options?.context, effect: operation.effect === 'read' ? 'read' : 'write' })
     const scope: Scope = { actor: outer ? outer.actor : options?.actor ?? null, context, store: outer?.store, tx: outer?.tx, afterCommit: [], lifetime: outer?.lifetime }
     const store = stores.get(one.store)!
-    assertTransaction({ settled: outer?.lifetime?.settled, crossStore: !!outer?.store && outer.store !== store, operation: `${one.name}.${name}`, outer: outer?.lifetime?.operation ?? outer?.context.chain.at(-1) })
+    assertTransaction({ effect: operation.effect === 'read' ? 'read' : 'write', settled: outer?.lifetime?.settled, crossStore: !!outer?.store && outer.store !== store, kayan: one.name, operation: name, outer: outer?.lifetime?.operation ?? outer?.context.chain.at(-1) })
     const shape = shapes.get(one.name)!
     let kind = operation.steps.map(sealOf).find((seal) => seal && ['insert', 'update', 'remove', 'find', 'findOne', 'count', 'updateMany', 'deleteMany'].includes(seal))!
     let schema = operation.input ? operation.input(shape as never) : kind === 'insert' ? shape.create : kind === 'update' ? shape.update : kind === 'remove' ? shape.id : kind === 'findOne' ? shape.byID : shape.list

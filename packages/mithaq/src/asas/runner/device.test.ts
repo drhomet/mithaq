@@ -144,7 +144,7 @@ test('a nested tools handle cannot write after its outer transaction has settled
   }] })
   await fixture.asas.connect()
   await fixture.asas.kayan.patient.operations.create({ name: 'outer' })
-  await assert.rejects(late(), (error: Error & { key?: string }) => error.key === 'error.invalid.settled_transaction' && /joined the transaction "patient\.create" opened, which has already settled/.test(error.message))
+  await assert.rejects(late(), (error: Error & { key?: string }) => error.constructor === Error && error.key === undefined && /joined the transaction "patient\.create" opened, which has already settled/.test(error.message))
   assert.equal((await fixture.asas.kayan.note.operations.count()).totalDocs, 1)
 })
 

@@ -66,7 +66,7 @@ test('both runners resolve a bulk operation without each to its single-row updat
   assert.deepEqual(results, [{ names: ['changed'], errors: [], total: 2 }, { names: ['changed'], errors: [], total: 2 }])
 })
 
-test('both runners refuse excessive nesting with the same keyed error before another row is written', async () => {
+test('both runners refuse excessive nesting with the same plain error before another row is written', async () => {
   const results: unknown[] = []
   for (const device of [false, true]) {
     const { asas, operations } = setup({ device, depth: 1, beforeSteps: [async (ctx, tools) => {
@@ -76,10 +76,10 @@ test('both runners refuse excessive nesting with the same keyed error before ano
     await asas.connect()
     await assert.rejects(operations.create!({ name: 'outer' }), (error: Error & { status?: number; key?: string }) => {
       results.push([error.status, error.key])
-      return error.status === 400 && error.key === 'error.invalid.depth'
+      return error.constructor === Error && error.status === undefined && error.key === undefined
     })
   }
-  assert.deepEqual(results, [[400, 'error.invalid.depth'], [400, 'error.invalid.depth']])
+  assert.deepEqual(results, [[undefined, undefined], [undefined, undefined]])
 })
 
 test('both runners refuse options on bound calls and a bulk whose single-row operation is missing', async () => {
@@ -89,20 +89,20 @@ test('both runners refuse options on bound calls and a bulk whose single-row ope
       return ctx
     }] })
     await asas.connect()
-    await assert.rejects(operations.create!({ name: 'outer' }), (error: Error & { key?: string }) => error.key === 'error.invalid.bound_options')
+    await assert.rejects(operations.create!({ name: 'outer' }), (error: Error & { key?: string }) => error.constructor === Error && error.message === 'Bound kayan tools inherit the current user and context; do not pass actor or context options.')
     const { update: _update, ...withoutUpdate } = defaultOperations
     assert.throws(() => setup({ device, operations: withoutUpdate }), (error: Error & { key?: string }) => error.key === 'error.invalid.bulk_operation')
   }
 })
 
-test('both runners refuse direct store access in beforeTransaction with a keyed error', async () => {
+test('both runners refuse direct store access in beforeTransaction with a plain error', async () => {
   for (const device of [false, true]) {
     const { asas, operations } = setup({ device, operations: { ...defaultOperations, create: { ...defaultOperations.create, beforeTransaction: [async (ctx: Ctx, tools: RuntimeWriteTools) => {
       await tools.store.find({ tx: ctx.tx, kayan: ctx.kayan as never, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' } } })
       return ctx
     }] } } })
     await asas.connect()
-    await assert.rejects(operations.create!({ name: 'outside' }), (error: Error & { key?: string }) => error.key === 'error.invalid.outside_transaction')
+    await assert.rejects(operations.create!({ name: 'outside' }), (error: Error & { key?: string }) => error.constructor === Error && /runs outside the operation/.test(error.message))
   }
 })
 
@@ -114,7 +114,7 @@ test('both runners refuse a nested write across stores before either store chang
       return ctx
     }] })
     await asas.connect()
-    await assert.rejects(operations.create!({ name: 'outer' }), (error: Error & { key?: string }) => error.key === 'error.invalid.cross_store')
+    await assert.rejects(operations.create!({ name: 'outer' }), (error: Error & { key?: string }) => error.constructor === Error && error.message === 'Kayan "note" operation "create" cannot write to another store while transaction "patient.create" is open.')
     assert.equal((await operations.count!()).totalDocs, 0)
   }
 })
@@ -158,3 +158,61 @@ test('both builds refuse the same invalid page and bulk numbers', () => {
     assert.equal(message(true, limits), message(false, limits))
   }
 })
+
+// These messages and the HTTP contract were exercised against f583401 before restoring them.
+for (const invariant of ['write depth', 'read depth', 'cross store', 'settled write', 'settled read', 'bound actor', 'bound options', 'outside store'] as const) {
+  test(`main parity: ${invariant} stays a private programmer error on both runners`, async () => {
+    const expected = {
+      'write depth': 'Write depth 2 is past the cap of 1: patient.create -> patient.create.',
+      'read depth': 'Read depth 2 is past the cap of 1: patient.find -> patient.find.',
+      'cross store': 'Kayan "note" operation "create" cannot write to another store while transaction "patient.create" is open.',
+      'settled write': 'Kayan "patient" operation "create" joined the transaction "patient.create" opened, which has already settled, so the write that started this one was not awaited. Await every write a step begins.',
+      'settled read': 'Kayan "patient" read joined the transaction "patient.create" opened, which has already settled, so the read that started this one was not awaited.',
+      'bound actor': 'Bound kayan tools inherit the current user and context; do not pass actor or context options.',
+      'bound options': 'Bound kayan tools do not accept operation options.',
+      'outside store': `Kayan "patient" operation "create" reached the store from "beforeTransaction", which runs outside the operation's transaction, so the write would not be in it. Write through tools.kayans, which opens its own, or move the step into "steps".`,
+    }[invariant]
+    for (const device of [false, true]) {
+      let late: Promise<unknown> | undefined
+      const step = async (ctx: Ctx, tools: RuntimeWriteTools): Promise<Ctx> => {
+        const calls = tools.kayans as Record<string, Record<string, Call>>
+        if (invariant === 'settled write' || invariant === 'settled read') {
+          late = new Promise((resolve, reject) => setTimeout(() => calls.patient![invariant === 'settled read' ? 'find' : 'create']!(invariant === 'settled read' ? {} : { name: 'late' }).then(resolve, reject), 0))
+          void late.catch(() => {})
+        } else if (invariant === 'cross store') await calls.note!.create!({ name: 'inner' })
+        else if (invariant === 'bound actor' || invariant === 'bound options') await calls.patient!.create!({ name: 'inner' }, invariant === 'bound actor' ? { actor: 'forged' } : {})
+        else if (invariant === 'outside store') await tools.store.find({ kayan: ctx.kayan as never, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' } } })
+        else await calls.patient![invariant === 'read depth' ? 'find' : 'create']!(invariant === 'read depth' ? {} : { name: 'inner' })
+        return ctx
+      }
+      const { asas, operations } = setup({ device, depth: 1, crossStore: invariant === 'cross store',
+        ...(invariant === 'outside store'
+          ? { operations: { ...defaultOperations, create: { ...defaultOperations.create, beforeTransaction: [step] } } }
+          : invariant === 'read depth' ? { operations: { ...defaultOperations, find: { ...defaultOperations.find, steps: [step, ...defaultOperations.find.steps] } } } : { beforeSteps: [step] }),
+        ...((invariant === 'settled write' || invariant === 'settled read' || invariant === 'cross store') && { depth: defaultDepth }),
+      })
+      await asas.connect()
+      const call = async () => {
+        const result = await operations[invariant === 'read depth' ? 'find' : 'create']!(invariant === 'read depth' ? {} : { name: 'outer' })
+        return invariant === 'settled write' || invariant === 'settled read' ? late! : result
+      }
+      await assert.rejects(call, (error: Error & { status?: number; key?: string }) => {
+        assert.equal(error.constructor, Error)
+        assert.equal(error.message, expected)
+        assert.equal(error.status, undefined)
+        assert.equal(error.key, undefined)
+        return true
+      })
+      const reported: unknown[] = []
+      const http = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => reported.push(error) })([
+        { kayan: 'patient', name: 'probe', effect: 'create', input: { '~standard': { vendor: 'probe', version: 1, validate: (value: unknown) => ({ value }) } }, call },
+      ] as never)
+      const response = await http.handle(new Request('http://localhost/api/patient/probe', { method: 'POST', body: '{}' }), async () => null)
+      assert.equal(response!.status, 500)
+      assert.deepEqual(await response!.json(), { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' })
+      assert.equal(reported.length, 1)
+      assert.equal((reported[0] as Error).constructor, Error)
+      assert.equal((reported[0] as Error).message, expected)
+    }
+  })
+}

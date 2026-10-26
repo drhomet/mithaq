@@ -1953,6 +1953,25 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await memos().count({ where: { title: { equals: 'nested bulk boundary' } } }, { actor: two })).totalDocs, 0)
   })
 
+  test('programmer errors remain private and cannot replace the tenant inherited by a nested write', async () => {
+    const errors: unknown[] = []
+    const plug = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => errors.push(error) })(built.operations as never)
+    storeProbe = async (_ctx, tools) => {
+      await (tools.kayans as Record<string, Ops>).memos!.create({ title: 'forged nested actor' }, { actor: two })
+    }
+    try {
+      const response = (await plug.handle(new Request('http://test/api/memos/probe', { method: 'POST', body: JSON.stringify({ title: 'private programmer error' }) }), async () => one))!
+      assert.equal(response.status, 500)
+      assert.deepEqual(await response.json(), { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' })
+      assert.equal(errors.length, 1)
+      assert.equal((errors[0] as Error).constructor, Error)
+      assert.equal((errors[0] as Error).message, 'Bound kayan tools inherit the current user and context; do not pass actor or context options.')
+    } finally { storeProbe = async () => {} }
+    assert.equal((await memos().count({ where: { title: { equals: 'forged nested actor' } } }, { actor: two })).totalDocs, 0)
+    assert.equal((await memos().findByID({ id: ids.org1 }, { actor: one })).firmId, 'org1')
+    await assert.rejects(memos().findByID({ id: ids.org1 }, { actor: two }), (error: AsasError) => error.status === 404)
+  })
+
   test('every committed nested hook runs after a failure without exposing its rows to another organization', async () => {
     const seen: unknown[] = []
     storeProbe = async (ctx, tools) => {
