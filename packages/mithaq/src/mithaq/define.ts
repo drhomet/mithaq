@@ -1,13 +1,13 @@
 import type { CheckedCardNodes } from '../screen/index.ts'
 import { applyRows, rowFields, rowsOf, type FieldList, type RowFieldWhere } from './rows.ts'
-import { isVersions, languageRows, serviceTargetOf, tenantDefaults } from './language.ts'
+import { isVersions, languageRows, serviceTargetOf, tenantDefaults } from './language-core.ts'
 import type { Ref } from './user.ts'
 import { defaultGlobalOperations, defaultOperations, resolveOperations, type ContextOf, type DefaultLists, type OperationDeclaration, type Operations, type SchemasOf } from '../asas/runner/steps.ts'
 import { defaultFields, defaultGlobalFields } from '../base/fields.ts'
 import { draftFields, versionOperations } from '../versions/versions.ts'
 import type { KayanVersions } from '../versions/index.ts'
 import type { DerivedInput, OperationParsed } from '../asas/runner/write.ts'
-import type { Language } from './language.ts'
+import type { Language } from './language-core.ts'
 import type { ActorBoundAccess, Access, Field, FieldOf, Indexes, KayanService, KindValue, LocalesOf, MessageTree, RuntimeField, ServiceOf } from './types.ts'
 import type { AuthStrategy } from '../asas/actor.ts'
 import type { KayanConfigOf } from './rukn.ts'
@@ -355,6 +355,7 @@ export const defineGlobal = <const L extends Language>(language: L) => {
     const R = Record<never, never>,
     const TargetDeclarations = Record<never, never>,
   >(global: {
+    placement?: 'device'
     name: Name
     /** The fields, in column order: `{ ...defaultFields, ...defaultGlobalFields, siteTitle }`, or `({ defaults }) => ({ ...defaults, siteTitle })`. */
     fields: OverDefaults<CheckedFields<L, Fields>, typeof defaultFields & typeof defaultGlobalFields>

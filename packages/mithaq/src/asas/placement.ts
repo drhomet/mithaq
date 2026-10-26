@@ -1,4 +1,4 @@
-import { isStore, serviceTargetOf, type Language } from '../mithaq/language.ts'
+import { isStore, serviceTargetOf, type Language } from '../mithaq/language-core.ts'
 import type { Kayan } from '../mithaq/types.ts'
 
 /** Checked before resolution so a refused build never initializes a target or auth factory. */

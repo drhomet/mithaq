@@ -53,8 +53,7 @@ export type AccessTarget<
  * The keys an actor holds for a kayan: what the build's access target resolved,
  * or the kayan's own rows where no target answered. Precedence, never a union.
  */
-export const heldPermissions = ({ access, user }: { access: unknown; user: unknown }): Held =>
-  actorPermissions(user) ?? rowsOf(access)?.permissions(user)
+export { heldPermissions } from './permissions.ts'
 
 /** One page of every row a filter matches, which is how each table is read. */
 export const allRows = async ({ store, kayan, where }: { store: Store; kayan: string; where: Where }) =>

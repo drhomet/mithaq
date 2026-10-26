@@ -23,7 +23,7 @@ import { kayanServiceKeys, unsortable, type CompoundIndex, type Kayan, type Kaya
 import { defaultKinds } from '../base/kinds.ts'
 import { compareDecimals } from '../base/decimal.ts'
 import type { ScreenField } from '../screen/index.ts'
-import { isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceTargetOf, tenantDefaults, type FieldTarget, type Language, type Store } from './language.ts'
+import { isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceTargetOf, tenantDefaults, type FieldTarget, type Language, type Store } from './language-core.ts'
 import type { KayanVersions } from '../versions/index.ts'
 import { versionsOf } from '../versions/versions.ts'
 import { providerOf } from '../base/rules.ts'

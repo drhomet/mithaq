@@ -20,7 +20,9 @@
     "./drizzle/pg-core": "./src/drizzle/proxy/pg-core.ts",
     "./drizzle/node-postgres": "./src/drizzle/proxy/node-postgres.ts",
     "./rich-text/mention": "./src/rich-text/mention-node.ts",
-    "./rich-text/client": "./src/rich-text/client.ts"
+    "./rich-text/client": "./src/rich-text/client.ts",
+    "./device": "./src/device.ts",
+    "./generate-sqlite-migrations": "./src/drizzle/sqlite/generate.ts"
   },
   "bin": {
     "mithaq": "./src/asas/cli/mithaq.ts"
@@ -63,7 +65,9 @@
       "./drizzle/pg-core": "./dist/drizzle/proxy/pg-core.js",
       "./drizzle/node-postgres": "./dist/drizzle/proxy/node-postgres.js",
       "./rich-text/mention": "./dist/rich-text/mention-node.js",
-      "./rich-text/client": "./dist/rich-text/client.js"
+      "./rich-text/client": "./dist/rich-text/client.js",
+      "./device": "./dist/device.js",
+      "./generate-sqlite-migrations": "./dist/drizzle/sqlite/generate.js"
     },
     "bin": {
       "mithaq": "dist/asas/cli/mithaq.js"

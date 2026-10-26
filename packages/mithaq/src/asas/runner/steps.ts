@@ -7,12 +7,12 @@ import type { LabelFunction, Localized, ResolvedField, ResolvedKayan, RuntimeFie
 import type { RawStepStore, StepStore, Store } from '../../mithaq/language.ts'
 import { providerOf } from '../../base/rules.ts'
 import { invalid } from './errors.ts'
-import { snapshot } from './runtime.ts'
+import { snapshot } from './snapshot.ts'
 import { rawStepStore } from './store.ts'
 
 /**
  * What the caller passed, plus the three keys the runner keeps. `Extra` is the service target's
- * `context`, so a project reads its own keys typed. Held in an `AsyncLocalStorage`, so nested writes are counted.
+ * `context`, so a project reads its own keys typed. Carried by the runner, so nested writes are counted.
  */
 export type Context<Extra extends Record<string, unknown> = Record<string, unknown>> = {
   /** How many writes deep this one is. The runner raises it by one. */
@@ -656,8 +656,8 @@ export const defaultOperations = {
   // A list like any other, so a kayan overrides it or leaves it out.
   count: { steps: [count] },
   // No default is filled for a bulk: each row's single-row write fills its own.
-  updateMany: { steps: [updateMany] },
-  deleteMany: { steps: [deleteMany] },
+  updateMany: { steps: [updateMany], each: 'update' },
+  deleteMany: { steps: [deleteMany], each: 'delete' },
 } satisfies Operations
 
 // A global is found by being the only row, so its read takes a depth alone.
