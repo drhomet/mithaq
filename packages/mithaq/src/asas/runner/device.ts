@@ -232,7 +232,7 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
     return result
   }
   const calls = bound()
-  const built = Object.fromEntries(resolved.map((one) => [one.name, { name: one.name, fields: one.fields, operations: calls[one.name]!, targets: { service: { operations: calls[one.name] }, [one.schema]: { schemas: shapes.get(one.name) } } }]))
+  const built = Object.fromEntries(resolved.map((one) => [one.name, { name: one.name, fields: one.fields, operations: calls[one.name]!, targets: { service: { operations: calls[one.name] }, [one.schema]: { schemas: shapes.get(one.name) }, [one.store]: { table: (stores.get(one.store) as Store & { tables: Record<string, unknown> }).tables[one.name] } } }]))
   const globalNames = new Set(global.map((one) => one.name))
   const asas = {
     targets, catalog,

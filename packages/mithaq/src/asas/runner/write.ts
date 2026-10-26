@@ -1,3 +1,4 @@
+import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
 // One list in one place, so drizzle's callback transaction is kept as it is.
 import { commentMarks } from '../../rich-text/comments-server.ts'
 import { stepTools } from './store.ts'
@@ -1272,7 +1273,7 @@ type KayanOutputs<K, List extends Registry, L extends LanguageValues, Operations
   & { [Name in SchemaNameOf<K, L>]: { schemas: DerivedSchemas<TargetNamed<L, Name>, FieldsOfKayan<K>> } }
   & (TargetNamed<L, StoreNameOf<K, L>> extends { tables: unknown }
       ? K extends { name: infer Name extends string }
-        ? { [Named in StoreNameOf<K, L>]: { table: BuiltTables<List, StoreNameOf<K, L>, DefaultStoreOf<L>, L['kinds']>[Name] } }
+        ? { [Named in StoreNameOf<K, L>]: { table: TargetNamed<L, StoreNameOf<K, L>> extends { type: 'drizzle-sqlite' } ? SQLiteTable : BuiltTables<List, StoreNameOf<K, L>, DefaultStoreOf<L>, L['kinds']>[Name] } }
         : {}
       : {})
 

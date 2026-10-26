@@ -162,3 +162,8 @@ test('a device step store find keeps its filter and hold refuses a missing row',
   await fixture.asas.kayan.patient.operations.create({ name: 'existing' })
   await fixture.asas.kayan.patient.operations.create({ name: 'probe' })
 })
+
+test('a device kayan exposes its built SQLite table beside its schemas and operations', () => {
+  const { asas } = setup()
+  assert.equal(asas.kayan.patient.targets.sqlite.table, asas.targets.sqlite.tables.patient)
+})
