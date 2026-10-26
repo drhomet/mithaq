@@ -227,6 +227,7 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
       return result
     }
     if (operation.beforeTransaction.length) {
+      if (outer?.tx !== undefined) throw invalid({ message: 'A nested device write cannot run beforeTransaction outside its open transaction. Move the hook into steps or call the write before opening the transaction.', key: 'error.invalid.before_transaction' })
       const outside = { ...scope, store: undefined, tx: undefined, afterCommit: [], lifetime: undefined }
       let ctx: Ctx = { kayan: one, data, actor: scope.actor, user: scope.actor, context: scope.context, tx: undefined }
       const tools = { operation: name, schema, output: shape.row, kind, effect: operation.effect, kayans: bound(outside), of: of(outside, false), catalog }

@@ -56,7 +56,7 @@ export const deviceAsas = (contract: SqliteContract) => {
 }
 ```
 
-Apply migrations, then `await asas.connect()` before operations such as `asas.kayan.patient.operations.create({ name: 'Huda' })`. Supply an actor with operation options when access needs one. The device runner carries actor, context and transaction through bound `tools.of(kayan)` and `tools.kayans` calls; nested writes join the outer transaction. Await every nested call. Independent calls have independent context, without AsyncLocalStorage. `afterCommit` runs after durability; its failure leaves the write standing and raises `AfterCommitError` with its result.
+Apply migrations, then `await asas.connect()` before operations such as `asas.kayan.patient.operations.create({ name: 'Huda' })`. Supply an actor with operation options when access needs one. The device runner carries actor, context and transaction through bound `tools.of(kayan)` and `tools.kayans` calls; nested writes join the outer transaction. Await every nested call. A nested write with `beforeTransaction` is refused with `error.invalid.before_transaction`: that slot runs outside the transaction on the server, and an outside query on the device would wait behind its own open transaction. Move that hook into `steps` or call the write before opening the transaction. Independent calls have independent context, without AsyncLocalStorage. `afterCommit` runs after durability; its failure leaves the write standing and raises `AfterCommitError` with its result.
 
 ## Migrations
 

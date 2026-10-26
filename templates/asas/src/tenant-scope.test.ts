@@ -1943,6 +1943,22 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await memos().count({ where: { title: { equals: 'outside nested hook' } } }, { actor: two })).totalDocs, 0)
   })
 
+  test('a nested beforeTransaction read on the server stays outside the write and inside the actor scope', async () => {
+    const seen: unknown[] = []
+    storeProbe = async (ctx, tools) => {
+      if (tools.operation === 'probe') {
+        await (tools.kayans as Record<string, Ops>).memos!.outsideProbe({ title: 'nested outside read' })
+      } else {
+        assert.equal(ctx.tx, undefined)
+        const result = await (tools.kayans as Record<string, Ops>).memos!.find({ where: { id: { equals: ids.org2 } } })
+        seen.push(result.totalDocs)
+      }
+    }
+    try { await memos().probe({ title: 'outer for outside read' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, [0])
+    assert.equal((await memos().count({ where: { title: { equals: 'nested outside read' } } }, { actor: two })).totalDocs, 0)
+  })
+
   for (const operation of ['outsideProbe', 'afterProbe'] as const) test(`step find, hold, sum and upsert are unavailable in ${operation}`, async () => {
     storeProbe = async (ctx, tools) => {
       assert.throws(() => tools.store.find({ tx: ctx.tx, kayan: declaration(built, 'memos'), args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' } } }), /outside.*transaction/)

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, sqliteAdapter, drizzleSqliteIdKinds, drizzleSqliteKinds, drizzleSqliteRules, zodTarget, zodKinds, zodRules, zodIdKinds, type ProjectStep, type Ctx } from '../../device.ts'
 import { nodeSqlite } from '../../drizzle/sqlite/__fixtures__/node-sqlite.ts'
 
-const setup = ({ beforeTransaction = [], beforeSteps = [], afterSteps = [], afterCommit = [] }: { beforeTransaction?: readonly ProjectStep[]; beforeSteps?: readonly ProjectStep[]; afterSteps?: readonly ProjectStep[]; afterCommit?: readonly ProjectStep[] } = {}) => {
+const setup = ({ beforeTransaction = [], noteBeforeTransaction = [], beforeSteps = [], afterSteps = [], afterCommit = [] }: { beforeTransaction?: readonly ProjectStep[]; noteBeforeTransaction?: readonly ProjectStep[]; beforeSteps?: readonly ProjectStep[]; afterSteps?: readonly ProjectStep[]; afterCommit?: readonly ProjectStep[] } = {}) => {
   const fixture = nodeSqlite()
   fixture.sqlite.exec('create table patient (id integer primary key autoincrement, name text not null, created_at integer not null, updated_at integer not null); create table note (id integer primary key autoincrement, title text not null, created_at integer not null, updated_at integer not null)')
   const language = defineMithaq({ locales: ['en', 'ar'] as const, arkan: [base], targets: {
@@ -13,7 +13,7 @@ const setup = ({ beforeTransaction = [], beforeSteps = [], afterSteps = [], afte
   } })
   const access = { create: () => true, read: () => true, update: () => true, delete: () => true }
   const patient = language.defineKayan({ name: 'patient', placement: 'device', access, fields: { ...defaultFields, id: { kind: 'number' }, name: { kind: 'text', label: { en: 'Name', ar: 'Name' }, rules: { required: true } } }, targets: { service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, beforeTransaction: beforeTransaction as never } } } } })
-  const note = language.defineKayan({ name: 'note', placement: 'device', access, fields: { ...defaultFields, id: { kind: 'number' }, title: { kind: 'text', label: { en: 'Title', ar: 'Title' }, rules: { required: true } } }, targets: { service: { operations: defaultOperations } } })
+  const note = language.defineKayan({ name: 'note', placement: 'device', access, fields: { ...defaultFields, id: { kind: 'number' }, title: { kind: 'text', label: { en: 'Title', ar: 'Title' }, rules: { required: true } } }, targets: { service: { operations: { ...defaultOperations, create: { ...defaultOperations.create, beforeTransaction: noteBeforeTransaction as never } } } } })
   return { ...fixture, language, patient, note, asas: language.buildAsas({ kayan: [patient, note], http: [] }) }
 }
 
@@ -224,4 +224,26 @@ test('related-field filters refuse hidden fields and constrain readable notes by
   assert.equal((await asas.kayan.note.operations.find({ where: alternatives }, { actor: 'scoped' })).totalDocs, 1)
   await assert.rejects(asas.kayan.note.operations.updateMany({ where, data: { title: 'leaked' } }, { actor: 'masked' }), (error: Error & { key?: string }) => error.key === 'error.forbidden.field_read')
   assert.deepEqual((await asas.kayan.note.operations.updateMany({ where, data: { title: 'leaked' } }, { actor: 'scoped' })).docs, [])
+})
+
+
+test('a nested beforeTransaction read is refused promptly and rolls back the outer write', async () => {
+  let fixture: ReturnType<typeof setup>
+  fixture = setup({ beforeSteps: [async (ctx, tools) => {
+    if (ctx.kayan.name === 'patient') await (tools.of(fixture.note) as { create(data: { title: string }): Promise<unknown> }).create({ title: 'inner' })
+    return ctx
+  }], noteBeforeTransaction: [async (ctx, tools) => {
+    await tools.of(fixture.patient).count()
+    return ctx
+  }] })
+  await fixture.asas.connect()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await assert.rejects(Promise.race([
+      fixture.asas.kayan.patient.operations.create({ name: 'outer' }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('nested write did not settle')), 1000) }),
+    ]), (error: Error & { key?: string }) => error.key === 'error.invalid.before_transaction')
+  } finally { clearTimeout(timer) }
+  assert.equal((await fixture.asas.kayan.patient.operations.count()).totalDocs, 0)
+  assert.equal((await fixture.asas.kayan.note.operations.count()).totalDocs, 0)
 })
