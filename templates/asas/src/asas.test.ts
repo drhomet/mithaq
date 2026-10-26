@@ -19429,6 +19429,13 @@ test('main parity: Postgres decimal queries still compare and sort numerically t
     for (const [sort, expected] of [['amount', [two.id, ten.id]], ['-amount', [ten.id, two.id]]] as const) {
       assert.deepEqual((await calls.find({ where: { id: { in: [ten.id, two.id] } }, sort })).docs.map((row) => row.id), expected)
     }
+    for (const value of ['10', '10.00', '+0010.0']) {
+      for (const operator of ['equals', 'not_equals', 'in', 'not_in']) {
+        const response = (await plug.handle(new Request('http://test/api/measures/find', { method: 'POST', body: JSON.stringify({ where: { id: { in: [ten.id, two.id] }, amount: { [operator]: operator.endsWith('in') ? [value] : value } } }) }), async () => null))!
+        assert.equal(response.status, 200)
+        assert.deepEqual((await response.json() as { docs: { id: string }[] }).docs.map((row) => row.id), [operator.startsWith('not_') ? two.id : ten.id])
+      }
+    }
     assert.deepEqual(reported, [])
   } finally {
     await calls.delete({ id: ten.id })

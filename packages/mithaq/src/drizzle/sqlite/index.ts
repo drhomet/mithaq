@@ -6,6 +6,7 @@ import type { Store } from '../../mithaq/language.ts'
 import { implementationOf } from '../../mithaq/rukn.ts'
 import type { Operator, Where } from '../../mithaq/where.ts'
 import { conflict, invalid, missing } from '../../asas/runner/errors.ts'
+import { decimalDigits, isDecimal } from '../../base/decimal.ts'
 import { kinds as shippedKinds, type SqliteColumnBuilder } from './kinds.ts'
 import type { SqliteColumnRule, SqliteModifiable } from './rules.ts'
 
@@ -46,6 +47,21 @@ const referenced = (thrown: unknown, name: string) =>
   failed(thrown, /\bFOREIGN KEY constraint failed/)
     ? conflict({ message: `A "${name}" row is still pointed at by another row, so it is not deleted.`, key: 'error.conflict.referenced', params: { kayan: name }, cause: thrown })
     : thrown
+
+// The same numeric value must have one spelling for SQLite equality and unique constraints.
+const decimalText = (value: unknown, field: ResolvedField): unknown => {
+  if (value === null || value === undefined) return value
+  if (!isDecimal(value)) throw invalid({ message: `Field "${field.name}" needs decimal text.`, key: 'error.invalid.value', params: { field: field.name } })
+  const { precision, scale } = field.rules ?? {}
+  const size = decimalDigits(value)
+  if ((typeof scale === 'number' && size.fraction > scale) || (typeof precision === 'number' && (size.whole + size.fraction > precision || size.whole > precision - (scale as number)))) {
+    throw invalid({ message: `Field "${field.name}" exceeds its decimal precision or scale.`, key: 'error.invalid.value', params: { field: field.name } })
+  }
+  const [whole, fraction] = value.replace(/^[+-]/, '').split('.')
+  const digits = whole!.replace(/^0+/, '') || '0'
+  const tail = (fraction ?? '').replace(/0+$/, '')
+  return `${value.startsWith('-') && (digits !== '0' || tail) ? '-' : ''}${digits}${tail ? `.${tail}` : ''}`
+}
 
 // Text keeps decimal precision, but SQLite cannot order it numerically without rounding.
 const refuseDecimalOrder = (kayan: string, field: string) => invalid({
@@ -123,6 +139,8 @@ export const sqliteAdapter = <
     const increments = ({ name, values, insert = false }: { name: string; values: Record<string, unknown>; insert?: boolean }) => {
       const data = { ...declaredData(name, values) }
       for (const [field, value] of Object.entries(data)) {
+        const declared = kayanByName.get(name)?.fields[field]
+        if (declared?.kind === 'decimal') data[field] = decimalText(value, declared)
         if (kayanByName.get(name)?.fields[field]?.kind === 'json' || !value || typeof value !== 'object' || !('$inc' in value)) continue
         if (kayanByName.get(name)?.fields[field]?.kind !== 'integer' || !Number.isSafeInteger(value.$inc) || Object.keys(value).length !== 1) {
           throw invalid({ message: `Kayan "${name}" field "${field}" accepts $inc only on an integer field with one safe integer.`, key: 'error.invalid.value', params: { kayan: name, field } })
@@ -150,7 +168,11 @@ export const sqliteAdapter = <
         if (named?.kind === 'decimal' && Object.keys(rules).some((operator) => ['greater_than', 'greater_than_equal', 'less_than', 'less_than_equal'].includes(operator))) throw refuseDecimalOrder(name, path)
         const target = hop ? tables[field!.target!.name]! : table
         const column = target[hop ?? own!]!
-        const condition = conditionsOf(named?.kind === 'richText' ? textOf(column) : column, rules as Record<string, unknown>)
+        const normalized = named?.kind === 'decimal' ? Object.fromEntries(Object.entries(rules).map(([operator, value]) => [operator,
+          operator === 'equals' || operator === 'not_equals' ? decimalText(value, named)
+            : operator === 'in' || operator === 'not_in' ? (value as unknown[]).map((one) => decimalText(one, named)) : value,
+        ])) : rules
+        const condition = conditionsOf(named?.kind === 'richText' ? textOf(column) : column, normalized as Record<string, unknown>)
         parts.push(hop ? inArray(table[own!]!, client.select({ id: target.id as never }).from(target).where(condition)) : condition)
       }
       return parts.length === 1 ? parts[0] : and(...parts)

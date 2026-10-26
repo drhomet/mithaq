@@ -28,9 +28,10 @@ const deviceLanguage = (database: ReturnType<typeof nodeSqlite>['database'], bef
   },
 })
 
-const device = async (beforeSteps: readonly ProjectStep[] = []) => {
+const device = async (beforeSteps: readonly ProjectStep[] = [], weightRules: { precision?: number; scale?: number; unique?: boolean } = {}) => {
   const proxy = nodeSqlite()
   for (const statement of schema) proxy.sqlite.exec(statement)
+  if (weightRules.unique) proxy.sqlite.exec('create unique index patient_weight_unique on patient(weight)')
   const { defineKayan, buildAsas } = deviceLanguage(proxy.database, beforeSteps)
   const patient = defineKayan({
     name: 'patient',
@@ -40,7 +41,7 @@ const device = async (beforeSteps: readonly ProjectStep[] = []) => {
       mrn: { kind: 'text', label: label('MRN'), rules: { required: true, unique: true } },
       name: { kind: 'text', label: label('Name'), rules: { required: true } },
       born: { kind: 'date', label: label('Born') },
-      weight: { kind: 'decimal', label: label('Weight') },
+      weight: { kind: 'decimal', label: label('Weight'), rules: weightRules },
       admitted: { kind: 'checkbox', label: label('Admitted'), rules: { required: true, defaultValue: false } },
       flags: { kind: 'json', maxBytes: 1000, label: label('Flags') },
     },
@@ -70,7 +71,7 @@ test('a device kayan is created, read, updated and deleted through an injected d
   const read = await asas.kayan.patient.operations.findByID({ id: made.id })
   assert.deepEqual(
     { born: read?.born, weight: read?.weight, admitted: read?.admitted, flags: read?.flags, createdAt: read?.createdAt?.getTime() },
-    { born: '1990-02-28', weight: '71.50', admitted: false, flags: { allergies: ['penicillin'] }, createdAt: made.createdAt.getTime() },
+    { born: '1990-02-28', weight: '71.5', admitted: false, flags: { allergies: ['penicillin'] }, createdAt: made.createdAt.getTime() },
   )
   const changed = await asas.kayan.patient.operations.update({ id: made.id, admitted: true, weight: '70.25' })
   assert.deepEqual([changed.admitted, changed.weight], [true, '70.25'])
@@ -220,4 +221,74 @@ test('a device decimal refuses both ascending and descending sorting through man
   const refusal = (error: AsasError) => error.status === 400 && error.key === 'error.invalid.decimal_order'
   for (const sort of ['weight', '-weight']) await assert.rejects(asas.kayan.patient.operations.find({ sort }), refusal)
   for (const direction of ['asc', 'desc'] as const) await assert.rejects(asas.targets.sqlite.find({ kayan: 'patient', args: { sort: { field: 'weight', direction }, limit: 10, page: 1 } }), refusal)
+})
+
+
+test('device decimal writes return canonical text without losing significant digits', async () => {
+  const { asas } = await device()
+  const calls = asas.kayan.patient.operations
+  for (const [at, [value, expected]] of [
+    ['+0010.00', '10'], ['-000.000', '0'], ['-0010.0500', '-10.05'],
+    ['000.00100', '0.001'], ['9007199254740993.12345678901234567890', '9007199254740993.1234567890123456789'],
+  ].entries()) {
+    const row = await calls.create({ mrn: `canonical-${at}`, name: 'Decimal', weight: value! })
+    assert.equal(row.weight, expected)
+    assert.equal((await calls.findByID({ id: row.id }))?.weight, expected)
+  }
+  const row = await calls.create({ mrn: 'updated', name: 'Decimal', weight: '1' })
+  assert.equal((await calls.update({ id: row.id, weight: '+0020.500' })).weight, '20.5')
+  const store = asas.targets.sqlite
+  for (const weight of ['+0030.00', '-000.00']) {
+    const result = await store.transaction((tx) => store.upsert({ tx, kayan: 'patient', on: ['mrn'], data: { mrn: 'upsert', name: 'Decimal', weight, createdAt: new Date(), updatedAt: new Date() } }))
+    assert.equal(result.weight, weight.startsWith('-') ? '0' : '30')
+  }
+})
+
+test('device decimal equality and membership normalize direct, nested and related filter values', async () => {
+  const { asas } = await device()
+  const ten = await asas.kayan.patient.operations.create({ mrn: 'equivalent', name: 'Ten', weight: '10.00' })
+  await asas.kayan.patient.operations.create({ mrn: 'other', name: 'Two', weight: '2.00' })
+  await asas.kayan.patient.operations.create({ mrn: 'null', name: 'Null', weight: null })
+  await asas.kayan.admission.operations.create({ patient: ten.id, ward: 'Decimal' })
+  for (const value of ['10', '10.00', '+0010.0']) {
+    for (const operator of ['equals', 'not_equals', 'in', 'not_in'] as const) {
+      const rules = { [operator]: operator.endsWith('in') ? [value] : value }
+      const expected = operator.startsWith('not_') ? 0 : 1
+      assert.equal((await asas.kayan.patient.operations.count({ where: { and: [{ mrn: { equals: 'equivalent' } }, { weight: rules }] } })).totalDocs, expected)
+      assert.equal((await asas.kayan.admission.operations.count({ where: { 'patient.weight': rules } })).totalDocs, expected)
+    }
+  }
+  assert.equal((await asas.kayan.patient.operations.count({ where: { weight: { in: ['+0010.0', null] } } })).totalDocs, 2)
+  assert.equal((await asas.kayan.patient.operations.count({ where: { weight: { not_in: ['+0010.0', null] } } })).totalDocs, 1)
+})
+
+
+test('device decimal stores refuse malformed and oversized raw writes and filters with keyed invalid errors', async () => {
+  const { asas } = await device([], { precision: 7, scale: 2 })
+  const store = asas.targets.sqlite
+  const row = await asas.kayan.patient.operations.create({ mrn: 'validated', name: 'Decimal', weight: '10.00' })
+  const refusal = (error: AsasError) => error.status === 400 && error.key === 'error.invalid.value'
+  for (const weight of ['garbage', '', '1e2', '1.', ' 10', 10, '123456.00', '0.001', '1.000']) {
+    const data = { mrn: 'invalid', name: 'Decimal', weight, createdAt: new Date(), updatedAt: new Date() }
+    await assert.rejects(store.transaction((tx) => store.insert({ tx, kayan: 'patient', data })), refusal)
+    await assert.rejects(store.transaction((tx) => store.update({ tx, kayan: 'patient', id: row.id, data: { weight } })), refusal)
+    await assert.rejects(store.transaction((tx) => store.upsert({ tx, kayan: 'patient', on: ['mrn'], data })), refusal)
+    for (const operator of ['equals', 'not_equals', 'in', 'not_in']) {
+      await assert.rejects(store.find({ kayan: 'patient', args: { limit: 10, page: 1, sort: { field: 'id', direction: 'asc' }, where: { weight: { [operator]: operator.endsWith('in') ? [weight] : weight } } as Where } }), refusal)
+    }
+  }
+  assert.equal((await asas.kayan.patient.operations.findByID({ id: row.id }))?.weight, '10')
+  assert.equal((await asas.kayan.patient.operations.count()).totalDocs, 1)
+})
+
+
+test('device decimal unique constraints reject alternate spellings on insert, update and upsert', async () => {
+  const { asas } = await device([], { unique: true })
+  await asas.kayan.patient.operations.create({ mrn: 'unique-ten', name: 'Ten', weight: '10.00' })
+  const other = await asas.kayan.patient.operations.create({ mrn: 'unique-two', name: 'Two', weight: '2' })
+  const conflict = (error: AsasError) => error.status === 409 && error.key === 'error.conflict.unique'
+  await assert.rejects(asas.kayan.patient.operations.create({ mrn: 'duplicate', name: 'Ten', weight: '+0010.0' }), conflict)
+  await assert.rejects(asas.kayan.patient.operations.update({ id: other.id, weight: '010.00' }), conflict)
+  const store = asas.targets.sqlite
+  await assert.rejects(store.transaction((tx) => store.upsert({ tx, kayan: 'patient', on: ['mrn'], data: { mrn: 'unique-two', name: 'Ten', weight: '10.0', createdAt: new Date(), updatedAt: new Date() } })), conflict)
 })
