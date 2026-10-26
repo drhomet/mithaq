@@ -76,7 +76,7 @@ test('a test step that writes refuses a database nobody named, the dev database,
 
 test('the seed fills the organization SEED_EMAIL and SEED_ORGANIZATION name through its owner on the first run and adds nothing on the second, and with neither the first user\'s first organization', () => {
   const base = testDatabase()
-  const name = `mithaq_seed_${process.pid}`
+  const name = `${new URL(base).pathname.slice(1)}_seed_${process.pid}`
   const fresh = Object.assign(new URL(base), { pathname: `/${name}` }).href
   const client = 'asas.targets.drizzle.db.$client'
   script(base, `await ${client}.query('create database ${name}')`)
@@ -190,7 +190,7 @@ test('the committed migrations carry every tag name into name_en and fill name_a
   // it is applied to a fresh database, two tags are written in the old shape, and
   // then the last one runs.
   const base = testDatabase()
-  const name = `mithaq_migrate_${process.pid}`
+  const name = `${new URL(base).pathname.slice(1)}_migrate_${process.pid}`
   const fresh = Object.assign(new URL(base), { pathname: `/${name}` }).href
   const client = 'asas.targets.drizzle.db.$client'
   const migrations = new URL('./migrations/', import.meta.url)
@@ -221,7 +221,7 @@ test('the committed migrations publish every course already stored when they add
   // already there. Every migration before it is applied to a fresh database, two
   // courses are written in the old shape, and then it runs.
   const base = testDatabase()
-  const name = `mithaq_status_${process.pid}`
+  const name = `${new URL(base).pathname.slice(1)}_status_${process.pid}`
   const fresh = Object.assign(new URL(base), { pathname: `/${name}` }).href
   const client = 'asas.targets.drizzle.db.$client'
   const migrations = new URL('./migrations/', import.meta.url)

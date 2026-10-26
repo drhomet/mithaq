@@ -29,13 +29,16 @@ This file is for an agent changing mithaq itself. An agent working inside a crea
 
 ## Checks
 
+Before choosing or running tests, read [running-tests](.claude/skills/running-tests/SKILL.md). Builders run focused tests and `test:unit`; the coordinator runs the full suite once per release.
+
 Bun 1.3 with its isolated linker and Node 24 or later. From the root:
 
 ```sh
 bun install
 bun run typecheck
 bun run lint:args
-bun run test             # needs DATABASE_URL
+bun run test:unit        # no database
+bun run test --workers 1 # release suite, needs DATABASE_URL; omit --workers for memory-based selection
 bun run test:tanstack    # builds and boots both TanStack apps
 bun run test:next        # builds and boots the Next host
 bun run pack             # stages the three published packages in .pack/
@@ -43,7 +46,7 @@ bun run test:release     # creates a project from .pack/ and runs it
 AUTH_BROWSER_EXECUTABLE=/path/to/chromium bun run test:release # also checks native auth before hydration and hydrated sign-in
 ```
 
-`bun run test`, the boot tests and `test:release` need `DATABASE_URL` pointing at a local throwaway Postgres whose database is named `mithaq`, on any port except 5432 and 55439. `testDatabase` in `templates/asas/src/test-database.ts` refuses anything else, and the tests drop and rebuild that database.
+`bun run test`, the boot tests and `test:release` need `DATABASE_URL` pointing at a local throwaway Postgres whose database is named `mithaq`, on an unprotected port. `testDatabase` in `templates/asas/src/test-database.ts` refuses anything else, and the tests drop and rebuild that database.
 
 From `templates/asas/`, with `DATABASE_URL` exported (the `mithaq` bin runs under Node and reads no `.env`):
 
@@ -57,7 +60,7 @@ From `templates/mithaq/`, `apps/asas-tanstack/` and `apps/asas-backoffice/`, eac
 bunx mithaq upgrade --check    # the files a project holds from mithaq-admin against the package
 ```
 
-Run the whole set before you call a change done.
+Run the relevant checks while building. The coordinator runs the whole set once for the release.
 
 ## Rules
 

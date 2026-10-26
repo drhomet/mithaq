@@ -48,7 +48,7 @@ test('dev:setup refuses a database on another machine, any NODE_ENV but developm
 
 test('dev:setup pushes the schema, makes a verified super admin who owns an organization and signs in to both apps, seeds with --seed, and refuses once a user exists', () => {
   const base = testDatabase()
-  const name = `mithaq_dev_setup_${process.pid}`
+  const name = `${new URL(base).pathname.slice(1)}_dev_setup_${process.pid}`
   const fresh = Object.assign(new URL(base), { pathname: `/${name}` }).href
   const client = 'asas.targets.drizzle.db.$client'
   script(base, `await ${client}.query('create database ${name}')`)

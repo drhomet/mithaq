@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { availableParallelism, tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 
 for (const [file, name] of [['ci.yml', 'packages'], ['release.yml', 'pack']] as const) test(`${file} uploads one artifact from Postgres 17 while both database checks gate release`, () => {
@@ -12,5 +16,21 @@ for (const [file, name] of [['ci.yml', 'packages'], ['release.yml', 'pack']] as 
   if (file === 'release.yml') {
     assert.match(source, /needs: verify/)
     assert.match(source.split('actions/download-artifact@')[1]!, /name: pack\n/)
+  }
+})
+
+test('CI passes the worker count Node used before the memory-based runner', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mithaq-ci-workers-'))
+  try {
+    await writeFile(join(directory, 'bun'), '#!/bin/sh\nprintf \'%s\\n\' "$@"\n', { mode: 0o755 })
+    for (const file of ['ci.yml', 'release.yml']) {
+      const source = readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')
+      const command = /^\s*- run: (bun run test(?:\s.*)?)$/m.exec(source)?.[1]
+      assert.ok(command)
+      const args = execFileSync('/bin/sh', ['-c', command], { env: { ...process.env, PATH: `${directory}:${process.env.PATH}` }, encoding: 'utf8' }).trim().split('\n')
+      assert.deepEqual(args, ['run', 'test', '--workers', String(Math.max(1, availableParallelism() - 1))])
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
   }
 })
