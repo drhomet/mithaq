@@ -514,9 +514,10 @@ export const buildAsas = <
     auth?: Auth
     /**
      * The HTTP plugs, asked in order, so the order decides who owns a prefix two claim. Required:
-     * `fetchHttp` takes no dependency; `orpcHttp` first gives `asas.router` its typed client.
+     * `fetchHttp` takes no dependency; `orpcHttp` first gives `asas.router` its typed client. A
+     * device asas, which nothing reaches over HTTP, names none: `http: []`.
      */
-    http: readonly [
+    http: readonly [] | readonly [
       (operations: OperationTable<Procedures<KayanList, GlobalList, Declared<KayanList, GlobalList>, L>>) => Http,
       ...((operations: OperationTable<Procedures<KayanList, GlobalList, Declared<KayanList, GlobalList>, L>>) => HttpPlug)[],
     ]
@@ -532,8 +533,8 @@ export const buildAsas = <
   /** Every declared thing, which is what a relationship is resolved against. */
   type All = Declared<KayanList, GlobalList>
 
-  // Refused before any work: core picks no plug of its own.
-  if (!http?.length) {
+  // Refused before any work: core picks no plug of its own, and `[]` is a build naming none.
+  if (!Array.isArray(http)) {
     throw new Error(
       'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], or orpcHttp with the same options first for the typed client.',
     )
@@ -1133,7 +1134,7 @@ export const buildAsas = <
     targets: Object.fromEntries(
       Object.entries(buildTargets as L['targets']).map(([name, target]) => [name, isScreen(target) ? { ...target, client: screens[name] } : target]),
     ) as {
-      [Name in keyof L['targets']]: L['targets'][Name] extends { tables: unknown }
+      [Name in keyof L['targets']]: L['targets'][Name] extends { tables: unknown; type: 'drizzle' }
         ? Omit<L['targets'][Name], 'tables'> & {
             tables: BuiltTables<All, Name, ServiceOf<L>['store'], L['kinds']>
           }
