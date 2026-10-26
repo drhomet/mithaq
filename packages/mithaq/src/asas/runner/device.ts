@@ -7,7 +7,7 @@ import { refusePlacement } from '../placement.ts'
 import { defaults, parse, sealOf, validated, outputOf, type Context, type Ctx, type DerivedShapes, type OperationStep, type ResolvedOperation, type RuntimeWriteTools, type ReadTools } from './steps.ts'
 import { stepTools } from './store.ts'
 import { projectReadableFields } from './access.ts'
-import { assertWhere, assertWhereGrammar } from './query.ts'
+import { assertWhere, assertWhereGrammar, assertStoreWhere } from './query.ts'
 import { AfterCommitError, denied, invalid, missing } from './errors.ts'
 import { snapshot } from './snapshot.ts'
 import { providerOf } from '../../base/rules.ts'
@@ -123,7 +123,21 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
         const target = byName.get(args.kayan)
         if (!target || stores.get(target.store) !== store) throw new Error('A device step store call must name a kayan in its own store.')
         if (tx === undefined) throw new Error('A step store call requires the operation transaction.')
-        if (word === 'find' || word === 'hold') return store.find({ ...args, kayan: target.name, args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: args.where, ...(word === 'hold' ? { lock: 'update' } : {}) }, tx })
+        if (word === 'find') {
+          const query = args.args as Parameters<Store['find']>[0]['args']
+          if (query.where) assertStoreWhere(target, query.where)
+          return store.find({ kayan: target.name, args: query, tx })
+        }
+        if (word === 'hold') {
+          const { ids, mode } = args as unknown as { ids: Scalar[]; mode: 'update' | 'noKeyUpdate' | 'share' | 'keyShare' }
+          if (!['update', 'noKeyUpdate', 'share', 'keyShare'].includes(mode)) throw invalid({ message: 'Holding rows requires a valid lock mode.', key: 'error.invalid.value' })
+          for (const id of new Set(ids)) {
+            const found = await store.find({ kayan: target.name, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, lock: mode, where: { id: { equals: id } } }, tx })
+            if (!found.docs.length) throw noRow(target)
+          }
+          return
+        }
+        if (args.where) assertStoreWhere(target, args.where)
         return (store[word as 'insert'] as (args: object) => Promise<unknown>)({ ...args, tx })
       }])) as unknown as RuntimeWriteTools['store']
       const common = { operation: name, schema, output: shape.row, publicOutput: output, catalog, kayans: bound(scope, operation.effect === 'read'), of: of(scope, operation.effect === 'read'), audit: service.audit }

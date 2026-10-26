@@ -147,3 +147,18 @@ test('a nested tools handle cannot write after its outer transaction has settled
   await assert.rejects(late(), /settled/)
   assert.equal((await fixture.asas.kayan.note.operations.count()).totalDocs, 1)
 })
+
+test('a device step store find keeps its filter and hold refuses a missing row', async () => {
+  let fixture: ReturnType<typeof setup>
+  fixture = setup({ beforeSteps: [async (ctx, tools) => {
+    if (tools.effect !== 'read' && ctx.kayan.name === 'patient' && ctx.data.name === 'probe') {
+      const found = await tools.store.find({ tx: ctx.tx, kayan: fixture.patient, args: { limit: 1, page: 1, sort: { field: 'id', direction: 'asc' }, where: { name: { equals: 'missing' } } } })
+      assert.equal(found.totalDocs, 0)
+      await assert.rejects(tools.store.hold({ tx: ctx.tx, kayan: fixture.patient, ids: [999], mode: 'update' }), (error: Error & { status?: number }) => error.status === 404)
+    }
+    return ctx
+  }] })
+  await fixture.asas.connect()
+  await fixture.asas.kayan.patient.operations.create({ name: 'existing' })
+  await fixture.asas.kayan.patient.operations.create({ name: 'probe' })
+})
