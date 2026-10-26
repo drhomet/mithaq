@@ -27,8 +27,7 @@
     // `@/lib/*` is the third: every primitive reads `cn` from the app's
     // `utils` alias (`apps/asas-tanstack/components.json` `"utils": "@/lib/utils"`),
     // which is the one line each copied file differs from its source in
-    // (`tanstack-business:packages/design-system/src/ui/button.tsx`
-    // `import { cn } from '../lib/utils'`).
+    // (the source imports `cn` from `'../lib/utils'`).
     // Any other `@/` is the app's own, which the template's shells import as
     // the app they compile in does, and which the tests reach through them
     // (`../../templates/mithaq/src/ui/app-shell.tsx` `from '@/copy.ts'`).

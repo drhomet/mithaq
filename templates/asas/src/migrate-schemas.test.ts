@@ -449,7 +449,7 @@ test('6. a push refuses a kayan\'s table that changed schema, and a name it cann
   }
 })
 
-test('7. TB\'s shape: a providers entry with schemaName \'auth\' generates every auth kayan in auth, migrates beside the playbook in app and another tool\'s objects, and a change of it is drift', async (t) => {
+test('7. A providers entry with schemaName \'auth\' generates every auth kayan in auth, migrates beside the playbook in app and another tool\'s objects, and a change of it is drift', async (t) => {
   await migrateDatabase()
   const root = await migrationProject(withSummary)
   // The generated kayan import `mithaq` and the provider package by name, so

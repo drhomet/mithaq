@@ -1,7 +1,7 @@
-/* Theme copied wholesale from tanstack-business:apps/web/src/styles.css:
+/* Theme copied wholesale from an earlier app's styles.css:
    imports, custom-variant, :root and .dark variables, the @theme inline
    block and the @layer base rules.
-   The @source line points at this project's template instead of TB's monorepo.
+   The @source line points at this project's template instead of that app's monorepo.
    Tailwind finds this app's own files, an ejected `src/components/mithaq`
    among them, without one. */
 @import 'tailwindcss';
