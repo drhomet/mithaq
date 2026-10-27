@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Security: preserve complete access constraints on related finds, counts and version reads. Empty disjunctions match no rows on Postgres, consistent with memory; empty conjunctions still match every row. See the [access security note](packages/mithaq/src/asas/runner/README.md#security-access-constraints). No migration or vocabulary change is needed.
+- Security (affects 0.3.6 and earlier): preserve complete access constraints on related finds, counts and version reads. Empty disjunctions match no rows on Postgres, consistent with memory; empty conjunctions still match every row. See the [access security note](packages/mithaq/src/asas/runner/README.md#security-access-constraints). No migration or vocabulary change is needed.
 
 ## 0.3.7
 
