@@ -19410,7 +19410,7 @@ test('mixed and empty logical constraints retain their meaning in Postgres and a
     create table ${schemaName}.patient (id serial primary key, name text not null, created_at timestamptz not null, updated_at timestamptz not null);
     create table ${schemaName}.note (id serial primary key, title text, patient_id integer references ${schemaName}.patient(id), created_at timestamptz not null, updated_at timestamptz not null)`)
   try {
-    await mixedWherePrivacy({ schemaName, store: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }) })
+    await mixedWherePrivacy({ schemaName, dropsEmptyBranch: true, store: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }) })
   } finally { await db.execute(`drop schema ${schemaName} cascade`) }
 })
 

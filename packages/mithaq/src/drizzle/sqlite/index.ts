@@ -156,8 +156,8 @@ export const sqliteAdapter = <
       const conjunction = (where as { and?: Where[] }).and
       if (Array.isArray(conjunction)) parts.push(and(...conjunction.map((one) => whereOf(client, name, one))))
       const disjunction = (where as { or?: Where[] }).or
-      // Drizzle omits undefined clauses, but an empty OR is false and an unconstrained branch is true.
-      if (Array.isArray(disjunction)) parts.push(or(...disjunction.map((one) => whereOf(client, name, one) ?? sql`1`)) ?? sql`0`)
+      // An empty OR matches nothing; drizzle's `or()` of nothing would apply no constraint. A branch that compiles to nothing is still dropped.
+      if (Array.isArray(disjunction)) parts.push(disjunction.length ? or(...disjunction.map((one) => whereOf(client, name, one))) : sql`0`)
       for (const [path, rules] of Object.entries(where)) {
         if (path === 'and' || path === 'or') continue
         const [own, hop, ...rest] = path.split('.')

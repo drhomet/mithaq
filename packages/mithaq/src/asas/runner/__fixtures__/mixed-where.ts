@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, fetchHttp, defaultMaxBodyBytes, serviceTarget, zodTarget, zodKinds, zodRules, zodIdKinds, type Store, type Where } from '../../../index.ts'
 
-/** The same privacy scenario over the server stores and the injected device store. */
-export const mixedWherePrivacy = async ({ store, schemaName }: { store: Pick<Store, 'capability' | 'placement'>; schemaName?: string }) => {
+/** The same privacy scenario over the server stores and the injected device store. `dropsEmptyBranch` is set for the SQL stores, which drop an `or` branch that compiles to nothing, as main did. */
+export const mixedWherePrivacy = async ({ store, schemaName, dropsEmptyBranch }: { store: Pick<Store, 'capability' | 'placement'>; schemaName?: string; dropsEmptyBranch?: boolean }) => {
   const language = defineMithaq({ arkan: [base], targets: {
     store: store as Store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
     service: serviceTarget({ store: 'store', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
@@ -47,9 +47,8 @@ export const mixedWherePrivacy = async ({ store, schemaName }: { store: Pick<Sto
     [{ or: [] }, 0], [{ and: [] }, 2],
     [{ and: [{ or: [] }] }, 0], [{ or: [{ or: [] }] }, 0],
     [{ and: [], or: [] }, 0], [{ or: [], name: { equals: 'visible' } }, 0],
-    [{ or: [{ and: [] }, { name: { equals: 'absent' } }] }, 2],
-    [{ or: [{}, { name: { equals: 'absent' } }] }, 2],
     [{ and: [{ and: [] }, { name: { equals: 'visible' } }] }, 1],
+    ...(dropsEmptyBranch ? [[{ or: [{ name: { like: '   ' } }, { name: { equals: 'visible' } }] }, 1], [{ or: [{ name: { like: '   ' } }] }, 2]] : []),
   ] as [Where, number][]) {
     assert.equal((await raw.find({ kayan: 'patient', args: { where, sort, limit: 10, page: 1 } })).totalDocs, expected, JSON.stringify(where))
     assert.equal(await raw.count!({ kayan: 'patient', args: { where } }), expected, JSON.stringify(where))

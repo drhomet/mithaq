@@ -9,7 +9,7 @@ for (const device of [false, true]) test(`${device ? 'device' : 'server'} relate
   const fixture = nodeSqlite()
   fixture.sqlite.exec('create table patient (id integer primary key autoincrement, name text not null, created_at integer not null, updated_at integer not null); create table note (id integer primary key autoincrement, title text, patient_id integer references patient(id), created_at integer not null, updated_at integer not null)')
   try {
-    await mixedWherePrivacy({ store: device ? sqliteAdapter({ ...fixture.database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }) : memoryStore() })
+    await mixedWherePrivacy({ dropsEmptyBranch: device, store: device ? sqliteAdapter({ ...fixture.database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }) : memoryStore() })
   } finally { fixture.sqlite.close() }
 })
 
