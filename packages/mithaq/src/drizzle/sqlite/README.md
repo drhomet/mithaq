@@ -76,6 +76,8 @@ UUIDs, dates and decimals are text. JSON, text arrays and Lexical rich text are 
 
 The device target is unreleased, so no automatic data migration is included. Recreate pre-release device databases or canonicalize every existing decimal column before using this version, resolving any unique collisions first. Existing noncanonical rows need that conversion for equality filters to match them.
 
+In a `where`, an empty `or: []` matches nothing and an empty `and: []` matches everything, as in the memory store and, since this change, on Postgres. See the [changelog](../../../../../CHANGELOG.md).
+
 Unsupported on the device: HTTP targets, Better Auth and other auth providers, the tenant field, BLOBs, storage, screen and access targets, versions, localized columns, many-valued relationships, Postgres schemas, JSON filters and `nullsNotDistinct` indexes. Relationship columns and filters over one related field are supported. The host supplies actors rather than an HTTP authentication service. Do not import the server entry, a build-time generator, or Node built-ins into the phone bundle.
 
 ## Wiring on a phone

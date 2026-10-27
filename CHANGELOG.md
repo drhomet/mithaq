@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Server change: an empty `or: []` in a store `where` now matches nothing on Postgres and SQLite, as the memory store already did; it used to apply no constraint. It reaches the server through raw stores, constraints that core builds, and a project step's sealed store filter (`assertStoreWhere` admits an empty `and` or `or`): `store.update({ where: { or: [] } })` hit the row before and now misses with `missing`. An empty `and: []` still matches everything. A branch that compiles to nothing, such as a blank `like`, is still dropped. No migration is needed.
+
 ## 0.3.6
 
 - Empty cells of every shipped kind show one dash with localized accessible words. Checkbox cells show declared true/false words or localized Yes/No.
