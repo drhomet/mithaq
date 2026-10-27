@@ -47,6 +47,8 @@ export const mixedWherePrivacy = async ({ store, schemaName, dropsEmptyBranch }:
     [{ or: [] }, 0], [{ and: [] }, 2],
     [{ and: [{ or: [] }] }, 0], [{ or: [{ or: [] }] }, 0],
     [{ and: [], or: [] }, 0], [{ or: [], name: { equals: 'visible' } }, 0],
+    [{ or: [{ and: [] }, { name: { equals: 'absent' } }] }, dropsEmptyBranch ? 0 : 2],
+    [{ or: [{}, { name: { equals: 'absent' } }] }, dropsEmptyBranch ? 0 : 2],
     [{ and: [{ and: [] }, { name: { equals: 'visible' } }] }, 1],
     ...(dropsEmptyBranch ? [[{ or: [{ name: { like: '   ' } }, { name: { equals: 'visible' } }] }, 1], [{ or: [{ name: { like: '   ' } }] }, 2]] : []),
   ] as [Where, number][]) {
