@@ -204,7 +204,7 @@ Access constraints apply in full to related finds, counts and version reads,
 alongside the tenant scope. A filter intended to match no rows must stay closed
 on every server store.
 
-In 0.3.6 and earlier, affected reads could return rows or totals beyond the
+In 0.3.7 and earlier, affected reads could return rows or totals beyond the
 project's declared access rules. Upgrade mithaq and redeploy server applications; no
 migration or vocabulary change is needed. Review affected access rules and
 assess any prior exposure privately, without sharing private rows or logs in
@@ -214,7 +214,7 @@ Known limit: the Postgres and memory stores do not yet read every filter shape
 identically. Examples are a blank or whitespace-only `like`, an empty `not_in`,
 JSON `null` or empty arrays tested for presence, and an operand with no
 constraint inside an `or`. Where they differ after this fix, Postgres returns
-fewer rows than memory, except in shapes that already differed on 0.3.6. Keep
+fewer rows than memory, except in shapes that already differed on 0.3.7. Keep
 access rules to plain field rules, `and` and `or` with real values.
 
 ## Reading further: `tenant: 'mine' | 'all'`
