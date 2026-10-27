@@ -95,11 +95,8 @@ const readAccess = async <Actor>(
 // A dotted key is refused: across the hop it would be three segments, and passed through
 // unprefixed it would constrain the near table instead of the far one.
 const prefixWhere = (kayan: string, prefix: string, where: Where): Where => {
-  const conjunction = (where as { and?: Where[] }).and
-  if (conjunction) return { and: conjunction.map((one) => prefixWhere(kayan, prefix, one)) }
-  const disjunction = (where as { or?: Where[] }).or
-  if (disjunction) return { or: disjunction.map((one) => prefixWhere(kayan, prefix, one)) }
   return Object.fromEntries(Object.entries(where).map(([field, rule]) => {
+    if (field === 'and' || field === 'or') return [field, (rule as Where[]).map((one) => prefixWhere(kayan, prefix, one))]
     if (field.includes('.')) {
       throw new Error(
         `Kayan "${kayan}" access constraint path "${field}" is reached across a relationship from "${prefix}", so carrying it would be three segments, and a query path is never more than two.`,

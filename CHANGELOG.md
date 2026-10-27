@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Security: preserve complete access constraints on related finds, counts and version reads. Empty disjunctions match no rows on Postgres, consistent with memory; empty conjunctions still match every row. See the [access security note](packages/mithaq/src/asas/runner/README.md#security-access-constraints). No migration or vocabulary change is needed.
+
 ## 0.3.7
 
 - The vocabulary gains the `jobs` capability and target: store-agnostic tasks use `{ cron, queue, run }`, keyed by name in `buildAsas.tasks`. `drizzleJobs` and `memoryJobs` share a contract for atomic scheduling, exclusive claims, transactional enqueue, leases and retention. A long-running server passes `connect({ work })`; a serverless host leaves it out and calls `mithaq jobs run [queue ...]` from the platform’s cron for one pass. `--with jobs` installs the target and its table with no tasks; `uploads` pulls it in for its sweep. Existing projects add the owner-approved target and run and apply its migration to opt in; without a jobs target and tasks, nothing changes. Operation-side enqueue, retries and tenant execution remain later work.

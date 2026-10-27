@@ -198,6 +198,18 @@ Where it lives: `packages/mithaq/src/asas/runner/tenant.ts` `tenancy` (with
 `templates/asas/src/tenant-scope.test.ts` and
 `templates/asas/src/tenant-target.test.ts`.
 
+## Security: access constraints
+
+Access constraints apply in full to related finds, counts and version reads,
+alongside the tenant scope. A filter intended to match no rows must stay closed
+on every server store.
+
+Before this fix, affected reads could return rows or totals beyond the project's
+declared access rules. Upgrade mithaq and redeploy server applications; no
+migration or vocabulary change is needed. Review affected access rules and
+assess any prior exposure privately, without sharing private rows or logs in
+public issues.
+
 ## Reading further: `tenant: 'mine' | 'all'`
 
 A read may ask to reach past the active organization with the `tenant` option.
