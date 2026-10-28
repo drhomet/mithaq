@@ -4,6 +4,11 @@
 
 - Server change: an empty `or: []` in a store `where` now matches nothing on Postgres and SQLite, as the memory store already did; on Postgres it used to apply no constraint, and the SQLite adapter is new. It reaches the server through raw stores, constraints that core builds, and a project step's sealed store filter (`assertStoreWhere` admits an empty `and` or `or`): `store.update({ where: { or: [] } })` hit the row before and now misses with `missing`. An empty `and: []` still matches everything at the top level or inside an `and`; as an `or` branch an empty `and` compiles to nothing and is dropped on Postgres and SQLite, as on main, so `{ or: [{ and: [] }, { name: { equals: 'absent' } }] }` counts 0 there while the memory store counts 2. A branch that compiles to nothing, such as a blank `like`, is still dropped. No migration is needed.
 
+## 0.3.7
+
+- The vocabulary gains the `jobs` capability and target: store-agnostic tasks use `{ cron, queue, run }`, keyed by name in `buildAsas.tasks`. `drizzleJobs` and `memoryJobs` share a contract for atomic scheduling, exclusive claims, transactional enqueue, leases and retention. A long-running server passes `connect({ work })`; a serverless host leaves it out and calls `mithaq jobs run [queue ...]` from the platform’s cron for one pass. `--with jobs` installs the target and its table with no tasks; `uploads` pulls it in for its sweep. Existing projects add the owner-approved target and run and apply its migration to opt in; without a jobs target and tasks, nothing changes. Operation-side enqueue, retries and tenant execution remain later work.
+- The uploads template schedules `defaultStorageSweepTask` in production with counts-only logs. Upload kayan may opt into `orphanAfter` cleanup through scoped managed deletes, retaining soft-deleted owners and every version, or `maxUnattached` per-user caps with the optional `uploadedByField` and a translated refusal. Before enabling the cap, add the uploader field with a migration and run `bunx mithaq generate messages` for the message key `maxUnattached` adds. The media library enables neither policy. The object-only `storage sweep --check` command and its output stay unchanged.
+
 ## 0.3.6
 
 - Empty cells of every shipped kind show one dash with localized accessible words. Checkbox cells show declared true/false words or localized Yes/No.

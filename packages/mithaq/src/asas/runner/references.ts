@@ -3,6 +3,7 @@ import type { Store } from '../../mithaq/language-core.ts'
 import { combineWhere, type Scalar, type Where } from '../../mithaq/where.ts'
 import { AsasError, invalid } from './errors.ts'
 import { publishedWhere } from './row-state.ts'
+import { cleanupUploadTargets, richTextUploads } from '../../storage/upload-references.ts'
 
 // Postgres answers a uuid in lowercase, so ids are compared in that case.
 export const keyIn = (kayan: ResolvedKayan) => (value: unknown) =>
@@ -37,10 +38,22 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
       targets.set(key, held)
     }
   }
+  const uploads = new Set<ResolvedKayan>()
+  for (const field of Object.values(kayan.fields)) {
+    if (field.kind !== 'richText') continue
+    for (const reference of richTextUploads(data[field.name])) {
+      const target = cleanupUploadTargets.get(field)?.find((one) => one.name === reference.kayan)
+      if (!target) continue
+      const held = targets.get(target) ?? { target, sets: [] }
+      held.sets.push({ field: field.name, value: reference.id })
+      targets.set(target, held)
+      uploads.add(target)
+    }
+  }
   for (const [key, { target, sets }] of targets) {
     const far = target.tenant
     // A raw write to a shared row names it as it likes; the foreign key holds it.
-    if (!access && !far) continue
+    if (!access && !far && !uploads.has(target)) continue
     // Held whatever the target's own access answers, so no access widens it.
     const tenanted = tenant !== undefined && tenant !== null && far ? { [far]: { equals: tenant as Scalar } } : undefined
     // A 400: the value is what the caller sent wrong. Absent, hidden and another tenant's
@@ -60,7 +73,7 @@ export const assertReferences = async ({ kayan, store, data, tenant, access, off
           })
     }
     // With no organization and no access to ask, nothing scopes the target, so nothing is admitted.
-    if (!access && !tenanted) throw refuse(sets[0]!.field)
+    if (!access && !tenanted && (far || !uploads.has(target))) throw refuse(sets[0]!.field)
     let admits: Where | undefined
     try {
       admits = await access?.(target)

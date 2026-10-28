@@ -27,6 +27,13 @@ const every = Object.keys(addOns)
 const read = (...path: string[]) => readFileSync(join(scratch, ...path), 'utf8')
 const json = (...path: string[]) => JSON.parse(read(...path))
 
+test('each add-on removes only copy keys that the template holds', () => {
+  const copy = JSON.parse(readFileSync(join(template, 'templates/asas/src/messages/mithaq.json'), 'utf8'))
+  for (const [name, { copy: keys }] of Object.entries(addOns)) for (const key of keys) {
+    assert.notEqual(key.split('.').reduce((branch, part) => branch?.[part], copy), undefined, `${name}: ${key}`)
+  }
+})
+
 test('a project takes the published mithaq and mithaq-admin under the names its imports use, at exactly one version', () => {
   create({ name: 'my-app', cwd: scratch, template, version: '1.2.3', addOns: every })
   const features = readdirSync(join(scratch, 'my-app/packages/features')).map((one) => `packages/features/${one}`)
@@ -191,10 +198,10 @@ test('a dependency left pointing into the framework repository is refused, whate
 
 test('an add-on brings every one it needs, said so, and a name the table does not hold is refused with the list', () => {
   assert.deepEqual(resolveAddOns([]), { chosen: [], added: [] })
-  assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'rich-text', 'uploads', 'media', 'courses'], added: ['roles', 'audit-log', 'rich-text', 'uploads', 'media'] })
-  assert.deepEqual(resolveAddOns(['media']), { chosen: ['uploads', 'media'], added: ['uploads'] }, 'and what an add-on it needs needs')
+  assert.deepEqual(resolveAddOns(['courses']), { chosen: ['roles', 'audit-log', 'rich-text', 'jobs', 'uploads', 'media', 'courses'], added: ['roles', 'audit-log', 'rich-text', 'jobs', 'uploads', 'media'] })
+  assert.deepEqual(resolveAddOns(['media']), { chosen: ['jobs', 'uploads', 'media'], added: ['jobs', 'uploads'] }, 'and what an add-on it needs needs')
   assert.deepEqual(resolveAddOns(['backoffice', 'roles', 'roles']).chosen, ['roles', 'backoffice'], 'in the table\'s order, once each')
-  assert.throws(() => resolveAddOns(['roles', 'images', 'rich']), /^Error: No add-on is named "images", "rich"\. The add-ons are roles, audit-log, settings, rich-text, rich-text-mentions, rich-text-find-replace, rich-text-comments, uploads, media, courses, backoffice\.$/)
+  assert.throws(() => resolveAddOns(['roles', 'images', 'rich']), /^Error: No add-on is named "images", "rich"\. The add-ons are roles, audit-log, settings, rich-text, rich-text-mentions, rich-text-find-replace, rich-text-comments, jobs, uploads, media, courses, backoffice\.$/)
 })
 
 test('a region keeps its lines only where its add-ons are chosen, a without region is uncommented only where they are not, and the markers go either way', () => {
@@ -235,6 +242,9 @@ test('a minimal project holds auth and the tags example alone: no other feature,
   // Its code, the comments aside, which may name what an add-on would bring.
   const code = (file: string) => read(file).replaceAll(/^\s*(\/\/|\/?\*).*$/gm, '')
   const language = code('minimal/packages/mithaq/src/mithaq.ts')
+  assert.doesNotMatch(language, /\bjobs\b|drizzleJobs|defaultJobLease|defaultJobRetention|mithaq_jobs/)
+  assert.doesNotMatch(code('minimal/packages/asas/src/asas.ts'), /tasks:|defaultStorageSweepTask/)
+  assert.doesNotMatch(code('minimal/apps/asas-tanstack/src/server.ts'), /work:/)
   assert.match(language, /^import \{ accessTarget \} from '\.\/roles\/member-access\.ts'$/m)
   assert.match(language, /^export \{ accessTarget \}$/m)
   assert.doesNotMatch(language, /rbacTarget|auditSink|sessionLabels|softDelete|'courses'|'roles'|'auditLog'|'settings'|richText|storage\(/)
@@ -252,6 +262,27 @@ test('a minimal project holds auth and the tags example alone: no other feature,
   assert.equal(read('minimal/packages/asas/mithaq.hints.json'), '[]\n')
   const sources = filesUnder(at).filter((file) => /\.tsx?$/.test(file))
   assert.deepEqual(sources.filter((file) => /add-on: /.test(readFileSync(file, 'utf8'))).map((file) => file.slice(at.length)), [], 'no marker is left')
+})
+
+test('jobs alone holds its target without tasks, and uploads pulls jobs in for its sweep', () => {
+  assert.deepEqual(resolveAddOns(['jobs']), { chosen: ['jobs'], added: [] })
+  assert.deepEqual(resolveAddOns(['uploads']), { chosen: ['jobs', 'uploads'], added: ['jobs'] })
+  for (const [name, asked] of [['jobs-only', ['jobs']], ['with-uploads', ['uploads']]] as const) {
+    create({ name, cwd: scratch, template, version: '1.2.3', addOns: [...asked] })
+    assert.match(read(name, 'packages/mithaq/src/mithaq.ts'), /jobs: drizzleJobs\(\{ lease: defaultJobLease, retain: defaultJobRetention \}\)/)
+    const asas = read(name, 'packages/asas/src/asas.ts')
+    const host = read(name, 'apps/asas-tanstack/src/server.ts')
+    if (name === 'jobs-only') {
+      assert.doesNotMatch(asas, /tasks:|defaultStorageSweepTask/)
+      assert.doesNotMatch(host, /work:/)
+    } else {
+      assert.match(asas, /tasks: \{ storageSweep: defaultStorageSweepTask \}/)
+      assert.match(host, /work: \['maintenance'\]/)
+    }
+    assert.deepEqual(readdirSync(join(scratch, name, 'packages/asas/src/migrations')), ['drizzle.config.ts'], 'a partial project generates its own first migration')
+    const sources = filesUnder(join(scratch, name)).filter((file) => /\.tsx?$/.test(file))
+    assert.ok(sources.every((file) => !/add-on: /.test(readFileSync(file, 'utf8'))), 'no marker is left')
+  }
 })
 
 test('a full project holds every add-on and the template\'s migrations, none of the files that stand in for an add-on, and no marker', () => {

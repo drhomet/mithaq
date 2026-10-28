@@ -3,7 +3,8 @@
 // `npm create mithaq` do, with `mithaq` and `mithaq-admin` installed from the packed tarballs and no framework source; each
 // consumer typechecks, migrates, builds its apps, boots each under Node, answers a signed-in request, seeds and passes
 // `mithaq generate --check`: a monorepo with every add-on with Bun, a minimal one (auth and the tags example) with npm,
-// which writes its own first migration and boots with no BACKOFFICE_URL, a single package with every add-on it can hold,
+// which writes its own first migration and boots with no BACKOFFICE_URL, a jobs-only monorepo with no tasks,
+// a single package with every add-on it can hold,
 // and a monorepo with settings, rich text, media without courses and the backoffice console but no roles, whose staff hold their keys through
 // Better Auth's member roles' access target as they do through the roles add-on's. A full project speaks the frozen
 // vocabulary, and every other one that vocabulary less the words its missing add-ons bring. A project with no rich text,
@@ -21,7 +22,7 @@ import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { testDatabase } from '../templates/asas/src/test-database.ts'
-import { base, storage } from '../packages/mithaq/src/index.ts'
+import { base, defaultJobLease, defaultJobRetention, drizzleJobs, storage } from '../packages/mithaq/src/index.ts'
 import { richText } from '../packages/mithaq/src/rich-text/index.ts'
 import { vocabularyOf } from '../packages/mithaq/src/mithaq/lock.ts'
 import { richTextNodes } from '../templates/mithaq/src/mithaq/rich-text-nodes.ts'
@@ -66,11 +67,11 @@ const vocabularyIn = ({ folder, source, extension }: { folder: string; source: s
 }
 // The template's, which holds every add-on and so every word, frozen until the owner signs a change.
 const vocabulary = vocabularyIn({ folder: join(root, 'templates/asas'), source: join(root, 'packages/mithaq/src'), extension: '.ts' })
-assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), 'e4c797b0f387d25d5590a9debb12b58aec3188847d90b8b215ab85e651e0b5f4', 'the template speaks the frozen vocabulary')
+assert.equal(createHash('sha256').update(vocabulary!).digest('hex'), '009614b5410df6fbd78fdb0cf077630036a2b5428f93e32c84f5d60e59d38900', 'the template speaks the frozen vocabulary')
 type Words = Record<'kinds' | 'rules' | 'targets', Record<string, unknown>>
 const bare = vocabularyOf({ arkan: [base] }) as Words
 /** The words each add-on that brings any adds to the language: its rukn's kinds, rules and targets beyond `base`'s. */
-const wordsOf = Object.fromEntries(Object.entries({ 'rich-text': richText({ nodes: richTextNodes }), uploads: storage(storageConfig) }).map(([name, rukn]) => {
+const wordsOf = Object.fromEntries(Object.entries({ 'rich-text': richText({ nodes: richTextNodes }), uploads: storage(storageConfig), jobs: { name: 'jobs', targets: { jobs: drizzleJobs({ lease: defaultJobLease, retain: defaultJobRetention }) } } }).map(([name, rukn]) => {
   const own = vocabularyOf({ arkan: [base, rukn] }) as Words
   return [name, (['kinds', 'rules', 'targets'] as const).flatMap((part) => Object.keys(own[part]).filter((key) => !Object.hasOwn(bare[part], key)).map((key) => [part, key] as const))]
 }))
@@ -121,6 +122,7 @@ try {
   for (const run of [
     { manager: 'bun', addOns: ['--full'], modes: ['--organization-name', "Noor's School", '--organization-name-ar', 'مدرسة النور'] },
     { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
+    { manager: 'bun', addOns: ['--with', 'jobs'], modes: ['--organizations', 'many'] },
     { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
     { manager: 'bun', addOns: ['--with', 'settings,backoffice,rich-text,media'], modes: ['--organizations', 'many'] },
   ]) await release({ tarball, adminTarball, ...run })
@@ -169,7 +171,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
   const full = addOns.includes('--full')
   // `--full` holds the backoffice console where the layout can.
   const backoffice = !single && (full || addOns.some((one) => /(^|,)backoffice(,|$)/.test(one)))
-  const name = `${manager}-${layout}-${full ? 'full' : addOns.length ? 'pick' : 'minimal'}`
+  const name = `${manager}-${layout}-${full ? 'full' : addOns.includes('jobs') ? 'jobs' : addOns.length ? 'pick' : 'minimal'}`
   const consumer = join(scratch, name)
   const servers: ReturnType<typeof spawn>[] = []
   let output = ''
@@ -271,6 +273,15 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     if (readdirSync(migrations).length === 1) command(installed(template, '.bin/mithaq'), ['migrate', '--name', 'init'], template)
     const drizzleKit = createRequire(join(mithaq, 'package.json')).resolve('drizzle-kit')
     command(process.execPath, [join(dirname(drizzleKit), 'bin.cjs'), 'migrate', '--config', 'src/migrations/drizzle.config.ts'], template)
+    command(process.execPath, ['--input-type=module', '-e', [
+      "import assert from 'node:assert/strict'",
+      "import { asas } from './src/asas.ts'",
+      `assert.equal(Object.hasOwn(asas.targets.drizzle.tables, 'mithaq_jobs'), ${chosen.includes('jobs')})`,
+      `assert.equal(Boolean(asas.jobs), ${chosen.includes('jobs')})`,
+      `assert.equal((await asas.targets.drizzle.db.execute("select to_regclass('public.mithaq_jobs') as name")).rows[0].name !== null, ${chosen.includes('jobs')})`,
+      ...(chosen.includes('jobs') && !chosen.includes('uploads') ? ["assert.deepEqual(asas.jobs.queues, [])"] : []),
+      'await asas.destroy()',
+    ].join('\n')], template)
     const spoken = vocabularyIn({ folder: template, source: join(mithaq, 'dist'), extension: '.js' })!
     if (full) assert.equal(spoken, vocabulary, `${name} speaks the frozen vocabulary`)
     const missing = Object.keys(wordsOf).filter((one) => !chosen.includes(one))

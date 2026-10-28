@@ -56,7 +56,7 @@ const once = (text, from, to, count = 1) => {
  * when it is chosen), the npm packages only it uses (a name ending in `/` is a whole scope), the keys of its words in
  * the shared copy file, `mithaq.json`, which can hold no region, and whether it brings
  * tables, without which the template's migrations, written for every table, do not fit the project. Its lines in a
- * shared file sit in `// add-on: <name>` regions, which `keepAddOns` reads. `rich-text` and `uploads` bring words of the
+ * shared file sit in `// add-on: <name>` regions, which `keepAddOns` reads. `rich-text`, `jobs` and `uploads` bring words of the
  * language, kinds and a target, so a project's vocabulary follows the add-ons it holds.
  */
 export const addOns = {
@@ -89,8 +89,9 @@ export const addOns = {
   'rich-text-mentions': { needs: ['rich-text'], files: [], without: [], packages: [], copy: [], tables: false },
   'rich-text-find-replace': { needs: ['rich-text'], files: [], without: [], packages: [], copy: [], tables: false },
   'rich-text-comments': { needs: ['rich-text', 'audit-log'], files: ['packages/features/rich-text-comments', 'packages/asas/src/messages/richTextThreads.json'], without: [], packages: [], copy: [], tables: true },
+  jobs: { needs: [], files: [], without: [], packages: [], copy: [], tables: true },
   // The `upload` kind, the storage target and its adapters.
-  uploads: { needs: [], files: ['packages/mithaq/src/storage'], without: [], packages: ['aws4fetch', 'file-type', 'image-dimensions'], copy: ['kinds.upload', 'kinds.upload.invalid'], tables: false },
+  uploads: { needs: ['jobs'], files: ['packages/mithaq/src/storage'], without: [], packages: ['aws4fetch', 'file-type', 'image-dimensions'], copy: ['kinds.upload', 'kinds.upload.invalid'], tables: true },
   // The organization's images, which an upload field points at.
   media: { needs: ['uploads'], files: ['packages/features/media', 'packages/asas/src/messages/media.json'], without: [], packages: [], copy: [], tables: true },
   // The worked example: its business roles are the roles add-on's, its edit pages draw the audit log's activity, its

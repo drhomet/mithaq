@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -28,23 +28,24 @@ export const template = new URL('test-language.ts', import.meta.url).href
 export const mithaqEntry = new URL('../../../packages/mithaq/src/index.ts', import.meta.url).href
 
 /**
- * The database the migrate steps share, created on the server DATABASE_URL names the first time a
- * step needs it and dropped when the file ends, so no other file ever sees its tables. Its name
+ * Each top-level test calls migrateDatabase for its own database, dropped before the next test
+ * and when the file ends, so no other test ever sees its tables. Its name
  * carries the process and a random part, so two runs on one server never meet.
  */
-export const migrateName = `mithaq_migrate_${process.pid}_${randomBytes(4).toString('hex')}`
+export let migrateName = ''
 /** Read only once `migrateDatabase` has resolved, which is when it names the steps' own database. */
 export let migrateEnv: NodeJS.ProcessEnv = process.env
 /** One statement on its own connection, closed after, so no idle pool keeps the file running. */
-const adminQuery = async (statement: string) => {
+export const queryDatabase = async ({ url = testDatabase(), statement }: { url?: string; statement: string }) => {
   const { drizzle } = await import('drizzle-orm/node-postgres')
-  const { $client } = drizzle({ connection: { connectionString: testDatabase(), max: 1 } })
+  const { $client } = drizzle({ connection: { connectionString: url, max: 1 } })
   try {
-    return (await $client.query<{ datname: string }>(statement)).rows
+    return await $client.query(statement)
   } finally {
     await $client.end()
   }
 }
+const adminQuery = async (statement: string) => (await queryDatabase({ statement })).rows as { datname: string }[]
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0)
@@ -54,32 +55,40 @@ const alive = (pid: number) => {
   }
 }
 let creating: Promise<void> | undefined
-export const migrateDatabase = () =>
-  (creating ??= (async () => {
+export const migrateDatabase = async () => {
+  if (creating) await adminQuery(`drop database if exists ${migrateName} with (force)`)
+  migrateName = `${new URL(testDatabase()).pathname.slice(1)}_migrate_${process.pid}_${randomBytes(4).toString('hex')}`
+  creating = (async () => {
     // A run killed outright never reaches its `after`, so its database is dropped here once its process is gone.
     // ponytail: liveness is read from this machine's processes; a test server shared between machines needs a lease instead.
-    for (const { datname } of await adminQuery(`select datname from pg_database where datname ~ '^mithaq_migrate_[0-9]+_[0-9a-f]+$'`)) {
-      if (!alive(Number(datname.split('_')[2]))) await adminQuery(`drop database if exists ${datname} with (force)`).catch(() => {})
+    const base = new URL(testDatabase()).pathname.slice(1)
+    for (const { datname } of await adminQuery(`select datname from pg_database where datname ~ '^${base}_migrate_[0-9]+_[0-9a-f]+$'`)) {
+      const pid = Number(datname.slice(base.length + 1).split('_')[1])
+      if (!alive(pid)) await adminQuery(`drop database if exists ${datname} with (force)`).catch(() => {})
     }
     await adminQuery(`create database ${migrateName}`)
     migrateEnv = { ...process.env, DATABASE_URL: Object.assign(new URL(testDatabase()), { pathname: `/${migrateName}` }).href }
-  })())
+  })()
+  await creating
+}
 
 after(async () => {
   if (creating) await adminQuery(`drop database if exists ${migrateName} with (force)`)
+  for (const root of projects) await rm(root, { recursive: true, force: true })
 })
 
 /**
  * A project `mithaq migrate` can run against: the template's language gives real drizzle tables,
  * and the kayan are the test's to edit between steps.
  */
+const projects = new Set<URL>()
 export const migrationProject = async (kayan: string) => {
   const root = pathToFileURL(`${await mkdtemp(join(tmpdir(), 'mithaq-migrate-'))}/`)
+  projects.add(root)
   await mkdir(new URL('src/', root))
   await writeFile(new URL('src/mithaq.ts', root), "export const generate = { migrations: 'src/migrations/' }\n")
   await writeFile(new URL('src/asas.ts', root), kayanSourceOf(kayan))
-  // Everything the steps do to the database goes through the project's own connection. `$client` is
-  // node-postgres, so no drizzle import has to resolve from a directory outside the workspace.
+  // Output-sensitive probes still run through the project, while ordinary fixture SQL uses sqlIn.
   await writeFile(
     new URL('sql.ts', root),
     `import { asas } from './src/asas.ts'\nawait asas.targets.drizzle.db.$client.query(process.argv[2])\nawait asas.destroy()\n`,
@@ -144,7 +153,16 @@ const nodeIn = (root: URL, file: string, ...argv: string[]) =>
     })
     child.on('close', resolve)
   })
-export const sqlIn = (root: URL, statement: string) => nodeIn(root, 'sql.ts', statement)
+// SQL is fixture setup or an assertion, not a CLI test. Keep it on a short-lived connection.
+export const sqlIn = async (_root: URL, statement: string) => {
+  try {
+    await queryDatabase({ url: migrateEnv.DATABASE_URL!, statement })
+    return 0
+  } catch (error) {
+    console.error(error)
+    return 1
+  }
+}
 export const pushIn = (root: URL) => nodeIn(root, 'push.ts')
 export const appliedIn = (root: URL) =>
   new Promise<{ code: number | null; output: string }>((resolve) => {

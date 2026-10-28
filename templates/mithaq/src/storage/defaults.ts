@@ -10,6 +10,8 @@ import {
   readForFile,
   sanitizeFilename,
   signReference,
+  sweepStorage,
+  type JobTask,
   type StorageConfig,
   type StorageKayan,
 } from 'mithaq'
@@ -153,4 +155,15 @@ export const defaultServeFile: StorageConfig['serve'] = async ({ request, kayan,
     answer: ({ disposition }) => adapter.staticHandler(request, { doc, disposition }),
   })
 }
-// mithaq-admin b06d8d335d306c07556f8f2b81fba20ba7ded198 af2cd4436012c35d6e1d868b3f5cc2efec50c61983d2559609ebec55d1b4acf5
+
+/** The scheduled object and row cleanup policy a project names in tasks. */
+export const defaultStorageSweepTask: JobTask = {
+  cron: '@hourly',
+  queue: 'maintenance',
+  run: async ({ asas }) => {
+    const counts = await sweepStorage({ asas })
+    console.info(counts)
+    return counts
+  },
+}
+// mithaq-admin 0.0.0 e3d18c039b6ff3364707471e96dbea269ab35b2b357b90c08faf4ff0d29b314e

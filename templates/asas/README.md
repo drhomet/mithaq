@@ -24,14 +24,15 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | `audit-log` | The `auditLog` kayan, the `audit` step that writes one row per change, the activity panel on each edit page, the course's Activity tab, the dashboard's Activity page (searched by text, person and field, filtered by kayan, action and day, for a holder of `auditLog.find`: the page asks the same key as the panel, and the log's read, scoped to the active organization and to the kayan the reader lists, is the boundary), and the backoffice's staff history (`backofficeLog`: impersonations, backoffice roles set and bans, read by `super_admin` and `explorer`). Without it the backoffice writes those as server log lines alone. |
 | `settings` | The `settings` global, one row per organization. |
 | `rich-text` | The `richText` kind, its Lexical nodes (`packages/mithaq/src/mithaq/rich-text-nodes.ts`) and the editor. Without it, no Lexical is installed. |
-| `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`). Without it, no storage setting is read. |
+| `jobs` | The `jobs` target and its `mithaq_jobs` table, generated through normal migrations. `--with jobs` alone starts with no tasks. |
+| `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`). Needs `jobs` for its scheduled sweep. Without uploads, no storage setting is read. |
 | `media` | The organization's images (`media`), which an upload field points at. A holder of `media.create` reads every one; anyone else only what the features pointing at images hand it, such as the courses add-on's covers of the courses they read. Needs `uploads`. |
 | `courses` | The worked example: courses, sessions and enrollments, each course with a cover from the media, and the business roles that work them. Needs `media`, `roles`, `audit-log` and `rich-text`. |
 | `backoffice` | The backoffice console, `apps/asas-backoffice`. A single package cannot hold it. |
 
 It also asks how the project holds its people, or takes `--organizations`, `--show-organization`, `--sign-up` and `--organization-name` (with `--organization-name-ar`): one organization made by its owner on first run and joined by invitation (the default, and the worked example's: a school), named in code and shown by name or never (`--show-organization no`), or many, where a person signs up, proves their address and then creates an organization or joins one by invitation. [Organization modes](#organization-modes) has the whole story.
 
-`rich-text` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
+`rich-text`, `jobs` and `uploads` bring words of the language, a kind or a target, so a project's vocabulary is the one its add-ons make; every other add-on brings kayan and pages alone. A project short of an add-on with tables ships no migration: write its first with `bunx mithaq migrate --name init` before it first deploys (see [Running in production](#running-in-production)). No command adds an add-on to a project yet; [Add an add-on](#add-an-add-on) says how to by hand.
 
 What you get is a workspace:
 
@@ -859,7 +860,7 @@ An ejected file is the project's own. A project edits it in place and never patc
 
 ### Add an add-on
 
-No command adds an add-on yet. Make two throwaway projects at your mithaq version, one with the add-on and one without, with `bun create mithaq` and the same other add-ons as yours; `git diff --no-index` between them shows exactly what the add-on brings: its feature folder, its own files, the dependency in `packages/asas/package.json`, and the lines it adds to the language, the asas and the tenant app's `copy.ts`. Copy those in, then run `bunx mithaq generate screens`, `bunx mithaq generate messages` and `bunx mithaq migrate --name add_<add-on>` from `packages/asas`. Adding `roles` also takes `default-member-roles.ts` out of `tenant-roles.ts`, and leaves each organization's Better Auth admins and members with no keys until someone assigns them a role; owners keep every key through `administrator`. Adding `rich-text` or `uploads` adds words to the project's vocabulary, so a project with a `mithaq.lock` signs it again with `mithaq lock`, which the developer approves.
+No command adds an add-on yet. Make two throwaway projects at your mithaq version, one with the add-on and one without, with `bun create mithaq` and the same other add-ons as yours; `git diff --no-index` between them shows exactly what the add-on brings: its feature folder, its own files, the dependency in `packages/asas/package.json`, and the lines it adds to the language, the asas and the tenant app's `copy.ts`. Copy those in, then run `bunx mithaq generate screens`, `bunx mithaq generate messages` and `bunx mithaq migrate --name add_<add-on>` from `packages/asas`. Adding `roles` also takes `default-member-roles.ts` out of `tenant-roles.ts`, and leaves each organization's Better Auth admins and members with no keys until someone assigns them a role; owners keep every key through `administrator`. Adding `rich-text`, `jobs` or `uploads` adds words to the project's vocabulary, so a project with a `mithaq.lock` signs it again with `mithaq lock`, which the developer approves.
 
 ### Tests
 
@@ -899,7 +900,11 @@ Each app connects once before it serves any request. Both `apps/asas-tanstack/sr
 ```ts
 const { env } = process
 if (env.NODE_ENV === 'production') {
-  await (await import('asas')).asas.connect().catch((error: unknown) => {
+  await (await import('asas')).asas.connect({
+    // add-on: uploads
+    work: ['maintenance'],
+    // end add-on: uploads
+  }).catch((error: unknown) => {
     console.error(error)
     process.exit(1)
   })
@@ -972,6 +977,16 @@ Uploaded files go through the storage rukn, the pluggable part that brings the `
 Each upload row stores the name of the adapter that holds its file. `STORAGE_ADAPTER` only picks where new uploads go, so keep every adapter that old rows still name.
 
 `mithaq storage sweep` deletes objects that no row names and that are more than a day old. Run it with `--check` first to see the list (see [The `mithaq` command](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/src/asas/cli/README.md#storage-sweep)).
+
+The `jobs` add-on (`--with jobs`, also pulled in by `uploads`) names `jobs: drizzleJobs({ lease: defaultJobLease, retain: defaultJobRetention })`. Jobs alone brings the target and its `mithaq_jobs` table with no tasks. A project without jobs has no jobs target, table or migration. With uploads, `src/asas.ts` names `tasks: { storageSweep: defaultStorageSweepTask }` from the ejected storage defaults. Long-running servers call `connect({ work: ['maintenance'] })`; one timer per task fires at its own cron, hourly for the default sweep. Development and tests start no work unless explicitly requested. `connect()` alone starts no timers; `readOnly` together with `work` is refused, as is a queue no task uses.
+
+Multiple instances record each occurrence once and claim it exclusively through the jobs driver. Drizzle uses a unique occurrence identity and `FOR UPDATE SKIP LOCKED`; core scheduling and execution are store-agnostic. Completed and failed history is pruned each pass by explicit retention, except that each task’s newest scheduled row remains as a watermark so pruning cannot reschedule equal or older work. Logs contain only task names and counts. Throws fail the job; expired leases end interrupted without retry. Shutdown waits for active passes. Existing projects add the owner-approved jobs target and apply its generated migration to opt in. Without a target and tasks, existing projects see no change.
+
+A serverless host leaves `work` out because timers can freeze between requests, and calls `mithaq jobs run` from the platform’s cron. For an external cron or a manual development run, use `bunx mithaq jobs run maintenance` with `DATABASE_URL` exported; omit queue arguments to run all task queues. It performs one pass without timers. The scheduled task first cleans eligible upload rows, then reuses the CLI’s object policy. `storage sweep --check` remains the preview for object cleanup and does not remove upload rows.
+
+On an upload kayan, optional `targets.storage.orphanAfter` is a positive grace period in milliseconds for abandoned rows. Cleanup permanently deletes an eligible row through its managed delete, scoped to one organization, after locking it and checking again for references. Soft-deleted owners, relationship sets, rich-text uploads and every retained version keep a file. `cascade` and `set null` pointers targeting that kayan are refused; its owners must share its store. The `removed` step deletes the object after commit. Keep the grace longer than the form's expected lifetime.
+
+Optional `targets.storage.maxUnattached` caps unattached rows per user in their organization. Spread `uploadedByField` from `mithaq` beside `uploadFields`, then add the field with a migration before enabling the cap. Setting `maxUnattached` adds a message key, so run `bunx mithaq generate messages` before `generate messages --check` can pass. Core fills its optional text column from the actor's id on create, and never updates it. It has no user foreign key. The refusal is translated with its limit; attaching, trashing or removing a file frees room. Signed instructions can still race past this soft cap; strict caps need reservations. The `media` kayan enables neither option because it is a library where unattached files are normal. See the [language's jobs guide](https://github.com/drhomet/mithaq/blob/main/packages/mithaq/README.md#jobs).
 
 ### Building and starting both apps
 

@@ -1,3 +1,4 @@
+import { jobTable } from './job-table.ts'
 import { and, asc, count as sqlCount, sum as sqlSum, desc, eq, getTableColumns, getTableName, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, ne, notInArray, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import {
@@ -182,7 +183,7 @@ export type BuiltTables<
 } & {
   // And one per kayan that keeps versions, for the same reason.
   [K in StoreKayan<List[number], StoreName, DefaultStore> as VersionsName<K>]?: ReturnType<typeof pgTable>
-}
+} & { mithaq_jobs?: ReturnType<typeof jobTable> }
 
 /** Builds one field's column. `tables` is every table built so far, keyed by kayan name, which a foreign key reads lazily. */
 export type ColumnBuilder = (field: ResolvedField, tables: Tables) => AnyPgColumnBuilder
@@ -664,7 +665,7 @@ export const drizzleAdapter = <
     throw new Refusal('The drizzle store the language holds keeps every build\'s tables merged, an earlier build\'s among them, so it neither pushes nor migrates them: connect a build, `asas.connect()`, or run the command on `asas.targets.drizzle`.')
   }
   const adapter = { ...storeOf({ ...config, state: every }), connect: async () => merged(), commands: { migrate: async () => merged() } }
-  adapter.init = function (this: unknown, kayanList) {
+  adapter.init = function (this: unknown, kayanList, options) {
     // A target that spreads this adapter and overrides a member would hand the build a store
     // without the override: refused rather than dropped in silence.
     if (this !== undefined && this !== adapter) {
@@ -674,7 +675,7 @@ export const drizzleAdapter = <
     }
     const state = stateOf()
     const built = storeOf({ ...config, state })
-    built.init(kayanList)
+    built.init(kayanList, options)
     Object.assign(every.tables, state.tables)
     Object.assign(every.schemas, state.schemas)
     Object.assign(every.enums, state.enums)
@@ -842,7 +843,7 @@ const storeOf = <
         (await import('./migrate.ts')).run({ target: { db, tables, schemas, enums, connectionString, kayan: [...kayanByName.values()] }, flags }),
     },
 
-    init(kayanList) {
+    init(kayanList, options) {
       const indexNames: { where: string; kayan: string; name: string }[] = []
       for (const kayan of kayanList) {
         kayanByName.set(kayan.name, kayan)
@@ -1017,6 +1018,11 @@ const storeOf = <
           },
           (table) => [index().on(table.parent!), index().on(table.latest!)],
         )
+      }
+      if (options?.jobs) {
+        if (tables.mithaq_jobs || kayanList.some((one) => one.table === 'mithaq_jobs')) throw new Error('The name mithaq_jobs is reserved for jobs.')
+        tables.mithaq_jobs = jobTable()
+        schemas.public = null
       }
       // Every name the push and the pull hand drizzle-kit as a glob passes here once, built.
       for (const [key, table] of Object.entries(tables)) {

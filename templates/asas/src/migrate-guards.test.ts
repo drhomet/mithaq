@@ -402,7 +402,7 @@ const playbookIndexesIn = (root: URL, expected: number) =>
 const duplicatePair = `insert into public.organization (id, name) values ('o1', 'One');
   insert into app.playbooks (id, code, organization_id) values ('p1', 'C-1', 'o1'), ('p2', 'C-1', 'o1');`
 
-test('a kayan\'s indexes, TB\'s two non-unique pairs in `app` and a unique one, are one migration of three CREATE INDEX lines and nothing else, a new unique index over duplicate rows fails in Postgres and applies nothing, a removed index is a DROP INDEX asked of no one, and the push builds the same three', async (t) => {
+test('a kayan\'s indexes, two non-unique pairs in `app` and a unique one, are one migration of three CREATE INDEX lines and nothing else, a new unique index over duplicate rows fails in Postgres and applies nothing, a removed index is a DROP INDEX asked of no one, and the push builds the same three', async (t) => {
   await migrateDatabase()
   const root = await migrationProject(withSummary)
   try {

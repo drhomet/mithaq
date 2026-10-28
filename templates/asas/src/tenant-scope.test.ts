@@ -44,6 +44,8 @@ import {
   localAuthOperations,
   storage,
   uploadFields,
+  uploadedByField,
+  cleanupUploads,
   versionOperations,
   versionsTarget,
   withUploadReference,
@@ -56,6 +58,7 @@ import {
   type WriteTools,
 } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
+import { defaultNodes, richText, UploadNode } from 'mithaq/rich-text'
 import { storageRoutes } from '../../../packages/mithaq/src/storage/storage.ts'
 import { memoryStore } from './memory-store.ts'
 import { expectedUpdatedAt } from '../../mithaq/src/steps/expected-updated-at.ts'
@@ -148,13 +151,13 @@ const stubServer = () => ({
   handler: async () => new Response(null),
 })
 
-const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { authorize = defaultAuthorize, withLocal = false, publicFiles = false, linkRead }: { authorize?: Authorize; withLocal?: boolean; publicFiles?: boolean; linkRead?: FieldAccess } = {}) => {
+const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { authorize = defaultAuthorize, withLocal = false, publicFiles = false, linkRead, fileLimit, fileUploader }: { authorize?: Authorize; withLocal?: boolean; publicFiles?: boolean; linkRead?: FieldAccess; fileLimit?: number; fileUploader?: object } = {}) => {
   /** A step that writes the row `aimed` names through the raw store, beside the operation's own. */
   const aimAt = (write: 'insert' | 'update' | 'remove') =>
     async (ctx: { tx: unknown }, tools: { store: Record<typeof write, (args: object) => Promise<unknown>> }) =>
       (await tools.store[write]({ tx: ctx.tx, kayan: declaration(built, aimed.kayan ?? ''), id: aimed.id, data: aimed.data }), ctx)
   const language = defineMithaq({
-    arkan: [base, storage(storageConfig)],
+    arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storage(storageConfig)],
     targets: {
       store,
       zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
@@ -315,10 +318,10 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   const files = {
     name: 'files',
     schemaName,
-    fields: { ...defaultFields, ...uploadFields, firmId: tenant.field },
+    fields: { ...defaultFields, ...uploadFields, ...uploadedByField, ...(fileUploader && { uploadedBy: fileUploader }), firmId: tenant.field },
     access: { create: () => true, read: () => true, update: () => true, delete: () => true },
     targets: {
-      storage: { mimeTypes: ['image/png'], ...(publicFiles && { public: true }) },
+      storage: { mimeTypes: ['image/png'], orphanAfter: 1, ...(fileLimit !== undefined && { maxUnattached: fileLimit }), ...(publicFiles && { public: true }) },
       service: {
         operations: {
           ...defaultOperations,
@@ -339,8 +342,21 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
       versions: { drafts: { autosave: true } },
     },
   }
+  const draftOwners = {
+    ...papers, name: 'draftOwners', fields: { ...papers.fields, body: { kind: 'richText' } },
+    targets: {
+      ...papers.targets,
+      service: { operations: { ...defaultOperations, ...versionOperations, stepDraft: { ...defaultOperations.update, afterSteps: [probeStore] } } },
+    },
+  }
+  const fileOwners = {
+    name: 'fileOwners', dbName: 'file_owners', schemaName,
+    fields: { ...defaultFields, firmId: tenant.field, title: { kind: 'text' }, cover: { kind: 'upload', relationTo: 'files' }, deletedAt: { kind: 'datetime', rules: { providedBy: { create: 'never', update: 'never' } } } },
+    access: { create: () => true, read: () => true, update: () => true, delete: () => true },
+    targets: { versions: {}, service: { operations: { ...defaultOperations, ...versionOperations, heldAttach: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert, pause] } } } },
+  }
   // Shared files: no organization's, whoever uploads them.
-  const assets = { ...files, name: 'assets', fields: { ...defaultFields, ...uploadFields } }
+  const assets = { ...files, name: 'assets', fields: { ...defaultFields, ...uploadFields, ...uploadedByField } }
   // One row per organization, kept so by its unique tenant field.
   const prefs = language.defineGlobal({
     name: 'prefs',
@@ -468,12 +484,12 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
     auth: local({ tokenExpiration: defaultTokenExpiration, maxLoginAttempts: defaultMaxLoginAttempts, lockTime: defaultLockTime, ip: () => null, email: { send: async () => {} }, context: (request) => localProbe(request), secret: 'tenant-scope-a-local-auth-test-secret' }),
     targets: { service: { operations: { ...defaultOperations, ...localAuthOperations } } },
   }
-  const built: Built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, tags, pins, badges, serials, stamps, terms, shelves, numbered, uuidData, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
+  const built: Built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [firms, memos, open, files, assets, notes, papers, draftOwners, fileOwners, tags, pins, badges, serials, stamps, terms, shelves, numbered, uuidData, user, ...(withLocal ? [locals] : [])] as never, global: [prefs], auth: { maxBodyBytes: defaultMaxBodyBytes, onError: (error: unknown) => reported.push(error) } } as never) as unknown as Built
   return built
 }
 
-type Ops = Record<'touchMany' | 'hookProbe' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
-type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
+type Ops = Record<'touchMany' | 'hookProbe' | 'stepDraft' | 'heldAttach' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
+type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData' | 'fileOwners' | 'draftOwners', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 // Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
 const declaration = (built: Built, name: string) => (built.kayan as unknown as Record<string, { name: string; fields: Record<string, RuntimeField> }>)[name]
@@ -481,8 +497,7 @@ const declaration = (built: Built, name: string) => (built.kayan as unknown as R
   ?? { name, fields: {} as Record<string, RuntimeField> }
 
 /** An actor through the real Better Auth strategy, so every fact the scope reads is the trusted snapshot's. */
-const actorOf = async ({ active, orgs = active ? { [active]: ['editor'] } : {}, backoffice = false, collection = 'user' }: { active?: string | null; orgs?: Record<string, string[]>; backoffice?: boolean; collection?: string }) => {
-  const id = `person-${(members += 1)}`
+const actorOf = async ({ active, orgs = active ? { [active]: ['editor'] } : {}, backoffice = false, collection = 'user', id = `person-${(members += 1)}` }: { active?: string | null; orgs?: Record<string, string[]>; backoffice?: boolean; collection?: string; id?: string }) => {
   sessions.set(id, { active, orgs: Object.keys(orgs) })
   for (const [org, slugs] of Object.entries(orgs)) assignments.set(`${org}:${id}`, slugs)
   if (backoffice) staff.add(id)
@@ -1275,6 +1290,128 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal((await built.handler(new Request(new URL(request.url, 'http://test'), { method: 'PUT', headers: request.headers, body: png }))).status, 204)
     return file.uploadReference
   }
+
+  test('background cleanup writes uploader identity and only checks and deletes its own organization', async () => {
+    const files = built.kayan.files.operations
+    const prior = (await store.find({ kayan: 'files', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { firmId: { equals: 'org1' } } } })).docs.length
+    const own = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const kept = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const foreign = await files.create({ uploadReference: await uploaded(two, 'files') }, { actor: two })
+    assert.equal(own.uploadedBy, one.id)
+    await built.kayan.notes.operations.create({ title: 'attached upload', memo: null, memoSet: [], tag: null, cover: kept.id, reply: null }, { actor: one })
+    const counts = await cleanupUploads({ asas: built, tenant: 'org1', now: new Date(Date.now() + 60000) })
+    assert.deepEqual(counts, { rowsChecked: prior + 2, rowsDeleted: 1, rowsKept: prior + 1, failures: 0 })
+    assert.equal((await refusal(files.findByID({ id: own.id }, { actor: one }))).status, 404)
+    assert.equal((await files.findByID({ id: kept.id }, { actor: one })).id, kept.id)
+    assert.equal((await files.findByID({ id: foreign.id }, { actor: two })).id, foreign.id)
+    assert.equal((await refusal(files.update({ id: kept.id, uploadedBy: 'somebody' }, { actor: one }))).status, 400)
+  })
+
+  test('title-only drafts and autosaves keep an existing rich-text snapshot after its upload is deleted', async () => {
+    const files = built.kayan.files.operations
+    const papers = built.kayan.draftOwners.operations
+    const file = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const body = { root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'upload', version: 3, format: '', id: 'node', relationTo: 'files', value: file.id, fields: null }] } }
+    const paper = await papers.create({ title: 'published upload', memo: null, body, _status: 'published' }, { actor: one })
+    await files.delete({ id: file.id }, { actor: one })
+    for (const autosave of [false, true]) {
+      assert.equal((await refusal(papers.update({ id: paper.id, title: 'foreign edit' }, { actor: two, draft: true, autosave }))).status, 404)
+      await papers.update({ id: paper.id, title: `saved ${autosave}` }, { actor: one, draft: true, autosave })
+      const saved = await papers.findByID({ id: paper.id }, { actor: one, draft: true })
+      assert.equal(saved.title, `saved ${autosave}`)
+      assert.deepEqual(saved.body, body)
+    }
+  })
+
+  test('a draft step refuses an upload deleted by cleanup before saving its rich-text snapshot', async () => {
+    const files = built.kayan.files.operations
+    const papers = built.kayan.draftOwners.operations
+    const file = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const paper = await papers.create({ title: 'draft after cleanup', memo: null, body: null }, { actor: one })
+    await cleanupUploads({ asas: built, tenant: 'org1', now: new Date(Date.now() + 60000) })
+    assert.equal((await refusal(files.findByID({ id: file.id }, { actor: one }))).status, 404)
+    const body = { root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'upload', version: 3, format: '', id: 'node', relationTo: 'files', value: file.id, fields: null }] } }
+    storeProbe = async (ctx, tools) => { await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'draftOwners'), id: paper.id, data: { body } }) }
+    try {
+      assert.equal((await refusal(papers.stepDraft({ id: paper.id, title: 'refused snapshot' }, { actor: one, draft: true }))).key, 'error.invalid.tenant_reference')
+    } finally { storeProbe = async () => {} }
+    assert.equal((await papers.findByID({ id: paper.id }, { actor: one, draft: true })).body, null)
+  })
+
+  test('a draft step holds its own rich-text upload against cleanup and refuses another organization', { timeout: 10000 }, async () => {
+    const files = built.kayan.files.operations
+    const papers = built.kayan.draftOwners.operations
+    const own = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const foreign = await files.create({ uploadReference: await uploaded(two, 'files') }, { actor: two })
+    const paper = await papers.create({ title: 'step upload draft', memo: null, body: null }, { actor: one })
+    const body = (id: string) => ({ root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'upload', version: 3, format: '', id: 'node', relationTo: 'files', value: id, fields: null }] } })
+    storeProbe = async (ctx, tools) => { await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'draftOwners'), id: paper.id, data: { body: body(foreign.id) } }) }
+    try {
+      assert.equal((await refusal(papers.stepDraft({ id: paper.id, title: 'foreign upload' }, { actor: one, draft: true }))).key, 'error.invalid.tenant_reference')
+    } finally { storeProbe = async () => {} }
+    const held = postgres ? hold() : undefined
+    storeProbe = async (ctx, tools) => {
+      await tools.store.update({ tx: ctx.tx, kayan: declaration(built, 'draftOwners'), id: paper.id, data: { body: body(own.id) } })
+      if (held) await pause(ctx)
+    }
+    const drafting = papers.stepDraft({ id: paper.id, title: 'own upload' }, { actor: one, draft: true })
+    let cleaning: ReturnType<typeof cleanupUploads> | undefined
+    try {
+      if (held) {
+        await within(held.reached.promise)
+        let answered = false
+        cleaning = cleanupUploads({ asas: built, tenant: 'org1', now: new Date(Date.now() + 60000) }).then((result) => { answered = true; return result })
+        await setTimeout(50)
+        assert.equal(answered, false, 'cleanup waits for the draft step holding the referenced upload')
+      }
+    } finally {
+      held?.release.resolve()
+      await within(Promise.allSettled([drafting, ...(cleaning ? [cleaning] : [])]), 5000)
+      storeProbe = async () => {}
+    }
+    await drafting
+    if (cleaning) assert.equal((await cleaning).failures, 0)
+    assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one, draft: true })).body, body(own.id))
+    assert.equal((await papers.findByID({ id: paper.id }, { actor: one })).body, null)
+    assert.equal((await files.findByID({ id: own.id }, { actor: one })).id, own.id)
+    assert.equal((await files.findByID({ id: foreign.id }, { actor: two })).id, foreign.id)
+  })
+
+  test('cleanup retains historical and soft-deleted owners in Postgres as well as memory', async () => {
+    const files = built.kayan.files.operations
+    const owners = built.kayan.fileOwners.operations
+    const oldFile = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const softFile = await files.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const old = await owners.create({ title: 'historical owner', cover: oldFile.id }, { actor: one })
+    await owners.update({ id: old.id, cover: null }, { actor: one })
+    const versions = await store.find({ kayan: '_file_owners_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { parent: { equals: old.id } } } })
+    const historical = versions.docs.find((row) => !row.latest)!
+    await store.transaction((tx) => store.update({ tx, kayan: '_file_owners_versions', id: historical.id, data: { version: { ...(historical.version as object), firmId: 'org2' } } }))
+    const soft = await owners.create({ title: 'trashed owner', cover: softFile.id }, { actor: one })
+    await owners.delete({ id: soft.id }, { actor: one })
+    const result = await cleanupUploads({ asas: built, tenant: 'org1', now: new Date(Date.now() + 60000) })
+    assert.equal(result.failures, 0)
+    assert.equal((await files.findByID({ id: oldFile.id }, { actor: one })).id, oldFile.id)
+    assert.equal((await files.findByID({ id: softFile.id }, { actor: one })).id, softFile.id)
+    const snapshots = await store.find({ kayan: '_file_owners_versions', args: { limit: 0, page: 1, sort: { field: 'id', direction: 'asc' }, where: { parent: { equals: old.id } } } })
+    assert.ok(snapshots.docs.some((row) => !row.latest && (row.version as Record<string, unknown>).cover === oldFile.id))
+  })
+
+  if (postgres) test('cleanup waits for a competing attachment and rechecks references with its row locked', { timeout: 10000 }, async () => {
+    const file = await built.kayan.files.operations.create({ uploadReference: await uploaded(one, 'files') }, { actor: one })
+    const held = hold()
+    const attaching = built.kayan.fileOwners.operations.heldAttach({ title: 'racing owner', cover: file.id }, { actor: one })
+    await within(held.reached.promise)
+    let answered = false
+    const cleaning = cleanupUploads({ asas: built, tenant: 'org1', now: new Date(Date.now() + 60000) }).then((result) => { answered = true; return result })
+    try {
+      await setTimeout(50)
+      assert.equal(answered, false)
+    } finally { held.release.resolve() }
+    await attaching
+    assert.equal((await cleaning).failures, 0)
+    assert.equal((await built.kayan.files.operations.findByID({ id: file.id }, { actor: one })).id, file.id)
+  })
 
   test('an upload is signed, checked and served in its kayan\'s own scope: an organization\'s file under its folder, a shared kayan\'s under none', async () => {
     const files = built.kayan.files.operations
@@ -2416,6 +2553,11 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
 
 suite('memory store', async () => {
   const store = memoryStore()
+  const insert = store.insert
+  store.insert = (args) => insert(args.kayan === 'fileOwners'
+    ? { ...args, data: { deletedAt: null, ...args.data } }
+    // Postgres serializes snapshots, so the test store must detach one from its mutable owner.
+    : args.kayan === '_file_owners_versions' ? { ...args, data: structuredClone(args.data) } : args)
   return { built: languageOf(store as never), store: store as unknown as Store, done: async () => {} }
 })
 
@@ -2587,4 +2729,42 @@ test('default-argument linking masks cannot expose counts across records or orga
   const page=await built.kayan.memos.operations.find({counts:['notes']},{actor:one})
   assert.deepEqual(page.docs.map((row:{id:string})=>row.id),[parent.id])
   assert.deepEqual(page.counts,{})
+})
+
+
+test('the upload cap counts one user in the active organization and leaves other users and organizations alone', async () => {
+  const memory = memoryStore()
+  const built = languageOf(memory as never, { fileLimit: 1 })
+  for (const id of ['org1', 'org2']) await memory.insert({ tx: undefined, kayan: 'firms', data: { id, name: id } })
+  const one = await actorOf({ active: 'org1', id: 'capped-user' })
+  const ask = (actor: Record<string, unknown>) => built.handler(new Request('http://test/api/files/uploadInstructions', { method: 'POST', headers: { 'x-person': String(actor.id), 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'cover.png', filesize: 1, mimeType: 'image/png' }) }))
+  const row = { id: randomUUID(), uploadedBy: one.id, firmId: 'org1', key: 'app/capped-file', storage: 'local', filename: 'cover.png', mimeType: 'image/png', filesize: 1, width: null, height: null, createdAt: new Date(), updatedAt: new Date() }
+  await memory.insert({ tx: undefined, kayan: 'files', data: row })
+  assert.equal((await ask(one)).status, 400)
+  const two = await actorOf({ active: 'org2', id: 'capped-user' })
+  assert.equal((await ask(two)).status, 200)
+  const other = await actorOf({ active: 'org1' })
+  assert.equal((await ask(other)).status, 200)
+  await built.destroy()
+})
+
+
+test('a custom uploadedBy keeps its caller value and stays within its organization', async () => {
+  const memory = memoryStore()
+  const built = languageOf(memory as never, { fileUploader: { kind: 'text' } })
+  try {
+    for (const id of ['org1', 'org2']) await memory.insert({ tx: undefined, kayan: 'firms', data: { id, name: id } })
+    const one = await actorOf({ active: 'org1' })
+    const two = await actorOf({ active: 'org2' })
+    const png = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'))
+    const asked = await built.handler(new Request('http://test/api/files/uploadInstructions', { method: 'POST', headers: { 'x-person': String(one.id), 'content-type': 'application/json' }, body: JSON.stringify({ filename: 'cover.png', filesize: png.length, mimeType: 'image/png' }) }))
+    assert.equal(asked.status, 200)
+    const { request, file } = await asked.json() as { request: { url: string; headers: Record<string, string> }; file: { uploadReference: Record<string, unknown> } }
+    assert.equal((await built.handler(new Request(new URL(request.url, 'http://test'), { method: 'PUT', headers: request.headers, body: png }))).status, 204)
+    const files = built.kayan.files.operations
+    const made = await files.create({ uploadReference: file.uploadReference, uploadedBy: 'legacy-owner' }, { actor: one })
+    assert.equal(made.uploadedBy, 'legacy-owner')
+    assert.equal((await files.findByID({ id: made.id }, { actor: one })).uploadedBy, 'legacy-owner')
+    assert.equal((await refusal(files.findByID({ id: made.id }, { actor: two }))).status, 404)
+  } finally { await built.destroy() }
 })

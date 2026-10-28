@@ -36,7 +36,7 @@ test('187z. the converters take the project\'s nodes and pick none of their own:
   }
 })
 
-test('187a. TB\'s real stored description converts with nothing dropped, passes the reader and reads as the same text', () => {
+test('187a. A stored Payload description converts with nothing dropped, passes the reader and reads as the same text', () => {
   const result = converted(richText.convertPayloadToLexical({ data: fixture, nodes: defaultNodes }))
   assert.deepEqual(result.dropped, [])
   const before = read(fixture)

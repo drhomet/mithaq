@@ -450,7 +450,7 @@ fields: { ...defaultFields, ...draftFields, /* ... */ },
 Where it lives: `packages/mithaq/src/versions/versions.ts` `versionsOf`.
 
 **Storage.** A kayan holds files by writing `targets.storage` (`mimeTypes`,
-optional `fileSize`, optional `public: true`) and spreading `uploadFields`.
+optional `fileSize`, optional `public: true`, `orphanAfter` and `maxUnattached`) and spreading `uploadFields`.
 Exactly one of its operations makes rows, and that operation runs the config's
 `uploaded` step in `beforeTransaction`. The browser asks `POST
 /api/<kayan>/uploadInstructions`, uploads the file, and sends the signed
@@ -458,6 +458,12 @@ reference back in the create; `GET /api/<kayan>/file/<id>` serves it through
 the kayan's own `findByID`. A global holds no files, and a kayan that holds
 files keeps no versions. Where it lives:
 `packages/mithaq/src/storage/storage.ts` `resolveStorage`.
+
+The uploads template names `defaultStorageSweepTask` from its ejected `storage/defaults.ts` in `buildAsas.tasks` as `storageSweep`. A long-running server passes `connect({ work: ['maintenance'] })` to run it hourly; a serverless host leaves `work` out and calls `mithaq jobs run maintenance` from the platform’s cron. Run `storage sweep --check` first to inspect the existing object policy. The scheduled task first removes abandoned upload rows, then calls the same `config.sweep` object policy as the CLI. The CLI remains an object-only sweep and still prints keys; background logs contain task names and counts alone: rows checked, deleted and kept, objects listed and deleted, and failures.
+
+Set `targets.storage.orphanAfter` to a positive grace period in milliseconds only on an upload kayan where an unattached row means an abandoned upload. A cleanup takes one organization at a time, locks each candidate and checks its references again in the delete transaction. Soft-deleted owners and every retained version snapshot keep the file, including rich-text upload nodes and relationship sets. Cleanup permanently deletes eligible rows even when the upload kayan normally soft-deletes, and calls `removed` after commit. Foreign-key refusals keep the row. A pointer using `onDelete: 'cascade'` or `'set null'` makes this policy unsafe and is refused with its field name. Owners and their upload must use the same store. An internal, row-specific maintenance actor authorizes only that selected delete; the ordinary tenant scope and sealed step store still apply, independently of project access rules.
+
+Set `targets.storage.maxUnattached` to a positive per-user cap and spread `uploadedByField` beside `uploadFields`. The runner writes the actor's id to the optional `uploadedBy` text column on create and refuses managed updates to it. It has no foreign key, so deleting a user never blocks on their uploads. Instructions are refused with the translated `error.invalid.upload_limit` and a `limit` parameter while that user already holds the cap of unattached rows in the active organization. Attaching, trashing or removing a file frees a slot. Previously signed instructions can exceed the cap; a strict cap needs reservations. Add the field with a migration before enabling the cap. Setting `maxUnattached` adds a message key, so run `bunx mithaq generate messages` before `generate messages --check` can pass. The template's `media` is a library, so it enables neither policy: an unreferenced image there is normal.
 
 **Screens.** A kayan says what each screen draws of it under
 `targets.<screen>`: its title field, its pages, and per-field drawing hints. See
@@ -504,6 +510,7 @@ capability alone:
 | `tenant` | says which kayan a row's organization is | at most one, named `tenant` |
 | `storage` | where a kayan's files are kept | at most one |
 | `versions` | where a kayan's past copies are kept | at most one |
+| `jobs` | persists scheduled work through a driver sharing the service store’s transactions | at most one |
 
 A store or schema target has one entry per kind and per rule; a kind may also
 carry its own implementation for a target's `type`. A target may carry
@@ -570,6 +577,50 @@ export const asas = buildAsas({
 Where it lives: `packages/mithaq/src/asas/build.ts` `buildAsas`; the template's
 is `templates/asas/src/asas.ts`.
 
+### Jobs
+
+Jobs are a capability of the language. The template’s `jobs` add-on (`--with jobs`, also pulled in by `uploads`) names its target explicitly:
+
+<!-- from: templates/mithaq/src/mithaq.ts -->
+```ts
+jobs: drizzleJobs({ lease: defaultJobLease, retain: defaultJobRetention }),
+```
+
+Import `drizzleJobs`, `defaultJobLease` and `defaultJobRetention` from `mithaq` or `mithaq/targets`. The lease is thirty seconds, renewed while work runs; retention keeps completed history for seven days and failed history for thirty days. Each value is explicit milliseconds and replaceable. A language without a jobs target and a build without `tasks` gain no table, timer, migration or message key. Existing projects opt in by adding the owner-approved target, signing their language change and writing and applying a migration before starting workers. Two jobs targets, a driver incompatible with the service store, missing lease or retention, and tasks without a jobs target are refused.
+
+Tasks are keyed by name and spread like operations. With uploads, the template names its ejected policy:
+
+<!-- from: templates/asas/src/asas.ts -->
+```ts
+tasks: { storageSweep: defaultStorageSweepTask },
+```
+
+A task is `{ cron, queue, run }`. `run({ asas, input, signal })` returns `Promise<Record<string, number>>`, finite numeric counts alone. Every task names a valid cron, a nonempty queue and a run function; cron uses UTC. The default storage task runs hourly on `maintenance`. Projects edit its ejected policy in `storage/defaults.ts`.
+
+`asas.connect({ work: ['maintenance'] })` starts one protected, unreferenced timer per task in those queues, at the task’s own cron. `connect()` starts no timers; development and tests run no work unless requested. A queue no task uses is refused by name before stores connect. `connect({ readOnly: true, work })` is refused. `destroy()` stops timers and waits for an in-flight pass before closing stores. A long-running server passes `connect({ work })` explicitly. A serverless host leaves `work` out because timers can freeze between requests, and calls `mithaq jobs run` from the platform’s cron. [`mithaq jobs run maintenance`](src/asas/cli/README.md#jobs-run) performs one pass for an outside cron; with no queue arguments it uses all task queues.
+
+`asas.jobs.schedule({ queue, now? })` records the latest occurrence at or before now; older missed fires are not backfilled. `asas.jobs.run({ queue })` schedules, expires dead leases, claims and runs due jobs, then prunes history. It catches task and database failures so a later pass can run. One claimed job at a time keeps every lease under its heartbeat. An expired job ends failed as interrupted and never reruns blindly. Logs hold task names and counts, never input, output keys, stored error text or uploaded filenames. A task’s thrown message is stored in its failed job, so restrict database access to job history.
+
+Core’s scheduler and worker contain no SQL. `drizzleJobs` owns `mithaq_jobs`, generated through the drizzle store’s normal migrations, never a kayan or a managed API. It holds task, input, queue, nullable tenant, schedule and wait times, token, lease, attempts, completion, error, output and timestamps. A partial unique index plus `ON CONFLICT DO NOTHING` makes scheduling atomic, and `FOR UPDATE SKIP LOCKED` makes claims exclusive. Each task’s newest scheduled row remains as its watermark: recording rejects an equal or older occurrence, and pruning keeps that row even past retention. A drizzle wrapper must forward both `init(kayan, options)` arguments.
+
+`memoryJobs({ lease, retain })` supplies the same guarantees in one process for tests and development. A memory store spreads `memoryTransactions()` and uses its `transaction` function and `afterCommit` hook; queued jobs become visible only after a successful transaction. Drivers initialized against the same memory transaction manager share jobs and task watermarks. Memory state disappears when the process exits.
+
+### Writing a jobs driver
+
+Implement `JobsDriver` from `mithaq`. Its `store` names the compatible store, `fits(store)` checks compatibility, and `init(store)` binds a fresh driver to the initialized store. `buildAsas` calls these against the service store so future operation-side enqueue can share its transaction. A target is `{ capability: 'jobs', type, driver, lease, retain }`; it builds no field maps.
+
+- `record({ task, scheduledFor, queue, tenant })` records only when no row of that task has an equal or newer scheduled time; equal racers insert once. A recorded occurrence is immediately due even if its scheduled time is ahead of the driver clock; only `enqueue({ runAt })` delays work. Pruning preserves the newest row as the task watermark.
+- `enqueue({ task, input, queue, tenant, runAt, tx })` joins the caller’s transaction, including rollback. This driver method is tested now; operation-side enqueue is not exposed yet.
+- `claim({ queue, tasks, limit, lease, token })` returns exclusive due jobs whose names are in `tasks`, only unclaimed and never attempted. A rolling deployment leaves unknown tasks for an instance that knows them. Phase one claims null-tenant jobs alone.
+- `renew({ ids, token, lease })` returns only ids with unexpired leases still owned by the token.
+- `finish({ id, token, output } | { id, token, error })` completes or fails only work whose unexpired lease that token owns. Stale tokens change nothing.
+- `expire()` fails expired held work without making it runnable again and returns its count.
+- `prune({ completed, failed })` takes retention durations in milliseconds and removes terminal history older than those durations using the driver’s clock. It returns the count, keeping the newest scheduled row of each task even past retention.
+
+Run the exported `jobsContract(factory)` from `mithaq/jobs/contract` in a `node:test` file. The async factory returns `{ driver, peer, transaction, destroy }`, with both drivers sharing fresh storage and transactions for each case. The driver owns its clock for claims, renewal, completion, expiry and retention; drizzle uses `clock_timestamp()` and memory uses its own clock. The same suite proves races across drivers, task filters, claim limits and due times, rollback and commit visibility, renewal past the original deadline, expiry, stale finishes and watermark-preserving retention for both shipped drivers.
+
+Polling wakes workers only at task cron fires. Wake-ups, Convex and Prisma drivers, tasks per organization, enqueue from operations, retries, `LISTEN/NOTIFY` and an HTTP runner are later work. Tenant columns reserve that future contract; jobs provide no escape from managed tenant enforcement.
+
 ### Defaults are explicit
 
 Core never falls back to a behaviour of its own. Each default has an exported
@@ -610,7 +661,7 @@ project, which the project edits there.
 - `kayan.<name>.operations` and `global.<name>.operations`: each operation as a
   function, `(input, { actor })`, for code in the app:
   `asas.kayan.courses.operations.find({ limit: 20 }, { actor })`.
-- `connect({ readOnly? })`: reaches every store and prepares it, and with
+- `connect({ readOnly?, work? })`: reaches every store and prepares it, and with
   `readOnly` writes nothing. With the drizzle store's `prodMigrations`, it runs
   or refuses pending migrations; see [Migrations in production](src/drizzle/README.md).
 - `destroy()`: closes every store.
@@ -1013,7 +1064,7 @@ A red lock also stops both apps' `dev`, `build` and `preview` scripts. While a p
 
 ### Add a target
 
-A target is one entry in `defineMithaq`'s `targets`, under a name, with a `capability` core knows: `store`, `schema`, `access`, `service`, `screen`, `tenant`, `storage` or `versions`. A target's name and capability are vocabulary, so the owner signs every new one. A new capability is a change to mithaq itself.
+A target is one entry in `defineMithaq`'s `targets`, under a name, with a `capability` core knows: `store`, `schema`, `access`, `service`, `screen`, `tenant`, `storage`, `versions` or `jobs`. A target's name and capability are vocabulary, so the owner signs every new one. A new capability is a change to mithaq itself.
 
 A target of an existing capability can be the project's own and spreads into `targets` beside the shipped ones. A new target shipped by mithaq follows the order below. Paths from here on are in the mithaq repository.
 

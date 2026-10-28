@@ -22,6 +22,9 @@ import * as richTextComments from '@asas/rich-text-comments'
 // end add-on: rich-text-comments
 import * as tags from '@asas/tags'
 import { defaultMaxBodyBytes, fetchHttp, Notice } from 'mithaq'
+// add-on: uploads
+import { defaultStorageSweepTask } from '@asas/mithaq/storage/defaults.ts'
+// end add-on: uploads
 import { orpcHttp } from 'mithaq/orpc'
 import { buildAsas, requestContext } from '@asas/mithaq'
 import { backofficeHttp } from './backoffice-http.ts'
@@ -37,6 +40,9 @@ import { superAdmin } from '@asas/mithaq/roles/tenant-access.ts'
 const report = (error: unknown) => console.error(error instanceof Notice ? error.message : error)
 
 export const asas = buildAsas({
+  // add-on: uploads
+  tasks: { storageSweep: defaultStorageSweepTask },
+  // end add-on: uploads
   kayan: [
     ...auth.kayan,
     // add-on: roles

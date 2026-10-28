@@ -108,7 +108,7 @@ type StoreKeys<Targets> = {
   [Name in keyof Targets]: Targets[Name] extends { capability: 'store' } ? Name : never
 }[keyof Targets] & string
 type SchemaKeys<Targets> = {
-  [Name in keyof Targets]: Targets[Name] extends { capability: 'screen' | 'service' | 'storage' | 'store' | 'tenant' | 'versions' } ? never : Name
+  [Name in keyof Targets]: Targets[Name] extends { capability: 'screen' | 'service' | 'storage' | 'store' | 'tenant' | 'versions' | 'jobs' } ? never : Name
 }[keyof Targets] & string
 type NamedStore<Name> = [Name] extends [undefined] ? { store?: undefined } : { store: Name }
 type NamedSchema<Name> = [Name] extends [undefined] ? { schema?: undefined } : { schema: Name }

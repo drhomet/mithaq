@@ -24,7 +24,7 @@ import { kayanServiceKeys, unsortable, type CompoundIndex, type Kayan, type Kaya
 import { defaultKinds } from '../base/kinds.ts'
 import { compareDecimals } from '../base/decimal.ts'
 import type { ScreenField } from '../screen/index.ts'
-import { isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceTargetOf, tenantDefaults, type FieldTarget, type Language, type Store } from './language-core.ts'
+import { isJobs, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceTargetOf, tenantDefaults, type FieldTarget, type Language, type Store } from './language-core.ts'
 import type { KayanVersions } from '../versions/index.ts'
 import { versionsOf } from '../versions/versions.ts'
 import { providerOf } from '../base/rules.ts'
@@ -675,7 +675,7 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
   const resolvedByName = new Map(resolved.map((kayan) => [kayan.name, kayan]))
   // The targets that shape a field; the access, service and screen targets shape none.
   const targets = Object.entries(language.targets).filter(
-    ([, target]) => !isAccess(target) && !isScreen(target) && !isService(target) && !isVersions(target) && !isStorage(target) && !isTenant(target),
+    ([, target]) => !isJobs(target) && !isAccess(target) && !isScreen(target) && !isService(target) && !isVersions(target) && !isStorage(target) && !isTenant(target),
   ) as [string, FieldTarget][]
   // A `targets.<name>` naming no target is a typo, not an override. `service` is left
   // out: only a kayan writes it, and one written elsewhere is refused by name.
