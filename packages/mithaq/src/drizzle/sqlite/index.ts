@@ -63,6 +63,14 @@ const decimalText = (value: unknown, field: ResolvedField): unknown => {
   return `${value.startsWith('-') && (digits !== '0' || tail) ? '-' : ''}${digits}${tail ? `.${tail}` : ''}`
 }
 
+// Postgres reads ISO text for a timestamp itself; a millisecond column takes a Date.
+const moment = (value: unknown, field: ResolvedField): unknown => {
+  if (typeof value !== 'string') return value
+  const at = new Date(value)
+  if (Number.isNaN(at.getTime())) throw invalid({ message: `Field "${field.name}" needs a moment.`, key: 'error.invalid.value', params: { field: field.name } })
+  return at
+}
+
 // Text keeps decimal precision, but SQLite cannot order it numerically without rounding.
 const refuseDecimalOrder = (kayan: string, field: string) => invalid({
   message: `Kayan "${kayan}" field "${field}" is a decimal stored as text, so the device store cannot order it exactly.`,
@@ -172,6 +180,8 @@ export const sqliteAdapter = <
         const normalized = named?.kind === 'decimal' ? Object.fromEntries(Object.entries(rules).map(([operator, value]) => [operator,
           operator === 'equals' || operator === 'not_equals' ? decimalText(value, named)
             : operator === 'in' || operator === 'not_in' ? (value as unknown[]).map((one) => decimalText(one, named)) : value,
+        ])) : named?.kind === 'datetime' ? Object.fromEntries(Object.entries(rules).map(([operator, value]) => [operator,
+          operator === 'exists' ? value : Array.isArray(value) ? value.map((one) => moment(one, named)) : moment(value, named),
         ])) : rules
         const condition = conditionsOf(named?.kind === 'richText' ? textOf(column) : column, normalized as Record<string, unknown>)
         parts.push(hop ? inArray(table[own!]!, client.select({ id: target.id as never }).from(target).where(condition)) : condition)
@@ -263,8 +273,8 @@ export const sqliteAdapter = <
         if (kind === 'decimal') throw invalid({ message: `Kayan "${name}" field "${field}" is a decimal, and SQLite sums a decimal as a float, which would round it.`, key: 'error.invalid.value', params: { kayan: name, field } })
         if (kind !== 'integer' && kind !== 'number') throw invalid({ message: `Kayan "${name}" field "${field}" is not numeric, so it cannot be summed.`, key: 'error.invalid.value', params: { kayan: name, field } })
         const client = (tx ?? db) as Database
-        // `total` answers 0 over no rows, where `sum` answers null.
-        const [row] = await client.select({ total: sql<number>`total(${tables[name]![field]})` }).from(tables[name]!).where(where ? whereOf(client, name, where) : undefined)
+        // `sum` adds integers exactly where `total` adds doubles, and as text no driver reads it through a double.
+        const [row] = await client.select({ total: sql<string>`cast(coalesce(sum(${tables[name]![field]}), 0) as text)` }).from(tables[name]!).where(where ? whereOf(client, name, where) : undefined)
         return String(row?.total ?? 0)
       },
       async count({ kayan: name, args: { where }, tx }: Parameters<NonNullable<Store['count']>>[0]) {

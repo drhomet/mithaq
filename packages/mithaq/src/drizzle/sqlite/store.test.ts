@@ -292,3 +292,23 @@ test('device decimal unique constraints reject alternate spellings on insert, up
   const store = asas.targets.sqlite
   await assert.rejects(store.transaction((tx) => store.upsert({ tx, kayan: 'patient', on: ['mrn'], data: { mrn: 'unique-two', name: 'Ten', weight: '10.0', createdAt: new Date(), updatedAt: new Date() } })), conflict)
 })
+
+test('a datetime filter takes a moment as ISO text, as the server store does', async () => {
+  const { asas } = await device()
+  const first = await asas.kayan.patient.operations.create({ mrn: 'T-1', name: 'First' })
+  await wait(2)
+  const second = await asas.kayan.patient.operations.create({ mrn: 'T-2', name: 'Second' })
+  const names = async (where: Where) => (await asas.kayan.patient.operations.find({ where, sort: 'name', limit: 10 })).docs.map((one) => one.name)
+  assert.deepEqual(await names({ createdAt: { greater_than_equal: second.createdAt.toISOString() } }), ['Second'])
+  assert.deepEqual(await names({ createdAt: { in: [first.createdAt.toISOString()] } }), ['First'])
+  assert.deepEqual(await names({ createdAt: { exists: true } }), ['First', 'Second'])
+})
+
+test('an integer sum is exact past the doubles, as a Postgres sum is', async () => {
+  const { asas, sqlite } = await device()
+  const { id } = await asas.kayan.patient.operations.create({ mrn: 'S-1', name: 'One' })
+  // Past any one value the schema admits, so only rows written beside the runner reach it.
+  sqlite.prepare('insert into admission (patient_id, ward, beds, updated_at, created_at) values (?, ?, ?, 0, 0)').run(id, 'A', 9007199254740991n)
+  sqlite.prepare('insert into admission (patient_id, ward, beds, updated_at, created_at) values (?, ?, ?, 0, 0)').run(id, 'B', 2)
+  assert.equal(await asas.targets.sqlite.sum({ kayan: 'admission', field: 'beds' }), '9007199254740993')
+})
