@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxLimit, defaultOperations, defineMithaq, serviceTarget, sqliteAdapter, drizzleSqliteIdKinds, drizzleSqliteKinds, drizzleSqliteRules, zodTarget, zodKinds, zodRules, zodIdKinds, type ProjectStep, type Ctx } from '../../device.ts'
 import { nodeSqlite } from '../../drizzle/sqlite/__fixtures__/node-sqlite.ts'
+import { deviceAsas } from '../../drizzle/sqlite/__fixtures__/device-language.ts'
 
 const setup = ({ beforeTransaction = [], noteBeforeTransaction = [], beforeSteps = [], afterSteps = [], afterCommit = [] }: { beforeTransaction?: readonly ProjectStep[]; noteBeforeTransaction?: readonly ProjectStep[]; beforeSteps?: readonly ProjectStep[]; afterSteps?: readonly ProjectStep[]; afterCommit?: readonly ProjectStep[] } = {}) => {
   const fixture = nodeSqlite()
@@ -259,4 +260,16 @@ test('a device build accepts the default bulk ceiling above maxLimit', () => {
   } }).buildAsas({ kayan: [patient], http: [] })
   assert.doesNotThrow(() => build(defaultBulkLimit))
   assert.doesNotThrow(() => build(defaultMaxLimit))
+})
+
+test('a device row is updated and deleted by its uuid in any case, as the server finds it', async () => {
+  const fixture = nodeSqlite()
+  fixture.sqlite.exec("create table patient (id text primary key not null, name text not null, created_at integer not null, updated_at integer not null)")
+  fixture.sqlite.exec("insert into patient values ('abcdefab-1234-4234-8234-abcdefabcdef', 'Huda', 0, 0)")
+  const asas = deviceAsas(fixture.database)
+  await asas.connect()
+  const id = 'ABCDEFAB-1234-4234-8234-ABCDEFABCDEF'
+  assert.equal((await asas.kayan.patient.operations.update({ id, name: 'Huda Salem' })).name, 'Huda Salem')
+  await asas.kayan.patient.operations.delete({ id })
+  assert.equal((await asas.kayan.patient.operations.count()).totalDocs, 0)
 })

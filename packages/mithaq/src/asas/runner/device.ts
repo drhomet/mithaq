@@ -99,7 +99,8 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
     let kind = operation.steps.map(sealOf).find((seal) => seal && ['insert', 'update', 'remove', 'find', 'findOne', 'count', 'updateMany', 'deleteMany'].includes(seal))!
     let schema = operation.input ? operation.input(shape as never) : kind === 'insert' ? shape.create : kind === 'update' ? shape.update : kind === 'remove' ? shape.id : kind === 'findOne' ? shape.byID : shape.list
     if (!schema) throw new Error(`Kayan "${one.name}" has no ${kind} input shape.`)
-    if (operation.effect !== 'read' && !one.single && ['update', 'remove'].includes(kind)) await validated(shape.id, { id: data.id })
+    // The parsed id, which lower-cases a uuid, so the row is found and written however the caller spelled it.
+    if (operation.effect !== 'read' && !one.single && ['update', 'remove'].includes(kind)) data = { ...data, id: (await validated(shape.id, { id: data.id }) as Row).id }
     const output = operation.output ?? outputOf(operation)?.(shape as never)
     const where = await service.authorize({ actor: scope.actor, data, effect: operation.effect, kayan: one, operation: name, kind: kind as never })
     const run = async (tx?: unknown) => {
