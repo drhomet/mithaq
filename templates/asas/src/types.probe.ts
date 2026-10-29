@@ -1950,8 +1950,11 @@ const guardedGlobal = defineGlobal({
   } } },
 })
 const guardedGlobalAsas = buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], global: [guardedGlobal] })
-// @ts-expect-error the declared input requires expectedUpdatedAt
-void guardedGlobalAsas.global.guardedGlobal.operations.update({ title: 'Missing expected update' })
+// A first save has read no row, so the key the declared input adds is optional on a global's update.
+void guardedGlobalAsas.global.guardedGlobal.operations.update({ title: 'First save' })
+type GuardedGlobalUpdate = NonNullable<Parameters<typeof guardedGlobalAsas.global.guardedGlobal.operations.update>[0]>
+type GuardedGlobalKeyIsOptional = Expect<Equal<{} extends Pick<GuardedGlobalUpdate, 'expectedUpdatedAt'> ? true : false, true>>
+type GuardedGlobalKeyStays = Expect<Equal<'expectedUpdatedAt' extends keyof GuardedGlobalUpdate ? true : false, true>>
 void guardedGlobalAsas.global.guardedGlobal.operations.update({ title: 'Declared input', expectedUpdatedAt: new Date() })
 
 // @ts-expect-error a global has no create operation

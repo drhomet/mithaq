@@ -2556,6 +2556,28 @@ test('32. a global\'s first update parses against the create shape, so a field n
   assert.equal(changed.globalType, 'settings', 'and the globalType write passes the check on the update branch too')
 })
 
+test('32a. a global whose update takes expectedUpdatedAt makes its row on a first save that sends the key or leaves it out, and checks it once the row exists', async () => {
+  const mithaq = language(memoryStore())
+  const guarded = <const Name extends string>(name: Name) => mithaq.defineGlobal({
+    name,
+    access: { read: () => true, update: () => true },
+    fields: { ...defaultFields, ...defaultGlobalFields, title: { kind: 'text' } },
+    targets: { service: { operations: { ...defaultGlobalOperations, update: { input: ({ update }) => update.extend({ expectedUpdatedAt: z.date() }), steps: [expectedUpdatedAt, update] } } } },
+  })
+  const built = mithaq.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [], global: [guarded('profile'), guarded('brand')] })
+  const { profile, brand } = built.global
+  // The key is still held to the input that adds it, so a value that is no instant is refused before any row is made.
+  await assert.rejects(profile.operations.update({ title: 'bad', expectedUpdatedAt: 'not a date' as never }), (error: AsasError) => error.status === 400 && /expectedUpdatedAt/.test(error.message))
+  assert.equal(await profile.operations.findOne(), null)
+  // A caller that has read no row has no instant to send, and one that sends some instant is not refused for it.
+  const made = await profile.operations.update({ title: 'first', expectedUpdatedAt: new Date(0) })
+  assert.equal(made.title, 'first')
+  assert.equal((await brand.operations.update({ title: 'first' })).title, 'first')
+  // Once the row exists the step holds the update to the instant it was read at.
+  await assert.rejects(profile.operations.update({ title: 'stale', expectedUpdatedAt: new Date(0) }), (error: AsasError) => error.status === 409)
+  assert.equal((await profile.operations.update({ title: 'second', expectedUpdatedAt: made.updatedAt })).title, 'second')
+})
+
 // A localized field's value is one object keyed by locale, and that is a claim about every schema
 // target rather than about zod: the locales reach a target on the resolved field, which is the one
 // value both of a target's maps and its `derive` already take.
