@@ -4,6 +4,8 @@ import type { Job, JobPolicy, JobsDriver, JobsTarget, JobStore } from '../jobs/d
 
 type Database = Pick<NodePgDatabase, 'execute' | 'transaction'>
 const taskLock = (task: string) => sql`select pg_advisory_xact_lock(hashtext(${`mithaq_jobs:${task}`}))`
+// Pinned, whatever the database's default: only read committed gives the statement after the lock a snapshot taken after it.
+const afterLock = { isolationLevel: 'read committed' } as const
 const driver = (store?: JobStore): JobsDriver => {
   const db = () => {
     if (!store || !('db' in store)) throw new Error('Initialize drizzleJobs with its drizzle store before running work.')
@@ -24,7 +26,7 @@ const driver = (store?: JobStore): JobsDriver => {
         where not exists (select 1 from mithaq_jobs where task = ${task} and scheduled_for >= ${scheduledFor})
         on conflict (task, scheduled_for) where scheduled_for is not null do nothing returning id`)
       return result.rows.length === 1
-    }),
+    }, afterLock),
     enqueue: async ({ task, input, queue, tenant, runAt, tx }) => {
       await (tx as Database).execute(sql`insert into mithaq_jobs (task, input, queue, tenant, wait_until)
         values (${task}, ${JSON.stringify(input)}::jsonb, ${queue}, ${tenant}, ${runAt})`)
@@ -78,7 +80,7 @@ const driver = (store?: JobStore): JobsDriver => {
               select 1 from mithaq_jobs as newer where newer.task = job.task and newer.scheduled_for > job.scheduled_for
             )) returning id`)
           return rows.length
-        })
+        }, afterLock)
       }
       return pruned
     },

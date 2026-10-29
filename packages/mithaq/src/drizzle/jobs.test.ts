@@ -81,3 +81,42 @@ test('a paused scheduler never resurrects an occurrence completed and pruned by 
     await store.destroy()
   }
 })
+
+test('a scheduler on a database whose default isolation is repeatable read still sees the occurrence a peer committed while it waited for the task', async () => {
+  const adapter = drizzleAdapter({ connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds })
+  const store = adapter.init([], { jobs: true }) as typeof adapter
+  const pool = new Pool({ connectionString: testDatabase(), max: 2 })
+  const schema = `jobs_isolation_${crypto.randomUUID().replaceAll('-', '')}`
+  const [control, first] = await Promise.all([pool.connect(), pool.connect()])
+  let recording: Promise<boolean> | undefined
+  try {
+    await store.connect()
+    await control.query(`create schema "${schema}"; create table "${schema}".mithaq_jobs (like public.mithaq_jobs including all)`)
+    for (const client of [control, first]) await client.query(`set search_path to "${schema}"`)
+    // As a database or role configured with this default would hand every transaction.
+    await first.query("set default_transaction_isolation = 'repeatable read'")
+    const db = drizzle({ client: first })
+    const scheduler = drizzleJobs({ lease: 30000, retain: { completed: 0, failed: 0 } }).driver.init({ type: 'drizzle', sql: 'drizzle', db, tables: { mithaq_jobs: {} }, transaction: db.transaction.bind(db) } as never)
+    const scheduledFor = new Date(Date.now() - 2000)
+    const pid = (await first.query('select pg_backend_pid() as pid')).rows[0].pid
+    const waiting = async () => (await control.query('select wait_event from pg_stat_activity where pid = $1', [pid])).rows[0]?.wait_event === 'advisory'
+    // The peer holds the task while it records the next occurrence, the watermark a completed and pruned one leaves.
+    await control.query('begin')
+    await control.query("select pg_advisory_xact_lock(hashtext('mithaq_jobs:isolated'))")
+    recording = scheduler.record({ task: 'isolated', queue: 'maintenance', tenant: null, scheduledFor })
+    for (let i = 0; i < 200 && !await waiting(); i++) await setTimeout(10)
+    assert.equal(await waiting(), true, 'the scheduler waits for the task')
+    await control.query("insert into mithaq_jobs (task, input, queue, scheduled_for) values ('isolated', '{}'::jsonb, 'maintenance', $1)", [new Date(scheduledFor.getTime() + 1000)])
+    await control.query('commit')
+    assert.equal(await recording, false, 'an occurrence older than one already recorded is never recorded')
+    assert.deepEqual((await control.query("select scheduled_for from mithaq_jobs where task = 'isolated'")).rows.length, 1)
+  } finally {
+    await control.query('rollback')
+    await Promise.allSettled([recording])
+    await control.query(`drop schema if exists "${schema}" cascade`)
+    control.release()
+    first.release()
+    await pool.end()
+    await store.destroy()
+  }
+})
