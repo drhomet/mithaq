@@ -188,8 +188,10 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
           afterProbe: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], afterCommit: [probeStore] },
           probeAfterEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [steps.update, probeStore] },
           probeEdit: { steps: ({ steps }: { steps: { update: unknown } }) => [probeStore, steps.update] },
+          touchMany: { ...defaultOperations.updateMany, each: 'probeEdit' },
           probeBulk: { steps: ({ steps }: { steps: { updateMany: unknown } }) => [probeStore, steps.updateMany] },
           probe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert] },
+          hookProbe: { steps: ({ steps }: { steps: { insert: unknown } }) => [probeStore, steps.insert], afterCommit: [probeStore] },
           guarded: { steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], beforeTransaction: [(ctx: unknown) => (outside += 1, ctx)] },
           claimed: { input: () => z.object({ title: z.string(), firmId: z.string() }).strict(), steps: ({ steps }: { steps: { insert: unknown } }) => [steps.insert], beforeTransaction: [(ctx: unknown) => (outside += 1, ctx)] },
           stamp: { steps: ({ steps }: { steps: { insert: unknown } }) => [moveTo('org2'), steps.insert] },
@@ -487,7 +489,7 @@ const languageOf = (store: Record<string, unknown> & { capability: 'store' }, { 
   return built
 }
 
-type Ops = Record<'stepDraft' | 'heldAttach' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
+type Ops = Record<'touchMany' | 'hookProbe' | 'stepDraft' | 'heldAttach' | 'canonical' | 'probeAfterEdit' | 'draftProbeAfterEdit' | 'bump' | 'draftBump' | 'outsideProbe' | 'afterProbe' | 'probeEdit' | 'probeBulk' | 'probe' | 'create' | 'update' | 'delete' | 'find' | 'findByID' | 'count' | 'updateMany' | 'guarded' | 'claimed' | 'stamp' | 'shift' | 'mine' | 'nested' | 'twin' | 'sweep' | 'poke' | 'restamp' | 'touch' | 'prune' | 'plant' | 'link' | 'scribble' | 'forge' | 'peek' | 'peekNested' | 'findVersions' | 'findVersionByID' | 'restoreVersion' | 'heldDelete' | 'heldLink' | 'heldDraft' | 'heldEdit' | 'heldSweep' | 'heldStale' | 'heldRecode' | 'deleteMany' | 'heldShelve' | 'heldClear' | 'heldErase', (input?: unknown, options?: unknown) => Promise<any>>
 type Built = { global: { prefs: { operations: Record<'findOne' | 'update', (input?: unknown, options?: unknown) => Promise<any>> } }; operations: unknown; auth: { actor: (headers: Headers) => Promise<unknown> }; kayan: Record<'memos' | 'opens' | 'firms' | 'files' | 'assets' | 'notes' | 'papers' | 'tags' | 'pins' | 'badges' | 'serials' | 'stamps' | 'terms' | 'shelves' | 'numbered' | 'uuidData' | 'fileOwners' | 'draftOwners', { operations: Ops }>; handler: (request: Request) => Promise<Response>; targets: Record<string, any>; connect: () => Promise<void>; destroy: () => Promise<void> }
 
 // Generic probes select an existing declaration from the built asas; only negative probes fabricate an unknown one.
@@ -783,6 +785,13 @@ const suite = (name: string, make: (authorize: Authorize) => Promise<{ built: Bu
     const both = await actorOf({ active: 'org1', orgs: { org1: ['editor', 'reader'] } })
     assert.ok((await memos().find({ limit: 0 }, { actor: both })).docs.every((row: { firmId: string }) => row.firmId === 'org1'))
     assert.ok((await memos().mine({ limit: 0 }, { actor: one })).docs.every((row: { firmId: string }) => row.firmId === 'org1'))
+  })
+
+  test('mixed caller constraints never discard a tenant boundary beside logical keys', async () => {
+    const where = { and: [{ id: { exists: true } }], or: [{ id: { exists: true } }], firmId: { equals: 'org2' } }
+    assert.equal((await memos().find({ where }, { actor: one })).totalDocs, 0)
+    assert.equal((await memos().count({ where }, { actor: one })).totalDocs, 0)
+    assert.ok((await memos().count({ where }, { actor: two })).totalDocs > 0)
   })
 
   test('a nested managed call keeps the scope of the operation around it', async () => {
@@ -1167,6 +1176,19 @@ const suite = (name: string, make: (authorize: Authorize) => Promise<{ built: Bu
     }
     assert.equal((await pins.count({ where: { 'memo.secret': { equals: 's2' } } }, { actor: two })).totalDocs, 1, 'org2\'s editor reads it')
     assert.equal((await pins.count({ where: { 'memo.secret': { equals: 's2' } } }, { actor: one })).totalDocs, 0, 'org1\'s does not reach it')
+  })
+
+  test('related filters in alternative branches keep the far read scope and field denial', async () => {
+    const pins = built.kayan.pins.operations
+    await pins.create({ label: 'alternative own', memo: ids.org1 }, { actor: one })
+    await pins.create({ label: 'alternative foreign', memo: ids.org2 }, { actor: two })
+    const where = { or: [{ 'memo.title': { equals: 'two' } }, { label: { equals: 'alternative own' } }] }
+    for (const read of [pins.find, pins.count]) {
+      assert.equal((await read({ where }, { actor: one })).totalDocs, 1)
+      const reader = await actorOf({ active: 'org1', orgs: { org1: ['editor'], org2: ['reader'] } })
+      const error = await refusal(read({ where: { or: [{ 'memo.secret': { equals: 's1' } }, { label: { equals: 'absent' } }] } }, { actor: reader, tenant: 'mine' }))
+      assert.equal(error.key, 'error.forbidden.field_read')
+    }
   })
 
   test('joins at every depth read each level through the scope, under the active organization and tenant: \'mine\'', async () => {
@@ -2060,6 +2082,113 @@ const suite = (name: string, make: (authorize: Authorize) => Promise<{ built: Bu
     await holding
     await probing
     assert.equal((await changing as Record<string, unknown>)[kayan === 'tags' ? 'label' : 'name'], 'changed after hold')
+  })
+
+  test('a bulk ceiling above the maximum page size still keeps another organization out', async () => {
+    assert.ok(defaultBulkLimit > defaultMaxLimit)
+    const own = await memos().create({ title: 'bulk page limit' }, { actor: one })
+    const foreign = await memos().findByID({ id: ids.org2 }, { actor: two })
+    const result = await memos().updateMany({ where: { id: { in: [own.id, ids.org2] } }, data: { title: 'bulk page limit changed' } }, { actor: one })
+    assert.deepEqual(result.docs.map((row: { id: string }) => row.id), [own.id])
+    assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, foreign.title)
+    assert.equal((await memos().count({ where: { id: { equals: own.id } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('a custom bulk each with its canonical update declared cannot update another organization', async () => {
+    const first = await memos().create({ title: 'custom each first' }, { actor: one })
+    const second = await memos().create({ title: 'custom each second' }, { actor: two })
+    const changed = await memos().touchMany({ where: { id: { in: [first.id, second.id] } }, data: { title: 'custom each changed' } }, { actor: one })
+    assert.deepEqual(changed.docs.map((row: { id: string }) => row.id), [first.id])
+    assert.equal((await memos().findByID({ id: second.id }, { actor: two })).title, 'custom each second')
+    assert.equal((await memos().count({ where: { title: { equals: 'custom each changed' } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('a nested bulk write cannot use its filter to change another organization', async () => {
+    storeProbe = async (_ctx, tools) => {
+      const result = await (tools.kayans as Record<string, Ops>).memos!.updateMany({ where: { id: { equals: ids.org2 } }, data: { title: 'foreign bulk edit' } })
+      assert.deepEqual(result.docs, [])
+    }
+    try { await memos().probe({ title: 'nested bulk boundary' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.equal((await memos().findByID({ id: ids.org2 }, { actor: two })).title, 'two')
+    assert.equal((await memos().count({ where: { title: { equals: 'nested bulk boundary' } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('programmer errors remain private and cannot replace the tenant inherited by a nested write', async () => {
+    const errors: unknown[] = []
+    const plug = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => errors.push(error) })(built.operations as never)
+    storeProbe = async (_ctx, tools) => {
+      await (tools.kayans as Record<string, Ops>).memos!.create({ title: 'forged nested actor' }, { actor: two })
+    }
+    try {
+      const response = (await plug.handle(new Request('http://test/api/memos/probe', { method: 'POST', body: JSON.stringify({ title: 'private programmer error' }) }), async () => one))!
+      assert.equal(response.status, 500)
+      assert.deepEqual(await response.json(), { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' })
+      assert.equal(errors.length, 1)
+      assert.equal((errors[0] as Error).constructor, Error)
+      assert.equal((errors[0] as Error).message, 'Bound kayan tools inherit the current user and context; do not pass actor or context options.')
+    } finally { storeProbe = async () => {} }
+    assert.equal((await memos().count({ where: { title: { equals: 'forged nested actor' } } }, { actor: two })).totalDocs, 0)
+    assert.equal((await memos().findByID({ id: ids.org1 }, { actor: one })).firmId, 'org1')
+    await assert.rejects(memos().findByID({ id: ids.org1 }, { actor: two }), (error: AsasError) => error.status === 404)
+  })
+
+  test('every committed nested hook runs after a failure without exposing its rows to another organization', async () => {
+    const seen: unknown[] = []
+    storeProbe = async (ctx, tools) => {
+      if (ctx.tx !== undefined) {
+        await (tools.kayans as Record<string, Ops>).memos!.afterProbe({ title: 'first queued hook' })
+        await (tools.kayans as Record<string, Ops>).memos!.afterProbe({ title: 'second queued hook' })
+      } else {
+        seen.push([ctx.data.title, ctx.tenant])
+        if (ctx.data.title === 'first queued hook') throw new Error('first hook failed')
+      }
+    }
+    try {
+      const error = await refusal(memos().hookProbe({ title: 'outer queued hook' }, { actor: one }))
+      assert.ok(error instanceof AfterCommitError)
+    } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, [['first queued hook', 'org1'], ['second queued hook', 'org1'], ['outer queued hook', 'org1']])
+    assert.equal((await memos().count({ where: { title: { contains: 'queued hook' } } }, { actor: one })).totalDocs, 3)
+    assert.equal((await memos().count({ where: { title: { contains: 'queued hook' } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('a beforeTransaction write runs its committed hook once and keeps the outer organization', async () => {
+    const seen: string[] = []
+    storeProbe = async (ctx, tools) => {
+      if (tools.operation === 'outsideProbe') await (tools.kayans as Record<string, Ops>).memos!.afterProbe({ title: 'outside nested hook' })
+      else seen.push(String(ctx.tenant))
+    }
+    try { await memos().outsideProbe({ title: 'outside outer hook' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, ['org1'])
+    assert.equal((await memos().count({ where: { title: { equals: 'outside nested hook' } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('a nested beforeTransaction hook without queries keeps its actor and runs once without reaching another organization', async () => {
+    const seen: unknown[] = []
+    storeProbe = async (ctx, tools) => {
+      if (tools.operation === 'probe') await (tools.kayans as Record<string, Ops>).memos!.outsideProbe({ title: 'nested pure hook' })
+      else seen.push([ctx.tx, ctx.tenant])
+    }
+    try { await memos().probe({ title: 'outer pure hook' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, [[undefined, 'org1']])
+    assert.equal((await memos().count({ where: { title: { equals: 'nested pure hook' } } }, { actor: one })).totalDocs, 1)
+    assert.equal((await memos().count({ where: { title: { equals: 'nested pure hook' } } }, { actor: two })).totalDocs, 0)
+  })
+
+  test('a nested beforeTransaction read on the server stays outside the write and inside the actor scope', async () => {
+    const seen: unknown[] = []
+    storeProbe = async (ctx, tools) => {
+      if (tools.operation === 'probe') {
+        await (tools.kayans as Record<string, Ops>).memos!.outsideProbe({ title: 'nested outside read' })
+      } else {
+        assert.equal(ctx.tx, undefined)
+        const result = await (tools.kayans as Record<string, Ops>).memos!.find({ where: { id: { equals: ids.org2 } } })
+        seen.push(result.totalDocs)
+      }
+    }
+    try { await memos().probe({ title: 'outer for outside read' }, { actor: one }) } finally { storeProbe = async () => {} }
+    assert.deepEqual(seen, [0])
+    assert.equal((await memos().count({ where: { title: { equals: 'nested outside read' } } }, { actor: two })).totalDocs, 0)
   })
 
   for (const operation of ['outsideProbe', 'afterProbe'] as const) test(`step find, hold, sum and upsert are unavailable in ${operation}`, async () => {

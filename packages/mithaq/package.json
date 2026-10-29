@@ -21,6 +21,8 @@
     "./drizzle/node-postgres": "./src/drizzle/proxy/node-postgres.ts",
     "./rich-text/mention": "./src/rich-text/mention-node.ts",
     "./rich-text/client": "./src/rich-text/client.ts",
+    "./device": "./src/device.ts",
+    "./generate-sqlite-migrations": "./src/drizzle/sqlite/generate.ts",
     "./jobs/contract": "./src/jobs/contract.ts"
   },
   "bin": {
@@ -65,6 +67,8 @@
       "./drizzle/node-postgres": "./dist/drizzle/proxy/node-postgres.js",
       "./rich-text/mention": "./dist/rich-text/mention-node.js",
       "./rich-text/client": "./dist/rich-text/client.js",
+      "./device": "./dist/device.js",
+      "./generate-sqlite-migrations": "./dist/drizzle/sqlite/generate.js",
       "./jobs/contract": "./dist/jobs/contract.js"
     },
     "bin": {

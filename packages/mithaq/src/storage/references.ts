@@ -11,14 +11,8 @@ export const uploaderId = (actor: unknown): string | undefined => {
   return typeof id === 'string' ? id : typeof id === 'number' && Number.isFinite(id) ? String(id) : undefined
 }
 
-// Only uploads opted into row cleanup need application-held locks for JSON references.
-export const cleanupUploadTargets = new WeakMap<ResolvedField, readonly ResolvedKayan[]>()
-export const richTextUploads = (value: unknown): { kayan: string; id: unknown }[] => {
-  if (!value || typeof value !== 'object') return []
-  const node = value as Record<string, unknown>
-  const own = node.type === 'upload' && typeof node.relationTo === 'string' && node.value != null ? [{ kayan: node.relationTo, id: node.value }] : []
-  return [...own, ...Object.values(node).flatMap((child) => richTextUploads(child))]
-}
+export { cleanupUploadTargets, richTextUploads } from './upload-references.ts'
+import { richTextUploads } from './upload-references.ts'
 
 const contains = (value: unknown, id: unknown): boolean => {
   if (typeof value === 'string' || typeof value === 'number') return String(value).toLowerCase() === String(id).toLowerCase()

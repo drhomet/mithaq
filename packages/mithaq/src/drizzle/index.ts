@@ -383,7 +383,7 @@ const whereOf = (
   const conjunction = (where as { and?: Where[] }).and
   if (Array.isArray(conjunction)) parts.push(and(...conjunction.map((one) => whereOf(db, tables, kayanByName, name, one))))
   const disjunction = (where as { or?: Where[] }).or
-  // drizzle's or() of nothing is undefined, which would apply no constraint and grant every row; memory matches none.
+  // An empty OR matches nothing; drizzle's `or()` of nothing would apply no constraint. A branch that compiles to nothing is still dropped.
   if (Array.isArray(disjunction)) parts.push(disjunction.length ? or(...disjunction.map((one) => whereOf(db, tables, kayanByName, name, one))) : sql`false`)
   for (const [field, rules] of Object.entries(where)) {
     if (field === 'and' || field === 'or') continue

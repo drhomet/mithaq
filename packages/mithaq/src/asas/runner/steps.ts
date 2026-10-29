@@ -7,12 +7,12 @@ import type { LabelFunction, Localized, ResolvedField, ResolvedKayan, RuntimeFie
 import type { RawStepStore, StepStore, Store } from '../../mithaq/language.ts'
 import { providerOf } from '../../base/rules.ts'
 import { invalid } from './errors.ts'
-import { snapshot } from './runtime.ts'
+import { snapshot } from './snapshot.ts'
 import { rawStepStore } from './store.ts'
 
 /**
  * What the caller passed, plus the three keys the runner keeps. `Extra` is the service target's
- * `context`, so a project reads its own keys typed. Held in an `AsyncLocalStorage`, so nested writes are counted.
+ * `context`, so a project reads its own keys typed. Carried by the runner, so nested writes are counted.
  */
 export type Context<Extra extends Record<string, unknown> = Record<string, unknown>> = {
   /** How many writes deep this one is. The runner raises it by one. */
@@ -728,4 +728,19 @@ export const resolveOperations = (
     resolved[name] = Object.keys(ran).length ? { ...declaration, ...ran } : declaration
   }
   return resolved
+}
+
+/** Resolved before either runner publishes calls, so a missing row operation cannot fail halfway through a batch. */
+export const bulkEach = ({ kayan, operation, declaration }: { kayan: ResolvedKayan; operation: string; declaration: ResolvedOperation }) => {
+  const seal = declaration.steps.map(sealOf).find((step) => step && bulkSeals.includes(step as never))
+  if (!seal) {
+    if (declaration.each) throw new Error(`Kayan "${kayan.name}" operation "${operation}" names "each", and only a bulk operation runs another on each row.`)
+    return undefined
+  }
+  // Main requires the canonical write even when the batch names a custom `each`.
+  const required = seal === 'updateMany' ? 'update' : 'delete'
+  if (!kayan.operations[required]) throw new Error(`Kayan "${kayan.name}" operation "${operation}" writes every matched row through operation "${required}", which this kayan does not have. Declare it, or leave "${operation}" out of the object.`)
+  const single = declaration.each ?? required
+  if (!kayan.operations[single]) throw new Error(`Kayan "${kayan.name}" operation "${operation}" runs "${single}" on each row it matches, and the kayan has no operation "${single}".`)
+  return single
 }

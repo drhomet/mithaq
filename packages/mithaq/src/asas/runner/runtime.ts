@@ -28,7 +28,4 @@ export const running = new AsyncLocalStorage<Running>()
 // under an exclusive lock; the one create inside skips `create` access.
 export const firstRegisters = new WeakSet<Open>()
 
-export const snapshot = (row: unknown) =>
-  row && typeof row === 'object' && !Array.isArray(row)
-    ? Object.freeze({ ...(row as Record<string, unknown>) })
-    : undefined
+export { snapshot } from './snapshot.ts'

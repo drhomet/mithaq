@@ -3,6 +3,7 @@ import { isRef, refuseLiteral } from './user.ts'
 import { jsonSchemaCheck } from '../base/json-schema.ts'
 import {
   bulkSeals,
+  bulkEach,
   defaultGlobalOperations,
   holdOutput,
   readSeals,
@@ -23,7 +24,7 @@ import { kayanServiceKeys, unsortable, type CompoundIndex, type Kayan, type Kaya
 import { defaultKinds } from '../base/kinds.ts'
 import { compareDecimals } from '../base/decimal.ts'
 import type { ScreenField } from '../screen/index.ts'
-import { isJobs, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceTargetOf, tenantDefaults, type FieldTarget, type Language, type Store } from './language.ts'
+import { isJobs, isAccess, isScreen, isService, isStorage, isStore, isTenant, isVersions, serviceTargetOf, tenantDefaults, type FieldTarget, type Language, type Store } from './language-core.ts'
 import type { KayanVersions } from '../versions/index.ts'
 import { versionsOf } from '../versions/versions.ts'
 import { providerOf } from '../base/rules.ts'
@@ -1156,15 +1157,9 @@ export const resolve = (kayanList: readonly Kayan[], language: Language): Resolv
         )
       }
     }
-    // Refused rather than dropped: a bulk without its single-row write cannot run.
     for (const [operation, declaration] of Object.entries(kayan.operations)) {
-      const seal = declaration.steps.map(sealOf).find((held) => held && bulkSeals.includes(held))
-      if (!seal) continue
-      const single = seal === 'updateMany' ? 'update' : 'delete'
-      if (kayan.operations[single]) continue
-      throw new Error(
-        `Kayan "${kayan.name}" operation "${operation}" writes every matched row through operation "${single}", which this kayan does not have. Declare it, or leave "${operation}" out of the object.`,
-      )
+      const single = bulkEach({ kayan, operation, declaration })
+      if (single) declaration.each = single
     }
   }
   // A language that names the mark and a build where nothing takes it makes every delete

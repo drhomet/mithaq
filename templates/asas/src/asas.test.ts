@@ -19443,6 +19443,46 @@ test('the default mention directory filters and limits managed tenant reads with
   assert.equal((await search('rt2-directory')).status, 403, 'directory access itself is required')
 })
 
+test('mixed and empty logical constraints retain their meaning in Postgres and across related reads', async () => {
+  const { mixedWherePrivacy } = await import('../../../packages/mithaq/src/asas/runner/__fixtures__/mixed-where.ts')
+  const schemaName = 'mixed_where_privacy'
+  await db.execute(`create schema ${schemaName};
+    create table ${schemaName}.patient (id serial primary key, name text not null, created_at timestamptz not null, updated_at timestamptz not null);
+    create table ${schemaName}.note (id serial primary key, title text, patient_id integer references ${schemaName}.patient(id), created_at timestamptz not null, updated_at timestamptz not null)`)
+  try {
+    await mixedWherePrivacy({ schemaName, dropsEmptyBranch: true, store: drizzleAdapter({ db, kinds: drizzleKinds, rules: drizzleRules, idKinds: drizzleIdKinds }) })
+  } finally { await db.execute(`drop schema ${schemaName} cascade`) }
+})
+
+test('main parity: Postgres decimal queries still compare and sort numerically through HTTP without reporting an error', async () => {
+  const calls = measureAsas.kayan.measures.operations
+  const ten = await calls.create({ quantity: 2, amount: '10.00' })
+  const two = await calls.create({ quantity: 2, amount: '2.00' })
+  const reported: unknown[] = []
+  const plug = fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: (error) => reported.push(error) })(measureAsas.operations)
+  try {
+    for (const [operator, expected] of [['greater_than', [ten.id]], ['greater_than_equal', [ten.id]], ['less_than', [two.id]], ['less_than_equal', [two.id]]] as const) {
+      const response = (await plug.handle(new Request('http://test/api/measures/find', { method: 'POST', body: JSON.stringify({ where: { id: { in: [ten.id, two.id] }, amount: { [operator]: '9.00' } }, sort: 'amount' }) }), async () => null))!
+      assert.equal(response.status, 200)
+      assert.deepEqual((await response.json() as { docs: { id: string }[] }).docs.map((row) => row.id), expected)
+    }
+    for (const [sort, expected] of [['amount', [two.id, ten.id]], ['-amount', [ten.id, two.id]]] as const) {
+      assert.deepEqual((await calls.find({ where: { id: { in: [ten.id, two.id] } }, sort })).docs.map((row) => row.id), expected)
+    }
+    for (const value of ['10', '10.00', '+0010.0']) {
+      for (const operator of ['equals', 'not_equals', 'in', 'not_in']) {
+        const response = (await plug.handle(new Request('http://test/api/measures/find', { method: 'POST', body: JSON.stringify({ where: { id: { in: [ten.id, two.id] }, amount: { [operator]: operator.endsWith('in') ? [value] : value } } }) }), async () => null))!
+        assert.equal(response.status, 200)
+        assert.deepEqual((await response.json() as { docs: { id: string }[] }).docs.map((row) => row.id), [operator.startsWith('not_') ? two.id : ten.id])
+      }
+    }
+    assert.deepEqual(reported, [])
+  } finally {
+    await calls.delete({ id: ten.id })
+    await calls.delete({ id: two.id })
+  }
+})
+
 test('orphan cleanup refuses a rich-text owner in another store and names its field and store', () => {
   const language = defineMithaq({
     arkan: [base, richText({ nodes: [...defaultNodes, UploadNode] }), storage(templateStorage)],

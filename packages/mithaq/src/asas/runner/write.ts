@@ -1,4 +1,7 @@
-import { cleanupUploadTargets, richTextUploads, uploaderId } from '../../storage/references.ts'
+import { assertTransaction, commitWrite, operationContext, outsideStore, runSlot } from './lifecycle.ts'
+export { drain } from './lifecycle.ts'
+import type { SQLiteTable } from 'drizzle-orm/sqlite-core'
+import { uploaderId } from '../../storage/references.ts'
 import { storagePurge } from './storage-maintenance.ts'
 // One list in one place, so drizzle's callback transaction is kept as it is.
 import { commentMarks } from '../../rich-text/comments-server.ts'
@@ -6,7 +9,7 @@ import { stepTools } from './store.ts'
 import { rowsOfField, type Rows } from '../../mithaq/rows.ts'
 import { heldPermissions } from '../../rbac/index.ts'
 import { authActor } from '../actor.ts'
-import { AfterCommitError, AsasError, conflict, denied, invalid, missing, retryConflict } from './errors.ts'
+import { AsasError, conflict, denied, invalid, missing } from './errors.ts'
 import type { AdminAccess, FieldAccess, LocalesOf, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
 import { defaultKinds, isStorableText, type Kind } from '../../base/kinds.ts'
@@ -72,173 +75,11 @@ type CallArgs<L, Actor, Input, Read extends boolean = false> = [Record<string, u
 /** The admin provider as the runner sees it: the kayan's name, and its gate. */
 export type ManagedAdmin<Actor = unknown> = { access?: AdminAccess<Actor>; kayan?: string }
 
-const isScalar = (value: unknown): value is Scalar =>
-  value === null ||
-  ['string', 'boolean'].includes(typeof value) ||
-  (typeof value === 'number' && Number.isFinite(value)) ||
-  (value instanceof Date && Number.isFinite(value.getTime()))
+export { assertWhere, assertWhereGrammar, assertStoreWhere, assertFieldWhere, whereLimits } from './query.ts'
+import { assertWhere, assertWhereGrammar } from './query.ts'
 
-const known: ReadonlySet<string> = new Set<Operator>(operatorList)
-/** A list of operators as a sentence says it: `"a", "b" and "c"`. */
-const and = new Intl.ListFormat('en-GB', { type: 'conjunction' })
-
-const checkOperatorValue = (said: string, field: string, operator: string, value: unknown) => {
-  if ([value].flat().some((one) => typeof one === 'string' && !isStorableText(one))) {
-    throw new Error(`${said} field "${field}" operator "${operator}" compares text holding a NUL or half a surrogate pair, which no column holds.`)
-  }
-  if (operator === 'exists') {
-    if (typeof value !== 'boolean') throw new Error(`${said} field "${field}" operator "exists" needs a boolean.`)
-    return
-  }
-  if (operator === 'in' || operator === 'not_in') {
-    if (!Array.isArray(value) || !value.every(isScalar)) {
-      throw new Error(`${said} field "${field}" operator "${operator}" needs scalar array.`)
-    }
-    return
-  }
-  if ((operator === 'contains' || operator === 'like') && typeof value !== 'string') {
-    throw new Error(`${said} field "${field}" operator "${operator}" needs a string.`)
-  }
-  if (['greater_than', 'greater_than_equal', 'less_than', 'less_than_equal'].includes(operator) && value === null) {
-    throw new Error(`${said} field "${field}" operator "${operator}" cannot compare null.`)
-  }
-  if (!isScalar(value)) {
-    throw new Error(`${said} field "${field}" operator "${operator}" needs a scalar.`)
-  }
-}
-
-// A second segment is a locale or a related field, never both: `resolve` refuses
-// `localized` beside `relationTo` on the field itself, whatever the kind is named.
-// A json field's path may run past two segments: its keys are no columns, and Payload names them so.
-const queryField = ({ kayan, key, said }: { kayan: ResolvedKayan; key: string; said: string }) => {
-  const parts = key.split('.')
-  const unsupported = `${said} path "${key}" is unsupported. A path is one field, and may then name one related field of what a relationship points at or one locale of a localized field, so it is never more than two segments, or a key at each segment after a json field.`
-  const field = parts[0]!
-  const resolved = kayan.fields[field]
-  if ((parts.length > 2 && resolved?.kind !== 'json') || parts.some((part) => !part || !isStorableText(part))) throw new Error(unsupported)
-  const path = parts[1]
-  if (!resolved || !Object.hasOwn(kayan.fields, field)) throw new Error(`${said} names unknown field "${key}".`)
-  if (resolved.kind === 'json') return { field, key, kind: resolved.kind, operators: resolved.operators }
-  if (!path || resolved.locales?.includes(path)) return { field, key, kind: resolved.kind, operators: resolved.operators }
-  if (!resolved.target) throw new Error(unsupported)
-  const target = resolved.target.fields[path]
-  if (!target || !Object.hasOwn(resolved.target.fields, path)) throw new Error(`${said} path "${key}" names unknown related field.`)
-  // A path into json across a hop would be a third segment, and a json value compared whole has no store answer.
-  if (target.kind === 'json') throw new Error(`${said} path "${key}" reaches json field "${path}" across a relationship, and a json field is filtered on its own kayan alone.`)
-  return { field, key, kind: target.kind, operators: target.operators }
-}
-
-/** Raw store filters keep their adapter's value and empty-filter semantics; only declared paths are checked here. */
-export const assertStoreWhere = (kayan: ResolvedKayan, where: Where): Where => {
-  for (const [key, value] of Object.entries(where)) {
-    if (key === 'and' || key === 'or') {
-      if (Array.isArray(value)) for (const one of value) assertStoreWhere(kayan, one)
-    } else queryField({ kayan, key, said: `Kayan "${kayan.name}" store filter` })
-  }
-  return where
-}
-
-// An access constraint and a screen's `when` share this one grammar.
-export const assertFieldWhere = ({ said, key, kind, operators, value, valued = true }: { said: string; key: string; kind: string; operators?: readonly Operator[]; value: unknown; valued?: boolean }): FieldWhere => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`${said} field "${key}" must use operators.`)
-  }
-  const fieldWhere: Record<string, unknown> = Object.create(null)
-  for (const [operator, operand] of Object.entries(value)) {
-    if (!known.has(operator)) {
-      throw new Error(`${said} field "${key}" uses unsupported operator "${operator}".`)
-    }
-    // A kind that names its operators is held to them and nothing else
-    // as rich text is to the three that search the words of its text.
-    if (operators && !operators.includes(operator as Operator)) {
-      throw new Error(
-        `${said} field "${key}" operator "${operator}" is not supported on a field of kind "${kind}"; only ${and.format(operators.map((one) => `"${one}"`))} ${operators.length === 1 ? 'is' : 'are'}.`,
-      )
-    }
-    // Every operator here compares one value, so none means anything against a list
-    // column; drizzle's array mapper would throw a 500 first. `exists` asks about the column.
-    if (kind === 'textArray' && operator !== 'exists') {
-      throw new Error(`${said} field "${key}" operator "${operator}" is not supported on a list field; only "exists" is.`)
-    }
-    if (!operators && (operator === 'contains' || operator === 'like') && !['email', 'text'].includes(kind)) {
-      throw new Error(`${said} field "${key}" operator "${operator}" only supports text-like fields.`)
-    }
-    if (
-      !operators &&
-      ['greater_than', 'greater_than_equal', 'less_than', 'less_than_equal'].includes(operator) &&
-      !['date', 'datetime', 'number', 'integer', 'decimal'].includes(kind)
-    ) {
-      throw new Error(`${said} field "${key}" operator "${operator}" only supports numeric, date and datetime fields.`)
-    }
-    checkOperatorValue(said, key, operator, operand)
-    if (!valued && Array.isArray(operand) && operand.length > whereLimits.values) {
-      throw new Error(`${said} field "${key}" operator "${operator}" lists at most ${whereLimits.values} values.`)
-    }
-    // Each word of a `like` is a pattern the store matches, so its words are held to the same count.
-    if (!valued && operator === 'like' && typeof operand === 'string' && operand.trim().split(/\s+/).length > whereLimits.values) {
-      throw new Error(`${said} field "${key}" operator "like" holds at most ${whereLimits.values} words.`)
-    }
-    // A value an integer or decimal column cannot hold would reach Postgres as a 500.
-    // A caller's own query skips this: its row shape refuses values with a path each.
-    if (valued && (kind === 'integer' || kind === 'decimal') && operator !== 'exists') {
-      for (const one of Array.isArray(operand) ? operand : [operand]) {
-        const read = kind === 'integer' && typeof one === 'string' && /^[+-]?\d+$/.test(one) ? Number(one) : one
-        if (read !== null && !defaultKinds[kind].accepts(read)) throw new Error(`${said} field "${key}" operator "${operator}" needs a value of kind "${kind}".`)
-      }
-    }
-    fieldWhere[operator] = operand
-  }
-  if (!Object.keys(fieldWhere).length) throw new Error(`${said} field "${key}" has no operators.`)
-  return fieldWhere as FieldWhere
-}
-
-export const assertWhere = (kayan: ResolvedKayan, where: unknown): Where =>
-  normalizedWhere({ kayan, where, valued: true, said: `Kayan "${kayan.name}" access constraint` })
-
-// Grammar alone: a caller's values are the row shape's to refuse.
-export const assertWhereGrammar = (kayan: ResolvedKayan, where: unknown): Where =>
-  normalizedWhere({ kayan, where, valued: false, said: `Kayan "${kayan.name}" query` })
-
-/**
- * How large a caller's `where` may be: the values one `in` or `not_in` lists, and the fields, `and`s and
- * `or`s it holds in all, however nested. Each is a condition the store runs, so past these a read is
- * refused before it reaches the store rather than holding it for minutes.
- */
-export const whereLimits = { values: 1000, nodes: 200 } as const
-
-const normalizedWhere = ({ kayan, where, valued, said, nodes = { left: whereLimits.nodes } }: { kayan: ResolvedKayan; where: unknown; valued: boolean; said: string; nodes?: { left: number } }): Where => {
-  if (!where || typeof where !== 'object' || Array.isArray(where)) {
-    throw new Error(`${said} is not an object of fields.`)
-  }
-  const entries = Object.entries(where)
-  if (!entries.length) throw new Error(`${said} is empty.`)
-  // No prototype, so `__proto__` is a key like any other.
-  const normalized: Record<string, unknown> = Object.create(null)
-  for (const [key, value] of entries) {
-    // An access constraint is the project's own to size; a caller's is held to the limits.
-    if (!valued && --nodes.left < 0) throw new Error(`${said} holds at most ${whereLimits.nodes} fields, "and"s and "or"s.`)
-    if (key === 'and' || key === 'or') {
-      if (!Array.isArray(value) || !value.length) {
-        throw new Error(`${said} "${key}" must be a non-empty array.`)
-      }
-      normalized[key] = value.map((one) => normalizedWhere({ kayan, where: one, valued, said, nodes }))
-      continue
-    }
-    const queried = queryField({ kayan, key, said })
-    const fieldWhere = assertFieldWhere({ said, key, kind: queried.kind, operators: queried.operators, value, valued })
-    normalized[queried.key] = { ...(normalized[queried.key] as object | undefined), ...fieldWhere }
-  }
-  return normalized as Where
-}
-
-// `exists` rather than `equals: null`: it asks about the column, which every store
-// answers alike. The access target's reader never asks it, so `buildAsas` refuses the pair.
-export const aliveWhere = (kayan: ResolvedKayan): Where | undefined =>
-  kayan.softDelete ? { [kayan.softDelete]: { exists: false } } : undefined
-
-// A row made as a draft and never published is read by nothing but a draft read.
-export const publishedWhere = (kayan: ResolvedKayan): Where | undefined =>
-  combineWhere(aliveWhere(kayan), kayan.versions?.drafts ? { _status: { equals: 'published' } } : undefined)
+export { aliveWhere, publishedWhere } from './row-state.ts'
+import { aliveWhere, publishedWhere } from './row-state.ts'
 
 /** A field of one kayan that points at rows of another, which a delete of one of those rows answers to. */
 export type Pointer = { kayan: ResolvedKayan; field: ResolvedField }
@@ -412,26 +253,8 @@ const fieldAccess = async <Actor>(
   return next
 }
 
-export const projectReadableFields = async <Actor>({
-  kayan,
-  row,
-  actor,
-}: {
-  kayan: ResolvedKayan
-  row: Record<string, unknown>
-  actor: Actor | null
-}) => {
-  const next = { ...row }
-  for (const field of Object.values(kayan.fields)) {
-    const access = field.access?.read
-    if (!access || !(field.name in next)) continue
-    const allowed = await (access as FieldAccess<Actor, Record<string, unknown>, unknown>)({ data: row, doc: row, id: row.id, siblingData: row, user: actor })
-    if (!allowed) delete next[field.name]
-  }
-  return next
-}
-
-
+export { projectReadableFields } from './access.ts'
+import { projectReadableFields } from './access.ts'
 
 // A stored row the row shape refuses is the data's fault, so a plain `Error` (a masked
 // 500). The message names the fields and id, never a value: a message may quote it.
@@ -567,10 +390,6 @@ const validateTenantRelationships = async <Actor>(
  * organization than the written row's, or one `access` leaves out. A step's own raw write
  * passes no `access`, so it is held to the organization alone.
  */
-// Postgres answers a uuid in lowercase, so ids are compared in that case.
-const keyIn = (kayan: ResolvedKayan) => (value: unknown) =>
-  kayan.fields.id?.kind === 'uuid' && typeof value === 'string' ? value.toLowerCase() : value
-
 /** The sealed store checks the final value once, including values a step writes outside its own record. */
 export const assertCommentMarks = async ({ kayan, store, data, tenant, tx, id = data.id }: {
   kayan: ResolvedKayan
@@ -595,178 +414,12 @@ export const assertCommentMarks = async ({ kayan, store, data, tenant, tx, id = 
   }
 }
 
-export const assertReferences = async ({ kayan, store, data, tenant, access, offered, tx }: {
-  kayan: ResolvedKayan
-  store: Pick<Store, 'find'>
-  data: Record<string, unknown>
-  /** The organization the written row belongs to, or the active one where the row belongs to none. */
-  tenant: unknown
-  /** What else the target's row must meet: its read access for this actor. */
-  access?: (target: ResolvedKayan) => Promise<Where | undefined>
-  /** What one field's `filterOptions` offers this actor, which a managed write is held to. */
-  offered?: (field: ResolvedField) => Promise<Where | undefined>
-  tx?: unknown
-}) => {
-  const own = kayan.tenant
-  // Gathered per target, so two fields at one kayan and a whole `hasMany` set are one read; a
-  // field whose options are its own is read apart.
-  const targets = new Map<ResolvedKayan | ResolvedField, { target: ResolvedKayan; sets: { field: string; value: unknown }[] }>()
-  for (const field of Object.values(kayan.fields)) {
-    // The ownership column is the runner's, or was judged above. A join takes no write.
-    if (!field.target || field.name === own || field.kind === 'join') continue
-    const given = data[field.name]
-    if (given === undefined || given === null) continue
-    const key = offered && field.filterOptions ? field : field.target
-    for (const value of field.hasMany ? (given as readonly unknown[]) : [given]) {
-      if (value === undefined || value === null) continue
-      const held = targets.get(key) ?? { target: field.target, sets: [] }
-      held.sets.push({ field: field.name, value })
-      targets.set(key, held)
-    }
-  }
-  const uploads = new Set<ResolvedKayan>()
-  for (const field of Object.values(kayan.fields)) {
-    if (field.kind !== 'richText') continue
-    for (const reference of richTextUploads(data[field.name])) {
-      const target = cleanupUploadTargets.get(field)?.find((one) => one.name === reference.kayan)
-      if (!target) continue
-      const held = targets.get(target) ?? { target, sets: [] }
-      held.sets.push({ field: field.name, value: reference.id })
-      targets.set(target, held)
-      uploads.add(target)
-    }
-  }
-  for (const [key, { target, sets }] of targets) {
-    const far = target.tenant
-    // A raw write to a shared row names it as it likes; the foreign key holds it.
-    if (!access && !far && !uploads.has(target)) continue
-    // Held whatever the target's own access answers, so no access widens it.
-    const tenanted = tenant !== undefined && tenant !== null && far ? { [far]: { equals: tenant as Scalar } } : undefined
-    // A 400: the value is what the caller sent wrong. Absent, hidden and another tenant's
-    // ids are one refusal, so none tells the caller which ids exist.
-    const refuse = (field: string) => {
-      const params = { kayan: kayan.name, field, target: target.name }
-      return tenanted
-        ? invalid({
-            message: `"${kayan.name}" field "${field}" must reference a "${target.name}" row in the same tenant.`,
-            key: 'error.invalid.tenant_reference',
-            params,
-          })
-        : invalid({
-            message: `"${kayan.name}" field "${field}" must reference a "${target.name}" row the actor can read.`,
-            key: 'error.invalid.reference',
-            params,
-          })
-    }
-    // With no organization and no access to ask, nothing scopes the target, so nothing is admitted.
-    if (!access && !tenanted && (far || !uploads.has(target))) throw refuse(sets[0]!.field)
-    let admits: Where | undefined
-    try {
-      admits = await access?.(target)
-    } catch (thrown) {
-      if (!(thrown instanceof AsasError) || thrown.status !== 403) throw thrown
-      // Fail closed before the store is asked, so the foreign key cannot tell which ids exist.
-      throw refuse(sets[0]!.field)
-    }
-    const keyOf = keyIn(target)
-    const ids = [...new Set(sets.map(({ value }) => keyOf(value)))]
-    const found = await store.find({ kayan: target.name, args: {
-      limit: ids.length,
-      // The lock a foreign key takes: it holds off the row's delete, and never another write naming the
-      // row or a plain update of its other columns, so those neither wait on it nor deadlock with it.
-      // See "Create, update and delete" in packages/mithaq/README.md for checks that need a stronger lock.
-      lock: 'keyShare',
-      page: 1,
-      sort: { field: 'id', direction: 'asc' },
-      where: combineWhere(
-        combineWhere(
-          combineWhere({ id: { in: ids as Scalar[] } }, admits),
-          tenanted,
-        ),
-        // Nothing a plain read shows may point at a row no plain read shows; a step's own write may.
-        combineWhere(access ? publishedWhere(target) : undefined, key === target ? undefined : await offered!(key as ResolvedField)),
-      ),
-    }, tx })
-    const admitted = new Set(found.docs.map((row) => keyOf(row.id)))
-    const refused = sets.find(({ value }) => !admitted.has(keyOf(value)))
-    if (refused) throw refuse(refused.field)
-  }
-}
+export { assertReferences } from './references.ts'
+import { assertReferences, keyIn } from './references.ts'
 
-
-export const defaultAccess = async <Actor>(admin: ManagedAdmin<Actor> | undefined, actor: Actor | null) => {
-  if (!admin?.kayan || !admin.access || !actor || authActor(actor)?.collection !== admin.kayan) return false
-  return admin.access({ user: actor })
-}
-
-export type Authorize = <Actor>(args: {
-  admin?: ManagedAdmin<Actor>
-  actor: Actor | null
-  data: Record<string, unknown>
-  effect: OperationEffect
-  kayan: ResolvedKayan
-  kind?: Tools['kind']
-  // The named operation, not the effect: `courses.archive` is its own key.
-  operation?: string
-}) => Promise<Where | undefined>
-
-// Asked of the one store that grades this actor. The row answers deny first, so this
-// only narrows; a refusal is a 403, never a 5xx an offline client would retry.
-const assertPermission = (kayan: ResolvedKayan, operation: string | undefined, actor: unknown) => {
-  if (operation === undefined) return
-  const keys = heldPermissions({ access: kayan.access, user: actor })
-  if (keys === undefined || keys === true) return
-  const key = `${kayan.name}.${operation}`
-  if (keys.has(key)) return
-  throw denied({
-    message: `Forbidden: "${kayan.name}" operation "${operation}" needs permission "${key}".`,
-    key: 'error.forbidden.permission',
-    params: { kayan: kayan.name, operation },
-  })
-}
-
-export const defaultAuthorize: Authorize = async <Actor>({
-  admin,
-  actor,
-  data,
-  effect,
-  kayan,
-  kind,
-  operation: named,
-}: {
-  admin?: ManagedAdmin<Actor>
-  actor: Actor | null
-  data: Record<string, unknown>
-  effect: OperationEffect
-  kayan: ResolvedKayan
-  kind?: Tools['kind']
-  operation?: string
-}) => {
-  if (effect === 'read') {
-    const access = kayan.access?.read
-    const result = access
-      ? await (access as Access<Actor, Record<string, unknown>, unknown>)({ id: data.id, slug: kayan.name, user: actor })
-      : await defaultAccess(admin, actor)
-    if (!result) throw denied({ message: `Forbidden: "${kayan.name}" read access denied.`, key: 'error.forbidden.read', params: { kayan: kayan.name } })
-    assertPermission(kayan, named, actor)
-    return result === true ? undefined : assertWhere(kayan, result)
-  }
-  const operation = effect
-  const access = kayan.access?.[operation]
-  const { id, ...values } = data
-  const accessData = kind === 'insert' ? data : kind === 'update' ? values : undefined
-  const result = access
-    ? await (access as Access<Actor, Record<string, unknown>, unknown>)({ data: accessData, id, slug: kayan.name, user: actor })
-    : await defaultAccess(admin, actor)
-  if (operation === 'create') {
-    if (result !== true) throw denied({ message: `Forbidden: "${kayan.name}" create access denied.`, key: 'error.forbidden.create', params: { kayan: kayan.name } })
-    assertPermission(kayan, named, actor)
-    return undefined
-  }
-  if (!result) throw denied({ message: `Forbidden: "${kayan.name}" ${operation} access denied.`, key: 'error.forbidden.operation', params: { kayan: kayan.name, operation } })
-  assertPermission(kayan, named, actor)
-  return result === true ? undefined : assertWhere(kayan, result)
-}
+export { defaultAccess, defaultAuthorize, type Authorize } from './access.ts'
+import type { Authorize } from './access.ts'
+import { defaultAccess } from './access.ts'
 
 // Shared with the bulk runner, so the depth cap, the cross-transaction refusals and the
 // ambient actor rule answer alike for a bulk and the row it is made of.
@@ -784,46 +437,15 @@ export const beginWrite = <Actor = unknown>({
   options?: Options<Actor>
 }) => {
   const outer = running.getStore()
-  const chain = [...(outer?.context.chain ?? []), `${kayan.name}.${operation}`]
-  const depth = (outer?.context.depth ?? 0) + 1
-  if (depth > cap) {
-    throw new Error(`Write depth ${depth} is past the cap of ${cap}: ${chain.join(' -> ')}.`)
-  }
-  // Frozen, so a step cannot reset `depth` and hand every write under it a spent cap.
-  const context: Context = Object.freeze({
-    source: 'local',
-    ...(outer?.context ?? options?.context),
-    depth,
-    chain,
-  })
+  const context = operationContext({ kayan: kayan.name, operation, cap, outer: outer?.context, given: options?.context, effect: 'write' })
   const open = outer?.transactions ?? new Map()
   // A nested write joins the outer transaction on the same store, so both commit or roll
   // back together; another store opens its own. Outside slots carry no transactions.
   const joined = open.get(store)
-  if (outer?.transactions && !joined) {
-    throw new Error(
-      `Kayan "${kayan.name}" operation "${operation}" cannot write to another store while transaction "${outer.context.chain.at(-1)}" is open.`,
-    )
-  }
-  if (joined?.settled) {
-    throw new Error(
-      `Kayan "${kayan.name}" operation "${operation}" joined the transaction "${joined.operation}" opened, which has already settled, so the write that started this one was not awaited. Await every write a step begins.`,
-    )
-  }
+  assertTransaction({ effect: 'write', crossStore: !!outer?.transactions && !joined, settled: joined?.settled, kayan: kayan.name, operation, outer: joined?.operation ?? outer?.context.chain.at(-1) })
   const entry: Open = joined ?? { tx: undefined, operation: `${kayan.name}.${operation}` }
   const actor = (outer?.user as Actor | null | undefined) ?? options?.actor ?? null
   return { actor, context, entry, open }
-}
-
-// A write from outside the transaction would not roll back with it, or would land after
-// the commit; a step there calls a managed operation, which opens its own.
-const outsideStore = (kayan: ResolvedKayan, operation: string, slot: string): WriteTools['store'] => {
-  const refuse = () => {
-    throw new Error(
-      `Kayan "${kayan.name}" operation "${operation}" reached the store from "${slot}", which runs outside the operation's transaction, so the write would not be in it. Write through tools.kayans, which opens its own, or move the step into "steps".`,
-    )
-  }
-  return Object.freeze({ find: refuse, hold: refuse, upsert: refuse, sum: refuse, insert: refuse, remove: refuse, update: refuse })
 }
 
 // No transaction is carried, so a managed write here opens its own. An `afterCommit`
@@ -843,37 +465,8 @@ export const runOutside = async <Actor>({
   start: Ctx
   around: { context: Context; user: Actor | null }
 }): Promise<Ctx> => {
-  const given = stepTools({ ...tools, store: outsideStore(kayan, tools.operation, slot) } as WriteTools)
-  // Read before the first step, which is handed `start` itself and may rewrite it in place.
-  const { tenant } = start
-  return running.run(around as Running, async () => {
-    let ctx = start
-    try {
-      for (const step of list) ctx = { ...(await step(ctx, given)), tenant }
-    } catch (cause) {
-      if (slot === 'beforeTransaction') throw cause
-      throw new Error(
-        `Kayan "${kayan.name}" operation "${tools.operation}" threw in afterCommit, which runs after the commit, so the write stands.`,
-        { cause },
-      )
-    }
-    return ctx
-  })
-}
-
-// One that throws does not silence the rest, since each stands for a committed write;
-// the first error is the one reported.
-export const drain = async (queue: readonly (() => Promise<void>)[]) => {
-  // A wrapper, so a thunk that threw a falsy value is still raised.
-  let failure: { cause: unknown } | undefined
-  for (const queued of queue) {
-    try {
-      await queued()
-    } catch (cause) {
-      failure ??= { cause }
-    }
-  }
-  if (failure) throw failure.cause
+  const given = stepTools({ ...tools, store: outsideStore({ kayan: kayan.name, operation: tools.operation, slot }) } as WriteTools)
+  return running.run(around as Running, () => runSlot({ kayan: kayan.name, operation: tools.operation, slot, list, start, tools: given }))
 }
 
 // A shape that names the key answers a probe value with an issue at it. An asynchronous
@@ -1265,23 +858,10 @@ export const write = <Actor = unknown>({
       if (declaration.afterCommit.length || purge) joined.afterCommit = [...(joined.afterCommit ?? []), afterCommit]
       return result
     }
-    let result: unknown
-    try {
-      result = await store.transaction(run)
-    } catch (thrown) {
-      throw retryConflict(thrown)
-    } finally {
-      entry.settled = true
-    }
-    try {
-      await drain([...(entry.afterCommit ?? []), afterCommit])
-    } catch (cause) {
-      // Only the outermost operation answers with what it committed; under an outer one the
-      // failure climbs as a plain `Error`.
-      if (running.getStore()) throw cause
-      throw new AfterCommitError(result, cause)
-    }
-    return result as Awaited<ReturnType<typeof publicResult>>
+    return commitWrite({
+      transaction: (run) => store.transaction(run), run, lifetime: entry,
+      queue: () => [...(entry.afterCommit ?? []), afterCommit], nested: !!running.getStore(),
+    }) as Promise<Awaited<ReturnType<typeof publicResult>>>
   }
 
 type Registry = readonly { name: string; fields: Record<string, RuntimeField> }[]
@@ -1631,7 +1211,7 @@ type KayanOutputs<K, List extends Registry, L extends LanguageValues, Operations
   & { [Name in SchemaNameOf<K, L>]: { schemas: DerivedSchemas<TargetNamed<L, Name>, FieldsOfKayan<K>> } }
   & (TargetNamed<L, StoreNameOf<K, L>> extends { tables: unknown }
       ? K extends { name: infer Name extends string }
-        ? { [Named in StoreNameOf<K, L>]: { table: BuiltTables<List, StoreNameOf<K, L>, DefaultStoreOf<L>, L['kinds']>[Name] } }
+        ? { [Named in StoreNameOf<K, L>]: { table: TargetNamed<L, StoreNameOf<K, L>> extends { type: 'drizzle-sqlite' } ? SQLiteTable : BuiltTables<List, StoreNameOf<K, L>, DefaultStoreOf<L>, L['kinds']>[Name] } }
         : {}
       : {})
 

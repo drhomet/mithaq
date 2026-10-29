@@ -1,3 +1,6 @@
+import { assertPageLimits, pageKeys } from './limits.ts'
+import { assertNoOptions } from './runner/lifecycle.ts'
+import { refusePlacement } from './placement.ts'
 import { cleanupUploadTargets } from '../storage/references.ts'
 import { storageMaintenanceAccess } from './runner/storage-maintenance.ts'
 import { buildJobs } from '../jobs/jobs.ts'
@@ -260,9 +263,6 @@ const lowerUuids = ({ kayan, input, bulk }: { kayan: ResolvedKayan; input: unkno
 // the key answers with an issue at the key.
 const probe = Symbol('mithaq.operation.input')
 
-/** The service target's four numbers, each a positive integer the project names. */
-const pageKeys = ['defaultLimit', 'maxLimit', 'joinLimit', 'bulkLimit'] as const
-
 // An input field the schema names no key for would be dropped or refused at every click,
 // so it fails the build. Asked through Standard Schema alone: a probe value at that key.
 const refuseUndeclaredInput = (where: string, screens: Readonly<Record<string, OperationScreen | undefined>> | undefined, schema: StandardSchemaV1) => {
@@ -427,7 +427,6 @@ const operations = <Actor>(
         enumerable: true,
         get: () => kayans(declaration.effect),
       })
-      if (declaration.each && !bulkSeals.includes(kind as never)) throw new Error(`Kayan "${kayan.name}" operation "${operation}" names "each", and only a bulk operation runs another on each row.`)
       // Built in the second pass, where every single-row write it delegates to exists.
       if (bulkSeals.includes(kind as never)) {
         bulkLists.push({ operation, declaration, tools, input })
@@ -437,8 +436,7 @@ const operations = <Actor>(
       methods[operation] = publish(operation, declaration.effect, input, run)
   }
   for (const { operation, declaration, tools, input } of bulkLists) {
-    const single = declaration.each ?? (declaration.effect === 'update' ? 'update' : 'delete')
-    if (!methods[single]) throw new Error(`Kayan "${kayan.name}" operation "${operation}" runs "${single}" on each row it matches, and the kayan has no operation "${single}".`)
+    const single = declaration.each!
     const run = bulk<Actor>({
       kayan,
       declaration,
@@ -521,9 +519,10 @@ export const buildAsas = <
     auth?: Auth
     /**
      * The HTTP plugs, asked in order, so the order decides who owns a prefix two claim. Required:
-     * `fetchHttp` takes no dependency; `orpcHttp` first gives `asas.router` its typed client.
+     * `fetchHttp` takes no dependency; `orpcHttp` first gives `asas.router` its typed client. A
+     * device asas, which nothing reaches over HTTP, names none: `http: []`.
      */
-    http: readonly [
+    http: readonly [] | readonly [
       (operations: OperationTable<Procedures<KayanList, GlobalList, Declared<KayanList, GlobalList>, L>>) => Http,
       ...((operations: OperationTable<Procedures<KayanList, GlobalList, Declared<KayanList, GlobalList>, L>>) => HttpPlug)[],
     ]
@@ -539,8 +538,8 @@ export const buildAsas = <
   /** Every declared thing, which is what a relationship is resolved against. */
   type All = Declared<KayanList, GlobalList>
 
-  // Refused before any work: core picks no plug of its own.
-  if (!http?.length) {
+  // Refused before any work: core picks no plug of its own, and `[]` is a build naming none.
+  if (!Array.isArray(http)) {
     throw new Error(
       'buildAsas was handed no "http", and core picks no plug of its own. Name the plugs: http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], or orpcHttp with the same options first for the typed client.',
     )
@@ -555,6 +554,12 @@ export const buildAsas = <
   const globalNames = new Set(globals.map((one) => one.name))
   // One list, so a name declared twice is refused whichever list it is in.
   const declared = [...(kayan as readonly Kayan[]), ...globals]
+  const storeNames = declared.length ? declared.map((one) => one.targets?.service?.store ?? serviceTargetOf(language)?.store) : [serviceTargetOf(language)?.store]
+  if (!http.length && !storeNames.every((name) => {
+    const target = name && language.targets[name]
+    return target && isStore(target) && target.placement === 'device'
+  })) throw new Error('buildAsas requires http to name at least one HTTP plug for a server store.')
+  refusePlacement({ language, kayan: declared, http, runtime: 'server' })
   refuseArkan(language)
   // A kayan writing `targets.screen` would read as every screen and mean one.
   if (Object.hasOwn(language.targets, 'screen')) {
@@ -603,13 +608,7 @@ export const buildAsas = <
     throw new Error(`The service target declares no "${absent}", and every build's runner has one. Add it to serviceTarget({ ... }).`)
   }
   // Checked before `resolve` and the screens read `maxLimit`, so a bad one is refused in its own words.
-  for (const key of pageKeys) {
-    if (!Number.isInteger(service[key]) || service[key] < 1) throw new Error(`service.${key} must be a positive integer.`)
-  }
-  // A page the runner opens on its own may not be larger than the most a caller may ask for.
-  for (const key of ['defaultLimit', 'joinLimit'] as const) {
-    if (service[key] > service.maxLimit) throw new Error(`service.${key} is ${service[key]}, past service.maxLimit ${service.maxLimit}.`)
-  }
+  assertPageLimits(service)
   const transport = (['http', 'orpc'] as const).find((key) => Object.hasOwn(service, key))
   if (transport) {
     throw new Error(
@@ -838,14 +837,6 @@ export const buildAsas = <
       }))
 
   let built!: Record<string, Record<string, unknown>>
-  const assertNoOptions = (value: unknown) => {
-    if (value === undefined) return
-    // Two faults, two sentences.
-    if (value && typeof value === 'object' && ('actor' in value || 'context' in value)) {
-      throw new Error('Bound kayan tools inherit the current user and context; do not pass actor or context options.')
-    }
-    throw new Error('Bound kayan tools do not accept operation options.')
-  }
   const boundCache = new Map<'read' | 'write', unknown>()
   const boundKayans = (mode: 'read' | 'write') => {
     const cached = boundCache.get(mode)
@@ -1155,7 +1146,7 @@ export const buildAsas = <
     targets: Object.fromEntries(
       Object.entries(buildTargets as L['targets']).map(([name, target]) => [name, isScreen(target) ? { ...target, client: screens[name] } : target]),
     ) as {
-      [Name in keyof L['targets']]: L['targets'][Name] extends { tables: unknown }
+      [Name in keyof L['targets']]: L['targets'][Name] extends { tables: unknown; type: 'drizzle' }
         ? Omit<L['targets'][Name], 'tables'> & {
             tables: BuiltTables<All, Name, ServiceOf<L>['store'], L['kinds']>
           }

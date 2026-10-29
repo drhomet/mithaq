@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Security (affects 0.3.7 and earlier): preserve complete access constraints on related finds, counts and version reads. Empty disjunctions match no rows on Postgres, consistent with memory; empty conjunctions still match every row. See the [access security note](packages/mithaq/src/asas/runner/README.md#security-access-constraints). No migration or vocabulary change is needed.
+- Server change: an empty `or: []` in a store `where` now matches nothing on Postgres and SQLite, as the memory store already did; on Postgres it used to apply no constraint, and the SQLite adapter is new. It reaches the server through raw stores, constraints that core builds, and a project step's sealed store filter (`assertStoreWhere` admits an empty `and` or `or`): `store.update({ where: { or: [] } })` hit the row before and now misses with `missing`. An empty `and: []` still matches everything at the top level or inside an `and`; as an `or` branch an empty `and` compiles to nothing and is dropped on Postgres and SQLite, as on main, so `{ or: [{ and: [] }, { name: { equals: 'absent' } }] }` counts 0 there while the memory store counts 2. A branch that compiles to nothing, such as a blank `like`, is still dropped. No migration is needed.
 
 ## 0.3.7
 

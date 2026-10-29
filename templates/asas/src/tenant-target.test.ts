@@ -329,3 +329,19 @@ test('a tenant field may explicitly replace its own index with a declared index 
     assert.throws(() => build(tenanted, { ...declaration, indexes }), /declares index false, and a tenant field is index: true/)
   }
 })
+
+test('a server build refuses device-only declarations before resolving fields or connecting', () => {
+  const patient = untenanted.defineKayan({ name: 'patient', placement: 'device', fields: { ...defaultFields }, targets: operations })
+  assert.throws(() => build(untenanted, patient), /patient.*device-only.*server/)
+})
+
+test('a server store requires at least one HTTP plug even for an empty build', () => {
+  for (const kayan of [[], [notes({})]]) {
+    assert.throws(() => untenanted.buildAsas({ kayan, http: [] }), /buildAsas.*http.*at least one/)
+  }
+})
+
+test('a build using only device stores may name an empty HTTP list', () => {
+  const language = defineMithaq({ arkan: [base], targets: { ...offline(), drizzle: { ...memoryStore(), placement: 'device' as const } } })
+  assert.doesNotThrow(() => language.buildAsas({ kayan: [], http: [] }))
+})
