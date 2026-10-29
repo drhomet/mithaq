@@ -56,6 +56,7 @@ import {
   type RuntimeField,
   type Ctx,
   type WriteTools,
+  type Where,
 } from 'mithaq'
 import { orpcHttp } from 'mithaq/orpc'
 import { defaultNodes, richText, UploadNode } from 'mithaq/rich-text'
@@ -520,17 +521,22 @@ const refusal = async (promise: Promise<unknown>) => {
   return thrown as AsasError
 }
 
-const suite = (name: string, make: () => Promise<{ built: Built; store: Store; done: () => Promise<void> }>, postgres = false) => describe(name, () => {
+const suite = (name: string, make: (authorize: Authorize) => Promise<{ built: Built; store: Store; done: () => Promise<void> }>, postgres = false) => describe(name, () => {
   let built: Built
   let store: Store
   let done: () => Promise<void>
   let one: Record<string, unknown>
   let two: Record<string, unknown>
   let ids: { org1: string; org2: string; org3: string }
+  let readConstraint: Where | undefined
   const memos = () => built.kayan.memos.operations
 
   before(async () => {
-    ;({ built, store, done } = await make())
+    ;({ built, store, done } = await make(async (args) => {
+      const where = await defaultAuthorize(args)
+      return readConstraint && args.effect === 'read' && ['memos', 'papers'].includes(args.kayan.name)
+        ? { and: [...(where ? [where] : []), readConstraint] } : where
+    }))
     await store.transaction(async (tx) => {
       for (const id of ['org1', 'org2', 'org3']) await store.insert({ tx, kayan: 'firms', data: { id, name: id } })
     })
@@ -2419,21 +2425,75 @@ const suite = (name: string, make: () => Promise<{ built: Built; store: Store; d
     assert.equal(mode === 'keyShare' ? changed.id : changed[kayan === 'memos' ? 'title' : 'label'], mode === 'keyShare' ? row.id : 'changed')
   })
 
-
+  describe('privacy access siblings', () => {
+    let visibleNote: string
+    let visiblePaper: string
+    let hiddenVersion: string
+    let parents: string[]
+    before(async () => {
+      const papers = built.kayan.papers.operations
+      parents = []
+      for (const [title, actor] of [['privacy visible', one], ['privacy hidden', one], ['privacy visible', two]] as const) {
+        const memo = await memos().create({ title }, { actor })
+        const linked = await built.kayan.notes.operations.create(note({ title, memo: memo.id }), { actor })
+        const paper = await papers.create({ title, memo: memo.id, _status: 'published' }, { actor })
+        parents.push(paper.id)
+        if (actor === one && title === 'privacy visible') {
+          visibleNote = linked.id
+          visiblePaper = paper.id
+        }
+        if (title === 'privacy hidden') hiddenVersion = (await papers.findVersions({ where: { parent: { equals: paper.id } } }, { actor })).docs[0].id
+      }
+    })
+    for (const [shape, constraint] of [
+      ['and with field', { and: [{ title: { contains: 'privacy' } }], title: { equals: 'privacy visible' } }],
+      ['or with field', { or: [{ title: { contains: 'privacy' } }], title: { equals: 'privacy visible' } }],
+      ['nested and inside or with fields', { or: [{ and: [{ title: { contains: 'privacy' } }], title: { equals: 'privacy visible' } }], title: { not_equals: 'privacy denied' } }],
+      ['dotted sibling', { and: [{ title: { contains: 'privacy' } }], 'firmId.name': { equals: 'org1' } }],
+    ] as const) for (const surface of ['related find', 'related count', 'versions', 'version by id'] as const) test(`${shape} retains every access sibling in ${surface}`, async () => {
+      readConstraint = constraint
+      try {
+        const where = { 'memo.title': { contains: 'privacy' } }
+        const read = () => surface === 'related find' ? built.kayan.notes.operations.find({ where, limit: 0 }, { actor: one })
+          : surface === 'related count' ? built.kayan.notes.operations.count({ where }, { actor: one })
+            : surface === 'versions' ? built.kayan.papers.operations.findVersions({ where: { parent: { in: parents } }, limit: 0 }, { actor: one })
+              : built.kayan.papers.operations.findVersionByID({ id: hiddenVersion }, { actor: one })
+        if (shape === 'dotted sibling') {
+          const kayan = surface.startsWith('related') ? 'memos' : 'papers'
+          const prefix = surface.startsWith('related') ? 'memo' : 'parent'
+          await assert.rejects(read, (error) => error instanceof Error && error.constructor === Error && error.message === `Kayan "${kayan}" access constraint path "firmId.name" is reached across a relationship from "${prefix}", so carrying it would be three segments, and a query path is never more than two.`)
+          return
+        }
+        if (surface === 'related find') {
+          const found = await read()
+          assert.deepEqual(found.docs.map((row: { id: string }) => row.id), [visibleNote])
+          assert.equal(found.totalDocs, 1)
+        } else if (surface === 'related count') {
+          assert.deepEqual(await read(), { totalDocs: 1 })
+        } else if (surface === 'versions') {
+          const found = await read()
+          assert.deepEqual(found.docs.map((row: { parent: string }) => row.parent), [visiblePaper])
+          assert.equal(found.totalDocs, 1)
+        } else {
+          assert.equal((await refusal(read())).status, 404)
+        }
+      } finally { readConstraint = undefined }
+    })
+  })
 })
 
-suite('memory store', async () => {
+suite('memory store', async (authorize) => {
   const store = memoryStore()
   const insert = store.insert
   store.insert = (args) => insert(args.kayan === 'fileOwners'
     ? { ...args, data: { deletedAt: null, ...args.data } }
     // Postgres serializes snapshots, so the test store must detach one from its mutable owner.
     : args.kayan === '_file_owners_versions' ? { ...args, data: structuredClone(args.data) } : args)
-  return { built: languageOf(store as never), store: store as unknown as Store, done: async () => {} }
+  return { built: languageOf(store as never, { authorize }), store: store as unknown as Store, done: async () => {} }
 })
 
-suite('postgres', async () => {
-  const built = languageOf(drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }) as never, { withLocal: true })
+suite('postgres', async (authorize) => {
+  const built = languageOf(drizzleAdapter({ idKinds: drizzleIdKinds, connectionString: testDatabase(), kinds: drizzleKinds, rules: drizzleRules }) as never, { withLocal: true, authorize })
   await built.connect()
   return {
     built,
