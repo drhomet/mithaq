@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix: a global whose `update.input` adds keys beside its fields, such as `expectedUpdatedAt`, makes its row on the first save. The keys are optional in a global's update type, since a first save has read no row, and any the first save sends are checked against the declared input and handed to the steps, rather than refused by the create shape ([issue #10](https://github.com/drhomet/mithaq/issues/10)).
+
 ## 0.3.8
 
 - `mithaq/device` builds `placement: 'device'` kayan into on-device SQLite through an injected drizzle database and transaction, with bundled migrations from `generateSqliteMigrations` applied by `migrateSqlite`. The server stays on Postgres; the device guide is [packages/mithaq/src/drizzle/sqlite/README.md](packages/mithaq/src/drizzle/sqlite/README.md). It is tested on Node's SQLite behind the same contract and has not yet run on a phone.

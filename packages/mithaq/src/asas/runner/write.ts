@@ -756,9 +756,22 @@ export const write = <Actor = unknown>({
         // With no `input` the filled row is parsed, so a default reaches a required column; with one,
         // the caller's strict shape is parsed first. A remove writes no column, so neither runs.
         const fill = (one: Ctx) => (fieldOperation ? (defaults(one, publicTools) as Ctx) : one)
+        // A global's first save parses the create shape, which names no key its update's own input adds
+        // beside the fields; those are held to that input and handed on to the steps.
+        const added = kind !== tools.kind && declaration.input
+          ? Object.keys(ctx.data).filter((key) => !Object.hasOwn(kayan.fields, key) && namesKey(tools.schema, key))
+          : []
+        // Only the issues at those keys count: the update shape also asks for an id the first save has none of.
+        const sent = Object.fromEntries(added.map((key) => [key, ctx.data[key]]))
+        const answer = added.length ? await tools.schema['~standard'].validate(withoutPrototype(sent)) : undefined
+        const refused = answer?.issues?.filter(({ path: [first] = [] }) => added.includes(String(typeof first === 'object' ? first.key : first)))
+        if (refused?.length) throw issueRefusal(refused, tools.schema['~standard'].vendor)
+        const addedValues = (answer && !answer.issues ? answer.value : sent) as Record<string, unknown>
+        if (added.length) ctx = { ...ctx, data: Object.fromEntries(Object.entries(ctx.data).filter(([key]) => !added.includes(key))) }
         ctx = declaration.input
           ? fill(await parse({ schema: runTools.schema, ctx, tools: publicTools }))
           : await parse({ schema: runTools.schema, ctx: fill(ctx), tools: publicTools })
+        if (added.length) ctx = { ...ctx, data: { ...ctx.data, ...Object.fromEntries(added.map((key) => [key, addedValues[key]])) } }
         // Filled after the parse, from the session alone.
         if (kind === 'insert' && kayan.tenant) ctx = { ...ctx, data: { ...ctx.data, [kayan.tenant]: owner } }
         // The guards belong to the store seal, and no slot may hold one.
@@ -1229,8 +1242,12 @@ type Built<K, List extends Registry, L extends LanguageValues, Operations> = {
 // answers null until the first update makes the row.
 type GlobalOperations<K extends Registry[number], List extends Registry, L extends LanguageValues, Actor> = {
   findOne(...args: CallArgs<L, Actor, { depth?: number }>): Promise<Row<K['fields'], L, List> | null>
-  update(...args: CallArgs<L, Actor, Omit<OperationData<OwnOperation<K, 'update'>, UpdateInput<K['fields'], L, List>>, 'id'>>): Promise<Row<K['fields'], L, List>>
+  update(...args: CallArgs<L, Actor, FirstSave<OperationData<OwnOperation<K, 'update'>, UpdateInput<K['fields'], L, List>>, K['fields']>>): Promise<Row<K['fields'], L, List>>
 }
+
+// A first save has read no row, so a key the update's input adds beside the fields is the caller's to leave out.
+type Added<Data, Fields> = Exclude<keyof Data, keyof Fields>
+type FirstSave<Data, Fields> = Omit<Data, 'id' | Added<Data, Fields>> & Partial<Pick<Data, Added<Data, Fields>>>
 
 /** What `asas.global` holds: one built global per name, of the shape a kayan has. */
 export type Globals<
