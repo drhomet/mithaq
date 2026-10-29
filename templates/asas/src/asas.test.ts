@@ -4302,6 +4302,42 @@ test('20. kayan access runs before writes and constrains updates and deletes', a
   assert.equal(noAuthorizeStepRan, false)
 })
 
+for (const postgres of [false, true]) test(`empty logical store filters on ${postgres ? 'Postgres' : 'memory'} match no rows for or and every row for and`, async () => {
+  const store = postgres ? drizzleAdapter({ idKinds: drizzleIdKinds, db, kinds: drizzleKinds, rules: drizzleRules }) : memoryStore()
+  assert.ok(store.count)
+  const language = defineMithaq({
+    arkan: [base],
+    targets: {
+      store,
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'store', schema: 'zod', authorize: defaultAuthorize }),
+    },
+  })
+  const rows = language.defineKayan({
+    name: 'emptyAccess',
+    fields: { ...defaultFields, ...borrowed, title: { kind: 'text' } },
+    access: { create: () => true, read: () => true },
+    targets: { ...(postgres && { store: tables.courses }), service: { operations: defaultOperations } },
+  })
+  const built = language.buildAsas({ http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })], kayan: [rows] })
+  const operations = built.kayan.emptyAccess.operations
+  const first = await operations.create({ title: 'Empty privacy first' })
+  const second = await operations.create({ title: 'Empty privacy second' })
+  const where = { id: { in: [first.id, second.id] } }
+  for (const [constraint, expected] of [
+    [{ or: [] }, []],
+    [{ and: [{ or: [] }] }, []],
+    [{ or: [], title: { equals: first.title } }, []],
+    [{ and: [] }, [first.id, second.id]],
+  ] as const) {
+    const args = { where: { and: [where, constraint] }, limit: 0, page: 1, sort: { field: 'id', direction: 'asc' as const } }
+    const found = await store.find({ kayan: 'emptyAccess', args })
+    assert.deepEqual(found.docs.map((row) => row.id).sort(), [...expected].sort())
+    assert.equal(found.totalDocs, expected.length)
+    assert.equal(await store.count({ kayan: 'emptyAccess', args }), expected.length)
+  }
+})
+
 test('20a. managed reads apply collection and field access before query, count and response projection', async () => {
   const language = online()
   const fields = {
