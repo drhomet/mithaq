@@ -5973,8 +5973,11 @@ test('39. a global on a language with no tenant field refuses a create or delete
       one.update({ siteTitle: 'First' }),
       one.update({ siteTitle: 'Second' }),
     ])
-    assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
-    assert.match(refusal(results), /project_settings_global_type_key/)
+    // Under load one can commit before the other reads, which then updates the row it finds: both succeed.
+    if (results.some((result) => result.status === 'rejected')) {
+      assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
+      assert.match(refusal(results), /project_settings_global_type_key/)
+    }
     assert.equal((await db.select().from(table)).length, 1)
 
     const found = await one.findOne()
@@ -6028,8 +6031,11 @@ test('40. a global refuses the globalType a caller sends with a 403 raised befor
       one.update({ siteTitle: 'First' }),
       one.update({ siteTitle: 'Second' }),
     ])
-    assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
-    assert.match(refusal(results), /stamped_settings_global_type_key/)
+    // Under load one can commit before the other reads, which then updates the row it finds: both succeed.
+    if (results.some((result) => result.status === 'rejected')) {
+      assert.deepEqual(results.map((result) => result.status).sort(), ['fulfilled', 'rejected'])
+      assert.match(refusal(results), /stamped_settings_global_type_key/)
+    }
     const rows = await db.select().from(table)
     assert.equal(rows.length, 1)
     assert.equal(rows[0]!.globalType, 'stampedSettings')
