@@ -102,7 +102,7 @@ export const unknownType = ({ node, types, versions, depth = richTextBounds.dept
   // A class reads every version up to the one it writes, and a node with none is Lexical's first.
   const reads = typeof held.type === 'string' ? versions?.get(held.type) : undefined
   const version = held.version === undefined ? 1 : held.version
-  if (reads !== undefined && !(typeof version === 'number' && version <= reads)) return held.type as string
+  if (reads !== undefined && !(reads >= 1 && typeof version === 'number' && version <= reads)) return held.type as string
   for (const child of Array.isArray(held.children) ? held.children : []) {
     const type = unknownType({ node: child, types, versions, depth: depth - 1 })
     if (type !== undefined) return type
