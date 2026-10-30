@@ -1,4 +1,4 @@
-import { nodeFeatures, richTextChoiceFeatures, richTextFormatBits } from './feature-data.ts'
+import { nodeFeatures, richTextChoiceFeatures, richTextFormatBits, toolFeatureNodes } from './feature-data.ts'
 
 import type { RichTextPolicy } from './policy.ts'
 
@@ -72,7 +72,7 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
       const choices = Object.entries(richTextChoiceFeatures).filter(([, name]) => name === feature).map(([choice]) => choice)
       // Checklists share list classes; derive the association from the existing list policy guard.
       const types = feature === richTextChoiceFeatures.check ? Object.keys(nodeFeatures).filter((type) => nodeFeatures[type] === richTextChoiceFeatures.bullet)
-        : mapped.length ? mapped : Object.hasOwn(richTextFormatBits, feature) ? ['text'] : choices.length ? [] : [...profile.nodes]
+        : mapped.length ? mapped : Object.hasOwn(richTextFormatBits, feature) ? ['text'] : toolFeatureNodes[feature] ?? []
       const selected = types.filter((type) => profile.nodes.includes(type))
       for (const type of selected.length ? selected : types) {
         // A place that only shows a node never runs the editor's tools on it.
