@@ -7,7 +7,7 @@ import { combineWhere, compareValues, same, type Scalar, type Where } from '../.
 import { AsasError, denied, invalid, missing } from './errors.ts'
 import { running } from './runtime.ts'
 import type { OperationEffect, RuntimeWriteTools as WriteTools } from './steps.ts'
-import { assertStoreWhere, assertReferences, assertCommentMarks, type Authorize } from './write.ts'
+import { assertStoreWhere, assertReferences, assertCommentMarks, assertRichTextVersions, richTextVersionRefusal, type Authorize } from './write.ts'
 
 /** How far a read reaches past the active organization: every verified membership, or every tenant. */
 export type TenantReach = 'mine' | 'all'
@@ -246,7 +246,14 @@ export const tenancy = ({ language, assigned, onError, collection }: {
         }
         for (const key of args.on) declaredField(args.kayan, key)
         await references({ name: args.kayan, data, tx: args.tx })
-        return writes.upsert({ ...args, data, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) })
+        const where = combineWhere(checked(args.kayan, args.where), sealed(args.kayan))
+        const keyed = { and: args.on.map((key) => ({ [key]: { equals: data[key] as Scalar } })) } as Where
+        const found = await assertRichTextVersions({ kayan, store: { find }, data, tx: args.tx, target: combineWhere(keyed, sealed(args.kayan)) })
+        if (found !== false) return writes.upsert({ ...args, data, where })
+        // No row was there to hold and compare, so one another transaction makes meanwhile is refused rather than overwritten unchecked.
+        return writes.upsert({ ...args, data, where: combineWhere(where, { id: { in: [] } }) }).catch((thrown: unknown) => {
+          throw thrown instanceof AsasError && thrown.status === 404 ? richTextVersionRefusal(kayan) : thrown
+        })
       },
       insert: async (args) => {
         const field = named(args.kayan).tenant
@@ -263,6 +270,7 @@ export const tenancy = ({ language, assigned, onError, collection }: {
       update: async (args) => {
         const where = combineWhere(checked(args.kayan, args.where), sealed(args.kayan, args.data))
         await references({ name: args.kayan, data: args.data, tx: args.tx, id: args.id })
+        await assertRichTextVersions({ kayan: named(args.kayan), store: { find }, data: args.data, tx: args.tx, target: combineWhere({ id: { equals: args.id as Scalar } }, where) })
         return writes.update({ ...args, where })
       },
       remove: async (args) => writes.remove({ ...args, where: combineWhere(checked(args.kayan, args.where), sealed(args.kayan)) }),
