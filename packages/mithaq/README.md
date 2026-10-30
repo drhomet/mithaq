@@ -1184,7 +1184,9 @@ JSON before save. A stored value is never cleaned: one holding content past the
 field's policy, such as a table after `tables` was removed from the field, a
 node no class registers, or a node at a newer JSON version than its class
 writes, is shown read-only as its words with a message, and a save leaves the
-field out, so the stored value stays as it was. Legacy block directions without
+field out, so the stored value stays as it was. A table with merged cells is
+read-only too: the editor has no merge command, and its row, column and paste
+edits would split or stretch the spans. Legacy block directions without
 a matching NodeState direction choice are also read-only, since policy cleaning
 would otherwise clear them.
 

@@ -19,7 +19,7 @@ export function Plugin() {
     }),
     editor.registerNodeTransform(TableRowNode, (node) => { if (node.getHeight() !== undefined) node.setHeight(undefined) }),
   ), [editor])
-  return <TablePlugin hasCellMerge hasCellBackgroundColor={false} hasHorizontalScroll />
+  return <TablePlugin hasCellMerge={false} hasCellBackgroundColor={false} hasHorizontalScroll />
 }
 export function Buttons({ t }: FeatureProps) {
   const [editor] = useLexicalComposerContext()

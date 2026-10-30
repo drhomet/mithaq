@@ -286,6 +286,10 @@ const ownScopes: Record<string, Record<string, Record<string, string>>> = {
       en: 'This text holds content this field no longer allows, so it is shown as its words and cannot be changed here.',
       ar: 'يحتوي هذا النص على محتوى لم يعد هذا الحقل يسمح به، فيُعرض بكلماته ولا يمكن تغييره هنا.',
     },
+    'richText.mergedCells': {
+      en: 'This text holds merged table cells, which this editor cannot change, so it is shown as its words and cannot be changed here.',
+      ar: 'يحتوي هذا النص على خلايا جدول مدمجة لا يستطيع هذا المحرر تغييرها، فيُعرض بكلماته ولا يمكن تغييره هنا.',
+    },
     'richText.unreadable': {
       en: 'This editor cannot read this text, so it is shown as its words and cannot be changed here.',
       ar: 'لا يستطيع هذا المحرر قراءة هذا النص، فيُعرض بكلماته ولا يمكن تغييره هنا.',
