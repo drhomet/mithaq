@@ -21,7 +21,7 @@ export type RichTextDiagnostic = {
   profile: string
   node?: string
   feature?: string
-  place: Place
+  place: Place | null
   required: Support
   available: Support
   remedy: string
@@ -32,8 +32,9 @@ const supportRank = { none: 0, view: 1, edit: 2 }
 export type RichTextContract = { formats?: Readonly<Record<string, number>>; paragraphs?: readonly string[] }
 
 const resolves = (reference: string, contract?: RichTextContract): boolean => {
-  const [section, name, extra] = reference.split('.')
-  if (!name || extra) return false
+  const parts = reference.split('.')
+  const [section, name] = parts
+  if (!name || parts.length !== 2) return false
   if (section === 'paragraphs') return contract?.paragraphs?.includes(name) === true
   return section === 'formats' && Object.hasOwn(richTextFormatBits, name) && contract?.formats?.[name] === richTextFormatBits[name as keyof typeof richTextFormatBits]
 }
@@ -48,6 +49,9 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
       if (missing || unresolved) diagnostics.push({ severity: 'error', code: missing ? 'native-reference-required' : 'native-reference-unresolved', profile: profile.name, node: node.type, place, required: node.support[place], available: 'none', remedy: 'Declare only lossless native support with references resolved by the installed rich-input contract.' })
     }
   }
+  for (const type of profile.nodes) {
+    if (!registry.some((node) => node.type === type)) diagnostics.push({ severity: 'warning', code: 'profile-node-unknown', profile: profile.name, node: type, place: null, required: 'none', available: 'none', remedy: 'Register the selected node or correct its profile type.' })
+  }
   for (const place of richTextPlaces) {
     const requirement = profile.requirements[place]
     if (!requirement) continue
@@ -58,8 +62,7 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
       const required = requirement.nodes?.[type] ?? requirement.default
       const node = registry.find((node) => node.type === type)
       const available = node?.support[place] ?? 'none'
-      if (!node) diagnostics.push({ severity: 'warning', code: 'profile-node-unknown', profile: profile.name, node: type, place, required, available, remedy: 'Register the selected node or correct its profile type.' })
-      else if (supportRank[available] < supportRank[required]) diagnostics.push({ severity: 'warning', code: 'support-gap', profile: profile.name, node: type, place, required, available, remedy: 'Install support for this node at this place or revise the profile requirement.' })
+      if (node && supportRank[available] < supportRank[required]) diagnostics.push({ severity: 'warning', code: 'support-gap', profile: profile.name, node: type, place, required, available, remedy: 'Install support for this node at this place or revise the profile requirement.' })
     }
     for (const feature of new Set(policies.flatMap((policy) => [...policy.features]))) {
       const mapped = Object.entries(nodeFeatures).filter(([, name]) => name === feature).map(([type]) => type)

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { checkRichTextSupport, type NodeRegistration, type RichTextProfile } from 'mithaq/rich-text/registry'
@@ -61,13 +61,9 @@ test('the initial inventory names exactly the selected classes and proves every 
   const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
   const { defaultNodes, UploadNode, typesOf, versionsOf, richTextReader } = await import('./rich-text.ts')
   const { AutoLinkNode } = await import('@lexical/link')
-  const { TableNode, TableRowNode, TableCellNode } = await import('@lexical/table')
-  const { CodeNode, CodeHighlightNode } = await import('@lexical/code-core')
-  const { MarkNode } = await import('@lexical/mark')
-  const { HashtagNode } = await import('@lexical/hashtag')
-  const { MentionNode } = await import('./mention-node.ts')
+  const { richTextFeatureNodes, richTextFeatures } = await import('./index.ts')
   const { createEditor } = await import('lexical')
-  const nodes = [...defaultNodes, AutoLinkNode, UploadNode, TableNode, TableRowNode, TableCellNode, CodeNode, CodeHighlightNode, MarkNode, HashtagNode, MentionNode]
+  const nodes = [...defaultNodes, AutoLinkNode, UploadNode, ...richTextFeatureNodes(richTextFeatures)]
   const types = typesOf(nodes)
   assert.deepEqual(defaultNodeRegistry.map((node) => node.type).sort(), [...types].sort())
   const versions = versionsOf(nodes)
@@ -98,7 +94,7 @@ test('the initial inventory names exactly the selected classes and proves every 
     assert.deepEqual(registration.json.reads, Array.from({ length: registration.json.writes }, (_, index) => index + 1))
     for (const version of registration.json.reads) {
       const fixture = { ...fixtures[registration.type], version }
-      let block = fixture
+      let block: object = fixture
       if (['text', 'linebreak', 'tab', 'link', 'autolink', 'mark', 'hashtag', 'mention'].includes(registration.type)) block = { ...paragraph, children: [fixture] }
       if (registration.type === 'code-highlight') block = { ...fixtures.code, children: [fixture] }
       if (registration.type === 'listitem') block = { ...fixtures.list, children: [fixture] }
@@ -127,4 +123,75 @@ test('profile typos and field policies warn for each required place with stable 
   assert.ok(!diagnostics.some((item) => item.code === 'policy-support-gap' && item.feature === 'link' && item.place === 'admin'))
   assert.deepEqual(checkRichTextSupport({ registry: [...registry].reverse(), profile: { ...selected, nodes: [...selected.nodes].reverse() }, policies: [...policies, ...policies] }), diagnostics)
   assert.ok(diagnostics.every((item) => item.severity === 'warning' && item.remedy && item.profile === selected.name))
+})
+
+test('the CLI defaults to the inventory, accepts policies, and rejects unreadable or malformed inputs without leaking their contents', () => {
+  withModules((paths) => {
+    const policyPath = join(paths.folder, 'policies.mjs')
+    writeFileSync(policyPath, `export default [{ features: ['link'], fonts: ['sans'] }]`)
+    const normal = cli(['--profile', paths.profile, '--policies', policyPath])
+    assert.equal(normal.status, 0, normal.stderr)
+    assert.ok(normal.stdout.includes('policy-support-gap'))
+    for (const args of [[], ['--unknown'], ['--strict=false'], ['--profile'], ['--profile', join(paths.folder, 'missing.mjs')], ['--profile', paths.profile, '--contract', paths.profile], ['--profile', paths.profile, '--policies', paths.registry]]) {
+      const result = cli(args)
+      assert.equal(result.status, 1)
+      assert.equal(JSON.parse(result.stderr).severity, 'error')
+      assert.ok(!result.stderr.includes(paths.folder))
+    }
+    for (const value of [null, {}, { ...profile, requirements: { typo: { default: 'edit' } } }, { ...profile, requirements: { admin: { default: 'none' } } }, { ...profile, strict: true }]) {
+      writeFileSync(paths.profile, `export default ${JSON.stringify(value)}`)
+      assert.equal(cli(['--profile', paths.profile]).status, 1)
+    }
+    writeFileSync(paths.profile, `throw new Error('DOCUMENT-TEXT-MUST-STAY-PRIVATE')`)
+    const error = cli(['--profile', paths.profile])
+    assert.equal(error.status, 1)
+    assert.ok(!error.stderr.includes('DOCUMENT-TEXT-MUST-STAY-PRIVATE'))
+  })
+})
+
+// @ts-expect-error every place is explicit even when it has no support
+const incompleteSupport: NodeRegistration['support'] = { admin: 'edit' }
+void incompleteSupport
+
+test('support ranks, node overrides and omitted places do not invent requirements', () => {
+  const node: NodeRegistration = { ...registration, support: { ...registration.support, 'lynx-viewer': 'view' } }
+  assert.deepEqual(checkRichTextSupport({ registry: [node], profile }), [])
+  assert.deepEqual(checkRichTextSupport({ registry: [node], profile: { ...profile, requirements: {} } }), [])
+  const override: RichTextProfile = { ...profile, requirements: { 'lynx-viewer': { default: 'edit', nodes: { link: 'view' } } } }
+  assert.deepEqual(checkRichTextSupport({ registry: [node], profile: override }), [])
+  assert.equal(checkRichTextSupport({ registry: [node], profile: { ...override, requirements: { 'lynx-viewer': { default: 'edit' } } } })[0]?.code, 'support-gap')
+  assert.equal(checkRichTextSupport({ registry: [], profile: { ...profile, requirements: {} } })[0]?.code, 'profile-node-unknown')
+})
+
+test('native format policies use the shared bits rather than assuming a native edit claim covers every format', () => {
+  const node: NodeRegistration = { ...registration, type: 'text', native: ['formats.bold'], support: { ...registration.support, 'native-ios': 'edit' } }
+  const profile: RichTextProfile = { name: 'native', nodes: ['text'], requirements: { 'native-ios': { default: 'edit' } } }
+  const diagnostics = checkRichTextSupport({ registry: [node], profile, policies: [{ features: ['bold', 'italic'], fonts: ['sans'] }], contract: { formats: { bold: 1, italic: 2 } } })
+  assert.equal(diagnostics.length, 1)
+  assert.equal(diagnostics[0]?.feature, 'italic')
+  assert.equal(diagnostics[0]?.code, 'policy-support-gap')
+})
+
+test('the registry bundles and runs without Lexical, React, DOM or runtime imports', async () => {
+  const { build } = await import('esbuild')
+  const { runInNewContext } = await import('node:vm')
+  const result = await build({ entryPoints: ['packages/mithaq/src/rich-text/registry.ts'], bundle: true, platform: 'neutral', format: 'iife', globalName: 'registry', write: false, metafile: true })
+  assert.deepEqual(Object.keys(result.metafile!.inputs).sort(), ['packages/mithaq/src/rich-text/feature-data.ts', 'packages/mithaq/src/rich-text/registry.ts'])
+  const context: { registry?: typeof import('./registry.ts') } = {}
+  runInNewContext(result.outputFiles[0]!.text, context)
+  assert.equal(context.registry!.defaultNodeRegistry.length, 21)
+  assert.equal(context.registry!.checkRichTextSupport({ registry: [registration], profile })[0]?.code, 'support-gap')
+})
+
+test('the CLI runs under Bun as well as Node 24 and both package manifests publish its separate bin', () => {
+  const manifest = JSON.parse(readFileSync('packages/mithaq/package.json', 'utf8'))
+  assert.equal(manifest.bin['mithaq-check-rich-text'], './src/rich-text/check.ts')
+  assert.equal(manifest.publishConfig.bin['mithaq-check-rich-text'], 'dist/rich-text/check.js')
+  withModules((paths) => {
+    const result = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/check.ts', '--profile', paths.profile], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(JSON.parse(result.stdout).code, 'support-gap')
+    const strict = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/check.ts', '--profile', paths.profile, '--strict'], { encoding: 'utf8' })
+    assert.equal(strict.status, 1)
+  })
 })

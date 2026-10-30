@@ -1130,6 +1130,107 @@ store contract to Postgres through Drizzle; it still has the `store` capability.
 The [0.1.1 to 0.2.0 upgrade guide](../../templates/asas/README.md#011-to-020)
 covers the other breaking changes.
 
+## Rich text support checks
+
+`mithaq/rich-text/registry` exports `defaultNodeRegistry`, `NodeRegistration`,
+`Place`, `Support`, `RichTextProfile` and the pure `checkRichTextSupport` function.
+This subpath loads no Lexical, React, DOM, Node built-ins or native code. It is
+safe to bundle for PrimJS; the file-reading CLI is a separate bin.
+
+A registration names its Lexical `type`, `json: { writes, reads }`, an explicit
+`support` entry for every place (`admin`, `lynx-viewer`, `native-android`,
+`native-ios`), and optional `native` contract references. `edit` includes `view`;
+`view` means a real renderer, and `none` means only a generic locked fallback.
+A reference such as `formats.bold` or `paragraphs.p` resolves against the
+installed rich-input contract; format values must match `richTextFormatBits`.
+The sentinel `none` makes no native claim. References alone do not establish a
+lossless codec: promote support only after codec and device fixtures prove the
+complete node shape. A subset of heading tags or flat lists is insufficient.
+
+The initial inventory has 21 types: all default and core nodes, autolink,
+upload, tables, code, mentions, hashtags and comment marks. Admin support is
+`edit`; Lynx and both native places are `none` until their renderers and
+lossless codecs are proven. Upload writes version 3 and reads 1–3; every other
+node reads and writes version 1. These declarations describe installed support,
+not permission to edit an unsupported instance. Unknown versions, metadata and
+unsupported shapes still require preservation and a read-only fallback.
+
+Each app owns its profile outside `defineMithaq`. For example,
+`rich-text-profile.ts` can default-export:
+
+```ts
+import type { RichTextProfile } from 'mithaq/rich-text/registry'
+
+export default {
+  name: 'my-app',
+  nodes: ['root', 'paragraph', 'text', 'link'],
+  requirements: {
+    admin: { default: 'edit' },
+    'lynx-viewer': { default: 'view', nodes: { link: 'view' } },
+  },
+} satisfies RichTextProfile
+```
+
+An omitted place has no requirement. Per-node overrides are `edit` or `view`.
+Unknown selected types and overrides naming unselected types warn. Strictness
+belongs only to the CLI invocation, never to a profile. Mithaq supplies no
+worked-app profile or starter profile file.
+
+Add an app script to its `package.json`:
+
+```json
+{
+  "scripts": {
+    "check:rich-text": "mithaq-check-rich-text --profile ./rich-text-profile.ts"
+  }
+}
+```
+
+Run `bun run check:rich-text` before a pull request, or `npm run check:rich-text`
+on Node 24. Add `--strict` to fail on warnings. Native apps also pass
+`--contract ./path/to/installed/rich-input/contract.json`. The CLI accepts
+`--policies ./rich-text-policies.ts` (a default-exported array of
+`RichTextPolicy` values) and `--registry ./rich-text-registry.ts` (a
+default-exported array of registrations, usually extending `defaultNodeRegistry`).
+All module paths resolve from the working directory, and relative imports
+inside a module resolve from that module. Node 24 and Bun run the bin.
+Profile modules are trusted executable app configuration; do not load untrusted
+modules. `--help` prints usage.
+
+For programmatic checks:
+
+```ts
+import { checkRichTextSupport, defaultNodeRegistry } from 'mithaq/rich-text/registry'
+import profile from './rich-text-profile.ts'
+
+const diagnostics = checkRichTextSupport({ registry: defaultNodeRegistry, profile })
+```
+
+Optional `policies` is an array of field authoring policies, without field or
+record identifiers. Optional `contract` is the parsed rich-input contract.
+Feature associations, format bits and toolbar choices come from the existing
+shared maps rather than a second registry of feature names. Policies warn when
+a required place cannot edit an allowed node or format, even if the profile
+only asks that place to view it. Non-node tools conservatively check selected
+nodes. Repeated diagnostics are deduplicated and sorted deterministically.
+
+Support diagnostics carry `severity`, stable `code`, `profile`, `node` or
+`feature`, `place`, `required`, `available` and `remedy`. An unknown selected
+type has `place: null` and `required: 'none'` because the typo is independent of
+place requirements. Codes are `support-gap`, `policy-support-gap`,
+`profile-node-unknown`, `profile-node-unselected`, `native-reference-required`
+and `native-reference-unresolved`. The latter two are errors regardless of
+profile requirements; missing or unresolved native references never become
+warnings. Inventory references are checked even for unused nodes.
+
+The CLI writes one support diagnostic per JSON line to stdout. Warnings exit 0,
+or 1 with `--strict`; errors always exit 1. Bad arguments, unreadable modules or
+JSON, and invalid input shapes exit 1 with a generic `invalid-cli`,
+`unreadable-input` or `invalid-input` diagnostic on stderr. Neither support
+checks nor CLI input errors print document text, payloads, record identifiers,
+file contents or caught exception messages. Existing CI discovers the check's
+unit tests; apps add their own script without a new workflow.
+
 ## Rich text features
 
 A project installs features in its `richText` rukn. The starter writes the
