@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { after } from 'node:test'
+import { setTimeout } from 'node:timers/promises'
 import { testDatabase } from './test-database.ts'
 import { binary } from '../../../packages/mithaq/src/drizzle/migrate.ts'
 
@@ -55,8 +56,17 @@ const alive = (pid: number) => {
   }
 }
 let creating: Promise<void> | undefined
+// A pool's `end()` resolves before its backends exit, and a forced drop terminating one the pool is still closing
+// makes that client emit an error nothing listens for, failing whichever test is running. So the drop waits them out.
+const dropMigrateDatabase = async () => {
+  for (let tries = 0; tries < 100; tries++) {
+    if (!(await adminQuery(`select 1 from pg_stat_activity where datname = '${migrateName}'`)).length) break
+    await setTimeout(50)
+  }
+  await adminQuery(`drop database if exists ${migrateName} with (force)`)
+}
 export const migrateDatabase = async () => {
-  if (creating) await adminQuery(`drop database if exists ${migrateName} with (force)`)
+  if (creating) await dropMigrateDatabase()
   migrateName = `${new URL(testDatabase()).pathname.slice(1)}_migrate_${process.pid}_${randomBytes(4).toString('hex')}`
   creating = (async () => {
     // A run killed outright never reaches its `after`, so its database is dropped here once its process is gone.
@@ -73,7 +83,7 @@ export const migrateDatabase = async () => {
 }
 
 after(async () => {
-  if (creating) await adminQuery(`drop database if exists ${migrateName} with (force)`)
+  if (creating) await dropMigrateDatabase()
   for (const root of projects) await rm(root, { recursive: true, force: true })
 })
 
