@@ -1420,6 +1420,20 @@ const suite = (name: string, make: (authorize: Authorize) => Promise<{ built: Bu
     assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one })).body, versioned(1, 'Upgraded'))
     await papers.update({ id: paper.id, body: versioned(1, 'Edited') }, { actor: one })
     assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one })).body, versioned(1, 'Edited'), 'while an edit at the same version saves')
+
+    // A step's upsert by the conflict key: refused over the upgraded row, and making a row where the key names none.
+    const fresh = randomUUID()
+    const upsertOf = (id: string, words: string) => async (ctx: Ctx, tools: WriteTools) => {
+      await tools.store.upsert({ tx: ctx.tx, kayan: declaration(built, 'draftOwners'), on: ['id'], data: { id, title: 'upserted', balance: 0, meta: {}, body: versioned(0, words), _status: 'published', createdAt: new Date(), updatedAt: new Date() } } as never)
+    }
+    try {
+      storeProbe = upsertOf(paper.id, 'Stale upsert')
+      assert.equal((await refusal(papers.stepDraft({ id: paper.id, title: 'stepping' }, { actor: one }))).key, 'error.conflict.rich_text_version')
+      assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one })).body, versioned(1, 'Edited'))
+      storeProbe = upsertOf(fresh, 'Fresh upsert')
+      await papers.stepDraft({ id: paper.id, title: 'stepping' }, { actor: one })
+    } finally { storeProbe = async () => {} }
+    assert.deepEqual((await papers.findByID({ id: fresh }, { actor: one })).body, versioned(0, 'Fresh upsert'))
   })
 
   test('cleanup retains historical and soft-deleted owners in Postgres as well as memory', async () => {

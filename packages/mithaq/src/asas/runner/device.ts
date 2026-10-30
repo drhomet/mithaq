@@ -13,6 +13,7 @@ import { assertReadableWhere, protectedField } from './query-access.ts'
 import { assertWhere, assertStoreWhere } from './query.ts'
 import { denied, invalid, missing } from './errors.ts'
 import { snapshot } from './snapshot.ts'
+import { assertRichTextVersions, upsertRichText } from './rich-text-versions.ts'
 import { providerOf } from '../../base/rules.ts'
 import type { Writes, Globals } from './write.ts'
 import type { StandardSchemaV1 } from '../../mithaq/standard-schema.ts'
@@ -140,6 +141,12 @@ export function buildDeviceAsas(language: Language, { kayan, global = [], http }
           return
         }
         if (args.where) assertStoreWhere(target, args.where)
+        const data = args.data ?? {}
+        if (word === 'update') await assertRichTextVersions({ kayan: target, store, data, tx, target: combineWhere({ id: { equals: args.id as Scalar } }, args.where) })
+        if (word === 'upsert') {
+          const keyed = { and: (args.on as readonly string[]).map((key) => ({ [key]: { equals: data[key] as Scalar } })) }
+          return upsertRichText({ kayan: target, store, data, tx, keyed, where: args.where, upsert: (where) => store.upsert({ ...args, on: args.on as readonly string[], data, where, tx }) })
+        }
         return (store[word as 'insert'] as (args: object) => Promise<unknown>)({ ...args, tx })
       }])) as unknown as RuntimeWriteTools['store']
       const common = { operation: name, schema, output: shape.row, publicOutput: output, catalog, kayans: bound(scope, operation.effect === 'read'), of: of(scope, operation.effect === 'read'), audit: service.audit }
