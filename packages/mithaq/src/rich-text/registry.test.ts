@@ -24,7 +24,7 @@ test('a missing viewer warns through the public check and CLI, failing only with
   const diagnostics = checkRichTextSupport({ registry: [registration], profile })
   assert.deepEqual(diagnostics, [{ severity: 'warning', code: 'support-gap', profile: 'cluster-like', node: 'link', place: 'lynx-viewer', required: 'view', available: 'none', remedy: 'Install support for this node at this place or revise the profile requirement.' }])
   withModules((paths) => {
-    const args = ['--profile', paths.profile]
+    const args = ['--profile', paths.profile, '--json']
     const normal = cli(args)
     assert.equal(normal.status, 0, normal.stderr)
     assert.deepEqual(JSON.parse(normal.stdout), diagnostics[0])
@@ -180,6 +180,17 @@ test('the CLI defaults to the inventory, accepts policies, and rejects unreadabl
   })
 })
 
+test('the CLI groups its readable output by severity, code and place, with a count and the nodes', async () => {
+  const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
+  const nodes = defaultNodeRegistry.map((node) => node.type)
+  withModules((paths) => {
+    writeFileSync(paths.profile, `export default ${JSON.stringify({ name: 'cluster-like', nodes, requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' } } })}`)
+    const result = cli(['--profile', paths.profile])
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout, `warning support-gap at lynx-viewer (21): ${[...nodes].sort().join(', ')}. Install support for this node at this place or revise the profile requirement.\n`)
+  })
+})
+
 // @ts-expect-error every place is explicit even when it has no support
 const incompleteSupport: NodeRegistration['support'] = { admin: 'edit' }
 void incompleteSupport
@@ -219,7 +230,7 @@ test('the CLI runs under Bun as well as Node 24 and both package manifests publi
   assert.equal(manifest.bin['mithaq-check-rich-text'], './src/rich-text/check.ts')
   assert.equal(manifest.publishConfig.bin['mithaq-check-rich-text'], 'dist/rich-text/check.js')
   withModules((paths) => {
-    const result = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/check.ts', '--profile', paths.profile], { encoding: 'utf8' })
+    const result = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/check.ts', '--profile', paths.profile, '--json'], { encoding: 'utf8' })
     assert.equal(result.status, 0, result.stderr)
     assert.equal(JSON.parse(result.stdout).code, 'support-gap')
     const strict = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/check.ts', '--profile', paths.profile, '--strict'], { encoding: 'utf8' })

@@ -26,13 +26,13 @@ const validPolicies = (value: unknown): value is readonly RichTextPolicy[] => Ar
   return true
 })
 
-const usage = 'mithaq-check-rich-text --profile <module> [--policies <module>] [--contract <contract.json>] [--strict]'
+const usage = 'mithaq-check-rich-text --profile <module> [--policies <module>] [--contract <contract.json>] [--strict] [--json]'
 const readModule = async (path: string): Promise<unknown> => (await import(pathToFileURL(resolve(path)).href)).default
 
 const main = async () => {
   let code = 'invalid-cli'
   try {
-    const { values } = parseArgs({ options: { profile: { type: 'string' }, policies: { type: 'string' }, contract: { type: 'string' }, strict: { type: 'boolean' }, help: { type: 'boolean' } }, allowPositionals: false })
+    const { values } = parseArgs({ options: { profile: { type: 'string' }, policies: { type: 'string' }, contract: { type: 'string' }, strict: { type: 'boolean' }, json: { type: 'boolean' }, help: { type: 'boolean' } }, allowPositionals: false })
     if (values.help) { console.log(usage); return 0 }
     if (!values.profile || Object.entries(values).some(([, value]) => value === '')) throw new Error()
     code = 'unreadable-input'
@@ -42,7 +42,11 @@ const main = async () => {
     code = 'invalid-input'
     if (!validProfile(profile) || !validPolicies(policies) || (contract !== undefined && !validContract(contract))) throw new Error()
     const diagnostics = checkRichTextSupport({ profile, registry: defaultNodeRegistry, policies, contract })
-    for (const diagnostic of diagnostics) console.log(JSON.stringify(diagnostic))
+    if (values.json) for (const diagnostic of diagnostics) console.log(JSON.stringify(diagnostic))
+    // One gap usually spans many nodes, so a person reads one line per gap rather than one per node.
+    else for (const [key, items] of Map.groupBy(diagnostics, (item) => `${item.severity} ${item.code} at ${item.place ?? 'every place'}`)) {
+      console.log(`${key} (${items.length}): ${items.map((item) => item.feature ? `${item.feature} on ${item.node}` : item.node).join(', ')}. ${items[0]!.remedy}`)
+    }
     return diagnostics.some((item) => item.severity === 'error' || values.strict) ? 1 : 0
   } catch {
     // Module errors can contain document data or credentials; only configuration advice crosses the CLI boundary.
