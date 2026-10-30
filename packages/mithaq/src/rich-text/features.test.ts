@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { defaultNodes, richText } from './index.ts'
+import { defaultNodes, defaultRichTextFeatures, richText } from './index.ts'
 
 const document = (node: object) => ({ root: { type: 'root', children: [{ type: 'paragraph', children: [node] }] } })
 const text = (format = 0) => ({ type: 'text', text: 'مرحبا Hello', format })
@@ -104,8 +104,30 @@ test('code accepts no free theme string', () => {
 
 test('direction overrides belong to real blocks and never inline links', () => {
   const check = richText({ nodes: defaultNodes, features: ['link', 'direction'] }).kinds.richText.targets.zod()
-  for (const extra of [{ $: { direction: 'rtl' } }, { direction: 'rtl' }]) {
-    assert.equal(check.safeParse(document({ type: 'link', url: 'https://example.com', children: [text()], ...extra })).success, false)
+  assert.equal(check.safeParse(document({ type: 'link', url: 'https://example.com', children: [text()], $: { direction: 'rtl' } })).success, false)
+  assert.equal(check.safeParse(document({ ...text(), direction: 'rtl' })).success, false)
+})
+
+test('legacy direction metadata survives validation for every element, including custom elements', async () => {
+  const { AutoLinkNode, CalloutNode } = await import('../../../mithaq-admin/test/callout-node.ts')
+  const check = richText({ nodes: [...defaultNodes, AutoLinkNode, CalloutNode], features: [...defaultRichTextFeatures, 'tables', 'comments'], comments: { threads: 'richTextThreads' } }).kinds.richText.targets.zod()
+  const element = (type: string, children: object[], extra = {}) => ({ type, children, direction: 'ltr', format: '', indent: 0, version: 1, ...extra })
+  const paragraph = () => element('paragraph', [text()])
+  // Lexical 0.20's ElementNode.exportJSON includes direction; every subclass spreading super inherits it.
+  for (const node of [
+    element('link', [text()], { url: 'https://example.com' }),
+    element('autolink', [text()], { url: 'https://example.com' }),
+    element('mark', [text()], { ids: ['00000000-0000-4000-8000-000000000001'] }),
+    element('list', [element('listitem', [text()])], { listType: 'bullet', tag: 'ul' }),
+    element('table', [element('tablerow', [element('tablecell', [paragraph()], { headerState: 0 })])]),
+    element('quote', [text()]),
+    element('callout', [paragraph()], { tone: 'info' }),
+  ]) {
+    const value = { root: element('root', [node]) }
+    const before = JSON.stringify(value)
+    const result = check.safeParse(value)
+    assert.equal(result.success, true, result.success ? '' : result.error.message)
+    assert.equal(JSON.stringify(value), before, `${node.type} retains its metadata`)
   }
 })
 

@@ -53,9 +53,9 @@ type EditorProps = {
 }
 
 // The policy derives a block's direction from NodeState; a legacy direction without that choice would be cleared.
-// The root is skipped: older Lexical writes its direction on every root, and the policy keeps it as metadata.
+// Other elements keep older Lexical's direction as metadata, without a block choice.
 const losesDirection = (node: RichTextNode): boolean =>
-  (node.type !== 'root' && node.direction != null && node.direction !== (node.$ as { direction?: unknown } | undefined)?.direction)
+  (richTextBlockTypes.includes(node.type) && node.direction != null && node.direction !== (node.$ as { direction?: unknown } | undefined)?.direction)
   || (node.children ?? []).some(losesDirection)
 // A copy, so the form's own value is never changed: a legacy block direction becomes the choice the toolbar shows.
 const chosen = (node: RichTextNode): RichTextNode => ({
