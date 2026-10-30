@@ -113,3 +113,18 @@ test('the initial inventory names exactly the selected classes and proves every 
   }
   assert.ok(defaultNodeRegistry.every((node) => node.support.admin === 'edit' && node.support['lynx-viewer'] === 'none' && node.support['native-ios'] === 'none' && node.support['native-android'] === 'none'))
 })
+
+test('profile typos and field policies warn for each required place with stable sorted diagnostics', () => {
+  const selected: RichTextProfile = { name: 'check', nodes: ['link', 'missing', 'text'], requirements: { 'native-ios': { default: 'edit', nodes: { typo: 'view', heading: 'edit' } }, admin: { default: 'edit' } } }
+  const text: NodeRegistration = { ...registration, type: 'text' }
+  const registry = [registration, text]
+  const policies = [{ features: ['link', 'bold', 'checklist'] as const, fonts: ['sans'] as const }]
+  const diagnostics = checkRichTextSupport({ registry, profile: selected, policies })
+  assert.ok(diagnostics.some((item) => item.code === 'profile-node-unknown' && item.node === 'missing'))
+  assert.ok(diagnostics.some((item) => item.code === 'profile-node-unselected' && item.node === 'typo'))
+  assert.ok(diagnostics.some((item) => item.code === 'profile-node-unselected' && item.node === 'heading'))
+  for (const feature of ['link', 'bold', 'checklist']) assert.ok(diagnostics.some((item) => item.code === 'policy-support-gap' && item.feature === feature && item.place === 'native-ios' && item.required === 'edit'))
+  assert.ok(!diagnostics.some((item) => item.code === 'policy-support-gap' && item.feature === 'link' && item.place === 'admin'))
+  assert.deepEqual(checkRichTextSupport({ registry: [...registry].reverse(), profile: { ...selected, nodes: [...selected.nodes].reverse() }, policies: [...policies, ...policies] }), diagnostics)
+  assert.ok(diagnostics.every((item) => item.severity === 'warning' && item.remedy && item.profile === selected.name))
+})
