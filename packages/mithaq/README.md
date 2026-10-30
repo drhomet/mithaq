@@ -1208,6 +1208,9 @@ const diagnostics = checkRichTextSupport({ registry: defaultNodeRegistry, profil
 
 Optional `policies` is an array of field authoring policies, without field or
 record identifiers. Optional `contract` is the parsed rich-input contract.
+Optional `codecs` names the node types the installed native codec carries
+whole; it defaults to none, since no native codec ships yet, so every native
+`edit` claim is an error until one does. The CLI passes none.
 Feature associations, format bits and toolbar choices come from the existing
 shared maps rather than a second registry of feature names. Policies warn when
 a required place cannot edit an allowed node or format, even if the profile
@@ -1218,10 +1221,11 @@ Support diagnostics carry `severity`, stable `code`, `profile`, `node` or
 `feature`, `place`, `required`, `available` and `remedy`. An unknown selected
 type has `place: null` and `required: 'none'` because the typo is independent of
 place requirements. Codes are `support-gap`, `policy-support-gap`,
-`profile-node-unknown`, `profile-node-unselected`, `native-reference-required`
-and `native-reference-unresolved`. The latter two are errors regardless of
-profile requirements; missing or unresolved native references never become
-warnings. Inventory references are checked even for unused nodes.
+`profile-node-unknown`, `profile-node-unselected`, `native-reference-required`,
+`native-reference-unresolved` and `native-codec-missing`. The last three are
+errors regardless of profile requirements: a native `edit` claim needs
+references and a codec carrying its type. An unresolved reference is reported
+once per node with `place: null`, even for a node that claims nothing native.
 
 The CLI writes one support diagnostic per JSON line to stdout. Warnings exit 0,
 or 1 with `--strict`; errors always exit 1. Bad arguments, unreadable modules or

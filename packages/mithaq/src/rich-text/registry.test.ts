@@ -32,19 +32,30 @@ test('a missing viewer warns through the public check and CLI, failing only with
   })
 })
 
-test('native editing requires real references in the installed contract', () => {
+test('native editing requires real references in the installed contract and a codec that carries the node', () => {
   const nativeProfile: RichTextProfile = { name: 'phone', nodes: ['link'], requirements: {} }
+  const contract = { formats: { bold: 2 }, paragraphs: ['p', 'h2', 'h3'] }
   for (const place of ['native-android', 'native-ios'] as const) {
-    for (const native of [undefined, [], ['none'], ['paragraphs.h1'], ['formats.bold']]) {
+    for (const native of [undefined, [], ['none']]) {
       const node = { ...registration, support: { ...registration.support, [place]: 'edit' as const }, native }
-      const diagnostics = checkRichTextSupport({ registry: [node], profile: nativeProfile, contract: { formats: { bold: 2 }, paragraphs: ['p', 'h2', 'h3'] } })
-      assert.equal(diagnostics.length, 1)
-      assert.equal(diagnostics[0]?.severity, 'error')
-      assert.equal(diagnostics[0]?.place, place)
+      assert.deepEqual(checkRichTextSupport({ registry: [node], profile: nativeProfile, contract, codecs: ['link'] }).map(({ severity, code, place }) => ({ severity, code, place })), [{ severity: 'error', code: 'native-reference-required', place }])
     }
   }
-  const node: NodeRegistration = { ...registration, native: ['formats.bold', 'paragraphs.p'], support: { ...registration.support, 'native-ios': 'edit' } }
-  assert.deepEqual(checkRichTextSupport({ registry: [node], profile: nativeProfile, contract: { formats: { bold: 1 }, paragraphs: ['p'] } }), [])
+  const resolving: NodeRegistration = { ...registration, native: ['formats.bold', 'paragraphs.p'], support: { ...registration.support, 'native-ios': 'edit' } }
+  const installed = { formats: { bold: 1 }, paragraphs: ['p'] }
+  assert.deepEqual(checkRichTextSupport({ registry: [resolving], profile: nativeProfile, contract: installed, codecs: ['link'] }), [])
+  for (const codecs of [undefined, [], ['text']]) {
+    assert.deepEqual(checkRichTextSupport({ registry: [resolving], profile: nativeProfile, contract: installed, codecs }).map(({ severity, code, place }) => ({ severity, code, place })), [{ severity: 'error', code: 'native-codec-missing', place: 'native-ios' }])
+  }
+})
+
+test('an unresolved native reference is one error per node, whatever the node claims', () => {
+  const nativeProfile: RichTextProfile = { name: 'phone', nodes: ['link'], requirements: {} }
+  const both = { 'native-android': 'edit', 'native-ios': 'edit' } as const
+  for (const [native, support] of [[['paragraphs.h1'], both], [['formats.bold'], both], [['paragraphs.h1'], {}]] as const) {
+    const node: NodeRegistration = { ...registration, native, support: { ...registration.support, ...support } }
+    assert.deepEqual(checkRichTextSupport({ registry: [node], profile: nativeProfile, contract: { formats: { bold: 2 }, paragraphs: ['p'] }, codecs: ['link'] }), [{ severity: 'error', code: 'native-reference-unresolved', profile: 'phone', node: 'link', place: null, required: 'none', available: 'none', remedy: 'Declare only native references the installed rich-input contract resolves.' }])
+  }
 })
 
 test('the initial inventory names exactly the selected classes and proves every written and readable JSON version', async () => {
@@ -156,7 +167,7 @@ test('support ranks, node overrides and omitted places do not invent requirement
 test('native format policies use the shared bits rather than assuming a native edit claim covers every format', () => {
   const node: NodeRegistration = { ...registration, type: 'text', native: ['formats.bold'], support: { ...registration.support, 'native-ios': 'edit' } }
   const profile: RichTextProfile = { name: 'native', nodes: ['text'], requirements: { 'native-ios': { default: 'edit' } } }
-  const diagnostics = checkRichTextSupport({ registry: [node], profile, policies: [{ features: ['bold', 'italic'], fonts: ['sans'] }], contract: { formats: { bold: 1, italic: 2 } } })
+  const diagnostics = checkRichTextSupport({ registry: [node], profile, policies: [{ features: ['bold', 'italic'], fonts: ['sans'] }], contract: { formats: { bold: 1, italic: 2 } }, codecs: ['text'] })
   assert.equal(diagnostics.length, 1)
   assert.equal(diagnostics[0]?.feature, 'italic')
   assert.equal(diagnostics[0]?.code, 'policy-support-gap')

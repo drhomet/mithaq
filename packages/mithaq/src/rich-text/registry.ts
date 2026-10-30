@@ -17,7 +17,7 @@ export type RichTextProfile = {
 }
 export type RichTextDiagnostic = {
   severity: 'warning' | 'error'
-  code: 'support-gap' | 'profile-node-unknown' | 'profile-node-unselected' | 'policy-support-gap' | 'native-reference-required' | 'native-reference-unresolved'
+  code: 'support-gap' | 'profile-node-unknown' | 'profile-node-unselected' | 'policy-support-gap' | 'native-reference-required' | 'native-reference-unresolved' | 'native-codec-missing'
   profile: string
   node?: string
   feature?: string
@@ -39,14 +39,17 @@ const resolves = (reference: string, contract?: RichTextContract): boolean => {
   return section === 'formats' && Object.hasOwn(richTextFormatBits, name) && contract?.formats?.[name] === richTextFormatBits[name as keyof typeof richTextFormatBits]
 }
 
-export const checkRichTextSupport = ({ registry, profile, policies = [], contract }: { registry: readonly NodeRegistration[]; profile: RichTextProfile; policies?: readonly RichTextPolicy[]; contract?: RichTextContract }): RichTextDiagnostic[] => {
+export const checkRichTextSupport = ({ registry, profile, policies = [], contract, codecs = [] }: { registry: readonly NodeRegistration[]; profile: RichTextProfile; policies?: readonly RichTextPolicy[]; contract?: RichTextContract; codecs?: readonly string[] }): RichTextDiagnostic[] => {
   const diagnostics: RichTextDiagnostic[] = []
   for (const node of registry) {
+    const references = node.native?.filter((reference) => reference !== 'none') ?? []
+    // A stale reference is wrong whatever the node claims, so it belongs to the node rather than to a place.
+    if (references.some((reference) => !resolves(reference, contract))) diagnostics.push({ severity: 'error', code: 'native-reference-unresolved', profile: profile.name, node: node.type, place: null, required: 'none', available: 'none', remedy: 'Declare only native references the installed rich-input contract resolves.' })
     for (const place of ['native-android', 'native-ios'] as const) {
-      const references = node.native?.filter((reference) => reference !== 'none') ?? []
-      const missing = node.support[place] === 'edit' && (!references.length || node.native?.includes('none'))
-      const unresolved = references.some((reference) => !resolves(reference, contract)) && (node.support[place] !== 'none' || (place === 'native-android' && node.support['native-ios'] === 'none'))
-      if (missing || unresolved) diagnostics.push({ severity: 'error', code: missing ? 'native-reference-required' : 'native-reference-unresolved', profile: profile.name, node: node.type, place, required: node.support[place], available: 'none', remedy: 'Declare only lossless native support with references resolved by the installed rich-input contract.' })
+      if (node.support[place] !== 'edit') continue
+      // References name what rich-input draws; only a codec carrying the whole node makes editing lossless.
+      if (!references.length || node.native?.includes('none')) diagnostics.push({ severity: 'error', code: 'native-reference-required', profile: profile.name, node: node.type, place, required: 'edit', available: 'none', remedy: 'Declare only lossless native support with references resolved by the installed rich-input contract.' })
+      else if (!codecs.includes(node.type)) diagnostics.push({ severity: 'error', code: 'native-codec-missing', profile: profile.name, node: node.type, place, required: 'edit', available: 'none', remedy: 'Claim native editing only for node types the installed native codec carries.' })
     }
   }
   for (const type of profile.nodes) {
