@@ -1187,7 +1187,9 @@ writes, is shown read-only as its words with a message, and a save leaves the
 field out, so the stored value stays as it was.
 
 Each node class reads every JSON version up to the one it writes, and a node
-with no version is read as Lexical's first. The server refuses a value holding
+with no version is read as Lexical's first. A class that cannot be constructed
+without arguments declares `static supportedVersion = 1` (its highest supported
+JSON version); without a known version its nodes are refused. The server refuses a value holding
 a newer version (`versionsOf` lists what a node list reads), and refuses any
 write that lowers the highest version of a node type a field holds, compared
 with the row and its newest version: a save, draft, autosave, bulk write,

@@ -40,18 +40,20 @@ export const typesOf = (nodes: readonly Klass<LexicalNode>[]): ReadonlySet<strin
 
 /**
  * The JSON version each class of a list writes, which is the highest it reads. Asked of a fresh node,
- * since Lexical keeps it in `exportJSON` alone; a class that cannot be made bare is left out and read at any version.
+ * since Lexical keeps it in `exportJSON` alone. A class needing arguments declares `static supportedVersion`;
+ * without either source its nodes are refused.
  */
 export const versionsOf = (nodes: readonly Klass<LexicalNode>[]): ReadonlyMap<string, number> => {
   const versions = new Map<string, number>()
   createEditor({ nodes: [...nodes], onError: (error) => { throw error } }).update(() => {
     for (const node of [...coreNodes, ...nodes]) {
+      let version = (node as typeof node & { supportedVersion?: number }).supportedVersion
       try {
-        const { version } = new node().exportJSON()
-        if (typeof version === 'number') versions.set(node.getType(), version)
+        version ??= new node().exportJSON().version
       } catch {
-        // ponytail: a class needing constructor arguments is not version-checked; a static version on the class is the upgrade.
+        // No probe means no known version, so even an unnumbered node must be refused.
       }
+      versions.set(node.getType(), typeof version === 'number' && Number.isInteger(version) && version >= 1 ? version : 0)
     }
   }, { discrete: true })
   return versions
