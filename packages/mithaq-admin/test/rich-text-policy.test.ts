@@ -338,3 +338,28 @@ test('stored content past a narrowed policy is drawn read-only and never sent, e
     assert.match(JSON.stringify(changes.at(-1)), /pasted/)
   } })
 })
+
+
+test('a stored node at a newer JSON version than its class reads is drawn read-only, said by name, and never sent', async () => {
+  const { RichTextViewer } = await import('../registry/rich-text-viewer.tsx')
+  const value = { root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'heading', tag: 'h2', version: 2, direction: null, format: '', indent: 0, addedLater: 'kept', children: [{ type: 'text', version: 1, text: 'Newer heading', format: 0, detail: 0, mode: 'normal', style: '' }] }] } }
+  for (const element of [
+    (changes: unknown[]) => createElement(RichTextEditor, { value: structuredClone(value), onChange: (next) => changes.push(next), direction: 'ltr', t, locale: 'en', id: 'newer' }),
+    () => createElement(RichTextViewer, { value: structuredClone(value), direction: 'ltr', t, id: 'newer' }),
+  ]) {
+    const host = mount()
+    const root = createRoot(host)
+    const changes: unknown[] = []
+    try {
+      await act(async () => root.render(createElement(RichTextContext, { value: installed }, element(changes))))
+      await act(async () => sleep(100))
+      assert.match(host.querySelector('[role="alert"]')?.textContent ?? '', /newer "heading" node/)
+      assert.equal(host.querySelectorAll('[contenteditable]').length, 0, 'no editor is mounted over it')
+      assert.ok(host.textContent?.includes('Newer heading'), 'its words are shown')
+      assert.equal(changes.length, 0, 'and nothing is sent')
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+    }
+  }
+})

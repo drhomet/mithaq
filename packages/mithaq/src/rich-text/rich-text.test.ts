@@ -244,3 +244,17 @@ test('186ae. a Payload upload node naming its row by a number, as Payload\'s pos
   // A number that is no id stays as it was, and the reader refuses it.
   assert.ok('refused' in richText.convertPayloadToLexical({ data: state(uploadNode({ value: Number.NaN })), nodes }))
 })
+
+test('187m. a node of a known type is read only at a JSON version its class reads, so a newer one is refused by name and never parsed, while an older or unnumbered one still reads', () => {
+  const nodes = [...defaultNodes, richText.UploadNode]
+  for (const value of [state(paragraph(text('a'))), state({ ...paragraph(text('a')), version: undefined }), state({ type: 'upload', relationTo: 'media', value: '1', version: 3 })]) {
+    assert.ok('text' in read(value, nodes), `reads ${JSON.stringify(value)}`)
+  }
+  for (const [value, type] of [[state({ ...paragraph(text('a')), version: 2 }), 'paragraph'], [state(paragraph(text('a', { version: 9 }))), 'text'], [state({ type: 'upload', relationTo: 'media', value: '1', version: 4 }), 'upload'], [state({ ...paragraph(text('a')), version: '1' }), 'paragraph']] as const) {
+    const answer = read(value, nodes)
+    assert.ok('refused' in answer, `refuses ${JSON.stringify(value)}`)
+    assert.equal(answer.type, type)
+    assert.match(answer.refused, new RegExp(`newer "${type}" node`))
+  }
+  assert.deepEqual(richText.storedRichText(state({ ...paragraph(text('a')), version: 2 })), { text: '' }, 'a stored value still reads back for display')
+})
