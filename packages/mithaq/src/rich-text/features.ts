@@ -1,5 +1,5 @@
-export { richTextFormatBits, richTextChoiceFeatures, nodeFeatures } from './feature-data.ts'
-import { richTextFormatBits, nodeFeatures } from './feature-data.ts'
+export { richTextFormatBits, richTextChoiceFeatures, nodeFeatures, richTextBlockTypes } from './feature-data.ts'
+import { richTextFormatBits, nodeFeatures, richTextBlockTypes } from './feature-data.ts'
 import { HashtagExtension } from '@lexical/hashtag'
 import type { RichTextNode } from './value.ts'
 
@@ -10,7 +10,6 @@ export const allRichTextFormats = Object.values(richTextFormatBits).reduce((mask
 export const richTextFormatMask = (policy: RichTextPolicy) => Object.entries(richTextFormatBits).reduce((bits, [name, bit]) => bits | (policy.features.includes(name as RichTextFeature) ? bit : 0), 0)
 
 export const richTextCodeLanguages = ['javascript', 'typescript', 'json', 'css', 'markup', 'python'] as const
-export const richTextBlockTypes: readonly string[] = ['paragraph', 'heading', 'quote', 'list', 'listitem', 'table', 'tablerow', 'tablecell', 'code']
 export const richTextNodeFeature = (node: RichTextNode): RichTextFeature | undefined => node.type === 'list' && node.listType === 'check' ? 'checklist' : nodeFeatures[node.type]
 
 /** Policy runs over the original JSON so Lexical cannot silently drop an unsupported value. */

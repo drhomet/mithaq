@@ -149,10 +149,20 @@ test('tools without a node of their own are checked on the node they act on', as
   const features = ['alignment', 'indent', 'direction', 'styling', 'markdown', 'counter', 'findReplace'] as const
   const profile: RichTextProfile = { name: 'phone', nodes: defaultNodeRegistry.map((node) => node.type), requirements: { 'lynx-viewer': { default: 'edit' } } }
   const gaps = checkRichTextSupport({ registry: defaultNodeRegistry, profile, policies: [{ features, fonts: ['sans'] }] }).filter((item) => item.code === 'policy-support-gap')
-  assert.deepEqual(gaps.map((item) => `${item.feature}:${item.node}`).sort(), ['alignment:paragraph', 'counter:text', 'direction:paragraph', 'findReplace:text', 'indent:paragraph', 'markdown:text', 'styling:text'])
+  const blocks = ['paragraph', 'heading', 'quote', 'list', 'listitem', 'table', 'tablerow', 'tablecell', 'code']
+  // Lexical's list, table and code nodes refuse indent, and a list item's indent is list nesting.
+  const expected = [...blocks.flatMap((type) => [`alignment:${type}`, `direction:${type}`]), ...['paragraph', 'heading', 'quote'].map((type) => `indent:${type}`), 'counter:text', 'findReplace:text', 'markdown:text', 'styling:text']
+  assert.deepEqual(gaps.map((item) => `${item.feature}:${item.node}`).sort(), expected.sort())
   const { richTextFeatures } = await import('./policy.ts')
   const every = checkRichTextSupport({ registry: defaultNodeRegistry, profile, policies: [{ features: richTextFeatures, fonts: ['sans'], comments: { threads: 'threads' } }] })
   assert.deepEqual(new Set(every.map((item) => item.feature).filter(Boolean)), new Set(richTextFeatures), 'every feature acts on some node')
+})
+
+test('block tools are checked on a heading a profile asks to edit', async () => {
+  const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
+  const profile: RichTextProfile = { name: 'phone', nodes: defaultNodeRegistry.map((node) => node.type), requirements: { 'native-ios': { default: 'view', nodes: { heading: 'edit' } } } }
+  const gaps = checkRichTextSupport({ registry: defaultNodeRegistry, profile, policies: [{ features: ['headings', 'direction', 'alignment'], fonts: ['sans'] }] }).filter((item) => item.code === 'policy-support-gap')
+  assert.deepEqual(gaps.map((item) => `${item.feature}:${item.node}`).sort(), ['alignment:heading', 'direction:heading', 'headings:heading'])
 })
 
 test('the CLI defaults to the inventory, accepts policies, and rejects unreadable or malformed inputs without leaking their contents', () => {
