@@ -380,3 +380,22 @@ test('stored merged table cells survive opening, editing another paragraph and s
     assert.equal(richText({ nodes: [...defaultNodes, ...nodes], features: ['tables'] }).kinds.richText.targets.zod().safeParse(saved).success, true)
   } })
 })
+
+test('a stored legacy direction without a matching direction choice stays read-only through an unrelated form edit and save', async () => {
+  for (const features of [[], ['direction']] as const) for (const direction of ['rtl', 'ltr'] as const) {
+    const value = { root: { type: 'root', version: 1, children: [{ type: 'paragraph', version: 1, direction, children: [{ type: 'text', version: 1, text: 'Legacy direction', format: 0 }] }] } }
+    const host = mount(), root = createRoot(host)
+    const form = { title: 'Before', body: structuredClone(value) }
+    const changes: unknown[] = []
+    try {
+      await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(RichTextEditor, { value: form.body, policy: { features, fonts: ['sans'] }, onChange: (next) => { changes.push(next); form.body = next as typeof value }, direction: 'ltr', t, locale: 'en', id: 'legacy-direction' }))))
+      await act(async () => sleep(100))
+      assert.equal(host.querySelectorAll('[contenteditable]').length, 0, 'no editor can clear the legacy direction')
+      assert.match(host.querySelector('[role="alert"]')?.textContent ?? '', /no longer allows/)
+      assert.match(host.textContent ?? '', /Legacy direction/)
+      form.title = 'After'
+      assert.deepEqual(JSON.parse(JSON.stringify(form)).body, value, 'saving another field preserves the loaded JSON')
+      assert.equal(changes.length, 0)
+    } finally { await act(async () => root.unmount()); host.remove() }
+  }
+})

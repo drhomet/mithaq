@@ -18,7 +18,7 @@ import { RichTextContext, type RichTextPick } from 'mithaq-admin/rich-text-picks
 import { holdsPlaceholder } from 'mithaq-admin/rich-text-selection.ts'
 import { SlashMenu } from 'mithaq-admin/rich-text-slash-menu.tsx'
 import { ToolbarRow } from 'mithaq-admin/rich-text-toolbar.tsx'
-import { configOf, unreadable, valueOf, type RichTextDirection, type RichTextValue } from 'mithaq-admin/rich-text-value.ts'
+import { configOf, unreadable, valueOf, type RichTextDirection, type RichTextNode, type RichTextValue } from 'mithaq-admin/rich-text-value.ts'
 import { FloatingToolbar } from 'mithaq-admin/rich-text-floating-toolbar.tsx'
 import { FeatureNodes, useFeatureNodes, type RichTextFeatureModule } from 'mithaq-admin/rich-text-features.tsx'
 import { PolicyPlugin } from 'mithaq-admin/rich-text-policy.tsx'
@@ -52,6 +52,11 @@ type EditorProps = {
   control?: ControlProps
 }
 
+// The policy derives direction from NodeState; a legacy direction without that choice would be cleared.
+const losesDirection = (node: RichTextNode): boolean =>
+  (node.direction != null && node.direction !== (node.$ as { direction?: unknown } | undefined)?.direction)
+  || (node.children ?? []).some(losesDirection)
+
 function Editor({ value, onChange, direction, t, locale, id, placeholder, describedBy, invalid, required, nodes, picks, control , modules, policy }: EditorProps & { modules: readonly RichTextFeatureModule[]; policy: RichTextPolicy }): ReactElement {
   const provided = use(RichTextContext)
   const { Plugin } = provided
@@ -60,7 +65,7 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   const [held] = useState(() => valueOf(value))
   const [problem] = useState(() => unreadable(held, drawn))
   // Shown, never cleaned: `PolicyPlugin` would rewrite what the server no longer takes for this field, and the next save would keep the loss.
-  const [beyond] = useState(() => problem === undefined && (richTextGuard(held) ?? richTextFeatureGuard({ node: held.root, policy })) !== undefined)
+  const [beyond] = useState(() => problem === undefined && ((richTextGuard(held) ?? richTextFeatureGuard({ node: held.root, policy })) !== undefined || losesDirection(held.root)))
   // Built only over a value these nodes read, so a value nested past the bound never reaches `JSON.stringify` or Lexical.
   const [initial] = useState(() => (problem === undefined && !beyond ? configOf({ namespace: 'MithaqRichText', nodes: drawn, value: held, editable: true }) : undefined))
   const [isLinkEditMode, setIsLinkEditMode] = useState(false)
