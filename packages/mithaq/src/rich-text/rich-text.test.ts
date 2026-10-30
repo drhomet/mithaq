@@ -258,3 +258,31 @@ test('187m. a node of a known type is read only at a JSON version its class read
   }
   assert.deepEqual(richText.storedRichText(state({ ...paragraph(text('a')), version: 2 })), { text: '' }, 'a stored value still reads back for display')
 })
+
+test('a node needing constructor arguments is refused unless its class declares a supported JSON version', async () => {
+  const { TextNode } = await import('lexical')
+  class RequiredText extends TextNode {
+    static getType() { return 'required-text' }
+    static clone(node: RequiredText) { return new RequiredText(node.getTextContent()) }
+    constructor(words?: string) {
+      if (words === undefined) throw new Error('Words are required.')
+      super(words)
+    }
+    static importJSON(json: import('lexical').SerializedTextNode) { return new RequiredText(json.text).updateFromJSON(json) }
+    exportJSON() { return { ...super.exportJSON(), type: 'required-text', version: 1 } }
+  }
+  class DeclaredText extends RequiredText {
+    static supportedVersion = 1
+    static getType() { return 'declared-text' }
+    static clone(node: DeclaredText) { return new DeclaredText(node.getTextContent()) }
+    static importJSON(json: import('lexical').SerializedTextNode) { return new DeclaredText(json.text).updateFromJSON(json) }
+    exportJSON() { return { ...super.exportJSON(), type: 'declared-text' } }
+  }
+  for (const version of [undefined, 1, 2]) {
+    const result = read(state(paragraph(text('Keep', { type: 'required-text', version }))), [...defaultNodes, RequiredText])
+    assert.ok('refused' in result, `an undeclared class refuses version ${version}`)
+  }
+  const nodes = [...defaultNodes, DeclaredText]
+  assert.equal('refused' in read(state(paragraph(text('Keep', { type: 'declared-text', version: 1 }))), nodes), false)
+  assert.equal('refused' in read(state(paragraph(text('Keep', { type: 'declared-text', version: 2 }))), nodes), true)
+})
