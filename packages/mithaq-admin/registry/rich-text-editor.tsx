@@ -12,7 +12,7 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import type { Klass, LexicalNode } from 'lexical'
 import type { ControlProps } from 'mithaq-admin/control-props.ts'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, richTextChoiceFeatures, safeUrl } from 'mithaq/rich-text/client'
+import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, richTextChoiceFeatures, richTextFeatureGuard, richTextGuard, safeUrl } from 'mithaq/rich-text/client'
 import { FloatingLinkEditorPlugin } from 'mithaq-admin/rich-text-link-plugin.tsx'
 import { RichTextContext, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { holdsPlaceholder } from 'mithaq-admin/rich-text-selection.ts'
@@ -59,10 +59,13 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   const allowedPicks = (picks ?? provided.picks).filter((pick) => !richTextChoiceFeatures[pick.key] || policy.features.includes(richTextChoiceFeatures[pick.key]!))
   const [held] = useState(() => valueOf(value))
   const [problem] = useState(() => unreadable(held, drawn))
+  // Shown, never cleaned: `PolicyPlugin` would rewrite what the server no longer takes for this field, and the next save would keep the loss.
+  const [beyond] = useState(() => problem === undefined && (richTextGuard(held) ?? richTextFeatureGuard({ node: held.root, policy })) !== undefined)
   // Built only over a value these nodes read, so a value nested past the bound never reaches `JSON.stringify` or Lexical.
-  const [initial] = useState(() => (problem === undefined ? configOf({ namespace: 'MithaqRichText', nodes: drawn, value: held, editable: true }) : undefined))
+  const [initial] = useState(() => (problem === undefined && !beyond ? configOf({ namespace: 'MithaqRichText', nodes: drawn, value: held, editable: true }) : undefined))
   const [isLinkEditMode, setIsLinkEditMode] = useState(false)
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null)
+  if (beyond) return <Unreadable value={held} nodes={drawn} problem="" said={t('admin.richText.beyondPolicy', 'This text holds content this field no longer allows, so it is shown as its words and cannot be changed here.') ?? ''} direction={direction} t={t} id={id} describedBy={describedBy} />
   if (problem !== undefined || !initial) return <Unreadable value={held} nodes={drawn} problem={problem ?? ''} direction={direction} t={t} id={id} describedBy={describedBy} />
   return (
     <div className="border-input bg-background overflow-clip rounded-lg border shadow-xs" dir={direction} data-rich-text={id}>

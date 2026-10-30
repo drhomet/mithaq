@@ -63,18 +63,20 @@ function Walked({ node, types, inline, depth = richTextBounds.depth }: { node: R
 }
 
 /** A stored value this editor cannot mount, drawn read-only by `Walked`. It reports no change, so the field stays out of every save and nothing it holds is lost. */
-export function Unreadable({ value, nodes, problem, direction, t, id, describedBy }: {
+export function Unreadable({ value, nodes, problem, said: given, direction, t, id, describedBy }: {
   value: RichTextValue
   nodes: readonly Klass<LexicalNode>[]
   problem: string
+  /** Why the text is read-only, where neither an unknown node nor a failed parse is the reason. */
+  said?: string
   direction: RichTextDirection
   t: Translate
   id?: string
   describedBy?: string
 }): ReactElement {
-  const said = problem
+  const said = given ?? (problem
     ? (t('admin.richText.unknownNode', 'This text holds a "{type}" node this editor cannot draw, so it is shown as its words and cannot be changed here.') ?? '').replace('{type}', () => problem)
-    : (t('admin.richText.unreadable', 'This editor cannot read this text, so it is shown as its words and cannot be changed here.') ?? '')
+    : (t('admin.richText.unreadable', 'This editor cannot read this text, so it is shown as its words and cannot be changed here.') ?? ''))
   return (
     <div dir={direction} data-rich-text-view={id ?? ''} data-rich-text-unreadable={problem} className="grid gap-2">
       <p role="alert" className="text-destructive text-sm">{said}</p>
