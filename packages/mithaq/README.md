@@ -1215,8 +1215,9 @@ Feature associations, format bits and toolbar choices come from the existing
 shared maps rather than a second registry of feature names. Policies warn when
 a place the profile asks to edit a node (by default or per node) cannot edit
 an allowed feature on it; a place that only views a node runs no tools on it.
-Non-node tools conservatively check selected
-nodes. Repeated diagnostics are deduplicated and sorted deterministically.
+Tools with no node of their own are checked on
+the node they act on: alignment, indent and direction on `paragraph`; styling,
+markdown, the counter and find and replace on `text`. Repeated diagnostics are deduplicated and sorted deterministically.
 
 Support diagnostics carry `severity`, stable `code`, `profile`, `node` or
 `feature`, `place`, `required`, `available` and `remedy`. An unknown selected
