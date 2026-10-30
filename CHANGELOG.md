@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix: `drizzleJobs` runs its record and prune transactions at read committed, whatever the database's `default_transaction_isolation`. Under `repeatable read` or `serializable` a scheduler that waited for a task's lock read a snapshot taken before it, so it could record an occurrence a peer had already recorded, completed and pruned, and the task ran twice ([issue #29](https://github.com/drhomet/mithaq/issues/29)).
 - Fix: a global whose `update.input` adds keys beside its fields, such as `expectedUpdatedAt`, makes its row on the first save. The keys are optional in a global's update type, since a first save has read no row, and any the first save sends are checked against the declared input and handed to the steps, rather than refused by the create shape ([issue #10](https://github.com/drhomet/mithaq/issues/10)).
 
 ## 0.3.8
