@@ -19,12 +19,12 @@ const { $generateNodesFromDOM } = await import('@lexical/html')
 const t = (_key: string, fallback?: string) => fallback
 const legacy = JSON.parse(readFileSync(new URL('../../mithaq/src/rich-text/__fixtures__/legacy-formatting-034.json', import.meta.url), 'utf8'))
 
-async function withEditor({ value, policy, screen, locale = 'en', run }: { value?: unknown; policy?: RichTextPolicy; screen?: any; locale?: string; run: (args: { editor: import('lexical').LexicalEditor; host: HTMLElement; changes: RichTextValue[] }) => Promise<void> }) {
+async function withEditor({ value, policy, nodes, screen, locale = 'en', run }: { value?: unknown; policy?: RichTextPolicy; nodes?: readonly import('lexical').Klass<import('lexical').LexicalNode>[]; screen?: any; locale?: string; run: (args: { editor: import('lexical').LexicalEditor; host: HTMLElement; changes: RichTextValue[] }) => Promise<void> }) {
   const host = mount()
   const root = createRoot(host)
   const changes: RichTextValue[] = []
   try {
-    await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(ScreenContext, { value: screen }, createElement(RichTextEditor, { value, policy, onChange: (value) => changes.push(value), direction: 'ltr', t, locale, id: 'policy-editor' })))))
+    await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(ScreenContext, { value: screen }, createElement(RichTextEditor, { value, policy, nodes, onChange: (value) => changes.push(value), direction: 'ltr', t, locale, id: 'policy-editor' })))))
     await act(async () => sleep(100))
     const editor = (host.querySelector('#policy-editor') as unknown as { __lexicalEditor: import('lexical').LexicalEditor }).__lexicalEditor
     assert.ok(editor, 'the editor loaded')
@@ -455,5 +455,43 @@ test('older Lexical and Payload documents with a root direction stay editable, a
     if (block) assert.deepEqual(saved.root.children![0]!.$, { direction: block }, 'as the direction choice the toolbar shows')
     assert.match(JSON.stringify(saved), /Edited Older/)
     assert.equal(richTextFeatureGuard({ node: saved.root, policy: { features, fonts: ['sans'] } }), undefined)
+  } })
+})
+
+test('converted Payload links keep legacy element direction metadata through open and unrelated edits', async () => {
+  const { convertPayloadToLexical } = await import('mithaq/rich-text')
+  const text = (words: string) => ({ type: 'text', version: 1, text: words, format: 0, detail: 0, mode: 'normal', style: '' })
+  const block = (children: object[]) => ({ type: 'paragraph', version: 1, direction: null, format: '', indent: 0, textFormat: 0, textStyle: '', children })
+  for (const type of ['link', 'autolink']) for (const features of [['link'], ['link', 'direction']] as const) {
+    const converted = convertPayloadToLexical({ data: { root: { type: 'root', version: 1, direction: 'ltr', format: '', indent: 0, children: [
+      block([{ type, version: type === 'link' ? 3 : 2, direction: 'ltr', format: '', indent: 0, fields: { url: 'https://example.com', newTab: false, linkType: 'custom' }, children: [text('Older link')] }]),
+      block([text('Elsewhere')]),
+    ] } }, nodes: defaultNodes })
+    assert.ok('value' in converted)
+    const value = converted.value
+    const before = JSON.stringify(value)
+    await withEditor({ value, policy: { features, fonts: ['sans'] }, run: async ({ editor, changes }) => {
+      assert.equal(changes.length, 0, 'opening sends no replacement')
+      await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[1]!.spliceText(0, 0, 'Edited ') }))
+      const saved = changes.at(-1)!
+      assert.deepEqual(saved.root.children[0]!.children, value.root.children[0]!.children, 'the link saves unchanged, including direction metadata')
+      assert.match(JSON.stringify(saved), /Edited Elsewhere/)
+      assert.equal(richText({ nodes: defaultNodes, features }).kinds.richText.targets.zod().safeParse(saved).success, true)
+      assert.equal(JSON.stringify(value), before, 'the loaded value is untouched')
+    } })
+  }
+})
+
+test('custom elements keep legacy direction metadata without becoming block direction choices', async () => {
+  const { CalloutNode } = await import('./callout-node.ts')
+  const value = { root: { type: 'root', children: [{ type: 'callout', version: 1, tone: 'info', direction: 'ltr', children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Older custom element', format: 0 }] }] }] } }
+  for (const features of [[], ['direction']] as const) await withEditor({ value, nodes: [...installed.nodes, CalloutNode], policy: { features, fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    assert.equal(changes.length, 0, 'opening sends no replacement')
+    await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[0]!.spliceText(0, 0, 'Edited ') }))
+    const saved = changes.at(-1)!
+    assert.equal(saved.root.children[0]!.direction, 'ltr')
+    assert.equal(saved.root.children[0]!.$, undefined, 'metadata never becomes an explicit choice')
+    assert.match(JSON.stringify(saved), /Edited Older custom element/)
+    assert.equal(richText({ nodes: [...defaultNodes, CalloutNode], features }).kinds.richText.targets.zod().safeParse(saved).success, true)
   } })
 })

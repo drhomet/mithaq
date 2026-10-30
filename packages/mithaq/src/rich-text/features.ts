@@ -51,8 +51,8 @@ export const richTextFeatureGuard = ({ node, policy }: { node: RichTextNode; pol
   if (node.type === 'code' && node.language != null && !(richTextCodeLanguages as readonly string[]).includes(String(node.language))) return 'This code language is not allowed.'
   if (node.indent && node.type !== 'listitem' && !has('indent')) return 'The field does not allow indentation.'
   if (node.direction !== undefined && node.direction !== null && !['rtl', 'ltr'].includes(String(node.direction))) return 'A block direction must be rtl, ltr or null.'
-  if (node.direction != null && node.type !== 'root' && !richTextBlockTypes.includes(node.type)) return 'Only blocks carry direction.'
-  // Older Lexical documents carry root.direction. Keep that metadata on round trips; the renderer clears it.
+  if (node.direction != null && !Array.isArray(node.children)) return 'Only elements carry direction.'
+  // Older Lexical writes direction on every element, including inline and custom elements. Keep that metadata.
   // New overrides are NodeState choices and never belong to the root.
   if (node.type === 'root' && node.$ != null) return 'Direction and styling belong to blocks, never the root.'
   const state = node.$

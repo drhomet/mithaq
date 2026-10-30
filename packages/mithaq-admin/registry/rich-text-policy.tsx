@@ -55,6 +55,8 @@ export function PolicyPlugin({ policy }: { policy: RichTextPolicy }) {
           if ($isRootNode(node)) continue
           const block = richTextBlockTypes.includes(node.getType()) && !node.isInline()
           if ((!block || !policy.features.includes('direction')) && $getState(node, directionChoice) !== 'auto') $setState(node, directionChoice, 'auto')
+          // Non-block elements keep legacy direction metadata without becoming toolbar choices.
+          if (!block) continue
           const choice = block && policy.features.includes('direction') ? $getState(node, directionChoice) : 'auto'
           const direction = choice === 'auto' ? null : choice
           if (node.getDirection() !== direction) node.setDirection(direction)
