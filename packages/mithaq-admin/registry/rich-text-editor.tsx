@@ -77,7 +77,7 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   const [loaded] = useState(() => valueOf(value))
   const [problem] = useState(() => unreadable(loaded, drawn))
   // Mapped only once `unreadable` has bounded the value's depth.
-  const [held] = useState(() => (problem === undefined && policy.features.includes('direction') ? { ...loaded, root: chosen(loaded.root) } : loaded))
+  const [held] = useState(() => (problem === undefined && policy.features.includes('direction') ? { ...loaded, root: chosen(loaded.root) as RichTextValue['root'] } : loaded))
   // Shown, never cleaned: `PolicyPlugin` would rewrite what the server no longer takes for this field, and the next save would keep the loss.
   const [beyond] = useState(() => problem === undefined && ((richTextGuard(held) ?? richTextFeatureGuard({ node: held.root, policy })) !== undefined || losesDirection(held.root)))
   // Built only over a value these nodes read, so a value nested past the bound never reaches `JSON.stringify` or Lexical.
