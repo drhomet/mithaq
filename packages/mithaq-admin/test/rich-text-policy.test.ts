@@ -448,6 +448,7 @@ test('older Lexical and Payload documents with a root direction stay editable, a
     [doc('ltr', 'rtl'), ['direction'], 'rtl'],
     [payload, ['direction'], 'rtl'],
   ] as const) await withEditor({ value: structuredClone(value), policy: { features, fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    assert.equal(changes.length, 0, 'opening root-only and mapped-block documents sends no replacement')
     await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[0]!.spliceText(0, 0, 'Edited ') }))
     const saved = changes.at(-1)!
     assert.equal(saved.root.direction, (value as { root: { direction: string } }).root.direction, 'the root direction is kept as metadata')
