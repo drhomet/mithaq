@@ -56,3 +56,60 @@ test('native editing requires real references in the installed contract through 
   const node: NodeRegistration = { ...registration, native: ['formats.bold', 'paragraphs.p'], support: { ...registration.support, 'native-ios': 'edit' } }
   assert.deepEqual(checkRichTextSupport({ registry: [node], profile: nativeProfile, contract: { formats: { bold: 1 }, paragraphs: ['p'] } }), [])
 })
+
+test('the initial inventory names exactly the selected classes and proves every written and readable JSON version', async () => {
+  const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
+  const { defaultNodes, UploadNode, typesOf, versionsOf, richTextReader } = await import('./rich-text.ts')
+  const { AutoLinkNode } = await import('@lexical/link')
+  const { TableNode, TableRowNode, TableCellNode } = await import('@lexical/table')
+  const { CodeNode, CodeHighlightNode } = await import('@lexical/code-core')
+  const { MarkNode } = await import('@lexical/mark')
+  const { HashtagNode } = await import('@lexical/hashtag')
+  const { MentionNode } = await import('./mention-node.ts')
+  const { createEditor } = await import('lexical')
+  const nodes = [...defaultNodes, AutoLinkNode, UploadNode, TableNode, TableRowNode, TableCellNode, CodeNode, CodeHighlightNode, MarkNode, HashtagNode, MentionNode]
+  const types = typesOf(nodes)
+  assert.deepEqual(defaultNodeRegistry.map((node) => node.type).sort(), [...types].sort())
+  const versions = versionsOf(nodes)
+  const text = { type: 'text', version: 1, text: 'Hello مرحبا', format: 0, style: '', mode: 'normal', detail: 0 }
+  const paragraph = { type: 'paragraph', version: 1, children: [text], format: '', indent: 0, direction: null }
+  const fixtures: Record<string, object> = {
+    root: { type: 'root', version: 1, children: [paragraph] }, paragraph, text,
+    linebreak: { type: 'linebreak', version: 1 }, tab: { ...text, type: 'tab', text: '\t' },
+    heading: { ...paragraph, type: 'heading', tag: 'h1' }, quote: { ...paragraph, type: 'quote' },
+    list: { ...paragraph, type: 'list', listType: 'number', tag: 'ol', start: 3, children: [{ ...paragraph, type: 'listitem', value: 3 }] },
+    listitem: { ...paragraph, type: 'listitem', value: 1 },
+    link: { ...paragraph, type: 'link', url: 'https://example.com', rel: null, target: null, title: null },
+    autolink: { ...paragraph, type: 'autolink', url: 'https://example.com', isUnlinked: false },
+    horizontalrule: { type: 'horizontalrule', version: 1 },
+    upload: { type: 'upload', version: 3, relationTo: 'files', value: 'synthetic-file', id: 'synthetic-node', fields: null, format: '' },
+    table: { ...paragraph, type: 'table', children: [{ ...paragraph, type: 'tablerow', children: [{ ...paragraph, type: 'tablecell', headerState: 0, children: [paragraph] }] }] },
+    tablerow: { ...paragraph, type: 'tablerow', children: [{ ...paragraph, type: 'tablecell', headerState: 0, children: [paragraph] }] },
+    tablecell: { ...paragraph, type: 'tablecell', headerState: 0, children: [paragraph] },
+    code: { ...paragraph, type: 'code', language: 'javascript' }, 'code-highlight': { ...text, type: 'code-highlight', highlightType: 'keyword' },
+    mark: { ...paragraph, type: 'mark', ids: ['00000000-0000-4000-8000-000000000001'] },
+    hashtag: { ...text, type: 'hashtag', text: '#hello' },
+    mention: { ...text, type: 'mention', text: '@Huda', mode: 'token', kayan: 'user', id: 'synthetic-user', name: 'Huda' },
+  }
+  const editor = createEditor({ nodes, onError: (error) => { throw error } })
+  const read = richTextReader(nodes)
+  for (const registration of defaultNodeRegistry) {
+    assert.equal(versions.get(registration.type), registration.json.writes, registration.type)
+    assert.deepEqual(registration.json.reads, Array.from({ length: registration.json.writes }, (_, index) => index + 1))
+    for (const version of registration.json.reads) {
+      const fixture = { ...fixtures[registration.type], version }
+      let block = fixture
+      if (['text', 'linebreak', 'tab', 'link', 'autolink', 'mark', 'hashtag', 'mention'].includes(registration.type)) block = { ...paragraph, children: [fixture] }
+      if (registration.type === 'code-highlight') block = { ...fixtures.code, children: [fixture] }
+      if (registration.type === 'listitem') block = { ...fixtures.list, children: [fixture] }
+      if (registration.type === 'tablecell') block = { ...fixtures.tablerow, children: [fixture] }
+      if (['tablerow', 'tablecell'].includes(registration.type)) block = { ...fixtures.table, children: [block] }
+      const value = { root: registration.type === 'root' ? fixture : { ...fixtures.root, children: [block] } }
+      assert.ok(!('refused' in read(value)), `${registration.type} reads v${version}`)
+      const exported = editor.parseEditorState(value as import('lexical').SerializedEditorState).toJSON()
+      const find = (node: import('./value.ts').RichTextNode): import('./value.ts').RichTextNode | undefined => node.type === registration.type ? node : node.children?.map(find).find(Boolean)
+      assert.equal(find(exported.root)?.version, registration.json.writes, `${registration.type} writes v${registration.json.writes}`)
+    }
+  }
+  assert.ok(defaultNodeRegistry.every((node) => node.support.admin === 'edit' && node.support['lynx-viewer'] === 'none' && node.support['native-ios'] === 'none' && node.support['native-android'] === 'none'))
+})
