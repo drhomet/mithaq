@@ -23,10 +23,12 @@
     "./rich-text/client": "./src/rich-text/client.ts",
     "./device": "./src/device.ts",
     "./generate-sqlite-migrations": "./src/drizzle/sqlite/generate.ts",
-    "./jobs/contract": "./src/jobs/contract.ts"
+    "./jobs/contract": "./src/jobs/contract.ts",
+    "./rich-text/registry": "./src/rich-text/registry.ts"
   },
   "bin": {
-    "mithaq": "./src/asas/cli/mithaq.ts"
+    "mithaq": "./src/asas/cli/mithaq.ts",
+    "mithaq-check-rich-text": "./src/rich-text/check.ts"
   },
   "publishConfig": {
     "name": "@drhomet/mithaq",
@@ -69,10 +71,12 @@
       "./rich-text/client": "./dist/rich-text/client.js",
       "./device": "./dist/device.js",
       "./generate-sqlite-migrations": "./dist/drizzle/sqlite/generate.js",
-      "./jobs/contract": "./dist/jobs/contract.js"
+      "./jobs/contract": "./dist/jobs/contract.js",
+      "./rich-text/registry": "./dist/rich-text/registry.js"
     },
     "bin": {
-      "mithaq": "dist/asas/cli/mithaq.js"
+      "mithaq": "dist/asas/cli/mithaq.js",
+      "mithaq-check-rich-text": "dist/rich-text/check.js"
     }
   },
   "dependencies": {
