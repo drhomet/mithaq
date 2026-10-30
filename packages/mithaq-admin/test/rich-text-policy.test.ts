@@ -366,20 +366,35 @@ test('a stored node at a newer JSON version than its class reads is drawn read-o
   }
 })
 
-test('stored merged table cells survive opening, editing another paragraph and saving', async () => {
+test('stored merged table cells are drawn read-only and never sent, and a pasted merged table is saved unmerged', async () => {
   const text = (words: string) => ({ type: 'text', version: 1, text: words, format: 0, detail: 0, mode: 'normal', style: '' })
   const block = (type: string, children: object[], extra = {}) => ({ type, version: 1, direction: null, format: '', indent: 0, children, ...extra })
   const cell = (words: string, extra = {}) => block('tablecell', [block('paragraph', [text(words)])], { headerState: 0, colSpan: 1, rowSpan: 1, ...extra })
-  const table = block('table', [block('tablerow', [cell('Across', { colSpan: 2 }), cell('Down', { rowSpan: 2 })]), block('tablerow', [cell('One'), cell('Two')])])
-  const value = { root: block('root', [block('paragraph', [text('Elsewhere')]), table]) }
-  const { nodes } = await import('../registry/rich-text-tables.tsx')
-  const { createEditor } = await import('lexical')
-  const expected = JSON.parse(JSON.stringify(createEditor({ nodes }).parseEditorState(JSON.stringify(value)).toJSON())).root.children[1]
-  await withEditor({ value, policy: { features: ['tables'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
-    await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[0]!.spliceText(0, 0, 'Edited ') }))
-    const saved = changes.at(-1)!
-    assert.deepEqual(saved.root.children[1], expected)
-    assert.equal(richText({ nodes: [...defaultNodes, ...nodes], features: ['tables'] }).kinds.richText.targets.zod().safeParse(saved).success, true)
+  // Sol's two reproductions: pasting into the colSpan 2 cell split it, and Add row beside the 2x2 cell gave rowSpan 4.
+  const across = block('table', [block('tablerow', [cell('Across', { colSpan: 2 }), cell('Down', { rowSpan: 2 })]), block('tablerow', [cell('One'), cell('Two')])])
+  const square = block('table', [block('tablerow', [cell('Square', { colSpan: 2, rowSpan: 2 }), cell('Beside')]), block('tablerow', [cell('Below')])])
+  for (const table of [across, square]) {
+    const value = { root: block('root', [block('paragraph', [text('Elsewhere')]), table]) }
+    const host = mount(), root = createRoot(host)
+    const changes: unknown[] = []
+    try {
+      await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(RichTextEditor, { value: structuredClone(value), policy: { features: ['tables'], fonts: ['sans'] }, onChange: (next) => changes.push(next), direction: 'ltr', t, locale: 'en', id: 'merged' }))))
+      await act(async () => sleep(100))
+      assert.match(host.querySelector('[role="alert"]')?.textContent ?? '', /merged table cells/)
+      assert.equal(host.querySelectorAll('[contenteditable]').length, 0, 'no editor can split or stretch the merged cells')
+      assert.ok(host.textContent?.includes('Elsewhere'), 'its words are shown')
+      assert.equal(changes.length, 0, 'nothing is sent, so a save leaves the spans as stored')
+    } finally { await act(async () => root.unmount()); host.remove() }
+  }
+  await withEditor({ policy: { features: ['tables'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    await act(async () => editor.update(() => {
+      const dom = new window.DOMParser().parseFromString('<table><tr><td colspan="2" rowspan="2">pasted</td><td>x</td></tr><tr><td>y</td></tr></table>', 'text/html')
+      $getRoot().select().insertNodes($generateNodesFromDOM(editor, dom as unknown as Document))
+    }))
+    await act(async () => sleep(20))
+    const saved = JSON.stringify(changes.at(-1))
+    assert.match(saved, /pasted/)
+    assert.doesNotMatch(saved, /"(colSpan|rowSpan)":[2-9]/, 'the admin never writes a merged cell')
   } })
 })
 

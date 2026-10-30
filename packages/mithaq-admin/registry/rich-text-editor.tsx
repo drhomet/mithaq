@@ -56,6 +56,9 @@ type EditorProps = {
 const losesDirection = (node: RichTextNode): boolean =>
   (node.direction != null && node.direction !== (node.$ as { direction?: unknown } | undefined)?.direction)
   || (node.children ?? []).some(losesDirection)
+// The admin has no merge command and splits or stretches merged cells on paste and on row or column inserts, so it never edits them.
+const merges = (node: RichTextNode): boolean =>
+  Number(node.colSpan ?? 1) > 1 || Number(node.rowSpan ?? 1) > 1 || (node.children ?? []).some(merges)
 
 function Editor({ value, onChange, direction, t, locale, id, placeholder, describedBy, invalid, required, nodes, picks, control , modules, policy }: EditorProps & { modules: readonly RichTextFeatureModule[]; policy: RichTextPolicy }): ReactElement {
   const provided = use(RichTextContext)
@@ -67,10 +70,12 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   // Shown, never cleaned: `PolicyPlugin` would rewrite what the server no longer takes for this field, and the next save would keep the loss.
   const [beyond] = useState(() => problem === undefined && ((richTextGuard(held) ?? richTextFeatureGuard({ node: held.root, policy })) !== undefined || losesDirection(held.root)))
   // Built only over a value these nodes read, so a value nested past the bound never reaches `JSON.stringify` or Lexical.
-  const [initial] = useState(() => (problem === undefined && !beyond ? configOf({ namespace: 'MithaqRichText', nodes: drawn, value: held, editable: true }) : undefined))
+  const [merged] = useState(() => problem === undefined && !beyond && merges(held.root))
+  const [initial] = useState(() => (problem === undefined && !beyond && !merged ? configOf({ namespace: 'MithaqRichText', nodes: drawn, value: held, editable: true }) : undefined))
   const [isLinkEditMode, setIsLinkEditMode] = useState(false)
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null)
   if (beyond) return <Unreadable value={held} nodes={drawn} problem="" said={t('admin.richText.beyondPolicy', 'This text holds content this field no longer allows, so it is shown as its words and cannot be changed here.') ?? ''} direction={direction} t={t} id={id} describedBy={describedBy} />
+  if (merged) return <Unreadable value={held} nodes={drawn} problem="" said={t('admin.richText.mergedCells', 'This text holds merged table cells, which this editor cannot change, so it is shown as its words and cannot be changed here.') ?? ''} direction={direction} t={t} id={id} describedBy={describedBy} />
   if (problem !== undefined || !initial) return <Unreadable value={held} nodes={drawn} problem={problem ?? ''} direction={direction} t={t} id={id} describedBy={describedBy} />
   return (
     <div className="border-input bg-background overflow-clip rounded-lg border shadow-xs" dir={direction} data-rich-text={id}>
