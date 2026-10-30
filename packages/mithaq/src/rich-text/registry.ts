@@ -75,6 +75,8 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
         : mapped.length ? mapped : Object.hasOwn(richTextFormatBits, feature) ? ['text'] : choices.length ? [] : [...profile.nodes]
       const selected = types.filter((type) => profile.nodes.includes(type))
       for (const type of selected.length ? selected : types) {
+        // A place that only shows a node never runs the editor's tools on it.
+        if ((requirement.nodes?.[type] ?? requirement.default) !== 'edit') continue
         const node = profile.nodes.includes(type) ? registry.find((node) => node.type === type) : undefined
         let available = node?.support[place] ?? 'none'
         if (available === 'edit' && place.startsWith('native-')) {
