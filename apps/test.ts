@@ -19,6 +19,12 @@ const memoryFree = () => {
   return match ? Number(match[1]) : undefined
 }
 
+/** The file paths among the runner's arguments: what is left once its own options and node's shard are taken out. */
+export const pathsOf = (args: string[]) => {
+  const workerIndex = args.indexOf('--workers')
+  return args.filter((arg, index) => arg !== '--unit' && !arg.startsWith('--workers=') && arg !== '--workers' && index !== (workerIndex >= 0 ? workerIndex + 1 : -1) && !arg.startsWith('--test-shard='))
+}
+
 const main = async () => {
   const args = process.argv.slice(2).filter((arg) => arg !== '--')
   const unit = args.includes('--unit')
@@ -26,7 +32,9 @@ const main = async () => {
   const workerIndex = args.indexOf('--workers')
   const override = workerArg?.slice('--workers='.length) ?? (workerIndex >= 0 ? args[workerIndex + 1] ?? '' : undefined)
   const workers = testWorkers({ freePercent: memoryFree(), override })
-  const paths = args.filter((arg, index) => arg !== '--unit' && !arg.startsWith('--workers=') && arg !== '--workers' && index !== (workerIndex >= 0 ? workerIndex + 1 : -1))
+  const paths = pathsOf(args)
+  // CI splits the suite across jobs with node's own `--test-shard=<index>/<total>`.
+  const shard = args.filter((arg) => arg.startsWith('--test-shard='))
   const files = paths.length ? paths : unit
     ? [
       ...['packages/**/*.test.ts', 'apps/**/*.test.ts'].flatMap((pattern) => globSync(pattern)).filter((file) => !['packages/mithaq-admin/test/payload-password.test.ts', 'packages/mithaq/src/drizzle/jobs.test.ts'].includes(file)),
@@ -61,7 +69,7 @@ const main = async () => {
     }
   }
   console.log(`Test workers: ${workers}`)
-  return await run(['--test', `--test-concurrency=${workers}`, ...files])
+  return await run(['--test', `--test-concurrency=${workers}`, ...shard, ...files])
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

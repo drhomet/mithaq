@@ -19,7 +19,7 @@ for (const [file, name] of [['ci.yml', 'packages'], ['release.yml', 'pack']] as 
   }
 })
 
-test('CI passes the worker count Node used before the memory-based runner', async () => {
+test('CI passes the worker count Node used before the memory-based runner, and its shard', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mithaq-ci-workers-'))
   try {
     await writeFile(join(directory, 'bun'), '#!/bin/sh\nprintf \'%s\\n\' "$@"\n', { mode: 0o755 })
@@ -27,8 +27,10 @@ test('CI passes the worker count Node used before the memory-based runner', asyn
       const source = readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')
       const command = /^\s*- run: (bun run test(?:\s.*)?)$/m.exec(source)?.[1]
       assert.ok(command)
-      const args = execFileSync('/bin/sh', ['-c', command], { env: { ...process.env, PATH: `${directory}:${process.env.PATH}` }, encoding: 'utf8' }).trim().split('\n')
-      assert.deepEqual(args, ['run', 'test', '--workers', String(Math.max(1, availableParallelism() - 1))])
+      const args = execFileSync('/bin/sh', ['-c', command], { env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, SHARD: '3' }, encoding: 'utf8' }).trim().split('\n')
+      // CI splits the suite four ways, one shard a job; the release runs it whole.
+      const shard = file === 'ci.yml' ? ['--test-shard=3/4'] : []
+      assert.deepEqual(args, ['run', 'test', '--workers', String(Math.max(1, availableParallelism() - 1)), ...shard])
     }
   } finally {
     await rm(directory, { recursive: true, force: true })
