@@ -1177,9 +1177,25 @@ only for fields that select it. Feature selection controls content and browser
 loading, not package installation. A read view loads the optional nodes its stored
 document uses, so narrowing a field cannot erase its older document.
 
-Before emitting a write, the editor removes unsupported paste formatting, clears
-free CSS and table dimensions, unwraps disallowed links and normalizes unknown
-code languages. The same field guard checks emitted JSON before save.
+Before emitting a write, the editor cleans pasted and new content: it removes
+unsupported formatting, clears free CSS and table dimensions, unwraps disallowed
+links and normalizes unknown code languages. The same field guard checks emitted
+JSON before save. A stored value is never cleaned: one holding content past the
+field's policy, such as a table after `tables` was removed from the field, a
+node no class registers, or a node at a newer JSON version than its class
+writes, is shown read-only as its words with a message, and a save leaves the
+field out, so the stored value stays as it was.
+
+Each node class reads every JSON version up to the one it writes, and a node
+with no version is read as Lexical's first. The server refuses a value holding
+a newer version (`versionsOf` lists what a node list reads), and refuses any
+write that lowers the highest version of a node type a field holds, compared
+with the row and its newest version: a save, draft, autosave, bulk write,
+restore or a step's `update` or `upsert` of another row. The row is locked
+first, so a stale writer racing an upgrade is refused too, with a 409 whose key
+is `error.conflict.rich_text_version`; the person reloads and edits the newest
+copy. Removing every node of a type is not lowering it. Upgrade the server
+before any editor that writes a newer node version.
 
 ### Mentions, emoji and hashtags
 
