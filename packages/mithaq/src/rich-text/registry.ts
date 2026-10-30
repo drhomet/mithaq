@@ -1,4 +1,6 @@
-import { richTextFormatBits } from './feature-data.ts'
+import { nodeFeatures, richTextChoiceFeatures, richTextFormatBits } from './feature-data.ts'
+
+import type { RichTextPolicy } from './policy.ts'
 
 export type Place = 'admin' | 'lynx-viewer' | 'native-android' | 'native-ios'
 export type Support = 'edit' | 'view' | 'none'
@@ -15,7 +17,7 @@ export type RichTextProfile = {
 }
 export type RichTextDiagnostic = {
   severity: 'warning' | 'error'
-  code: string
+  code: 'support-gap' | 'profile-node-unknown' | 'profile-node-unselected' | 'policy-support-gap' | 'native-reference-required' | 'native-reference-unresolved'
   profile: string
   node?: string
   feature?: string
@@ -36,7 +38,7 @@ const resolves = (reference: string, contract?: RichTextContract): boolean => {
   return section === 'formats' && Object.hasOwn(richTextFormatBits, name) && contract?.formats?.[name] === richTextFormatBits[name as keyof typeof richTextFormatBits]
 }
 
-export const checkRichTextSupport = ({ registry, profile, contract }: { registry: readonly NodeRegistration[]; profile: RichTextProfile; contract?: RichTextContract }): RichTextDiagnostic[] => {
+export const checkRichTextSupport = ({ registry, profile, policies = [], contract }: { registry: readonly NodeRegistration[]; profile: RichTextProfile; policies?: readonly RichTextPolicy[]; contract?: RichTextContract }): RichTextDiagnostic[] => {
   const diagnostics: RichTextDiagnostic[] = []
   for (const node of registry) {
     for (const place of ['native-android', 'native-ios'] as const) {
@@ -49,13 +51,36 @@ export const checkRichTextSupport = ({ registry, profile, contract }: { registry
   for (const place of richTextPlaces) {
     const requirement = profile.requirements[place]
     if (!requirement) continue
+    for (const [type, required] of Object.entries(requirement.nodes ?? {})) {
+      if (!profile.nodes.includes(type)) diagnostics.push({ severity: 'warning', code: 'profile-node-unselected', profile: profile.name, node: type, place, required, available: 'none', remedy: 'Select this node in the profile or correct the requirement type.' })
+    }
     for (const type of profile.nodes) {
       const required = requirement.nodes?.[type] ?? requirement.default
-      const available = registry.find((node) => node.type === type)?.support[place] ?? 'none'
-      if (supportRank[available] < supportRank[required]) diagnostics.push({ severity: 'warning', code: 'support-gap', profile: profile.name, node: type, place, required, available, remedy: 'Install support for this node at this place or revise the profile requirement.' })
+      const node = registry.find((node) => node.type === type)
+      const available = node?.support[place] ?? 'none'
+      if (!node) diagnostics.push({ severity: 'warning', code: 'profile-node-unknown', profile: profile.name, node: type, place, required, available, remedy: 'Register the selected node or correct its profile type.' })
+      else if (supportRank[available] < supportRank[required]) diagnostics.push({ severity: 'warning', code: 'support-gap', profile: profile.name, node: type, place, required, available, remedy: 'Install support for this node at this place or revise the profile requirement.' })
+    }
+    for (const feature of new Set(policies.flatMap((policy) => [...policy.features]))) {
+      const mapped = Object.entries(nodeFeatures).filter(([, name]) => name === feature).map(([type]) => type)
+      const choices = Object.entries(richTextChoiceFeatures).filter(([, name]) => name === feature).map(([choice]) => choice)
+      // Checklists share list classes; derive the association from the existing list policy guard.
+      const types = feature === richTextChoiceFeatures.check ? Object.keys(nodeFeatures).filter((type) => nodeFeatures[type] === richTextChoiceFeatures.bullet)
+        : mapped.length ? mapped : Object.hasOwn(richTextFormatBits, feature) ? ['text'] : choices.length ? [] : [...profile.nodes]
+      const selected = types.filter((type) => profile.nodes.includes(type))
+      for (const type of selected.length ? selected : types) {
+        const node = profile.nodes.includes(type) ? registry.find((node) => node.type === type) : undefined
+        let available = node?.support[place] ?? 'none'
+        if (available === 'edit' && place.startsWith('native-')) {
+          const references = Object.hasOwn(richTextFormatBits, feature) ? [`formats.${feature}`] : choices.map((choice) => `paragraphs.${choice}`)
+          if (!references.length || references.some((reference) => !node?.native?.includes(reference))) available = 'none'
+        }
+        if (available !== 'edit') diagnostics.push({ severity: 'warning', code: 'policy-support-gap', profile: profile.name, node: type, feature, place, required: 'edit', available, remedy: 'Install editable support for the allowed feature or narrow the field policy at this place.' })
+      }
     }
   }
-  return diagnostics.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  const unique = [...new Map(diagnostics.map((item) => [JSON.stringify(item), item])).entries()]
+  return unique.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, item]) => item)
 }
 
 // Native codecs and Lynx renderers have not been proven against these complete node shapes.
