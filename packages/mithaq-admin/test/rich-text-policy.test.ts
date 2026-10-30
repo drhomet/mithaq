@@ -363,3 +363,20 @@ test('a stored node at a newer JSON version than its class reads is drawn read-o
     }
   }
 })
+
+test('stored merged table cells survive opening, editing another paragraph and saving', async () => {
+  const text = (words: string) => ({ type: 'text', version: 1, text: words, format: 0, detail: 0, mode: 'normal', style: '' })
+  const block = (type: string, children: object[], extra = {}) => ({ type, version: 1, direction: null, format: '', indent: 0, children, ...extra })
+  const cell = (words: string, extra = {}) => block('tablecell', [block('paragraph', [text(words)])], { headerState: 0, colSpan: 1, rowSpan: 1, ...extra })
+  const table = block('table', [block('tablerow', [cell('Across', { colSpan: 2 }), cell('Down', { rowSpan: 2 })]), block('tablerow', [cell('One'), cell('Two')])])
+  const value = { root: block('root', [block('paragraph', [text('Elsewhere')]), table]) }
+  const { nodes } = await import('../registry/rich-text-tables.tsx')
+  const { createEditor } = await import('lexical')
+  const expected = JSON.parse(JSON.stringify(createEditor({ nodes }).parseEditorState(JSON.stringify(value)).toJSON())).root.children[1]
+  await withEditor({ value, policy: { features: ['tables'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[0]!.spliceText(0, 0, 'Edited ') }))
+    const saved = changes.at(-1)!
+    assert.deepEqual(saved.root.children[1], expected)
+    assert.equal(richText({ nodes: [...defaultNodes, ...nodes], features: ['tables'] }).kinds.richText.targets.zod().safeParse(saved).success, true)
+  } })
+})
