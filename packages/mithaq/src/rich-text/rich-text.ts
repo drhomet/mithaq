@@ -38,6 +38,25 @@ const coreNodes: readonly Klass<LexicalNode>[] = [RootNode, ParagraphNode, TextN
 /** Every node type a list of classes can read, the core ones included. */
 export const typesOf = (nodes: readonly Klass<LexicalNode>[]): ReadonlySet<string> => new Set([...coreNodes, ...nodes].map((node) => node.getType()))
 
+/**
+ * The JSON version each class of a list writes, which is the highest it reads. Asked of a fresh node,
+ * since Lexical keeps it in `exportJSON` alone; a class that cannot be made bare is left out and read at any version.
+ */
+export const versionsOf = (nodes: readonly Klass<LexicalNode>[]): ReadonlyMap<string, number> => {
+  const versions = new Map<string, number>()
+  createEditor({ nodes: [...nodes], onError: (error) => { throw error } }).update(() => {
+    for (const node of [...coreNodes, ...nodes]) {
+      try {
+        const { version } = new node().exportJSON()
+        if (typeof version === 'number') versions.set(node.getType(), version)
+      } catch {
+        // ponytail: a class needing constructor arguments is not version-checked; a static version on the class is the upgrade.
+      }
+    }
+  }, { discrete: true })
+  return versions
+}
+
 // Set by `richTextReader` around its own synchronous parse alone, so a value is
 // never checked against another build's list.
 let holdingFiles: ReadonlySet<string> | undefined
@@ -158,6 +177,7 @@ const $holdsDecorator = (node: LexicalNode): boolean => $isDecoratorNode(node) |
  */
 export const richTextReader = (nodes: readonly Klass<LexicalNode>[], uploads?: readonly string[]) => {
   const types = typesOf(nodes)
+  const versions = versionsOf(nodes)
   const holding = uploads && new Set(uploads)
   // Made with the reader at `buildAsas`, so a list Lexical cannot register fails
   // the build rather than the first write.
@@ -165,7 +185,13 @@ export const richTextReader = (nodes: readonly Klass<LexicalNode>[], uploads?: r
   return (value: unknown): RichTextRead => {
     const refused = richTextGuard(value)
     if (refused) return { refused }
-    const type = unknownType({ node: (value as { root: unknown }).root, types })
+    const type = unknownType({ node: (value as { root: unknown }).root, types, versions })
+    if (type && types.has(type)) {
+      return {
+        refused: `The value holds a newer "${type}" node than this editor reads. Upgrade mithaq before writing it.`,
+        type,
+      }
+    }
     if (type) {
       return {
         refused: `No node of this editor is of type "${type}". Add its class to the nodes passed to richText({ nodes }), or convert or remove the node before writing.`,
@@ -247,7 +273,8 @@ export const convertPayloadToLexical = ({ data, nodes }: { data: unknown; nodes:
       // Payload's postgres adapter writes a numeric id where a collection's ids are serial.
       if (type === 'upload' && typeof next.value === 'number' && Number.isFinite(next.value)) next.value = String(next.value)
       if (type !== 'link' && type !== 'autolink') return [next]
-      const { fields, id: _id, ...link } = next
+      // Payload numbers its own link shape (3, an autolink 2); Lexical's link is written at its own version once canonical.
+      const { fields, id: _id, version: _version, ...link } = next
       const held = fields && typeof fields === 'object' ? (fields as Record<string, unknown>) : undefined
       let url = held ? held.url : link.url
       // Lexical's own autolink marks one its writer unlinked.

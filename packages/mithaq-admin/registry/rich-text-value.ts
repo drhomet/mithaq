@@ -1,6 +1,6 @@
 // Theme adapted from shadcn-editor, MIT. See LICENSES/shadcn-editor.txt.
 import { createEditor, type Klass, type LexicalNode } from 'lexical'
-import { typesOf, unknownType } from 'mithaq/rich-text/client'
+import { typesOf, unknownType, versionsOf } from 'mithaq/rich-text/client'
 
 /** One node of Lexical's serialized editor state. */
 export type RichTextNode = { type: string; children?: RichTextNode[]; text?: string; [key: string]: unknown }
@@ -86,10 +86,10 @@ export const configOf = ({ namespace, nodes, value, editable }: { namespace: str
 
 /**
  * What stops these nodes drawing a stored value, or nothing: the first node type the value holds
- * that no class of the list registers, or `''` where it nests past the server's bound or Lexical's own parse refuses it.
+ * that no class of the list registers or holds at a newer version than its class reads, or `''` where it nests past the server's bound or Lexical's own parse refuses it.
  */
 export const unreadable = (value: RichTextValue, nodes: readonly Klass<LexicalNode>[]): string | undefined => {
-  const type = unknownType({ node: value.root, types: typesOf(nodes) })
+  const type = unknownType({ node: value.root, types: typesOf(nodes), versions: versionsOf(nodes) })
   if (type !== undefined) return type
   try {
     createEditor({ nodes: [...nodes], onError: (error) => { throw error } }).parseEditorState(JSON.stringify(value))

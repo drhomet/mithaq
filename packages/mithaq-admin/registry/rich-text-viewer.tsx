@@ -67,14 +67,16 @@ export function Unreadable({ value, nodes, problem, said: given, direction, t, i
   value: RichTextValue
   nodes: readonly Klass<LexicalNode>[]
   problem: string
-  /** Why the text is read-only, where neither an unknown node nor a failed parse is the reason. */
+  /** Why the text is read-only, where the node list is not the reason. */
   said?: string
   direction: RichTextDirection
   t: Translate
   id?: string
   describedBy?: string
 }): ReactElement {
-  const said = given ?? (problem
+  const said = given ?? (problem && typesOf(nodes).has(problem)
+    ? (t('admin.richText.newerNode', 'This text holds a newer "{type}" node than this editor reads, so it is shown as its words and cannot be changed here.') ?? '').replace('{type}', () => problem)
+    : problem
     ? (t('admin.richText.unknownNode', 'This text holds a "{type}" node this editor cannot draw, so it is shown as its words and cannot be changed here.') ?? '').replace('{type}', () => problem)
     : (t('admin.richText.unreadable', 'This editor cannot read this text, so it is shown as its words and cannot be changed here.') ?? ''))
   return (

@@ -90,16 +90,20 @@ export const richTextGuard = (value: unknown): string | undefined => {
 export const isRichText = (value: unknown): value is RichTextValue => richTextGuard(value) === undefined
 
 /**
- * The first node type under a value's `root` that `types` does not hold, or nothing, and `''`
- * past the depth bound. Read off the JSON, since a production Lexical minifies its errors.
+ * The first node type under a value's `root` that `types` does not hold, or one at a JSON version
+ * past the highest `versions` names for it, or nothing, and `''` past the depth bound. Read off
+ * the JSON, since a production Lexical minifies its errors and its import ignores versions.
  */
-export const unknownType = ({ node, types, depth = richTextBounds.depth }: { node: unknown; types: ReadonlySet<string>; depth?: number }): string | undefined => {
+export const unknownType = ({ node, types, versions, depth = richTextBounds.depth }: { node: unknown; types: ReadonlySet<string>; versions?: ReadonlyMap<string, number>; depth?: number }): string | undefined => {
   if (!node || typeof node !== 'object') return undefined
   if (depth <= 0) return ''
-  const held = node as { type?: unknown; children?: unknown }
+  const held = node as { type?: unknown; version?: unknown; children?: unknown }
   if (typeof held.type === 'string' && !types.has(held.type)) return held.type
+  // A class reads every version up to the one it writes, and a node with none is Lexical's first.
+  const reads = typeof held.type === 'string' ? versions?.get(held.type) : undefined
+  if (reads !== undefined && held.version !== undefined && !(typeof held.version === 'number' && held.version <= reads)) return held.type as string
   for (const child of Array.isArray(held.children) ? held.children : []) {
-    const type = unknownType({ node: child, types, depth: depth - 1 })
+    const type = unknownType({ node: child, types, versions, depth: depth - 1 })
     if (type !== undefined) return type
   }
   return undefined
