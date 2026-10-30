@@ -5,6 +5,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { LexicalTypeaheadMenuPlugin, MenuOption, useBasicTypeaheadTriggerMatch } from '@lexical/react/LexicalTypeaheadMenuPlugin'
 import { HashtagPlugin } from '@lexical/react/LexicalHashtagPlugin'
 import { HashtagNode } from '@lexical/hashtag'
+import { registerMarkdownShortcuts } from '@lexical/markdown'
 import { $applyNodeReplacement, $createTextNode, $getRoot, $getSelection, $isRangeSelection, $setSelection, TextNode, type EditorConfig } from 'lexical'
 import { ScreenContext } from 'mithaq/admin/react'
 import { defaultMentionSources } from 'mithaq/rich-text/client'
@@ -62,14 +63,15 @@ export function Plugin({ policy, locale, t }: FeatureProps) {
   useEffect(() => editor.registerNodeTransform(MentionView, (node) => {
     if (editor.isEditable() && !sources.some((source) => source.kayan === node.getMention().kayan)) node.replace($createTextNode(node.getTextContent()).setFormat(node.getFormat()))
   }), [editor, sources])
-  useEffect(() => editor.registerNodeTransform(TextNode, (node) => {
-    if (!editor.isEditable() || !node.isSimpleText() || node.hasFormat('code') || node.getParents().some((parent) => parent.getType() === 'code')) return
-    const match = /:([a-z]+):/.exec(node.getTextContent())
-    if (!match || !Object.hasOwn(defaultEmoji, match[1]!)) return
-    const emoji = defaultEmoji[match[1] as keyof typeof defaultEmoji]
-    const part = node.splitText(match.index, match.index + match[0].length)[match.index ? 1 : 0]
-    part?.setTextContent(emoji)
-  }), [editor])
+  // Lexical's shortcut listener follows typed characters and ignores loaded text, pastes and undo.
+  useEffect(() => {
+    if (!editor.isEditable()) return
+    return registerMarkdownShortcuts(editor, [{
+      type: 'text-match', dependencies: [], trigger: ':',
+      regExp: new RegExp(`:(${Object.keys(defaultEmoji).join('|')}):$`),
+      replace: (node, match) => { node.setTextContent(defaultEmoji[match[1] as keyof typeof defaultEmoji]).selectEnd() },
+    }])
+  }, [editor])
   useEffect(() => {
     if (!screen) return
     let current = true

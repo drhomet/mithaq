@@ -1207,7 +1207,8 @@ Install `mentions` in the project's feature list, or use
 `create-mithaq --rich-text=mentions`. A field may leave it out of its own
 `features`. The add-on provides an `@` picker, a small emoji palette and
 `:smile:`, `:heart:`, `:thumbsup:`, `:check:` and `:tada:` shortcodes. Emoji
-remain ordinary text. Hashtags use Lexical hashtag nodes and accept Arabic.
+remain ordinary text. Shortcodes expand only while typing; loaded shortcodes
+stay literal. Hashtags use Lexical hashtag nodes and accept Arabic.
 No emoji database is bundled. The starter registers each installed phase-2
 module in `RichTextContext.featureModules`. Existing projects must merge
 `templates/mithaq/src/ui/rich-text-nodes.tsx`: register `mentions`, `findReplace`
