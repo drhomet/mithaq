@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { pbkdf2Sync, randomBytes, randomUUID } from 'node:crypto'
 import { after, before, test } from 'node:test'
+import { inspect } from 'node:util'
 import { betterAuth } from 'better-auth'
 import type { APIError } from 'better-auth/api'
 import { hashPassword } from 'better-auth/crypto'
@@ -154,10 +155,11 @@ test('the username sign-in rehashes too', async () => {
   assert.match(await storedOf(id), /^[0-9a-f]{32}:/)
 })
 
-test('a rehash the database refuses is logged and the sign-in still succeeds', async () => {
+test('a rehash the database refuses is logged without a hash, and the sign-in still succeeds', async () => {
   const id = await imported({ email: 'refused@example.com', password: 'correct-horse' })
   const held = await storedOf(id)
-  await pool.query(`create function ${schema}.refuse() returns trigger language plpgsql as $$ begin raise exception 'no writes'; end $$;
+  // The error carries both hashes, as drizzle-orm 1.0's does by naming the failed query's params.
+  await pool.query(`create function ${schema}.refuse() returns trigger language plpgsql as $$ begin raise exception 'no writes: % %', old.password, new.password; end $$;
     create trigger refuse before update on ${schema}.account for each row execute function ${schema}.refuse()`)
   errors.length = 0
   try {
@@ -167,6 +169,9 @@ test('a rehash the database refuses is logged and the sign-in still succeeds', a
   }
   assert.equal(await storedOf(id), held, 'the Payload hash stays, for the next sign-in to replace')
   assert.equal(errors.length, 1)
+  const [, salt = '', key = ''] = held.split('$')
+  const logged = inspect(errors, { depth: Infinity, showHidden: true })
+  for (const secret of [salt, key, 'correct-horse', 'no writes']) assert.ok(!logged.includes(secret), secret.slice(0, 12))
 })
 
 test('a password set while a rehash ran is never overwritten by it', async () => {

@@ -90,7 +90,9 @@ export const payloadRehash = () => ({
             update: { password: await ctx.context.password.hash(password) },
           })
         } catch (error) {
-          ctx.context.logger.error('A Payload password was not replaced with Better Auth\'s hash; the next sign-in tries again.', error)
+          // Its name and code alone: a database error's message can name the query's params, which hold both hashes.
+          const { name, code } = (error ?? {}) as { name?: unknown; code?: unknown }
+          ctx.context.logger.error('A Payload password was not replaced with Better Auth\'s hash; the next sign-in tries again.', { name, code })
         }
       }),
     }],
