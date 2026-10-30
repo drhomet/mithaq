@@ -1202,8 +1202,12 @@ with the row and its newest version: a save, draft, autosave, bulk write,
 restore or a step's `update` or `upsert` of another row. The row is locked
 first, so a stale writer racing an upgrade is refused too, with a 409 whose key
 is `error.conflict.rich_text_version`; the person reloads and edits the newest
-copy. Removing every node of a type is not lowering it. Upgrade the server
-before any editor that writes a newer node version.
+copy. Removing every node of a type is not lowering it. `convertPayloadToLexical`
+drops the version of Payload's own `upload`, `relationship`, `block` and
+`inlineBlock` nodes, since Payload numbers its shapes apart from Lexical, so a
+later Payload version of one is checked only by its registered class's
+`importJSON`. Upgrade the server before any editor that writes a newer node
+version.
 
 ### Mentions, emoji and hashtags
 
