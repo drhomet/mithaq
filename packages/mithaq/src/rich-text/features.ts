@@ -1,14 +1,13 @@
+export { richTextFormatBits, richTextChoiceFeatures, nodeFeatures } from './feature-data.ts'
+import { richTextFormatBits, nodeFeatures } from './feature-data.ts'
 import { HashtagExtension } from '@lexical/hashtag'
 import type { RichTextNode } from './value.ts'
 
 export * from './policy.ts'
 import { defaultMentionSources, richTextColors, richTextSizes, type RichTextFeature, type RichTextFont, type RichTextPolicy } from './policy.ts'
 
-export const richTextFormatBits = { bold: 1, italic: 2, strikethrough: 4, underline: 8, inlineCode: 16, subscript: 32, superscript: 64, highlight: 128, lowercase: 256, uppercase: 512, capitalize: 1024 } as const
 export const allRichTextFormats = Object.values(richTextFormatBits).reduce((mask, bit) => mask | bit, 0)
 export const richTextFormatMask = (policy: RichTextPolicy) => Object.entries(richTextFormatBits).reduce((bits, [name, bit]) => bits | (policy.features.includes(name as RichTextFeature) ? bit : 0), 0)
-export const richTextChoiceFeatures: Readonly<Record<string, RichTextFeature | undefined>> = { bold: 'bold', italic: 'italic', underline: 'underline', strikethrough: 'strikethrough', code: 'inlineCode', subscript: 'subscript', superscript: 'superscript', highlight: 'highlight', lowercase: 'lowercase', uppercase: 'uppercase', capitalize: 'capitalize', h1: 'headings', h2: 'headings', h3: 'headings', number: 'lists', bullet: 'lists', check: 'checklist', quote: 'quote', horizontalRule: 'divider', image: 'upload', upload: 'upload' }
-const nodeFeatures: Record<string, RichTextFeature> = { heading: 'headings', list: 'lists', listitem: 'lists', quote: 'quote', horizontalrule: 'divider', link: 'link', autolink: 'link', upload: 'upload', table: 'tables', tablerow: 'tables', tablecell: 'tables', code: 'code', 'code-highlight': 'code', mention: 'mentions', hashtag: 'mentions', mark: 'comments' }
 
 export const richTextCodeLanguages = ['javascript', 'typescript', 'json', 'css', 'markup', 'python'] as const
 export const richTextBlockTypes: readonly string[] = ['paragraph', 'heading', 'quote', 'list', 'listitem', 'table', 'tablerow', 'tablecell', 'code']
