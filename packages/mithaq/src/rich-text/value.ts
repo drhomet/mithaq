@@ -109,6 +109,32 @@ export const unknownType = ({ node, types, versions, depth = richTextBounds.dept
   return undefined
 }
 
+/** The highest JSON version of each node type a value holds, a node with none being Lexical's first. */
+const highestVersions = (value: unknown) => {
+  const versions = new Map<string, number>()
+  const walk = (node: unknown, depth: number) => {
+    if (!node || typeof node !== 'object' || depth <= 0) return
+    const held = node as { type?: unknown; version?: unknown; children?: unknown }
+    if (typeof held.type === 'string') {
+      const version = typeof held.version === 'number' ? held.version : 1
+      if (version > (versions.get(held.type) ?? -Infinity)) versions.set(held.type, version)
+    }
+    for (const child of Array.isArray(held.children) ? held.children : []) walk(child, depth - 1)
+  }
+  walk((value as { root?: unknown } | null)?.root, richTextBounds.depth)
+  return versions
+}
+
+/**
+ * The first node type whose highest JSON version `next` holds is below the highest `stored` holds,
+ * or nothing. A type `next` holds no node of is not lowered, so removing every node of a type stays allowed.
+ */
+export const loweredType = ({ stored, next }: { stored: unknown; next: unknown }): string | undefined => {
+  const before = highestVersions(stored)
+  for (const [type, version] of highestVersions(next)) if (version < (before.get(type) ?? -Infinity)) return type
+  return undefined
+}
+
 /** What a write's value reads as: its text and whether it holds a decorator, or why it is refused. */
 export type RichTextRead = { text: string; holdsDecorator?: boolean } | { refused: string; type?: string }
 

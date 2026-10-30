@@ -13,7 +13,7 @@ import { AsasError, conflict, denied, invalid, missing } from './errors.ts'
 import type { AdminAccess, FieldAccess, LocalesOf, ResolvedField, ResolvedKayan, RuntimeField, ServiceOf } from '../../mithaq/types.ts'
 import type { BuiltTables } from '../../drizzle/index.ts'
 import { defaultKinds, isStorableText, type Kind } from '../../base/kinds.ts'
-import type { RichTextValue } from '../../rich-text/value.ts'
+import { loweredType, type RichTextValue } from '../../rich-text/value.ts'
 import type { Access } from '../../mithaq/types.ts'
 import type { Store } from '../../mithaq/language.ts'
 import type { LanguageOf } from '../../mithaq/define.ts'
@@ -414,6 +414,40 @@ export const assertCommentMarks = async ({ kayan, store, data, tenant, tx, id = 
   }
 }
 
+/**
+ * Refuses a write that lowers the highest stored JSON version of a node type in a rich text field,
+ * against the row and its newest version alike, so an editor older than the one that wrote a node
+ * never saves it back in a shape that drops what it cannot read. The row is held before it is
+ * compared, so a racing upgrade is seen. Answers whether a row was found where rich text is written.
+ */
+export const assertRichTextVersions = async ({ kayan, store, data, tx, target }: {
+  kayan: ResolvedKayan
+  store: Pick<Store, 'find'>
+  data: Record<string, unknown>
+  tx?: unknown
+  /** The one row the write lands on, or nothing for a row it makes. */
+  target: Where | undefined
+}): Promise<boolean | undefined> => {
+  const fields = Object.values(kayan.fields).filter((field) => field.richTextPolicy && data[field.name] != null)
+  if (!fields.length || !target) return undefined
+  // No transaction holds a row until the write, so a comparison here could be stale by then.
+  if (!tx) throw richTextVersionRefusal(kayan)
+  // `noKeyUpdate` is the lock every managed write of the row takes, so writers queue here and nothing
+  // else is blocked; the write that follows keeps it until commit.
+  const [row] = (await store.find({ tx, kayan: kayan.name, args: { limit: 1, page: 1, lock: 'noKeyUpdate', sort: { field: 'id', direction: 'asc' }, where: target } })).docs
+  if (!row) return false
+  const newest = kayan.versions ? (await latestVersion({ kayan: kayan as ResolvedKayan & { versions: NonNullable<ResolvedKayan['versions']> }, store, parent: row.id, tx }))?.version as Record<string, unknown> | undefined : undefined
+  for (const field of fields) {
+    for (const stored of [row, newest]) {
+      if (stored && loweredType({ stored: stored[field.name], next: data[field.name] })) throw richTextVersionRefusal(kayan, field.name)
+    }
+  }
+  return true
+}
+
+export const richTextVersionRefusal = (kayan: ResolvedKayan, field?: string) =>
+  conflict({ message: 'This rich text holds a newer node than this write. Reload it and edit the newest copy.', key: 'error.conflict.rich_text_version', params: { kayan: kayan.name, ...(field && { field }) } })
+
 export { assertReferences } from './references.ts'
 import { assertReferences, keyIn } from './references.ts'
 
@@ -706,6 +740,7 @@ export const write = <Actor = unknown>({
               // Draft snapshots bypass the sealed row store, so hold new references and check annotations here.
               await assertReferences({ kayan: kept, store, data: values, tenant: tenantOf(actor), tx: heldTx })
               await assertCommentMarks({ kayan: kept, store, data: draft, tenant: tenantOf(actor), tx: heldTx, id: targetId })
+              await assertRichTextVersions({ kayan: kept, store, data: draft, tx: heldTx, target: { id: { equals: targetId as Scalar } } })
               await saveVersion({ kayan: kept, store, writes: store, tx: heldTx, row: draft, autosave: autosaving })
               return draft
             }

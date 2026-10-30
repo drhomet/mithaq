@@ -60,7 +60,8 @@ import { expectedUpdatedAt } from '../../mithaq/src/steps/expected-updated-at.ts
 // jsonb key order on its own.
 import { changedColumns } from '../../../packages/mithaq/src/versions/versions.ts'
 import { defaultNodes, richText as richTextRukn } from 'mithaq/rich-text'
-import { AutoLinkNode, CalloutNode } from '../../../packages/mithaq-admin/test/callout-node.ts'
+import { AutoLinkNode, CalloutNode, toneState } from '../../../packages/mithaq-admin/test/callout-node.ts'
+import { ElementNode } from 'lexical'
 
 const allowAccess = { create: () => true, read: () => true, update: () => true, delete: () => true } as const
 const user = userRefs<{ id: string }>()
@@ -4494,6 +4495,73 @@ test('185i. a draft of a required rich text field may be blank, since required i
   }
   const published = await notes.update!({ id: row.id, lead: blank }).catch((error: unknown) => error)
   assert.ok(published instanceof AsasError && published.status === 400, 'while a publish of the blank value is refused by required')
+})
+
+/** The callout a newer editor writes, at JSON version 2, under the same type as `CalloutNode`. */
+class NewerCalloutNode extends ElementNode {
+  $config() {
+    return this.config('callout', { extends: ElementNode, stateConfigs: [{ stateConfig: toneState, flat: true }] })
+  }
+  exportJSON() {
+    return { ...super.exportJSON(), version: 2 }
+  }
+}
+
+test('185j. no write lowers the highest stored JSON version of a node type in a rich text field: a stale save, draft, autosave, bulk or step upsert is refused 409 and leaves the row, while an edit at the same version and removing every node of the type save', async () => {
+  const store = memoryStore()
+  const id = '00000000-0000-4000-8000-00000000185a'
+  const other = '00000000-0000-4000-8000-00000000185b'
+  const callout = (version: number, words: string) => ({ root: { ...richText(words).root, children: [{ type: 'callout', version, tone: 'info', direction: null, format: '', indent: 0, children: richText(words).root.children }] } })
+  const buildOf = (nodes: readonly unknown[]) => {
+    const mithaq = defineMithaq({
+      arkan: [base, richTextRukn({ nodes: nodes as never })],
+      targets: { memory: store, zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }), service: serviceTarget({ depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit, store: 'memory', schema: 'zod', authorize: defaultAuthorize }), versions: versionsTarget({ max: 100 }) },
+    })
+    const built = mithaq.buildAsas({
+      http: [fetchHttp({ maxBodyBytes: defaultMaxBodyBytes, onError: console.error })],
+      kayan: [mithaq.defineKayan({
+        name: 'notes',
+        access: allowAccess,
+        fields: { ...defaultFields, body: { kind: 'richText' }, ...draftFields },
+        targets: { service: { operations: {
+          ...defaultOperations,
+          ...versionOperations,
+          // A create whose step also writes another row's body, by the conflict key, through the sealed store.
+          stamp: { steps: ({ steps }: { steps: { insert: WriteStep } }) => [
+            async (ctx: Ctx, tools: Tools) => (await (tools as unknown as { store: { upsert: (args: object) => Promise<unknown> } }).store.upsert({ tx: ctx.tx, kayan: built.kayan.notes, on: ['id'], data: { id, body: callout(1, 'Stamped'), _status: 'published', createdAt: new Date(), updatedAt: new Date() } }), ctx),
+            steps.insert,
+          ] },
+        } }, versions: { drafts: { autosave: true } } },
+      } as never)],
+    })
+    return built.kayan.notes!.operations as unknown as Record<string, (input: unknown, options?: unknown) => Promise<Record<string, unknown>>>
+  }
+  const older = buildOf([...defaultNodes, CalloutNode])
+  const newer = buildOf([...defaultNodes, NewerCalloutNode])
+  const stored = async () => (await newer.findByID!({ id }))?.body
+  const refused = async (write: Promise<unknown>, what: string) => {
+    const thrown = await write.then(() => undefined, (error: unknown) => error)
+    assert.ok(thrown instanceof AsasError && thrown.status === 409, `${what} is refused 409: ${String(thrown)}`)
+    assert.equal(thrown.key, 'error.conflict.rich_text_version', what)
+    assert.equal(thrown.message, 'This rich text holds a newer node than this write. Reload it and edit the newest copy.', `${what} says so in fixed words`)
+    assert.deepEqual(await stored(), callout(2, 'Upgraded'), `${what} leaves the stored value`)
+  }
+
+  await older.create!({ id, body: callout(1, 'First') })
+  await newer.update!({ id, body: callout(2, 'Upgraded') })
+  await refused(older.update!({ id, body: callout(1, 'Stale') }), 'a stale save')
+  await refused(older.update!({ id, body: callout(1, 'Stale draft') }, { draft: true }), 'a stale draft')
+  await refused(older.update!({ id, body: callout(1, 'Stale autosave') }, { draft: true, autosave: true }), 'a stale autosave')
+  await refused(older.updateMany!({ where: { id: { equals: id } }, data: { body: callout(1, 'Stale bulk') } }), 'a stale bulk write')
+  await refused(older.stamp!({ id: other, body: richText('Stamping') }), 'a step\'s upsert of another row')
+  assert.equal(await older.findByID!({ id: other }).then(() => 200, (thrown: AsasError) => thrown.status), 404, 'whose own row is not made either')
+
+  await newer.update!({ id, body: callout(2, 'Edited') })
+  assert.deepEqual(await stored(), callout(2, 'Edited'), 'an edit at the same version saves')
+  await older.update!({ id, body: richText('No callout left') })
+  assert.deepEqual(await stored(), richText('No callout left'), 'and removing every callout saves, since nothing is lowered')
+  await older.update!({ id, body: callout(1, 'Callout again') })
+  assert.deepEqual(await stored(), callout(1, 'Callout again'), 'after which the older editor writes the type again')
 })
 
 test('223c. the memory store gives each version row an id of its own, so every save leaves exactly one latest version, the newest', async () => {

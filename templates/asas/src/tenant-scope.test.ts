@@ -1383,6 +1383,45 @@ const suite = (name: string, make: (authorize: Authorize) => Promise<{ built: Bu
     assert.equal((await files.findByID({ id: foreign.id }, { actor: two })).id, foreign.id)
   })
 
+  // A paragraph at version 0 is what an editor older than Lexical's version 1 would write: every class still reads it.
+  const versioned = (version: number, words: string) => ({ root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'paragraph', version, direction: null, format: '', indent: 0, textFormat: 0, textStyle: '', children: [{ type: 'text', version: 1, text: words, format: 0, detail: 0, mode: 'normal', style: '' }] }] } })
+
+  if (postgres) test('a step\'s stale rich text write waits for an upgrade holding the row, then is refused 409, as a restore that would lower a node version is, while another organization is answered as for a missing row', { timeout: 10_000 }, async () => {
+    const papers = built.kayan.draftOwners.operations
+    const paper = await papers.create({ title: 'versioned body', memo: null, body: versioned(0, 'Old'), _status: 'published' }, { actor: one })
+    const [old] = (await papers.findVersions({ where: { parent: { equals: paper.id } } }, { actor: one })).docs
+    const mine = await memos().create({ title: 'stale writer' }, { actor: one })
+    const upgraded = hold()
+    storeProbe = async (ctx) => { await pause(ctx) }
+    const upgrading = papers.stepDraft({ id: paper.id, body: versioned(1, 'Upgraded'), _status: 'published' }, { actor: one })
+    void upgrading.catch(() => {})
+    let stale: Promise<AsasError> | undefined
+    try {
+      await within(upgraded.reached.promise)
+      Object.assign(aimed, { kayan: 'draftOwners', id: paper.id, data: { body: versioned(0, 'Stale') } })
+      stale = refusal(memos().touch({ id: mine.id, title: 'touching' }, { actor: one }))
+      void stale.catch(() => {})
+      assert.equal(await blocked(), 'waited', 'the stale write waits for the upgrade holding the row')
+    } finally {
+      upgraded.release.resolve()
+      await within(Promise.allSettled([upgrading, ...(stale ? [stale] : [])]), 5000)
+      storeProbe = async () => {}
+      Object.assign(aimed, { kayan: undefined, id: undefined, data: undefined })
+    }
+    await upgrading
+    const refused = await stale!
+    assert.equal(refused.status, 409, String(refused))
+    assert.equal(refused.key, 'error.conflict.rich_text_version')
+    assert.equal((await memos().findByID({ id: mine.id }, { actor: one })).title, 'stale writer', 'the refused operation changed nothing')
+    assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one })).body, versioned(1, 'Upgraded'), 'and the upgrade stands')
+
+    assert.equal((await refusal(papers.restoreVersion({ id: old.id }, { actor: one }))).key, 'error.conflict.rich_text_version', 'restoring the version saved before the upgrade is refused')
+    assert.equal((await refusal(papers.update({ id: paper.id, body: versioned(0, 'Foreign') }, { actor: two }))).status, 404, 'another organization\'s stale write is the 404 a missing row is')
+    assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one })).body, versioned(1, 'Upgraded'))
+    await papers.update({ id: paper.id, body: versioned(1, 'Edited') }, { actor: one })
+    assert.deepEqual((await papers.findByID({ id: paper.id }, { actor: one })).body, versioned(1, 'Edited'), 'while an edit at the same version saves')
+  })
+
   test('cleanup retains historical and soft-deleted owners in Postgres as well as memory', async () => {
     const files = built.kayan.files.operations
     const owners = built.kayan.fileOwners.operations
