@@ -273,3 +273,47 @@ test('a device row is updated and deleted by its uuid in any case, as the server
   await asas.kayan.patient.operations.delete({ id })
   assert.equal((await asas.kayan.patient.operations.count()).totalDocs, 0)
 })
+
+test('a device write never lowers the highest stored JSON version of a rich text node type, through an operation or a step\'s upsert, while removing every node of the type saves', async () => {
+  const { defaultNodes, richText } = await import('../../rich-text/index.ts')
+  const { CalloutNode, toneState } = await import('../../../../mithaq-admin/test/callout-node.ts')
+  const { ElementNode } = await import('lexical')
+  class NewerCalloutNode extends ElementNode {
+    $config() { return this.config('callout', { extends: ElementNode, stateConfigs: [{ stateConfig: toneState, flat: true }] }) }
+    exportJSON() { return { ...super.exportJSON(), version: 2 } }
+  }
+  const fixture = nodeSqlite()
+  fixture.sqlite.exec('create table memo (id integer primary key autoincrement, body text, created_at integer not null, updated_at integer not null)')
+  const paragraph = (words: string) => ({ type: 'paragraph', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'text', version: 1, text: words, format: 0, detail: 0, mode: 'normal', style: '' }] })
+  const plain = (words: string) => ({ root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children: [paragraph(words)] } })
+  const callout = (version: number, words: string) => ({ root: { ...plain(words).root, children: [{ type: 'callout', version, tone: 'info', direction: null, format: '', indent: 0, children: [paragraph(words)] }] } })
+  const stampAt = { id: 1 }
+  const buildOf = (nodes: readonly unknown[]) => {
+    const language = defineMithaq({ arkan: [base, richText({ nodes: nodes as never })], targets: {
+      sqlite: sqliteAdapter({ ...fixture.database, kinds: drizzleSqliteKinds, rules: drizzleSqliteRules, idKinds: drizzleSqliteIdKinds }),
+      zod: zodTarget({ kinds: zodKinds, rules: zodRules, idKinds: zodIdKinds }),
+      service: serviceTarget({ store: 'sqlite', schema: 'zod', authorize: defaultAuthorize, depth: defaultDepth, defaultLimit, maxLimit: defaultMaxLimit, joinLimit: defaultJoinLimit, bulkLimit: defaultBulkLimit }),
+    } })
+    const memo = language.defineKayan({ name: 'memo', placement: 'device', access: { create: () => true, read: () => true, update: () => true, delete: () => true }, fields: { ...defaultFields, id: { kind: 'number' }, body: { kind: 'richText' } }, targets: { service: { operations: {
+      ...defaultOperations,
+      stamp: { ...defaultOperations.create, steps: [async (ctx: Ctx, tools: { store: { upsert: (args: object) => Promise<unknown> } }) => (await tools.store.upsert({ tx: ctx.tx, kayan: memo, on: ['id'], data: { id: stampAt.id, body: callout(1, 'Stamped'), createdAt: new Date(), updatedAt: new Date() } }), ctx), ...defaultOperations.create.steps] },
+    } } } } as never)
+    return (language.buildAsas({ kayan: [memo], http: [] }) as unknown as { connect: () => Promise<void>; kayan: { memo: { operations: Record<string, (input: unknown) => Promise<Record<string, unknown>>> } } })
+  }
+  const older = buildOf([...defaultNodes, CalloutNode])
+  const newer = buildOf([...defaultNodes, NewerCalloutNode])
+  await older.connect()
+  await newer.connect()
+  const made = await newer.kayan.memo.operations.create!({ body: callout(2, 'Newer') })
+  const stored = async () => (await newer.kayan.memo.operations.findByID!({ id: made.id }))?.body
+  for (const [what, write] of [['a stale update', () => older.kayan.memo.operations.update!({ id: made.id, body: callout(1, 'Stale') })], ['a step\'s upsert', () => older.kayan.memo.operations.stamp!({ body: plain('Stamping') })]] as const) {
+    await assert.rejects(write(), (thrown: { status?: number; key?: string }) => thrown.status === 409 && thrown.key === 'error.conflict.rich_text_version', what)
+    assert.deepEqual(await stored(), callout(2, 'Newer'), `${what} leaves the stored value`)
+  }
+  assert.equal((await older.kayan.memo.operations.count!({})).totalDocs, 1, 'and the refused create made no row')
+  stampAt.id = 50
+  await older.kayan.memo.operations.stamp!({ body: plain('Stamping') })
+  assert.deepEqual((await older.kayan.memo.operations.findByID!({ id: 50 }))?.body, callout(1, 'Stamped'), 'a step\'s upsert of a key no row holds makes its row')
+  await older.kayan.memo.operations.update!({ id: made.id, body: plain('No callout') })
+  assert.deepEqual(await stored(), plain('No callout'), 'removing every callout saves')
+})
