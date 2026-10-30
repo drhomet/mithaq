@@ -88,13 +88,19 @@ test('the initial inventory names exactly the selected classes and proves every 
     hashtag: { ...text, type: 'hashtag', text: '#hello' },
     mention: { ...text, type: 'mention', text: '@Huda', mode: 'token', kayan: 'user', id: 'synthetic-user', name: 'Huda' },
   }
+  // mithaq's UploadNode has written v3 since it was added; v1 and v2 are Payload's shapes, which differ:
+  // v1 held the file as `{ id }` and neither had the node's own id (Payload's UploadServerNode.importJSON).
+  const uploads: Record<number, object> = {
+    1: { type: 'upload', version: 1, relationTo: 'files', value: { id: 'synthetic-file' }, fields: null, format: '' },
+    2: { type: 'upload', version: 2, relationTo: 'files', value: 'synthetic-file', fields: null, format: '' },
+  }
   const editor = createEditor({ nodes, onError: (error) => { throw error } })
   const read = richTextReader(nodes)
   for (const registration of defaultNodeRegistry) {
     assert.equal(versions.get(registration.type), registration.json.writes, registration.type)
     assert.deepEqual(registration.json.reads, Array.from({ length: registration.json.writes }, (_, index) => index + 1))
     for (const version of registration.json.reads) {
-      const fixture = { ...fixtures[registration.type], version }
+      const fixture = (registration.type === 'upload' && uploads[version]) || { ...fixtures[registration.type], version }
       let block: object = fixture
       if (['text', 'linebreak', 'tab', 'link', 'autolink', 'mark', 'hashtag', 'mention'].includes(registration.type)) block = { ...paragraph, children: [fixture] }
       if (registration.type === 'code-highlight') block = { ...fixtures.code, children: [fixture] }

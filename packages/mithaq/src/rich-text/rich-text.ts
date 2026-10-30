@@ -116,6 +116,9 @@ export class UploadNode extends DecoratorNode<unknown> {
 
   /** Refused where either half of what the node points at is missing, which an absent key leaves at its default. */
   updateFromJSON(json: LexicalUpdateJSON<SerializedLexicalNode>): this {
+    // Payload's v1 held the file as `{ id }`, which its own importJSON unwraps; later versions hold the id itself.
+    const { value, version } = json as { value?: unknown; version?: unknown }
+    if (version === 1 && value && typeof value === 'object' && 'id' in value) json = { ...json, value: value.id } as typeof json
     const node = super.updateFromJSON(json)
     if (!$getState(node, relationToState) || !$getState(node, valueState)) throw new Error('An upload names its relationTo and its value.')
     return node
