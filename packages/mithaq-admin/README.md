@@ -558,6 +558,10 @@ find/replace and comments have separate
 imports. RichTextEditor callers outside generated forms can pass `policy` with
 `features` and `fonts`. Code highlighting uses Lexical's Prism adapter. Styling
 writes fixed NodeState choices, never CSS; the viewer uses the same mapping.
+The editor cleans pasted and new content against the policy and never a stored
+value: one past the policy, or holding a node it cannot read at its version, is
+shown read-only with a message and left out of the save
+([rich text features](../mithaq/README.md#rich-text-features)).
 
 Projects holding ejected rich-text pieces must merge or eject the changed
 pieces and their dependencies again, including rich-text-features, choices and
