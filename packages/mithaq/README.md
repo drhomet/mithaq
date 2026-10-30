@@ -1191,6 +1191,7 @@ writes on every document, is kept as metadata. A legacy block direction without
 a matching NodeState direction choice becomes that choice where the field allows
 `direction`, and is read-only where it does not, since policy cleaning would
 otherwise clear it.
+On the first save after an edit, an older block's computed `direction` is stored as an explicit direction choice, so it no longer follows the text's language.
 
 Each node class reads every JSON version up to the one it writes, and a node
 with no version is read as Lexical's first. A class that cannot be constructed
