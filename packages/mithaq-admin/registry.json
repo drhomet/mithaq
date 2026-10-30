@@ -1882,7 +1882,8 @@
         "popover"
       ],
       "dependencies": [
-        "@lexical/hashtag@0.52.0"
+        "@lexical/hashtag@0.52.0",
+        "@lexical/markdown@0.52.0"
       ],
       "files": [
         {

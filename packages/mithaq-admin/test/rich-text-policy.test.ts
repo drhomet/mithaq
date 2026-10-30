@@ -155,12 +155,14 @@ test('the mounted link popover follows a scrolling ancestor', async () => {
 })
 
 test('the mentions add-on writes emoji as text and Arabic hashtags as hashtag nodes', async () => {
+  const { CONTROLLED_TEXT_INSERTION_COMMAND } = await import('lexical')
   await withEditor({ policy: { features: ['mentions'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
     await act(async () => editor.update(() => {
       const paragraph = $getRoot().getFirstChildOrThrow() as import('lexical').ParagraphNode
-      paragraph.append($createTextNode('مرحبا :smile: بكم').setFormat('bold'))
+      paragraph.append($createTextNode('مرحبا ').setFormat('bold'))
       paragraph.selectEnd()
     }))
+    for (const character of ':smile: بكم') await act(async () => editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, character))
     const saved = JSON.stringify(changes.at(-1))
     assert.ok(saved.includes('😀'))
     assert.ok(!saved.includes('"type":"emoji"'))
@@ -398,4 +400,22 @@ test('a stored legacy direction without a matching direction choice stays read-o
       assert.equal(changes.length, 0)
     } finally { await act(async () => root.unmount()); host.remove() }
   }
+})
+
+test('stored emoji shortcodes stay literal on open and unrelated edits while newly typed shortcodes expand', async () => {
+  const { CONTROLLED_TEXT_INSERTION_COMMAND } = await import('lexical')
+  const value = { root: { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Stored :smile:', format: 0 }] }] } }
+  await withEditor({ value, policy: { features: ['mentions'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), 'Stored :smile:', 'opening preserves the stored shortcode')
+    assert.equal(changes.length, 0)
+    await act(async () => editor.update(() => {
+      const text = $getRoot().getAllTextNodes()[0]!
+      text.selectEnd()
+      editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, '!')
+    }))
+    assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), 'Stored :smile:!', 'editing the same text node keeps its loaded shortcode')
+    for (const character of ' :heart:') await act(async () => editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, character))
+    assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), 'Stored :smile:! ❤️')
+    assert.match(JSON.stringify(changes.at(-1)), /Stored :smile:! ❤️/)
+  } })
 })
