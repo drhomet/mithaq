@@ -1213,8 +1213,9 @@ whole; it defaults to none, since no native codec ships yet, so every native
 `edit` claim is an error until one does. The CLI passes none.
 Feature associations, format bits and toolbar choices come from the existing
 shared maps rather than a second registry of feature names. Policies warn when
-a required place cannot edit an allowed node or format, even if the profile
-only asks that place to view it. Non-node tools conservatively check selected
+a place the profile asks to edit a node (by default or per node) cannot edit
+an allowed feature on it; a place that only views a node runs no tools on it.
+Non-node tools conservatively check selected
 nodes. Repeated diagnostics are deduplicated and sorted deterministically.
 
 Support diagnostics carry `severity`, stable `code`, `profile`, `node` or

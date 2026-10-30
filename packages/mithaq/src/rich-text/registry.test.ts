@@ -126,10 +126,23 @@ test('profile typos and field policies warn for each required place with stable 
   assert.ok(diagnostics.every((item) => item.severity === 'warning' && item.remedy && item.profile === selected.name))
 })
 
+test('field policies are checked only where the profile asks a place to edit', async () => {
+  const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
+  const { richTextFeatures } = await import('./policy.ts')
+  const nodes = defaultNodeRegistry.map((node) => node.type)
+  const policies = [{ features: richTextFeatures, fonts: ['sans'] as const, comments: { threads: 'threads' } }]
+  const viewing: RichTextProfile = { name: 'cluster-like', nodes, requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' } } }
+  assert.ok(!checkRichTextSupport({ registry: defaultNodeRegistry, profile: viewing, policies }).some((item) => item.code === 'policy-support-gap'))
+  const override: RichTextProfile = { ...viewing, requirements: { 'lynx-viewer': { default: 'view', nodes: { link: 'edit' } } } }
+  const gaps = checkRichTextSupport({ registry: defaultNodeRegistry, profile: override, policies: [{ features: ['link', 'bold', 'headings'], fonts: ['sans'] }] }).filter((item) => item.code === 'policy-support-gap')
+  assert.deepEqual(gaps.map((item) => `${item.feature}:${item.node}`), ['link:link'])
+})
+
 test('the CLI defaults to the inventory, accepts policies, and rejects unreadable or malformed inputs without leaking their contents', () => {
   withModules((paths) => {
     const policyPath = join(paths.folder, 'policies.mjs')
     writeFileSync(policyPath, `export default [{ features: ['link'], fonts: ['sans'] }]`)
+    writeFileSync(paths.profile, `export default ${JSON.stringify({ ...profile, requirements: { 'lynx-viewer': { default: 'edit' } } })}`)
     const normal = cli(['--profile', paths.profile, '--policies', policyPath])
     assert.equal(normal.status, 0, normal.stderr)
     assert.ok(normal.stdout.includes('policy-support-gap'))
