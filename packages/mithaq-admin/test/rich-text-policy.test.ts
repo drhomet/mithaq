@@ -294,3 +294,47 @@ test('Lexical full-width, Persian and Japanese hashtags satisfy the server polic
     assert.equal(richTextFeatureGuard({ node: saved.root, policy }), undefined)
   } })
 })
+
+
+test('stored content past a narrowed policy is drawn read-only and never sent, even where the editor registers its node, while a pasted table is still cleaned', async () => {
+  const { TableNode, TableRowNode, TableCellNode } = await import('@lexical/table')
+  const text = (words: string, format = 0) => ({ type: 'text', version: 1, text: words, format, detail: 0, mode: 'normal', style: '' })
+  const block = (type: string, children: object[], extra = {}) => ({ type, version: 1, direction: null, format: '', indent: 0, children, ...extra })
+  const cell = (words: string) => block('tablecell', [block('paragraph', [text(words)])], { headerState: 0, colSpan: 1, rowSpan: 1 })
+  const stored = (...children: object[]) => ({ root: block('root', children) })
+  const withTables = [...installed.nodes, TableNode, TableRowNode, TableCellNode]
+  const cases = [
+    ['a table', stored(block('table', [block('tablerow', [cell('kept'), cell('whole')])])), withTables],
+    ['a quote', stored(block('quote', [text('kept whole')])), installed.nodes],
+    ['an italic run', stored(block('paragraph', [text('kept whole', 2)])), installed.nodes],
+    ['a centered paragraph', stored(block('paragraph', [text('kept whole')], { format: 'center' })), installed.nodes],
+    ['a styled run, which no policy allows', stored(block('paragraph', [{ ...text('kept whole'), style: 'color: red' }])), installed.nodes],
+  ] as const
+  for (const [what, value, nodes] of cases) {
+    const host = mount()
+    const root = createRoot(host)
+    const changes: unknown[] = []
+    try {
+      await act(async () => root.render(createElement(RichTextContext, { value: installed }, createElement(RichTextEditor, { value: structuredClone(value), nodes, policy: { features: ['bold'], fonts: ['sans'] }, onChange: (next) => changes.push(next), direction: 'ltr', t, locale: 'en', id: 'narrowed' }))))
+      await act(async () => sleep(100))
+      assert.match(host.querySelector('[role="alert"]')?.textContent ?? '', /no longer allows/, `${what}: the field says why it cannot be changed`)
+      assert.equal(host.querySelectorAll('[contenteditable]').length, 0, `${what}: no editor is mounted over it`)
+      assert.ok(host.textContent?.includes('kept') && host.textContent.includes('whole'), `${what}: its words are shown`)
+      assert.equal(changes.length, 0, `${what}: nothing is sent, so a save leaves it as it is`)
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+    }
+  }
+  // The paste case above covers cleaning; this one pastes the same table into the same narrowed field.
+  await withEditor({ policy: { features: ['bold'], fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    await act(async () => editor.update(() => {
+      const dom = new window.DOMParser().parseFromString('<table><tr><td>pasted</td></tr></table>', 'text/html')
+      $getRoot().select().insertNodes($generateNodesFromDOM(editor, dom as unknown as Document))
+    }))
+    await act(async () => sleep(20))
+    assert.ok(changes.length, 'the paste is sent')
+    assert.ok(!JSON.stringify(changes.at(-1)).includes('"table"'), 'as cleaned text')
+    assert.match(JSON.stringify(changes.at(-1)), /pasted/)
+  } })
+})

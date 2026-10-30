@@ -8,7 +8,10 @@ import { colorChoice, sizeChoice, fontChoice, directionChoice } from 'mithaq-adm
 import { newLink } from 'mithaq-admin/rich-text-selection.ts'
 import { safeUrl } from 'mithaq/rich-text/client'
 
-/** Toolbar commands are not the only writer: paste and loaded JSON need the same policy before save. */
+/**
+ * Toolbar commands are not the only writer: pasted and new content need the same policy before save.
+ * A stored value past the policy never reaches it: the editor shows that value read-only, so nothing loaded is cleaned away.
+ */
 export function PolicyPlugin({ policy }: { policy: RichTextPolicy }) {
   const [editor] = useLexicalComposerContext()
   useEffect(() => {
