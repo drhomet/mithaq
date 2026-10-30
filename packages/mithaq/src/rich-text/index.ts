@@ -81,6 +81,14 @@ const richTextKind = ({ nodes, policy }: { nodes: readonly Klass<LexicalNode>[];
     },
   })
 
+/** Keep the registry's version fixtures on the same selected class list as the server. */
+export const richTextFeatureNodes = (features: readonly RichTextFeature[]): readonly Klass<LexicalNode>[] => [
+  ...(features.includes('mentions') ? [MentionNode, HashtagNode] : []),
+  ...(features.includes('comments') ? [MarkNode] : []),
+  ...(features.includes('tables') ? [TableNode, TableRowNode, TableCellNode] : []),
+  ...(features.includes('code') ? [CodeNode, CodeHighlightNode] : []),
+]
+
 /**
  * The rukn a project lays down for rich text, over its own node list:
  * `arkan: [base, richText({ nodes: richTextNodes })]`.
@@ -89,5 +97,5 @@ export const richText = <const Features extends readonly RichTextFeature[] = typ
   const policy = { features, fonts, ...(features.includes('mentions') && { mentionSources }), ...(features.includes('comments') && comments && { comments: { threads: comments.threads } }) }
   checkRichTextPolicy(policy)
   if (comments?.context !== undefined && typeof comments.context !== 'function') throw new Error('Comments context must be a function.')
-  return defineRukn({ name: 'richText', kinds: { richText: { ...richTextKind({ nodes: [...nodes, ...(features.includes('mentions') ? [MentionNode, HashtagNode] : []), ...(features.includes('comments') ? [MarkNode] : []), ...(features.includes('tables') ? [TableNode, TableRowNode, TableCellNode] : []), ...(features.includes('code') ? [CodeNode, CodeHighlightNode] : [])], policy }), richTextPolicy: policy, ...(comments && { richTextComments: comments }) } } })
+  return defineRukn({ name: 'richText', kinds: { richText: { ...richTextKind({ nodes: [...nodes, ...richTextFeatureNodes(features)], policy }), richTextPolicy: policy, ...(comments && { richTextComments: comments }) } } })
 }
