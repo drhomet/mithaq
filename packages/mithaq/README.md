@@ -1190,8 +1190,8 @@ Run `bun run check:rich-text` before a pull request, or `npm run check:rich-text
 on Node 24. Add `--strict` to fail on warnings. Native apps also pass
 `--contract ./path/to/installed/rich-input/contract.json`. The CLI accepts
 `--policies ./rich-text-policies.ts` (a default-exported array of
-`RichTextPolicy` values) and `--registry ./rich-text-registry.ts` (a
-default-exported array of registrations, usually extending `defaultNodeRegistry`).
+`RichTextPolicy` values) and checks mithaq's `defaultNodeRegistry`; an app
+checking registrations of its own calls `checkRichTextSupport` from a test.
 All module paths resolve from the working directory, and relative imports
 inside a module resolve from that module. Node 24 and Bun run the bin.
 Profile modules are trusted executable app configuration; do not load untrusted

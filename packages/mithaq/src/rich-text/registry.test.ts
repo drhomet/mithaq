@@ -24,7 +24,7 @@ test('a missing viewer warns through the public check and CLI, failing only with
   const diagnostics = checkRichTextSupport({ registry: [registration], profile })
   assert.deepEqual(diagnostics, [{ severity: 'warning', code: 'support-gap', profile: 'cluster-like', node: 'link', place: 'lynx-viewer', required: 'view', available: 'none', remedy: 'Install support for this node at this place or revise the profile requirement.' }])
   withModules((paths) => {
-    const args = ['--profile', paths.profile, '--registry', paths.registry]
+    const args = ['--profile', paths.profile]
     const normal = cli(args)
     assert.equal(normal.status, 0, normal.stderr)
     assert.deepEqual(JSON.parse(normal.stdout), diagnostics[0])
@@ -32,25 +32,15 @@ test('a missing viewer warns through the public check and CLI, failing only with
   })
 })
 
-test('native editing requires real references in the installed contract through the function and CLI', () => {
+test('native editing requires real references in the installed contract', () => {
   const nativeProfile: RichTextProfile = { name: 'phone', nodes: ['link'], requirements: {} }
   for (const place of ['native-android', 'native-ios'] as const) {
     for (const native of [undefined, [], ['none'], ['paragraphs.h1'], ['formats.bold']]) {
       const node = { ...registration, support: { ...registration.support, [place]: 'edit' as const }, native }
-      const contract = { formats: { bold: 2 }, paragraphs: ['p', 'h2', 'h3'] }
-      const diagnostics = checkRichTextSupport({ registry: [node], profile: nativeProfile, contract })
+      const diagnostics = checkRichTextSupport({ registry: [node], profile: nativeProfile, contract: { formats: { bold: 2 }, paragraphs: ['p', 'h2', 'h3'] } })
       assert.equal(diagnostics.length, 1)
       assert.equal(diagnostics[0]?.severity, 'error')
       assert.equal(diagnostics[0]?.place, place)
-      withModules((paths) => {
-        writeFileSync(paths.profile, `export default ${JSON.stringify(nativeProfile)}`)
-        writeFileSync(paths.registry, `export default ${JSON.stringify([node])}`)
-        const contractPath = join(paths.folder, 'contract.json')
-        writeFileSync(contractPath, JSON.stringify(contract))
-        const result = cli(['--profile', paths.profile, '--registry', paths.registry, '--contract', contractPath])
-        assert.equal(result.status, 1)
-        assert.equal(JSON.parse(result.stdout).severity, 'error', result.stderr)
-      })
     }
   }
   const node: NodeRegistration = { ...registration, native: ['formats.bold', 'paragraphs.p'], support: { ...registration.support, 'native-ios': 'edit' } }
@@ -132,7 +122,7 @@ test('the CLI defaults to the inventory, accepts policies, and rejects unreadabl
     const normal = cli(['--profile', paths.profile, '--policies', policyPath])
     assert.equal(normal.status, 0, normal.stderr)
     assert.ok(normal.stdout.includes('policy-support-gap'))
-    for (const args of [[], ['--unknown'], ['--strict=false'], ['--profile'], ['--profile', join(paths.folder, 'missing.mjs')], ['--profile', paths.profile, '--contract', paths.profile], ['--profile', paths.profile, '--policies', paths.registry]]) {
+    for (const args of [[], ['--unknown'], ['--strict=false'], ['--profile'], ['--profile', join(paths.folder, 'missing.mjs')], ['--profile', paths.profile, '--contract', paths.profile], ['--profile', paths.profile, '--policies', paths.registry], ['--profile', paths.profile, '--registry', paths.registry]]) {
       const result = cli(args)
       assert.equal(result.status, 1)
       assert.equal(JSON.parse(result.stderr).severity, 'error')
