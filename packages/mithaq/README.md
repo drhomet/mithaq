@@ -1187,7 +1187,9 @@ Add an app script to its `package.json`:
 ```
 
 Run `bun run check:rich-text` before a pull request, or `npm run check:rich-text`
-on Node 24. Add `--strict` to fail on warnings. Native apps also pass
+on Node 24. Add `--strict` to fail on warnings. The output has one line per
+severity, code and place, with a count and the nodes it names; `--json` prints
+each diagnostic as a JSON line instead. Native apps also pass
 `--contract ./path/to/installed/rich-input/contract.json`. The CLI accepts
 `--policies ./rich-text-policies.ts` (a default-exported array of
 `RichTextPolicy` values) and checks mithaq's `defaultNodeRegistry`; an app
