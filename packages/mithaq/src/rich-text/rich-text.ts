@@ -265,6 +265,8 @@ export const convertPayloadToLexical = ({ data, nodes }: { data: unknown; nodes:
         drop(`No node of this editor is of type "${type}", so it was left out.`)
         return []
       }
+      // Payload versions its own shapes; the registered class writes its canonical version below.
+      if (payloadTypes.has(type)) delete next.version
       for (const key of ['style', 'textStyle']) {
         if (Object.hasOwn(next, key) && next[key] !== '') {
           drop(`Its ${key}, ${quote(next[key])}, was cleared, since this editor writes none.`)

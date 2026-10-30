@@ -286,3 +286,21 @@ test('a node needing constructor arguments is refused unless its class declares 
   assert.equal('refused' in read(state(paragraph(text('Keep', { type: 'declared-text', version: 1 }))), nodes), false)
   assert.equal('refused' in read(state(paragraph(text('Keep', { type: 'declared-text', version: 2 }))), nodes), true)
 })
+
+test('Payload block and relationship versions convert to the versions their registered classes write', () => {
+  class Block extends CalloutNode {
+    $config() { return this.config('block', { extends: CalloutNode }) }
+  }
+  class Relationship extends CalloutNode {
+    $config() { return this.config('relationship', { extends: CalloutNode }) }
+  }
+  const nodes = [...defaultNodes, Block, Relationship]
+  const data = state(...['block', 'relationship'].map((type) => ({ type, version: 2, tone: 'warning', children: [paragraph(text(type))], direction: null, format: '', indent: 0 })))
+  const result = converted(richText.convertPayloadToLexical({ data, nodes }))
+  assert.deepEqual(result.dropped, [])
+  assert.deepEqual(result.value.root.children.map(({ type, version, tone }) => ({ type, version, tone })), [
+    { type: 'block', version: 1, tone: 'warning' },
+    { type: 'relationship', version: 1, tone: 'warning' },
+  ])
+  assert.deepEqual(read(result.value, nodes), { text: 'block\n\nrelationship', holdsDecorator: false })
+})
