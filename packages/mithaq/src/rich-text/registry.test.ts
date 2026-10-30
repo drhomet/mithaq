@@ -31,3 +31,28 @@ test('a missing viewer warns through the public check and CLI, failing only with
     assert.equal(cli([...args, '--strict']).status, 1)
   })
 })
+
+test('native editing requires real references in the installed contract through the function and CLI', () => {
+  const nativeProfile: RichTextProfile = { name: 'phone', nodes: ['link'], requirements: {} }
+  for (const place of ['native-android', 'native-ios'] as const) {
+    for (const native of [undefined, [], ['none'], ['paragraphs.h1'], ['formats.bold']]) {
+      const node = { ...registration, support: { ...registration.support, [place]: 'edit' as const }, native }
+      const contract = { formats: { bold: 2 }, paragraphs: ['p', 'h2', 'h3'] }
+      const diagnostics = checkRichTextSupport({ registry: [node], profile: nativeProfile, contract })
+      assert.equal(diagnostics.length, 1)
+      assert.equal(diagnostics[0]?.severity, 'error')
+      assert.equal(diagnostics[0]?.place, place)
+      withModules((paths) => {
+        writeFileSync(paths.profile, `export default ${JSON.stringify(nativeProfile)}`)
+        writeFileSync(paths.registry, `export default ${JSON.stringify([node])}`)
+        const contractPath = join(paths.folder, 'contract.json')
+        writeFileSync(contractPath, JSON.stringify(contract))
+        const result = cli(['--profile', paths.profile, '--registry', paths.registry, '--contract', contractPath])
+        assert.equal(result.status, 1)
+        assert.equal(JSON.parse(result.stdout).severity, 'error', result.stderr)
+      })
+    }
+  }
+  const node: NodeRegistration = { ...registration, native: ['formats.bold', 'paragraphs.p'], support: { ...registration.support, 'native-ios': 'edit' } }
+  assert.deepEqual(checkRichTextSupport({ registry: [node], profile: nativeProfile, contract: { formats: { bold: 1 }, paragraphs: ['p'] } }), [])
+})
