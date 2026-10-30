@@ -398,9 +398,9 @@ test('stored merged table cells are drawn read-only and never sent, and a pasted
   } })
 })
 
-test('a stored legacy direction without a matching direction choice stays read-only through an unrelated form edit and save', async () => {
-  for (const features of [[], ['direction']] as const) for (const direction of ['rtl', 'ltr'] as const) {
-    const value = { root: { type: 'root', version: 1, children: [{ type: 'paragraph', version: 1, direction, children: [{ type: 'text', version: 1, text: 'Legacy direction', format: 0 }] }] } }
+test('a stored legacy block direction stays read-only through an unrelated form edit and save where the field does not allow direction', async () => {
+  for (const features of [[], ['bold']] as const) for (const direction of ['rtl', 'ltr'] as const) {
+    const value = { root: { type: 'root', version: 1, direction: 'ltr', children: [{ type: 'paragraph', version: 1, direction, children: [{ type: 'text', version: 1, text: 'Legacy direction', format: 0 }] }] } }
     const host = mount(), root = createRoot(host)
     const form = { title: 'Before', body: structuredClone(value) }
     const changes: unknown[] = []
@@ -432,5 +432,28 @@ test('stored emoji shortcodes stay literal on open and unrelated edits while new
     for (const character of ' :heart:') await act(async () => editor.dispatchCommand(CONTROLLED_TEXT_INSERTION_COMMAND, character))
     assert.equal(editor.getEditorState().read(() => $getRoot().getTextContent()), 'Stored :smile:! ❤️')
     assert.match(JSON.stringify(changes.at(-1)), /Stored :smile:! ❤️/)
+  } })
+})
+
+test('older Lexical and Payload documents with a root direction stay editable, and a legacy block direction becomes the direction choice where the field allows it', async () => {
+  const { convertPayloadToLexical } = await import('mithaq/rich-text')
+  const text = (words: string) => ({ type: 'text', version: 1, text: words, format: 0, detail: 0, mode: 'normal', style: '' })
+  const doc = (root: string, block: string | null) => ({ root: { type: 'root', version: 1, direction: root, format: '', indent: 0, children: [{ type: 'paragraph', version: 1, direction: block, format: '', indent: 0, textFormat: 0, textStyle: '', children: [text('Older')] }] } })
+  const converted = convertPayloadToLexical({ data: doc('ltr', 'rtl'), nodes: defaultNodes })
+  assert.ok('value' in converted)
+  const payload = converted.value
+  for (const [value, features, block] of [
+    [doc('ltr', null), [], null],
+    [doc('rtl', null), ['direction'], null],
+    [doc('ltr', 'rtl'), ['direction'], 'rtl'],
+    [payload, ['direction'], 'rtl'],
+  ] as const) await withEditor({ value: structuredClone(value), policy: { features, fonts: ['sans'] }, run: async ({ editor, changes }) => {
+    await act(async () => editor.update(() => { $getRoot().getAllTextNodes()[0]!.spliceText(0, 0, 'Edited ') }))
+    const saved = changes.at(-1)!
+    assert.equal(saved.root.direction, (value as { root: { direction: string } }).root.direction, 'the root direction is kept as metadata')
+    assert.equal(saved.root.children![0]!.direction, block, 'the block direction is kept')
+    if (block) assert.deepEqual(saved.root.children![0]!.$, { direction: block }, 'as the direction choice the toolbar shows')
+    assert.match(JSON.stringify(saved), /Edited Older/)
+    assert.equal(richTextFeatureGuard({ node: saved.root, policy: { features, fonts: ['sans'] } }), undefined)
   } })
 })

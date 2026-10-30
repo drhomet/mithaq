@@ -1186,9 +1186,11 @@ node no class registers, or a node at a newer JSON version than its class
 writes, is shown read-only as its words with a message, and a save leaves the
 field out, so the stored value stays as it was. A table with merged cells is
 read-only too: the editor has no merge command, and its row, column and paste
-edits would split or stretch the spans. Legacy block directions without
-a matching NodeState direction choice are also read-only, since policy cleaning
-would otherwise clear them.
+edits would split or stretch the spans. A root direction, which older Lexical
+writes on every document, is kept as metadata. A legacy block direction without
+a matching NodeState direction choice becomes that choice where the field allows
+`direction`, and is read-only where it does not, since policy cleaning would
+otherwise clear it.
 
 Each node class reads every JSON version up to the one it writes, and a node
 with no version is read as Lexical's first. A class that cannot be constructed

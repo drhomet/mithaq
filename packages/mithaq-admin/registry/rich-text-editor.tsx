@@ -12,7 +12,7 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import type { Klass, LexicalNode } from 'lexical'
 import type { ControlProps } from 'mithaq-admin/control-props.ts'
 import type { Translate } from 'mithaq-admin/copy.ts'
-import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, richTextChoiceFeatures, richTextFeatureGuard, richTextGuard, safeUrl } from 'mithaq/rich-text/client'
+import { defaultRichTextFeatures, defaultRichTextFonts, type RichTextPolicy, richTextBlockTypes, richTextChoiceFeatures, richTextFeatureGuard, richTextGuard, safeUrl } from 'mithaq/rich-text/client'
 import { FloatingLinkEditorPlugin } from 'mithaq-admin/rich-text-link-plugin.tsx'
 import { RichTextContext, type RichTextPick } from 'mithaq-admin/rich-text-picks.tsx'
 import { holdsPlaceholder } from 'mithaq-admin/rich-text-selection.ts'
@@ -52,10 +52,19 @@ type EditorProps = {
   control?: ControlProps
 }
 
-// The policy derives direction from NodeState; a legacy direction without that choice would be cleared.
+// The policy derives a block's direction from NodeState; a legacy direction without that choice would be cleared.
+// The root is skipped: older Lexical writes its direction on every root, and the policy keeps it as metadata.
 const losesDirection = (node: RichTextNode): boolean =>
-  (node.direction != null && node.direction !== (node.$ as { direction?: unknown } | undefined)?.direction)
+  (node.type !== 'root' && node.direction != null && node.direction !== (node.$ as { direction?: unknown } | undefined)?.direction)
   || (node.children ?? []).some(losesDirection)
+// A copy, so the form's own value is never changed: a legacy block direction becomes the choice the toolbar shows.
+const chosen = (node: RichTextNode): RichTextNode => ({
+  ...node,
+  ...(node.type !== 'root' && (node.direction === 'rtl' || node.direction === 'ltr') && (node.$ as { direction?: unknown } | undefined)?.direction === undefined && richTextBlockTypes.includes(node.type) && Array.isArray(node.children)
+    ? { $: { ...(node.$ as object | undefined), direction: node.direction } }
+    : {}),
+  ...(node.children ? { children: node.children.map(chosen) } : {}),
+})
 // The admin has no merge command and splits or stretches merged cells on paste and on row or column inserts, so it never edits them.
 const merges = (node: RichTextNode): boolean =>
   Number(node.colSpan ?? 1) > 1 || Number(node.rowSpan ?? 1) > 1 || (node.children ?? []).some(merges)
@@ -65,8 +74,10 @@ function Editor({ value, onChange, direction, t, locale, id, placeholder, descri
   const { Plugin } = provided
   const drawn = useFeatureNodes({ nodes: nodes ?? provided.nodes, modules })
   const allowedPicks = (picks ?? provided.picks).filter((pick) => !richTextChoiceFeatures[pick.key] || policy.features.includes(richTextChoiceFeatures[pick.key]!))
-  const [held] = useState(() => valueOf(value))
-  const [problem] = useState(() => unreadable(held, drawn))
+  const [loaded] = useState(() => valueOf(value))
+  const [problem] = useState(() => unreadable(loaded, drawn))
+  // Mapped only once `unreadable` has bounded the value's depth.
+  const [held] = useState(() => (problem === undefined && policy.features.includes('direction') ? { ...loaded, root: chosen(loaded.root) } : loaded))
   // Shown, never cleaned: `PolicyPlugin` would rewrite what the server no longer takes for this field, and the next save would keep the loss.
   const [beyond] = useState(() => problem === undefined && ((richTextGuard(held) ?? richTextFeatureGuard({ node: held.root, policy })) !== undefined || losesDirection(held.root)))
   // Built only over a value these nodes read, so a value nested past the bound never reaches `JSON.stringify` or Lexical.
