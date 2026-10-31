@@ -3,7 +3,8 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { checkRichTextSupport, type NodeRegistration, type RichTextProfile } from 'mithaq/rich-text/registry'
+import { checkRichTextSupport, runsCodecTypes, type NodeRegistration, type RichTextProfile } from 'mithaq/rich-text/registry'
+import { runsContract } from '@drhomet/mithaq-rich-text'
 
 const registration: NodeRegistration = { type: 'link', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } }
 const profile: RichTextProfile = { name: 'cluster-like', nodes: ['link'], requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' } } }
@@ -47,6 +48,13 @@ test('native editing requires real references in the installed contract and a co
   for (const codecs of [undefined, [], ['text']]) {
     assert.deepEqual(checkRichTextSupport({ registry: [resolving], profile: nativeProfile, contract: installed, codecs }).map(({ severity, code, place }) => ({ severity, code, place })), [{ severity: 'error', code: 'native-codec-missing', place: 'native-ios' }])
   }
+})
+
+test('the runs codec list lets a heading claim native editing against the package contract, and still refuses a link', () => {
+  const claim = (type: string): NodeRegistration => ({ type, json: { writes: 1, reads: [1] }, native: ['paragraphs.h2', 'formats.bold'], support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'edit', 'native-ios': 'edit' } })
+  const check = (type: string) => checkRichTextSupport({ registry: [claim(type)], profile: { name: 'phone', nodes: [type], requirements: {} }, contract: runsContract, codecs: runsCodecTypes }).map(({ code, place }) => `${code} ${place}`)
+  assert.deepEqual(check('heading'), [])
+  assert.deepEqual(check('link'), ['native-codec-missing native-android', 'native-codec-missing native-ios'])
 })
 
 test('an unresolved native reference is one error per node, whatever the node claims', () => {

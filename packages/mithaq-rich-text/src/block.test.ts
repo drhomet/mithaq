@@ -4,6 +4,7 @@ import { block, inline, plain, withInline, type Json } from './__fixtures__/fixt
 import { LockedTable, loadBlock, saveBlock } from './block.ts'
 import { createRunsEditor, nodesToPlainText, runsToNodes } from './codec.ts'
 import { applyEdit } from './edit.ts'
+import { defaultNodeRegistry, runsCodecTypes } from './registry.ts'
 import { plainText } from './runs.ts'
 
 const open = (children: Json[]) => {
@@ -170,4 +171,21 @@ test('loadBlock hands native only runs that pass validateRuns, whatever its edit
   editor.parseEditorState = ((json: unknown) => parse(JSON.stringify(json).replace(/\{"type":"locked-unit"[^}]*\}/, '{"type":"text","version":1,"detail":0,"format":0,"mode":"normal","style":"","text":"\\uFFFC"}'))) as typeof editor.parseEditorState
   const children = [withInline({ before: 'see ', units: [inline.link], after: ' now' })]
   assert.throws(() => loadBlock({ editor, children, table: new LockedTable() }), /Invalid runs: a placeholder that is no locked unit/)
+})
+
+test('the codec carries exactly the registry’s runsCodecTypes, and every other registered type opens locked and saves unchanged', () => {
+  const rows = ['p', 'h2', 'h3', 'bullet', 'number'] as const
+  const children = rows.flatMap((kind) => plain('Problem one plan text', { kind }))
+  const { editor, table, runs } = open(children)
+  assert.deepEqual(runs.locked, [])
+  const types = new Set(['root'])
+  const walk = (node: Json) => { types.add(node.type); (node.children as Json[] | undefined)?.forEach(walk) }
+  saveBlock(editor, table).forEach(walk)
+  assert.deepEqual([...types].sort(), [...runsCodecTypes].sort())
+  for (const { type } of defaultNodeRegistry.filter(({ type }) => !runsCodecTypes.includes(type))) {
+    const node = { type, version: 1, children: [] } as Json
+    const opened = open([node])
+    assert.deepEqual(opened.runs.locked.map((u) => u.placement), ['paragraph'], type)
+    assert.deepEqual(saveBlock(opened.editor, opened.table), [node], type)
+  }
 })
