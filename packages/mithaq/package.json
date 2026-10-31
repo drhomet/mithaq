@@ -19,16 +19,16 @@
     "./drizzle": "./src/drizzle/proxy/index.ts",
     "./drizzle/pg-core": "./src/drizzle/proxy/pg-core.ts",
     "./drizzle/node-postgres": "./src/drizzle/proxy/node-postgres.ts",
-    "./rich-text/mention": "./src/rich-text/mention-node.ts",
-    "./rich-text/client": "./src/rich-text/client.ts",
+    "./rich-text/mention": "./src/rich-text/compat/mention.ts",
+    "./rich-text/client": "./src/rich-text/compat/client.ts",
     "./device": "./src/device.ts",
     "./generate-sqlite-migrations": "./src/drizzle/sqlite/generate.ts",
     "./jobs/contract": "./src/jobs/contract.ts",
-    "./rich-text/registry": "./src/rich-text/registry.ts"
+    "./rich-text/registry": "./src/rich-text/compat/registry.ts"
   },
   "bin": {
     "mithaq": "./src/asas/cli/mithaq.ts",
-    "mithaq-check-rich-text": "./src/rich-text/check.ts"
+    "mithaq-check-rich-text": "./src/rich-text/compat/check.ts"
   },
   "publishConfig": {
     "name": "@drhomet/mithaq",
@@ -67,16 +67,16 @@
       "./drizzle": "./dist/drizzle/proxy/index.js",
       "./drizzle/pg-core": "./dist/drizzle/proxy/pg-core.js",
       "./drizzle/node-postgres": "./dist/drizzle/proxy/node-postgres.js",
-      "./rich-text/mention": "./dist/rich-text/mention-node.js",
-      "./rich-text/client": "./dist/rich-text/client.js",
+      "./rich-text/mention": "./dist/rich-text/compat/mention.js",
+      "./rich-text/client": "./dist/rich-text/compat/client.js",
       "./device": "./dist/device.js",
       "./generate-sqlite-migrations": "./dist/drizzle/sqlite/generate.js",
       "./jobs/contract": "./dist/jobs/contract.js",
-      "./rich-text/registry": "./dist/rich-text/registry.js"
+      "./rich-text/registry": "./dist/rich-text/compat/registry.js"
     },
     "bin": {
       "mithaq": "dist/asas/cli/mithaq.js",
-      "mithaq-check-rich-text": "dist/rich-text/check.js"
+      "mithaq-check-rich-text": "dist/rich-text/compat/check.js"
     }
   },
   "dependencies": {

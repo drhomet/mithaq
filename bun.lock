@@ -156,7 +156,7 @@
       "version": "0.0.0",
       "bin": {
         "mithaq": "./src/asas/cli/mithaq.ts",
-        "mithaq-check-rich-text": "./src/rich-text/check.ts",
+        "mithaq-check-rich-text": "./src/rich-text/compat/check.ts",
       },
       "dependencies": {
         "@babel/helper-validator-identifier": "^8.0.4",

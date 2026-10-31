@@ -8,7 +8,7 @@ import { checkRichTextSupport, type NodeRegistration, type RichTextProfile } fro
 const registration: NodeRegistration = { type: 'link', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } }
 const profile: RichTextProfile = { name: 'cluster-like', nodes: ['link'], requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' } } }
 
-const cli = (args: string[]) => spawnSync(process.execPath, ['packages/mithaq/src/rich-text/check.ts', ...args], { encoding: 'utf8' })
+const cli = (args: string[]) => spawnSync(process.execPath, ['packages/mithaq/src/rich-text/compat/check.ts', ...args], { encoding: 'utf8' })
 
 const withModules = (run: (paths: { profile: string; registry: string; folder: string }) => void) => {
   const folder = mkdtempSync(join(process.cwd(), '.rich-text-check-'))
@@ -60,7 +60,7 @@ test('an unresolved native reference is one error per node, whatever the node cl
 
 test('the initial inventory names exactly the selected classes and proves every written and readable JSON version', async () => {
   const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
-  const { defaultNodes, UploadNode, typesOf, versionsOf, richTextReader } = await import('./rich-text.ts')
+  const { defaultNodes, UploadNode, typesOf, versionsOf, richTextReader } = await import('@drhomet/mithaq-rich-text/rich-text')
   const { AutoLinkNode } = await import('@lexical/link')
   const { richTextFeatureNodes, richTextFeatures } = await import('./index.ts')
   const { createEditor } = await import('lexical')
@@ -110,7 +110,7 @@ test('the initial inventory names exactly the selected classes and proves every 
       const value = { root: registration.type === 'root' ? fixture : { ...fixtures.root, children: [block] } }
       assert.ok(!('refused' in read(value)), `${registration.type} reads v${version}`)
       const exported = editor.parseEditorState(value as import('lexical').SerializedEditorState).toJSON()
-      const find = (node: import('./value.ts').RichTextNode): import('./value.ts').RichTextNode | undefined => node.type === registration.type ? node : node.children?.map(find).find(Boolean)
+      const find = (node: import('@drhomet/mithaq-rich-text/value').RichTextNode): import('@drhomet/mithaq-rich-text/value').RichTextNode | undefined => node.type === registration.type ? node : node.children?.map(find).find(Boolean)
       assert.equal(find(exported.root)?.version, registration.json.writes, `${registration.type} writes v${registration.json.writes}`)
     }
   }
@@ -134,7 +134,7 @@ test('profile typos and field policies warn for each required place with stable 
 
 test('field policies are checked only where the profile asks a place to edit', async () => {
   const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
-  const { richTextFeatures } = await import('./policy.ts')
+  const { richTextFeatures } = await import('@drhomet/mithaq-rich-text/policy')
   const nodes = defaultNodeRegistry.map((node) => node.type)
   const policies = [{ features: richTextFeatures, fonts: ['sans'] as const, comments: { threads: 'threads' } }]
   const viewing: RichTextProfile = { name: 'cluster-like', nodes, requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' } } }
@@ -153,7 +153,7 @@ test('tools without a node of their own are checked on the node they act on', as
   // Lexical's list, table and code nodes refuse indent, and a list item's indent is list nesting.
   const expected = [...blocks.flatMap((type) => [`alignment:${type}`, `direction:${type}`]), ...['paragraph', 'heading', 'quote'].map((type) => `indent:${type}`), 'counter:text', 'findReplace:text', 'markdown:text', 'styling:text']
   assert.deepEqual(gaps.map((item) => `${item.feature}:${item.node}`).sort(), expected.sort())
-  const { richTextFeatures } = await import('./policy.ts')
+  const { richTextFeatures } = await import('@drhomet/mithaq-rich-text/policy')
   const every = checkRichTextSupport({ registry: defaultNodeRegistry, profile, policies: [{ features: richTextFeatures, fonts: ['sans'], comments: { threads: 'threads' } }] })
   assert.deepEqual(new Set(every.map((item) => item.feature).filter(Boolean)), new Set(richTextFeatures), 'every feature acts on some node')
 })
@@ -229,7 +229,7 @@ test('the registry bundles and runs without Lexical, React, DOM or runtime impor
   const { runInNewContext } = await import('node:vm')
   const result = await build({ entryPoints: ['packages/mithaq-rich-text/src/registry.ts'], bundle: true, platform: 'neutral', format: 'iife', globalName: 'registry', write: false, metafile: true })
   assert.deepEqual(Object.keys(result.metafile!.inputs).sort(), ['packages/mithaq-rich-text/src/feature-data.ts', 'packages/mithaq-rich-text/src/registry.ts'])
-  const context: { registry?: typeof import('./registry.ts') } = {}
+  const context: { registry?: typeof import('@drhomet/mithaq-rich-text/registry') } = {}
   runInNewContext(result.outputFiles[0]!.text, context)
   assert.equal(context.registry!.defaultNodeRegistry.length, 21)
   assert.equal(context.registry!.checkRichTextSupport({ registry: [registration], profile })[0]?.code, 'support-gap')
@@ -237,13 +237,13 @@ test('the registry bundles and runs without Lexical, React, DOM or runtime impor
 
 test('the CLI runs under Bun as well as Node 24 and both package manifests publish its separate bin', () => {
   const manifest = JSON.parse(readFileSync('packages/mithaq/package.json', 'utf8'))
-  assert.equal(manifest.bin['mithaq-check-rich-text'], './src/rich-text/check.ts')
-  assert.equal(manifest.publishConfig.bin['mithaq-check-rich-text'], 'dist/rich-text/check.js')
+  assert.equal(manifest.bin['mithaq-check-rich-text'], './src/rich-text/compat/check.ts')
+  assert.equal(manifest.publishConfig.bin['mithaq-check-rich-text'], 'dist/rich-text/compat/check.js')
   withModules((paths) => {
-    const result = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/check.ts', '--profile', paths.profile, '--json'], { encoding: 'utf8' })
+    const result = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/compat/check.ts', '--profile', paths.profile, '--json'], { encoding: 'utf8' })
     assert.equal(result.status, 0, result.stderr)
     assert.equal(JSON.parse(result.stdout).code, 'support-gap')
-    const strict = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/check.ts', '--profile', paths.profile, '--strict'], { encoding: 'utf8' })
+    const strict = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/compat/check.ts', '--profile', paths.profile, '--strict'], { encoding: 'utf8' })
     assert.equal(strict.status, 1)
   })
 })
