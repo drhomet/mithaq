@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.9
 
 - Addition: `@drhomet/mithaq-rich-text` ships the existing shared node classes, JSON
   versions and readers, value guards, feature policy, registry and check CLI
