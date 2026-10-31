@@ -1,0 +1,35 @@
+{
+  "formats": {"bold": 1, "italic": 2, "strikethrough": 4, "underline": 8, "highlight": 128},
+  "paragraphs": ["p", "bullet", "number", "h2", "h3"],
+  "directions": ["auto", "ltr", "rtl"],
+  "blockKinds": ["section", "problem"],
+  "runsVersion": 2,
+  "placements": ["inline", "paragraph"],
+  "methods": {
+    "setContent": {"params": {"runs": "runs", "runsVersion": "int?"}, "returns": "accepted"},
+    "toggleFormat": {"params": {"format": "int"}},
+    "setParagraphKind": {"params": {"kind": "string"}},
+    "insertText": {"params": {"text": "string"}},
+    "replaceRange": {"params": {"start": "int", "end": "int", "text": "string?", "runs": "runs?"}},
+    "setSelection": {"params": {"start": "int", "end": "int"}},
+    "focus": {},
+    "blur": {},
+    "getContent": {"returns": "change"},
+    "undo": {},
+    "flush": {}
+  },
+  "events": ["change", "selection", "focus", "blur", "linktap", "formatstate"],
+  "errors": ["native-owns-content", "invalid-input", "composition-active", "locked-content"],
+  "attributes": {
+    "block-id": {"type": "string"},
+    "block-kind": {"type": "string"},
+    "placeholder": {"type": "string"},
+    "editable": {"type": "boolean", "default": true},
+    "autocorrect": {"type": "boolean", "default": false},
+    "spellcheck": {"type": "boolean", "default": false},
+    "no-personalized-learning": {"type": "boolean", "default": true}
+  },
+  "changeDebounceMs": 300,
+  "clipboardExpirySeconds": 120,
+  "undoDepth": 40
+}
