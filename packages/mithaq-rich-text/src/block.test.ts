@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { block, inline, plain, withInline, type Json } from './__fixtures__/fixtures.ts'
+import { block, inline, jsonOf, plain, withInline, type Json } from './__fixtures__/fixtures.ts'
 import { LockedTable, loadBlock, saveBlock } from './block.ts'
 import { createRunsEditor, nodesToPlainText, runsToNodes } from './codec.ts'
 import { applyEdit } from './edit.ts'
@@ -89,18 +89,31 @@ describe('what the phone cannot edit is locked whole and comes back untouched', 
   })
 })
 
-// Finding: a paragraph's textFormat and textStyle are Lexical's memory of the caret's typing
-// format, not content. Runs cannot carry them, so a Block that opens editable saves with
-// them rebuilt from its text. Locking every paragraph that has one would lock most of a
-// real note, so the codec drops them; the loss is invisible and is pinned here.
-test('a paragraph’s caret typing state is rebuilt on save, not preserved', () => {
+// A host's textFormat and textStyle are Lexical's memory of the caret's typing format, not content,
+// and Lexical 0.52 writes them only on empty elements. Runs cannot carry them, so a host the phone
+// did not touch gets its stored keys back; a host it edited saves them as Lexical rebuilds them.
+test('opening and saving with no edit changes nothing, typing state on hosts with text included', () => {
   const [paragraph] = plain('Problem one plan text') as [Json]
-  const children = [{ ...paragraph, textFormat: 1, textStyle: 'color: red' }]
+  const [heading] = plain('Plan', { kind: 'h2' }) as [Json]
+  const [list] = jsonOf({ text: 'one\ntwo', marks: [], paragraphs: [{ start: 0, kind: 'bullet', dir: 'auto' }, { start: 4, kind: 'bullet', dir: 'auto' }], locked: [] }) as [Json]
+  const items = list.children as Json[]
+  const children = [
+    { ...paragraph, textFormat: 1, textStyle: 'color: red' },
+    { ...heading, textFormat: 2, textStyle: 'color: blue' },
+    { ...list, children: [{ ...items[0]!, textFormat: 1, textStyle: 'color: red' }, { ...items[1]!, textFormat: 8 }] },
+  ]
   const { editor, table, runs } = open(children)
   assert.deepEqual(runs.locked, [])
-  assert.deepEqual(saveBlock(editor, table), [{ ...paragraph, textFormat: 0, textStyle: '' }])
+  assert.deepEqual(saveBlock(editor, table), children)
+  runsToNodes(editor, runs)
+  assert.deepEqual(saveBlock(editor, table), children, 'rebuilding unchanged runs touches no host')
+  const edited = applyEdit(runs, { type: 'replace', start: 0, end: 0, text: 'New ' })
+  assert.ok(edited.ok)
+  runsToNodes(editor, edited.runs)
+  const [first, ...rest] = saveBlock(editor, table)
+  assert.deepEqual(first, { ...paragraph, textFormat: 0, textStyle: '', children: [{ ...(paragraph.children as Json[])[0]!, text: 'New Problem one plan text' }] })
+  assert.deepEqual(rest, children.slice(1), 'hosts the edit did not touch keep their typing state')
 })
-
 
 for (const field of ['textStyle', 'textFormat']) test(`unknown ${field} on a TextNode locks its paragraph and survives save`, () => {
   const [paragraph] = plain('Problem one plan text') as [Json]
@@ -160,8 +173,10 @@ for (const kind of ['h2', 'bullet'] as const) test(`a ${kind}’s caret typing s
   const { editor, table, runs } = open([typed])
   assert.deepEqual(runs.locked, [])
   assert.deepEqual(saveBlock(editor, table), [typed], 'opening alone changes nothing')
-  runsToNodes(editor, runs)
-  assert.deepEqual(saveBlock(editor, table), [node])
+  const edited = applyEdit(runs, { type: 'replace', start: 0, end: 0, text: 'x' })
+  assert.ok(edited.ok)
+  runsToNodes(editor, edited.runs)
+  assert.deepEqual(saveBlock(editor, table), plain('x', { kind }))
 })
 
 test('loadBlock hands native only runs that pass validateRuns, whatever its editor parsed', () => {
