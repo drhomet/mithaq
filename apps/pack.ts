@@ -65,8 +65,12 @@ const adminFiles = execFileSync('git', ['ls-files', '-z', 'registry', 'registry.
   .split('\0')
   .filter((file) => file && (!/^registry\/(ui|lib|hooks)\//.test(file) || file === 'registry/ui/directional-icon.tsx'))
 for (const file of adminFiles) cpSync(join(admin, file), join(stagedAdmin, file))
-const { items } = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; files: { path: string }[] }[] }
+const registry = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; dependencies?: string[]; files: { path: string }[] }[] }
+const { items } = registry
 for (const { name, files } of items) for (const { path } of files) assert.ok(existsSync(join(stagedAdmin, path)), `${name} names ${path}, which ships`)
+// Ejected pieces name the same exact dependency as the admin that supplied their source.
+for (const item of items) if (item.dependencies) item.dependencies = item.dependencies.map((dependency) => dependency.startsWith('@drhomet/mithaq-rich-text@') ? `@drhomet/mithaq-rich-text@${publishConfig.version}` : dependency)
+writeFileSync(join(stagedAdmin, 'registry.json'), `${JSON.stringify(registry, null, 2)}\n`)
 // One version for the four packages, so a project that pins them together cannot pair two that drifted apart.
 // ponytail: the `mithaq` peer stays "*". A `file:` tarball, as test:release installs mithaq, satisfies only `*` in Bun's
 // isolated linker; whether an `npm:` alias satisfies an exact pin is untested. Pin the release version once a consumer

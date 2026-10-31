@@ -63,3 +63,16 @@ test('four staged packages share a release and core and admin pin the one shared
   assert.ok(existsSync(join(root, '.pack/mithaq-rich-text/LICENSE')))
   assert.ok(existsSync(join(root, '.pack/mithaq-rich-text/README.md')))
 })
+
+test('ejected pieces name the shared package at the same release version', () => {
+  const admin = join(root, '.pack/mithaq-admin')
+  const { version } = JSON.parse(readFileSync(join(admin, 'package.json'), 'utf8'))
+  const { items } = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; dependencies?: string[]; files: { path: string }[] }[] }
+  let shared = 0
+  for (const item of items) {
+    const importsShared = item.files.some(({ path }) => readFileSync(join(admin, path), 'utf8').includes("from '@drhomet/mithaq-rich-text/"))
+    if (importsShared) shared++
+    assert.deepEqual((item.dependencies ?? []).filter((one) => one.startsWith('@drhomet/mithaq-rich-text')), importsShared ? [`@drhomet/mithaq-rich-text@${version}`] : [], item.name)
+  }
+  assert.ok(shared > 0)
+})

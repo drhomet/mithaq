@@ -40,7 +40,8 @@
     "mithaq-admin": "*",
     "pg-connection-string": "2.14.0",
     "zod": "^4.6.5",
-    "@asas/rich-text-comments": "*"
+    "@asas/rich-text-comments": "*",
+    "@drhomet/mithaq-rich-text": "0.0.0"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.104.0",

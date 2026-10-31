@@ -28,11 +28,12 @@ export const managerOf = (agent = '') => ['npm', 'pnpm', 'yarn', 'bun'].find((na
  * `workspace:`, `link:` or `file:` spec is an error rather than a pin,
  * because nothing published stands behind it.
  */
-export function updatePackageJSONDependencies({ mithaq, mithaqAdmin, packageJson }) {
+export function updatePackageJSONDependencies({ mithaq, mithaqAdmin, richTextVersion, packageJson }) {
   for (const dependencies of [packageJson.dependencies, packageJson.devDependencies]) {
     if (!dependencies) continue
     if ('mithaq' in dependencies) dependencies.mithaq = mithaq
     if ('mithaq-admin' in dependencies) dependencies['mithaq-admin'] = mithaqAdmin
+    if ('@drhomet/mithaq-rich-text' in dependencies) dependencies['@drhomet/mithaq-rich-text'] = richTextVersion
     for (const [name, spec] of Object.entries(dependencies)) {
       if (spec !== mithaq && spec !== mithaqAdmin && /^(workspace|link|file):/.test(spec)) {
         throw new Error(`The template's dependency ${name} is ${spec}, which only resolves inside the mithaq repository.`)
@@ -82,7 +83,7 @@ export const addOns = {
     needs: [],
     files: ['packages/mithaq/src/mithaq/rich-text-features.ts', 'packages/mithaq/src/mithaq/rich-text-nodes.ts', 'packages/mithaq/src/ui/rich-text-nodes.tsx'],
     without: [],
-    packages: ['lexical', '@lexical/'],
+    packages: ['lexical', '@lexical/', '@drhomet/mithaq-rich-text'],
     copy: ['kinds.richText', 'kinds.richText.invalid'],
     tables: false,
   },
@@ -347,7 +348,7 @@ const writeOrganizations = (file, settings) =>
  * backoffice console. `addOns` names the add-ons the project holds beside auth and the tags example, with
  * every one they need; none is the minimal project.
  */
-export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, layout = 'monorepo', addOns: asked = [], richText: richTextAsked, passwordDelivery = 'admin', organizations, showOrganization, signUp, organizationName }) {
+export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mithaq@${version}`, mithaqAdmin = `npm:@drhomet/mithaq-admin@${version}`, mithaqRichText, layout = 'monorepo', addOns: asked = [], richText: richTextAsked, passwordDelivery = 'admin', organizations, showOrganization, signUp, organizationName }) {
   // A package name npm accepts, so it is also one folder, inside `cwd`, and a scope.
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name.length > 214) {
     throw new Error(`"${name}" is not a valid project name: use lowercase letters, digits, "-", "." and "_", starting with a letter or digit.`)
@@ -379,7 +380,7 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   }
   for (const file of files.filter((file) => basename(file) === 'package.json')) {
     const packageJson = readJson(join(project, file))
-    updatePackageJSONDependencies({ mithaq, mithaqAdmin, packageJson })
+    updatePackageJSONDependencies({ mithaq, mithaqAdmin, richTextVersion: version, packageJson })
     writeJson(join(project, file), file === 'package.json' ? { name, ...packageJson } : packageJson)
   }
   keepOnly({ project, chosen })
@@ -406,6 +407,11 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
       // Each server entry reads Vite's `import.meta.glob`, and each components map mithaq-admin's `.tsx`, which the app's own config checks.
       exclude: ['apps/*/src/server.ts', 'apps/*/src/components.ts'],
     })
+  }
+  // Release checks install the unpublished exact dependency from its tarball, after either layout has its final root.
+  if (mithaqRichText !== undefined) {
+    const manifest = readJson(join(project, 'package.json'))
+    writeJson(join(project, 'package.json'), { ...manifest, overrides: { ...manifest.overrides, '@drhomet/mithaq-rich-text': mithaqRichText } })
   }
   // npm, yarn and Bun read `workspaces`; pnpm 10.6 and later read this file.
   // Told nothing, pnpm installs a `"*"` workspace from the registry, where
@@ -466,7 +472,7 @@ const binAbove = (folder) => {
 const main = async () => {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, 'rich-text': { type: 'string' }, 'password-delivery': { type: 'string' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, 'organization-name': { type: 'string' }, 'organization-name-ar': { type: 'string' }, help: { type: 'boolean' } },
+    options: { mithaq: { type: 'string' }, 'mithaq-admin': { type: 'string' }, 'mithaq-rich-text': { type: 'string' }, layout: { type: 'string' }, with: { type: 'string' }, full: { type: 'boolean' }, 'rich-text': { type: 'string' }, 'password-delivery': { type: 'string' }, organizations: { type: 'string' }, 'show-organization': { type: 'string' }, 'sign-up': { type: 'string' }, 'organization-name': { type: 'string' }, 'organization-name-ar': { type: 'string' }, help: { type: 'boolean' } },
   })
   if (values.help) return console.log(help)
   if (values.full && values.with !== undefined) throw new Error('Pass --full or --with, not both: --full is every add-on.')
@@ -502,7 +508,7 @@ const main = async () => {
   if (added.length) console.log(`Added ${added.join(', ')}, which ${asked.filter((one) => addOns[one].needs.length).join(', ')} need${added.length === 1 ? 's' : ''}.`)
   const { version } = readJson(new URL('package.json', import.meta.url))
   const organizationName = named ? { en: named, ...(namedInArabic && { ar: namedInArabic }) } : undefined
-  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], layout, addOns: chosen, richText: values['rich-text']?.split(',').filter(Boolean), passwordDelivery, organizations, showOrganization, signUp, organizationName })
+  const project = create({ name, cwd: process.cwd(), template: fileURLToPath(new URL('template/', import.meta.url)), version, mithaq: values.mithaq, mithaqAdmin: values['mithaq-admin'], mithaqRichText: values['mithaq-rich-text'], layout, addOns: chosen, richText: values['rich-text']?.split(',').filter(Boolean), passwordDelivery, organizations, showOrganization, signUp, organizationName })
   const settings = organizationSettings({ organizations, showOrganization, signUp, chosen, organizationName, passwordDelivery })
   console.log(`Created ${project}${chosen.length ? `, with ${chosen.join(', ')}` : ', minimal'}.`)
   const manager = managerOf(process.env.npm_config_user_agent)

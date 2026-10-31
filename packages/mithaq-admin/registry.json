@@ -1105,7 +1105,8 @@
       "description": "The node list every rich text editor, viewer and the server read with, which a project spreads into its own list beside its own nodes.",
       "dependencies": [
         "lexical@0.52.0",
-        "@lexical/extension@0.52.0"
+        "@lexical/extension@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1122,7 +1123,8 @@
       "title": "Mithaq rich text value",
       "description": "What a richText field holds, the empty value an editor starts from, the theme its blocks are drawn with, and what stops a list of nodes reading a stored value.",
       "dependencies": [
-        "lexical@0.52.0"
+        "lexical@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1198,7 +1200,8 @@
         "@lexical/list@0.52.0",
         "@lexical/react@0.52.0",
         "@lexical/rich-text@0.52.0",
-        "@lexical/utils@0.52.0"
+        "@lexical/utils@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1224,7 +1227,8 @@
         "lexical@0.52.0",
         "@lexical/link@0.52.0",
         "@lexical/react@0.52.0",
-        "@lexical/utils@0.52.0"
+        "@lexical/utils@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1248,7 +1252,8 @@
       "dependencies": [
         "lexical@0.52.0",
         "@lexical/link@0.52.0",
-        "@lexical/utils@0.52.0"
+        "@lexical/utils@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1308,7 +1313,8 @@
       "description": "The rich text read view over the screen's nodes, never editable, and a stored value no node list here can mount drawn as its words with the reason in the viewer's language.",
       "dependencies": [
         "lexical@0.52.0",
-        "@lexical/react@0.52.0"
+        "@lexical/react@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1328,7 +1334,8 @@
       "description": "The Lexical editor with history, block formats, text formats, links, alignment, a divider and the / menu, written in the page's direction over the screen's nodes and picks.",
       "dependencies": [
         "lexical@0.52.0",
-        "@lexical/react@0.52.0"
+        "@lexical/react@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1448,7 +1455,8 @@
       "dependencies": [
         "lexical@0.52.0",
         "@lexical/react@0.52.0",
-        "@lexical/utils@0.52.0"
+        "@lexical/utils@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1743,7 +1751,9 @@
       "name": "mithaq-rich-text-features",
       "type": "registry:component",
       "registryDependencies": [],
-      "dependencies": [],
+      "dependencies": [
+        "@drhomet/mithaq-rich-text@0.0.0"
+      ],
       "files": [
         {
           "path": "registry/rich-text-features.tsx",
@@ -1800,7 +1810,9 @@
         "button",
         "dropdown-menu"
       ],
-      "dependencies": [],
+      "dependencies": [
+        "@drhomet/mithaq-rich-text@0.0.0"
+      ],
       "files": [
         {
           "path": "registry/rich-text-styling.tsx",
@@ -1818,7 +1830,8 @@
       ],
       "dependencies": [
         "@lexical/code-core@0.52.0",
-        "@lexical/code-prism@0.52.0"
+        "@lexical/code-prism@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {
@@ -1865,7 +1878,9 @@
       "name": "mithaq-rich-text-policy",
       "type": "registry:component",
       "registryDependencies": [],
-      "dependencies": [],
+      "dependencies": [
+        "@drhomet/mithaq-rich-text@0.0.0"
+      ],
       "files": [
         {
           "path": "registry/rich-text-policy.tsx",
@@ -1883,7 +1898,8 @@
       ],
       "dependencies": [
         "@lexical/hashtag@0.52.0",
-        "@lexical/markdown@0.52.0"
+        "@lexical/markdown@0.52.0",
+        "@drhomet/mithaq-rich-text@0.0.0"
       ],
       "files": [
         {

@@ -393,3 +393,23 @@ test('the comments tool installs its private table and audit sink, while other p
   assert.doesNotMatch(read('rt-no-comments/apps/asas-tanstack/src/copy.ts'), /'richText\.mentions'|'richText\.comments'/)
   assert.match(read('rt-no-comments/apps/asas-tanstack/src/copy.ts'), /'richText\.findReplace'/)
 })
+
+test('a release consumer can override the shared rich text tarball in either project layout', () => {
+  for (const layout of ['monorepo', 'single']) {
+    const name = `rich-text-tarball-${layout}`
+    const mithaqRichText = 'file:/release/mithaq-rich-text.tgz'
+    create({ name, cwd: scratch, template, version: '1.2.3', layout, mithaqRichText })
+    assert.deepEqual(json(name, 'package.json').overrides, { '@drhomet/mithaq-rich-text': mithaqRichText })
+  }
+})
+
+test('rich text hosts can resolve the shared package directly when an editor piece is ejected', () => {
+  create({ name: 'rich-text-hosts', cwd: scratch, template, version: '1.2.3', addOns: every })
+  for (const workspace of ['packages/mithaq', 'packages/asas', 'apps/asas-tanstack', 'apps/asas-backoffice']) {
+    assert.equal(json('rich-text-hosts', workspace, 'package.json').dependencies['@drhomet/mithaq-rich-text'], '1.2.3', workspace)
+  }
+  create({ name: 'without-rich-text-hosts', cwd: scratch, template, version: '1.2.3', addOns: [] })
+  for (const workspace of ['packages/mithaq', 'packages/asas', 'apps/asas-tanstack']) {
+    assert.equal(json('without-rich-text-hosts', workspace, 'package.json').dependencies['@drhomet/mithaq-rich-text'], undefined, workspace)
+  }
+})

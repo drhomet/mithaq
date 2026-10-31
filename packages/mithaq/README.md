@@ -1249,7 +1249,10 @@ comments service and write version gate; mithaq-admin keeps the React editor.
 The existing `mithaq/rich-text`, `/client`, `/mention` and `/registry` paths
 re-export the same shared classes. Pin core, admin and rich text to the same
 release, with one copy of rich text and Lexical per app. Stored JSON and editor
-behaviour are unchanged.
+behaviour are unchanged. New rich-text hosts declare the shared package directly
+so ejected pieces can import it with Bun's isolated linker. When ejecting a
+rich-text piece in an existing app, install the exact shared-package version
+reported by `mithaq eject`, matching that app's core and admin versions.
 
 A project installs features in its `richText` rukn. The starter writes the
 selection in `src/mithaq/rich-text-features.ts`. Existing projects can add that
