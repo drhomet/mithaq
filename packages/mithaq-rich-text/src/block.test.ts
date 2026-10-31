@@ -34,6 +34,25 @@ describe('a Block of stored JSON opens as runs and saves back unchanged', () => 
     }
   })
 
+  test('an upload with legacy array fields stays locked while another paragraph is edited, and saves byte-identical', () => {
+    const legacy = JSON.parse(JSON.stringify({ ...editable.upload!, fields: [{ caption: 'x' }, null] })) as Json
+    const { editor, table, runs } = open([...plain('Above'), legacy])
+    assert.deepEqual(runs.locked.map((u) => u.placement), ['paragraph'])
+    const edited = applyEdit(runs, { type: 'replace', start: 5, end: 5, text: ' edited' })
+    assert.ok(edited.ok)
+    runsToNodes(editor, edited.runs)
+    const saved = saveBlock(editor, table)
+    assert.deepEqual(saved, [...plain('Above edited'), legacy])
+    assert.equal(JSON.stringify(saved[1]), JSON.stringify(legacy))
+  })
+
+  test('a node whose own data holds an id like a placeholder\'s keeps it', () => {
+    const upload = { ...editable.upload!, fields: { metadata: { id: '~0' } } } as Json
+    const { editor, table, runs } = open([withInline({ before: 'see ', units: [inline.link], after: ' now' }), upload])
+    assert.deepEqual(runs.uploads?.[0]?.fields, { metadata: { id: '~0' } })
+    assert.deepEqual(saveBlock(editor, table)[1], upload)
+  })
+
   test('supported nodes open with no locked unit and save deep-equal', () => {
     const children = [...plain('Problem one plan text'), ...plain('مرحبا', { dir: 'rtl' })]
     const { editor, table, runs } = open(children)

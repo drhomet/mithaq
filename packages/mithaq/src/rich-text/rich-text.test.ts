@@ -211,14 +211,15 @@ test('187j. plain text: empty is one empty paragraph, one newline a linebreak, a
 /** An upload node as Payload's lexical editor writes it, v3. */
 const uploadNode = (extra: object = {}) => ({ type: 'upload', version: 3, format: '', id: '65f1c0ffee0000000000abcd', relationTo: 'media', value: '1b4e28ba-2fa1-11d2-883f-0016d3cca427', fields: null, ...extra })
 
-test('186r. an upload node reads where its relationTo is a kayan of the build that holds files, and is refused for another kayan, a missing one, a value that is no id string or fields that are no object', () => {
+test('186r. an upload node reads where its relationTo is a kayan of the build that holds files, and is refused for another kayan, a missing one, or a value that is no id string, and keeps its fields as written', () => {
   const nodes = [...defaultNodes, richText.UploadNode]
   const reader = richTextReader(nodes, ['media'])
   assert.deepEqual(reader(state(uploadNode())), { text: '', holdsDecorator: true })
   assert.deepEqual(reader(state(uploadNode({ format: 'center', fields: { caption: 'x' } }))), { text: '', holdsDecorator: true })
-  assert.deepEqual(reader(state(uploadNode({ fields: undefined }))), { text: '', holdsDecorator: true })
-  // Fields are refused rather than nulled, as rich-input refuses them, so no write loses them.
-  for (const bad of [{ relationTo: 'courses' }, { relationTo: undefined }, { value: 7 }, { value: '' }, { value: undefined }, { value: { id: 'x' } }, { fields: [{ caption: 'x' }] }, { fields: 'caption' }]) {
+  // Fields are kept as they were written, legacy arrays and scalars included, so no write is refused or loses them.
+  for (const fields of [undefined, [{ caption: 'x' }], 'caption', 7]) assert.deepEqual(reader(state(uploadNode({ fields }))), { text: '', holdsDecorator: true })
+  for (const fields of [[{ caption: 'x' }], 'caption']) assert.deepEqual(children(converted(richText.convertPayloadToLexical({ data: state(uploadNode({ fields })), nodes })).value, 0).fields, fields)
+  for (const bad of [{ relationTo: 'courses' }, { relationTo: undefined }, { value: 7 }, { value: '' }, { value: undefined }, { value: { id: 'x' } }]) {
     const result = reader(state(uploadNode(bad)))
     assert.ok('refused' in result, `refused: ${JSON.stringify(bad)}`)
   }

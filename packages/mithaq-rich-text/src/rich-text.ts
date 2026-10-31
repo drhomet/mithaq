@@ -84,15 +84,9 @@ const valueState = createState('value', {
 })
 /**
  * The extra fields Payload's editor asks of an upload, such as a caption, kept as they were written and drawn by nothing here.
- * Payload writes an object or null; anything else is refused rather than turned into null, as rich-input refuses it, so no save loses it.
+ * Payload writes an object or null. Anything else is legacy data, kept as written so no save loses it; the phone keeps such an upload locked.
  */
-const fieldsState = createState('fields', {
-  parse: (value) => {
-    if (value === undefined || value === null) return null
-    if (typeof value !== 'object' || Array.isArray(value)) throw new Error("An upload's fields are an object or null.")
-    return value as Record<string, unknown>
-  },
-})
+const fieldsState = createState('fields', { parse: (value) => (value === undefined ? null : value as Record<string, unknown> | null) })
 
 /** An upload node as Payload's lexical editor writes it, v3. */
 export type SerializedUploadNode = SerializedLexicalNode & {
