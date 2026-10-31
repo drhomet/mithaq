@@ -1135,7 +1135,7 @@ covers the other breaking changes.
 `mithaq/rich-text/registry` exports `defaultNodeRegistry`, `NodeRegistration`,
 `Place`, `Support`, `RichTextProfile` and the pure `checkRichTextSupport` function.
 This subpath loads no Lexical, React, DOM, Node built-ins or native code, and
-needs no `TextEncoder`, `Object.hasOwn` or WHATWG `URL`. It is safe to bundle for PrimJS; the file-reading CLI is a separate bin.
+needs no `TextEncoder`, `Object.hasOwn`, WHATWG `URL` or `String.normalize`. It is safe to bundle for PrimJS; the file-reading CLI is a separate bin.
 
 A registration names its Lexical `type`, `json: { writes, reads }`, an explicit
 `support` entry for every place (`admin`, `lynx-viewer`, `native-android`,

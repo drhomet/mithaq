@@ -3,10 +3,10 @@
 ## Unreleased
 
 - Fix: `@drhomet/mithaq-rich-text` runs on Lynx. The value guards, policy and
-  registry no longer need `TextEncoder`, `Object.hasOwn` or a WHATWG `URL`, which
-  Lynx's engines lack, so `isRichText` no longer refuses every value on a phone,
+  registry no longer need `TextEncoder`, `Object.hasOwn`, a WHATWG `URL` or
+  `String.normalize`, which Lynx's engines lack, so `isRichText` no longer refuses every value on a phone,
   and `safeUrl` refuses `https://@` and `https://[]` there as it does on a server.
-  A percent-encoded or emoji-only host is now refused everywhere.
+  A percent-encoded, emoji-only or symbol-only host is now refused everywhere.
 - Addition: the support registry declares `view` for the Lynx viewer on all 21
   node types, drawn read-only by rich-input's `RichTextValueViewer`. Native
   editing support is unchanged.

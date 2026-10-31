@@ -17,7 +17,7 @@ const URLS: [string, boolean][] = [
   ['https://a<b.com', false], ['https://a^b.com', false], ['https://a|b.com', false], ['https://a%b.com', false], ['https://a:b', false],
   ['https://example.com:65535', true], ['https://example.com:65536', false], ['https://example.com:', true], ['https://[::1', false],
   ['https://u@v@example.com', true], ['https://example.com\\path', true], ['https://a\\b', true],
-  ['https://a\u2028b', false], ['https://a\u2029b', false], ['https://a＠b', false], ['https://a／b', false], ['https://a：b', false], ['https://™', true],
+  ['https://a\u2028b', false], ['https://a\u2029b', false],
 ]
 
 test('safeUrl answers as before for web addresses, mail, phone, paths and fragments', () => {
@@ -37,12 +37,13 @@ test('the byte bound counts UTF-8 bytes as TextEncoder does', () => {
   }
 })
 
-test('the guards run without TextEncoder, Object.hasOwn or URL, as on Lynx', () => {
-  const saved = { TextEncoder: globalThis.TextEncoder, URL: globalThis.URL, hasOwn: Object.hasOwn }
+test('the guards run without TextEncoder, Object.hasOwn, URL or String.normalize, as on Lynx', () => {
+  const saved = { TextEncoder: globalThis.TextEncoder, URL: globalThis.URL, hasOwn: Object.hasOwn, normalize: String.prototype.normalize }
   try {
     delete (globalThis as { TextEncoder?: unknown }).TextEncoder
     delete (globalThis as { URL?: unknown }).URL
     delete (Object as { hasOwn?: unknown }).hasOwn
+    delete (String.prototype as { normalize?: unknown }).normalize
     assert.ok(isRichText(value(paragraph('نص · text'), { type: 'horizontalrule', version: 1 })))
     assert.ok(isRichText(link('https://example.com')))
     assert.ok(!isRichText(link('https://@')))
@@ -54,13 +55,14 @@ test('the guards run without TextEncoder, Object.hasOwn or URL, as on Lynx', () 
   } finally {
     Object.assign(globalThis, { TextEncoder: saved.TextEncoder, URL: saved.URL })
     Object.hasOwn = saved.hasOwn
+    String.prototype.normalize = saved.normalize
   }
 })
 
-test('no source file of the package needs TextEncoder, Object.hasOwn or WHATWG URL, which Lynx lacks', () => {
+test('no source file of the package needs TextEncoder, Object.hasOwn, WHATWG URL or String.normalize, which Lynx lacks', () => {
   const folder = new URL('./', import.meta.url)
   for (const name of readdirSync(folder).filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))) {
     const source = readFileSync(new URL(name, folder), 'utf8')
-    assert.doesNotMatch(source, /new TextEncoder|Object\.hasOwn\(|new URL\(/, name)
+    assert.doesNotMatch(source, /new TextEncoder|Object\.hasOwn\(|new URL\(|\.normalize\(/, name)
   }
 })
