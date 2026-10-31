@@ -104,7 +104,8 @@ export const loadBlock = ({ editor, children, table }: { editor: LexicalEditor; 
     // Two touching lists of one kind would become one list on save, so the later one stays a unit.
     const listKind = node.type === 'list' ? node.listType : undefined
     if (survives(candidate) && !(listKind && listKind === previousList)) {
-      kept.push(JSON.parse(JSON.stringify(candidate), (key, value) => (key === 'id' && typeof value === 'string' && value.startsWith('~') ? table.add(inlineUnits[Number(value.slice(1))]!) : value)))
+      // Only a placeholder's own id is remapped, never an id inside a node's data.
+      kept.push(JSON.parse(JSON.stringify(candidate), function (this: Json, key, value) { return this.type === 'locked-unit' && key === 'id' ? table.add(inlineUnits[Number(value.slice(1))]!) : value }))
       previousList = listKind
     } else {
       kept.push(placeholder({ placement: 'paragraph', id: table.add(node), json: node }))
