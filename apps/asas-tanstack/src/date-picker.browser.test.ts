@@ -24,7 +24,9 @@ const dir = new URLSearchParams(location.search).get('dir')
 document.documentElement.dir = dir
 const props = (id) => ({ id, value: '2026-09-15', values: {}, setValue() {}, onChange() {}, field: { name: id, kind: 'date', rules: {} }, kayan: { slug: 'events', fields: [] }, readOnly: false, locale: dir === 'rtl' ? 'ar' : 'en', t: (key, fallback) => fallback })
 createRoot(document.getElementById('root')).render(h(DirectionProvider, { direction: dir }, h('div', { className: 'flex flex-col px-4 pb-4 lg:px-6 lg:pb-6' },
-  h(Card, null, h(CardContent, { className: 'flex flex-col gap-4' }, h(DatePicker, props('starts')), h('div', { id: 'inline' }, h(CalendarControl, props('day'))))))))
+  h(Card, null, h(CardContent, { className: 'flex flex-col gap-4' }, h(DatePicker, props('starts')), h('div', { id: 'inline' }, h(CalendarControl, props('day'))))),
+  // From sm, a record page's side card can be narrower than the calendar.
+  innerWidth >= 640 && h(Card, { className: 'mt-4 w-64' }, h(CardContent, null, h('div', { id: 'side' }, h(CalendarControl, props('side'))))))))
 `
 
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -56,12 +58,11 @@ after(async () => {
 
 const sizes = (selector: string) => `[...document.querySelectorAll('${selector} button[data-day]')].map((one) => { const { width, height } = one.getBoundingClientRect(); return [width, height] })`
 const overflow = 'document.documentElement.scrollWidth - document.documentElement.clientWidth'
-// The card clips what crosses it, so the inline calendar must sit inside the card.
-const spills = `(() => {
-  const box = document.querySelector('[data-slot=card]').getBoundingClientRect()
-  const calendar = document.querySelector('#inline [data-slot=calendar]').getBoundingClientRect()
+// The card clips what crosses it, so each inline calendar must sit inside its card.
+const spills = `[...document.querySelectorAll('[data-slot=card]')].some((card) => {
+  const box = card.getBoundingClientRect(), calendar = card.querySelector('[data-slot=calendar]').getBoundingClientRect()
   return calendar.left < box.left - 0.5 || calendar.right > box.right + 0.5
-})()`
+})`
 const outside = `(() => { const box = document.querySelector('[data-slot=popover-content]').getBoundingClientRect(); return box.left < 0 || box.right > innerWidth })()`
 
 // 360px is the narrow Android phone, 390px the common one.
@@ -74,7 +75,7 @@ for (const [width, phone] of [[360, true], [390, true], [1024, false]] as const)
       const fits = ([width, height]: number[]) => phone ? width! >= 44 && height! >= 44 : width === 32 && height === 32
       const inline = await page.evaluate(sizes('#inline')) as number[][]
       assert.ok(inline.length >= 28 && inline.every(fits), `inline ${JSON.stringify(inline[0])}`)
-      assert.equal(await page.evaluate(spills), false, 'the inline calendar crosses the card')
+      assert.equal(await page.evaluate(spills), false, 'an inline calendar crosses its card')
       assert.equal(await page.evaluate(overflow), 0, 'the page scrolls sideways with the inline calendar')
       const shot = async (name: string) => {
         for (const theme of process.env.DATE_PICKER_SCREENSHOTS ? ['light', 'dark'] : []) {

@@ -32,7 +32,9 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "group/calendar bg-background p-3 [--cell-radius:var(--radius-4xl)] [--cell-size:--spacing(11)] sm:[--cell-size:--spacing(8)] in-data-[slot=card-content]:p-0 sm:in-data-[slot=card-content]:p-3 in-data-[slot=card-content]:mx-[min(0px,calc((100%_-_7*var(--cell-size))/2))] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent",
+        // Inside a card the calendar reaches into the padding when the content box is narrower than its days.
+        // ponytail: below about 340px wide the days still cross a card (and the popover the screen); shrink the phone cell there if such phones matter.
+        "group/calendar bg-background p-3 [--cell-radius:var(--radius-4xl)] [--cell-size:--spacing(11)] sm:[--cell-size:--spacing(8)] in-data-[slot=card-content]:p-0 sm:in-data-[slot=card-content]:p-3 in-data-[slot=card-content]:mx-[min(0px,calc((100%_-_7*var(--cell-size))/2))] sm:in-data-[slot=card-content]:mx-[min(0px,calc((100%_-_7*var(--cell-size)_-_1.5rem)/2))] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className
