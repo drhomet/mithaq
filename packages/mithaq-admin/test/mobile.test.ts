@@ -74,7 +74,7 @@ const cellSize = (classes: string[]) => ({
 })
 
 for (const [app, phone] of [['asas-tanstack', true], ['asas-backoffice', false]] as const) {
-  for (const dir of ['ltr', 'rtl'] as const) test(`the ${app} date picker's day buttons ${phone ? 'start at the 44px phone target and return to 32px from sm' : 'stay 32px'} (${dir})`, async () => {
+  for (const dir of ['ltr', 'rtl'] as const) test(`the ${app} date picker's day buttons ${phone ? 'start at the 44px phone target and return to 32px from sm' : 'keep the 32px cell size'} (${dir})`, async () => {
     const { Calendar } = await import(`../../../apps/${app}/src/components/ui/calendar.tsx`)
     const { DirectionProvider } = await import('../registry/ui/direction.tsx')
     const close = await mounted(createElement(DirectionProvider, { direction: dir }, createElement(Calendar, { mode: 'single', defaultMonth: new Date(2026, 8, 1), dir })))
