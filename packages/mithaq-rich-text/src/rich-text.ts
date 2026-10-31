@@ -82,8 +82,17 @@ const valueState = createState('value', {
     return value
   },
 })
-/** The extra fields Payload's editor asks of an upload, such as a caption, kept as they were written and drawn by nothing here. */
-const fieldsState = createState('fields', { parse: (value) => (value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null) })
+/**
+ * The extra fields Payload's editor asks of an upload, such as a caption, kept as they were written and drawn by nothing here.
+ * Payload writes an object or null; anything else is refused rather than turned into null, as rich-input refuses it, so no save loses it.
+ */
+const fieldsState = createState('fields', {
+  parse: (value) => {
+    if (value === undefined || value === null) return null
+    if (typeof value !== 'object' || Array.isArray(value)) throw new Error("An upload's fields are an object or null.")
+    return value as Record<string, unknown>
+  },
+})
 
 /** An upload node as Payload's lexical editor writes it, v3. */
 export type SerializedUploadNode = SerializedLexicalNode & {
@@ -115,7 +124,7 @@ export class UploadNode extends DecoratorNode<unknown> {
   }
 
   /** Refused where either half of what the node points at is missing, which an absent key leaves at its default. */
-  updateFromJSON(json: LexicalUpdateJSON<SerializedLexicalNode>): this {
+  updateFromJSON(json: LexicalUpdateJSON<SerializedUploadNode>): this {
     // Payload's v1 held the file as `{ id }`, which its own importJSON unwraps; later versions hold the id itself.
     const { value, version } = json as { value?: unknown; version?: unknown }
     if (version === 1 && value && typeof value === 'object' && 'id' in value) json = { ...json, value: value.id } as typeof json

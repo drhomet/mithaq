@@ -2,11 +2,11 @@
 // characters and paragraph breaks, edited by splicing. The property tests hold
 // applyEdit to it.
 import type { Edit } from '../edit.ts'
-import type { Direction, LockedRange, ParagraphKind, Runs } from '../runs.ts'
+import type { Direction, LockedRange, ParagraphKind, Runs, UploadReference } from '../runs.ts'
 
 type Unit = Pick<LockedRange, 'id' | 'placement' | 'preview'>
-// A divider is its own cell, apart from any locked payload.
-type Cell = { type: 'char'; ch: string; fmt: number; unit?: Unit; divider?: true }
+// A divider or an upload is its own cell, apart from any locked payload; an upload carries its reference.
+type Cell = { type: 'char'; ch: string; fmt: number; unit?: Unit; divider?: true; upload?: UploadReference }
 // A break carries the kind and direction of the paragraph that follows it.
 type Break = { type: 'break'; kind: ParagraphKind; dir: Direction }
 export type Doc = { first: { kind: ParagraphKind; dir: Direction }; items: (Cell | Break)[] }
@@ -20,7 +20,9 @@ export const fromRuns = (runs: Runs): Doc => {
     else {
       const unit = runs.locked.find((u) => u.start === i)
       const divider = runs.paragraphs.some((p) => p.start === i && p.kind === 'divider')
-      items.push({ type: 'char', ch: runs.text[i]!, fmt: fmtAt(i), ...(unit && { unit: { id: unit.id, placement: unit.placement, preview: unit.preview } }), ...(divider && { divider: true as const }) })
+      const file = runs.uploads?.find((u) => u.start === i)
+      const upload = file && { relationTo: file.relationTo, value: file.value, fields: file.fields, id: file.id, format: file.format }
+      items.push({ type: 'char', ch: runs.text[i]!, fmt: fmtAt(i), ...(unit && { unit: { id: unit.id, placement: unit.placement, preview: unit.preview } }), ...(divider && { divider: true as const }), ...(upload && { upload }) })
     }
   }
   return { first: { kind: runs.paragraphs[0]!.kind, dir: runs.paragraphs[0]!.dir }, items }
@@ -29,6 +31,7 @@ export const fromRuns = (runs: Runs): Doc => {
 export const toRuns = ({ first, items }: Doc): Runs => {
   let text = ''
   const runs: Runs = { text: '', marks: [], paragraphs: [{ start: 0, ...first }], locked: [] }
+  const uploads: NonNullable<Runs['uploads']> = []
   items.forEach((item, i) => {
     if (item.type === 'break') {
       text += '\n'
@@ -37,13 +40,14 @@ export const toRuns = ({ first, items }: Doc): Runs => {
     }
     text += item.ch
     if (item.unit) runs.locked.push({ start: i, end: i + 1, ...item.unit })
+    if (item.upload) uploads.push({ start: i, end: i + 1, ...item.upload })
     const last = runs.marks.at(-1)
     if (!item.fmt) return
     if (last && last.end === i && last.format === item.fmt) last.end = i + 1
     else runs.marks.push({ start: i, end: i + 1, format: item.fmt })
   })
   runs.text = text
-  return runs
+  return uploads.length ? { ...runs, uploads } : runs
 }
 
 /** The paragraphs of a doc as lists of cells, with their kind and direction. */
@@ -56,23 +60,26 @@ const paragraphsOf = ({ first, items }: Doc) => {
   return out
 }
 
-/** Null when the doc breaks the rule that a paragraph unit is alone in a p/auto paragraph, or a divider alone in its own. */
+/** Null when the doc breaks the rule that a paragraph unit is alone in a p/auto paragraph, or a divider or an upload alone in its own. */
 const checked = (doc: Doc): Doc | null =>
   paragraphsOf(doc).every((p) => (!p.cells.some((c) => c.unit?.placement === 'paragraph') || (p.cells.length === 1 && p.kind === 'p' && p.dir === 'auto'))
-    && (!p.cells.some((c) => c.divider) || p.cells.length === 1)) ? doc : null
+    && (!p.cells.some(isDivider) || p.cells.length === 1)) ? doc : null
 
-const isDivider = (item: Cell | Break | undefined) => item?.type === 'char' && item.divider === true
+// An upload is edited as a divider is: one cell, deleted whole, nothing typed inside.
+const isDivider = (item: Cell | Break | undefined) => item?.type === 'char' && (item.divider === true || !!item.upload)
+const isUnitKind = (kind: ParagraphKind) => kind === 'divider' || kind === 'upload'
 
-/** The kind of a paragraph follows its cells: one holding a divider is a divider, one that lost its divider is plain. */
+/** The kind of a paragraph follows its cells: one holding a divider or an upload is one, one that lost it is plain. */
 const settleKinds = (doc: Doc) => {
-  const heads = [{ head: doc.first, divider: false }]
+  const heads: { head: { kind: ParagraphKind; dir: Direction }; unit?: ParagraphKind }[] = [{ head: doc.first }]
   for (const item of doc.items) {
-    if (item.type === 'break') heads.push({ head: item, divider: false })
-    else if (item.divider) heads.at(-1)!.divider = true
+    if (item.type === 'break') heads.push({ head: item })
+    else if (item.divider) heads.at(-1)!.unit = 'divider'
+    else if (item.upload) heads.at(-1)!.unit = 'upload'
   }
-  for (const { head, divider } of heads) {
-    if (divider) Object.assign(head, { kind: 'divider', dir: 'auto' })
-    else if (head.kind === 'divider') Object.assign(head, { kind: 'p', dir: 'auto' })
+  for (const { head, unit } of heads) {
+    if (unit) Object.assign(head, { kind: unit, dir: 'auto' })
+    else if (isUnitKind(head.kind)) Object.assign(head, { kind: 'p', dir: 'auto' })
   }
 }
 
@@ -120,19 +127,19 @@ export const modelApply = (doc: Doc, edit: Edit): Doc | null => {
   if (edit.type === 'toggle') {
     const cells = copy.items.slice(edit.start, edit.end)
     if (cells.some((i) => i.type === 'char' && i.unit)) return null
-    const chars = cells.filter((i): i is Cell => i.type === 'char' && !i.divider)
+    const chars = cells.filter((i): i is Cell => i.type === 'char' && !isDivider(i))
     const clear = chars.length > 0 && chars.every((c) => c.fmt & edit.format)
     for (const c of chars) c.fmt = clear ? c.fmt & ~edit.format : c.fmt | edit.format
     return copy
   }
-  if (edit.type === 'kind' && edit.kind === 'divider') return null
+  if (edit.type === 'kind' && isUnitKind(edit.kind)) return null
   const paras = paragraphsOf(copy)
   const hit = paras.slice(edit.from, edit.to + 1)
   if (hit.some((p) => p.cells.some((c) => c.unit?.placement === 'paragraph'))) return null
   let n = -1
   const set = (a: { kind: ParagraphKind; dir: Direction }) => {
     n++
-    if (n < edit.from || n > edit.to || a.kind === 'divider') return
+    if (n < edit.from || n > edit.to || isUnitKind(a.kind)) return
     if (edit.type === 'kind') a.kind = edit.kind
     else a.dir = edit.dir
   }

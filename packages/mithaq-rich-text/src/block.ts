@@ -30,10 +30,11 @@ export class LockedTable {
   }
 }
 
-const NODE_TYPES = new Set(['root', 'paragraph', 'text', 'linebreak', 'tab', ...defaultNodes.map((node) => node.getType())])
+const NODE_TYPES = new Set(['root', 'paragraph', 'text', 'linebreak', 'tab', 'upload', ...defaultNodes.map((node) => node.getType())])
 // Inline containers and leaves that may sit in a paragraph. An unregistered type in
 // a paragraph is treated the same way: it cannot be a block, so it is an inline unit.
-const INLINE_TYPES = new Set(['link', 'autolink', 'linebreak', 'tab'])
+// An upload is a block; one found inside a paragraph stays an inline unit, as before the phone had uploads.
+const INLINE_TYPES = new Set(['link', 'autolink', 'linebreak', 'tab', 'upload'])
 const TEXT_HOSTS = new Set(['paragraph', 'heading', 'quote', 'listitem'])
 
 const root = (children: Json[]) => ({ root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children } })
