@@ -1,4 +1,4 @@
-// Measures the shipped date control in Chromium with the tenant app's own Tailwind build: its day buttons are phone targets that fit the popover and a form card without sideways scrolling, and 32px from sm.
+// Measures the shipped date control in Chromium with each app's own Tailwind build and components: its day buttons are phone targets that fit the popover and a form card without sideways scrolling, and 32px from sm.
 // Chromium is AUTH_BROWSER_EXECUTABLE or Playwright's own; a run without one skips, except in CI.
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
@@ -12,7 +12,7 @@ const executablePath = process.env.AUTH_BROWSER_EXECUTABLE ?? chromium.executabl
 const skip = !existsSync(executablePath)
 assert.ok(!skip || process.env.CI === undefined, 'CI requires a Chromium for the date picker check')
 
-// The tenant shell's page padding (`nav.tsx`), around the form card the inline calendar is drawn in.
+// Both shells' phone page padding (`nav.tsx`, `app-shell.tsx`), around the form card the inline calendar is drawn in.
 const fixture = `
 import { createElement as h } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -29,13 +29,21 @@ createRoot(document.getElementById('root')).render(h(DirectionProvider, { direct
   innerWidth >= 640 && h(Card, { className: 'mt-4 w-64' }, h(CardContent, null, h('div', { id: 'side' }, h(CalendarControl, props('side'))))))))
 `
 
-const root = fileURLToPath(new URL('../', import.meta.url))
+const apps = ['asas-tanstack', 'asas-backoffice'] as const
 let browser: Browser
-let server: ViteDevServer
+const servers = new Map<string, ViteDevServer>()
 before(async () => {
   if (skip) return
   browser = await chromium.launch({ executablePath, headless: true })
-  server = await createServer({
+  for (const app of apps) servers.set(app, await serve(fileURLToPath(new URL(`../../${app}/`, import.meta.url))))
+})
+after(async () => {
+  await browser?.close()
+  for (const server of servers.values()) await server.close()
+})
+
+const serve = async (root: string) => {
+  const server = await createServer({
     root, configFile: false, logLevel: 'error', server: { port: 0, host: '127.0.0.1' },
     resolve: { alias: [{ find: /^@\//, replacement: `${root}src/` }] },
     // Every dependency is found before the first request, since one found later reloads the page mid-test.
@@ -49,12 +57,8 @@ before(async () => {
         : next()),
     }],
   })
-  await server.listen()
-})
-after(async () => {
-  await browser?.close()
-  await server?.close()
-})
+  return server.listen()
+}
 
 const sizes = (selector: string) => `[...document.querySelectorAll('${selector} button[data-day]')].map((one) => { const { width, height } = one.getBoundingClientRect(); return [width, height] })`
 const overflow = 'document.documentElement.scrollWidth - document.documentElement.clientWidth'
@@ -66,11 +70,11 @@ const spills = `[...document.querySelectorAll('[data-slot=card]')].some((card) =
 const outside = `(() => { const box = document.querySelector('[data-slot=popover-content]').getBoundingClientRect(); return box.left < 0 || box.right > innerWidth })()`
 
 // 360px is the narrow Android phone, 390px the common one.
-for (const [width, phone] of [[360, true], [390, true], [1024, false]] as const) {
-  for (const dir of ['ltr', 'rtl'] as const) test(`the tenant date picker at ${width}px has ${phone ? '44px day buttons that fit the card and popover' : '32px day buttons'} (${dir})`, { skip }, async () => {
+for (const app of apps) for (const [width, phone] of [[360, true], [390, true], [1024, false]] as const) {
+  for (const dir of ['ltr', 'rtl'] as const) test(`the ${app} date picker at ${width}px has ${phone ? '44px day buttons that fit the card and popover' : '32px day buttons'} (${dir})`, { skip }, async () => {
     const page = await browser.newPage({ viewport: { width, height: 844 } })
     try {
-      await page.goto(`${server.resolvedUrls!.local[0]}?dir=${dir}`)
+      await page.goto(`${servers.get(app)!.resolvedUrls!.local[0]}?dir=${dir}`)
       await page.locator('#inline button[data-day]').first().waitFor()
       const fits = ([width, height]: number[]) => phone ? width! >= 44 && height! >= 44 : width === 32 && height === 32
       const inline = await page.evaluate(sizes('#inline')) as number[][]
@@ -81,7 +85,7 @@ for (const [width, phone] of [[360, true], [390, true], [1024, false]] as const)
         for (const theme of process.env.DATE_PICKER_SCREENSHOTS ? ['light', 'dark'] : []) {
           // Shot once the buttons' colour transitions to the theme have finished.
           await page.evaluate((dark) => { document.documentElement.classList.toggle('dark', dark); return Promise.all(document.getAnimations().map((one) => one.finished)) }, theme === 'dark')
-          await page.screenshot({ path: `${process.env.DATE_PICKER_SCREENSHOTS}/${width}-${dir}-${name}-${theme}.png` })
+          await page.screenshot({ path: `${process.env.DATE_PICKER_SCREENSHOTS}/${app}-${width}-${dir}-${name}-${theme}.png` })
         }
       }
       await shot('card')
