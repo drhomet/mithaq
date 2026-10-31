@@ -1190,7 +1190,8 @@ Run `bun run check:rich-text` before a pull request, or `npm run check:rich-text
 on Node 24. Add `--strict` to fail on warnings. The output has one line per
 severity, code and place, with a count and the nodes it names; `--json` prints
 each diagnostic as a JSON line instead. Native apps also pass
-`--contract ./path/to/installed/rich-input/contract.json`. The CLI accepts
+`--contract`, with the rich-input contract `@drhomet/mithaq-rich-text` ships as
+`contract.json`. The CLI accepts
 `--policies ./rich-text-policies.ts` (a default-exported array of
 `RichTextPolicy` values) and checks mithaq's `defaultNodeRegistry`; an app
 checking registrations of its own calls `checkRichTextSupport` from a test.
@@ -1211,8 +1212,9 @@ const diagnostics = checkRichTextSupport({ registry: defaultNodeRegistry, profil
 Optional `policies` is an array of field authoring policies, without field or
 record identifiers. Optional `contract` is the parsed rich-input contract.
 Optional `codecs` names the node types the installed native codec carries
-whole; it defaults to none, since no native codec ships yet, so every native
-`edit` claim is an error until one does. The CLI passes none.
+whole; it defaults to none, so every native `edit` claim is an error. The CLI
+passes `runsCodecTypes`, the types the shared runs codec carries: `root`,
+`paragraph`, `text`, `heading`, `list` and `listitem`.
 Feature associations, format bits and toolbar choices come from the existing
 shared maps rather than a second registry of feature names. Policies warn when
 a place the profile asks to edit a node (by default or per node) cannot edit
