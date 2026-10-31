@@ -18,6 +18,7 @@ import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { testDatabase } from '../templates/asas/src/test-database.ts'
@@ -80,8 +81,9 @@ const vocabularyWithout = (missing: readonly string[]) => {
   for (const [part, key] of missing.flatMap((name) => wordsOf[name] ?? [])) delete words[part][key]
   return words
 }
-mkdirSync(join(root, '.pack'), { recursive: true })
-const scratch = mkdtempSync(join(root, '.pack/mithaq-release-'))
+const scratchParent = process.env.MITHAQ_RELEASE_TMPDIR ?? tmpdir()
+mkdirSync(scratchParent, { recursive: true })
+const scratch = mkdtempSync(join(scratchParent, 'mithaq-release-'))
 /**
  * Every message a consumer mails, caught on this machine: a production start needs a mailer, and the project's Resend
  * mailer posts here through `RESEND_BASE_URL`, so nothing reaches Resend.
@@ -228,9 +230,9 @@ async function release({ manager, tarball, adminTarball, richTextTarball, layout
     const rich = realpathSync(installed(mithaq, '@drhomet/mithaq-rich-text'))
     assert.equal(realpathSync(installed(admin, '@drhomet/mithaq-rich-text')), rich, 'core and admin use one shared package')
     if (chosen.includes('rich-text')) {
-      const lexical = realpathSync(installed(rich, 'lexical'))
+      const { peerDependencies } = JSON.parse(readFileSync(join(rich, 'package.json'), 'utf8')) as { peerDependencies: Record<string, string> }
       for (const owner of [mithaq, admin, app, single ? consumer : join(consumer, 'packages/mithaq')]) {
-        assert.equal(realpathSync(installed(owner, 'lexical')), lexical, `${owner} loads the one Lexical`)
+        for (const peer of Object.keys(peerDependencies)) assert.equal(realpathSync(installed(owner, peer)), realpathSync(installed(rich, peer)), `${owner} loads the one ${peer}`)
         assert.equal(realpathSync(installed(owner, '@drhomet/mithaq-rich-text')), rich, `${owner} loads the one shared package`)
       }
     }

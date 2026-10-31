@@ -19,6 +19,12 @@ test('the existing rich text imports expose the shared package classes by identi
 test('the shared library bundles below 1 MB and reads JSON with no server or DOM runtime', async (t) => {
   const { build } = await import('esbuild')
   const { runInNewContext } = await import('node:vm')
+  const { parse } = await import('@babel/parser')
+  const own = await build({ entryPoints: ['packages/mithaq-rich-text/src/index.ts'], bundle: true, packages: 'external', platform: 'neutral', format: 'esm', write: false })
+  // Lexical owns DOM adapters; our JSON readers and node classes must stay usable on phones even inside uncalled functions.
+  for (const token of parse(own.outputFiles[0]!.text, { sourceType: 'module', tokens: true }).tokens!) {
+    if (token.type.label === 'name') assert.ok(!['window', 'document', 'navigator', 'localStorage', 'sessionStorage', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'DOMParser', 'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame'].includes(token.value), `shared code uses DOM identifier ${token.value}`)
+  }
   const result = await build({ entryPoints: ['packages/mithaq-rich-text/src/index.ts'], bundle: true, minify: true, platform: 'neutral', format: 'iife', globalName: 'richText', define: { 'process.env.NODE_ENV': '"production"' }, write: false, metafile: true })
   for (const path of Object.keys(result.metafile!.inputs)) {
     assert.ok(/^packages\/mithaq-rich-text\/src\/(?!check\.ts$)/.test(path) || /\/node_modules\/(?:lexical|@lexical\/[^/]+|@preact\/signals-core)\//.test(path), `only shared library and Lexical dependencies: ${path}`)
@@ -45,12 +51,17 @@ test('the shared library bundles below 1 MB and reads JSON with no server or DOM
 
 test('core and admin resolve one shared package and one Lexical', async () => {
   const { createRequire } = await import('node:module')
-  const { realpathSync } = await import('node:fs')
+  const { realpathSync, readFileSync } = await import('node:fs')
   const core = createRequire(new URL('../../package.json', import.meta.url))
   const admin = createRequire(new URL('../../../mithaq-admin/package.json', import.meta.url))
   const shared = createRequire(core.resolve('@drhomet/mithaq-rich-text'))
-  for (const name of ['lexical', '@drhomet/mithaq-rich-text']) {
+  const { peerDependencies } = JSON.parse(readFileSync(new URL('../../../mithaq-rich-text/package.json', import.meta.url), 'utf8')) as { peerDependencies: Record<string, string> }
+  for (const name of ['@drhomet/mithaq-rich-text', ...Object.keys(peerDependencies)]) {
     const expected = realpathSync(core.resolve(name))
     for (const resolve of [admin, shared]) assert.equal(realpathSync(resolve.resolve(name)), expected, name)
   }
+})
+
+test('the shared CLI subpath is explicitly a bin entry', () => {
+  assert.equal(import.meta.resolve('@drhomet/mithaq-rich-text/bin/check'), new URL('../../../mithaq-rich-text/src/check.ts', import.meta.url).href)
 })

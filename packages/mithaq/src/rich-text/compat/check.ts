@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-import '@drhomet/mithaq-rich-text/check'
+import '@drhomet/mithaq-rich-text/bin/check'

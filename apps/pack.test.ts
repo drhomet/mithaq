@@ -59,6 +59,7 @@ test('four staged packages share a release and core and admin pin the one shared
   assert.equal(rich.dependencies, undefined, 'phone consumers install no server dependencies')
   for (const version of Object.values(rich.peerDependencies)) assert.equal(version, '0.52.0')
   for (const entry of Object.values(rich.exports)) assert.ok(existsSync(join(root, '.pack/mithaq-rich-text', entry as string)))
+  assert.equal(rich.exports['./bin/check'], `./${rich.bin['mithaq-check-rich-text']}`)
   assert.ok(existsSync(join(root, '.pack/mithaq-rich-text', rich.bin['mithaq-check-rich-text'])))
   assert.ok(existsSync(join(root, '.pack/mithaq-rich-text/LICENSE')))
   assert.ok(existsSync(join(root, '.pack/mithaq-rich-text/README.md')))
