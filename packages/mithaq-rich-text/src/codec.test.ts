@@ -14,17 +14,23 @@ test('one plain paragraph survives runs → nodes → runs', () => {
   assert.deepEqual(roundTrip(runs), runs)
 })
 
-test('each of the five formats and their mixes survive, with marks that never cross a paragraph break', () => {
+test('each of the eleven formats and their mixes survive, with marks that never cross a paragraph break', () => {
   const runs: Runs = {
-    text: 'bold italic both\nstrike under mark',
+    text: 'bold italic both\nstrike under mark\ncode H2O x2 low UP word',
     marks: [
       { start: 0, end: 4, format: 1 },
       { start: 5, end: 11, format: 2 },
       { start: 11, end: 16, format: 1 | 2 },
       { start: 17, end: 23, format: 4 },
       { start: 24, end: 29, format: 8 | 128 },
+      { start: 35, end: 39, format: 16 },
+      { start: 41, end: 42, format: 32 },
+      { start: 45, end: 46, format: 64 },
+      { start: 47, end: 50, format: 256 },
+      { start: 51, end: 53, format: 512 | 1 },
+      { start: 54, end: 58, format: 1024 },
     ],
-    paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }, { start: 17, kind: 'p', dir: 'auto' }],
+    paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }, { start: 17, kind: 'p', dir: 'auto' }, { start: 35, kind: 'p', dir: 'auto' }],
     locked: [],
   }
   assert.deepEqual(roundTrip(runs), runs)

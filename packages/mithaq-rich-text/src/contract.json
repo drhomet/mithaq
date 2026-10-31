@@ -1,5 +1,5 @@
 {
-  "formats": {"bold": 1, "italic": 2, "strikethrough": 4, "underline": 8, "highlight": 128},
+  "formats": {"bold": 1, "italic": 2, "strikethrough": 4, "underline": 8, "inlineCode": 16, "subscript": 32, "superscript": 64, "highlight": 128, "lowercase": 256, "uppercase": 512, "capitalize": 1024},
   "paragraphs": ["p", "bullet", "number", "h2", "h3"],
   "directions": ["auto", "ltr", "rtl"],
   "blockKinds": ["section", "problem"],
