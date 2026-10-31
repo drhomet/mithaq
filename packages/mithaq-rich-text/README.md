@@ -33,7 +33,10 @@ version or unknown metadata, is kept as its original JSON in a `LockedTable`
 before Lexical parses it, and native sees one locked placeholder with a plain
 text preview. Saving swaps the original back in, so untouched subtrees, unknown
 fields and Block envelope fields round-trip deep-equal and no placeholder, id or
-temporary node is stored. `runsCodecTypes` lists the node types it carries as
+temporary node is stored. A table inside a list item is an inline unit, so the
+item stays editable around it and the table JSON is kept intact. A paragraph,
+heading or list item the phone did not edit keeps its stored `textFormat` and
+`textStyle`. `runsCodecTypes` lists the node types it carries as
 editable runs. The entry runs headless on PrimJS, with no DOM, `isWellFormed`
 or `structuredClone`.
 
