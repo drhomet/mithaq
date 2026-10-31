@@ -16,6 +16,7 @@
     "./value": "./src/value.ts",
     "./nodes": "./src/nodes.ts",
     "./registry": "./src/registry.ts",
+    "./contract.json": "./src/contract.json",
     "./bin/check": "./src/check.ts"
   },
   "bin": {
@@ -52,6 +53,7 @@
       "./value": "./dist/value.js",
       "./nodes": "./dist/nodes.js",
       "./registry": "./dist/registry.js",
+      "./contract.json": "./dist/contract.json",
       "./bin/check": "./dist/check.js"
     },
     "bin": {
