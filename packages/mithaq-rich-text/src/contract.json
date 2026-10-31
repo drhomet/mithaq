@@ -8,6 +8,7 @@
   "methods": {
     "setContent": {"params": {"runs": "runs", "runsVersion": "int?"}, "returns": "accepted"},
     "toggleFormat": {"params": {"format": "int"}},
+    "clearFormat": {},
     "setParagraphKind": {"params": {"kind": "string"}},
     "insertText": {"params": {"text": "string"}},
     "replaceRange": {"params": {"start": "int", "end": "int", "text": "string?", "runs": "runs?"}},
@@ -16,6 +17,7 @@
     "blur": {},
     "getContent": {"returns": "content"},
     "undo": {},
+    "redo": {},
     "flush": {}
   },
   "laidOutDirections": ["ltr", "rtl"],
