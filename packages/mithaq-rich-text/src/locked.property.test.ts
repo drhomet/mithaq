@@ -13,7 +13,7 @@ const INLINE = Object.keys(inline) as (keyof typeof inline)[]
 const BLOCK = Object.keys(block)
 
 // Editable paragraphs from the codec, then units spliced in: paragraph units between top-level
-// nodes, inline units between the children of a paragraph, heading or list item.
+// nodes, inline units between the children of a paragraph, heading, quote or list item, never inside a rule.
 const specArb = fc.record({
   rows: paragraphsArb,
   units: fc.array(
@@ -23,7 +23,7 @@ const specArb = fc.record({
 })
 
 const hosts = (nodes: Json[]): Json[] =>
-  nodes.flatMap((n) => (n.type === 'list' ? (n.children as Json[]) : ['paragraph', 'heading'].includes(n.type) ? [n] : []))
+  nodes.flatMap((n) => (n.type === 'list' ? (n.children as Json[]) : ['paragraph', 'heading', 'quote'].includes(n.type) ? [n] : []))
 
 type Spec = { rows: Parameters<typeof runsFromParagraphs>[0]; units: { at: number; name: string; inside: number }[] }
 

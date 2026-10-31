@@ -126,3 +126,24 @@ describe('locked units in runs', () => {
     assert.throws(() => runsToNodes(editor, { text: 'a￼b', marks: [], paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }], locked: [] }), /placeholder/i)
   })
 })
+
+describe('quotes and dividers', () => {
+  const U = '￼'
+  test('quote text with marks and direction, consecutive dividers, a divider beside locked units and a final one survive', () => {
+    const runs: Runs = {
+      text: `قول مقتبس\n${U}\n${U}\n${U}\n${U}\nquoted ${U}\n${U}`,
+      marks: [{ start: 0, end: 3, format: 1 }],
+      paragraphs: [
+        { start: 0, kind: 'quote', dir: 'rtl' }, { start: 10, kind: 'divider', dir: 'auto' }, { start: 12, kind: 'divider', dir: 'auto' },
+        { start: 14, kind: 'p', dir: 'auto' }, { start: 16, kind: 'divider', dir: 'auto' }, { start: 18, kind: 'quote', dir: 'ltr' }, { start: 27, kind: 'divider', dir: 'auto' },
+      ],
+      locked: [unit({ start: 14, id: 'u1', placement: 'paragraph' }), unit({ start: 25, id: 'u2' })],
+    }
+    const editor = createRunsEditor()
+    runsToNodes(editor, runs)
+    assert.deepEqual(editor.getEditorState().toJSON().root.children.map((c) => c.type), ['quote', 'horizontalrule', 'horizontalrule', 'locked-unit', 'horizontalrule', 'quote', 'horizontalrule'])
+    assert.deepEqual(nodesToRuns(editor), runs)
+    assert.equal(nodesToPlainText(editor), 'قول مقتبس\n\n\nLocked u1\n\nquoted Locked u2\n')
+    assert.equal(nodesToPlainText(editor), plainText(runs))
+  })
+})

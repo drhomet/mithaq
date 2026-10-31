@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { fromRuns, modelApply, toRuns } from './__fixtures__/model.ts'
 import { applyEdit, type Edit } from './edit.ts'
-import { validateRuns, type Runs } from './runs.ts'
+import { validateRuns, type ParagraphKind, type Runs } from './runs.ts'
 
 const unit = ({ start, id, placement = 'inline' }: { start: number; id: string; placement?: 'inline' | 'paragraph' }) => ({ start, end: start + 1, id, placement, preview: `Locked ${id}` })
 
@@ -95,3 +95,77 @@ for (const kind of ['bullet', 'number', 'h2', 'h3', 'p'] as const) {
     assert.deepEqual(toRuns(modeled), expected)
   })
 }
+
+describe('a divider stays alone in its paragraph through every edit', () => {
+  const U = '￼'
+  const runs = (text: string, kinds: ParagraphKind[], marks: Runs['marks'] = []): Runs => ({
+    text, marks, locked: [],
+    paragraphs: text.split('\n').map((_, i, all) => ({ start: all.slice(0, i).join('\n').length + (i ? 1 : 0), kind: kinds[i]!, dir: 'auto' as const })),
+  })
+  // edit.ts and the independent model agree on each case, refusals included.
+  const both = (before: Runs, edit: Edit): Runs | null => {
+    const result = applyEdit(before, edit)
+    const modeled = modelApply(fromRuns(before), edit)
+    assert.equal(result.ok, modeled !== null, JSON.stringify(edit))
+    if (!result.ok) return null
+    assert.deepEqual(result.runs, toRuns(modeled!))
+    return validateRuns(result.runs)
+  }
+  const shape = (r: Runs | null) => r && [r.text, r.paragraphs.map((p) => p.kind).join(' ')]
+  const rule = runs(`Above\n${U}\nBelow`, ['p', 'divider', 'h2'])
+
+  test('Backspace below a rule and Delete above it remove the rule as one unit; the paragraph below keeps its kind', () => {
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 7, end: 8, text: '' })), ['Above\nBelow', 'p h2'])
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 5, end: 6, text: '' })), ['Above\nBelow', 'p h2'])
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 5, end: 6, text: 'x' })), ['Abovex\nBelow', 'p h2'])
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 6, end: 7, text: '' })), ['Above\nBelow', 'p h2'])
+  })
+
+  test('cutting one of two rules, by either of its breaks or itself, keeps the unselected neighbour', () => {
+    const two = runs(`A\n${U}\n${U}\nB`, ['p', 'divider', 'divider', 'h2'])
+    for (const [start, end] of [[2, 3], [1, 2], [4, 5]] as const) {
+      assert.deepEqual(shape(both(two, { type: 'replace', start, end, text: '' })), [`A\n${U}\nB`, 'p divider h2'], `${start}-${end}`)
+    }
+    // The break between two rules is beside both, so removing it removes both, as on Android.
+    assert.deepEqual(shape(both(two, { type: 'replace', start: 3, end: 4, text: '' })), ['A\n\nB', 'p p h2'])
+    const last = runs(`A\n${U}`, ['p', 'divider'])
+    assert.deepEqual(shape(both(last, { type: 'replace', start: 2, end: 3, text: '' })), ['A', 'p'])
+    assert.deepEqual(shape(both(runs(U, ['divider']), { type: 'replace', start: 0, end: 1, text: '' })), ['', 'p'])
+  })
+
+  test('nothing is typed beside a rule, but Enter opens a plain paragraph on either side of it', () => {
+    for (const at of [6, 7]) assert.equal(both(rule, { type: 'replace', start: at, end: at, text: 'x' }), null, `typed at ${at}`)
+    assert.deepEqual(shape(both(runs(U, ['divider']), { type: 'replace', start: 1, end: 1, text: '\n' })), [`${U}\n`, 'divider p'])
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 6, end: 6, text: '\n' })), [`Above\n\n${U}\nBelow`, 'p p divider h2'])
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 1, end: 1, text: `x${U}y` })), [`Axybove\n${U}\nBelow`, 'p divider h2'])
+  })
+
+  test('replacing a selection that starts on a rule takes the kind of the paragraph it ends in', () => {
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 6, end: 10, text: 'x\ny' })), ['Above\nx\nylow', 'p h2 h2'])
+    assert.deepEqual(shape(both(rule, { type: 'replace', start: 6, end: 7, text: 'new' })), ['Above\nnew\nBelow', 'p p h2'])
+  })
+
+  test('formatting across a rule passes it by; formatting only the rule changes nothing', () => {
+    const across = both(runs(`Above\n${U}\nBelow`, ['p', 'divider', 'p']), { type: 'toggle', start: 0, end: 13, format: 1 })
+    assert.deepEqual(across?.marks, [{ start: 0, end: 5, format: 1 }, { start: 8, end: 13, format: 1 }])
+    assert.deepEqual(both(across!, { type: 'toggle', start: 0, end: 13, format: 1 })?.marks, [])
+    assert.deepEqual(both(rule, { type: 'toggle', start: 6, end: 7, format: 1 }), rule)
+  })
+
+  test('a kind or direction change across a rule leaves the rule as it is; no kind change makes one', () => {
+    assert.deepEqual(shape(both(rule, { type: 'kind', from: 0, to: 2, kind: 'quote' })), [rule.text, 'quote divider quote'])
+    assert.deepEqual(both(rule, { type: 'dir', from: 0, to: 2, dir: 'rtl' })?.paragraphs.map((p) => p.dir), ['rtl', 'auto', 'rtl'])
+    assert.deepEqual(applyEdit(rule, { type: 'kind', from: 0, to: 0, kind: 'divider' }), { ok: false, reason: 'invalid-input' })
+    assert.equal(modelApply(fromRuns(rule), { type: 'kind', from: 0, to: 0, kind: 'divider' }), null)
+  })
+
+  test('a rule beside a locked unit: removing the rule from either side keeps the unit, and the unit itself stays', () => {
+    const beside: Runs = { ...runs(`${U}\n${U}\nB`, ['p', 'divider', 'p']), locked: [unit({ start: 0, id: 'u1', placement: 'paragraph' })] }
+    for (const [start, end] of [[3, 4], [1, 2], [2, 3]] as const) {
+      const after = both(beside, { type: 'replace', start, end, text: '' })
+      assert.deepEqual(shape(after), [`${U}\nB`, 'p p'], `${start}-${end}`)
+      assert.deepEqual(after!.locked, beside.locked)
+    }
+    assert.equal(both(beside, { type: 'replace', start: 0, end: 1, text: '' }), null)
+  })
+})

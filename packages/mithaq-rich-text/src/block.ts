@@ -34,7 +34,7 @@ const NODE_TYPES = new Set(['root', 'paragraph', 'text', 'linebreak', 'tab', ...
 // Inline containers and leaves that may sit in a paragraph. An unregistered type in
 // a paragraph is treated the same way: it cannot be a block, so it is an inline unit.
 const INLINE_TYPES = new Set(['link', 'autolink', 'linebreak', 'tab'])
-const TEXT_HOSTS = new Set(['paragraph', 'heading', 'listitem'])
+const TEXT_HOSTS = new Set(['paragraph', 'heading', 'quote', 'listitem'])
 
 const root = (children: Json[]) => ({ root: { type: 'root', version: 1, direction: null, format: '', indent: 0, children } })
 

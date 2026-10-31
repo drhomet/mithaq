@@ -31,9 +31,10 @@ test('1,000 random edits keep runs → nodes → runs the identity, and applyEdi
         runs = validateRuns(result.runs)
         runsToNodes(editor, runs)
         assert.deepEqual(nodesToRuns(editor), runs)
-        assert.equal(nodesToPlainText(editor), runs.text, 'plain text from the nodes is runs.text')
-        assert.equal(plainText(runs), runs.text)
-        assert.doesNotMatch(runs.text, /[•◦▪‣￼]/)
+        // With no locked unit, the only U+FFFC are dividers, which read as nothing.
+        assert.equal(plainText(runs), runs.text.replaceAll('￼', ''))
+        assert.equal(nodesToPlainText(editor), plainText(runs), 'plain text from the nodes matches the runs')
+        assert.doesNotMatch(plainText(runs), /[•◦▪‣￼]/)
       }
     }),
     { seed: SEED, numRuns: RUNS },

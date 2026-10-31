@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import type { Edit } from '../edit.ts'
-import { DIRECTIONS, FORMATS, PARAGRAPH_KINDS, type Runs } from '../runs.ts'
+import { DIRECTIONS, FORMATS, PARAGRAPH_KINDS, PLACEHOLDER, type Runs } from '../runs.ts'
 
 // Synthetic text only. Every writing system the phone types lives here, with the
 // awkward cases for UTF-16 offsets: surrogate pairs, ZWJ sequences, flags,
@@ -21,10 +21,14 @@ export const textArb = fc.array(fc.constantFrom(...SNIPPETS), { maxLength: 4 }).
 // Empty paragraphs are a quarter of all paragraphs.
 const paragraphTextArb = fc.oneof({ weight: 1, arbitrary: fc.constant('') }, { weight: 3, arbitrary: textArb })
 
+// A divider holds exactly its placeholder, with dir auto; a quote holds ordinary text.
 export const paragraphsArb = fc.array(
-  fc.record({ kind: fc.constantFrom(...PARAGRAPH_KINDS), dir: fc.constantFrom(...DIRECTIONS), text: paragraphTextArb }),
+  fc.record({ kind: fc.constantFrom(...PARAGRAPH_KINDS), dir: fc.constantFrom(...DIRECTIONS), text: paragraphTextArb })
+    .map((row) => (row.kind === 'divider' ? { ...row, dir: 'auto' as const, text: PLACEHOLDER } : row)),
   { minLength: 1, maxLength: 5 },
 )
+// Only insertion makes a divider, so kind edits never ask for one.
+const EDIT_KINDS = PARAGRAPH_KINDS.filter((kind) => kind !== 'divider')
 
 export const runsFromParagraphs = (rows: { kind: Runs['paragraphs'][number]['kind']; dir: Runs['paragraphs'][number]['dir']; text: string }[]): Runs => {
   let at = 0
@@ -53,7 +57,7 @@ export const rawEditArb: fc.Arbitrary<RawEdit> = fc.record({
     { weight: 1, arbitrary: fc.constant('x\uFFFCy') },
   ),
   bit: fc.nat({ max: 4 }),
-  kind: fc.nat({ max: PARAGRAPH_KINDS.length - 1 }),
+  kind: fc.nat({ max: EDIT_KINDS.length - 1 }),
   dir: fc.nat({ max: DIRECTIONS.length - 1 }),
 }) as fc.Arbitrary<RawEdit>
 
@@ -64,12 +68,13 @@ const boundaries = (text: string) => {
 }
 const pick = <T>(list: T[], at: number): T => list[Math.min(list.length - 1, Math.floor(at * list.length))]!
 
-/** Turns a raw edit into a concrete one for these runs. About 40% of the time it is anchored on a locked unit's edge. */
+/** Turns a raw edit into a concrete one for these runs. About 40% of the time it is anchored on a locked unit's or a divider's edge. */
 export const resolveEdit = (runs: Runs, raw: RawEdit): Edit => {
   const spots = boundaries(runs.text)
   let start = pick(spots, raw.a)
-  if (runs.locked.length && raw.anchor < 0.4) {
-    const unit = pick(runs.locked, raw.a)
+  const anchors = [...runs.locked, ...runs.paragraphs.filter((p) => p.kind === 'divider').map((p) => ({ start: p.start, end: p.start + 1 }))]
+  if (anchors.length && raw.anchor < 0.4) {
+    const unit = pick(anchors, raw.a)
     start = raw.b < 0.5 ? unit.start : unit.end
   }
   // Ranges are short, as a person's selections are.
@@ -79,5 +84,5 @@ export const resolveEdit = (runs: Runs, raw: RawEdit): Edit => {
   if (raw.type === 'toggle') return { type: 'toggle', start, end, format: Object.values(FORMATS)[raw.bit]! }
   const from = Math.min(Math.floor(raw.a * runs.paragraphs.length), runs.paragraphs.length - 1)
   const to = Math.min(runs.paragraphs.length - 1, from + Math.floor(raw.b * 3))
-  return raw.type === 'kind' ? { type: 'kind', from, to, kind: PARAGRAPH_KINDS[raw.kind]! } : { type: 'dir', from, to, dir: DIRECTIONS[raw.dir]! }
+  return raw.type === 'kind' ? { type: 'kind', from, to, kind: EDIT_KINDS[raw.kind]! } : { type: 'dir', from, to, dir: DIRECTIONS[raw.dir]! }
 }
