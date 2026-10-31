@@ -398,8 +398,11 @@ test('a release consumer can override the shared rich text tarball in either pro
   for (const layout of ['monorepo', 'single']) {
     const name = `rich-text-tarball-${layout}`
     const mithaqRichText = 'file:/release/mithaq-rich-text.tgz'
-    create({ name, cwd: scratch, template, version: '1.2.3', layout, mithaqRichText })
-    assert.deepEqual(json(name, 'package.json').overrides, { '@drhomet/mithaq-rich-text': mithaqRichText })
+    create({ name, cwd: scratch, template, version: '1.2.3', layout, addOns: ['rich-text'], mithaqRichText })
+    const manifest = json(name, 'package.json')
+    assert.deepEqual(manifest.overrides, { '@drhomet/mithaq-rich-text': mithaqRichText })
+    // npm refuses an override of a root dependency unless both specs are identical.
+    if (layout === 'single') assert.equal(manifest.dependencies['@drhomet/mithaq-rich-text'], mithaqRichText)
   }
 })
 

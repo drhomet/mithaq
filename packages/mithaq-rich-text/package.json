@@ -16,7 +16,7 @@
     "./value": "./src/value.ts",
     "./nodes": "./src/nodes.ts",
     "./registry": "./src/registry.ts",
-    "./check": "./src/check.ts"
+    "./bin/check": "./src/check.ts"
   },
   "bin": {
     "mithaq-check-rich-text": "./src/check.ts"
@@ -52,7 +52,7 @@
       "./value": "./dist/value.js",
       "./nodes": "./dist/nodes.js",
       "./registry": "./dist/registry.js",
-      "./check": "./dist/check.js"
+      "./bin/check": "./dist/check.js"
     },
     "bin": {
       "mithaq-check-rich-text": "dist/check.js"

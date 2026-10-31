@@ -411,6 +411,8 @@ export function create({ name, cwd, template, version, mithaq = `npm:@drhomet/mi
   // Release checks install the unpublished exact dependency from its tarball, after either layout has its final root.
   if (mithaqRichText !== undefined) {
     const manifest = readJson(join(project, 'package.json'))
+    // npm requires a root dependency and its override to use the exact same spec.
+    if (manifest.dependencies?.['@drhomet/mithaq-rich-text']) manifest.dependencies['@drhomet/mithaq-rich-text'] = mithaqRichText
     writeJson(join(project, 'package.json'), { ...manifest, overrides: { ...manifest.overrides, '@drhomet/mithaq-rich-text': mithaqRichText } })
   }
   // npm, yarn and Bun read `workspaces`; pnpm 10.6 and later read this file.
