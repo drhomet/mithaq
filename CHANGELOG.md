@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Addition: `@drhomet/mithaq-rich-text` ships the existing shared node classes, JSON
+  versions and readers, value guards, feature policy, registry and check CLI
+  without a mithaq server. Core keeps the rukn, comments service and write
+  version gate; admin keeps its editor. Existing rich-text imports keep working
+  with the same class identities and stored JSON. All four packages release at
+  one version. See the [package guide](packages/mithaq-rich-text/README.md).
+
 - Breaking: every rich text node class needs a known JSON version. A project's own node class whose constructor takes arguments, so its version cannot be read from an instance, adds `static supportedVersion = 1` (the highest JSON version it reads); until it does, the server refuses every stored node of that type and the admin shows such a value read-only ([issue #38](https://github.com/drhomet/mithaq/issues/38)).
 - Security: `payloadRehash` logs only a failed rehash's error `name` and `code`. It logged the whole error, and a database error's message can name the query's params (drizzle-orm 1.0's does), which hold the user's Payload salt and hash and the new hash. A project that holds `payload-password.ts` ejects it again ([issue #35](https://github.com/drhomet/mithaq/issues/35)).
 - Fix: `drizzleJobs` runs its record and prune transactions at read committed, whatever the database's `default_transaction_isolation`. Under `repeatable read` or `serializable` a scheduler that waited for a task's lock read a snapshot taken before it, so it could record an occurrence a peer had already recorded, completed and pruned, and the task ran twice ([issue #29](https://github.com/drhomet/mithaq/issues/29)).

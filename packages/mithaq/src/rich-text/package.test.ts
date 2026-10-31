@@ -21,7 +21,7 @@ test('the shared library bundles below 1 MB and reads JSON with no server or DOM
   const { runInNewContext } = await import('node:vm')
   const result = await build({ entryPoints: ['packages/mithaq-rich-text/src/index.ts'], bundle: true, minify: true, platform: 'neutral', format: 'iife', globalName: 'richText', define: { 'process.env.NODE_ENV': '"production"' }, write: false, metafile: true })
   for (const path of Object.keys(result.metafile!.inputs)) {
-    assert.ok(!/packages\/mithaq\/|\/check\.ts$|(?:^|\/)(?:react|react-dom|drizzle-orm|drizzle-kit|zod|pg)\//.test(path), path)
+    assert.ok(/^packages\/mithaq-rich-text\/src\/(?!check\.ts$)/.test(path) || /\/node_modules\/(?:lexical|@lexical\/[^/]+|@preact\/signals-core)\//.test(path), `only shared library and Lexical dependencies: ${path}`)
   }
   for (const output of Object.values(result.metafile!.outputs)) assert.deepEqual(output.imports, [], 'no Node builtins or external runtime imports')
   const bundle = result.outputFiles[0]!
@@ -35,7 +35,11 @@ test('the shared library bundles below 1 MB and reads JSON with no server or DOM
   assert.equal(shared.defaultNodeRegistry.length, 21)
   const value = shared.convertPlaintextToLexical({ text: 'Hello مرحبا', nodes: shared.defaultNodes })
   assert.ok(!('refused' in value), JSON.stringify(value))
-  if ('value' in value) assert.equal(shared.richTextReader(shared.defaultNodes)(value.value).text, 'Hello مرحبا')
+  if ('value' in value) {
+    const read = shared.richTextReader(shared.defaultNodes)(value.value)
+    assert.ok(!('refused' in read))
+    assert.equal(read.text, 'Hello مرحبا')
+  }
   assert.equal(shared.versionsOf([shared.UploadNode, shared.MentionNode]).get('upload'), 3)
 })
 

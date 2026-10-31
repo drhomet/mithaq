@@ -55,7 +55,7 @@ const bump = (version: string) => {
   assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD'), 'main', 'a release is cut from main')
   assert.ok(!succeeds('git', ['rev-parse', '-q', '--verify', `refs/tags/v${version}`]), `the tag v${version} exists`)
   assert.ok(!published(`@drhomet/mithaq@${version}`), `@drhomet/mithaq@${version} is on npm`)
-  // The one version apps/pack.ts stamps on all three staged packages.
+  // The one version apps/pack.ts stamps on all four staged packages.
   const file = join(root, 'packages/mithaq/package.json')
   const manifest = JSON.parse(readFileSync(file, 'utf8')) as { publishConfig: { version: string } }
   manifest.publishConfig.version = version
@@ -67,7 +67,7 @@ const bump = (version: string) => {
 }
 
 const publish = () => {
-  const packages = ['mithaq', 'mithaq-admin', 'create-mithaq'].map((dir) => {
+  const packages = ['mithaq-rich-text', 'mithaq', 'mithaq-admin', 'create-mithaq'].map((dir) => {
     const { name, version } = JSON.parse(readFileSync(join(root, '.pack', dir, 'package.json'), 'utf8')) as { name: string; version: string }
     return { dir: join(root, '.pack', dir), name, version: taggedVersion({ ref: process.env.GITHUB_REF_NAME, version }) }
   })
@@ -80,7 +80,7 @@ const publish = () => {
   const notes = join(root, '.pack/release-notes.md')
   writeFileSync(notes, `${git('log', range, '--format=- %s', '--no-merges')}\n`)
 
-  // Core first, so the admin and the starter never name a version of it that is missing. A package already at the version
+  // Shared rich text first, then core, admin and the starter, so their exact dependencies exist before they ship. A package already at the version
   // is skipped, so a run that failed partway finishes the rest when it is re-run.
   for (const { dir, name } of packages) {
     if (published(`${name}@${version}`)) {

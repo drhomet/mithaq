@@ -17,7 +17,6 @@ import { createServer as createHttpServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -81,7 +80,8 @@ const vocabularyWithout = (missing: readonly string[]) => {
   for (const [part, key] of missing.flatMap((name) => wordsOf[name] ?? [])) delete words[part][key]
   return words
 }
-const scratch = mkdtempSync(join(tmpdir(), 'mithaq-release-'))
+mkdirSync(join(root, '.pack'), { recursive: true })
+const scratch = mkdtempSync(join(root, '.pack/mithaq-release-'))
 /**
  * Every message a consumer mails, caught on this machine: a production start needs a mailer, and the project's Resend
  * mailer posts here through `RESEND_BASE_URL`, so nothing reaches Resend.
@@ -108,24 +108,33 @@ const linkMailed = async (email: string) => {
 const authBrowser = await authPostBrowser()
 try {
   command(process.execPath, ['apps/pack.ts'], root)
-  for (const name of ['mithaq', 'mithaq-admin']) command('npm', ['pack', `.pack/${name}`, '--pack-destination', scratch], root)
+  for (const name of ['mithaq-rich-text', 'mithaq', 'mithaq-admin']) command('npm', ['pack', `.pack/${name}`, '--pack-destination', scratch], root)
   const { version: published } = JSON.parse(readFileSync(join(root, '.pack/mithaq/package.json'), 'utf8')) as { version: string }
-  for (const name of ['mithaq', 'mithaq-admin', 'create-mithaq']) {
+  for (const name of ['mithaq-rich-text', 'mithaq', 'mithaq-admin', 'create-mithaq']) {
     const { repository, homepage, bugs } = JSON.parse(readFileSync(join(root, `.pack/${name}/package.json`), 'utf8')) as { repository?: { url: string }; homepage?: string; bugs?: { url: string } }
     assert.deepEqual([repository?.url, homepage, bugs?.url], ['git+https://github.com/drhomet/mithaq.git', 'https://github.com/drhomet/mithaq#readme', 'https://github.com/drhomet/mithaq/issues'], `.pack/${name} names the public repository`)
   }
   const tarball = `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`
   const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
-  withoutRichText(tarball)
-  // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
-  // by sign-up; one never shown, with an open sign-up, which a production start refuses without a mailer.
-  for (const run of [
-    { manager: 'bun', addOns: ['--full'], modes: ['--organization-name', "Noor's School", '--organization-name-ar', 'مدرسة النور'] },
-    { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
-    { manager: 'bun', addOns: ['--with', 'jobs'], modes: ['--organizations', 'many'] },
-    { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
-    { manager: 'bun', addOns: ['--with', 'settings,backoffice,rich-text,media'], modes: ['--organizations', 'many'] },
-  ]) await release({ tarball, adminTarball, ...run })
+  const richTextTarball = `file:${join(scratch, `drhomet-mithaq-rich-text-${published}.tgz`)}`
+  // The staged template is a test fixture: only this run overrides the unpublished exact dependency with its tarball.
+  const templateManifest = join(root, '.pack/create-mithaq/template/package.json')
+  const originalTemplate = readFileSync(templateManifest, 'utf8')
+  writeFileSync(templateManifest, JSON.stringify({ ...JSON.parse(originalTemplate), overrides: { '@drhomet/mithaq-rich-text': richTextTarball } }))
+  try {
+    withoutRichText({ tarball, richTextTarball })
+    // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
+    // by sign-up; one never shown, with an open sign-up, which a production start refuses without a mailer.
+    for (const run of [
+      { manager: 'bun', addOns: ['--full'], modes: ['--organization-name', "Noor's School", '--organization-name-ar', 'مدرسة النور'] },
+      { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
+      { manager: 'bun', addOns: ['--with', 'jobs'], modes: ['--organizations', 'many'] },
+      { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
+      { manager: 'bun', addOns: ['--with', 'settings,backoffice,rich-text,media'], modes: ['--organizations', 'many'] },
+    ]) await release({ tarball, adminTarball, ...run })
+  } finally {
+    writeFileSync(templateManifest, originalTemplate)
+  }
   console.log('release consumer passed')
 } finally {
   await authBrowser?.close()
@@ -134,10 +143,10 @@ try {
 }
 
 /** A project with no rich text installs `mithaq` and no Lexical, and still typechecks and builds its language. */
-function withoutRichText(tarball: string) {
+function withoutRichText({ tarball, richTextTarball }: { tarball: string; richTextTarball: string }) {
   const project = join(scratch, 'npm-without-rich-text')
   mkdirSync(project)
-  writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'without-rich-text', private: true, type: 'module', dependencies: { mithaq: tarball } }))
+  writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'without-rich-text', private: true, type: 'module', dependencies: { mithaq: tarball }, overrides: { '@drhomet/mithaq-rich-text': richTextTarball } }))
   writeFileSync(join(project, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, module: 'nodenext', target: 'esnext', noEmit: true, skipLibCheck: true, types: [] }, files: ['index.ts'] }))
   writeFileSync(join(project, 'index.ts'), [
     "import { base, defaultAuthorize, defaultBulkLimit, defaultDepth, defaultFields, defaultJoinLimit, defaultLimit, defaultMaxBodyBytes, defaultMaxLimit, defaultOperations, defineMithaq, drizzleAdapter, drizzleKinds, drizzleRules, drizzleIdKinds, fetchHttp, serviceTarget, zodKinds, zodRules, zodIdKinds, zodTarget } from 'mithaq'",
@@ -224,6 +233,14 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     for (const workspace of workspaces) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq')), mithaq, `${workspace} loads the one mithaq`)
     // A second mithaq-admin is a second components map, so the template's shells and the app must draw from one.
     for (const workspace of drawing) assert.equal(realpathSync(installed(join(consumer, workspace), 'mithaq-admin')), admin, `${workspace} loads the one mithaq-admin`)
+    const rich = realpathSync(installed(mithaq, '@drhomet/mithaq-rich-text'))
+    assert.equal(realpathSync(installed(admin, '@drhomet/mithaq-rich-text')), rich, 'core and admin use one shared package')
+    if (chosen.includes('rich-text')) {
+      const lexical = realpathSync(installed(rich, 'lexical'))
+      for (const owner of [mithaq, admin, app, single ? consumer : join(consumer, 'packages/mithaq')]) {
+        assert.equal(realpathSync(installed(owner, 'lexical')), lexical, `${owner} loads the one Lexical`)
+      }
+    }
     // The asas, where every mithaq command runs, and the language, which holds the files a project keeps from mithaq-admin.
     const template = single ? consumer : join(consumer, 'packages/asas')
     const language = single ? consumer : join(consumer, 'packages/mithaq')

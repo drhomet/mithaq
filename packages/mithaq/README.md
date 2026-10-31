@@ -1241,6 +1241,16 @@ unit tests; apps add their own script without a new workflow.
 
 ## Rich text features
 
+Shared nodes, JSON versions and readers, value guards, policy, feature data and
+support registry now live in [`@drhomet/mithaq-rich-text`](../mithaq-rich-text/README.md).
+Apps without a mithaq server, including Rounds, install only that package and
+its Lexical 0.52.0 peers. Core keeps the `richText` rukn, zod and drizzle targets,
+comments service and write version gate; mithaq-admin keeps the React editor.
+The existing `mithaq/rich-text`, `/client`, `/mention` and `/registry` paths
+re-export the same shared classes. Pin core, admin and rich text to the same
+release, with one copy of rich text and Lexical per app. Stored JSON and editor
+behaviour are unchanged.
+
 A project installs features in its `richText` rukn. The starter writes the
 selection in `src/mithaq/rich-text-features.ts`. Existing projects can add that
 file and pass its config alongside `nodes` in their rukn. No vocabulary or
@@ -1355,7 +1365,7 @@ richText({
 })
 ```
 
-Browser pieces import shared readers and nodes from `mithaq/rich-text/client`,
+Browser pieces import shared readers and nodes from `@drhomet/mithaq-rich-text/client`,
 which leaves the server factory and its optional imports out of their bundles.
 Browser extensions import the DOM-free `MentionNode` from
 `mithaq/rich-text/mention`; the server rukn registers it automatically. This

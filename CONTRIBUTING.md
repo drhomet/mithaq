@@ -33,7 +33,7 @@ bun run test:tanstack
 bun run test:next
 ```
 
-Before a release, `bun run pack` stages the three published packages in `.pack/`, and `bun run test:release` creates a project from them and runs it end to end.
+Before a release, `bun run pack` stages the four published packages in `.pack/`, and `bun run test:release` creates a project from them and runs it end to end.
 
 From `templates/asas/`, with `DATABASE_URL` exported, and then from `templates/mithaq/`, `apps/asas-tanstack/` and `apps/asas-backoffice/`, which hold files from mithaq-admin:
 
@@ -67,6 +67,7 @@ mithaq/
   .github/workflows/  ci.yml runs the checks; release.yml publishes a pushed v tag
   packages/
     mithaq/           the framework, published as @drhomet/mithaq
+    mithaq-rich-text/ the shared nodes, JSON readers, policy and registry, published as @drhomet/mithaq-rich-text
     mithaq-admin/     the admin's pieces, the screen host, storage adapters and steps, published as @drhomet/mithaq-admin
     create-mithaq/    the bun create starter
   templates/          the template a project starts from, in its three steps
@@ -99,7 +100,8 @@ The guides sit beside the code they describe, each as its folder's `README.md`:
 - [`packages/mithaq/src/asas/cli/README.md`](packages/mithaq/src/asas/cli/README.md), the `mithaq` command;
 - [`packages/mithaq/src/asas/runner/README.md`](packages/mithaq/src/asas/runner/README.md), tenancy;
 - [`packages/mithaq/src/drizzle/README.md`](packages/mithaq/src/drizzle/README.md), migrations in production;
-- [`packages/mithaq-admin/README.md`](packages/mithaq-admin/README.md), the admin package.
+- [`packages/mithaq-admin/README.md`](packages/mithaq-admin/README.md), the admin package;
+- [`packages/mithaq-rich-text/README.md`](packages/mithaq-rich-text/README.md), shared rich text.
 
 Every guide above but the front page also ships in `@drhomet/mithaq` under `docs/`, at its repository path, so the links between them resolve in `node_modules/mithaq/docs/`, where a created project's agent reads the guides of the version it installed. A new user guide joins the list in `apps/pack.ts`, and `apps/pack.test.ts` proves the package holds it.
 
@@ -112,7 +114,7 @@ The folders follow the parts of the framework. `index.ts` re-exports the public 
 | `mithaq/` | The language. `language.ts` has `defineMithaq` and the target types and capabilities; `define.ts` has `defineKayan` and `defineGlobal`; `resolve.ts` resolves each kayan and holds most of the build's refusals; `rukn.ts` has `defineRukn` and how arkan merge; `rows.ts` compiles access row tables; `lock.ts` is `mithaq lock` and `vocabularyOf`; `messages.ts` and `generate-messages.ts` are the copy and `mithaq generate messages`; `where.ts`, `user.ts`, `types.ts`, `refusal.ts` and `standard-schema.ts` are shared types and helpers. |
 | `asas/` | The runtime. `build.ts` is `buildAsas`; `actor.ts` resolves who is calling; `http/` holds the two HTTP plugs, `fetchHttp` and `orpcHttp`; `runner/` runs operations (`write.ts`, `read.ts`, `bulk.ts`, the shipped steps and `defaultOperations` in `steps.ts`, the organization scope in `tenant.ts`, refusals in `errors.ts`); `cli/` is the `mithaq` bin (`mithaq.ts`) and `mithaq upgrade --check` (`upgrade.ts`). |
 | `base/` | The `base` rukn: the shipped kinds (`kinds.ts`), rules (`rules.ts`), `defaultFields` and its parts (`fields.ts`), and exact decimals (`decimal.ts`). |
-| `rich-text/` | The `richText` rukn and its Lexical reading and writing, with `defaultNodes`, behind `mithaq/rich-text`; `value.ts` is the Lexical-free part the rest of core imports. |
+| `rich-text/` | The `richText` rukn, comments service and compatibility exports; shared readers, nodes, policy and registry live in `packages/mithaq-rich-text`. Core imports its Lexical-free `/value` and `/policy` entries. |
 | `storage/` | The storage rukn: the `upload` kind, the storage target, `uploadFields` and the building blocks the defaults call. |
 | `versions/` | The `versions` rukn: the versions target, `draftFields` and `versionOperations`. |
 | `drizzle/` | The Postgres store: `drizzleAdapter` (`index.ts`), its kinds and rules, `mithaq migrate` (`migrate.ts`), and `proxy/`, which re-exports drizzle-orm as `mithaq/drizzle`. |
@@ -165,20 +167,32 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 
 Before tagging each future release, add an entry to [CHANGELOG.md](CHANGELOG.md), grouped into breaking changes, additions and fixes. The 0.2.0 entry records what changed since 0.1.1; its upgrade link gives the steps a project takes.
 
-The three packages share one version, `publishConfig.version` in `packages/mithaq/package.json`. The maintainer releases:
+The four packages share one version, `publishConfig.version` in `packages/mithaq/package.json`. The maintainer releases:
 
 ```sh
 node apps/release.ts 0.2.0          # on a clean, up-to-date main: commits the version and tags v0.2.0
 git push --atomic origin main v0.2.0
 ```
 
-The `release` run runs every check and stages the packages, then waits for the maintainer's approval in the repository's Actions tab. Approved, it publishes the three packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release from the commit subjects since the previous tag. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
+The `release` run runs every check and stages the packages, then waits for the maintainer's approval in the repository's Actions tab. Approved, it publishes the four packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release from the commit subjects since the previous tag. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
 
 Set up once:
 
+The owner must create `@drhomet/mithaq-rich-text` with a first manual publish,
+because trusted publishing cannot create a package. After this change is
+merged and checked, stage the release and run
+`npm publish .pack/mithaq-rich-text --access public` with two-factor
+authentication. On npmjs.com add its Trusted Publisher: GitHub Actions,
+repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`, allowed
+action `npm publish`. Complete its first trusted publish within two days of
+saving that configuration. Set Publishing access to "Require two-factor
+authentication and disallow tokens", and revoke old tokens. This is owner setup;
+contributors do not publish from a pull request. The shared package publishes
+before core, then admin and the starter, all at one version.
+
 1. Publish `@drhomet/mithaq-admin` once by hand, since trusted publishing cannot create a package: `bun run pack && npm publish .pack/mithaq-admin --access public`.
 2. Tag the current release, so the next release's notes start there rather than at the first commit: `git tag -a v0.1.1 4527ae1 -m v0.1.1 && git push origin v0.1.1`. That commit has no `release.yml`, so the tag starts no run.
-3. On npmjs.com, for each of `@drhomet/mithaq`, `@drhomet/mithaq-admin` and `create-mithaq`, add a Trusted Publisher: GitHub Actions, repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`, allowed action `npm publish`. Then set Publishing access to "Require two-factor authentication and disallow tokens", and revoke the old tokens.
+3. On npmjs.com, for each of `@drhomet/mithaq-rich-text`, `@drhomet/mithaq`, `@drhomet/mithaq-admin` and `create-mithaq`, add a Trusted Publisher: GitHub Actions, repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`, allowed action `npm publish`. Then set Publishing access to "Require two-factor authentication and disallow tokens", and revoke the old tokens.
 4. In the repository's settings, create the environment `npm` with the maintainer as required reviewer and deployment tags limited to `v*`, and add a tag ruleset so only the maintainer creates `v*` tags.
 
 ## Send a pull request

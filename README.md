@@ -129,7 +129,7 @@ organization: tenant.field,
 - **Auth:** Better Auth (`betterAuth`) or local accounts (`local`), with `mithaq generate auth` writing the Better Auth kayan.
 - **Versions and drafts:** the `versions` rukn keeps a row's past versions, with drafts, autosave and restore.
 - **Files:** the `storage` rukn and the `upload` kind. The template ships adapters for local disk, Cloudflare R2, S3-compatible services and UploadThing as project files.
-- **Rich text:** the `richText` rukn, over Lexical.
+- **Rich text:** the `richText` rukn, over Lexical. Shared nodes, JSON readers, policy and registry also ship alone as [`@drhomet/mithaq-rich-text`](packages/mithaq-rich-text/README.md), for apps without a mithaq server.
 - **Admin screens:** `screenTarget` describes each screen; `mithaq generate screens` writes its routes into the host app, and the React components come from the `mithaq-admin` package, drawn with the app's own shadcn primitives, and a project ejects the ones it wants to own. `mithaq upgrade --check` compares the files it holds with the installed version.
 - **Copy:** `mithaq generate messages` writes the project's labels and messages to one file per kayan, and refuses a label missing a locale.
 

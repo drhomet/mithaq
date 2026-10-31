@@ -1,4 +1,4 @@
-// Stages the published packages in `.pack/mithaq/`, `.pack/mithaq-admin/` and `.pack/create-mithaq/`, to publish with `npm publish <dir> --access public`.
+// Stages the published packages in `.pack/mithaq/`, `.pack/mithaq-admin/`, `.pack/mithaq-rich-text/` and `.pack/create-mithaq/`, to publish with `npm publish <dir> --access public`.
 // Staged rather than published from `packages/mithaq`, because npm and Bun ignore `publishConfig.exports` and only pnpm applies it.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -16,11 +16,11 @@ const { publishConfig, private: _private, devDependencies: _dev, scripts: _scrip
 
 // Committed files only, as the template is staged, so nothing left in the working tree ships.
 const tracked = (...paths: string[]) => execFileSync('git', ['ls-files', '-z', ...paths], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
-const guides = ['packages/mithaq/src/drizzle/sqlite/README.md', 'packages/mithaq/README.md', 'packages/mithaq/src/auth/better-auth/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'templates/asas/README.md']
+const guides = ['packages/mithaq/src/drizzle/sqlite/README.md', 'packages/mithaq/README.md', 'packages/mithaq/src/auth/better-auth/README.md', 'packages/mithaq/src/asas/cli/README.md', 'packages/mithaq/src/asas/runner/README.md', 'packages/mithaq/src/drizzle/README.md', 'packages/mithaq-admin/README.md', 'packages/mithaq-rich-text/README.md', 'templates/asas/README.md']
 const skills = 'templates/asas/.claude/skills'
 // The build compiles every `src/**/*.ts` it finds, so a file git does not track there would ship in `dist/`. Release CI
 // checks out clean; this guards a publish from a working tree, over every path staged from the tree.
-const untracked = execFileSync('git', ['ls-files', '-z', '--others', '--exclude-standard', 'packages/mithaq/src', 'LICENSES', ...guides, skills], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
+const untracked = execFileSync('git', ['ls-files', '-z', '--others', '--exclude-standard', 'packages/mithaq/src', 'packages/mithaq-rich-text/src', 'LICENSES', ...guides, skills], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
 assert.deepEqual(untracked, [], 'git tracks none of these files: commit or remove each before packing')
 const stageLicenses = (to: string) => {
   cpSync(join(root, 'LICENSE'), join(to, 'LICENSE'))
@@ -35,7 +35,24 @@ for (const [entry, file] of Object.entries(manifest.exports)) {
   assert.equal(built, file.replace(/^\.\/src\//, './dist/').replace(/\.ts$/, '.js'), `${entry} is published from the build of ${file}`)
   assert.ok(existsSync(join(staged, built)), `${built} was built`)
 }
-writeFileSync(join(staged, 'package.json'), `${JSON.stringify({ ...manifest, ...publishConfig }, null, 2)}\n`)
+writeFileSync(join(staged, 'package.json'), `${JSON.stringify({ ...manifest, ...publishConfig, dependencies: { ...(manifest.dependencies as Record<string, string>), '@drhomet/mithaq-rich-text': publishConfig.version } }, null, 2)}\n`)
+
+// The shared readers and node classes ship alone, without core or the admin's server dependencies.
+const rich = join(root, 'packages/mithaq-rich-text')
+const stagedRich = join(root, '.pack/mithaq-rich-text')
+rmSync(stagedRich, { recursive: true, force: true })
+const { publishConfig: richPublished, private: _richPrivate, devDependencies: _richDev, ...richManifest } = JSON.parse(readFileSync(join(rich, 'package.json'), 'utf8')) as { publishConfig: { exports: Record<string, string> }; exports: Record<string, string>; [key: string]: unknown }
+execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(rich, 'tsconfig.build.json'), '--outDir', join(stagedRich, 'dist')], { stdio: 'inherit' })
+assert.deepEqual(Object.keys(richPublished.exports), Object.keys(richManifest.exports))
+for (const [entry, file] of Object.entries(richManifest.exports)) {
+  const built = richPublished.exports[entry]!
+  assert.equal(built, file.replace(/^\.\/src\//, './dist/').replace(/\.ts$/, '.js'))
+  assert.ok(existsSync(join(stagedRich, built)), `${built} was built`)
+}
+writeFileSync(join(stagedRich, 'package.json'), `${JSON.stringify({ ...richManifest, ...richPublished, version: publishConfig.version }, null, 2)}\n`)
+cpSync(join(rich, 'README.md'), join(stagedRich, 'README.md'))
+stageLicenses(stagedRich)
+console.log(`staged ${stagedRich}`)
 
 // The admin's pieces as TSX source, which each project compiles against its own primitives. registry/ui, lib and hooks are
 // shadcn's own, held for the package's typecheck and tests; only directional-icon.tsx, which an item names, ships.
@@ -50,11 +67,11 @@ const adminFiles = execFileSync('git', ['ls-files', '-z', 'registry', 'registry.
 for (const file of adminFiles) cpSync(join(admin, file), join(stagedAdmin, file))
 const { items } = JSON.parse(readFileSync(join(admin, 'registry.json'), 'utf8')) as { items: { name: string; files: { path: string }[] }[] }
 for (const { name, files } of items) for (const { path } of files) assert.ok(existsSync(join(stagedAdmin, path)), `${name} names ${path}, which ships`)
-// One version for the three packages, so a project that pins them together cannot pair two that drifted apart.
+// One version for the four packages, so a project that pins them together cannot pair two that drifted apart.
 // ponytail: the `mithaq` peer stays "*". A `file:` tarball, as test:release installs mithaq, satisfies only `*` in Bun's
 // isolated linker; whether an `npm:` alias satisfies an exact pin is untested. Pin the release version once a consumer
 // installed from the registry proves it.
-writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version }, null, 2)}\n`)
+writeFileSync(join(stagedAdmin, 'package.json'), `${JSON.stringify({ ...adminManifest, ...adminPublished, version: publishConfig.version, dependencies: { ...(adminManifest.dependencies as Record<string, string>), '@drhomet/mithaq-rich-text': publishConfig.version } }, null, 2)}\n`)
 stageLicenses(stagedAdmin)
 console.log(`staged ${stagedAdmin}, with ${adminFiles.length} files`)
 
