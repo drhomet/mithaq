@@ -93,7 +93,8 @@ const replace = ({ runs, start, end, raw }: { runs: Runs; start: number; end: nu
     at += line.length + 1
   }
 
-  const inherit = runs.paragraphs.findLast((p) => p.start <= start)!
+  // filter().pop(), not findLast: ES2023 built-ins are not proven on PrimJS.
+  const inherit = runs.paragraphs.filter((p) => p.start <= start).pop()!
   const paragraphs = [
     ...runs.paragraphs.filter((p) => p.start <= start).map((p) => ({ ...p })),
     ...[...ins.matchAll(/\n/g)].map((m) => ({ ...inherit, start: start + m.index + 1 })),
