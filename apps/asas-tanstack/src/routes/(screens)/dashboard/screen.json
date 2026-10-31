@@ -219,7 +219,11 @@
   "components": {
     "activity": "@asas/mithaq:./src/ui/activity.tsx#Activity",
     "activityLog": "@asas/mithaq:./src/ui/activity.tsx#ActivityTab",
-    "versions": "./src/ui-dashboard/versions.tsx#Versions"
+    "versions": "./src/ui-dashboard/versions.tsx#Versions",
+    "fileCell": "@asas/mithaq:./src/ui/uploads.tsx#FileCell",
+    "fileSizeCell": "@asas/mithaq:./src/ui/uploads.tsx#FileSizeCell",
+    "fileDetails": "@asas/mithaq:./src/ui/uploads.tsx#FileDetails",
+    "newUpload": "@asas/mithaq:./src/ui/uploads.tsx#NewUpload"
   },
   "controls": {
     "text": {
@@ -3257,7 +3261,7 @@
                       "columns": [
                         {
                           "field": "filename",
-                          "cell": "@asas/media:./media/ui/preview.tsx#FileName",
+                          "cell": "@asas/mithaq:./src/ui/uploads.tsx#FileCell",
                           "decided": "leaf"
                         },
                         {
@@ -3272,7 +3276,7 @@
                         },
                         {
                           "field": "filesize",
-                          "cell": "@asas/media:./media/ui/preview.tsx#FileSize",
+                          "cell": "@asas/mithaq:./src/ui/uploads.tsx#FileSizeCell",
                           "decided": "leaf"
                         },
                         {
@@ -3294,7 +3298,7 @@
         },
         "create": {
           "path": "/media/new",
-          "component": "@asas/media:./media/ui/preview.tsx#NewImage"
+          "component": "@asas/mithaq:./src/ui/uploads.tsx#NewUpload"
         },
         "edit": {
           "path": "/media/:id",
@@ -3377,7 +3381,7 @@
                 ],
                 "side": [
                   {
-                    "component": "@asas/media:./media/ui/preview.tsx#MediaPreview"
+                    "component": "@asas/mithaq:./src/ui/uploads.tsx#FileDetails"
                   }
                 ]
               }

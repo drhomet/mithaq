@@ -47,13 +47,13 @@ const apiOf = (client: FetchClient) => ({ media: { find: (input: Record<string, 
 
 let mounted: ReturnType<typeof createRoot> | undefined
 const mayCreate = { collections: { media: { create: true, operations: { create: true }, fields: { alt: { create: true } } } } } as unknown as ScreenState['access']
-const render = async (element: ReactElement, client: FetchClient = clientOf([]), access: ScreenState['access'] = mayCreate) => {
+const render = async (element: ReactElement, client: FetchClient = clientOf([]), access: ScreenState['access'] = mayCreate, over: Partial<ScreenState> = {}) => {
   const previous = mounted
   if (previous) await act(async () => previous.unmount())
   const host = mount()
   const root = createRoot(host)
   mounted = root
-  const state: ScreenState = { t, locale: 'en', dir: 'ltr', screen, access, user: { name: 'Admin', email: 'admin@example.com' }, client }
+  const state: ScreenState = { t, locale: 'en', dir: 'ltr', screen, access, user: { name: 'Admin', email: 'admin@example.com' }, client, ...over }
   await act(async () => root.render(createElement(ScreenContext, { value: state }, createElement(ComponentsProvider, { components: defaultComponents }, element))))
   await act(async () => sleep(20))
   return host
@@ -383,4 +383,110 @@ test('the unattached upload cap is translated with its limit and cannot be retri
   const { refusalOf } = await import('../registry/upload-api.ts')
   const error = Object.assign(new Error('Attach a file first.'), { data: { key: 'error.invalid.upload_limit', params: { limit: 5 } } })
   assert.deepEqual(refusalOf(error, () => 'أرفق ملفا أو احذفه أولا. الحد {limit}.'), { words: 'أرفق ملفا أو احذفه أولا. الحد 5.', retry: false })
+})
+
+// An upload kayan of another name than the template's, so nothing below holds because the kayan is called `media`.
+const files = { ...media, name: 'files', pages: { list: { path: '/files' }, create: { path: '/files/new' }, edit: { path: '/files/:id' } } } as unknown as typeof media
+const mayCreateFiles = { collections: { files: { create: true, operations: { create: true }, fields: { alt: { create: true } } } } } as unknown as ScreenState['access']
+const filesClient = (asked: { operation: string; input: Record<string, unknown> }[]) => clientOf(asked, {
+  uploadInstructions: () => ({ type: 'http', request: { method: 'PUT', url: '/api/storage/local/token', headers: {} }, file: { uploadReference: { id: 'n9' } } }),
+  create: (input) => ({ ...png, id: 'n9', url: '/api/files/file/n9', thumbnailURL: '/api/files/file/n9', ...input }),
+})
+/** Chooses a file and fills the alternative text in the open dialog of `kayan`, then sends it. */
+const uploadIn = async (kayan: string) => {
+  const dialog = window.document.querySelector(`[data-upload-dialog="${kayan}"]`) as unknown as Element
+  const input = dialog.querySelector('input[type="file"]') as unknown as HTMLInputElement
+  Object.defineProperty(input, 'files', { value: [new File([new Uint8Array([1, 2, 3])], 'new.png', { type: 'image/png' })], configurable: true })
+  await act(async () => fire(input as unknown as Element, 'change'))
+  await act(async () => typeInto(dialog.querySelector(`#upload-${kayan}-alt`)!, 'New'))
+  await act(async () => typeInto(dialog.querySelector(`#upload-${kayan}-alt-ar`)!, 'جديد'))
+  await act(async () => fire(dialog.querySelector('form')!, 'submit'))
+  await act(async () => sleep(20))
+}
+
+test('186ag. an upload kayan lists each file by its thumbnail before its name, or its name alone, and its size as a person reads it', async () => {
+  const { FileCell, FileSizeCell } = await import('../registry/upload-pages.tsx')
+  const filename = files.fields.find((one) => one.name === 'filename')!
+  const image = await render(createElement(FileCell, { field: filename, value: 'cover.png', row: { ...png, url: '/api/files/file/a1', thumbnailURL: '/api/files/file/a1' } }))
+  assert.equal(image.querySelector('img[data-upload-thumbnail]')?.getAttribute('src'), '/api/files/file/a1', 'the thumbnail through the row\'s own file route')
+  assert.equal(image.textContent, 'cover.png', 'before the name')
+  assert.equal(image.querySelector('[title="cover.png"]')?.className.includes('min-w-28'), true, 'which keeps room enough to be read on a phone')
+  const other = await render(createElement(FileCell, { field: filename, value: 'notes.pdf', row: pdf }))
+  assert.equal(other.querySelector('img'), null, 'a file that is no image has no thumbnail')
+  assert.equal(other.textContent, 'notes.pdf', 'and is named once')
+  assert.equal(other.querySelector('[title="notes.pdf"]')?.className.includes('min-w-28'), true, 'wrapping as an image\'s name does, never cut to one line')
+  const size = await render(createElement(FileSizeCell, { field: files.fields.find((one) => one.name === 'filesize')!, value: 2048, row: png }))
+  assert.equal(size.textContent, '2 kilobytes', 'the size is never the raw bytes')
+  const { sizeOf } = await import('../registry/upload-api.ts')
+  assert.deepEqual([sizeOf(512, 'en'), sizeOf(1536 * 1024, 'en')], ['512 bytes', '1.5 megabytes'])
+  assert.deepEqual([sizeOf(512, 'ar'), sizeOf(1536 * 1024, 'ar')].map((one) => one.replace(/[\d٠-٩٫.]+\s*/, '')), ['بايت', 'ميغابايت'], 'and in Arabic')
+})
+
+test('186ah. an upload kayan\'s New page opens the upload dialog at once, opens the new row once it is made, and goes back to the list on Cancel', async (context) => {
+  const { NewUpload } = await import('../registry/upload-pages.tsx')
+  const went: string[] = []
+  context.mock.method(window.location as unknown as Record<'assign', (to: string) => void>, 'assign', (to: string) => void went.push(to))
+  const asked: { operation: string; input: Record<string, unknown> }[] = []
+  const page = () => render(createElement(NewUpload, { locales: ['ar', 'en'] }), filesClient(asked), mayCreateFiles, { kayan: files })
+  await page()
+  assert.equal(window.document.querySelector('[data-upload-dialog="files"]') !== null, true, 'the dialog for the page\'s own kayan is open at once')
+  await uploadIn('files')
+  assert.deepEqual(asked.map((one) => one.operation), ['uploadInstructions', 'create'], 'the file is sent before the row is made')
+  assert.deepEqual(asked[1]!.input, { alt: { ar: 'جديد', en: 'New' }, uploadReference: { id: 'n9' } }, 'with its declared fields')
+  assert.deepEqual(went, ['/dashboard/files/n9'], 'and the new row opens, and the dialog closing itself is no Cancel')
+
+  went.length = 0
+  await page()
+  const cancel = [...window.document.querySelectorAll('[data-upload-dialog="files"] button')].find((one) => one.textContent === 'Cancel')
+  await act(async () => click(cancel as unknown as Element))
+  assert.deepEqual(went, ['/dashboard/files'], 'Cancel goes back to the list')
+  assert.equal(window.document.querySelector('[data-upload-new-page] button') !== null, true, 'and the page under the dialog opens it again')
+
+  const bare = await render(createElement(NewUpload, { locales: ['ar', 'en'] }), filesClient([]), mayCreateFiles, { kayan: { ...files, storage: undefined } })
+  assert.equal(bare.textContent, '', 'a kayan that keeps no files has no upload page to draw')
+})
+
+test('186ai. an upload kayan\'s edit page leads with the file, its size, Download through the file route, and Replace file, which uploads a new file and opens it, leaving this one', async (context) => {
+  const { FileDetails } = await import('../registry/upload-pages.tsx')
+  const went: string[] = []
+  context.mock.method(window.location as unknown as Record<'assign', (to: string) => void>, 'assign', (to: string) => void went.push(to))
+  const asked: { operation: string; input: Record<string, unknown> }[] = []
+  const record = { ...png, filesize: 2048, url: '/api/files/file/a1', thumbnailURL: '/api/files/file/a1' }
+  const details = (access: ScreenState['access']) => render(createElement(FileDetails, { locales: ['ar', 'en'] }), filesClient(asked), access, { kayan: files, record })
+  let host = await details(mayCreateFiles)
+  assert.equal(host.querySelector('[data-file-details]')?.hasAttribute('data-lead'), true, 'marked to lead, so the record layout puts it above the form on a phone')
+  assert.equal(host.querySelector('img[data-upload-thumbnail]')?.getAttribute('src'), '/api/files/file/a1', 'the file itself')
+  assert.equal(host.textContent?.includes('2 kilobytes'), true, 'its size')
+  assert.equal(host.querySelector('[data-file-download]')?.getAttribute('download'), 'cover.png', 'Download saves it under its name')
+  assert.equal(host.querySelector('[data-file-download]')?.getAttribute('href'), '/api/files/file/a1', 'through the file route')
+  await act(async () => click(host.querySelector('[data-file-replace]')!))
+  assert.equal(window.document.querySelector('[data-upload-dialog="files"]') !== null, true, 'Replace file opens the upload dialog for this kayan')
+  await uploadIn('files')
+  assert.deepEqual(asked.map((one) => one.operation), ['uploadInstructions', 'create'], 'it makes a new row, and never updates or deletes this one')
+  assert.deepEqual(went, ['/dashboard/files/n9'], 'and opens it')
+  host = await details({ collections: { media: { create: true } } } as never)
+  assert.equal(host.querySelector('[data-file-replace]'), null, 'not offered to a viewer who may not make a file of this kayan')
+  assert.equal(host.querySelector('[data-file-download]') !== null, true, 'who may still download it')
+  host = await details({ collections: { files: { create: true, operations: { create: false }, fields: { alt: { create: true } } } } } as never)
+  assert.equal(host.querySelector('[data-file-replace]'), null, 'nor where the create operation itself is refused, though another create-type operation is allowed')
+  host = await details({ collections: { files: { create: true, operations: { create: true }, fields: { alt: { create: false } } } } } as never)
+  assert.equal(host.querySelector('[data-file-replace]'), null, 'nor to one who may write none of its fields')
+  host = await render(createElement(FileDetails, { locales: ['ar', 'en'] }), filesClient([]), mayCreateFiles, { kayan: { ...files, storage: undefined }, record })
+  assert.equal(host.querySelector('[data-file-replace]'), null, 'nor on a kayan that keeps no files')
+})
+
+test('186aj. the template\'s media draws with the built-ins its dashboard registers, and holds no copies of its own', async () => {
+  const { existsSync } = await import('node:fs')
+  assert.equal(existsSync(new URL('../../../templates/features/media/media/ui/preview.tsx', import.meta.url)), false, 'the copied pieces are gone')
+  const of = (name: string) => screen.components[name]
+  assert.deepEqual(['fileCell', 'fileSizeCell', 'fileDetails', 'newUpload'].map((name) => of(name)?.replace(/^.*\//, '')), ['uploads.tsx#FileCell', 'uploads.tsx#FileSizeCell', 'uploads.tsx#FileDetails', 'uploads.tsx#NewUpload'])
+  const list = JSON.stringify(media.pages.list)
+  assert.equal(list.includes(`"field":"filename","cell":"${of('fileCell')}"`) && list.includes(`"field":"filesize","cell":"${of('fileSizeCell')}"`), true, 'the list draws the file and size cells')
+  assert.equal((media.pages.create as { component?: string }).component, of('newUpload'), 'New is the upload page')
+  assert.equal(JSON.stringify(media.pages.edit).includes(`"component":"${of('fileDetails')}"`), true, 'and the edit page draws the file beside the form')
+  // The template's own page draws the built-in in its shell, with its locales.
+  const { NewUpload } = await import('../../../templates/mithaq/src/ui/uploads.tsx')
+  await render(createElement(NewUpload, { page: media.pages.create! }), clientOf([]), mayCreate, { kayan: media })
+  assert.equal(window.document.querySelector('[data-upload-dialog="media"]') !== null, true, 'the template\'s New page opens the dialog')
+  assert.equal(window.document.querySelectorAll('#upload-media-alt, #upload-media-alt-ar').length, 2, 'asking the alternative text in each of its locales')
 })

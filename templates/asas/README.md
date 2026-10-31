@@ -25,7 +25,7 @@ A project starts minimal: the language, the asas, the `auth` feature and the `ta
 | `settings` | The `settings` global, one row per organization. |
 | `rich-text` | The `richText` kind, its Lexical nodes (`packages/mithaq/src/mithaq/rich-text-nodes.ts`) and the editor. Without it, no Lexical is installed. |
 | `jobs` | The `jobs` target and its `mithaq_jobs` table, generated through normal migrations. `--with jobs` alone starts with no tasks. |
-| `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`). Needs `jobs` for its scheduled sweep. Without uploads, no storage setting is read. |
+| `uploads` | The `upload` kind, the storage target and its adapters (`packages/mithaq/src/storage/`), and `packages/mithaq/src/ui/uploads.tsx`, which the dashboard registers as the four components an upload kayan draws its own files with: `fileCell` and `fileSizeCell` for its list, `newUpload` for its New page and `fileDetails` beside its edit form. Needs `jobs` for its scheduled sweep. Without uploads, no storage setting is read. |
 | `media` | The organization's images (`media`), which an upload field points at. A holder of `media.create` reads every one; anyone else only what the features pointing at images hand it, such as the courses add-on's covers of the courses they read. Needs `uploads`. |
 | `courses` | The worked example: courses, sessions and enrollments, each course with a cover from the media, and the business roles that work them. Needs `media`, `roles`, `audit-log` and `rich-text`. |
 | `backoffice` | The backoffice console, `apps/asas-backoffice`. A single package cannot hold it. |

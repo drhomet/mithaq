@@ -1,10 +1,8 @@
-import { defaultFields, defaultOperations, folderOf, uploadFields, withUploadReference, type Where } from 'mithaq'
+import { defaultFields, defaultOperations, uploadFields, withUploadReference, type Where } from 'mithaq'
 import { defineKayan, organization } from '@asas/mithaq'
 import { readsPast } from '@asas/mithaq/roles/tenant-access.ts'
 import { appPage, danger, navGroups } from '@asas/mithaq/mithaq/pages.ts'
 import { storageConfig } from '@asas/mithaq/storage/index.ts'
-
-const ui = folderOf(new URL('./ui/', import.meta.url))
 
 /**
  * One way an actor that holds no `media.create` reads an image: the images it
@@ -69,18 +67,19 @@ export const media = ({ reads }: { reads: readonly ImageRead[] }) => defineKayan
     // made. The list draws each image's thumbnail beside its name and its size as a
     // person reads it. The file's own columns are the runner's, so the edit
     // page draws them read-only, with the image, its size, Download and
-    // Replace file beside the form, and above it on a phone.
+    // Replace file beside the form, and above it on a phone. Each is a piece
+    // the dashboard registers for any upload kayan.
     dashboard: {
       nav: { icon: 'table-2', group: navGroups.library },
       useAsTitle: 'filename',
       description: { en: 'The images this organization uses, each with the words a screen reader says for it.', ar: 'الصور التي تستخدمها هذه المؤسسة، ولكل منها الكلمات التي يقرؤها قارئ الشاشة.' },
       pages: {
         list: { path: '/media', page: appPage([{ layout: 'table', main: [{ list: {
-          columns: [{ field: 'filename', cell: ui('preview.tsx#FileName') }, 'alt', 'mimeType', { field: 'filesize', cell: ui('preview.tsx#FileSize') }, 'createdAt'],
+          columns: [{ field: 'filename', cell: 'fileCell' }, 'alt', 'mimeType', { field: 'filesize', cell: 'fileSizeCell' }, 'createdAt'],
           search: ['filename'],
           sort: '-createdAt',
         } }] }]) },
-        create: { path: '/media/new', component: ui('preview.tsx#NewImage') },
+        create: { path: '/media/new', component: 'newUpload' },
         edit: {
           path: '/media/:id',
           page: appPage([{
@@ -89,7 +88,7 @@ export const media = ({ reads }: { reads: readonly ImageRead[] }) => defineKayan
               { section: 'description', label: { en: 'Description', ar: 'الوصف' }, fields: ['alt'] },
               { section: 'file', label: { en: 'File', ar: 'الملف' }, fields: ['filename', 'mimeType', { row: ['width', 'height'] }] },
             ] }],
-            side: [{ component: ui('preview.tsx#MediaPreview') }],
+            side: [{ component: 'fileDetails' }],
           }], { more: danger() }),
         },
       },
