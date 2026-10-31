@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { CalloutNode } from '../../../mithaq-admin/test/callout-node.ts'
-import * as richText from './rich-text.ts'
+import * as richText from '@drhomet/mithaq-rich-text/rich-text'
 
 const { defaultNodes, richTextReader } = richText
 

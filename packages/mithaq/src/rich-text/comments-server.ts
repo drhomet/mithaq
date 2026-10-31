@@ -4,12 +4,12 @@ import type { Store } from '../mithaq/language.ts'
 import type { FieldAccess, ResolvedKayan } from '../mithaq/types.ts'
 import { combineWhere, type Where } from '../mithaq/where.ts'
 import type { Authorize, ManagedAdmin } from '../asas/runner/write.ts'
-import type { RichTextCommentOptions } from './policy.ts'
+import type { RichTextCommentOptions } from '@drhomet/mithaq-rich-text/policy'
 import type { AuditHandler, Context } from '../asas/runner/steps.ts'
 import { running } from '../asas/runner/runtime.ts'
 import { AsasError, codes, denied, invalid, missing } from '../asas/runner/errors.ts'
 import { boundedBody } from '../asas/http/fetch.ts'
-import { richTextBounds } from './value.ts'
+import { richTextBounds } from '@drhomet/mithaq-rich-text/value'
 
 export type Comment = { id: string; author: string; text: string; createdAt: string; editedAt?: string }
 export type CommentThread = { id: string; resolved: boolean; quote: string; comments: Comment[] }
