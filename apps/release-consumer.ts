@@ -117,24 +117,16 @@ try {
   const tarball = `file:${join(scratch, `drhomet-mithaq-${published}.tgz`)}`
   const adminTarball = `file:${join(scratch, `drhomet-mithaq-admin-${published}.tgz`)}`
   const richTextTarball = `file:${join(scratch, `drhomet-mithaq-rich-text-${published}.tgz`)}`
-  // The staged template is a test fixture: only this run overrides the unpublished exact dependency with its tarball.
-  const templateManifest = join(root, '.pack/create-mithaq/template/package.json')
-  const originalTemplate = readFileSync(templateManifest, 'utf8')
-  writeFileSync(templateManifest, JSON.stringify({ ...JSON.parse(originalTemplate), overrides: { '@drhomet/mithaq-rich-text': richTextTarball } }))
-  try {
-    withoutRichText({ tarball, richTextTarball })
-    // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
-    // by sign-up; one never shown, with an open sign-up, which a production start refuses without a mailer.
-    for (const run of [
-      { manager: 'bun', addOns: ['--full'], modes: ['--organization-name', "Noor's School", '--organization-name-ar', 'مدرسة النور'] },
-      { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
-      { manager: 'bun', addOns: ['--with', 'jobs'], modes: ['--organizations', 'many'] },
-      { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
-      { manager: 'bun', addOns: ['--with', 'settings,backoffice,rich-text,media'], modes: ['--organizations', 'many'] },
-    ]) await release({ tarball, adminTarball, ...run })
-  } finally {
-    writeFileSync(templateManifest, originalTemplate)
-  }
+  withoutRichText({ tarball, richTextTarball })
+  // Each organization mode once: the worked example as created, one organization by invitation; many, which founds
+  // by sign-up; one never shown, with an open sign-up, which a production start refuses without a mailer.
+  for (const run of [
+    { manager: 'bun', addOns: ['--full'], modes: ['--organization-name', "Noor's School", '--organization-name-ar', 'مدرسة النور'] },
+    { manager: 'npm', addOns: [], modes: ['--organizations', 'many'] },
+    { manager: 'bun', addOns: ['--with', 'jobs'], modes: ['--organizations', 'many'] },
+    { manager: 'bun', layout: 'single', addOns: ['--full'], modes: ['--organizations', 'one', '--show-organization', 'no', '--sign-up', 'open'] },
+    { manager: 'bun', addOns: ['--with', 'settings,backoffice,rich-text,media'], modes: ['--organizations', 'many'] },
+  ]) await release({ tarball, adminTarball, richTextTarball, ...run })
   console.log('release consumer passed')
 } finally {
   await authBrowser?.close()
@@ -173,7 +165,7 @@ function withoutRichText({ tarball, richTextTarball }: { tarball: string; richTe
   console.log('release consumer passed: npm-without-rich-text')
 }
 
-async function release({ manager, tarball, adminTarball, layout = 'monorepo', addOns, modes }: { manager: string; tarball: string; adminTarball: string; layout?: string; addOns: string[]; modes: string[] }) {
+async function release({ manager, tarball, adminTarball, richTextTarball, layout = 'monorepo', addOns, modes }: { manager: string; tarball: string; adminTarball: string; richTextTarball: string; layout?: string; addOns: string[]; modes: string[] }) {
   const single = layout === 'single'
   const many = modes.includes('many')
   const open = modes.includes('open')
@@ -187,7 +179,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
   try {
     // The project as `<manager> create mithaq` makes it, with `mithaq` and `mithaq-admin` pointed at the tarballs through flags
     // only this check passes, so neither is fetched from npm.
-    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, ...addOns, ...modes, '--password-delivery', 'email', '--mithaq', tarball, '--mithaq-admin', adminTarball], {
+    const created = spawnSync(process.execPath, [join(root, '.pack/create-mithaq/index.js'), name, '--layout', layout, ...addOns, ...modes, '--password-delivery', 'email', '--mithaq', tarball, '--mithaq-admin', adminTarball, '--mithaq-rich-text', richTextTarball], {
       cwd: scratch,
       encoding: 'utf8',
       timeout: 600_000,
@@ -239,6 +231,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
       const lexical = realpathSync(installed(rich, 'lexical'))
       for (const owner of [mithaq, admin, app, single ? consumer : join(consumer, 'packages/mithaq')]) {
         assert.equal(realpathSync(installed(owner, 'lexical')), lexical, `${owner} loads the one Lexical`)
+        assert.equal(realpathSync(installed(owner, '@drhomet/mithaq-rich-text')), rich, `${owner} loads the one shared package`)
       }
     }
     // The asas, where every mithaq command runs, and the language, which holds the files a project keeps from mithaq-admin.
@@ -277,6 +270,7 @@ async function release({ manager, tarball, adminTarball, layout = 'monorepo', ad
     // An ejected piece is drawn in place of the package's by every importer, the package's own pieces among them, in
     // whatever layout the manager installed: the type check reads it through `paths` and the build through `mithaq/vite`.
     command(installed(app, '.bin/mithaq'), ['eject', 'nav-links'], app)
+    if (chosen.includes('rich-text')) command(installed(app, '.bin/mithaq'), ['eject', 'rich-text-nodes'], app)
     const ejected = join(app, 'src/components/mithaq/nav-links.tsx')
     writeFileSync(ejected, `${readFileSync(ejected, 'utf8')}(globalThis as { ejectedProbe?: string }).ejectedProbe = 'mithaq-ejected-probe'\n`)
     for (const project of single ? ['.'] : ['apps/asas-tanstack', ...(backoffice ? ['apps/asas-backoffice'] : []), '.']) command(tsc, ['-p', project], consumer)

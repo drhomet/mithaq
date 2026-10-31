@@ -28,7 +28,8 @@
     "@lexical/markdown": "0.52.0",
     "@lexical/code-prism": "0.52.0",
     "@lexical/mark": "0.52.0",
-    "@lexical/hashtag": "0.52.0"
+    "@lexical/hashtag": "0.52.0",
+    "@drhomet/mithaq-rich-text": "0.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
