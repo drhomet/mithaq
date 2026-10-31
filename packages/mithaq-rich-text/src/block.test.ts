@@ -75,6 +75,16 @@ describe('what the phone cannot edit is locked whole and comes back untouched', 
     assert.deepEqual(saveBlock(editor, table), [list])
   })
 
+  test('a table inside a list item is an inline unit: the item stays editable and the table saves intact', () => {
+    const [list] = plain('x', { kind: 'bullet' }) as [Json]
+    const item = (list.children as Json[])[0] as Json
+    item.children = [...(item.children as Json[]), block.table!]
+    const { editor, table, runs } = open([list])
+    assert.equal(runs.text, 'x\uFFFC')
+    assert.deepEqual(runs.locked.map((u) => u.placement), ['inline'])
+    assert.deepEqual(saveBlock(editor, table), [list])
+  })
+
   test('two touching lists of one kind do not merge: the later one is locked', () => {
     const children = [...plain('a', { kind: 'bullet' }), ...plain('b', { kind: 'bullet' })]
     const { editor, table, runs } = open(children)
