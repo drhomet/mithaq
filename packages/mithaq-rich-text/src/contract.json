@@ -14,9 +14,14 @@
     "setSelection": {"params": {"start": "int", "end": "int"}},
     "focus": {},
     "blur": {},
-    "getContent": {"returns": "change"},
+    "getContent": {"returns": "content"},
     "undo": {},
     "flush": {}
+  },
+  "laidOutDirections": ["ltr", "rtl"],
+  "results": {
+    "change": {"runs": "runs", "selection": "selection", "isComposing": "boolean"},
+    "content": {"runs": "runs", "selection": "selection", "isComposing": "boolean", "directions": "laidOutDirection[]"}
   },
   "events": ["change", "selection", "focus", "blur", "linktap", "formatstate"],
   "errors": ["native-owns-content", "invalid-input", "composition-active", "locked-content"],
@@ -31,5 +36,6 @@
   },
   "changeDebounceMs": 300,
   "clipboardExpirySeconds": 120,
-  "undoDepth": 40
+  "undoDepth": 40,
+  "headings": {"h2": {"fontSize": 18, "lineHeight": 28, "fontWeight": 600}, "h3": {"fontSize": 16, "lineHeight": 24, "fontWeight": 600}}
 }
