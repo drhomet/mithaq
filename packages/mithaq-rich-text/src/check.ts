@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
-import { checkRichTextSupport, defaultNodeRegistry, richTextPlaces, type RichTextContract, type RichTextProfile } from './registry.ts'
+import { checkRichTextSupport, defaultNodeRegistry, richTextPlaces, runsCodecTypes, type RichTextContract, type RichTextProfile } from './registry.ts'
 import { checkRichTextPolicy, type RichTextPolicy } from './policy.ts'
 
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
@@ -41,7 +41,7 @@ const main = async () => {
     const contract: unknown = values.contract ? JSON.parse(readFileSync(resolve(values.contract), 'utf8')) : undefined
     code = 'invalid-input'
     if (!validProfile(profile) || !validPolicies(policies) || (contract !== undefined && !validContract(contract))) throw new Error()
-    const diagnostics = checkRichTextSupport({ profile, registry: defaultNodeRegistry, policies, contract })
+    const diagnostics = checkRichTextSupport({ profile, registry: defaultNodeRegistry, policies, contract, codecs: runsCodecTypes })
     if (values.json) for (const diagnostic of diagnostics) console.log(JSON.stringify(diagnostic))
     // One gap usually spans many nodes, so a person reads one line per gap rather than one per node.
     else for (const [key, items] of Map.groupBy(diagnostics, (item) => `${item.severity} ${item.code} at ${item.place ?? 'every place'}`)) {
