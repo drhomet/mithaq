@@ -380,6 +380,17 @@ the language and not the kayan. Leaving one out is a type error, and
 text upload node (`UploadView`, `imagePick` and `UploadPlugin`) is the item
 `mithaq-upload-node`, for a project that has both.
 
+An upload kayan's own screens come from `upload-pages.tsx`, the item
+`mithaq-upload-pages`, and read the kayan off the page they are drawn on:
+`FileCell` (the thumbnail, else the file's name) and `FileSizeCell` for its
+list, `NewUpload` for its New page, which opens `UploadDialog` and goes to
+the new row or back to the list, and `FileDetails` beside its edit form,
+with Download and Replace file. Replace uploads a new file and opens it; the
+old row stays. The starter registers each in the dashboard's `components`
+from its own `src/ui/uploads.tsx`, which hands them the project's locales
+and the New page its app shell, so a kayan names them (`cell: 'fileCell'`,
+`component: 'newUpload'`) and replaces any one with its own `ui()` reference.
+
 ## Replace a node
 
 A page's tree is drawn from the same map, one component per kind of node under

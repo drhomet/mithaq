@@ -487,6 +487,14 @@ export const dashboardScreen = screenTarget({
     // A row's versions, with their restore, which the edit page of a kayan that
     // keeps drafts draws in a tab of its own.
     versions: dashboardUi('versions.tsx#Versions'),
+    // add-on: uploads
+    // What an upload kayan draws of its own files: the list's file and size
+    // cells, its New page, and the file beside its edit form.
+    fileCell: ui('uploads.tsx#FileCell'),
+    fileSizeCell: ui('uploads.tsx#FileSizeCell'),
+    fileDetails: ui('uploads.tsx#FileDetails'),
+    newUpload: ui('uploads.tsx#NewUpload'),
+    // end add-on: uploads
   },
 })
 

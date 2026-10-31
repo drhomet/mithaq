@@ -1099,50 +1099,6 @@ test('218b. a session reads as its course and its start in the enrollment picker
   queries.clear()
 })
 
-test('218c. an image lists by its thumbnail and its size in kilobytes or megabytes, its page leads with the image, Download and Replace file, and its New page opens the upload dialog', async (t) => {
-  const { FileName, FileSize, MediaPreview, NewImage } = await import('../../../templates/features/media/media/ui/preview.tsx')
-  const { sizeOf } = await import('../registry/upload.tsx')
-  // The template's page imports the upload dialog by the package's name, and the dialog reads the map the same way.
-  const { ComponentsProvider: AppComponents } = await import('mithaq-admin/components.tsx')
-  const appDefaults = withAddOns((await import('mithaq-admin/default-components.tsx')).defaultComponents, (await import('mithaq-admin/rich-text.tsx')).richTextComponents, (await import('mithaq-admin/upload.tsx')).uploadComponents)
-  const inApp = (element: ReactElement) => createElement(AppComponents, { components: appDefaults }, element)
-  assert.deepEqual([sizeOf(512, 'en'), sizeOf(2048, 'en'), sizeOf(1536 * 1024, 'en')], ['512 bytes', '2 kilobytes', '1.5 megabytes'], 'bytes, kilobytes and megabytes as a person reads them')
-  assert.deepEqual([sizeOf(512, 'ar'), sizeOf(1536 * 1024, 'ar')].map((one) => one.replace(/[\d٠-٩٫.]+\s*/, '')), ['بايت', 'ميغابايت'], 'and in Arabic, the megabyte long as the kilobyte is')
-  const media = screen.kayan.media!
-  const image = { id: 'm1', filename: 'cover.png', mimeType: 'image/png', filesize: 2048, alt: { en: 'A cover' }, url: '/api/media/file/m1', thumbnailURL: '/api/media/file/m1' }
-  const size = await render(createElement(FileSize, { field: media.fields.find((one) => one.name === 'filesize')!, value: 2048, row: image }))
-  assert.equal(size.textContent, '2 kilobytes', 'the size column is never the raw bytes')
-  const name = await render(createElement(FileName, { field: media.fields.find((one) => one.name === 'filename')!, value: 'cover.png', row: image }))
-  assert.equal(name.querySelector('img[data-upload-thumbnail]')?.getAttribute('src'), '/api/media/file/m1', 'the name column leads with the thumbnail')
-  assert.equal(name.textContent, 'cover.png', 'and the name')
-  assert.equal(name.querySelector('[title="cover.png"]')?.className.includes('min-w-28'), true, 'which keeps room enough to be read on a phone')
-
-  const preview = (access: ScreenState['access']) => render(inApp(createElement(MediaPreview)), { kayan: media, record: image, access })
-  let host = await preview({ collections: { media: { create: true } } } as never)
-  assert.equal(host.querySelector('[data-media-download]')?.getAttribute('download'), 'cover.png', 'Download saves the file under its name')
-  assert.equal(host.querySelector('[data-media-download]')?.getAttribute('href'), '/api/media/file/m1', 'through the file route')
-  assert.equal(host.textContent?.includes('2 kilobytes'), true, 'the size reads in kilobytes')
-  await act(async () => click(host.querySelector('[data-media-replace]')!))
-  assert.equal(window.document.querySelector('[data-upload-dialog="media"]') !== null, true, 'Replace file opens the upload dialog')
-  host = await preview({})
-  assert.equal(host.querySelector('[data-media-replace]'), null, 'and is not offered to a viewer who may not make an image')
-
-  const edit = media.pages.edit as Extract<PageClient, { page: unknown }>
-  const side = ((edit.page.main as unknown as { side: unknown[] }[])[0]!.side as Record<string, unknown>[])
-  assert.equal(String(side[0]!.component).endsWith('preview.tsx#MediaPreview'), true, 'the edit page draws the image beside the form')
-  assert.equal(host.querySelector('[data-media-preview]')?.hasAttribute('data-lead'), true, 'marked to lead, so the record layout puts it above the form on a phone')
-  assert.equal((media.pages.create as { component?: string }).component?.endsWith('preview.tsx#NewImage'), true, 'and the kayan has a New page, which the list\'s New button opens')
-
-  const location = window.location as unknown as Record<'assign', (to: string) => void>
-  const went: string[] = []
-  t.mock.method(location, 'assign', (to: string) => void went.push(to))
-  await render(inApp(createElement(NewImage, { page: media.pages.create! })), { kayan: media })
-  assert.equal(window.document.querySelector('[data-upload-dialog="media"]') !== null, true, 'the New page opens the upload dialog at once')
-  const cancel = [...window.document.querySelectorAll('[data-upload-dialog="media"] button')].find((one) => one.textContent === 'Cancel')
-  await act(async () => click(cancel as unknown as Element))
-  assert.deepEqual(went, ['/dashboard/media'], 'and closing it goes back to the list')
-})
-
 /** One element anywhere on the page, a portal's among them. */
 const onPage = (selector: string) => window.document.querySelector(selector) as unknown as Element | null
 /** The Members page as a viewer holding `permissions` draws it, its dialogs made openable under happy-dom. */

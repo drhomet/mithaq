@@ -1435,6 +1435,22 @@
       ]
     },
     {
+      "name": "mithaq-upload-pages",
+      "type": "registry:component",
+      "title": "Mithaq upload pages",
+      "description": "What an upload kayan draws of its own files, whichever kayan it is: the list's file and size cells, its New page opening the upload dialog, and the file beside its edit form with Download and Replace file.",
+      "files": [
+        {
+          "path": "registry/upload-pages.tsx",
+          "type": "registry:component",
+          "target": "@components/mithaq/upload-pages.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "button"
+      ]
+    },
+    {
       "name": "mithaq-upload",
       "type": "registry:component",
       "title": "Mithaq upload",

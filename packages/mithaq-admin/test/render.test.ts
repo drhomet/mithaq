@@ -562,6 +562,7 @@ test('12. the app holds the current source of every registry item it copied', ()
       'mithaq-upload-cell',
       'mithaq-upload-dialog',
       'mithaq-upload-control',
+      'mithaq-upload-pages',
       'mithaq-upload',
       'mithaq-upload-node',
       'mithaq-screens-host',
