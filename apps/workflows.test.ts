@@ -35,7 +35,7 @@ test('CI passes the worker count Node used before the memory-based runner', asyn
   }
 })
 
-test('every workflow installs Chromium before the suite, whose date picker check fails in CI without it', () => {
+test('CI and the release run install Chromium before the suite, whose date picker check fails in CI without it', () => {
   for (const file of ['ci.yml', 'release.yml']) {
     const source = readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8')
     const install = source.indexOf('playwright-core/cli.js install')
