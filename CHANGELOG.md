@@ -14,6 +14,12 @@
   `saveBlock`). What runs cannot carry is kept as its original JSON before
   Lexical parses it and saved back unchanged. `runsCodecTypes` names the node
   types it carries; the inventory's native support stays `none`.
+- Addition: the runs codec carries rich-input's `upload` paragraph as mithaq's
+  UploadNode, so a stored upload opens on the phone as one unit, deleted whole,
+  and saves back unchanged. Server change: an UploadNode whose `fields` is not
+  an object or null is refused, as rich-input refuses it, where it was read as
+  `null` and the fields were lost on the next save. Payload writes an object or
+  null, so no migration is needed.
 
 - Breaking: every rich text node class needs a known JSON version. A project's own node class whose constructor takes arguments, so its version cannot be read from an instance, adds `static supportedVersion = 1` (the highest JSON version it reads); until it does, the server refuses every stored node of that type and the admin shows such a value read-only ([issue #38](https://github.com/drhomet/mithaq/issues/38)).
 - Security: `payloadRehash` logs only a failed rehash's error `name` and `code`. It logged the whole error, and a database error's message can name the query's params (drizzle-orm 1.0's does), which hold the user's Payload salt and hash and the new hash. A project that holds `payload-password.ts` ejects it again ([issue #35](https://github.com/drhomet/mithaq/issues/35)).

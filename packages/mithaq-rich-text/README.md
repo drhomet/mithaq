@@ -36,8 +36,12 @@ fields and Block envelope fields round-trip deep-equal and no placeholder, id or
 temporary node is stored. A table inside a list item is an inline unit, so the
 item stays editable around it and the table JSON is kept intact. A paragraph,
 heading or list item the phone did not edit keeps its stored `textFormat` and
-`textStyle`. `runsCodecTypes` lists the node types it carries as
-editable runs. The entry runs headless on PrimJS, with no DOM, `isWellFormed`
+`textStyle`. An UploadNode is an `upload` paragraph whose `uploads` range holds
+the node's `relationTo`, `value`, `fields`, `id` and `format` exactly, and never
+a src, path or URL; the host resolves `value` to a file and hands rich-input how
+to draw it apart from the content. An upload the runs cannot carry exactly, such
+as an older version or a missing key, stays a locked unit. `runsCodecTypes`
+lists the node types it carries as editable runs. The entry runs headless on PrimJS, with no DOM, `isWellFormed`
 or `structuredClone`.
 
 The `richText` rukn, its zod and drizzle targets, comments service and write

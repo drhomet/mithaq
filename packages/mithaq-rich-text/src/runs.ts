@@ -25,6 +25,10 @@
 //    kind `p` and dir `auto`. No mark overlaps a placeholder.
 // 6. A `divider` paragraph (Lexical's HorizontalRuleNode) holds one U+FFFC and
 //    nothing else, with dir `auto`. It is never a locked unit, and no mark covers it.
+// 7. An `upload` paragraph (mithaq's UploadNode) is laid out as a divider is, and
+//    `uploads` holds its reference, one per upload paragraph in order: the
+//    UploadNode's `relationTo`, `value`, `fields`, `id` and `format` and nothing
+//    else, so no src, path or URL is ever content. `fields` is a JSON object or null.
 //
 // Projection limits:
 // - After supported inline leaves become units, any container that still cannot
@@ -43,7 +47,7 @@ import contract from './contract.json' with { type: 'json' }
 
 export { contract as runsContract }
 
-export type ParagraphKind = 'p' | 'bullet' | 'number' | 'h2' | 'h3' | 'quote' | 'divider'
+export type ParagraphKind = 'p' | 'bullet' | 'number' | 'h2' | 'h3' | 'quote' | 'divider' | 'upload'
 export type Direction = 'auto' | 'ltr' | 'rtl'
 export type Placement = 'inline' | 'paragraph'
 
@@ -56,12 +60,17 @@ export const PARAGRAPH_KINDS = contract.paragraphs as readonly ParagraphKind[]
 export const DIRECTIONS = contract.directions as readonly Direction[]
 export const PLACEMENTS = contract.placements as readonly Placement[]
 export const PLACEHOLDER = '￼'
+export const UPLOAD_FORMATS = contract.upload.formats as readonly UploadReference['format'][]
 
 export type Mark = { start: number; end: number; format: number }
 export type Paragraph = { start: number; kind: ParagraphKind; dir: Direction }
 /** A section the phone cannot edit, kept as its original JSON in a JS side table. */
 export type LockedRange = { start: number; end: number; id: string; placement: Placement; preview: string }
-export type Runs = { text: string; marks: Mark[]; paragraphs: Paragraph[]; locked: LockedRange[] }
+/** A file in the Block: the stored UploadNode's own fields, never how to draw it. */
+export type UploadReference = { relationTo: string; value: string; fields: Record<string, unknown> | null; id: string; format: '' | 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' }
+export type UploadRange = UploadReference & { start: number; end: number }
+/** `uploads` is absent where the Block holds none, as rich-input sends it. */
+export type Runs = { text: string; marks: Mark[]; paragraphs: Paragraph[]; locked: LockedRange[]; uploads?: UploadRange[] }
 
 const err = (message: string): never => { throw new TypeError(`Invalid runs: ${message}`) }
 
@@ -97,11 +106,21 @@ export const validateRuns = (runs: Runs, expectedIds?: readonly string[]): Runs 
     end = mark.end
   }
   if (!Array.isArray(runs.locked)) err('locked must be a list')
-  const dividers = runs.paragraphs.filter((p) => p.kind === 'divider').map((p) => p.start)
+  const dividers = runs.paragraphs.filter((p) => p.kind === 'divider' || p.kind === 'upload').map((p) => p.start)
   for (const at of dividers) {
     const p = runs.paragraphs.find((q) => q.start === at)!
-    if (text[at] !== PLACEHOLDER || (at + 1 < text.length && text[at + 1] !== '\n') || p.dir !== 'auto' || runs.locked.some((u) => u.start === at)) err('a divider is an auto paragraph holding only its placeholder')
+    if (text[at] !== PLACEHOLDER || (at + 1 < text.length && text[at + 1] !== '\n') || p.dir !== 'auto' || runs.locked.some((u) => u.start === at)) err('a divider or upload is an auto paragraph holding only its placeholder')
   }
+  const uploads = runs.uploads ?? []
+  if (!Array.isArray(uploads)) err('uploads must be a list')
+  const files = runs.paragraphs.filter((p) => p.kind === 'upload').map((p) => p.start)
+  if (uploads.length !== files.length) err('one upload reference per upload paragraph')
+  uploads.forEach((u, i) => {
+    if (u?.start !== files[i] || u.end !== u.start + 1) err('an upload reference sits on its upload paragraph')
+    if (typeof u.relationTo !== 'string' || !u.relationTo || typeof u.value !== 'string' || !u.value || u.value.length > contract.upload.maxValueLength || typeof u.id !== 'string'
+      || !UPLOAD_FORMATS.includes(u.format) || !(u.fields === null || (typeof u.fields === 'object' && !Array.isArray(u.fields)))) err('an upload reference is the UploadNode\'s relationTo, value, fields, id and format')
+    if (Object.keys(u).some((key) => key !== 'start' && key !== 'end' && !contract.upload.storedFields.includes(key))) err('an upload reference holds no draw info')
+  })
   const placeholders = [...text.matchAll(/￼/g)].map((m) => m.index).filter((at) => !dividers.includes(at))
   if (placeholders.length !== runs.locked.length) err('a placeholder that is no locked unit or divider')
   const ids = new Set<string>()
@@ -119,7 +138,7 @@ export const validateRuns = (runs: Runs, expectedIds?: readonly string[]): Runs 
   return runs
 }
 
-/** What a person reads or a preview shows: placeholders become their previews, a divider nothing, paragraph breaks stay, list markers never appear. */
+/** What a person reads or a preview shows: placeholders become their previews, a divider or upload nothing, paragraph breaks stay, list markers never appear. */
 export const plainText = (runs: Runs): string => {
   const previews = new Map(runs.locked.map((unit) => [unit.start, unit.preview]))
   return runs.text.replace(/￼/g, (_, at: number) => previews.get(at) ?? '')

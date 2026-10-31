@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import type { Edit } from '../edit.ts'
-import { DIRECTIONS, FORMATS, PARAGRAPH_KINDS, PLACEHOLDER, type Runs } from '../runs.ts'
+import { DIRECTIONS, FORMATS, PARAGRAPH_KINDS, PLACEHOLDER, UPLOAD_FORMATS, type Runs, type UploadReference } from '../runs.ts'
 
 // Synthetic text only. Every writing system the phone types lives here, with the
 // awkward cases for UTF-16 offsets: surrogate pairs, ZWJ sequences, flags,
@@ -21,23 +21,34 @@ export const textArb = fc.array(fc.constantFrom(...SNIPPETS), { maxLength: 4 }).
 // Empty paragraphs are a quarter of all paragraphs.
 const paragraphTextArb = fc.oneof({ weight: 1, arbitrary: fc.constant('') }, { weight: 3, arbitrary: textArb })
 
-// A divider holds exactly its placeholder, with dir auto; a quote holds ordinary text.
+// Synthetic references only, with the opaque fields rich-input must keep exactly: nested nulls and booleans.
+const uploadArb: fc.Arbitrary<UploadReference> = fc.record({
+  relationTo: fc.constantFrom('files', 'media'),
+  value: fc.constantFrom('synthetic-file-1', '1b4e28ba-2fa1-11d2-883f-0016d3cca427'),
+  fields: fc.constantFrom(null, { caption: 'Test caption', nested: { kept: null, shown: false } }),
+  id: fc.constantFrom('', '65f1c0ffee0000000000abcd'),
+  format: fc.constantFrom(...UPLOAD_FORMATS),
+})
+
+// A divider or an upload holds exactly its placeholder, with dir auto; a quote holds ordinary text.
 export const paragraphsArb = fc.array(
-  fc.record({ kind: fc.constantFrom(...PARAGRAPH_KINDS), dir: fc.constantFrom(...DIRECTIONS), text: paragraphTextArb })
-    .map((row) => (row.kind === 'divider' ? { ...row, dir: 'auto' as const, text: PLACEHOLDER } : row)),
+  fc.record({ kind: fc.constantFrom(...PARAGRAPH_KINDS), dir: fc.constantFrom(...DIRECTIONS), text: paragraphTextArb, upload: uploadArb })
+    .map(({ upload, ...row }) => (row.kind === 'upload' ? { ...row, dir: 'auto' as const, text: PLACEHOLDER, upload } : row.kind === 'divider' ? { ...row, dir: 'auto' as const, text: PLACEHOLDER } : row)),
   { minLength: 1, maxLength: 5 },
 )
-// Only insertion makes a divider, so kind edits never ask for one.
-const EDIT_KINDS = PARAGRAPH_KINDS.filter((kind) => kind !== 'divider')
+// Only insertion makes a divider or an upload, so kind edits never ask for one.
+const EDIT_KINDS = PARAGRAPH_KINDS.filter((kind) => kind !== 'divider' && kind !== 'upload')
 
-export const runsFromParagraphs = (rows: { kind: Runs['paragraphs'][number]['kind']; dir: Runs['paragraphs'][number]['dir']; text: string }[]): Runs => {
+export const runsFromParagraphs = (rows: { kind: Runs['paragraphs'][number]['kind']; dir: Runs['paragraphs'][number]['dir']; text: string; upload?: UploadReference }[]): Runs => {
   let at = 0
-  const paragraphs = rows.map(({ kind, dir, text }) => {
+  const uploads: NonNullable<Runs['uploads']> = []
+  const paragraphs = rows.map(({ kind, dir, text, upload }) => {
     const p = { start: at, kind, dir }
+    if (upload) uploads.push({ start: at, end: at + 1, ...upload })
     at += text.length + 1
     return p
   })
-  return { text: rows.map((r) => r.text).join('\n'), marks: [], paragraphs, locked: [] }
+  return { text: rows.map((r) => r.text).join('\n'), marks: [], paragraphs, locked: [], ...(uploads.length ? { uploads } : {}) }
 }
 
 /** An edit described by fractions, so shrinking keeps it meaningful on any document. */
@@ -68,11 +79,11 @@ const boundaries = (text: string) => {
 }
 const pick = <T>(list: T[], at: number): T => list[Math.min(list.length - 1, Math.floor(at * list.length))]!
 
-/** Turns a raw edit into a concrete one for these runs. About 40% of the time it is anchored on a locked unit's or a divider's edge. */
+/** Turns a raw edit into a concrete one for these runs. About 40% of the time it is anchored on a locked unit's, a divider's or an upload's edge. */
 export const resolveEdit = (runs: Runs, raw: RawEdit): Edit => {
   const spots = boundaries(runs.text)
   let start = pick(spots, raw.a)
-  const anchors = [...runs.locked, ...runs.paragraphs.filter((p) => p.kind === 'divider').map((p) => ({ start: p.start, end: p.start + 1 }))]
+  const anchors = [...runs.locked, ...runs.paragraphs.filter((p) => p.kind === 'divider' || p.kind === 'upload').map((p) => ({ start: p.start, end: p.start + 1 }))]
   if (anchors.length && raw.anchor < 0.4) {
     const unit = pick(anchors, raw.a)
     start = raw.b < 0.5 ? unit.start : unit.end

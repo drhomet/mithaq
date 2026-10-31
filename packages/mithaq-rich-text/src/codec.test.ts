@@ -147,3 +147,25 @@ describe('quotes and dividers', () => {
     assert.equal(nodesToPlainText(editor), plainText(runs))
   })
 })
+
+describe('uploads', () => {
+  const U = '￼'
+  test('an upload paragraph becomes one UploadNode with its exact reference, and comes back unchanged', () => {
+    const file = { relationTo: 'files', value: 'synthetic-file-1', fields: { caption: 'Test caption', nested: { kept: null, shown: false, list: [1, null] } }, id: '65f1c0ffee0000000000abcd', format: 'center' } as const
+    const runs: Runs = {
+      text: `Above\n${U}\n${U}\nBelow`,
+      marks: [],
+      paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }, { start: 6, kind: 'upload', dir: 'auto' }, { start: 8, kind: 'upload', dir: 'auto' }, { start: 10, kind: 'p', dir: 'auto' }],
+      locked: [],
+      uploads: [{ start: 6, end: 7, ...file }, { start: 8, end: 9, relationTo: 'files', value: 'synthetic-file-2', fields: null, id: '', format: '' }],
+    }
+    const editor = createRunsEditor()
+    runsToNodes(editor, runs)
+    const children = editor.getEditorState().toJSON().root.children
+    assert.deepEqual(children[1], { type: 'upload', version: 3, ...file })
+    assert.deepEqual(children.map((c) => c.type), ['paragraph', 'upload', 'upload', 'paragraph'])
+    assert.deepEqual(nodesToRuns(editor), runs)
+    assert.equal(nodesToPlainText(editor), 'Above\n\n\nBelow')
+    assert.equal(nodesToPlainText(editor), plainText(runs))
+  })
+})

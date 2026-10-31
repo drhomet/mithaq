@@ -15,6 +15,25 @@ const open = (children: Json[]) => {
 }
 
 describe('a Block of stored JSON opens as runs and saves back unchanged', () => {
+  test('a stored upload, saved before as a locked unit, opens as an upload paragraph and saves back to the same JSON', () => {
+    const children = [...plain('Above'), editable.upload!, editable.upload!, ...plain('Below')]
+    const { editor, table, runs } = open(children)
+    assert.deepEqual(runs.locked, [])
+    assert.equal(runs.text, 'Above\n\uFFFC\n\uFFFC\nBelow')
+    const { type: _type, version: _version, ...reference } = editable.upload!
+    assert.deepEqual(runs.uploads, [{ start: 6, end: 7, ...reference }, { start: 8, end: 9, ...reference }])
+    assert.deepEqual(saveBlock(editor, table), children)
+  })
+
+  test('an upload the runs cannot carry exactly stays a locked unit and saves unchanged', () => {
+    // Array fields (Payload writes an object), an older version, a numeric value, a missing key and a src are each kept whole.
+    for (const node of [{ fields: [{ caption: 'x' }] }, { version: 2 }, { value: 42 }, { fields: undefined }, { src: 'file:///synthetic.png' }].map((extra) => JSON.parse(JSON.stringify({ ...editable.upload!, ...extra })) as Json)) {
+      const { editor, table, runs } = open([node])
+      assert.deepEqual(runs.locked.map((u) => u.placement), ['paragraph'], JSON.stringify(node))
+      assert.deepEqual(saveBlock(editor, table), [node])
+    }
+  })
+
   test('supported nodes open with no locked unit and save deep-equal', () => {
     const children = [...plain('Problem one plan text'), ...plain('مرحبا', { dir: 'rtl' })]
     const { editor, table, runs } = open(children)
@@ -220,7 +239,7 @@ test('loadBlock hands native only runs that pass validateRuns, whatever its edit
 
 test('the codec carries exactly the registry’s runsCodecTypes, and every other registered type opens locked and saves unchanged', () => {
   const rows = ['p', 'h2', 'h3', 'bullet', 'number', 'quote'] as const
-  const children = [...rows.flatMap((kind) => plain('Problem one plan text', { kind })), editable.rule!]
+  const children = [...rows.flatMap((kind) => plain('Problem one plan text', { kind })), editable.rule!, editable.upload!]
   const { editor, table, runs } = open(children)
   assert.deepEqual(runs.locked, [])
   const types = new Set(['root'])

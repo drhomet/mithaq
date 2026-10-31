@@ -1214,7 +1214,8 @@ record identifiers. Optional `contract` is the parsed rich-input contract.
 Optional `codecs` names the node types the installed native codec carries
 whole; it defaults to none, so every native `edit` claim is an error. The CLI
 passes `runsCodecTypes`, the types the shared runs codec carries: `root`,
-`paragraph`, `text`, `heading`, `list` and `listitem`.
+`paragraph`, `text`, `heading`, `list`, `listitem`, `quote`, `horizontalrule`
+and `upload`.
 Feature associations, format bits and toolbar choices come from the existing
 shared maps rather than a second registry of feature names. Policies warn when
 a place the profile asks to edit a node (by default or per node) cannot edit

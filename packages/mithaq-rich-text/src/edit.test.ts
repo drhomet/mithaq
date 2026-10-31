@@ -169,3 +169,39 @@ describe('a divider stays alone in its paragraph through every edit', () => {
     assert.equal(both(beside, { type: 'replace', start: 0, end: 1, text: '' }), null)
   })
 })
+
+describe('an upload is edited as a divider is, and its reference moves with it', () => {
+  const U = '￼'
+  const file = (start: number, value: string) => ({ start, end: start + 1, relationTo: 'files', value, fields: { caption: 'Test caption', nested: { kept: null } }, id: '', format: 'center' as const })
+  const doc: Runs = {
+    text: `Above\n${U}\n${U}\nBelow`, marks: [], locked: [],
+    paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }, { start: 6, kind: 'upload', dir: 'auto' }, { start: 8, kind: 'upload', dir: 'auto' }, { start: 10, kind: 'h2', dir: 'auto' }],
+    uploads: [file(6, 'synthetic-file-1'), file(8, 'synthetic-file-2')],
+  }
+  const both = (before: Runs, edit: Edit): Runs | null => {
+    const result = applyEdit(before, edit)
+    const modeled = modelApply(fromRuns(before), edit)
+    assert.equal(result.ok, modeled !== null, JSON.stringify(edit))
+    if (!result.ok) return null
+    assert.deepEqual(result.runs, toRuns(modeled!))
+    return validateRuns(result.runs)
+  }
+
+  test('typing above shifts both references; deleting one upload takes it whole and keeps the other', () => {
+    assert.deepEqual(both(doc, { type: 'replace', start: 0, end: 0, text: 'مرحبا ' })?.uploads, [file(12, 'synthetic-file-1'), file(14, 'synthetic-file-2')])
+    for (const [start, end] of [[6, 7], [5, 6]] as const) {
+      const after = both(doc, { type: 'replace', start, end, text: '' })
+      assert.equal(after?.text, `Above\n${U}\nBelow`, `${start}-${end}`)
+      assert.deepEqual(after?.uploads, [file(6, 'synthetic-file-2')])
+    }
+    const none = both(doc, { type: 'replace', start: 5, end: 10, text: '' })
+    assert.deepEqual([none?.text, none?.uploads], ['AboveBelow', undefined])
+  })
+
+  test('nothing is typed on an upload, formatting passes it by, and no kind change makes or changes one', () => {
+    for (const at of [6, 7]) assert.equal(both(doc, { type: 'replace', start: at, end: at, text: 'x' }), null, `typed at ${at}`)
+    assert.deepEqual(both(doc, { type: 'toggle', start: 0, end: 15, format: 1 })?.marks, [{ start: 0, end: 5, format: 1 }, { start: 10, end: 15, format: 1 }])
+    assert.deepEqual(both(doc, { type: 'kind', from: 0, to: 3, kind: 'quote' })?.paragraphs.map((p) => p.kind), ['quote', 'upload', 'upload', 'quote'])
+    assert.deepEqual(applyEdit(doc, { type: 'kind', from: 0, to: 0, kind: 'upload' }), { ok: false, reason: 'invalid-input' })
+  })
+})

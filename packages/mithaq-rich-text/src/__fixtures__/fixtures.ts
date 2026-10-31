@@ -32,10 +32,11 @@ export const inline = {
   newlineText: text({ value: 'two\nlines' }),
 }
 
-// Stored the way the web admin writes them, and locked before the phone had quotes and dividers; now they open editable.
+// Stored the way the web admin writes them, and locked before the phone had quotes, dividers and uploads; now they open editable.
 export const editable = {
   quote: { type: 'quote', version: 1, direction: 'rtl', format: '', indent: 0, children: [text({ value: 'Quoted plan text' }), text({ value: ' مرحبا', format: 1 })] },
   rule: { type: 'horizontalrule', version: 1 },
+  upload: { type: 'upload', version: 3, format: 'center', id: '65f1c0ffee0000000000abcd', relationTo: 'files', value: 'synthetic-file-1', fields: { caption: 'Test caption', nested: { kept: null, shown: false } } },
 } as Record<string, Json>
 
 // Paragraph units: whole top-level nodes the phone cannot edit.

@@ -50,10 +50,12 @@ test('native editing requires real references in the installed contract and a co
   }
 })
 
-test('the runs codec list lets a heading claim native editing against the package contract, and still refuses a link', () => {
+test('the runs codec list lets a heading or an upload claim native editing against the package contract, and still refuses a link', () => {
   const claim = (type: string): NodeRegistration => ({ type, json: { writes: 1, reads: [1] }, native: ['paragraphs.h2', 'formats.bold'], support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'edit', 'native-ios': 'edit' } })
   const check = (type: string) => checkRichTextSupport({ registry: [claim(type)], profile: { name: 'phone', nodes: [type], requirements: {} }, contract: runsContract, codecs: runsCodecTypes }).map(({ code, place }) => `${code} ${place}`)
   assert.deepEqual(check('heading'), [])
+  assert.deepEqual(check('upload'), [])
+  assert.deepEqual(checkRichTextSupport({ registry: [{ ...claim('upload'), native: ['paragraphs.upload'] }], profile: { name: 'phone', nodes: ['upload'], requirements: {} }, contract: runsContract, codecs: runsCodecTypes }), [])
   assert.deepEqual(check('link'), ['native-codec-missing native-android', 'native-codec-missing native-ios'])
 })
 

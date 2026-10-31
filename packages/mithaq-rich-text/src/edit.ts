@@ -15,7 +15,7 @@ export type Edit =
 
 export type EditResult =
   | { ok: true; runs: Runs }
-  // locked-content: the edit would cut, split, replace, format or move a locked unit, or put text in a paragraph unit or a divider.
+  // locked-content: the edit would cut, split, replace, format or move a locked unit, or put text in a paragraph unit, a divider or an upload.
   | { ok: false; reason: 'locked-content' | 'invalid-input' }
 
 type Piece = { start: number; end: number; format: number }
@@ -66,16 +66,19 @@ const settle = (runs: Runs): EditResult => {
   try {
     return { ok: true, runs: validateRuns(runs) }
   } catch {
-    // The only rules a well-formed edit can break: a paragraph unit or a divider sharing its paragraph.
+    // The only rules a well-formed edit can break: a paragraph unit, a divider or an upload sharing its paragraph.
     return refuse('locked-content')
   }
 }
 
-const dividersOf = (runs: Runs) => runs.paragraphs.filter((p) => p.kind === 'divider').map((p) => p.start)
+// An upload is edited as a divider is: one unit, deleted whole, nothing typed inside. Its reference moves with it.
+const isUnitKind = (kind: ParagraphKind) => kind === 'divider' || kind === 'upload'
+const dividersOf = (runs: Runs) => runs.paragraphs.filter((p) => isUnitKind(p.kind)).map((p) => p.start)
 
 /**
  * Removing the break beside a divider removes the divider with it, and removing a divider alone takes one of its
  * breaks, so a divider never shares its paragraph. Only the requested boundaries choose dividers, as on Android.
+ * Here and below, "divider" covers uploads too.
  */
 const widen = ({ runs, start, end, ins }: { runs: Runs; start: number; end: number; ins: string }) => {
   let from = start
@@ -118,7 +121,7 @@ const replace = ({ runs, start: asked, end: askedEnd, raw }: { runs: Runs; start
   const owner = runs.paragraphs.filter((p) => p.start <= start).pop()!
   // A removed divider gives its place to the paragraph the edit ends in, as Backspace below a rule keeps that paragraph's kind.
   const last = runs.paragraphs.filter((p) => p.start <= end).pop()!
-  const inherit = owner.kind !== 'divider' || owner.start < start || owner.start >= end ? owner
+  const inherit = !isUnitKind(owner.kind) || owner.start < start || owner.start >= end ? owner
     : last === owner ? { ...owner, kind: 'p' as const, dir: 'auto' as const } : { ...owner, kind: last.kind, dir: last.dir }
   const paragraphs = [
     ...runs.paragraphs.filter((p) => p.start <= start).map((p) => (p === owner ? { ...inherit } : { ...p })),
@@ -129,14 +132,16 @@ const replace = ({ runs, start: asked, end: askedEnd, raw }: { runs: Runs; start
     ...runs.locked.filter((u) => u.start < start),
     ...runs.locked.filter((u) => u.start >= end).map((u) => ({ ...u, start: u.start + delta, end: u.end + delta })),
   ]
-  const dividers = dividersOf(runs).filter((at) => at < start || at >= end).map((at) => (at < start ? at : at + delta))
+  const shift = <T extends { start: number; end: number }>(u: T): T => (u.start < start ? u : { ...u, start: u.start + delta, end: u.end + delta })
+  const uploads = (runs.uploads ?? []).filter((u) => u.start < start || u.start >= end).map(shift)
+  const dividers = runs.paragraphs.filter((p) => p.kind === 'divider' && (p.start < start || p.start >= end)).map((p) => shift({ start: p.start, end: p.start + 1 }).start)
   // Removing an empty neighbour must not lend its list kind or direction to a unit. A divider stays a divider
   // wherever its placeholder goes, and a paragraph that held none, such as one opened after a rule, is plain.
   for (const p of paragraphs) {
-    if (dividers.includes(p.start)) {
-      p.kind = 'divider'
+    if (dividers.includes(p.start) || uploads.some((u) => u.start === p.start)) {
+      p.kind = dividers.includes(p.start) ? 'divider' : 'upload'
       p.dir = 'auto'
-    } else if (p.kind === 'divider' || locked.some((u) => u.placement === 'paragraph' && u.start === p.start)) {
+    } else if (isUnitKind(p.kind) || locked.some((u) => u.placement === 'paragraph' && u.start === p.start)) {
       p.kind = 'p'
       p.dir = 'auto'
     }
@@ -146,6 +151,7 @@ const replace = ({ runs, start: asked, end: askedEnd, raw }: { runs: Runs; start
     marks: toMarks(kept),
     paragraphs,
     locked,
+    ...(uploads.length ? { uploads } : {}),
   })
 }
 
@@ -163,12 +169,12 @@ const toggle = ({ runs, start, end, format }: { runs: Runs; start: number; end: 
 }
 
 const paragraphs = ({ runs, from, to, change }: { runs: Runs; from: number; to: number; change: Partial<Runs['paragraphs'][number]> }): EditResult => {
-  // Only insertion makes a divider.
-  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to >= runs.paragraphs.length || change.kind === 'divider') return refuse('invalid-input')
+  // Only insertion makes a divider or an upload.
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to >= runs.paragraphs.length || (change.kind && isUnitKind(change.kind))) return refuse('invalid-input')
   const target = runs.paragraphs.slice(from, to + 1)
   if (runs.locked.some((u) => u.placement === 'paragraph' && target.some((p) => p.start === u.start))) return refuse('locked-content')
   // A divider in the range keeps its kind and direction, as Lexical's $setBlocksType passes a HorizontalRuleNode by.
-  return { ok: true, runs: { ...runs, paragraphs: runs.paragraphs.map((p, i) => (i >= from && i <= to && p.kind !== 'divider' ? { ...p, ...change } : p)) } }
+  return { ok: true, runs: { ...runs, paragraphs: runs.paragraphs.map((p, i) => (i >= from && i <= to && !isUnitKind(p.kind) ? { ...p, ...change } : p)) } }
 }
 
 export const applyEdit = (runs: Runs, edit: Edit): EditResult => {

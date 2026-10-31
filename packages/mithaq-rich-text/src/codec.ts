@@ -4,12 +4,12 @@ import { $createHorizontalRuleNode, $isHorizontalRuleNode, type HorizontalRuleNo
 import { $createHeadingNode, $createQuoteNode, $isHeadingNode, $isQuoteNode } from '@lexical/rich-text'
 import { $createParagraphNode, $createTextNode, $getRoot, $isParagraphNode, $isTextNode, createEditor, type ElementNode, type LexicalEditor } from 'lexical'
 import { $createLockedNode, $isLockedNode, LockedNode } from './locked-node.ts'
-import { defaultNodes } from './rich-text.ts'
-import { FORMAT_MASK, PLACEHOLDER, validateRuns, type Direction, type Mark, type ParagraphKind, type Runs } from './runs.ts'
+import { defaultNodes, UploadNode } from './rich-text.ts'
+import { FORMAT_MASK, PLACEHOLDER, validateRuns, type Direction, type Mark, type ParagraphKind, type Runs, type UploadRange } from './runs.ts'
 
-/** A headless editor for one Block: the shared default nodes plus the locked stand-in. */
+/** A headless editor for one Block: the shared default nodes, uploads and the locked stand-in. */
 export const createRunsEditor = (): LexicalEditor =>
-  createEditor({ nodes: [...defaultNodes, LockedNode], onError: (error) => { throw error } })
+  createEditor({ nodes: [...defaultNodes, UploadNode, LockedNode], onError: (error) => { throw error } })
 
 /** The format of the mark covering [start, end), cut at the paragraph's bounds. */
 const segments = ({ text, start, end, marks }: { text: string; start: number; end: number; marks: Mark[] }) => {
@@ -39,6 +39,10 @@ export const runsToNodes = (editor: LexicalEditor, runs: Runs): void => {
       const units = runs.locked.filter((u) => u.start >= p.start && u.start < end)
       if (units[0]?.placement === 'paragraph') return void root.append($createLockedNode(units[0]))
       if (p.kind === 'divider') return void root.append($createHorizontalRuleNode())
+      if (p.kind === 'upload') {
+        const { start: _start, end: _end, ...reference } = runs.uploads!.find((u) => u.start === p.start)!
+        return void root.append(new UploadNode().updateFromJSON(reference))
+      }
       const paragraph =
         p.kind === 'p' ? $createParagraphNode()
         : p.kind === 'h2' || p.kind === 'h3' ? $createHeadingNode(p.kind)
@@ -63,8 +67,8 @@ export const runsToNodes = (editor: LexicalEditor, runs: Runs): void => {
 }
 
 /** The Block's paragraphs in order, lists flattened to their items. */
-const $rows = (): { node: ElementNode | LockedNode | HorizontalRuleNode; kind: ParagraphKind }[] => {
-  const rows: { node: ElementNode | LockedNode | HorizontalRuleNode; kind: ParagraphKind }[] = []
+const $rows = (): { node: ElementNode | LockedNode | HorizontalRuleNode | UploadNode; kind: ParagraphKind }[] => {
+  const rows: { node: ElementNode | LockedNode | HorizontalRuleNode | UploadNode; kind: ParagraphKind }[] = []
   for (const block of $getRoot().getChildren()) {
     if ($isListNode(block)) {
       const kind = block.getListType()
@@ -77,15 +81,16 @@ const $rows = (): { node: ElementNode | LockedNode | HorizontalRuleNode; kind: P
     } else if ($isParagraphNode(block)) rows.push({ node: block, kind: 'p' })
     else if ($isQuoteNode(block)) rows.push({ node: block, kind: 'quote' })
     else if ($isHorizontalRuleNode(block)) rows.push({ node: block, kind: 'divider' })
+    else if (block instanceof UploadNode) rows.push({ node: block, kind: 'upload' })
     else if ($isLockedNode(block) && !block.isInline()) rows.push({ node: block, kind: 'p' })
     else throw new TypeError(`Not representable as runs: ${block.getType()}`)
   }
   return rows
 }
 
-/** What a person reads or a preview shows, read from the nodes alone: units show their preview, a divider nothing, paragraphs join by "\n", no list markers. */
+/** What a person reads or a preview shows, read from the nodes alone: units show their preview, a divider or upload nothing, paragraphs join by "\n", no list markers. */
 export const nodesToPlainText = (editor: LexicalEditor): string =>
-  editor.getEditorState().read(() => $rows().map(({ node, kind }) => (kind === 'divider' ? '' : node.getTextContent())).join('\n'))
+  editor.getEditorState().read(() => $rows().map(({ node, kind }) => (kind === 'divider' || kind === 'upload' ? '' : node.getTextContent())).join('\n'))
 
 export const nodesToRuns = (editor: LexicalEditor): Runs =>
   editor.getEditorState().read(() => {
@@ -93,15 +98,20 @@ export const nodesToRuns = (editor: LexicalEditor): Runs =>
     const marks: Mark[] = []
     const paragraphs: Runs['paragraphs'] = []
     const locked: Runs['locked'] = []
+    const uploads: UploadRange[] = []
     const lock = (node: LockedNode) => {
       locked.push({ start: text.length, end: text.length + 1, id: node.__id, placement: node.__placement, preview: node.__preview })
       text += PLACEHOLDER
     }
     $rows().forEach(({ node: paragraph, kind }, i) => {
       if (i > 0) text += '\n'
-      if ($isLockedNode(paragraph) || $isHorizontalRuleNode(paragraph)) {
+      if ($isLockedNode(paragraph) || $isHorizontalRuleNode(paragraph) || paragraph instanceof UploadNode) {
         paragraphs.push({ start: text.length, kind, dir: 'auto' })
         if ($isLockedNode(paragraph)) return lock(paragraph)
+        if (paragraph instanceof UploadNode) {
+          const { relationTo, value, fields, id, format } = paragraph.exportJSON()
+          uploads.push({ start: text.length, end: text.length + 1, relationTo, value, fields, id, format })
+        }
         return void (text += PLACEHOLDER)
       }
       paragraphs.push({ start: text.length, kind, dir: fromLexicalDir(paragraph.getDirection()) })
@@ -118,5 +128,5 @@ export const nodesToRuns = (editor: LexicalEditor): Runs =>
         text += child.getTextContent()
       }
     })
-    return { text, marks, paragraphs, locked }
+    return { text, marks, paragraphs, locked, ...(uploads.length ? { uploads } : {}) }
   })

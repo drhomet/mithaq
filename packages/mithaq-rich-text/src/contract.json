@@ -1,6 +1,8 @@
 {
   "formats": {"bold": 1, "italic": 2, "strikethrough": 4, "underline": 8, "inlineCode": 16, "subscript": 32, "superscript": 64, "highlight": 128, "lowercase": 256, "uppercase": 512, "capitalize": 1024},
-  "paragraphs": ["p", "bullet", "number", "h2", "h3", "quote", "divider"],
+  "paragraphs": ["p", "bullet", "number", "h2", "h3", "quote", "divider", "upload"],
+  "transport": {"jsonObjectParams": ["runs", "fields"], "note": "Upload runs and insertUpload fields may be JSON strings, decoded before validation, to preserve nulls through Lynx iOS method arguments. Results remain objects. Change events include optional uploadsJSON to preserve opaque booleans and nulls."},
+  "upload": {"maxValueLength": 255, "formats": ["", "left", "start", "center", "right", "end", "justify"], "storedFields": ["relationTo", "value", "fields", "id", "format"]},
   "directions": ["auto", "ltr", "rtl"],
   "blockKinds": ["section", "problem"],
   "runsVersion": 2,
@@ -19,11 +21,13 @@
     "undo": {},
     "redo": {},
     "insertDivider": {},
+    "insertUpload": {"params": {"relationTo": "string", "value": "string", "fields": "object?", "name": "string?", "mime": "string?", "src": "string?"}},
+    "setUploadSources": {"params": {"sources": "object"}},
     "flush": {}
   },
   "laidOutDirections": ["ltr", "rtl"],
   "results": {
-    "change": {"runs": "runs", "selection": "selection", "isComposing": "boolean"},
+    "change": {"runs": "runs", "selection": "selection", "isComposing": "boolean", "uploadsJSON": "string?"},
     "content": {"runs": "runs", "selection": "selection", "isComposing": "boolean", "directions": "laidOutDirection[]"}
   },
   "events": ["change", "selection", "focus", "blur", "linktap", "formatstate"],

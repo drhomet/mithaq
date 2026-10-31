@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { describe, test } from 'node:test'
-import { DIRECTIONS, FORMAT_MASK, PARAGRAPH_KINDS, PLACEMENTS, RUNS_VERSION, plainText, runsContract, validateRuns, type Direction, type ParagraphKind, type Placement, type Runs } from './runs.ts'
+import { DIRECTIONS, FORMAT_MASK, PARAGRAPH_KINDS, PLACEMENTS, RUNS_VERSION, UPLOAD_FORMATS, plainText, runsContract, validateRuns, type Direction, type ParagraphKind, type Placement, type Runs, type UploadReference } from './runs.ts'
 
 test('the runs constants are read from contract.json, runs version 2 with locked units and their error', () => {
   assert.deepEqual(runsContract, JSON.parse(readFileSync(new URL('./contract.json', import.meta.url), 'utf8')))
   assert.equal(RUNS_VERSION, 2)
   assert.equal(FORMAT_MASK, 2047)
   // `satisfies` holds each type to the file: a value the contract gains or drops fails here.
-  assert.deepEqual(PARAGRAPH_KINDS, ['p', 'bullet', 'number', 'h2', 'h3', 'quote', 'divider'] satisfies ParagraphKind[])
-  assert.ok('insertDivider' in runsContract.methods)
+  assert.deepEqual(PARAGRAPH_KINDS, ['p', 'bullet', 'number', 'h2', 'h3', 'quote', 'divider', 'upload'] satisfies ParagraphKind[])
+  assert.ok('insertDivider' in runsContract.methods && 'insertUpload' in runsContract.methods)
+  assert.deepEqual(UPLOAD_FORMATS, ['', 'left', 'start', 'center', 'right', 'end', 'justify'] satisfies UploadReference['format'][])
   assert.deepEqual(DIRECTIONS, ['auto', 'ltr', 'rtl'] satisfies Direction[])
   assert.deepEqual(PLACEMENTS, ['inline', 'paragraph'] satisfies Placement[])
   assert.ok(runsContract.errors.includes('locked-content'))
@@ -76,6 +77,40 @@ describe('a divider paragraph holds one placeholder and nothing else', () => {
   })
   test('a malformed locked list is refused before checking dividers', () => {
     assert.throws(() => validateRuns({ ...runs(U, ['divider']), locked: {} as Runs['locked'] }), /locked must be a list/)
+  })
+})
+
+describe('an upload paragraph holds one placeholder and its exact UploadNode reference', () => {
+  const U = '\uFFFC'
+  const file = { relationTo: 'files', value: 'synthetic-file-1', fields: { caption: 'Test caption', nested: { kept: null, shown: false } }, id: '65f1c0ffee0000000000abcd', format: 'center' } as const
+  const runs = (extra: Partial<Runs> = {}, uploads: Runs['uploads'] = [{ start: 6, end: 7, ...file }]): Runs => ({
+    text: `Above\n${U}\nBelow`, marks: [], locked: [], uploads,
+    paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }, { start: 6, kind: 'upload', dir: 'auto' }, { start: 8, kind: 'p', dir: 'auto' }],
+    ...extra,
+  })
+  test('an upload between paragraphs passes and reads as nothing', () => {
+    assert.ok(validateRuns(runs()))
+    assert.ok(validateRuns(runs({}, [{ start: 6, end: 7, ...file, fields: null, id: '', format: '' }])))
+    assert.equal(plainText(runs()), 'Above\n\nBelow')
+  })
+  test('a missing, moved, extra or malformed reference, draw info, a mark, a lock or a direction on it is refused', () => {
+    const at = { start: 6, end: 7 }
+    for (const [what, value] of [
+      ['no reference', runs({}, [])],
+      ['no uploads at all', { ...runs(), uploads: undefined }],
+      ['a reference elsewhere', runs({}, [{ ...file, start: 0, end: 1 }])],
+      ['two references', runs({}, [{ ...at, ...file }, { ...at, ...file }])],
+      ['array fields', runs({}, [{ ...at, ...file, fields: [] as unknown as null }])],
+      ['an empty value', runs({}, [{ ...at, ...file, value: '' }])],
+      ['a value too long', runs({}, [{ ...at, ...file, value: 'x'.repeat(256) }])],
+      ['no relationTo', runs({}, [{ ...at, ...file, relationTo: '' }])],
+      ['an unknown format', runs({}, [{ ...at, ...file, format: 'middle' as 'center' }])],
+      ['a src', runs({}, [{ ...at, ...file, src: 'file:///synthetic.png' } as never])],
+      ['a mark over it', runs({ marks: [{ start: 6, end: 7, format: 1 }] })],
+      ['a lock on it', runs({ locked: [{ start: 6, end: 7, id: 'unit-1', placement: 'paragraph', preview: 'x' }] })],
+      ['a direction', runs({ paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }, { start: 6, kind: 'upload', dir: 'rtl' }, { start: 8, kind: 'p', dir: 'auto' }] })],
+      ['text beside it', { ...runs(), text: `Above\n${U}x\nBelow`, paragraphs: [{ start: 0, kind: 'p', dir: 'auto' }, { start: 6, kind: 'upload', dir: 'auto' }, { start: 9, kind: 'p', dir: 'auto' }] }],
+    ] as [string, Runs][]) assert.throws(() => validateRuns(value), TypeError, what)
   })
 })
 
