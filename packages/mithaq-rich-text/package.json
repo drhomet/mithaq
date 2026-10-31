@@ -1,0 +1,112 @@
+{
+  "name": "@drhomet/mithaq-rich-text",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./mention": "./src/mention-node.ts",
+    "./mention-node": "./src/mention-node.ts",
+    "./rich-text": "./src/rich-text.ts",
+    "./features": "./src/features.ts",
+    "./feature-data": "./src/feature-data.ts",
+    "./policy": "./src/policy.ts",
+    "./value": "./src/value.ts",
+    "./nodes": "./src/nodes.ts",
+    "./registry": "./src/registry.ts",
+    "./check": "./src/check.ts"
+  },
+  "bin": {
+    "mithaq-check-rich-text": "./src/check.ts"
+  },
+  "publishConfig": {
+    "files": [
+      "dist",
+      "README.md",
+      "LICENSE",
+      "LICENSES"
+    ],
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/drhomet/mithaq.git",
+      "directory": "packages/mithaq-rich-text"
+    },
+    "homepage": "https://github.com/drhomet/mithaq#readme",
+    "bugs": {
+      "url": "https://github.com/drhomet/mithaq/issues"
+    },
+    "engines": {
+      "node": ">=24"
+    },
+    "exports": {
+      ".": "./dist/index.js",
+      "./client": "./dist/client.js",
+      "./mention": "./dist/mention-node.js",
+      "./mention-node": "./dist/mention-node.js",
+      "./rich-text": "./dist/rich-text.js",
+      "./features": "./dist/features.js",
+      "./feature-data": "./dist/feature-data.js",
+      "./policy": "./dist/policy.js",
+      "./value": "./dist/value.js",
+      "./nodes": "./dist/nodes.js",
+      "./registry": "./dist/registry.js",
+      "./check": "./dist/check.js"
+    },
+    "bin": {
+      "mithaq-check-rich-text": "dist/check.js"
+    }
+  },
+  "peerDependencies": {
+    "lexical": "0.52.0",
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "@lexical/hashtag": "0.52.0",
+    "@lexical/mark": "0.52.0",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0"
+  },
+  "peerDependenciesMeta": {
+    "lexical": {
+      "optional": true
+    },
+    "@lexical/extension": {
+      "optional": true
+    },
+    "@lexical/link": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/rich-text": {
+      "optional": true
+    },
+    "@lexical/hashtag": {
+      "optional": true
+    },
+    "@lexical/mark": {
+      "optional": true
+    },
+    "@lexical/table": {
+      "optional": true
+    },
+    "@lexical/code-core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "lexical": "0.52.0",
+    "@lexical/extension": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "@lexical/hashtag": "0.52.0",
+    "@lexical/mark": "0.52.0",
+    "@lexical/table": "0.52.0",
+    "@lexical/code-core": "0.52.0"
+  }
+}

@@ -88,7 +88,8 @@
     "drizzle-orm": "1.0.0-rc.4",
     "jose": "6.2.12",
     "pg": "^8.16.3",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@drhomet/mithaq-rich-text": "0.0.0"
   },
   "peerDependencies": {
     "@lexical/extension": "0.52.0",

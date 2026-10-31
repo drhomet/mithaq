@@ -1,0 +1,14 @@
+// Every relative `.ts` import is rewritten to `.js`, because Node strips no
+// types under `node_modules`.
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/__fixtures__/**"]
+}

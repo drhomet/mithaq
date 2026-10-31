@@ -72,7 +72,7 @@ export type { Access, AccessArgs, AccessResult, AdminAccess, AdminAccessArgs, Co
 export type { Copy, MessageRegistry, MessageScope, MessagesResolver, ProjectMessages } from './mithaq/messages.ts'
 export { defaultJsonMaxBytes, defaultKinds, isJson, kind, type Json, type Kind, type OnDelete } from './base/kinds.ts'
 export { jsonSchemaCheck } from './base/json-schema.ts'
-export type { RichTextNode, RichTextValue } from './rich-text/value.ts'
+export type { RichTextNode, RichTextValue } from '@drhomet/mithaq-rich-text/value'
 export { defineRukn, type KayanConfigs, type Rukn } from './mithaq/rukn.ts'
 export { base } from './base/index.ts'
 export { storage, upload } from './storage/index.ts'

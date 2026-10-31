@@ -1,4 +1,4 @@
-import { loweredType } from '../../rich-text/value.ts'
+import { loweredType } from '@drhomet/mithaq-rich-text/value'
 import type { Store } from '../../mithaq/language-core.ts'
 import type { ResolvedKayan } from '../../mithaq/types.ts'
 import { combineWhere, type Where } from '../../mithaq/where.ts'
