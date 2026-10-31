@@ -227,8 +227,8 @@ test('native format policies use the shared bits rather than assuming a native e
 test('the registry bundles and runs without Lexical, React, DOM or runtime imports', async () => {
   const { build } = await import('esbuild')
   const { runInNewContext } = await import('node:vm')
-  const result = await build({ entryPoints: ['packages/mithaq/src/rich-text/registry.ts'], bundle: true, platform: 'neutral', format: 'iife', globalName: 'registry', write: false, metafile: true })
-  assert.deepEqual(Object.keys(result.metafile!.inputs).sort(), ['packages/mithaq/src/rich-text/feature-data.ts', 'packages/mithaq/src/rich-text/registry.ts'])
+  const result = await build({ entryPoints: ['packages/mithaq-rich-text/src/registry.ts'], bundle: true, platform: 'neutral', format: 'iife', globalName: 'registry', write: false, metafile: true })
+  assert.deepEqual(Object.keys(result.metafile!.inputs).sort(), ['packages/mithaq-rich-text/src/feature-data.ts', 'packages/mithaq-rich-text/src/registry.ts'])
   const context: { registry?: typeof import('./registry.ts') } = {}
   runInNewContext(result.outputFiles[0]!.text, context)
   assert.equal(context.registry!.defaultNodeRegistry.length, 21)

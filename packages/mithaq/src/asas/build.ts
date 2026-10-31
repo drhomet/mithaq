@@ -26,7 +26,7 @@ import type { BuiltTables } from '../drizzle/index.ts'
 import { screensOf, type ScreenClient } from '../screen/index.ts'
 import { messagesOf, type MessageRegistry, type MessagesResolver } from '../mithaq/messages.ts'
 import { resolve } from '../mithaq/resolve.ts'
-import { defaultMentionSources } from '../rich-text/policy.ts'
+import { defaultMentionSources } from '@drhomet/mithaq-rich-text/policy'
 import { commentService } from '../rich-text/comments-server.ts'
 import { recordStorage, resolveStorage, storageRoutes } from '../storage/storage.ts'
 

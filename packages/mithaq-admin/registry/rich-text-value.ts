@@ -1,6 +1,6 @@
 // Theme adapted from shadcn-editor, MIT. See LICENSES/shadcn-editor.txt.
 import { createEditor, type Klass, type LexicalNode } from 'lexical'
-import { typesOf, unknownType, versionsOf } from 'mithaq/rich-text/client'
+import { typesOf, unknownType, versionsOf } from '@drhomet/mithaq-rich-text/client'
 
 /** One node of Lexical's serialized editor state. */
 export type RichTextNode = { type: string; children?: RichTextNode[]; text?: string; [key: string]: unknown }

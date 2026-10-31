@@ -1,5 +1,5 @@
 import { holds, type AccessReport, type FetchClient, type ScreenClient } from 'mithaq/admin'
-import { defaultMentionSources, type Mention, type MentionSource } from 'mithaq/rich-text/client'
+import { defaultMentionSources, type Mention, type MentionSource } from '@drhomet/mithaq-rich-text/client'
 
 /** A cached mention name is public document text; only a fresh authorized read may add a link. */
 export const mentionHref = async ({ mention, client, screen, sources = defaultMentionSources, access }: { mention: Mention; client: FetchClient; screen: ScreenClient; sources?: readonly MentionSource[]; access?: AccessReport }): Promise<string | undefined> => {

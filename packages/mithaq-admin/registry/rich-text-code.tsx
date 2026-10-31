@@ -1,4 +1,4 @@
-import { richTextCodeLanguages } from 'mithaq/rich-text/client'
+import { richTextCodeLanguages } from '@drhomet/mithaq-rich-text/client'
 import { mergeRegister } from '@lexical/utils'
 import { useEffect, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'

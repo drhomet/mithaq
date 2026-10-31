@@ -6,7 +6,7 @@ import type { StandardSchemaV1 } from './standard-schema.ts'
 import type { Rules } from '../base/rules.ts'
 import type { Rule, RuleValue } from '../base/rules.ts'
 import type { Kind, defaultKinds } from '../base/kinds.ts'
-import type { RichTextRead } from '../rich-text/value.ts'
+import type { RichTextRead } from '@drhomet/mithaq-rich-text/value'
 import type { ResolvedStorage } from '../storage/storage.ts'
 import type { RefOf, ScreenField, ScreenKeys } from '../screen/index.ts'
 
@@ -65,7 +65,7 @@ export type JsonSchema = { schema: Record<string, unknown> | boolean; uri?: stri
 
 type Named<Locale extends string = string> = {
   /** A rich-text field may narrow the features its project installed. */
-  features?: readonly import('../rich-text/policy.ts').RichTextFeature[]
+  features?: readonly import('@drhomet/mithaq-rich-text/policy').RichTextFeature[]
   access?: { create?: StoredFieldAccess; read?: StoredFieldAccess; update?: StoredFieldAccess }
   /** One string per locale the language declares, every one required. */
   label?: Localized<Locale> | LabelFunction
@@ -131,8 +131,8 @@ export type Field<KindName extends string = string, RuleValues = Rules> = KindNa
 /** A field as it is after a build, open over locales for `Field`'s reason. */
 export type RuntimeField = Named & {
   kind: string
-  features?: readonly import('../rich-text/policy.ts').RichTextFeature[]
-  richTextPolicy?: import('../rich-text/policy.ts').RichTextPolicy
+  features?: readonly import('@drhomet/mithaq-rich-text/policy').RichTextFeature[]
+  richTextPolicy?: import('@drhomet/mithaq-rich-text/policy').RichTextPolicy
   /** Internal thread declaration, resolved by the build before any write. */
   commentThreads?: ResolvedKayan
   rules?: Record<string, unknown>
@@ -173,7 +173,7 @@ type BoundField<L extends LanguageShape, K extends keyof L['kinds'] & string> = 
     rules?: BoundRules<L, K>
     targets?: Record<string, unknown> & { [Screen in ScreenKeys<L['targets']>]?: ScreenField<RefOf<L['targets'][Screen], L['kinds']>, K> }
   } &
-  (L['kinds'][K] extends { richTextPolicy: { features: readonly (infer Feature extends import('../rich-text/policy.ts').RichTextFeature)[] } } ? { features?: readonly Feature[] } : { features?: never }) &
+  (L['kinds'][K] extends { richTextPolicy: { features: readonly (infer Feature extends import('@drhomet/mithaq-rich-text/policy').RichTextFeature)[] } } ? { features?: readonly Feature[] } : { features?: never }) &
   (K extends 'join'
     ? { relationTo: string | (() => Kayan); on: string; defaultLimit?: number; defaultSort?: string; hasMany?: never }
     : // A kind that points at a row says so, and a field of it names the kayan it points at.

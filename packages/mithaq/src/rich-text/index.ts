@@ -1,9 +1,6 @@
-import { MarkNode } from '@lexical/mark'
-import { HashtagNode } from '@lexical/hashtag'
-import { MentionNode } from './mention-node.ts'
-export { MentionNode, type Mention } from './mention-node.ts'
-import { TableNode, TableRowNode, TableCellNode } from '@lexical/table'
-import { CodeNode, CodeHighlightNode } from '@lexical/code-core'
+import { richTextFeatureNodes } from '@drhomet/mithaq-rich-text/nodes'
+export { richTextFeatureNodes } from '@drhomet/mithaq-rich-text/nodes'
+export { MentionNode, type Mention } from '@drhomet/mithaq-rich-text/mention'
 import { jsonb } from 'drizzle-orm/pg-core'
 import { text } from 'drizzle-orm/sqlite-core'
 import type { Klass, LexicalNode } from 'lexical'
@@ -12,11 +9,11 @@ import { kind } from '../base/kinds.ts'
 import { defineRukn } from '../mithaq/rukn.ts'
 import type { StandardSchemaV1 } from '../mithaq/standard-schema.ts'
 import type { ResolvedField } from '../mithaq/types.ts'
-import { isRichText, richTextGuard, richTextReader, storedRichText, type RichTextRead, type RichTextValue } from './rich-text.ts'
+import { isRichText, richTextGuard, richTextReader, storedRichText, type RichTextRead, type RichTextValue } from '@drhomet/mithaq-rich-text/rich-text'
 
-export * from './rich-text.ts'
-export * from './features.ts'
-import { checkRichTextPolicy, defaultRichTextFeatures, defaultRichTextFonts, richTextFeatureGuard, type RichTextFeature, type RichTextFont, type RichTextPolicy, defaultMentionSources, type MentionSource, type RichTextCommentOptions } from './features.ts'
+export * from '@drhomet/mithaq-rich-text/rich-text'
+export * from '@drhomet/mithaq-rich-text/features'
+import { checkRichTextPolicy, defaultRichTextFeatures, defaultRichTextFonts, richTextFeatureGuard, type RichTextFeature, type RichTextFont, type RichTextPolicy, defaultMentionSources, type MentionSource, type RichTextCommentOptions } from '@drhomet/mithaq-rich-text/features'
 
 // An emptied editor still sends a root and one empty paragraph, so a blank text
 // with no decorator is missing for `required`.
@@ -80,14 +77,6 @@ const richTextKind = ({ nodes, policy }: { nodes: readonly Klass<LexicalNode>[];
       screen: { control: 'richText', cell: 'richText' },
     },
   })
-
-/** Keep the registry's version fixtures on the same selected class list as the server. */
-export const richTextFeatureNodes = (features: readonly RichTextFeature[]): readonly Klass<LexicalNode>[] => [
-  ...(features.includes('mentions') ? [MentionNode, HashtagNode] : []),
-  ...(features.includes('comments') ? [MarkNode] : []),
-  ...(features.includes('tables') ? [TableNode, TableRowNode, TableCellNode] : []),
-  ...(features.includes('code') ? [CodeNode, CodeHighlightNode] : []),
-]
 
 /**
  * The rukn a project lays down for rich text, over its own node list:

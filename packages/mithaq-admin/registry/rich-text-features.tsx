@@ -1,6 +1,6 @@
 import { use, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
 import type { Klass, LexicalNode } from 'lexical'
-import type { RichTextPolicy, RichTextFeature } from 'mithaq/rich-text/client'
+import type { RichTextPolicy, RichTextFeature } from '@drhomet/mithaq-rich-text/client'
 import { RichTextContext } from 'mithaq-admin/rich-text-picks.tsx'
 import type { ControlProps } from 'mithaq-admin/control-props.ts'
 import type { Translate } from 'mithaq-admin/copy.ts'

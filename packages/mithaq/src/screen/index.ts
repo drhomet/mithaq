@@ -307,7 +307,7 @@ export type RefOf<Target, Kinds = {}> = Target extends { layouts: infer Layouts;
 type IconOf<Target> = Target extends { icons?: readonly (infer Name extends string)[] } ? Name : never
 
 type FieldData = {
-  richTextPolicy?: import('../rich-text/policy.ts').RichTextPolicy
+  richTextPolicy?: import('@drhomet/mithaq-rich-text/policy').RichTextPolicy
   name: string
   kind: string
   // The label function is left off: the projection is built once per boot, so calling

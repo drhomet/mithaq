@@ -3,10 +3,10 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $dfs } from '@lexical/utils'
 import { $isLinkNode } from '@lexical/link'
 import { $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection, $isElementNode, $isTextNode, $getState, $setState, $isRootNode, RootNode } from 'lexical'
-import { richTextFormatMask, allRichTextFormats, richTextNodeFeature, richTextBlockTypes, richTextColors, richTextSizes, type RichTextPolicy } from 'mithaq/rich-text/client'
+import { richTextFormatMask, allRichTextFormats, richTextNodeFeature, richTextBlockTypes, richTextColors, richTextSizes, type RichTextPolicy } from '@drhomet/mithaq-rich-text/client'
 import { colorChoice, sizeChoice, fontChoice, directionChoice } from 'mithaq-admin/rich-text-choices.ts'
 import { newLink } from 'mithaq-admin/rich-text-selection.ts'
-import { safeUrl } from 'mithaq/rich-text/client'
+import { safeUrl } from '@drhomet/mithaq-rich-text/client'
 
 /**
  * Toolbar commands are not the only writer: pasted and new content need the same policy before save.
