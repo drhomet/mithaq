@@ -8,6 +8,12 @@
   version gate; admin keeps its editor. Existing rich-text imports keep working
   with the same class identities and stored JSON. All four packages release at
   one version. See the [package guide](packages/mithaq-rich-text/README.md).
+- Addition: `@drhomet/mithaq-rich-text` holds rich-input's runs contract as
+  `contract.json`, with the runs types and `validateRuns` read from it, and the
+  runs codec for one native Block (`loadBlock`, `applyEdit`, `runsToNodes`,
+  `saveBlock`). What runs cannot carry is kept as its original JSON before
+  Lexical parses it and saved back unchanged. `runsCodecTypes` names the node
+  types it carries; the inventory's native support stays `none`.
 
 - Breaking: every rich text node class needs a known JSON version. A project's own node class whose constructor takes arguments, so its version cannot be read from an instance, adds `static supportedVersion = 1` (the highest JSON version it reads); until it does, the server refuses every stored node of that type and the admin shows such a value read-only ([issue #38](https://github.com/drhomet/mithaq/issues/38)).
 - Security: `payloadRehash` logs only a failed rehash's error `name` and `code`. It logged the whole error, and a database error's message can name the query's params (drizzle-orm 1.0's does), which hold the user's Payload salt and hash and the new hash. A project that holds `payload-password.ts` ejects it again ([issue #35](https://github.com/drhomet/mithaq/issues/35)).
