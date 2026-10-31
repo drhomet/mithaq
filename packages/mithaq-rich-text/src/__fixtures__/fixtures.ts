@@ -40,7 +40,7 @@ export const block = {
   unknown: { type: 'callout', version: 2, tone: 'note', children: [para([text({ value: 'Inside the callout' })])] },
   unknownVersion: para([text({ value: 'Version nine' })], { version: 9 }),
   unknownMetadata: para([text({ value: 'Has metadata' })], { clinicLabel: 'test', format: 'center', indent: 2 }),
-  codeFormat: para([text({ value: 'mono', format: 16 })]),
+  unknownFormat: para([text({ value: 'mono', format: 2048 })]),
   styledText: para([text({ value: 'styled', format: 0, extra: { style: 'color: red' } })]),
   nestedList: {
     type: 'list', version: 1, listType: 'bullet', start: 1, tag: 'ul', direction: null, format: '', indent: 0,

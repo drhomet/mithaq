@@ -6,7 +6,7 @@ import { DIRECTIONS, FORMAT_MASK, PARAGRAPH_KINDS, PLACEMENTS, RUNS_VERSION, pla
 test('the runs constants are read from contract.json, runs version 2 with locked units and their error', () => {
   assert.deepEqual(runsContract, JSON.parse(readFileSync(new URL('./contract.json', import.meta.url), 'utf8')))
   assert.equal(RUNS_VERSION, 2)
-  assert.equal(FORMAT_MASK, 1 | 2 | 4 | 8 | 128)
+  assert.equal(FORMAT_MASK, 2047)
   // `satisfies` holds each type to the file: a value the contract gains or drops fails here.
   assert.deepEqual(PARAGRAPH_KINDS, ['p', 'bullet', 'number', 'h2', 'h3'] satisfies ParagraphKind[])
   assert.deepEqual(DIRECTIONS, ['auto', 'ltr', 'rtl'] satisfies Direction[])
@@ -33,7 +33,7 @@ describe('validateRuns refuses what the contract forbids', () => {
   test('touching marks that hold the same format', () =>
     assert.throws(bad((r) => ({ ...r, marks: [{ start: 0, end: 1, format: 1 }, { start: 1, end: 3, format: 1 }] })), /same format/i))
   test('a mark with a format outside the contract, or none', () => {
-    assert.throws(bad((r) => ({ ...r, marks: [{ start: 0, end: 1, format: 16 }] })), /format/i)
+    assert.throws(bad((r) => ({ ...r, marks: [{ start: 0, end: 1, format: 2048 }] })), /format/i)
     assert.throws(bad((r) => ({ ...r, marks: [{ start: 0, end: 1, format: 0 }] })), /format/i)
   })
   test('a mark across a paragraph break', () =>
