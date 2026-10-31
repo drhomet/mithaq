@@ -37,7 +37,7 @@ test('the shared library bundles below 1 MB and reads JSON with no server or DOM
   assert.ok(bundle.contents.byteLength < 1_000_000, 'the library and its Lexical dependencies fit the phone budget')
   const context: { richText?: typeof import('@drhomet/mithaq-rich-text') } = {}
   // A bare context has no structuredClone already; removing isWellFormed makes it PrimJS's String too.
-  runInNewContext('delete String.prototype.isWellFormed; delete String.prototype.toWellFormed', context)
+  runInNewContext('delete String.prototype.isWellFormed; delete String.prototype.toWellFormed; delete Array.prototype.findLast; delete Array.prototype.findLastIndex', context)
   runInNewContext(bundle.text, context)
   // URL and TextEncoder are platform APIs, not DOM objects; no window, document, React or Node is supplied.
   Object.assign(context, { URL, TextEncoder })
