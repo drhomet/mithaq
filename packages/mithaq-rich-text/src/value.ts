@@ -40,8 +40,8 @@ export const safeUrl = (url: unknown): boolean => {
     // The host read from the string as WHATWG URL reads it, since Lynx's URL has no hostname:
     // user info and a port up to 65535 dropped, then no character URL forbids in a host. A
     // percent-encoded host, which URL decodes, is refused: stricter, and no editor writes one.
-    const authority = cleaned.slice(cleaned.indexOf('//') + 2).split(/[/?#\\]/)[0]
-    const [, host, port] = authority.slice(authority.lastIndexOf('@') + 1).match(/^(.*?)(?::(\d*))?$/)!
+    const authority = cleaned.slice(cleaned.indexOf('//') + 2).split(/[/?#\\]/)[0] ?? ''
+    const [, host = '', port] = authority.slice(authority.lastIndexOf('@') + 1).match(/^(.*?)(?::(\d*))?$/)!
     if (port && Number(port) > 65535) return false
     const ipv6 = /^\[[0-9a-f:.]+\]$/i.test(host)
     return (ipv6 || !/[\s#%/:<>?@[\\\]^|]/.test(host)) && /[\p{L}\p{N}]/u.test(host)
