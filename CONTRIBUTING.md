@@ -190,10 +190,8 @@ authentication and disallow tokens", and revoke old tokens. This is owner setup;
 contributors do not publish from a pull request. The shared package publishes
 before core, then admin and the starter, all at one version.
 
-1. Publish `@drhomet/mithaq-admin` once by hand, since trusted publishing cannot create a package: `bun run pack && npm publish .pack/mithaq-admin --access public`.
-2. Tag the current release, so the next release's notes start there rather than at the first commit: `git tag -a v0.1.1 4527ae1 -m v0.1.1 && git push origin v0.1.1`. That commit has no `release.yml`, so the tag starts no run.
-3. On npmjs.com, for each of `@drhomet/mithaq-rich-text`, `@drhomet/mithaq`, `@drhomet/mithaq-admin` and `create-mithaq`, add a Trusted Publisher: GitHub Actions, repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`, allowed action `npm publish`. Then set Publishing access to "Require two-factor authentication and disallow tokens", and revoke the old tokens.
-4. In the repository's settings, create the environment `npm` with the maintainer as required reviewer and deployment tags limited to `v*`, and add a tag ruleset so only the maintainer creates `v*` tags.
+1. On npmjs.com, for each of `@drhomet/mithaq-rich-text`, `@drhomet/mithaq`, `@drhomet/mithaq-admin` and `create-mithaq`, add a Trusted Publisher: GitHub Actions, repository `drhomet/mithaq`, workflow `release.yml`, environment `npm`, allowed action `npm publish`. Then set Publishing access to "Require two-factor authentication and disallow tokens", and revoke the old tokens.
+2. In the repository's settings, create the environment `npm` with the maintainer as required reviewer and deployment tags limited to `v*`, and add a tag ruleset so only the maintainer creates `v*` tags.
 
 ## Send a pull request
 
