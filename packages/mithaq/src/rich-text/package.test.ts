@@ -24,6 +24,8 @@ test('the shared library bundles below 1 MB and reads JSON with no server or DOM
   // Lexical owns DOM adapters; our JSON readers and node classes must stay usable on phones even inside uncalled functions.
   for (const token of parse(own.outputFiles[0]!.text, { sourceType: 'module', tokens: true }).tokens!) {
     if (token.type.label === 'name') assert.ok(!['window', 'document', 'navigator', 'localStorage', 'sessionStorage', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'DOMParser', 'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame'].includes(token.value), `shared code uses DOM identifier ${token.value}`)
+    // PrimJS lacks isWellFormed (lynx-packages-autolink#61); structuredClone is a web API, and ES2023 array search is unproven there.
+    if (token.type.label === 'name') assert.ok(!['isWellFormed', 'toWellFormed', 'structuredClone', 'findLast', 'findLastIndex'].includes(token.value), `shared code calls ${token.value}, which PrimJS may lack`)
   }
   const result = await build({ entryPoints: ['packages/mithaq-rich-text/src/index.ts'], bundle: true, minify: true, platform: 'neutral', format: 'iife', globalName: 'richText', define: { 'process.env.NODE_ENV': '"production"' }, write: false, metafile: true })
   for (const path of Object.keys(result.metafile!.inputs)) {
@@ -34,6 +36,8 @@ test('the shared library bundles below 1 MB and reads JSON with no server or DOM
   t.diagnostic(`Shared rich text and Lexical: ${bundle.contents.byteLength} bytes minified`)
   assert.ok(bundle.contents.byteLength < 1_000_000, 'the library and its Lexical dependencies fit the phone budget')
   const context: { richText?: typeof import('@drhomet/mithaq-rich-text') } = {}
+  // A bare context has no structuredClone already; removing isWellFormed makes it PrimJS's String too.
+  runInNewContext('delete String.prototype.isWellFormed; delete String.prototype.toWellFormed', context)
   runInNewContext(bundle.text, context)
   // URL and TextEncoder are platform APIs, not DOM objects; no window, document, React or Node is supplied.
   Object.assign(context, { URL, TextEncoder })
@@ -47,6 +51,18 @@ test('the shared library bundles below 1 MB and reads JSON with no server or DOM
     assert.equal(read.text, 'Hello مرحبا')
   }
   assert.equal(shared.versionsOf([shared.UploadNode, shared.MentionNode]).get('upload'), 3)
+  // The runs codec opens a Block with a table it cannot edit, takes an edit beside it and saves the table back untouched.
+  const table = { type: 'table', version: 1, direction: null, format: '', indent: 0, children: [] }
+  const paragraph = (text: string) => ({ type: 'paragraph', version: 1, direction: null, format: '', indent: 0, textFormat: 0, textStyle: '', children: [{ type: 'text', version: 1, detail: 0, format: 0, mode: 'normal', style: '', text }] })
+  const editor = shared.createRunsEditor()
+  const units = new shared.LockedTable()
+  const runs = shared.loadBlock({ editor, children: [paragraph('مرحبا'), table], table: units })
+  assert.equal(runs.text, 'مرحبا\n\uFFFC')
+  const edited = shared.applyEdit(runs, { type: 'replace', start: 5, end: 5, text: ' world' })
+  assert.ok(edited.ok)
+  assert.equal(shared.applyEdit(runs, { type: 'replace', start: 5, end: 7, text: '' }).ok, false)
+  shared.runsToNodes(editor, shared.validateRuns(edited.runs, ['u1']))
+  assert.deepEqual(JSON.parse(JSON.stringify(shared.saveBlock(editor, units))), [paragraph('مرحبا world'), table])
 })
 
 test('core and admin resolve one shared package and one Lexical', async () => {
