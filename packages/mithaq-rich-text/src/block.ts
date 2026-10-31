@@ -20,6 +20,8 @@ type Json = SerializedLexicalNode & Record<string, unknown> & { children?: Json[
 /** The original JSON of every unit in a session, by id. It never leaves JS. */
 export class LockedTable {
   readonly units = new Map<string, Json>()
+  /** The Block's children as `loadBlock` opened them, for the typing state of hosts the phone did not touch. */
+  opened: readonly Json[] = []
   #next = 1
   add(json: Json): string {
     const id = `u${this.#next++}`
@@ -87,6 +89,7 @@ const placeholder = ({ placement, id, json }: { placement: LockedRange['placemen
 
 /** Opens a Block's children as runs. Each unit gets the next id in `table`. */
 export const loadBlock = ({ editor, children, table }: { editor: LexicalEditor; children: readonly Json[]; table: LockedTable }): Runs => {
+  table.opened = children
   const kept: Json[] = []
   let previousList: unknown
   for (const node of children) {
@@ -126,5 +129,19 @@ export const saveBlock = (editor: LexicalEditor, table: LockedTable): Json[] => 
   // As stored: keys Lexical leaves undefined are absent, as they are after any database round trip.
   const saved = (JSON.parse(JSON.stringify(editor.getEditorState().toJSON().root.children)) as Json[]).map(restore)
   if (used.size !== table.units.size) throw new Error('A locked unit was lost')
+  // Lexical writes typing state only on empty hosts, so an untouched host gets its stored keys back.
+  // ponytail: hosts match from both ends, so only one edited stretch per save keeps the rest; an LCS if edits scatter.
+  const before = hostsOf(table.opened)
+  const after = hostsOf(saved)
+  const keep = (from: Json, to: Json) => {
+    if (!same(from, to)) return false
+    for (const key of ['textFormat', 'textStyle']) if (key in from) to[key] = from[key]; else delete to[key]
+    return true
+  }
+  let head = 0
+  while (head < Math.min(before.length, after.length) && keep(before[head]!, after[head]!)) head++
+  for (let tail = 1; tail <= Math.min(before.length, after.length) - head && keep(before.at(-tail)!, after.at(-tail)!); tail++);
   return saved
 }
+
+const hostsOf = (nodes: readonly Json[]): Json[] => nodes.flatMap((node) => (node.type === 'list' ? hostsOf(node.children ?? []) : TEXT_HOSTS.has(node.type) ? [node] : []))
