@@ -19,6 +19,22 @@
   and saves back unchanged. Fix: an UploadNode keeps `fields` that are not an
   object or null as they were written, where it read them as `null` and the next
   save lost them; the phone keeps such an upload locked and saves it untouched.
+- Addition: an upload kayan draws its own files with mithaq-admin's new
+  `mithaq-upload-pages` item (`upload-pages.tsx`), whichever kayan it is:
+  `FileCell` (the thumbnail, else the file's name) and `FileSizeCell` for its
+  list, `NewUpload`, which opens the upload dialog and goes to the new row or
+  back to the list, and `FileDetails` beside the edit form, with Download and
+  Replace file. The starter's `uploads` add-on registers them in the
+  dashboard's `components` as `fileCell`, `fileSizeCell`, `newUpload` and
+  `fileDetails` from `src/ui/uploads.tsx`, and its media names them in place
+  of its own `preview.tsx`. Their copy is `admin.upload.newAbout`,
+  `admin.upload.download`, `admin.upload.replace` and
+  `admin.upload.replaceAbout`, which replace `media.newAbout`,
+  `media.download`, `media.replace` and `media.replaceAbout`. A project still
+  holding `features/media/media/ui/preview.tsx` keeps working until it
+  switches: copy `src/ui/uploads.tsx` and its four registrations from the
+  starter, name them in the media kayan, add the four keys and delete the
+  file ([issue #3](https://github.com/drhomet/mithaq/issues/3)).
 
 - Breaking: every rich text node class needs a known JSON version. A project's own node class whose constructor takes arguments, so its version cannot be read from an instance, adds `static supportedVersion = 1` (the highest JSON version it reads); until it does, the server refuses every stored node of that type and the admin shows such a value read-only ([issue #38](https://github.com/drhomet/mithaq/issues/38)).
 - Security: `payloadRehash` logs only a failed rehash's error `name` and `code`. It logged the whole error, and a database error's message can name the query's params (drizzle-orm 1.0's does), which hold the user's Payload salt and hash and the new hash. A project that holds `payload-password.ts` ejects it again ([issue #35](https://github.com/drhomet/mithaq/issues/35)).

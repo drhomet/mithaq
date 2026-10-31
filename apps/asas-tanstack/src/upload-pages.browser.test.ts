@@ -31,9 +31,11 @@ document.documentElement.classList.toggle('dark', query.get('theme') === 'dark')
 const png = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#6b8"/></svg>')
 const record = { id: 'f1', filename: 'a-rather-long-file-name-for-the-cover-of-the-course.png', mimeType: 'image/png', filesize: 245760, url: png, thumbnailURL: png }
 const kayan = { name: 'files', fields: [{ name: 'alt', kind: 'text', rules: { required: true, localized: true } }], operations: [], pages: { list: { path: '/files' }, edit: { path: '/files/:id' } }, storage: { mimeTypes: ['image/png'], fileSize: 10485760 } }
-const state = { t: translator(locale), locale, dir, screen: { path: '/dashboard', kayan: { files: kayan } }, access: { collections: { files: { create: true } } }, user: { name: 'A', email: 'a@example.com' }, client: async () => ({}), kayan, record }
+const state = { t: translator(locale), locale, dir, screen: { path: '/dashboard', kayan: { files: kayan } }, access: { collections: { files: { create: true, operations: { create: true }, fields: { alt: { create: true } } } } }, user: { name: 'A', email: 'a@example.com' }, client: async () => ({}), kayan, record }
+const pdf = { id: 'f2', filename: 'the-rather-long-terms-and-conditions-of-enrollment-for-the-year.pdf', mimeType: 'application/pdf', url: '/api/files/file/f2', thumbnailURL: null }
 const view = query.get('view')
-const drawn = view === 'details' ? h(FileDetails, { locales: ['ar', 'en'] }) : view === 'new' ? h(NewUpload, { locales: ['ar', 'en'] }) : h(FileCell, { field: { name: 'filename', kind: 'text', rules: {} }, value: record.filename, row: record })
+const cell = (row) => h(FileCell, { field: { name: 'filename', kind: 'text', rules: {} }, value: row.filename, row })
+const drawn = view === 'details' ? h(FileDetails, { locales: ['ar', 'en'] }) : view === 'new' ? h(NewUpload, { locales: ['ar', 'en'] }) : view === 'pdf' ? cell(pdf) : cell(record)
 createRoot(document.getElementById('root')).render(h(DirectionProvider, { direction: dir }, h(ScreenContext, { value: state }, h(ComponentsProvider, { components },
   h('div', { className: 'flex flex-col px-4 pb-4 pt-4 lg:px-6 lg:pb-6' }, drawn)))))
 `
@@ -86,6 +88,13 @@ for (const width of [360, 390] as const) {
         await page.locator('[data-upload-thumbnail]').waitFor()
         assert.equal(await page.evaluate(overflow), 0, 'the cell scrolls sideways')
         await shot(`cell-${theme}`)
+        await page.goto(`${server.resolvedUrls!.local[0]}?view=pdf&dir=${dir}&theme=${theme}`)
+        const name = page.locator('[title$=".pdf"]')
+        await name.waitFor()
+        // A name too long for one line wraps onto a second rather than being cut, as an image's does.
+        assert.ok((await name.evaluate((one) => one.getBoundingClientRect().height / parseFloat(getComputedStyle(one).lineHeight))) > 1.5, 'the file name is cut to one line')
+        assert.equal(await page.evaluate(overflow), 0, 'a file that is no image scrolls sideways')
+        await shot(`pdf-${theme}`)
         await page.goto(`${server.resolvedUrls!.local[0]}?view=new&dir=${dir}&theme=${theme}`)
         await page.locator('[data-upload-dialog="files"]').waitFor()
         await page.locator('[data-upload-dialog]').evaluate((one) => Promise.all(one.getAnimations({ subtree: true }).map((animation) => animation.finished)))

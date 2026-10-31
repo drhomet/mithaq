@@ -413,7 +413,8 @@ test('186ag. an upload kayan lists each file by its thumbnail before its name, o
   assert.equal(image.querySelector('[title="cover.png"]')?.className.includes('min-w-28'), true, 'which keeps room enough to be read on a phone')
   const other = await render(createElement(FileCell, { field: filename, value: 'notes.pdf', row: pdf }))
   assert.equal(other.querySelector('img'), null, 'a file that is no image has no thumbnail')
-  assert.equal(other.textContent?.includes('notes.pdf'), true, 'and is named')
+  assert.equal(other.textContent, 'notes.pdf', 'and is named once')
+  assert.equal(other.querySelector('[title="notes.pdf"]')?.className.includes('min-w-28'), true, 'wrapping as an image\'s name does, never cut to one line')
   const size = await render(createElement(FileSizeCell, { field: files.fields.find((one) => one.name === 'filesize')!, value: 2048, row: png }))
   assert.equal(size.textContent, '2 kilobytes', 'the size is never the raw bytes')
   const { sizeOf } = await import('../registry/upload-api.ts')
@@ -440,6 +441,9 @@ test('186ah. an upload kayan\'s New page opens the upload dialog at once, opens 
   await act(async () => click(cancel as unknown as Element))
   assert.deepEqual(went, ['/dashboard/files'], 'Cancel goes back to the list')
   assert.equal(window.document.querySelector('[data-upload-new-page] button') !== null, true, 'and the page under the dialog opens it again')
+
+  const bare = await render(createElement(NewUpload, { locales: ['ar', 'en'] }), filesClient([]), mayCreateFiles, { kayan: { ...files, storage: undefined } })
+  assert.equal(bare.textContent, '', 'a kayan that keeps no files has no upload page to draw')
 })
 
 test('186ai. an upload kayan\'s edit page leads with the file, its size, Download through the file route, and Replace file, which uploads a new file and opens it, leaving this one', async (context) => {
@@ -463,6 +467,12 @@ test('186ai. an upload kayan\'s edit page leads with the file, its size, Downloa
   host = await details({ collections: { media: { create: true } } } as never)
   assert.equal(host.querySelector('[data-file-replace]'), null, 'not offered to a viewer who may not make a file of this kayan')
   assert.equal(host.querySelector('[data-file-download]') !== null, true, 'who may still download it')
+  host = await details({ collections: { files: { create: true, operations: { create: false }, fields: { alt: { create: true } } } } } as never)
+  assert.equal(host.querySelector('[data-file-replace]'), null, 'nor where the create operation itself is refused, though another create-type operation is allowed')
+  host = await details({ collections: { files: { create: true, operations: { create: true }, fields: { alt: { create: false } } } } } as never)
+  assert.equal(host.querySelector('[data-file-replace]'), null, 'nor to one who may write none of its fields')
+  host = await render(createElement(FileDetails, { locales: ['ar', 'en'] }), filesClient([]), mayCreateFiles, { kayan: { ...files, storage: undefined }, record })
+  assert.equal(host.querySelector('[data-file-replace]'), null, 'nor on a kayan that keeps no files')
 })
 
 test('186aj. the template\'s media draws with the built-ins its dashboard registers, and holds no copies of its own', async () => {

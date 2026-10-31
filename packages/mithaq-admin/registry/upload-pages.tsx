@@ -4,10 +4,11 @@
 // sees it. A new file is made in the upload dialog, which sends the bytes before the row is made, signed for the
 // active organization.
 import { useRef, useState, type ReactElement } from 'react'
-import { DownloadIcon, UploadIcon } from 'lucide-react'
+import { DownloadIcon, FileIcon, UploadIcon } from 'lucide-react'
 import type { CellProps, Row } from 'mithaq/admin'
 import { useAccess, useClient, useKayan, useLocale, useRecord, useScreen } from 'mithaq/admin/react'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { createsIn } from 'mithaq-admin/field-values.ts'
 import { FileThumb, FileValue } from 'mithaq-admin/file-thumb.tsx'
 import { sizeOf } from 'mithaq-admin/upload-api.ts'
 import { UploadDialog } from 'mithaq-admin/upload-dialog.tsx'
@@ -26,11 +27,10 @@ export function FileSizeCell({ value }: CellProps): ReactElement | null {
 export function FileCell({ value, row }: CellProps): ReactElement {
   const { t, locale } = useLocale()
   const name = String(value ?? '')
-  // A file that is no image is drawn by its icon and name already, so the name is not drawn twice.
-  if (!row.thumbnailURL) return <FileThumb row={row} t={t} locale={locale} size="xs" />
   return (
     <span className="inline-flex min-w-0 items-center gap-2">
-      <FileThumb row={row} t={t} locale={locale} size="xs" />
+      {/* A file that is no image is its icon, since the thumbnail's own fallback would draw the name a second time, cut to one line. */}
+      {row.thumbnailURL ? <FileThumb row={row} t={t} locale={locale} size="xs" /> : <FileIcon className="text-muted-foreground size-4 shrink-0" aria-hidden />}
       <span className="line-clamp-2 min-w-28 [overflow-wrap:anywhere]" dir="auto" title={name}>{name}</span>
     </span>
   )
@@ -74,7 +74,8 @@ export function FileDetails({ locales }: { locales: readonly string[] }): ReactE
   const row = useRecord()
   const [replacing, setReplacing] = useState(false)
   if (!row) return null
-  const creates = access.collections?.[kayan.name]?.create === true
+  // As the upload control and the list's New button ask: the create itself and a field the viewer may write, on a kayan that keeps files.
+  const creates = kayan.storage !== undefined && createsIn({ kayan, report: access.collections?.[kayan.name] })
   const url = typeof row.url === 'string' ? row.url : undefined
   return (
     <div data-file-details="" data-lead="" className="grid justify-items-start gap-3">
@@ -104,11 +105,12 @@ export function FileDetails({ locales }: { locales: readonly string[] }): ReactE
  * What a New page of an upload kayan draws in its shell: the upload dialog, open at once, over a button that opens it
  * again. Closing it goes back to the list.
  */
-export function NewUpload({ locales }: { locales: readonly string[] }): ReactElement {
+export function NewUpload({ locales }: { locales: readonly string[] }): ReactElement | null {
   const { t } = useLocale()
   const screen = useScreen()
   const kayan = useKayan()
   const [open, setOpen] = useState(true)
+  if (!kayan.storage) return null
   return (
     <div data-upload-new-page="" className="grid justify-items-start gap-4">
       <p className="text-muted-foreground">{t('admin.upload.newAbout', 'Choose a file and fill in its details. It is uploaded before it is saved.')}</p>
