@@ -17,6 +17,7 @@ const URLS: [string, boolean][] = [
   ['https://a<b.com', false], ['https://a^b.com', false], ['https://a|b.com', false], ['https://a%b.com', false], ['https://a:b', false],
   ['https://example.com:65535', true], ['https://example.com:65536', false], ['https://example.com:', true], ['https://[::1', false],
   ['https://u@v@example.com', true], ['https://example.com\\path', true], ['https://a\\b', true],
+  ['https://a\u2028b', false], ['https://a\u2029b', false], ['https://a＠b', false], ['https://a／b', false], ['https://a：b', false], ['https://™', true],
 ]
 
 test('safeUrl answers as before for web addresses, mail, phone, paths and fragments', () => {

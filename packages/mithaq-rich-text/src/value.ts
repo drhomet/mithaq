@@ -41,8 +41,11 @@ export const safeUrl = (url: unknown): boolean => {
     // user info and a port up to 65535 dropped, then no character URL forbids in a host. A
     // percent-encoded host, which URL decodes, is refused: stricter, and no editor writes one.
     const authority = cleaned.slice(cleaned.indexOf('//') + 2).split(/[/?#\\]/)[0] ?? ''
-    const [, host = '', port] = authority.slice(authority.lastIndexOf('@') + 1).match(/^(.*?)(?::(\d*))?$/)!
+    const [, raw = '', port] = authority.slice(authority.lastIndexOf('@') + 1).match(/^(.*?)(?::(\d*))?$/s) ?? []
     if (port && Number(port) > 65535) return false
+    // ponytail: no IP or IDNA parser, so a malformed IP, punycode or IDNA-disallowed host still
+    // passes; each is a web address with a host, never another scheme.
+    const host = raw.normalize('NFKC')
     const ipv6 = /^\[[0-9a-f:.]+\]$/i.test(host)
     return (ipv6 || !/[\s#%/:<>?@[\\\]^|]/.test(host)) && /[\p{L}\p{N}]/u.test(host)
   }
