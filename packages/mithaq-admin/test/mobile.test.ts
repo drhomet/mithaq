@@ -67,22 +67,22 @@ test('a bare select trigger and combobox input own phone targets', async () => {
   } finally { await closeCombo() }
 })
 
-// The tenant app is the phone-first shell; the backoffice keeps the shadcn size on every width, as its own buttons keep their look.
+// Both apps draw the calendar phone first: 44px days on a phone, back to 32px from sm.
 const cellSize = (classes: string[]) => ({
   base: classes.find((one) => one.startsWith('[--cell-size:')),
   desktop: classes.find((one) => one.startsWith('sm:[--cell-size:')),
 })
 
-for (const [app, phone] of [['asas-tanstack', true], ['asas-backoffice', false]] as const) {
-  for (const dir of ['ltr', 'rtl'] as const) test(`the ${app} date picker's day buttons ${phone ? 'start at the 44px phone target and return to 32px from sm' : 'keep the 32px cell size'} (${dir})`, async () => {
+for (const app of ['asas-tanstack', 'asas-backoffice'] as const) {
+  for (const dir of ['ltr', 'rtl'] as const) test(`the ${app} date picker's day buttons start at the 44px phone target and return to 32px from sm (${dir})`, async () => {
     const { Calendar } = await import(`../../../apps/${app}/src/components/ui/calendar.tsx`)
     const { DirectionProvider } = await import('../registry/ui/direction.tsx')
     const close = await mounted(createElement(DirectionProvider, { direction: dir }, createElement(Calendar, { mode: 'single', defaultMonth: new Date(2026, 8, 1), dir })))
     try {
       const calendar = window.document.querySelector('[data-slot=calendar]')!
       const { base, desktop } = cellSize([...calendar.classList])
-      assert.equal(base, phone ? '[--cell-size:--spacing(11)]' : '[--cell-size:--spacing(8)]')
-      assert.equal(desktop, phone ? 'sm:[--cell-size:--spacing(8)]' : undefined)
+      assert.equal(base, '[--cell-size:--spacing(11)]')
+      assert.equal(desktop, 'sm:[--cell-size:--spacing(8)]')
       // The day button's width floor is the cell size, so the variable is the day button's size.
       assert.ok(calendar.querySelector('[data-day] button')!.classList.contains('min-w-(--cell-size)'))
     } finally { await close() }
