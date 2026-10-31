@@ -96,7 +96,7 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
  * `checkRichTextSupport`. Every other type opens on the phone as a locked unit. Here, not beside the codec,
  * so the check and its CLI read it without Lexical installed.
  */
-export const runsCodecTypes: readonly string[] = ['root', 'paragraph', 'text', 'heading', 'list', 'listitem']
+export const runsCodecTypes: readonly string[] = ['root', 'paragraph', 'text', 'heading', 'list', 'listitem', 'quote', 'horizontalrule']
 
 // Native codecs and Lynx renderers have not been proven against these complete node shapes.
 // Contract entries for a subset of text formats, heading tags or flat lists cannot establish edit support.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { block, inline, jsonOf, plain, withInline, type Json } from './__fixtures__/fixtures.ts'
+import { block, editable, inline, jsonOf, plain, withInline, type Json } from './__fixtures__/fixtures.ts'
 import { LockedTable, loadBlock, saveBlock } from './block.ts'
 import { createRunsEditor, nodesToPlainText, runsToNodes } from './codec.ts'
 import { applyEdit } from './edit.ts'
@@ -21,6 +21,26 @@ describe('a Block of stored JSON opens as runs and saves back unchanged', () => 
     assert.deepEqual(runs.locked, [])
     assert.equal(runs.text, 'Problem one plan text\nمرحبا')
     assert.deepEqual(saveBlock(editor, table), children)
+  })
+
+  test('a stored quote and a horizontal rule between paragraphs open editable, with no locked entry, and save deep-equal', () => {
+    const children = [...plain('Above'), editable.quote!, editable.rule!, editable.rule!, ...plain('Below'), editable.rule!]
+    const { editor, table, runs } = open(children)
+    assert.deepEqual(runs.locked, [])
+    assert.equal(runs.text, 'Above\nQuoted plan text مرحبا\n\uFFFC\n\uFFFC\nBelow\n\uFFFC')
+    assert.deepEqual(runs.paragraphs.map((p) => [p.kind, p.dir]), [['p', 'auto'], ['quote', 'rtl'], ['divider', 'auto'], ['divider', 'auto'], ['p', 'auto'], ['divider', 'auto']])
+    assert.deepEqual(runs.marks, [{ start: 22, end: 28, format: 1 }])
+    assert.equal(plainText(runs), 'Above\nQuoted plan text مرحبا\n\n\nBelow\n')
+    assert.equal(nodesToPlainText(editor), plainText(runs))
+    assert.deepEqual(saveBlock(editor, table), children)
+  })
+
+  test('a link inside a quote is an inline unit and the quote stays editable', () => {
+    const quote = { ...editable.quote!, children: [...(editable.quote!.children as Json[]), inline.link] } as Json
+    const { editor, table, runs } = open([quote])
+    assert.deepEqual(runs.locked.map((u) => u.placement), ['inline'])
+    assert.deepEqual(runs.paragraphs.map((p) => p.kind), ['quote'])
+    assert.deepEqual(saveBlock(editor, table), [quote])
   })
 
   test('an inline link amid editable text is one inline unit, and saves as the original link', () => {
@@ -199,8 +219,8 @@ test('loadBlock hands native only runs that pass validateRuns, whatever its edit
 })
 
 test('the codec carries exactly the registry’s runsCodecTypes, and every other registered type opens locked and saves unchanged', () => {
-  const rows = ['p', 'h2', 'h3', 'bullet', 'number'] as const
-  const children = rows.flatMap((kind) => plain('Problem one plan text', { kind }))
+  const rows = ['p', 'h2', 'h3', 'bullet', 'number', 'quote'] as const
+  const children = [...rows.flatMap((kind) => plain('Problem one plan text', { kind })), editable.rule!]
   const { editor, table, runs } = open(children)
   assert.deepEqual(runs.locked, [])
   const types = new Set(['root'])

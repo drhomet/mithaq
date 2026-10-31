@@ -1,6 +1,7 @@
 // Runs ↔ Lexical nodes for one Block, on Lexical's headless core with the shared node classes.
 import { $createListItemNode, $createListNode, $isListNode } from '@lexical/list'
-import { $createHeadingNode, $isHeadingNode } from '@lexical/rich-text'
+import { $createHorizontalRuleNode, $isHorizontalRuleNode, type HorizontalRuleNode } from '@lexical/extension'
+import { $createHeadingNode, $createQuoteNode, $isHeadingNode, $isQuoteNode } from '@lexical/rich-text'
 import { $createParagraphNode, $createTextNode, $getRoot, $isParagraphNode, $isTextNode, createEditor, type ElementNode, type LexicalEditor } from 'lexical'
 import { $createLockedNode, $isLockedNode, LockedNode } from './locked-node.ts'
 import { defaultNodes } from './rich-text.ts'
@@ -37,9 +38,11 @@ export const runsToNodes = (editor: LexicalEditor, runs: Runs): void => {
       const end = i + 1 < runs.paragraphs.length ? runs.paragraphs[i + 1]!.start - 1 : runs.text.length
       const units = runs.locked.filter((u) => u.start >= p.start && u.start < end)
       if (units[0]?.placement === 'paragraph') return void root.append($createLockedNode(units[0]))
+      if (p.kind === 'divider') return void root.append($createHorizontalRuleNode())
       const paragraph =
         p.kind === 'p' ? $createParagraphNode()
         : p.kind === 'h2' || p.kind === 'h3' ? $createHeadingNode(p.kind)
+        : p.kind === 'quote' ? $createQuoteNode()
         : $createListItemNode()
       paragraph.setDirection(toLexicalDir(p.dir))
       let at = p.start
@@ -60,8 +63,8 @@ export const runsToNodes = (editor: LexicalEditor, runs: Runs): void => {
 }
 
 /** The Block's paragraphs in order, lists flattened to their items. */
-const $rows = (): { node: ElementNode | LockedNode; kind: ParagraphKind }[] => {
-  const rows: { node: ElementNode | LockedNode; kind: ParagraphKind }[] = []
+const $rows = (): { node: ElementNode | LockedNode | HorizontalRuleNode; kind: ParagraphKind }[] => {
+  const rows: { node: ElementNode | LockedNode | HorizontalRuleNode; kind: ParagraphKind }[] = []
   for (const block of $getRoot().getChildren()) {
     if ($isListNode(block)) {
       const kind = block.getListType()
@@ -72,15 +75,17 @@ const $rows = (): { node: ElementNode | LockedNode; kind: ParagraphKind }[] => {
       if (tag !== 'h2' && tag !== 'h3') throw new TypeError(`Not representable as runs: ${tag}`)
       rows.push({ node: block, kind: tag })
     } else if ($isParagraphNode(block)) rows.push({ node: block, kind: 'p' })
+    else if ($isQuoteNode(block)) rows.push({ node: block, kind: 'quote' })
+    else if ($isHorizontalRuleNode(block)) rows.push({ node: block, kind: 'divider' })
     else if ($isLockedNode(block) && !block.isInline()) rows.push({ node: block, kind: 'p' })
     else throw new TypeError(`Not representable as runs: ${block.getType()}`)
   }
   return rows
 }
 
-/** What a person reads or a preview shows, read from the nodes alone: units show their preview, paragraphs join by "\n", no list markers. */
+/** What a person reads or a preview shows, read from the nodes alone: units show their preview, a divider nothing, paragraphs join by "\n", no list markers. */
 export const nodesToPlainText = (editor: LexicalEditor): string =>
-  editor.getEditorState().read(() => $rows().map(({ node }) => node.getTextContent()).join('\n'))
+  editor.getEditorState().read(() => $rows().map(({ node, kind }) => (kind === 'divider' ? '' : node.getTextContent())).join('\n'))
 
 export const nodesToRuns = (editor: LexicalEditor): Runs =>
   editor.getEditorState().read(() => {
@@ -94,8 +99,12 @@ export const nodesToRuns = (editor: LexicalEditor): Runs =>
     }
     $rows().forEach(({ node: paragraph, kind }, i) => {
       if (i > 0) text += '\n'
-      paragraphs.push({ start: text.length, kind, dir: $isLockedNode(paragraph) ? 'auto' : fromLexicalDir(paragraph.getDirection()) })
-      if ($isLockedNode(paragraph)) return lock(paragraph)
+      if ($isLockedNode(paragraph) || $isHorizontalRuleNode(paragraph)) {
+        paragraphs.push({ start: text.length, kind, dir: 'auto' })
+        if ($isLockedNode(paragraph)) return lock(paragraph)
+        return void (text += PLACEHOLDER)
+      }
+      paragraphs.push({ start: text.length, kind, dir: fromLexicalDir(paragraph.getDirection()) })
       for (const child of paragraph.getChildren()) {
         if ($isLockedNode(child)) { lock(child); continue }
         if (!$isTextNode(child)) throw new TypeError(`Not representable as runs: ${child.getType()}`)

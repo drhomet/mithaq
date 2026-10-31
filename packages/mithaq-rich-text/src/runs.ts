@@ -23,6 +23,8 @@
 //    each, sorted, with a unique `id`. U+FFFC appears nowhere else in `text`. A
 //    `paragraph` unit is a paragraph whose only text is its placeholder, with
 //    kind `p` and dir `auto`. No mark overlaps a placeholder.
+// 6. A `divider` paragraph (Lexical's HorizontalRuleNode) holds one U+FFFC and
+//    nothing else, with dir `auto`. It is never a locked unit, and no mark covers it.
 //
 // Projection limits:
 // - After supported inline leaves become units, any container that still cannot
@@ -41,7 +43,7 @@ import contract from './contract.json' with { type: 'json' }
 
 export { contract as runsContract }
 
-export type ParagraphKind = 'p' | 'bullet' | 'number' | 'h2' | 'h3'
+export type ParagraphKind = 'p' | 'bullet' | 'number' | 'h2' | 'h3' | 'quote' | 'divider'
 export type Direction = 'auto' | 'ltr' | 'rtl'
 export type Placement = 'inline' | 'paragraph'
 
@@ -89,13 +91,19 @@ export const validateRuns = (runs: Runs, expectedIds?: readonly string[]): Runs 
     boundary(mark.end)
     if (mark.start < end || mark.end <= mark.start) err('marks must be sorted and must not overlap')
     if (!Number.isInteger(mark.format) || mark.format === 0 || mark.format & ~FORMAT_MASK) err(`mark format ${mark.format}`)
-    if (/[\n￼]/.test(text.slice(mark.start, mark.end))) err('a mark must not cross a paragraph break or a placeholder')
+    if (/[\n￼]/.test(text.slice(mark.start, mark.end))) err('a mark must not cross a paragraph break, a placeholder or a divider')
     if (previous && previous.end === mark.start && previous.format === mark.format) err('touching marks hold the same format')
     previous = mark
     end = mark.end
   }
-  const placeholders = [...text.matchAll(/￼/g)].map((m) => m.index)
-  if (placeholders.length !== runs.locked.length) err('a placeholder that is no locked unit')
+  if (!Array.isArray(runs.locked)) err('locked must be a list')
+  const dividers = runs.paragraphs.filter((p) => p.kind === 'divider').map((p) => p.start)
+  for (const at of dividers) {
+    const p = runs.paragraphs.find((q) => q.start === at)!
+    if (text[at] !== PLACEHOLDER || (at + 1 < text.length && text[at + 1] !== '\n') || p.dir !== 'auto' || runs.locked.some((u) => u.start === at)) err('a divider is an auto paragraph holding only its placeholder')
+  }
+  const placeholders = [...text.matchAll(/￼/g)].map((m) => m.index).filter((at) => !dividers.includes(at))
+  if (placeholders.length !== runs.locked.length) err('a placeholder that is no locked unit or divider')
   const ids = new Set<string>()
   runs.locked.forEach((unit, i) => {
     if (unit.start !== placeholders[i] || unit.end !== unit.start + 1) err('a locked unit is one placeholder')
@@ -111,13 +119,8 @@ export const validateRuns = (runs: Runs, expectedIds?: readonly string[]): Runs 
   return runs
 }
 
-/** What a person reads or a preview shows: placeholders become their previews, paragraph breaks stay, list markers never appear. */
+/** What a person reads or a preview shows: placeholders become their previews, a divider nothing, paragraph breaks stay, list markers never appear. */
 export const plainText = (runs: Runs): string => {
-  let out = ''
-  let at = 0
-  for (const unit of runs.locked) {
-    out += runs.text.slice(at, unit.start) + unit.preview
-    at = unit.end
-  }
-  return out + runs.text.slice(at)
+  const previews = new Map(runs.locked.map((unit) => [unit.start, unit.preview]))
+  return runs.text.replace(/￼/g, (_, at: number) => previews.get(at) ?? '')
 }

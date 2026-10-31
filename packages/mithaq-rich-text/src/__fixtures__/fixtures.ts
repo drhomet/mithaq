@@ -32,11 +32,15 @@ export const inline = {
   newlineText: text({ value: 'two\nlines' }),
 }
 
+// Stored the way the web admin writes them, and locked before the phone had quotes and dividers; now they open editable.
+export const editable = {
+  quote: { type: 'quote', version: 1, direction: 'rtl', format: '', indent: 0, children: [text({ value: 'Quoted plan text' }), text({ value: ' مرحبا', format: 1 })] },
+  rule: { type: 'horizontalrule', version: 1 },
+} as Record<string, Json>
+
 // Paragraph units: whole top-level nodes the phone cannot edit.
 export const block = {
   table: { type: 'table', version: 1, direction: null, format: '', indent: 0, children: [{ type: 'tablerow', version: 1, children: [{ type: 'tablecell', version: 1, children: [para([text({ value: 'Cell A' })])] }] }] },
-  quote: { type: 'quote', version: 1, direction: null, format: '', indent: 0, children: [text({ value: 'Quoted plan text' })] },
-  rule: { type: 'horizontalrule', version: 1 },
   unknown: { type: 'callout', version: 2, tone: 'note', children: [para([text({ value: 'Inside the callout' })])] },
   unknownVersion: para([text({ value: 'Version nine' })], { version: 9 }),
   unknownMetadata: para([text({ value: 'Has metadata' })], { clinicLabel: 'test', format: 'center', indent: 2 }),
