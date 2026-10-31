@@ -91,6 +91,13 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
   return unique.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, item]) => item)
 }
 
+/**
+ * The node types the runs codec (`loadBlock`, `saveBlock`) carries as editable runs, the `codecs` input of
+ * `checkRichTextSupport`. Every other type opens on the phone as a locked unit. Here, not beside the codec,
+ * so the check and its CLI read it without Lexical installed.
+ */
+export const runsCodecTypes: readonly string[] = ['root', 'paragraph', 'text', 'heading', 'list', 'listitem']
+
 // Native codecs and Lynx renderers have not been proven against these complete node shapes.
 // Contract entries for a subset of text formats, heading tags or flat lists cannot establish edit support.
 export const defaultNodeRegistry: readonly NodeRegistration[] = [
