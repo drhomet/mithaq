@@ -63,7 +63,7 @@ export const richTextFeatureGuard = ({ node, policy }: { node: RichTextNode; pol
         if (!has('direction') || !richTextBlockTypes.includes(node.type) || !Array.isArray(node.children) || !['rtl', 'ltr', 'auto'].includes(String(value))) return 'The field does not allow this block direction.'
       } else {
         if (!has('styling') || typeof node.text !== 'string') return 'The field does not allow styling here.'
-        if (key === 'color' ? !Object.hasOwn(richTextColors, String(value)) : key === 'size' ? !Object.hasOwn(richTextSizes, String(value)) : key === 'font' ? !fonts.includes(value as RichTextFont) : true) return 'Styling must use the project\'s fixed choices.'
+        if (key === 'color' ? !Object.prototype.hasOwnProperty.call(richTextColors, String(value)) : key === 'size' ? !Object.prototype.hasOwnProperty.call(richTextSizes, String(value)) : key === 'font' ? !fonts.includes(value as RichTextFont) : true) return 'Styling must use the project\'s fixed choices.'
       }
     }
   }

@@ -36,7 +36,7 @@ const resolves = (reference: string, contract?: RichTextContract): boolean => {
   const [section, name] = parts
   if (!name || parts.length !== 2) return false
   if (section === 'paragraphs') return contract?.paragraphs?.includes(name) === true
-  return section === 'formats' && Object.hasOwn(richTextFormatBits, name) && contract?.formats?.[name] === richTextFormatBits[name as keyof typeof richTextFormatBits]
+  return section === 'formats' && Object.prototype.hasOwnProperty.call(richTextFormatBits, name) && contract?.formats?.[name] === richTextFormatBits[name as keyof typeof richTextFormatBits]
 }
 
 export const checkRichTextSupport = ({ registry, profile, policies = [], contract, codecs = [] }: { registry: readonly NodeRegistration[]; profile: RichTextProfile; policies?: readonly RichTextPolicy[]; contract?: RichTextContract; codecs?: readonly string[] }): RichTextDiagnostic[] => {
@@ -72,7 +72,7 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
       const choices = Object.entries(richTextChoiceFeatures).filter(([, name]) => name === feature).map(([choice]) => choice)
       // Checklists share list classes; derive the association from the existing list policy guard.
       const types = feature === richTextChoiceFeatures.check ? Object.keys(nodeFeatures).filter((type) => nodeFeatures[type] === richTextChoiceFeatures.bullet)
-        : mapped.length ? mapped : Object.hasOwn(richTextFormatBits, feature) ? ['text'] : toolFeatureNodes[feature] ?? []
+        : mapped.length ? mapped : Object.prototype.hasOwnProperty.call(richTextFormatBits, feature) ? ['text'] : toolFeatureNodes[feature] ?? []
       const selected = types.filter((type) => profile.nodes.includes(type))
       for (const type of selected.length ? selected : types) {
         // A place that only shows a node never runs the editor's tools on it.
@@ -80,7 +80,7 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
         const node = profile.nodes.includes(type) ? registry.find((node) => node.type === type) : undefined
         let available = node?.support[place] ?? 'none'
         if (available === 'edit' && place.startsWith('native-')) {
-          const references = Object.hasOwn(richTextFormatBits, feature) ? [`formats.${feature}`] : choices.map((choice) => `paragraphs.${choice}`)
+          const references = Object.prototype.hasOwnProperty.call(richTextFormatBits, feature) ? [`formats.${feature}`] : choices.map((choice) => `paragraphs.${choice}`)
           if (!references.length || references.some((reference) => !node?.native?.includes(reference))) available = 'none'
         }
         if (available !== 'edit') diagnostics.push({ severity: 'warning', code: 'policy-support-gap', profile: profile.name, node: type, feature, place, required: 'edit', available, remedy: 'Install editable support for the allowed feature or narrow the field policy at this place.' })
