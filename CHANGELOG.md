@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix: `@drhomet/mithaq-admin` relationship filters pick and send one id for `equals` and `not_equals`, including fields with `hasMany`; `in` and `not_in` keep their token lists ([issue #56](https://github.com/drhomet/mithaq/issues/56)).
+- Fix: `@drhomet/mithaq-admin` relationship filters pick and send one id for `equals` and `not_equals`, including fields with `hasMany`; `in` and `not_in` keep their token lists ([#63](https://github.com/drhomet/mithaq/pull/63)).
 
 ## 0.3.10
 
