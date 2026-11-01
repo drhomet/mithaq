@@ -11,6 +11,8 @@ import { asMoment } from 'mithaq-admin/format.tsx'
 import { TimeField } from 'mithaq-admin/time-field.tsx'
 
 const dayPickerLocales: Record<string, typeof enUS> = { ar, en: enUS }
+// Arabic short names can exceed the 32px desktop columns; initials keep them apart.
+const arabicWeekdays = { formatWeekdayName: (date: Date) => ar.localize.day(date.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6, { width: 'narrow' }) }
 
 const dayOf = (value: unknown): Date | undefined => {
   const [year, month, day] = typeof value === 'string' ? value.split('-').map(Number) : []
@@ -64,6 +66,7 @@ export function DatePicker(props: ControlProps): ReactElement {
             autoFocus
             dir={dir}
             locale={dayPickerLocales[locale]}
+            formatters={locale === 'ar' ? arabicWeekdays : undefined}
             selected={held}
             defaultMonth={held}
             onSelect={(day: Date | undefined) => {
@@ -102,5 +105,5 @@ export function DatePicker(props: ControlProps): ReactElement {
 
 export function CalendarControl(props: ControlProps): ReactElement {
   const held = dayOf(props.value)
-  return <Calendar mode="single" locale={dayPickerLocales[props.locale ?? '']} selected={held} defaultMonth={held} disabled={props.readOnly} onSelect={(date: Date | undefined) => changeOf(props)(date ? isoDay(date) : null)} aria-describedby={props.describedBy} />
+  return <Calendar mode="single" locale={dayPickerLocales[props.locale ?? '']} formatters={props.locale === 'ar' ? arabicWeekdays : undefined} selected={held} defaultMonth={held} disabled={props.readOnly} onSelect={(date: Date | undefined) => changeOf(props)(date ? isoDay(date) : null)} aria-describedby={props.describedBy} />
 }
