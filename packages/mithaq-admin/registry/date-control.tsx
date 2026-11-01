@@ -12,7 +12,7 @@ import { TimeField } from 'mithaq-admin/time-field.tsx'
 
 const dayPickerLocales: Record<string, typeof enUS> = { ar, en: enUS }
 // Arabic short names can exceed the 32px desktop columns; initials keep them apart.
-const arabicWeekdays = { formatWeekdayName: (date: Date) => date.toLocaleDateString('ar', { weekday: 'narrow' }) }
+const arabicWeekdays = { formatWeekdayName: (date: Date) => ar.localize.day(date.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6, { width: 'narrow' }) }
 
 const dayOf = (value: unknown): Date | undefined => {
   const [year, month, day] = typeof value === 'string' ? value.split('-').map(Number) : []

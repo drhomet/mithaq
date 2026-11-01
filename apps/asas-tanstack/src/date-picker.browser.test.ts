@@ -141,7 +141,7 @@ for (const app of apps) for (const [width, phone] of [[360, true], [390, true], 
       await popover.waitFor({ state: 'hidden' })
       await page.locator('#starts').click()
       assert.equal(await popover.locator('button[data-selected-single=true]').textContent(), '23', 'pointer selection persists')
-      assert.deepEqual(errors, [], 'no browser errors or hydration warnings')
+      assert.deepEqual(errors, [], 'no browser errors')
     } finally { await page.close() }
   })
 }
