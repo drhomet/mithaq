@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.10
 
 - Fix: `@drhomet/mithaq-rich-text` runs on Lynx. The value guards, policy and
   registry no longer need `TextEncoder`, `Object.hasOwn`, a WHATWG `URL` or
