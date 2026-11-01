@@ -42,6 +42,13 @@ test('a release renames Unreleased to its version, keeps an entry already rename
   assert.equal(releaseChangelog({ changelog: unreleased, version: '0.3.10' }), changelog('## 0.3.10\n\n- Fix: one.', '## 0.3.9\n\n- Fix: older.'))
   const renamed = changelog('## 0.3.10\n\n- Fix: one.', '## 0.3.9\n\n- Fix: older.')
   assert.equal(releaseChangelog({ changelog: renamed, version: '0.3.10' }), renamed)
+  const refused: [string, RegExp][] = [
+    [changelog('## Unreleased\n\n- Fix: two.', '## 0.3.10\n\n- Fix: one.'), /both "## Unreleased" and "## 0\.3\.10"/],
+    [changelog('## Unreleased\n\n- Fix: one.', '## Unreleased\n\n- Fix: two.'), /more than one "## Unreleased"/],
+    [changelog('## 0.3.10\n', '## Unreleased\n\n- Fix: one.'), /empty "## 0\.3\.10"/],
+  ]
+  for (const [text, reason] of refused) assert.throws(() => releaseChangelog({ changelog: text, version: '0.3.10' }), reason)
+  assert.equal(releaseChangelog({ changelog: ' ## Unreleased\r\n\r\n- Fix: one.\r\n', version: '0.3.10' }), '## 0.3.10\r\n\r\n- Fix: one.\r\n')
   for (const text of [changelog('## Unreleased\n', '## 0.3.9\n\n- Fix: older.'), changelog('## 0.3.9\n\n- Fix: older.')]) {
     assert.throws(() => releaseChangelog({ changelog: text, version: '0.3.10' }), /no entries under "## Unreleased" or "## 0\.3\.10"/)
   }

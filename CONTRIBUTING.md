@@ -165,7 +165,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 
 ## Release
 
-A pull request that changes what a project gets adds its entry under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md), as a breaking change, an addition or a fix. A push to `main` releases nothing; only a pushed `v*` tag does. `node apps/release.ts <version>` renames `## Unreleased` to `## <version>` in the version commit and refuses a release with no entries, and that section becomes the GitHub release's notes. The 0.2.0 entry records what changed since 0.1.1; its upgrade link gives the steps a project takes.
+A pull request that changes what a project gets adds its entry under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md), as a breaking change, an addition or a fix. A push to `main` releases nothing; only a pushed `v*` tag does. `node apps/release.ts <version>` renames `## Unreleased` to `## <version>` in the version commit and refuses a release with no entries, and that section becomes the GitHub release's notes. Before a plain release that follows release candidates, write its `## <version>` by hand, gathering the candidates' entries. The 0.2.0 entry records what changed since 0.1.1; its upgrade link gives the steps a project takes.
 
 The four packages share one version, `publishConfig.version` in `packages/mithaq/package.json`. The maintainer releases:
 

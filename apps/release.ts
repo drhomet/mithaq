@@ -35,11 +35,20 @@ export const changelogSection = ({ changelog, heading }: { changelog: string; he
   return lines.slice(start + 1, next < 0 ? undefined : next).join('\n').trim() || undefined
 }
 
-/** The changelog with its Unreleased entries under the version; a release with nothing to say is refused. */
+/** The changelog with its Unreleased entries under the version; a release that would drop, split or lack entries is refused. */
 export const releaseChangelog = ({ changelog, version }: { changelog: string; version: string }) => {
-  if (changelogSection({ changelog, heading: version })) return changelog
-  assert.ok(changelogSection({ changelog, heading: 'Unreleased' }), `CHANGELOG.md has no entries under "## Unreleased" or "## ${version}"`)
-  return changelog.replace(/^## Unreleased[ \t]*$/m, `## ${version}`)
+  const heading = (line: string) => line.trim() === '## Unreleased'
+  const lines = changelog.split('\n')
+  assert.ok(lines.filter(heading).length <= 1, 'CHANGELOG.md has more than one "## Unreleased"')
+  const pending = changelogSection({ changelog, heading: 'Unreleased' })
+  const done = changelogSection({ changelog, heading: version })
+  assert.ok(!(pending && done), `CHANGELOG.md has entries under both "## Unreleased" and "## ${version}"; keep them under one`)
+  if (done) return changelog
+  assert.ok(pending, `CHANGELOG.md has no entries under "## Unreleased" or "## ${version}"`)
+  const next = lines.map((line) => (heading(line) ? line.replace(/^\s*## Unreleased/, `## ${version}`) : line)).join('\n')
+  // An empty `## <version>` above it would win, and the tag would then publish nothing.
+  assert.equal(changelogSection({ changelog: next, heading: version }), pending, `CHANGELOG.md has an empty "## ${version}" besides "## Unreleased"`)
+  return next
 }
 
 const root = fileURLToPath(new URL('..', import.meta.url))
