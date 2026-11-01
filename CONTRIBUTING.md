@@ -139,7 +139,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 |---|---|
 | `lint-args.ts` | `bun run lint:args`: fails an exported function, constructor, method or function type with three or more positional parameters, over `packages/mithaq/src`, the registry and the template's packages. `lint-args.test.ts` and `lint-args.fixture.ts` test it. |
 | `pack.ts` | `bun run pack`: stages `.pack/mithaq/` (the built package and the user guides under `docs/`; `pack.test.ts` checks the guides), `.pack/mithaq-admin/` (the pieces as source, at the same version) and `.pack/create-mithaq/` (the starter, with the template minus its tests). |
-| `release.ts` | `node apps/release.ts <version>` commits the version and tags it; `--publish` is release.yml's publish step. `release.test.ts` tests it. |
+| `release.ts` | `node apps/release.ts <version>` prepares a release branch for PR review; `--tag <version>` tags merged main; `--publish` is release.yml's publish step. `release.test.ts` tests it. |
 | `release-consumer.ts` | `bun run test:release`: makes projects from the staged packages as `bun create mithaq` does, full, minimal and with add-ons picked, then typechecks, migrates, builds, boots and seeds each and runs `mithaq generate --check`. |
 | `tanstack-boot.ts`, `next-boot.ts` | `bun run test:tanstack` and `bun run test:next`: build and boot the apps and test them over a real socket. |
 | `migrated-database.ts` | Builds the boot tests' database with `drizzle-kit migrate`. |
@@ -167,12 +167,24 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 
 A pull request that changes what a project gets adds its entry under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md), as a breaking change, an addition or a fix. A push to `main` releases nothing; only a pushed `v*` tag does. `node apps/release.ts <version>` renames `## Unreleased` to `## <version>` in the version commit and refuses a release with no entries, and that section becomes the GitHub release's notes. Before a plain release that follows release candidates, write its `## <version>` by hand, gathering the candidates' entries. The 0.2.0 entry records what changed since 0.1.1; its upgrade link gives the steps a project takes.
 
-The four packages share one version, `publishConfig.version` in `packages/mithaq/package.json`. The maintainer releases:
+The four packages share one version, `publishConfig.version` in `packages/mithaq/package.json`, which `apps/pack.ts` stamps on all four staged packages. The maintainer prepares a release from clean `main` equal to freshly fetched `origin/main`:
 
 ```sh
-node apps/release.ts 0.2.0          # on a clean, up-to-date main: commits the version and tags v0.2.0
-git push --atomic origin main v0.2.0
+node apps/release.ts 0.2.0
 ```
+
+This creates `release/v0.2.0` and commits the version and changelog there. Main stays unchanged and no tag is created. The command refuses an existing local or remote release branch or tag, a version already on npm, a failed remote or npm check, or missing notes. Untracked files are allowed and kept out of the commit. It prints runnable `git push` and `gh pr create` commands for a POSIX shell; the PR body is the exact version's changelog section, safely quoted even when it contains shell syntax. The owner runs those commands, reviews the release PR and merges it into `main`.
+
+After the owner merges, switch back to clean, current `main` and create the tag:
+
+```sh
+git switch main
+git pull --ff-only origin main
+node apps/release.ts --tag 0.2.0
+git push origin v0.2.0
+```
+
+`--tag` fetches `origin/main` again and requires it to equal local main. It also requires matching `publishConfig.version`, nonempty notes under `## 0.2.0`, and no existing local or remote `v0.2.0` tag. It creates only an annotated local tag at HEAD and prints the tag push command for the owner; it does not bump, commit or push.
 
 The `release` run runs every check and stages the packages, then waits for the maintainer's approval in the repository's Actions tab. Approved, it publishes the four packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release with the version's changelog section as its notes. A tag with no `## <version>` section publishes nothing. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
 

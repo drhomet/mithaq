@@ -1,4 +1,5 @@
-// `node apps/release.ts <version>` commits the version and tags it, on a clean main, for the owner to push.
+// `node apps/release.ts <version>` prepares a release branch for the owner to review through a pull request.
+// `node apps/release.ts --tag <version>` tags merged main for the owner to push.
 // `node apps/release.ts --publish` runs only in .github/workflows/release.yml, after `bun run test:release` has staged `.pack/`.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -64,12 +65,23 @@ const published = (spec: string) => {
   return false
 }
 
-const bump = (version: string) => {
+const releaseBase = (version: string) => {
   assert.ok(isVersion(version), `${version} is not a version`)
   // Untracked files reach neither the commit, the tag nor the build, which stages committed files only.
   assert.equal(git('status', '--porcelain', '--untracked-files=no'), '', 'the working tree has uncommitted changes')
   assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD'), 'main', 'a release is cut from main')
-  assert.ok(!succeeds('git', ['rev-parse', '-q', '--verify', `refs/tags/v${version}`]), `the tag v${version} exists`)
+  // Fetch only main: remote tags must be checked without creating local tags before a refusal.
+  git('fetch', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main')
+  assert.equal(git('rev-parse', 'HEAD'), git('rev-parse', 'refs/remotes/origin/main'), 'main must equal freshly fetched origin/main')
+  assert.equal(git('tag', '--list', `v${version}`), '', `the tag v${version} exists`)
+  assert.equal(git('ls-remote', '--tags', 'origin', `refs/tags/v${version}`), '', `the tag v${version} exists on origin`)
+}
+
+const bump = (version: string) => {
+  releaseBase(version)
+  const branch = `release/v${version}`
+  assert.equal(git('branch', '--list', branch), '', `the branch ${branch} exists`)
+  assert.equal(git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`), '', `the branch ${branch} exists on origin`)
   assert.ok(!published(`@drhomet/mithaq@${version}`), `@drhomet/mithaq@${version} is on npm`)
   // The changelog entry becomes the GitHub release's notes, so a release without one stops here.
   const changelogFile = join(root, 'CHANGELOG.md')
@@ -78,12 +90,22 @@ const bump = (version: string) => {
   const file = join(root, 'packages/mithaq/package.json')
   const manifest = JSON.parse(readFileSync(file, 'utf8')) as { publishConfig: { version: string } }
   manifest.publishConfig.version = version
+  git('switch', '-c', branch)
   writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`)
   writeFileSync(changelogFile, changelog)
   git('commit', '--quiet', '-m', `The packages are at version ${version}.`, '--', file, changelogFile)
+  // Changelog text is untrusted shell input, including quotes, substitutions and newlines.
+  const body = `'${changelogSection({ changelog, heading: version })!.replaceAll("'", "'\\''")}'`
+  console.log(`Prepared ${branch}. To open its pull request (POSIX shell):\n  git push -u origin ${branch}\n  gh pr create --base main --head ${branch} --title 'Release v${version}' --body ${body}`)
+}
+
+const tag = (version: string) => {
+  releaseBase(version)
+  const manifest = JSON.parse(readFileSync(join(root, 'packages/mithaq/package.json'), 'utf8')) as { publishConfig: { version: string } }
+  assert.equal(manifest.publishConfig.version, version, `publishConfig.version must be ${version}`)
+  assert.ok(changelogSection({ changelog: readFileSync(join(root, 'CHANGELOG.md'), 'utf8'), heading: version }), `CHANGELOG.md has no entries under "## ${version}"`)
   git('tag', '-a', `v${version}`, '-m', `v${version}`)
-  // Atomic, so a rejected main leaves no tag on the remote to start a release run.
-  console.log(`Tagged v${version}. To release it:\n  git push --atomic origin main v${version}`)
+  console.log(`Tagged v${version} on main. To release it:\n  git push origin v${version}`)
 }
 
 const publish = () => {
@@ -116,8 +138,13 @@ const publish = () => {
 }
 
 if (import.meta.main) {
-  const [argument] = process.argv.slice(2)
-  assert.ok(argument, 'usage: node apps/release.ts <version> | --publish')
+  const args = process.argv.slice(2)
+  const [argument, version] = args
+  assert.ok(argument && args.length === (argument === '--tag' ? 2 : 1), 'usage: node apps/release.ts <version> | --tag <version> | --publish')
   if (argument === '--publish') publish()
+  else if (argument === '--tag') {
+    assert.ok(version, '--tag needs a version')
+    tag(version)
+  }
   else bump(argument)
 }
