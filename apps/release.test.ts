@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, type TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -14,15 +15,15 @@ test('a version is semver without build metadata, and without leading zeros', ()
 })
 
 const fixture = (t: TestContext) => {
-  const folder = fileURLToPath(new URL('../.rounds/61-release-pr/', import.meta.url))
-  mkdirSync(folder, { recursive: true })
-  const dir = mkdtempSync(join(folder, 'fixture-'))
+  const dir = mkdtempSync(join(tmpdir(), 'mithaq-release-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   const repo = join(dir, 'repo with spaces')
   const origin = join(dir, 'origin.git')
   const bin = join(dir, 'bin')
   for (const path of [join(repo, 'apps'), join(repo, 'packages/mithaq'), bin]) mkdirSync(path, { recursive: true })
   const env: NodeJS.ProcessEnv & { GH_ARGS: string } = { ...process.env, PATH: `${bin}:${process.env.PATH}`, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GH_ARGS: join(dir, 'gh-args') }
+  // Git hooks can export paths into the caller's repository; fixtures must own every Git path.
+  for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES']) delete env[name]
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   git('init', '--bare', origin)
   git('init', '-b', 'main')
