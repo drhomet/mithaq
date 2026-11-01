@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix: `@drhomet/mithaq-admin` relationship filters pick and send one id for `equals` and `not_equals`, including fields with `hasMany`; `in` and `not_in` keep their token lists ([#63](https://github.com/drhomet/mithaq/pull/63)).
+
 ## 0.3.10
 
 - Fix: `@drhomet/mithaq-rich-text` runs on Lynx. The value guards, policy and
