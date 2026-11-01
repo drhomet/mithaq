@@ -1754,6 +1754,49 @@ test('37. adding a row to a panel that already holds a filter reports nothing to
   assert.equal(reported.length, 1, 'the filled row reaches the host')
 })
 
+test('issue #56: relationship filters pick one id for scalar operators, keep token lists for membership, and clear values on operator changes', async () => {
+  for (const hasMany of [true, undefined] as const) {
+    const field = { ...courses.fields.find((one) => one.name === 'tags')!, hasMany }
+    const { api } = fakeApi({ tags: [{ id: 't1', name: 'Beginner' }, { id: 't2', name: 'Advanced' }] })
+    const reported: unknown[] = []
+    function Panel() {
+      const [value, setValue] = useState<import('../registry/list-query.ts').FilterWhere>()
+      return createElement(Filters, {
+        paths: [{ path: field.name, kind: field.kind, kayan: courses, field }],
+        value, client: kayans, api, t, locale: 'en',
+        onChange: (next) => { reported.push(next); setValue(next) },
+      })
+    }
+    const host = await render(createElement(Panel))
+    const where = (operator: string, value: unknown) => ({ or: [{ and: [{ tags: { [operator]: value } }] }] })
+    const operator = async (label: string) => {
+      await act(async () => click(host.querySelector('[aria-label="Operator"]')!))
+      await act(async () => click([...window.document.querySelectorAll('[data-slot="select-item"]')].find((one) => one.textContent === label)! as unknown as Element))
+      assert.equal(reported.at(-1), undefined, 'switching operators clears the committed filter')
+    }
+    for (const name of ['equals', 'not_equals']) {
+      if (name === 'not_equals') await operator('is not')
+      assert.equal((host.querySelector('#filter-0-0') as HTMLInputElement).value, '', 'the scalar picker starts empty')
+      await act(async () => click(host.querySelector('#filter-0-0')!))
+      await act(async () => click([...opened()!.querySelectorAll('[role="option"]')].find((one) => one.textContent === 'Beginner')! as unknown as Element))
+      assert.deepEqual(reported.at(-1), where(name, 't1'), `${name} sends one id even with hasMany=${hasMany}`)
+      assert.equal(opened(), null, 'the scalar picker closes after choosing one row')
+      assert.equal(host.querySelector('[data-slot="combobox-chip"]'), null, 'the filter shows a scalar picker, not chips')
+    }
+    for (const [name, label] of [['in', 'is one of'], ['not_in', 'is none of']] as const) {
+      await operator(label)
+      assert.equal(host.querySelector('#filter-0-0'), null, 'membership keeps the token input')
+      const input = host.querySelector('input[aria-label="value"]') as HTMLInputElement
+      assert.equal(input.value, '', 'the token input starts empty')
+      await act(async () => typeInto(input, 't1, t2'))
+      await debounced()
+      assert.deepEqual(reported.at(-1), where(name, ['t1', 't2']))
+    }
+    await operator('is')
+    assert.equal((host.querySelector('#filter-0-0') as HTMLInputElement).value, '', 'returning to a scalar operator clears the token list')
+  }
+})
+
 test('38. a reseed is keyed on the kayan and the id together, and clears a stale refusal along with the values', async () => {
   // The same id and a different kayan read as the same row and never reseeded.
   const { client: recorded, written } = recording()

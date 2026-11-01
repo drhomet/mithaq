@@ -325,7 +325,7 @@ export function Filters({ api, client, locale, onChange, paths, t, value }: Filt
             {path.kind === 'relationship' && valueShapeOf(operator) === 'scalar' ? (
               // The form's picker rather than a box for typing a uuid; `in` and `not_in` keep the token list because the picker settles on one id.
               <RelationshipControl
-                field={path.field}
+                field={{ ...path.field, hasMany: undefined }}
                 values={{}}
                 setValue={() => {}}
                 kayan={path.kayan}
