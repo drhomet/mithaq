@@ -1134,8 +1134,8 @@ covers the other breaking changes.
 
 `mithaq/rich-text/registry` exports `defaultNodeRegistry`, `NodeRegistration`,
 `Place`, `Support`, `RichTextProfile` and the pure `checkRichTextSupport` function.
-This subpath loads no Lexical, React, DOM, Node built-ins or native code. It is
-safe to bundle for PrimJS; the file-reading CLI is a separate bin.
+This subpath loads no Lexical, React, DOM, Node built-ins or native code, and
+needs no `TextEncoder`, `Object.hasOwn`, WHATWG `URL` or `String.normalize`. It is safe to bundle for PrimJS; the file-reading CLI is a separate bin.
 
 A registration names its Lexical `type`, `json: { writes, reads }`, an explicit
 `support` entry for every place (`admin`, `lynx-viewer`, `native-android`,
@@ -1149,8 +1149,9 @@ complete node shape. A subset of heading tags or flat lists is insufficient.
 
 The initial inventory has 21 types: all default and core nodes, autolink,
 upload, tables, code, mentions, hashtags and comment marks. Admin support is
-`edit`; Lynx and both native places are `none` until their renderers and
-lossless codecs are proven. Upload writes version 3 and reads 1–3; every other
+`edit`; the Lynx viewer is `view` for every node (rich-input's
+`RichTextValueViewer` draws each one read-only), and both native places are
+`none` until their lossless codecs are proven. Upload writes version 3 and reads 1–3; every other
 node reads and writes version 1. These declarations describe installed support,
 not permission to edit an unsupported instance. Unknown versions, metadata and
 unsupported shapes still require preservation and a read-only fallback.

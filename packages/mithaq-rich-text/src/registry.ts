@@ -36,7 +36,7 @@ const resolves = (reference: string, contract?: RichTextContract): boolean => {
   const [section, name] = parts
   if (!name || parts.length !== 2) return false
   if (section === 'paragraphs') return contract?.paragraphs?.includes(name) === true
-  return section === 'formats' && Object.hasOwn(richTextFormatBits, name) && contract?.formats?.[name] === richTextFormatBits[name as keyof typeof richTextFormatBits]
+  return section === 'formats' && Object.prototype.hasOwnProperty.call(richTextFormatBits, name) && contract?.formats?.[name] === richTextFormatBits[name as keyof typeof richTextFormatBits]
 }
 
 export const checkRichTextSupport = ({ registry, profile, policies = [], contract, codecs = [] }: { registry: readonly NodeRegistration[]; profile: RichTextProfile; policies?: readonly RichTextPolicy[]; contract?: RichTextContract; codecs?: readonly string[] }): RichTextDiagnostic[] => {
@@ -72,7 +72,7 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
       const choices = Object.entries(richTextChoiceFeatures).filter(([, name]) => name === feature).map(([choice]) => choice)
       // Checklists share list classes; derive the association from the existing list policy guard.
       const types = feature === richTextChoiceFeatures.check ? Object.keys(nodeFeatures).filter((type) => nodeFeatures[type] === richTextChoiceFeatures.bullet)
-        : mapped.length ? mapped : Object.hasOwn(richTextFormatBits, feature) ? ['text'] : toolFeatureNodes[feature] ?? []
+        : mapped.length ? mapped : Object.prototype.hasOwnProperty.call(richTextFormatBits, feature) ? ['text'] : toolFeatureNodes[feature] ?? []
       const selected = types.filter((type) => profile.nodes.includes(type))
       for (const type of selected.length ? selected : types) {
         // A place that only shows a node never runs the editor's tools on it.
@@ -80,7 +80,7 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
         const node = profile.nodes.includes(type) ? registry.find((node) => node.type === type) : undefined
         let available = node?.support[place] ?? 'none'
         if (available === 'edit' && place.startsWith('native-')) {
-          const references = Object.hasOwn(richTextFormatBits, feature) ? [`formats.${feature}`] : choices.map((choice) => `paragraphs.${choice}`)
+          const references = Object.prototype.hasOwnProperty.call(richTextFormatBits, feature) ? [`formats.${feature}`] : choices.map((choice) => `paragraphs.${choice}`)
           if (!references.length || references.some((reference) => !node?.native?.includes(reference))) available = 'none'
         }
         if (available !== 'edit') diagnostics.push({ severity: 'warning', code: 'policy-support-gap', profile: profile.name, node: type, feature, place, required: 'edit', available, remedy: 'Install editable support for the allowed feature or narrow the field policy at this place.' })
@@ -98,28 +98,29 @@ export const checkRichTextSupport = ({ registry, profile, policies = [], contrac
  */
 export const runsCodecTypes: readonly string[] = ['root', 'paragraph', 'text', 'heading', 'list', 'listitem', 'quote', 'horizontalrule', 'upload']
 
-// Native codecs and Lynx renderers have not been proven against these complete node shapes.
+// rich-input's RichTextValueViewer draws every node read-only on Lynx; native codecs have not been
+// proven against these complete node shapes.
 // Contract entries for a subset of text formats, heading tags or flat lists cannot establish edit support.
 export const defaultNodeRegistry: readonly NodeRegistration[] = [
-  { type: 'root', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'paragraph', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'text', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'linebreak', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'tab', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'heading', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'quote', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'list', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'listitem', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'link', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'autolink', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'horizontalrule', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'table', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'tablerow', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'tablecell', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'code', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'code-highlight', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'mark', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'hashtag', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'mention', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
-  { type: 'upload', json: { writes: 3, reads: [1, 2, 3] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'root', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'paragraph', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'text', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'linebreak', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'tab', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'heading', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'quote', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'list', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'listitem', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'link', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'autolink', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'horizontalrule', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'table', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'tablerow', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'tablecell', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'code', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'code-highlight', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'mark', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'hashtag', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'mention', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
+  { type: 'upload', json: { writes: 3, reads: [1, 2, 3] }, support: { admin: 'edit', 'lynx-viewer': 'view', 'native-android': 'none', 'native-ios': 'none' } },
 ]

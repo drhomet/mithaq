@@ -36,16 +36,35 @@ export const safeUrl = (url: unknown): boolean => {
   // A web address must name a host: refuses `https://`, `http:///path` (read as
   // a host named `path`), `https://@` and the like.
   if (protocol === 'http' || protocol === 'https') {
-    try {
-      return /^https?:\/\/[^/?#\\\s]/i.test(cleaned) && /[\p{L}\p{N}]/u.test(new URL(cleaned).hostname)
-    } catch {
-      return false
-    }
+    if (!/^https?:\/\/[^/?#\\\s]/i.test(cleaned)) return false
+    // The host read from the string as WHATWG URL reads it, since Lynx's URL has no hostname:
+    // user info and a port up to 65535 dropped, then no character URL forbids in a host. A
+    // percent-encoded host, which URL decodes, is refused: stricter, and no editor writes one.
+    const authority = cleaned.slice(cleaned.indexOf('//') + 2).split(/[/?#\\]/)[0] ?? ''
+    const [, raw = '', port] = authority.slice(authority.lastIndexOf('@') + 1).match(/^(.*?)(?::(\d*))?$/s) ?? []
+    if (port && Number(port) > 65535) return false
+    // ponytail: no IP or IDNA parser (and no String.normalize, which Android's Lynx engine lacks), so
+    // a malformed IP, punycode, fullwidth or IDNA-disallowed host still passes; each is a web
+    // address with a host, never another scheme.
+    const host = raw
+    const ipv6 = /^\[[0-9a-f:.]+\]$/i.test(host)
+    return (ipv6 || !/[\s#%/:<>?@[\\\]^|]/.test(host)) && /[\p{L}\p{N}]/u.test(host)
   }
   return protocol === 'mailto' || protocol === 'tel'
 }
 
 const held = (node: object, key: string) => (node as Record<string, unknown>)[key]
+// Lynx's engines lack Object.hasOwn and TextEncoder, so the guards use neither.
+const has = (node: object, key: string) => Object.prototype.hasOwnProperty.call(node, key)
+/** UTF-8 bytes of a string, as TextEncoder counts them (a lone surrogate is 3). */
+const utf8Length = (text: string) => {
+  let bytes = 0
+  for (const char of text) {
+    const point = char.codePointAt(0)!
+    bytes += point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4
+  }
+  return bytes
+}
 
 /**
  * Why a value is no Lexical editor state a `richText` column may hold, or nothing. Runs before
@@ -55,7 +74,7 @@ export const richTextGuard = (value: unknown): string | undefined => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'The value is no object.'
   const nested = within(value, richTextBounds.depth)
   if (nested) return nested
-  if (new TextEncoder().encode(JSON.stringify(value)).length > richTextBounds.bytes) return `The value is larger than ${richTextBounds.bytes} bytes.`
+  if (utf8Length(JSON.stringify(value)) > richTextBounds.bytes) return `The value is larger than ${richTextBounds.bytes} bytes.`
   const root = held(value, 'root')
   if (!root || typeof root !== 'object' || Array.isArray(root) || held(root, 'type') !== 'root') return 'The value has no root of type "root".'
   if (!Array.isArray(held(root, 'children'))) return 'The root holds no list of children.'
@@ -64,17 +83,17 @@ export const richTextGuard = (value: unknown): string | undefined => {
     if (!node || typeof node !== 'object' || Array.isArray(node) || typeof held(node, 'type') !== 'string') return 'A node is no object with a string type.'
     if (++count > richTextBounds.nodes) return `The value holds more than ${richTextBounds.nodes} nodes.`
     const type = held(node, 'type') as string
-    if (Object.hasOwn(node, 'text') && typeof held(node, 'text') !== 'string') return `A node of type "${type}" holds text that is no string.`
+    if (has(node, 'text') && typeof held(node, 'text') !== 'string') return `A node of type "${type}" holds text that is no string.`
     if (typeof held(node, 'text') === 'string') {
       for (const key of ['format', 'detail']) {
-        if (Object.hasOwn(node, key) && !Number.isInteger(held(node, key))) return `A node of type "${type}" holds a ${key} that is no whole number.`
+        if (has(node, key) && !Number.isInteger(held(node, key))) return `A node of type "${type}" holds a ${key} that is no whole number.`
       }
     }
     for (const key of ['style', 'textStyle']) {
-      if (Object.hasOwn(node, key) && held(node, key) !== '') return `A node of type "${type}" holds a ${key}, and this editor writes none.`
+      if (has(node, key) && held(node, key) !== '') return `A node of type "${type}" holds a ${key}, and this editor writes none.`
     }
     if ((type === 'link' || type === 'autolink') && !safeUrl(held(node, 'url'))) return `A link points at an address that is not http, https, mailto, tel or a path.`
-    if (!Object.hasOwn(node, 'children')) return undefined
+    if (!has(node, 'children')) return undefined
     const children = held(node, 'children')
     if (!Array.isArray(children)) return `A node of type "${type}" holds children that are no list.`
     for (const child of children) {

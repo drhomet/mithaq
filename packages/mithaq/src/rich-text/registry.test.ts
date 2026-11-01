@@ -8,6 +8,8 @@ import { runsContract } from '@drhomet/mithaq-rich-text'
 
 const registration: NodeRegistration = { type: 'link', json: { writes: 1, reads: [1] }, support: { admin: 'edit', 'lynx-viewer': 'none', 'native-android': 'none', 'native-ios': 'none' } }
 const profile: RichTextProfile = { name: 'cluster-like', nodes: ['link'], requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' } } }
+// The inventory's Lynx viewer reads every node, so the CLI, which checks the inventory, misses the native viewer.
+const nativeViewer: RichTextProfile = { ...profile, requirements: { admin: { default: 'edit' }, 'native-ios': { default: 'view' } } }
 
 const cli = (args: string[]) => spawnSync(process.execPath, ['packages/mithaq/src/rich-text/compat/check.ts', ...args], { encoding: 'utf8' })
 
@@ -25,10 +27,11 @@ test('a missing viewer warns through the public check and CLI, failing only with
   const diagnostics = checkRichTextSupport({ registry: [registration], profile })
   assert.deepEqual(diagnostics, [{ severity: 'warning', code: 'support-gap', profile: 'cluster-like', node: 'link', place: 'lynx-viewer', required: 'view', available: 'none', remedy: 'Install support for this node at this place or revise the profile requirement.' }])
   withModules((paths) => {
+    writeFileSync(paths.profile, `export default ${JSON.stringify(nativeViewer)}`)
     const args = ['--profile', paths.profile, '--json']
     const normal = cli(args)
     assert.equal(normal.status, 0, normal.stderr)
-    assert.deepEqual(JSON.parse(normal.stdout), diagnostics[0])
+    assert.deepEqual(JSON.parse(normal.stdout), { ...diagnostics[0], place: 'native-ios' })
     assert.equal(cli([...args, '--strict']).status, 1)
   })
 })
@@ -124,7 +127,7 @@ test('the initial inventory names exactly the selected classes and proves every 
       assert.equal(find(exported.root)?.version, registration.json.writes, `${registration.type} writes v${registration.json.writes}`)
     }
   }
-  assert.ok(defaultNodeRegistry.every((node) => node.support.admin === 'edit' && node.support['lynx-viewer'] === 'none' && node.support['native-ios'] === 'none' && node.support['native-android'] === 'none'))
+  assert.ok(defaultNodeRegistry.every((node) => node.support.admin === 'edit' && node.support['lynx-viewer'] === 'view' && node.support['native-ios'] === 'none' && node.support['native-android'] === 'none'))
 })
 
 test('profile typos and field policies warn for each required place with stable sorted diagnostics', () => {
@@ -204,10 +207,10 @@ test('the CLI groups its readable output by severity, code and place, with a cou
   const { defaultNodeRegistry } = await import('mithaq/rich-text/registry')
   const nodes = defaultNodeRegistry.map((node) => node.type)
   withModules((paths) => {
-    writeFileSync(paths.profile, `export default ${JSON.stringify({ name: 'cluster-like', nodes, requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' } } })}`)
+    writeFileSync(paths.profile, `export default ${JSON.stringify({ name: 'cluster-like', nodes, requirements: { admin: { default: 'edit' }, 'lynx-viewer': { default: 'view' }, 'native-ios': { default: 'view' } } })}`)
     const result = cli(['--profile', paths.profile])
     assert.equal(result.status, 0, result.stderr)
-    assert.equal(result.stdout, `warning support-gap at lynx-viewer (21): ${[...nodes].sort().join(', ')}. Install support for this node at this place or revise the profile requirement.\n`)
+    assert.equal(result.stdout, `warning support-gap at native-ios (21): ${[...nodes].sort().join(', ')}. Install support for this node at this place or revise the profile requirement.\n`)
   })
 })
 
@@ -250,6 +253,7 @@ test('the CLI runs under Bun as well as Node 24 and both package manifests publi
   assert.equal(manifest.bin['mithaq-check-rich-text'], './src/rich-text/compat/check.ts')
   assert.equal(manifest.publishConfig.bin['mithaq-check-rich-text'], 'dist/rich-text/compat/check.js')
   withModules((paths) => {
+    writeFileSync(paths.profile, `export default ${JSON.stringify(nativeViewer)}`)
     const result = spawnSync('bun', ['--no-env-file', 'packages/mithaq/src/rich-text/compat/check.ts', '--profile', paths.profile, '--json'], { encoding: 'utf8' })
     assert.equal(result.status, 0, result.stderr)
     assert.equal(JSON.parse(result.stdout).code, 'support-gap')
