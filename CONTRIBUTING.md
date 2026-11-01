@@ -165,7 +165,7 @@ The admin's pieces as TSX source, published as `@drhomet/mithaq-admin`; an app i
 
 ## Release
 
-Before tagging each future release, add an entry to [CHANGELOG.md](CHANGELOG.md), grouped into breaking changes, additions and fixes. The 0.2.0 entry records what changed since 0.1.1; its upgrade link gives the steps a project takes.
+A pull request that changes what a project gets adds its entry under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md), as a breaking change, an addition or a fix. A push to `main` releases nothing; only a pushed `v*` tag does. `node apps/release.ts <version>` renames `## Unreleased` to `## <version>` in the version commit and refuses a release with no entries, and that section becomes the GitHub release's notes. Before a plain release that follows release candidates, write its `## <version>` by hand, gathering the candidates' entries. The 0.2.0 entry records what changed since 0.1.1; its upgrade link gives the steps a project takes.
 
 The four packages share one version, `publishConfig.version` in `packages/mithaq/package.json`. The maintainer releases:
 
@@ -174,7 +174,7 @@ node apps/release.ts 0.2.0          # on a clean, up-to-date main: commits the v
 git push --atomic origin main v0.2.0
 ```
 
-The `release` run runs every check and stages the packages, then waits for the maintainer's approval in the repository's Actions tab. Approved, it publishes the four packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release from the commit subjects since the previous tag. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
+The `release` run runs every check and stages the packages, then waits for the maintainer's approval in the repository's Actions tab. Approved, it publishes the four packages through npm trusted publishing (a version with a `-`, such as `1.0.0-rc.1`, goes to the `next` dist-tag), and creates the GitHub release with the version's changelog section as its notes. A tag with no `## <version>` section publishes nothing. A re-run skips a package already at the version. The `release-check` label on a pull request runs `test:release` on it and uploads the tarballs.
 
 Set up once:
 

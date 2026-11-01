@@ -26,14 +26,30 @@ export const taggedVersion = ({ ref, version }: { ref: string | undefined; versi
   return version
 }
 
-/** A plain release's notes cover everything since the last plain release, past its prereleases; a prerelease's, since the last tag. */
-export const previousTag = ({ cwd, version }: { cwd: string; version: string }) => {
-  const plain = distTag(version) === 'latest' ? ['--exclude', 'v*-*'] : []
-  const found = spawnSync('git', ['describe', '--tags', '--abbrev=0', '--match', 'v*', ...plain, `v${version}^`], { cwd, encoding: 'utf8' })
-  return found.status === 0 ? found.stdout.trim() : undefined
+/** A version's section of CHANGELOG.md, up to the next `## ` heading, or nothing when it is missing or empty. */
+export const changelogSection = ({ changelog, heading }: { changelog: string; heading: string }) => {
+  const lines = changelog.split('\n')
+  const start = lines.findIndex((line) => line.trim() === `## ${heading}`)
+  if (start < 0) return undefined
+  const next = lines.findIndex((line, at) => at > start && line.startsWith('## '))
+  return lines.slice(start + 1, next < 0 ? undefined : next).join('\n').trim() || undefined
 }
 
-export const notesRange = ({ previous, tag }: { previous: string | undefined; tag: string }) => (previous ? `${previous}..${tag}` : tag)
+/** The changelog with its Unreleased entries under the version; a release that would drop, split or lack entries is refused. */
+export const releaseChangelog = ({ changelog, version }: { changelog: string; version: string }) => {
+  const heading = (line: string) => line.trim() === '## Unreleased'
+  const lines = changelog.split('\n')
+  assert.ok(lines.filter(heading).length <= 1, 'CHANGELOG.md has more than one "## Unreleased"')
+  const pending = changelogSection({ changelog, heading: 'Unreleased' })
+  const done = changelogSection({ changelog, heading: version })
+  assert.ok(!(pending && done), `CHANGELOG.md has entries under both "## Unreleased" and "## ${version}"; keep them under one`)
+  if (done) return changelog
+  assert.ok(pending, `CHANGELOG.md has no entries under "## Unreleased" or "## ${version}"`)
+  const next = lines.map((line) => (heading(line) ? line.replace(/^\s*## Unreleased/, `## ${version}`) : line)).join('\n')
+  // An empty `## <version>` above it would win, and the tag would then publish nothing.
+  assert.equal(changelogSection({ changelog: next, heading: version }), pending, `CHANGELOG.md has an empty "## ${version}" besides "## Unreleased"`)
+  return next
+}
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
@@ -55,12 +71,16 @@ const bump = (version: string) => {
   assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD'), 'main', 'a release is cut from main')
   assert.ok(!succeeds('git', ['rev-parse', '-q', '--verify', `refs/tags/v${version}`]), `the tag v${version} exists`)
   assert.ok(!published(`@drhomet/mithaq@${version}`), `@drhomet/mithaq@${version} is on npm`)
+  // The changelog entry becomes the GitHub release's notes, so a release without one stops here.
+  const changelogFile = join(root, 'CHANGELOG.md')
+  const changelog = releaseChangelog({ changelog: readFileSync(changelogFile, 'utf8'), version })
   // The one version apps/pack.ts stamps on all four staged packages.
   const file = join(root, 'packages/mithaq/package.json')
   const manifest = JSON.parse(readFileSync(file, 'utf8')) as { publishConfig: { version: string } }
   manifest.publishConfig.version = version
   writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`)
-  git('commit', '--quiet', '-m', `The packages are at version ${version}.`, '--', file)
+  writeFileSync(changelogFile, changelog)
+  git('commit', '--quiet', '-m', `The packages are at version ${version}.`, '--', file, changelogFile)
   git('tag', '-a', `v${version}`, '-m', `v${version}`)
   // Atomic, so a rejected main leaves no tag on the remote to start a release run.
   console.log(`Tagged v${version}. To release it:\n  git push --atomic origin main v${version}`)
@@ -76,9 +96,11 @@ const publish = () => {
   // The tag ruleset decides who tags; this keeps a tag on an unreviewed branch from publishing.
   assert.ok(succeeds('git', ['merge-base', '--is-ancestor', 'HEAD', 'origin/main']), `v${version} is not on main`)
 
-  const range = notesRange({ previous: previousTag({ cwd: root, version }), tag: `v${version}` })
+  // Checked before anything ships, so a tag without a changelog entry publishes nothing.
+  const entry = changelogSection({ changelog: readFileSync(join(root, 'CHANGELOG.md'), 'utf8'), heading: version })
+  assert.ok(entry, `CHANGELOG.md has no entries under "## ${version}"`)
   const notes = join(root, '.pack/release-notes.md')
-  writeFileSync(notes, `${git('log', range, '--format=- %s', '--no-merges')}\n`)
+  writeFileSync(notes, `${entry}\n`)
 
   // Shared rich text first, then core, admin and the starter, so their exact dependencies exist before they ship. A package already at the version
   // is skipped, so a run that failed partway finishes the rest when it is re-run.

@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { test } from 'node:test'
-import { distTag, isVersion, notesRange, previousTag, taggedVersion } from './release.ts'
+import { changelogSection, distTag, isVersion, releaseChangelog, taggedVersion } from './release.ts'
 
 test('a version is semver without build metadata, and without leading zeros', () => {
   for (const version of ['0.2.0', '1.0.0', '10.20.30', '1.0.0-rc.1', '1.0.0-alpha', '1.0.0-0.3.7', '1.0.0-x-y.1']) assert.ok(isVersion(version), version)
@@ -31,30 +27,29 @@ test('the tag that triggered the run must be v and the staged version', () => {
   assert.throws(() => taggedVersion({ ref: 'vnope', version: 'nope' }), /not a version/)
 })
 
-test('a plain release takes its notes from the last plain release, a prerelease from the last tag of any kind', () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'mithaq-release-test-'))
-  try {
-    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', ...args], { cwd, stdio: 'ignore' })
-    const release = (tag: string) => {
-      git('commit', '--allow-empty', '-qm', tag)
-      git('tag', '-a', tag, '-m', tag)
-    }
-    git('init', '-q')
-    release('v0.1.0')
-    assert.equal(previousTag({ cwd, version: '0.1.0' }), undefined)
-    release('v0.2.0-rc.1')
-    release('v0.2.0-rc.2')
-    release('v0.2.0')
-    release('v0.3.0-rc.1')
-    assert.equal(previousTag({ cwd, version: '0.2.0-rc.2' }), 'v0.2.0-rc.1')
-    assert.equal(previousTag({ cwd, version: '0.2.0' }), 'v0.1.0')
-    assert.equal(previousTag({ cwd, version: '0.3.0-rc.1' }), 'v0.2.0')
-  } finally {
-    rmSync(cwd, { recursive: true, force: true })
-  }
+const changelog = (...sections: string[]) => `# Changelog\n\n${sections.join('\n\n')}\n`
+
+test("a version's notes are its changelog section, up to the next heading, and nothing when it is missing or empty", () => {
+  const text = changelog('## 0.3.10\n\n- Fix: one.\n  Two lines.\n- Addition: three.', '## 0.3.9\n\n- Fix: older.')
+  assert.equal(changelogSection({ changelog: text, heading: '0.3.10' }), '- Fix: one.\n  Two lines.\n- Addition: three.')
+  assert.equal(changelogSection({ changelog: text, heading: '0.3.9' }), '- Fix: older.')
+  assert.equal(changelogSection({ changelog: text, heading: '0.3.1' }), undefined)
+  assert.equal(changelogSection({ changelog: changelog('## 0.4.0\n\n', '## 0.3.9\n\n- Fix: older.'), heading: '0.4.0' }), undefined)
 })
 
-test('the notes run from the previous tag, or over the whole history when there is none', () => {
-  assert.equal(notesRange({ previous: 'v0.1.1', tag: 'v0.2.0' }), 'v0.1.1..v0.2.0')
-  assert.equal(notesRange({ previous: undefined, tag: 'v0.2.0' }), 'v0.2.0')
+test('a release renames Unreleased to its version, keeps an entry already renamed, and refuses one with nothing to say', () => {
+  const unreleased = changelog('## Unreleased\n\n- Fix: one.', '## 0.3.9\n\n- Fix: older.')
+  assert.equal(releaseChangelog({ changelog: unreleased, version: '0.3.10' }), changelog('## 0.3.10\n\n- Fix: one.', '## 0.3.9\n\n- Fix: older.'))
+  const renamed = changelog('## 0.3.10\n\n- Fix: one.', '## 0.3.9\n\n- Fix: older.')
+  assert.equal(releaseChangelog({ changelog: renamed, version: '0.3.10' }), renamed)
+  const refused: [string, RegExp][] = [
+    [changelog('## Unreleased\n\n- Fix: two.', '## 0.3.10\n\n- Fix: one.'), /both "## Unreleased" and "## 0\.3\.10"/],
+    [changelog('## Unreleased\n\n- Fix: one.', '## Unreleased\n\n- Fix: two.'), /more than one "## Unreleased"/],
+    [changelog('## 0.3.10\n', '## Unreleased\n\n- Fix: one.'), /empty "## 0\.3\.10"/],
+  ]
+  for (const [text, reason] of refused) assert.throws(() => releaseChangelog({ changelog: text, version: '0.3.10' }), reason)
+  assert.equal(releaseChangelog({ changelog: ' ## Unreleased\r\n\r\n- Fix: one.\r\n', version: '0.3.10' }), '## 0.3.10\r\n\r\n- Fix: one.\r\n')
+  for (const text of [changelog('## Unreleased\n', '## 0.3.9\n\n- Fix: older.'), changelog('## 0.3.9\n\n- Fix: older.')]) {
+    assert.throws(() => releaseChangelog({ changelog: text, version: '0.3.10' }), /no entries under "## Unreleased" or "## 0\.3\.10"/)
+  }
 })
