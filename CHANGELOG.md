@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix: `@drhomet/mithaq-admin` date pickers and inline calendars use distinct Arabic weekday initials so desktop headings have visible spacing, while date labels keep full weekday names ([issue #52](https://github.com/drhomet/mithaq/issues/52); PR link pending).
+
 ## 0.3.10
 
 - Fix: `@drhomet/mithaq-rich-text` runs on Lynx. The value guards, policy and
